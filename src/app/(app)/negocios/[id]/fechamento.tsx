@@ -71,7 +71,7 @@ export function Fechamento({
         <form action={acao}>
           <input type="hidden" name="negocioId" value={negocioId} />
           <input type="hidden" name="status" value="ganho" />
-          <Botao type="submit" disabled={pendente} className="bg-green-600 hover:bg-green-700">
+          <Botao type="submit" disabled={pendente} className="bg-dourado text-carvao hover:bg-amber-400">
             Marcar como ganho
           </Botao>
         </form>

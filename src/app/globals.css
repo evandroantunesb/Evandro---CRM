@@ -1,11 +1,60 @@
 @import "tailwindcss";
 
+/*
+ * Identidade visual Raion.
+ * Carvão Profundo #0F0F10 · Dourado Solar #D4AF37 · Off-white Quente #FAF8F3
+ * Cinza Neutro #6B7280 · Cinza Claro #E5E7EB · Manrope (títulos) e Inter (textos).
+ * As escalas "amber" e "zinc" do Tailwind foram trocadas pelas da marca, para que
+ * todas as telas sigam a paleta sem precisar de classes novas.
+ */
 @theme inline {
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-inter);
+  --font-titulo: var(--font-manrope);
+}
+
+@theme {
+  --color-carvao: #0f0f10;
+  --color-dourado: #d4af37;
+  --color-offwhite: #faf8f3;
+  --color-cinza: #6b7280;
+  --color-cinza-claro: #e5e7eb;
+
+  /* Dourado Solar e tons derivados (os escuros garantem leitura de links e textos). */
+  --color-amber-50: #fbf7ea;
+  --color-amber-100: #f6ecce;
+  --color-amber-200: #eddb9f;
+  --color-amber-300: #e3c76c;
+  --color-amber-400: #dab94b;
+  --color-amber-500: #d4af37;
+  --color-amber-600: #b8952a;
+  --color-amber-700: #8c701d;
+  --color-amber-800: #6b5516;
+  --color-amber-900: #4a3b10;
+  --color-amber-950: #2b220a;
+
+  /* Neutros: do Off-white Quente ao Carvão Profundo, passando pelos cinzas da marca. */
+  --color-zinc-50: #faf8f3;
+  --color-zinc-100: #f3f1ec;
+  --color-zinc-200: #e5e7eb;
+  --color-zinc-300: #d1d3d8;
+  --color-zinc-400: #9ca0a8;
+  --color-zinc-500: #6b7280;
+  --color-zinc-600: #555a64;
+  --color-zinc-700: #3a3d44;
+  --color-zinc-800: #1f2024;
+  --color-zinc-900: #0f0f10;
+  --color-zinc-950: #0a0a0b;
 }
 
 body {
-  background: #f8f8f7;
-  color: #18181b;
+  background: var(--color-offwhite);
+  color: var(--color-carvao);
+}
+
+h1,
+h2,
+h3,
+.font-titulo {
+  font-family: var(--font-titulo);
+  letter-spacing: -0.01em;
 }
