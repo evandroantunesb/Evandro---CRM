@@ -34,6 +34,64 @@ export type Database = {
   }
   public: {
     Tables: {
+      anexos: {
+        Row: {
+          caminho: string
+          created_at: string
+          empresa_id: string
+          enviado_por: string | null
+          id: string
+          negocio_id: string
+          nome: string
+          tamanho: number
+          tipo_mime: string | null
+        }
+        Insert: {
+          caminho: string
+          created_at?: string
+          empresa_id: string
+          enviado_por?: string | null
+          id?: string
+          negocio_id: string
+          nome: string
+          tamanho: number
+          tipo_mime?: string | null
+        }
+        Update: {
+          caminho?: string
+          created_at?: string
+          empresa_id?: string
+          enviado_por?: string | null
+          id?: string
+          negocio_id?: string
+          nome?: string
+          tamanho?: number
+          tipo_mime?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "anexos_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anexos_enviado_por_fkey"
+            columns: ["enviado_por"]
+            isOneToOne: false
+            referencedRelation: "empresa_membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anexos_negocio_id_fkey"
+            columns: ["negocio_id"]
+            isOneToOne: false
+            referencedRelation: "negocios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       atividades: {
         Row: {
           ator_id: string | null
@@ -323,6 +381,7 @@ export type Database = {
       etapas: {
         Row: {
           ativa: boolean
+          campos_obrigatorios: string[]
           cor: string | null
           created_at: string
           empresa_id: string
@@ -335,6 +394,7 @@ export type Database = {
         }
         Insert: {
           ativa?: boolean
+          campos_obrigatorios?: string[]
           cor?: string | null
           created_at?: string
           empresa_id: string
@@ -347,6 +407,7 @@ export type Database = {
         }
         Update: {
           ativa?: boolean
+          campos_obrigatorios?: string[]
           cor?: string | null
           created_at?: string
           empresa_id?: string
@@ -370,6 +431,44 @@ export type Database = {
             columns: ["funil_id"]
             isOneToOne: false
             referencedRelation: "funis"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      etiquetas: {
+        Row: {
+          ativa: boolean
+          cor: string | null
+          created_at: string
+          empresa_id: string
+          id: string
+          nome: string
+          updated_at: string
+        }
+        Insert: {
+          ativa?: boolean
+          cor?: string | null
+          created_at?: string
+          empresa_id: string
+          id?: string
+          nome: string
+          updated_at?: string
+        }
+        Update: {
+          ativa?: boolean
+          cor?: string | null
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          nome?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "etiquetas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
             referencedColumns: ["id"]
           },
         ]
@@ -549,6 +648,84 @@ export type Database = {
           },
         ]
       }
+      motivos_perda: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          empresa_id: string
+          id: string
+          nome: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          empresa_id: string
+          id?: string
+          nome: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          nome?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "motivos_perda_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      negocio_etiquetas: {
+        Row: {
+          created_at: string
+          empresa_id: string
+          etiqueta_id: string
+          negocio_id: string
+        }
+        Insert: {
+          created_at?: string
+          empresa_id: string
+          etiqueta_id: string
+          negocio_id: string
+        }
+        Update: {
+          created_at?: string
+          empresa_id?: string
+          etiqueta_id?: string
+          negocio_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "negocio_etiquetas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "negocio_etiquetas_etiqueta_id_fkey"
+            columns: ["etiqueta_id"]
+            isOneToOne: false
+            referencedRelation: "etiquetas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "negocio_etiquetas_negocio_id_fkey"
+            columns: ["negocio_id"]
+            isOneToOne: false
+            referencedRelation: "negocios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       negocios: {
         Row: {
           contato_id: string
@@ -561,6 +738,8 @@ export type Database = {
           fechado_em: string | null
           funil_id: string
           id: string
+          motivo_perda_detalhe: string | null
+          motivo_perda_id: string | null
           numero: number
           origem_id: string | null
           responsavel_id: string | null
@@ -580,6 +759,8 @@ export type Database = {
           fechado_em?: string | null
           funil_id: string
           id?: string
+          motivo_perda_detalhe?: string | null
+          motivo_perda_id?: string | null
           numero?: number
           origem_id?: string | null
           responsavel_id?: string | null
@@ -599,6 +780,8 @@ export type Database = {
           fechado_em?: string | null
           funil_id?: string
           id?: string
+          motivo_perda_detalhe?: string | null
+          motivo_perda_id?: string | null
           numero?: number
           origem_id?: string | null
           responsavel_id?: string | null
@@ -644,6 +827,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "negocios_motivo_perda_id_fkey"
+            columns: ["motivo_perda_id"]
+            isOneToOne: false
+            referencedRelation: "motivos_perda"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "negocios_origem_id_fkey"
             columns: ["origem_id"]
             isOneToOne: false
@@ -655,6 +845,58 @@ export type Database = {
             columns: ["responsavel_id"]
             isOneToOne: false
             referencedRelation: "empresa_membros"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notas: {
+        Row: {
+          autor_id: string | null
+          created_at: string
+          empresa_id: string
+          id: string
+          negocio_id: string
+          texto: string
+          updated_at: string
+        }
+        Insert: {
+          autor_id?: string | null
+          created_at?: string
+          empresa_id: string
+          id?: string
+          negocio_id: string
+          texto: string
+          updated_at?: string
+        }
+        Update: {
+          autor_id?: string | null
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          negocio_id?: string
+          texto?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notas_autor_id_fkey"
+            columns: ["autor_id"]
+            isOneToOne: false
+            referencedRelation: "empresa_membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notas_negocio_id_fkey"
+            columns: ["negocio_id"]
+            isOneToOne: false
+            referencedRelation: "negocios"
             referencedColumns: ["id"]
           },
         ]
@@ -739,6 +981,87 @@ export type Database = {
         }
         Relationships: []
       }
+      tarefas: {
+        Row: {
+          concluida_em: string | null
+          concluida_por: string | null
+          created_at: string
+          criado_por: string | null
+          empresa_id: string
+          id: string
+          negocio_id: string | null
+          responsavel_id: string | null
+          tipo: Database["public"]["Enums"]["tipo_tarefa"]
+          titulo: string
+          updated_at: string
+          vence_em: string
+        }
+        Insert: {
+          concluida_em?: string | null
+          concluida_por?: string | null
+          created_at?: string
+          criado_por?: string | null
+          empresa_id: string
+          id?: string
+          negocio_id?: string | null
+          responsavel_id?: string | null
+          tipo?: Database["public"]["Enums"]["tipo_tarefa"]
+          titulo: string
+          updated_at?: string
+          vence_em: string
+        }
+        Update: {
+          concluida_em?: string | null
+          concluida_por?: string | null
+          created_at?: string
+          criado_por?: string | null
+          empresa_id?: string
+          id?: string
+          negocio_id?: string | null
+          responsavel_id?: string | null
+          tipo?: Database["public"]["Enums"]["tipo_tarefa"]
+          titulo?: string
+          updated_at?: string
+          vence_em?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tarefas_concluida_por_fkey"
+            columns: ["concluida_por"]
+            isOneToOne: false
+            referencedRelation: "empresa_membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tarefas_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "empresa_membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tarefas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tarefas_negocio_id_fkey"
+            columns: ["negocio_id"]
+            isOneToOne: false
+            referencedRelation: "negocios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tarefas_responsavel_id_fkey"
+            columns: ["responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "empresa_membros"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -766,6 +1089,8 @@ export type Database = {
         }
         Returns: boolean
       }
+      pode_ver_negocio: { Args: { p_negocio_id: string }; Returns: boolean }
+      pode_ver_pasta_anexo: { Args: { p_caminho: string }; Returns: boolean }
       pode_ver_responsavel: {
         Args: { p_empresa_id: string; p_responsavel_id: string }
         Returns: boolean
@@ -783,6 +1108,13 @@ export type Database = {
       situacao_empresa: "ativa" | "suspensa" | "cancelada"
       status_negocio: "aberto" | "ganho" | "perdido"
       tipo_pessoa: "pf" | "pj"
+      tipo_tarefa:
+        | "ligacao"
+        | "whatsapp"
+        | "visita"
+        | "reuniao"
+        | "email"
+        | "outro"
       tipo_vendedor: "interno" | "representante"
     }
     CompositeTypes: {
@@ -918,6 +1250,14 @@ export const Constants = {
       situacao_empresa: ["ativa", "suspensa", "cancelada"],
       status_negocio: ["aberto", "ganho", "perdido"],
       tipo_pessoa: ["pf", "pj"],
+      tipo_tarefa: [
+        "ligacao",
+        "whatsapp",
+        "visita",
+        "reuniao",
+        "email",
+        "outro",
+      ],
       tipo_vendedor: ["interno", "representante"],
     },
   },

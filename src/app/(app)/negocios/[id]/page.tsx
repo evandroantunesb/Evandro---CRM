@@ -1,11 +1,25 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ListaTarefas } from "@/components/lista-tarefas";
+import { NovaTarefa } from "@/components/nova-tarefa";
 import { Cartao, Selo } from "@/components/ui";
+import { apagarAnexo } from "@/lib/acoes/anexos";
+import { alternarEtiqueta } from "@/lib/acoes/negocios";
+import { apagarNota } from "@/lib/acoes/notas";
 import { carregarConfiguracao, formatarDataHora, formatarMoeda } from "@/lib/crm";
 import { descreverAtividade } from "@/lib/linha-do-tempo";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
+import type { TipoTarefa } from "@/lib/tipos";
 import { EdicaoNegocio } from "./edicao";
+import { EnviarAnexo } from "./enviar-anexo";
+import { Fechamento } from "./fechamento";
+import { NovaNota } from "./nova-nota";
+
+function tamanhoLegivel(bytes: number) {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1).replace(".", ",")} MB`;
+}
 
 export default async function DetalheNegocio({ params }: PageProps<"/negocios/[id]">) {
   const { atual } = await exigirPapel();
@@ -16,7 +30,7 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
     supabase
       .from("negocios")
       .select(
-        "id, numero, titulo, valor, descricao, status, funil_id, etapa_id, origem_id, responsavel_id, created_at, updated_at, contatos(id, nome, tipo, telefone, email, cidade, uf)",
+        "id, numero, titulo, valor, descricao, status, funil_id, etapa_id, origem_id, responsavel_id, motivo_perda_id, motivo_perda_detalhe, fechado_em, created_at, updated_at, contatos(id, nome, tipo, telefone, email, cidade, uf)",
       )
       .eq("id", id)
       .maybeSingle(),
@@ -24,12 +38,32 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
   ]);
   if (!negocio) notFound();
 
-  const { data: atividades } = await supabase
-    .from("atividades")
-    .select("id, tipo, dados, ator_id, created_at")
-    .eq("negocio_id", id)
-    .order("created_at", { ascending: false })
-    .limit(200);
+  const [{ data: atividades }, { data: notas }, { data: tarefas }, { data: anexos }, { data: marcadas }] =
+    await Promise.all([
+      supabase
+        .from("atividades")
+        .select("id, tipo, dados, ator_id, created_at")
+        .eq("negocio_id", id)
+        .order("created_at", { ascending: false })
+        .limit(200),
+      supabase
+        .from("notas")
+        .select("id, texto, autor_id, created_at")
+        .eq("negocio_id", id)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("tarefas")
+        .select("id, titulo, tipo, vence_em, concluida_em, responsavel_id, criado_por")
+        .eq("negocio_id", id)
+        .order("concluida_em", { ascending: true, nullsFirst: true })
+        .order("vence_em"),
+      supabase
+        .from("anexos")
+        .select("id, nome, tamanho, enviado_por, created_at")
+        .eq("negocio_id", id)
+        .order("created_at", { ascending: false }),
+      supabase.from("negocio_etiquetas").select("etiqueta_id").eq("negocio_id", id),
+    ]);
 
   const contato = negocio.contatos as unknown as {
     id: string;
@@ -44,11 +78,27 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
   const etapas = mapa(config.etapas);
   const origens = mapa(config.origens);
   const membros = mapa(config.membros);
+  const motivos = mapa(config.motivos);
   const nomes = {
     etapa: (i: string) => etapas.get(i) ?? "etapa removida",
     origem: (i: string) => origens.get(i) ?? "origem removida",
     membro: (i: string) => membros.get(i) ?? "usuário removido",
+    motivo: (i: string) => motivos.get(i) ?? "motivo removido",
   };
+  const souAdmin = atual.papel === "admin";
+  const etiquetasMarcadas = new Set((marcadas ?? []).map((m) => m.etiqueta_id));
+  const etiquetasVisiveis = config.etiquetas.filter((e) => e.ativa || etiquetasMarcadas.has(e.id));
+
+  // Linha do tempo: atividades do sistema e notas, da mais recente para a mais antiga.
+  const linha = [
+    ...(atividades ?? []).map((a) => ({
+      chave: `a${a.id}`,
+      quando: a.created_at,
+      nota: null,
+      texto: descreverAtividade(a.tipo, a.dados, nomes),
+    })),
+    ...(notas ?? []).map((n) => ({ chave: `n${n.id}`, quando: n.created_at, nota: n, texto: n.texto })),
+  ].sort((a, b) => b.quando.localeCompare(a.quando));
   const whatsapp = contato.telefone?.replace(/\D/g, "");
 
   return (
@@ -65,6 +115,17 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
             {negocio.status === "ganho" ? "Ganho" : "Perdido"}
           </Selo>
         )}
+        {config.etiquetas
+          .filter((e) => etiquetasMarcadas.has(e.id))
+          .map((e) => (
+            <span
+              key={e.id}
+              className="rounded-full px-2 py-0.5 text-xs font-medium text-white"
+              style={{ background: e.cor ?? "#71717a" }}
+            >
+              {e.nome}
+            </span>
+          ))}
       </div>
       <p className="text-sm text-zinc-600">
         {negocio.titulo}
@@ -72,7 +133,14 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
         {negocio.origem_id && <> · {nomes.origem(negocio.origem_id)}</>} · Responsável:{" "}
         {negocio.responsavel_id ? nomes.membro(negocio.responsavel_id) : "ninguém"} · Criado em{" "}
         {formatarDataHora(negocio.created_at)}
+        {negocio.fechado_em && <> · Fechado em {formatarDataHora(negocio.fechado_em)}</>}
       </p>
+      {negocio.status === "perdido" && negocio.motivo_perda_id && (
+        <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">
+          Motivo da perda: {nomes.motivo(negocio.motivo_perda_id)}
+          {negocio.motivo_perda_detalhe && <> · {negocio.motivo_perda_detalhe}</>}
+        </p>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
         <div className="flex flex-col gap-4">
@@ -87,62 +155,169 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
                 valor: negocio.valor,
                 descricao: negocio.descricao,
               }}
-              etapas={config.etapas.filter((e) => e.funilId === negocio.funil_id && (e.ativa || e.id === negocio.etapa_id))}
+              etapas={config.etapas.filter(
+                (e) => e.funilId === negocio.funil_id && (e.ativa || e.id === negocio.etapa_id),
+              )}
               origens={config.origens.filter((o) => o.ativa || o.id === negocio.origem_id)}
               responsaveis={atual.papel === "vendedor" ? [] : config.membros.filter((m) => m.ativo)}
             />
           </Cartao>
-          <Cartao titulo="Linha do tempo">
+          <Cartao titulo="Tarefas">
+            <div className="flex flex-col gap-3">
+              <ListaTarefas
+                vazio="Nenhuma tarefa. Crie a próxima ação para este cliente não esfriar."
+                tarefas={(tarefas ?? []).map((t) => ({
+                  id: t.id,
+                  titulo: t.titulo,
+                  tipo: t.tipo as TipoTarefa,
+                  vence_em: t.vence_em,
+                  concluida_em: t.concluida_em,
+                  responsavel: t.responsavel_id ? nomes.membro(t.responsavel_id) : null,
+                  podeApagar: souAdmin || t.criado_por === atual.membroId,
+                }))}
+              />
+              <NovaTarefa
+                negocioId={negocio.id}
+                responsaveis={atual.papel === "vendedor" ? [] : config.membros.filter((m) => m.ativo)}
+                responsavelPadrao={negocio.responsavel_id}
+              />
+            </div>
+          </Cartao>
+          <Cartao titulo="Notas e linha do tempo">
+            <NovaNota negocioId={negocio.id} />
             <ol className="flex flex-col">
-              {(atividades ?? []).map((a) => (
-                <li key={a.id} className="flex flex-col border-l-2 border-amber-200 py-2 pl-3 text-sm">
-                  <span className="text-zinc-900">{descreverAtividade(a.tipo, a.dados, nomes)}</span>
-                  <span className="text-xs text-zinc-500">{formatarDataHora(a.created_at)}</span>
-                </li>
-              ))}
+              {linha.map((item) =>
+                item.nota ? (
+                  <li
+                    key={item.chave}
+                    className="my-1 flex flex-col rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm"
+                  >
+                    <span className="whitespace-pre-wrap text-zinc-900">{item.texto}</span>
+                    <span className="flex gap-2 text-xs text-zinc-500">
+                      {item.nota.autor_id ? nomes.membro(item.nota.autor_id) : "usuário removido"} ·{" "}
+                      {formatarDataHora(item.quando)}
+                      {item.nota.autor_id === atual.membroId && (
+                        <form action={apagarNota} className="ml-auto">
+                          <input type="hidden" name="notaId" value={item.nota.id} />
+                          <button className="hover:text-red-700">Apagar</button>
+                        </form>
+                      )}
+                    </span>
+                  </li>
+                ) : (
+                  <li key={item.chave} className="flex flex-col border-l-2 border-zinc-200 py-2 pl-3 text-sm">
+                    <span className="text-zinc-800">{item.texto}</span>
+                    <span className="text-xs text-zinc-500">{formatarDataHora(item.quando)}</span>
+                  </li>
+                ),
+              )}
             </ol>
           </Cartao>
         </div>
-        <Cartao titulo="Contato">
-          <dl className="flex flex-col gap-2 text-sm">
-            <div>
-              <dt className="text-zinc-500">{contato.tipo === "pj" ? "Razão social" : "Nome"}</dt>
-              <dd>
-                <Link href={`/contatos/${contato.id}`} className="font-medium text-amber-700 hover:underline">
-                  {contato.nome}
-                </Link>
-              </dd>
-            </div>
-            {contato.telefone && (
+        <div className="flex flex-col gap-4">
+          <Cartao titulo="Situação">
+            <Fechamento
+              negocioId={negocio.id}
+              status={negocio.status}
+              motivos={config.motivos.filter((m) => m.ativo || m.id === negocio.motivo_perda_id)}
+            />
+          </Cartao>
+          <Cartao titulo="Contato">
+            <dl className="flex flex-col gap-2 text-sm">
               <div>
-                <dt className="text-zinc-500">Telefone</dt>
-                <dd>{contato.telefone}</dd>
+                <dt className="text-zinc-500">{contato.tipo === "pj" ? "Razão social" : "Nome"}</dt>
+                <dd>
+                  <Link href={`/contatos/${contato.id}`} className="font-medium text-amber-700 hover:underline">
+                    {contato.nome}
+                  </Link>
+                </dd>
               </div>
+              {contato.telefone && (
+                <div>
+                  <dt className="text-zinc-500">Telefone</dt>
+                  <dd>{contato.telefone}</dd>
+                </div>
+              )}
+              {contato.email && (
+                <div>
+                  <dt className="text-zinc-500">E-mail</dt>
+                  <dd>{contato.email}</dd>
+                </div>
+              )}
+              {(contato.cidade || contato.uf) && (
+                <div>
+                  <dt className="text-zinc-500">Cidade</dt>
+                  <dd>{[contato.cidade, contato.uf].filter(Boolean).join(" / ")}</dd>
+                </div>
+              )}
+            </dl>
+            {whatsapp && whatsapp.length >= 10 && (
+              <a
+                href={`https://wa.me/${whatsapp.startsWith("55") ? whatsapp : `55${whatsapp}`}`}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-4 inline-flex w-full items-center justify-center rounded-md bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
+              >
+                Abrir no WhatsApp
+              </a>
             )}
-            {contato.email && (
-              <div>
-                <dt className="text-zinc-500">E-mail</dt>
-                <dd>{contato.email}</dd>
+          </Cartao>
+          {etiquetasVisiveis.length > 0 && (
+            <Cartao titulo="Etiquetas">
+              <div className="flex flex-wrap gap-2">
+                {etiquetasVisiveis.map((e) => {
+                  const marcada = etiquetasMarcadas.has(e.id);
+                  return (
+                    <form key={e.id} action={alternarEtiqueta}>
+                      <input type="hidden" name="negocioId" value={negocio.id} />
+                      <input type="hidden" name="etiquetaId" value={e.id} />
+                      <input type="hidden" name="marcar" value={String(!marcada)} />
+                      <button
+                        aria-pressed={marcada}
+                        className={`rounded-full border px-2.5 py-1 text-xs font-medium ${marcada ? "text-white" : "bg-white text-zinc-700"}`}
+                        style={
+                          marcada
+                            ? { background: e.cor ?? "#71717a", borderColor: e.cor ?? "#71717a" }
+                            : { borderColor: e.cor ?? "#d4d4d8" }
+                        }
+                      >
+                        {marcada ? "✓ " : ""}
+                        {e.nome}
+                      </button>
+                    </form>
+                  );
+                })}
               </div>
-            )}
-            {(contato.cidade || contato.uf) && (
-              <div>
-                <dt className="text-zinc-500">Cidade</dt>
-                <dd>{[contato.cidade, contato.uf].filter(Boolean).join(" / ")}</dd>
-              </div>
-            )}
-          </dl>
-          {whatsapp && whatsapp.length >= 10 && (
-            <a
-              href={`https://wa.me/${whatsapp.startsWith("55") ? whatsapp : `55${whatsapp}`}`}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-4 inline-flex w-full items-center justify-center rounded-md bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
-            >
-              Abrir no WhatsApp
-            </a>
+            </Cartao>
           )}
-        </Cartao>
+          <Cartao titulo={`Arquivos (${anexos?.length ?? 0})`}>
+            <ul className="mb-3 flex flex-col">
+              {(anexos ?? []).map((a) => (
+                <li
+                  key={a.id}
+                  className="flex items-center gap-2 border-t border-zinc-100 py-2 text-sm first:border-t-0"
+                >
+                  <a
+                    href={`/anexos/${a.id}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="min-w-0 flex-1 truncate text-amber-700 hover:underline"
+                  >
+                    {a.nome}
+                  </a>
+                  <span className="text-xs text-zinc-500">{tamanhoLegivel(a.tamanho)}</span>
+                  {(souAdmin || a.enviado_por === atual.membroId) && (
+                    <form action={apagarAnexo}>
+                      <input type="hidden" name="anexoId" value={a.id} />
+                      <button className="text-xs text-zinc-400 hover:text-red-700">Apagar</button>
+                    </form>
+                  )}
+                </li>
+              ))}
+            </ul>
+            <EnviarAnexo empresaId={atual.empresaId} negocioId={negocio.id} />
+          </Cartao>
+        </div>
       </div>
     </div>
   );

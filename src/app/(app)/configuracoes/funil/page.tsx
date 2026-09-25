@@ -2,7 +2,7 @@ import { Cartao, Selo } from "@/components/ui";
 import { carregarConfiguracao } from "@/lib/crm";
 import { exigirPapel } from "@/lib/sessao";
 import { alternarFunil, definirInicial, reordenarEtapa } from "./actions";
-import { AlternarEtapa, NovaEtapa, NovoFunil, Renomear } from "./formularios";
+import { AlternarEtapa, CamposObrigatorios, NovaEtapa, NovoFunil, Renomear } from "./formularios";
 
 export default async function ConfigFunil() {
   const { atual } = await exigirPapel("admin");
@@ -13,6 +13,7 @@ export default async function ConfigFunil() {
       <h1 className="text-2xl font-semibold text-zinc-900">Funis e etapas</h1>
       <p className="text-sm text-zinc-600">
         A etapa inicial é onde os negócios novos entram. Ganho e perdido não são etapas: ficam como status do negócio.
+        Em cada etapa você pode exigir campos preenchidos (ex.: valor antes de &quot;Proposta enviada&quot;).
       </p>
       {funis.map((funil) => {
         const doFunil = etapas.filter((e) => e.funilId === funil.id);
@@ -61,6 +62,7 @@ export default async function ConfigFunil() {
                     </form>
                   ))}
                   <AlternarEtapa etapaId={etapa.id} ativa={etapa.ativa} />
+                  <CamposObrigatorios etapaId={etapa.id} campos={etapa.camposObrigatorios} />
                 </li>
               ))}
             </ol>

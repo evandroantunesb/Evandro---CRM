@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
+import { mensagemErro } from "@/lib/erros";
 import type { ResultadoAcao } from "@/lib/tipos";
 
 const uuidOpcional = z
@@ -94,7 +95,7 @@ export async function criarNegocio(_: ResultadoAcao, formData: FormData): Promis
     .select("id")
     .single();
   if (error || !negocio) {
-    return { ok: false, mensagem: "Não foi possível criar o negócio. Confira o responsável escolhido." };
+    return { ok: false, mensagem: mensagemErro(error, "Não foi possível criar o negócio. Confira o responsável escolhido.") };
   }
 
   revalidatePath("/negocios");
@@ -112,7 +113,7 @@ export async function moverEtapa(negocioId: string, etapaId: string): Promise<Re
     .update({ etapa_id: etapaId })
     .eq("id", negocioId)
     .select("id");
-  if (error || !data?.length) return { ok: false, mensagem: "Não foi possível mover o negócio." };
+  if (error || !data?.length) return { ok: false, mensagem: mensagemErro(error, "Não foi possível mover o negócio.") };
 
   revalidatePath("/negocios");
   revalidatePath(`/negocios/${negocioId}`);
@@ -148,11 +149,66 @@ export async function editarNegocio(_: ResultadoAcao, formData: FormData): Promi
     })
     .eq("id", d.negocioId)
     .select("id");
-  if (error || !data?.length) return { ok: false, mensagem: "Não foi possível salvar." };
+  if (error || !data?.length) return { ok: false, mensagem: mensagemErro(error, "Não foi possível salvar.") };
 
   revalidatePath("/negocios");
   revalidatePath(`/negocios/${d.negocioId}`);
   return { ok: true, mensagem: "Salvo." };
+}
+
+const esquemaFechamento = z.discriminatedUnion("status", [
+  z.object({ negocioId: z.string().uuid(), status: z.literal("ganho") }),
+  z.object({
+    negocioId: z.string().uuid(),
+    status: z.literal("perdido"),
+    motivo_perda_id: z.string().uuid("Escolha o motivo da perda."),
+    motivo_perda_detalhe: z.string().trim().max(1000).optional(),
+  }),
+  z.object({ negocioId: z.string().uuid(), status: z.literal("aberto") }),
+]);
+
+/** Marca como ganho, perdido (com motivo) ou reabre. */
+export async function alterarStatus(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  await exigirPapel();
+  const dados = esquemaFechamento.safeParse(Object.fromEntries(formData));
+  if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
+  const d = dados.data;
+
+  const supabase = await criarClienteServidor();
+  const { data, error } = await supabase
+    .from("negocios")
+    .update(
+      d.status === "perdido"
+        ? { status: d.status, motivo_perda_id: d.motivo_perda_id, motivo_perda_detalhe: d.motivo_perda_detalhe || null }
+        : { status: d.status },
+    )
+    .eq("id", d.negocioId)
+    .select("id");
+  if (error || !data?.length) return { ok: false, mensagem: mensagemErro(error, "Não foi possível alterar o status.") };
+
+  revalidatePath("/negocios");
+  revalidatePath(`/negocios/${d.negocioId}`);
+  const mensagens = { ganho: "Negócio ganho!", perdido: "Negócio marcado como perdido.", aberto: "Negócio reaberto." };
+  return { ok: true, mensagem: mensagens[d.status] };
+}
+
+/** Marca ou desmarca uma etiqueta no negócio. */
+export async function alternarEtiqueta(formData: FormData) {
+  const { atual } = await exigirPapel();
+  const ids = z
+    .object({ negocioId: z.string().uuid(), etiquetaId: z.string().uuid(), marcar: z.enum(["true", "false"]) })
+    .safeParse(Object.fromEntries(formData));
+  if (!ids.success) return;
+  const { negocioId, etiquetaId, marcar } = ids.data;
+
+  const supabase = await criarClienteServidor();
+  if (marcar === "true") {
+    await supabase.from("negocio_etiquetas").insert({ negocio_id: negocioId, etiqueta_id: etiquetaId, empresa_id: atual.empresaId });
+  } else {
+    await supabase.from("negocio_etiquetas").delete().eq("negocio_id", negocioId).eq("etiqueta_id", etiquetaId);
+  }
+  revalidatePath("/negocios");
+  revalidatePath(`/negocios/${negocioId}`);
 }
 
 export type Duplicado = { contatoId: string; nome: string; visivel: boolean; responsavel: string | null };

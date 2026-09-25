@@ -24,6 +24,16 @@ export type Card = {
   valor: string;
   etapaId: string;
   desde: string;
+  /** Próxima tarefa em aberto do negócio. */
+  tarefa: "atrasada" | "hoje" | "futura" | "nenhuma";
+  etiquetas: { nome: string; cor: string | null }[];
+};
+
+const INDICADOR_TAREFA = {
+  atrasada: { texto: "Tarefa atrasada", classe: "bg-red-100 text-red-800" },
+  hoje: { texto: "Tarefa hoje", classe: "bg-amber-100 text-amber-800" },
+  futura: null,
+  nenhuma: { texto: "Sem próxima tarefa", classe: "bg-zinc-100 text-zinc-600" },
 };
 
 type Coluna = { id: string; nome: string };
@@ -105,6 +115,20 @@ function CardKanban({ card }: { card: Card }) {
       <p className="truncate text-zinc-600">
         #{card.numero} · {card.titulo}
       </p>
+      {(card.etiquetas.length > 0 || INDICADOR_TAREFA[card.tarefa]) && (
+        <div className="mt-1.5 flex flex-wrap gap-1 text-xs">
+          {INDICADOR_TAREFA[card.tarefa] && (
+            <span className={`rounded px-1.5 py-0.5 ${INDICADOR_TAREFA[card.tarefa]!.classe}`}>
+              {INDICADOR_TAREFA[card.tarefa]!.texto}
+            </span>
+          )}
+          {card.etiquetas.map((e) => (
+            <span key={e.nome} className="rounded px-1.5 py-0.5 text-white" style={{ background: e.cor ?? "#71717a" }}>
+              {e.nome}
+            </span>
+          ))}
+        </div>
+      )}
       <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-500">
         {card.valor && <span className="font-medium text-zinc-800">{card.valor}</span>}
         {card.origem && <span className="rounded bg-zinc-100 px-1.5 py-0.5">{card.origem}</span>}
