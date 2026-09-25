@@ -8,7 +8,7 @@ export function LogoRaion({ tom = "escuro", altura = 28 }: { tom?: "escuro" | "c
       alt="Raion"
       width={1110}
       height={240}
-      style={{ height: altura, width: "auto" }}
+      style={{ height: altura, width: "auto", alignSelf: "flex-start" }}
       priority
     />
   );
