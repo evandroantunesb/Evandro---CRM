@@ -5,10 +5,89 @@ import { z } from "zod";
 import { calcular, DISPONIBILIDADE_PADRAO } from "@/lib/calculadora";
 import { mensagemErro } from "@/lib/erros";
 import { exigirPapel } from "@/lib/sessao";
+import type { Database } from "@/lib/supabase/database.types";
+import type { SupabaseServidor } from "@/lib/supabase/server";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { TIPOS_LIGACAO, type ResultadoAcao } from "@/lib/tipos";
+import { TIPOS_LIGACAO, type TipoLigacao, type ResultadoAcao } from "@/lib/tipos";
 
 const CAMINHO_LISTAS = "/configuracoes/listas";
+
+type LinhaCalculo = Omit<
+  Database["public"]["Tables"]["calculos_solares"]["Insert"],
+  "negocio_id" | "observacoes" | "atualizado_por" | "criado_por"
+>;
+
+/**
+ * Monta a linha de `calculos_solares` a partir do kit e dos parâmetros da
+ * empresa. Compartilhado entre "salvar cálculo" (negócio já existe) e a
+ * criação de negócio com calculadora embutida (nova proposta).
+ */
+export async function montarLinhaCalculo(
+  supabase: SupabaseServidor,
+  empresaId: string,
+  entrada: {
+    kitId: string;
+    tipoLigacao: TipoLigacao;
+    consumoMedioKwh: number | null;
+    valorFaturaMedio: number | null;
+    tarifaKwh: number;
+  },
+): Promise<{ ok: true; linha: LinhaCalculo } | { ok: false; mensagem: string }> {
+  if (entrada.consumoMedioKwh == null && entrada.valorFaturaMedio == null) {
+    return { ok: false, mensagem: "Informe o consumo médio ou o valor médio da fatura." };
+  }
+  const consumoMedioKwh = entrada.consumoMedioKwh ?? entrada.valorFaturaMedio! / entrada.tarifaKwh;
+
+  const [{ data: kit }, { data: parametros }] = await Promise.all([
+    supabase
+      .from("kits_solares")
+      .select("id, nome, potencia_kwp, preco")
+      .eq("id", entrada.kitId)
+      .eq("empresa_id", empresaId)
+      .maybeSingle(),
+    supabase.from("parametros_calculadora").select("*").eq("empresa_id", empresaId).maybeSingle(),
+  ]);
+  if (!kit) return { ok: false, mensagem: "Kit não encontrado." };
+  if (!parametros) return { ok: false, mensagem: "Parâmetros da calculadora não configurados." };
+
+  const disponibilidadeKwh = parametros[DISPONIBILIDADE_PADRAO[entrada.tipoLigacao]] as number;
+  const resultado = calcular({
+    potenciaKwp: kit.potencia_kwp,
+    precoKit: kit.preco,
+    tipoLigacao: entrada.tipoLigacao,
+    consumoMedioKwh,
+    tarifaKwh: entrada.tarifaKwh,
+    produtividadeKwhKwpMes: parametros.produtividade_kwh_kwp_mes,
+    percentualFioB: parametros.percentual_fio_b,
+    disponibilidadeKwh,
+  });
+
+  return {
+    ok: true,
+    linha: {
+      empresa_id: empresaId,
+      kit_id: kit.id,
+      kit_nome: kit.nome,
+      kit_potencia_kwp: kit.potencia_kwp,
+      kit_preco: kit.preco,
+      tipo_ligacao: entrada.tipoLigacao,
+      consumo_medio_kwh: consumoMedioKwh,
+      valor_fatura_medio: entrada.valorFaturaMedio,
+      tarifa_kwh: entrada.tarifaKwh,
+      produtividade_kwh_kwp_mes: parametros.produtividade_kwh_kwp_mes,
+      percentual_fio_b: parametros.percentual_fio_b,
+      disponibilidade_kwh: disponibilidadeKwh,
+      geracao_estimada_kwh_mes: resultado.geracaoEstimadaKwhMes,
+      kwh_faturado: resultado.kwhFaturado,
+      kwh_compensado: resultado.kwhCompensado,
+      custo_fio_b: resultado.custoFioB,
+      conta_sem_solar: resultado.contaSemSolar,
+      conta_com_solar: resultado.contaComSolar,
+      economia_mensal: resultado.economiaMensal,
+      payback_meses: resultado.paybackMeses,
+    },
+  };
+}
 
 /** Aceita "1.234,56", "1234,5" e "1234.5". */
 const numeroBr = (mensagem: string) =>
@@ -47,56 +126,15 @@ export async function salvarCalculo(_: ResultadoAcao, formData: FormData): Promi
     .safeParse(Object.fromEntries(formData));
   if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
   const d = dados.data;
-  const consumoMedioKwh = d.consumoMedioKwh ?? d.valorFaturaMedio! / d.tarifaKwh;
 
   const supabase = await criarClienteServidor();
-  const [{ data: kit }, { data: parametros }] = await Promise.all([
-    supabase
-      .from("kits_solares")
-      .select("id, nome, potencia_kwp, preco")
-      .eq("id", d.kitId)
-      .eq("empresa_id", atual.empresaId)
-      .maybeSingle(),
-    supabase.from("parametros_calculadora").select("*").eq("empresa_id", atual.empresaId).maybeSingle(),
-  ]);
-  if (!kit) return { ok: false, mensagem: "Kit não encontrado." };
-  if (!parametros) return { ok: false, mensagem: "Parâmetros da calculadora não configurados." };
-
-  const disponibilidadeKwh = parametros[DISPONIBILIDADE_PADRAO[d.tipoLigacao]] as number;
-  const resultado = calcular({
-    potenciaKwp: kit.potencia_kwp,
-    precoKit: kit.preco,
-    tipoLigacao: d.tipoLigacao,
-    consumoMedioKwh,
-    tarifaKwh: d.tarifaKwh,
-    produtividadeKwhKwpMes: parametros.produtividade_kwh_kwp_mes,
-    percentualFioB: parametros.percentual_fio_b,
-    disponibilidadeKwh,
-  });
+  const montado = await montarLinhaCalculo(supabase, atual.empresaId, d);
+  if (!montado.ok) return montado;
 
   const { error } = await supabase.from("calculos_solares").upsert(
     {
-      empresa_id: atual.empresaId,
+      ...montado.linha,
       negocio_id: d.negocioId,
-      kit_id: kit.id,
-      kit_nome: kit.nome,
-      kit_potencia_kwp: kit.potencia_kwp,
-      kit_preco: kit.preco,
-      tipo_ligacao: d.tipoLigacao,
-      consumo_medio_kwh: consumoMedioKwh,
-      valor_fatura_medio: d.valorFaturaMedio,
-      tarifa_kwh: d.tarifaKwh,
-      produtividade_kwh_kwp_mes: parametros.produtividade_kwh_kwp_mes,
-      percentual_fio_b: parametros.percentual_fio_b,
-      disponibilidade_kwh: disponibilidadeKwh,
-      geracao_estimada_kwh_mes: resultado.geracaoEstimadaKwhMes,
-      kwh_faturado: resultado.kwhFaturado,
-      kwh_compensado: resultado.kwhCompensado,
-      custo_fio_b: resultado.custoFioB,
-      conta_sem_solar: resultado.contaSemSolar,
-      conta_com_solar: resultado.contaComSolar,
-      economia_mensal: resultado.economiaMensal,
-      payback_meses: resultado.paybackMeses,
       observacoes: d.observacoes || null,
       atualizado_por: atual.membroId,
       criado_por: atual.membroId,

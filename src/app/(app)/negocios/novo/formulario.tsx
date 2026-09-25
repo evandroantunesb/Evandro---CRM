@@ -1,23 +1,51 @@
 "use client";
 
-import { useActionState, useState, useTransition } from "react";
+import { useActionState, useMemo, useState, useTransition } from "react";
 import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
 import { buscarContatos, criarNegocio, verificarDuplicado, type Duplicado } from "@/lib/acoes/negocios";
+import { calcular } from "@/lib/calculadora";
+import { formatarMoeda } from "@/lib/formatacao";
+import { ROTULO_TIPO_LIGACAO, TIPOS_LIGACAO, type TipoLigacao } from "@/lib/tipos";
 
 type Opcao = { id: string; nome: string };
 type ContatoEncontrado = { id: string; nome: string; telefone: string | null; email: string | null };
+type Kit = { id: string; nome: string; potenciaKwp: number; preco: number };
+type Parametros = {
+  produtividadeKwhKwpMes: number;
+  percentualFioB: number;
+  disponibilidadeMonoKwh: number;
+  disponibilidadeBiKwh: number;
+  disponibilidadeTriKwh: number;
+};
+
+/** Aceita "450", "450,5" e "1.234,56"; string vazia ou inválida vira null. */
+function numero(v: string): number | null {
+  if (!v.trim()) return null;
+  const n = Number(v.includes(",") ? v.replace(/\./g, "").replace(",", ".") : v);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+const DISPONIBILIDADE_POR_TIPO: Record<TipoLigacao, keyof Parametros> = {
+  monofasico: "disponibilidadeMonoKwh",
+  bifasico: "disponibilidadeBiKwh",
+  trifasico: "disponibilidadeTriKwh",
+};
 
 export function FormularioNegocio({
   funilId,
   origens,
   responsaveis,
   meuMembroId,
+  kits,
+  parametros,
 }: {
   funilId: string;
   origens: Opcao[];
   /** Vazio quando quem cria é vendedor: ele sempre fica como responsável. */
   responsaveis: Opcao[];
   meuMembroId: string;
+  kits: Kit[];
+  parametros: Parametros | null;
 }) {
   const [resultado, acao, pendente] = useActionState(criarNegocio, null);
   const [modo, setModo] = useState<"novo" | "existente">("novo");
@@ -26,6 +54,34 @@ export function FormularioNegocio({
   const [encontrados, setEncontrados] = useState<ContatoEncontrado[]>([]);
   const [duplicados, setDuplicados] = useState<Duplicado[]>([]);
   const [, iniciar] = useTransition();
+
+  // Calculadora embutida: assim que kit, tipo de ligação, tarifa e consumo
+  // (ou valor da fatura) estão preenchidos, o resultado já aparece — sem
+  // precisar abrir a calculadora separadamente depois de criar o negócio.
+  const [kitId, setKitId] = useState("");
+  const [tipoLigacao, setTipoLigacao] = useState<TipoLigacao>("trifasico");
+  const [consumoMedioKwh, setConsumoMedioKwh] = useState("");
+  const [valorFaturaMedio, setValorFaturaMedio] = useState("");
+  const [tarifaKwh, setTarifaKwh] = useState("");
+
+  const previa = useMemo(() => {
+    const kit = kits.find((k) => k.id === kitId);
+    const tarifa = numero(tarifaKwh);
+    const consumo = numero(consumoMedioKwh);
+    const fatura = numero(valorFaturaMedio);
+    if (!kit || !parametros || !tarifa || (!consumo && !fatura)) return null;
+    const consumoMedioFinal = consumo ?? fatura! / tarifa;
+    return calcular({
+      potenciaKwp: kit.potenciaKwp,
+      precoKit: kit.preco,
+      tipoLigacao,
+      consumoMedioKwh: consumoMedioFinal,
+      tarifaKwh: tarifa,
+      produtividadeKwhKwpMes: parametros.produtividadeKwhKwpMes,
+      percentualFioB: parametros.percentualFioB,
+      disponibilidadeKwh: parametros[DISPONIBILIDADE_POR_TIPO[tipoLigacao]],
+    });
+  }, [kits, kitId, tipoLigacao, consumoMedioKwh, valorFaturaMedio, tarifaKwh, parametros]);
 
   function pesquisar(termo: string) {
     setBusca(termo);
@@ -144,6 +200,9 @@ export function FormularioNegocio({
               type="email"
               onBlur={(e) => conferirDuplicado(e.currentTarget.form!)}
             />
+            <div className="md:col-span-2">
+              <Campo rotulo="Endereço" name="contato_endereco" placeholder="Rua, número, bairro" />
+            </div>
             {duplicados.map((d) => (
               <div key={d.contatoId} className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900 md:col-span-2">
                 {d.visivel ? (
@@ -177,6 +236,79 @@ export function FormularioNegocio({
           </div>
         )}
       </fieldset>
+
+      {kits.length > 0 && parametros && (
+        <fieldset className="flex flex-col gap-3">
+          <legend className="mb-2 text-sm font-semibold text-zinc-900">Calculadora solar (opcional)</legend>
+          <p className="-mt-1 text-xs text-zinc-500">
+            Escolha o kit e informe o consumo para já sair daqui com a economia e o payback calculados.
+          </p>
+          <div className="grid gap-3 md:grid-cols-2">
+            <Selecao rotulo="Kit" name="kit_id" value={kitId} onChange={(e) => setKitId(e.target.value)}>
+              <option value="">Calcular depois</option>
+              {kits.map((k) => (
+                <option key={k.id} value={k.id}>
+                  {k.nome} · {k.potenciaKwp.toLocaleString("pt-BR")} kWp · {formatarMoeda(k.preco)}
+                </option>
+              ))}
+            </Selecao>
+            <Selecao
+              rotulo="Tipo de ligação"
+              name="tipo_ligacao"
+              value={tipoLigacao}
+              onChange={(e) => setTipoLigacao(e.target.value as TipoLigacao)}
+            >
+              {TIPOS_LIGACAO.map((t) => (
+                <option key={t} value={t}>
+                  {ROTULO_TIPO_LIGACAO[t]}
+                </option>
+              ))}
+            </Selecao>
+            <Campo
+              rotulo="Consumo médio (kWh/mês)"
+              name="consumo_medio_kwh"
+              inputMode="decimal"
+              placeholder="ex.: 450"
+              value={consumoMedioKwh}
+              onChange={(e) => setConsumoMedioKwh(e.target.value)}
+            />
+            <Campo
+              rotulo="Ou valor médio da fatura (R$)"
+              name="valor_fatura_medio"
+              inputMode="decimal"
+              placeholder="ex.: 450,00"
+              value={valorFaturaMedio}
+              onChange={(e) => setValorFaturaMedio(e.target.value)}
+            />
+            <Campo
+              rotulo="Tarifa (R$/kWh)"
+              name="tarifa_kwh"
+              inputMode="decimal"
+              placeholder="ex.: 0,95"
+              value={tarifaKwh}
+              onChange={(e) => setTarifaKwh(e.target.value)}
+            />
+          </div>
+          {previa && (
+            <dl className="grid grid-cols-2 gap-3 rounded-lg bg-amber-50 px-4 py-3 text-sm md:grid-cols-4">
+              <div>
+                <dt className="text-zinc-500">Geração estimada</dt>
+                <dd className="font-medium text-zinc-900">{previa.geracaoEstimadaKwhMes.toLocaleString("pt-BR")} kWh/mês</dd>
+              </div>
+              <div>
+                <dt className="text-zinc-500">Economia estimada</dt>
+                <dd className="font-medium text-green-700">{formatarMoeda(previa.economiaMensal)}/mês</dd>
+              </div>
+              <div>
+                <dt className="text-zinc-500">Payback estimado</dt>
+                <dd className="font-medium text-zinc-900">
+                  {previa.paybackMeses != null ? `${previa.paybackMeses.toLocaleString("pt-BR")} meses` : "—"}
+                </dd>
+              </div>
+            </dl>
+          )}
+        </fieldset>
+      )}
 
       <Mensagem resultado={resultado} />
       <Botao type="submit" disabled={pendente || (modo === "existente" && !contato)} className="self-start">

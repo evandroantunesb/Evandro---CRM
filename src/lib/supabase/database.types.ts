@@ -281,6 +281,7 @@ export type Database = {
           documento: string | null
           email: string | null
           empresa_id: string
+          endereco: string | null
           id: string
           nome: string
           telefone: string | null
@@ -297,6 +298,7 @@ export type Database = {
           documento?: string | null
           email?: string | null
           empresa_id: string
+          endereco?: string | null
           id?: string
           nome: string
           telefone?: string | null
@@ -313,6 +315,7 @@ export type Database = {
           documento?: string | null
           email?: string | null
           empresa_id?: string
+          endereco?: string | null
           id?: string
           nome?: string
           telefone?: string | null
