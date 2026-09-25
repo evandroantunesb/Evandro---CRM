@@ -12,7 +12,9 @@ import {
 } from "@dnd-kit/core";
 import Link from "next/link";
 import { useState, useTransition } from "react";
+import { MoverEtapa } from "@/components/mover-etapa";
 import { moverEtapa } from "@/lib/acoes/negocios";
+import { formatarMoeda, formatarPrazo } from "@/lib/formatacao";
 
 export type Card = {
   id: string;
@@ -22,23 +24,34 @@ export type Card = {
   responsavel: string;
   origem: string | null;
   valor: string;
+  valorNumerico: number | null;
   etapaId: string;
   desde: string;
   /** Próxima tarefa em aberto do negócio. */
   tarefa: "atrasada" | "hoje" | "futura" | "nenhuma";
+  tarefaTitulo: string | null;
+  tarefaVenceEm: string | null;
   etiquetas: { nome: string; cor: string | null }[];
 };
 
-const INDICADOR_TAREFA = {
-  atrasada: { texto: "Tarefa atrasada", classe: "bg-red-100 text-red-800" },
-  hoje: { texto: "Tarefa hoje", classe: "bg-amber-100 text-amber-800" },
-  futura: null,
-  nenhuma: { texto: "Sem próxima tarefa", classe: "bg-zinc-100 text-zinc-600" },
+const CLASSE_TAREFA = {
+  atrasada: "bg-red-100 text-red-800",
+  hoje: "bg-amber-100 text-amber-800",
+  futura: "bg-zinc-100 text-zinc-600",
+  nenhuma: "bg-zinc-100 text-zinc-600",
 };
 
 type Coluna = { id: string; nome: string };
 
-export function Kanban({ colunas, cards: iniciais }: { colunas: Coluna[]; cards: Card[] }) {
+export function Kanban({
+  colunas,
+  cards: iniciais,
+  metricas,
+}: {
+  colunas: Coluna[];
+  cards: Card[];
+  metricas?: { ganhos30d: number; perdidos30d: number };
+}) {
   const [cards, setCards] = useState(iniciais);
   const [erro, setErro] = useState<string | null>(null);
   const [, iniciar] = useTransition();
@@ -65,19 +78,42 @@ export function Kanban({ colunas, cards: iniciais }: { colunas: Coluna[]; cards:
     });
   }
 
+  const valorTotal = cards.reduce((soma, c) => soma + (c.valorNumerico ?? 0), 0);
+  const fechados30d = metricas ? metricas.ganhos30d + metricas.perdidos30d : 0;
+  const taxaConversao30d = fechados30d > 0 ? Math.round((metricas!.ganhos30d / fechados30d) * 100) : null;
+
   return (
     <DndContext sensors={sensores} onDragEnd={aoSoltar}>
       {erro && <p className="mb-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">{erro}</p>}
+      {metricas && (
+        <div className="mb-3 flex flex-wrap gap-4 rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-sm">
+          <span className="text-zinc-600">
+            <strong className="font-semibold text-zinc-900">{cards.length}</strong> em aberto
+          </span>
+          <span className="text-zinc-600">
+            <strong className="font-semibold text-zinc-900">{formatarMoeda(valorTotal)}</strong> no funil
+          </span>
+          <span className="text-zinc-600">
+            Conversão (30 dias):{" "}
+            <strong className="font-semibold text-zinc-900">
+              {taxaConversao30d != null ? `${taxaConversao30d}%` : "—"}
+            </strong>
+            {fechados30d > 0 && (
+              <span className="text-zinc-400"> ({metricas!.ganhos30d} ganhos de {fechados30d} fechados)</span>
+            )}
+          </span>
+        </div>
+      )}
       <div className="flex gap-3 overflow-x-auto pb-4">
         {colunas.map((col) => (
-          <ColunaKanban key={col.id} coluna={col} cards={cards.filter((c) => c.etapaId === col.id)} />
+          <ColunaKanban key={col.id} coluna={col} colunas={colunas} cards={cards.filter((c) => c.etapaId === col.id)} />
         ))}
       </div>
     </DndContext>
   );
 }
 
-function ColunaKanban({ coluna, cards }: { coluna: Coluna; cards: Card[] }) {
+function ColunaKanban({ coluna, colunas, cards }: { coluna: Coluna; colunas: Coluna[]; cards: Card[] }) {
   const { setNodeRef, isOver } = useDroppable({ id: coluna.id });
   return (
     <section
@@ -89,14 +125,14 @@ function ColunaKanban({ coluna, cards }: { coluna: Coluna; cards: Card[] }) {
         <span className="rounded-full bg-white px-2 text-xs text-zinc-600">{cards.length}</span>
       </header>
       {cards.map((c) => (
-        <CardKanban key={c.id} card={c} />
+        <CardKanban key={c.id} card={c} colunas={colunas} />
       ))}
       {!cards.length && <p className="px-1 py-4 text-center text-xs text-zinc-400">Arraste um negócio para cá</p>}
     </section>
   );
 }
 
-function CardKanban({ card }: { card: Card }) {
+function CardKanban({ card, colunas }: { card: Card; colunas: Coluna[] }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: card.id });
   const estilo = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined;
   return (
@@ -115,11 +151,12 @@ function CardKanban({ card }: { card: Card }) {
       <p className="truncate text-zinc-600">
         #{card.numero} · {card.titulo}
       </p>
-      {(card.etiquetas.length > 0 || INDICADOR_TAREFA[card.tarefa]) && (
+      {(card.etiquetas.length > 0 || card.tarefa === "atrasada" || card.tarefa === "hoje") && (
         <div className="mt-1.5 flex flex-wrap gap-1 text-xs">
-          {INDICADOR_TAREFA[card.tarefa] && (
-            <span className={`rounded px-1.5 py-0.5 ${INDICADOR_TAREFA[card.tarefa]!.classe}`}>
-              {INDICADOR_TAREFA[card.tarefa]!.texto}
+          {(card.tarefa === "atrasada" || card.tarefa === "hoje") && (
+            <span className={`rounded px-1.5 py-0.5 ${CLASSE_TAREFA[card.tarefa]}`}>
+              {card.tarefa === "atrasada" ? "🔴" : "🟡"} {card.tarefaTitulo}
+              {card.tarefaVenceEm && ` — ${formatarPrazo(card.tarefaVenceEm)}`}
             </span>
           )}
           {card.etiquetas.map((e) => (
@@ -134,6 +171,9 @@ function CardKanban({ card }: { card: Card }) {
         {card.origem && <span className="rounded bg-zinc-100 px-1.5 py-0.5">{card.origem}</span>}
         <span>{card.responsavel}</span>
         <span className="ml-auto">{card.desde}</span>
+      </div>
+      <div className="mt-2">
+        <MoverEtapa negocioId={card.id} etapaAtualId={card.etapaId} etapas={colunas} compacto />
       </div>
     </article>
   );

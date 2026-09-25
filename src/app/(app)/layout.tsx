@@ -41,7 +41,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
 
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
-      <aside className="flex flex-col gap-5 bg-carvao p-4 text-offwhite md:sticky md:top-0 md:h-screen md:w-64 md:p-5">
+      <aside className="flex flex-col gap-5 bg-carvao p-4 text-offwhite md:sticky md:top-0 md:h-screen md:w-64 md:overflow-y-auto md:p-5">
         <div className="flex items-center justify-between gap-3 md:block">
           <Link href="/inicio" aria-label="Início">
             <LogoRaion tom="claro" altura={28} />
