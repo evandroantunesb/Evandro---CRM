@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import { Botao, Campo, Mensagem } from "@/components/ui";
-import { adicionarAdmin, criarEmpresa } from "./actions";
+import { adicionarAdmin, criarEmpresa, editarEmpresa } from "./actions";
 
 export function FormularioEmpresa() {
   const [resultado, acao, pendente] = useActionState(criarEmpresa, null);
@@ -31,6 +31,23 @@ export function FormularioAdmin({ empresaId }: { empresaId: string }) {
       <Campo rotulo="E-mail" name="email" type="email" required />
       <Botao type="submit" disabled={pendente}>
         Adicionar admin
+      </Botao>
+      <div className="md:col-span-3">
+        <Mensagem resultado={resultado} />
+      </div>
+    </form>
+  );
+}
+
+export function FormularioEdicaoEmpresa({ empresa }: { empresa: { id: string; nome: string; cnpj: string | null } }) {
+  const [resultado, acao, pendente] = useActionState(editarEmpresa, null);
+  return (
+    <form action={acao} className="grid gap-3 md:grid-cols-[2fr_1fr_auto] md:items-end">
+      <input type="hidden" name="empresaId" value={empresa.id} />
+      <Campo rotulo="Nome da empresa" name="nome" defaultValue={empresa.nome} required />
+      <Campo rotulo="CNPJ" name="cnpj" defaultValue={empresa.cnpj ?? ""} />
+      <Botao type="submit" variante="secundario" disabled={pendente}>
+        Salvar
       </Botao>
       <div className="md:col-span-3">
         <Mensagem resultado={resultado} />
