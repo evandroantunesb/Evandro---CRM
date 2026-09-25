@@ -14,7 +14,9 @@ export default async function PropostaPublica({ params }: PageProps<"/proposta/[
 
   const { data: proposta } = await admin
     .from("propostas")
-    .select("id, negocio_id, modo_preco, mensagem, negocios(titulo, contatos(nome, endereco, cidade, uf))")
+    .select(
+      "id, negocio_id, modo_preco, mensagem, mostrar_sistema, mostrar_economia, negocios(titulo, contatos(nome, endereco, cidade, uf))",
+    )
     .eq("token", token)
     .maybeSingle();
   if (!proposta) notFound();
@@ -53,49 +55,53 @@ export default async function PropostaPublica({ params }: PageProps<"/proposta/[
 
       {proposta.mensagem && <p className="text-sm whitespace-pre-wrap text-zinc-700">{proposta.mensagem}</p>}
 
-      <Cartao titulo="O sistema">
-        <dl className="grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <dt className="text-zinc-500">Kit</dt>
-            <dd className="font-medium text-zinc-900">{calculo.kit_nome}</dd>
-          </div>
-          <div>
-            <dt className="text-zinc-500">Potência</dt>
-            <dd className="font-medium text-zinc-900">{calculo.kit_potencia_kwp.toLocaleString("pt-BR")} kWp</dd>
-          </div>
-          <div>
-            <dt className="text-zinc-500">Ligação</dt>
-            <dd>{ROTULO_TIPO_LIGACAO[calculo.tipo_ligacao as TipoLigacao]}</dd>
-          </div>
-          <div>
-            <dt className="text-zinc-500">Geração estimada</dt>
-            <dd>{calculo.geracao_estimada_kwh_mes.toLocaleString("pt-BR")} kWh/mês</dd>
-          </div>
-        </dl>
-      </Cartao>
-
-      <Cartao titulo="Sua economia">
-        <dl className="grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <dt className="text-zinc-500">Conta hoje</dt>
-            <dd className="font-medium text-zinc-900">{formatarMoeda(calculo.conta_sem_solar)}/mês</dd>
-          </div>
-          <div>
-            <dt className="text-zinc-500">Conta com o sistema</dt>
-            <dd className="font-medium text-zinc-900">{formatarMoeda(calculo.conta_com_solar)}/mês</dd>
-          </div>
-          <div>
-            <dt className="text-zinc-500">Economia estimada</dt>
-            <dd className="font-medium text-green-700">{formatarMoeda(calculo.economia_mensal)}/mês</dd>
-          </div>
-          {modoPreco !== "sem_preco" && calculo.payback_meses != null && (
+      {proposta.mostrar_sistema && (
+        <Cartao titulo="O sistema">
+          <dl className="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <dt className="text-zinc-500">Retorno do investimento</dt>
-              <dd className="font-medium text-zinc-900">{calculo.payback_meses.toLocaleString("pt-BR")} meses</dd>
+              <dt className="text-zinc-500">Kit</dt>
+              <dd className="font-medium text-zinc-900">{calculo.kit_nome}</dd>
             </div>
-          )}
-        </dl>
-      </Cartao>
+            <div>
+              <dt className="text-zinc-500">Potência</dt>
+              <dd className="font-medium text-zinc-900">{calculo.kit_potencia_kwp.toLocaleString("pt-BR")} kWp</dd>
+            </div>
+            <div>
+              <dt className="text-zinc-500">Ligação</dt>
+              <dd>{ROTULO_TIPO_LIGACAO[calculo.tipo_ligacao as TipoLigacao]}</dd>
+            </div>
+            <div>
+              <dt className="text-zinc-500">Geração estimada</dt>
+              <dd>{calculo.geracao_estimada_kwh_mes.toLocaleString("pt-BR")} kWh/mês</dd>
+            </div>
+          </dl>
+        </Cartao>
+      )}
+
+      {proposta.mostrar_economia && (
+        <Cartao titulo="Sua economia">
+          <dl className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <dt className="text-zinc-500">Conta hoje</dt>
+              <dd className="font-medium text-zinc-900">{formatarMoeda(calculo.conta_sem_solar)}/mês</dd>
+            </div>
+            <div>
+              <dt className="text-zinc-500">Conta com o sistema</dt>
+              <dd className="font-medium text-zinc-900">{formatarMoeda(calculo.conta_com_solar)}/mês</dd>
+            </div>
+            <div>
+              <dt className="text-zinc-500">Economia estimada</dt>
+              <dd className="font-medium text-green-700">{formatarMoeda(calculo.economia_mensal)}/mês</dd>
+            </div>
+            {modoPreco !== "sem_preco" && calculo.payback_meses != null && (
+              <div>
+                <dt className="text-zinc-500">Retorno do investimento</dt>
+                <dd className="font-medium text-zinc-900">{calculo.payback_meses.toLocaleString("pt-BR")} meses</dd>
+              </div>
+            )}
+          </dl>
+        </Cartao>
+      )}
 
       {modoPreco !== "sem_preco" && (
         <Cartao titulo="Investimento">
