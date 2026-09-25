@@ -1192,6 +1192,100 @@ export type Database = {
         }
         Relationships: []
       }
+      propostas: {
+        Row: {
+          atualizado_por: string | null
+          created_at: string
+          criado_por: string | null
+          empresa_id: string
+          id: string
+          mensagem: string | null
+          modo_preco: Database["public"]["Enums"]["modo_preco_proposta"]
+          negocio_id: string
+          token: string
+          updated_at: string
+        }
+        Insert: {
+          atualizado_por?: string | null
+          created_at?: string
+          criado_por?: string | null
+          empresa_id: string
+          id?: string
+          mensagem?: string | null
+          modo_preco?: Database["public"]["Enums"]["modo_preco_proposta"]
+          negocio_id: string
+          token?: string
+          updated_at?: string
+        }
+        Update: {
+          atualizado_por?: string | null
+          created_at?: string
+          criado_por?: string | null
+          empresa_id?: string
+          id?: string
+          mensagem?: string | null
+          modo_preco?: Database["public"]["Enums"]["modo_preco_proposta"]
+          negocio_id?: string
+          token?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "propostas_atualizado_por_fkey"
+            columns: ["atualizado_por"]
+            isOneToOne: false
+            referencedRelation: "empresa_membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "propostas_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "empresa_membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "propostas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "propostas_negocio_id_fkey"
+            columns: ["negocio_id"]
+            isOneToOne: true
+            referencedRelation: "negocios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      propostas_aberturas: {
+        Row: {
+          aberta_em: string
+          id: number
+          proposta_id: string
+        }
+        Insert: {
+          aberta_em?: string
+          id?: never
+          proposta_id: string
+        }
+        Update: {
+          aberta_em?: string
+          id?: never
+          proposta_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "propostas_aberturas_proposta_id_fkey"
+            columns: ["proposta_id"]
+            isOneToOne: false
+            referencedRelation: "propostas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tarefas: {
         Row: {
           concluida_em: string | null
@@ -1315,6 +1409,7 @@ export type Database = {
       }
     }
     Enums: {
+      modo_preco_proposta: "sem_preco" | "parcelado" | "avista" | "completo"
       papel_membro: "admin" | "gestor" | "vendedor"
       situacao_empresa: "ativa" | "suspensa" | "cancelada"
       status_negocio: "aberto" | "ganho" | "perdido"
@@ -1458,6 +1553,7 @@ export const Constants = {
   },
   public: {
     Enums: {
+      modo_preco_proposta: ["sem_preco", "parcelado", "avista", "completo"],
       papel_membro: ["admin", "gestor", "vendedor"],
       situacao_empresa: ["ativa", "suspensa", "cancelada"],
       status_negocio: ["aberto", "ganho", "perdido"],
