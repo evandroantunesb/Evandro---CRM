@@ -12,6 +12,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
       ? [
           { href: "/inicio", rotulo: "Início" },
           { href: "/negocios", rotulo: "Negócios" },
+          { href: "/tarefas", rotulo: "Tarefas" },
           { href: "/contatos", rotulo: "Contatos" },
         ]
       : []),
@@ -19,6 +20,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
       ? [
           { href: "/configuracoes/funil", rotulo: "Funis e etapas" },
           { href: "/configuracoes/origens", rotulo: "Origens" },
+          { href: "/configuracoes/listas", rotulo: "Etiquetas e motivos" },
           { href: "/configuracoes/usuarios", rotulo: "Usuários" },
           { href: "/configuracoes/equipes", rotulo: "Equipes" },
         ]

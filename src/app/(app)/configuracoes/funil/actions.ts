@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import type { ResultadoAcao } from "@/lib/tipos";
+import { CAMPOS_OBRIGATORIOS, type ResultadoAcao } from "@/lib/tipos";
 
 const CAMINHO = "/configuracoes/funil";
 const nome = z.string().trim().min(2, "Nome muito curto").max(60, "Nome muito longo");
@@ -135,4 +135,16 @@ export async function alternarFunil(formData: FormData) {
     .update({ ativo: formData.get("ativo") === "true" })
     .eq("id", String(formData.get("funilId")));
   concluir("");
+}
+
+export async function definirCamposObrigatorios(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  await exigirPapel("admin");
+  const etapaId = z.string().uuid().safeParse(formData.get("etapaId"));
+  const campos = z.array(z.enum(CAMPOS_OBRIGATORIOS)).safeParse(formData.getAll("campos"));
+  if (!etapaId.success || !campos.success) return { ok: false, mensagem: "Dados inválidos." };
+
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.from("etapas").update({ campos_obrigatorios: campos.data }).eq("id", etapaId.data);
+  if (error) return { ok: false, mensagem: "Não foi possível salvar." };
+  return concluir("Campos obrigatórios salvos.");
 }

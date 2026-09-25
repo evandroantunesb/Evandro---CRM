@@ -1,6 +1,13 @@
 import type { Json } from "@/lib/supabase/database.types";
 
-type Nomes = { etapa: (id: string) => string; origem: (id: string) => string; membro: (id: string) => string };
+import { ROTULO_TIPO_TAREFA, type TipoTarefa } from "@/lib/tipos";
+
+type Nomes = {
+  etapa: (id: string) => string;
+  origem: (id: string) => string;
+  membro: (id: string) => string;
+  motivo: (id: string) => string;
+};
 
 /** Frase legível para cada tipo de atividade da linha do tempo. */
 export function descreverAtividade(tipo: string, dadosJson: Json, nomes: Nomes): string {
@@ -26,6 +33,16 @@ export function descreverAtividade(tipo: string, dadosJson: Json, nomes: Nomes):
       return "Negócio perdido";
     case "negocio_reaberto":
       return "Negócio reaberto";
+    case "motivo_perda":
+      return `Motivo da perda: ${nomeOu(nomes.motivo, d.motivo_id, "?")}${d.detalhe ? ` (${d.detalhe})` : ""}`;
+    case "tarefa_criada":
+      return `Tarefa criada: ${ROTULO_TIPO_TAREFA[d.tipo as TipoTarefa] ?? "Tarefa"}, ${d.titulo}`;
+    case "tarefa_concluida":
+      return `Tarefa concluída${d.atrasada ? " com atraso" : ""}: ${d.titulo}`;
+    case "anexo_adicionado":
+      return `Arquivo anexado: ${d.nome}`;
+    case "anexo_removido":
+      return `Arquivo removido: ${d.nome}`;
     default:
       return tipo;
   }
