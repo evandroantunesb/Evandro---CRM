@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Cartao } from "@/components/ui";
 import { obterSessao } from "@/lib/sessao";
@@ -13,8 +14,11 @@ export default async function Inicio() {
       <Cartao>
         <p className="text-sm text-zinc-700">
           Você está em <strong>{sessao.atual.empresaNome}</strong> como{" "}
-          <strong>{ROTULO_PAPEL[sessao.atual.papel]}</strong>. O funil de vendas chega na próxima entrega.
+          <strong>{ROTULO_PAPEL[sessao.atual.papel]}</strong>. 
         </p>
+        <Link href="/negocios" className="mt-3 inline-block text-sm font-medium text-amber-700 hover:underline">
+          Ir para os negócios →
+        </Link>
       </Cartao>
     </div>
   );

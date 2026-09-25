@@ -34,6 +34,127 @@ export type Database = {
   }
   public: {
     Tables: {
+      atividades: {
+        Row: {
+          ator_id: string | null
+          contato_id: string | null
+          created_at: string
+          dados: Json
+          empresa_id: string
+          id: number
+          negocio_id: string | null
+          tipo: string
+        }
+        Insert: {
+          ator_id?: string | null
+          contato_id?: string | null
+          created_at?: string
+          dados?: Json
+          empresa_id: string
+          id?: never
+          negocio_id?: string | null
+          tipo: string
+        }
+        Update: {
+          ator_id?: string | null
+          contato_id?: string | null
+          created_at?: string
+          dados?: Json
+          empresa_id?: string
+          id?: never
+          negocio_id?: string | null
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "atividades_contato_id_fkey"
+            columns: ["contato_id"]
+            isOneToOne: false
+            referencedRelation: "contatos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atividades_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atividades_negocio_id_fkey"
+            columns: ["negocio_id"]
+            isOneToOne: false
+            referencedRelation: "negocios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contatos: {
+        Row: {
+          cidade: string | null
+          created_at: string
+          criado_por: string | null
+          documento: string | null
+          email: string | null
+          empresa_id: string
+          id: string
+          nome: string
+          telefone: string | null
+          telefone_digitos: string | null
+          telefone2: string | null
+          tipo: Database["public"]["Enums"]["tipo_pessoa"]
+          uf: string | null
+          updated_at: string
+        }
+        Insert: {
+          cidade?: string | null
+          created_at?: string
+          criado_por?: string | null
+          documento?: string | null
+          email?: string | null
+          empresa_id: string
+          id?: string
+          nome: string
+          telefone?: string | null
+          telefone_digitos?: string | null
+          telefone2?: string | null
+          tipo?: Database["public"]["Enums"]["tipo_pessoa"]
+          uf?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cidade?: string | null
+          created_at?: string
+          criado_por?: string | null
+          documento?: string | null
+          email?: string | null
+          empresa_id?: string
+          id?: string
+          nome?: string
+          telefone?: string | null
+          telefone_digitos?: string | null
+          telefone2?: string | null
+          tipo?: Database["public"]["Enums"]["tipo_pessoa"]
+          uf?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contatos_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "empresa_membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contatos_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       empresa_membros: {
         Row: {
           ativo: boolean
@@ -92,6 +213,7 @@ export type Database = {
           created_by: string | null
           id: string
           nome: string
+          seq_negocio: number
           situacao: Database["public"]["Enums"]["situacao_empresa"]
           updated_at: string
         }
@@ -101,6 +223,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           nome: string
+          seq_negocio?: number
           situacao?: Database["public"]["Enums"]["situacao_empresa"]
           updated_at?: string
         }
@@ -110,6 +233,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           nome?: string
+          seq_negocio?: number
           situacao?: Database["public"]["Enums"]["situacao_empresa"]
           updated_at?: string
         }
@@ -196,6 +320,60 @@ export type Database = {
           },
         ]
       }
+      etapas: {
+        Row: {
+          ativa: boolean
+          cor: string | null
+          created_at: string
+          empresa_id: string
+          funil_id: string
+          id: string
+          inicial: boolean
+          nome: string
+          ordem: number
+          updated_at: string
+        }
+        Insert: {
+          ativa?: boolean
+          cor?: string | null
+          created_at?: string
+          empresa_id: string
+          funil_id: string
+          id?: string
+          inicial?: boolean
+          nome: string
+          ordem?: number
+          updated_at?: string
+        }
+        Update: {
+          ativa?: boolean
+          cor?: string | null
+          created_at?: string
+          empresa_id?: string
+          funil_id?: string
+          id?: string
+          inicial?: boolean
+          nome?: string
+          ordem?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "etapas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "etapas_funil_id_fkey"
+            columns: ["funil_id"]
+            isOneToOne: false
+            referencedRelation: "funis"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       eventos: {
         Row: {
           ator_id: string | null
@@ -237,6 +415,96 @@ export type Database = {
           },
         ]
       }
+      funis: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          empresa_id: string
+          id: string
+          nome: string
+          ordem: number
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          empresa_id: string
+          id?: string
+          nome: string
+          ordem?: number
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          nome?: string
+          ordem?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "funis_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      historico_etapas: {
+        Row: {
+          empresa_id: string
+          entrou_em: string
+          etapa_id: string
+          id: number
+          movido_por: string | null
+          negocio_id: string
+          saiu_em: string | null
+        }
+        Insert: {
+          empresa_id: string
+          entrou_em?: string
+          etapa_id: string
+          id?: never
+          movido_por?: string | null
+          negocio_id: string
+          saiu_em?: string | null
+        }
+        Update: {
+          empresa_id?: string
+          entrou_em?: string
+          etapa_id?: string
+          id?: never
+          movido_por?: string | null
+          negocio_id?: string
+          saiu_em?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "historico_etapas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "historico_etapas_etapa_id_fkey"
+            columns: ["etapa_id"]
+            isOneToOne: false
+            referencedRelation: "etapas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "historico_etapas_negocio_id_fkey"
+            columns: ["negocio_id"]
+            isOneToOne: false
+            referencedRelation: "negocios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       logs_auditoria: {
         Row: {
           acao: string
@@ -274,6 +542,154 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "logs_auditoria_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      negocios: {
+        Row: {
+          contato_id: string
+          created_at: string
+          criado_por: string | null
+          descricao: string | null
+          empresa_id: string
+          etapa_desde: string
+          etapa_id: string
+          fechado_em: string | null
+          funil_id: string
+          id: string
+          numero: number
+          origem_id: string | null
+          responsavel_id: string | null
+          status: Database["public"]["Enums"]["status_negocio"]
+          titulo: string
+          updated_at: string
+          valor: number | null
+        }
+        Insert: {
+          contato_id: string
+          created_at?: string
+          criado_por?: string | null
+          descricao?: string | null
+          empresa_id: string
+          etapa_desde?: string
+          etapa_id: string
+          fechado_em?: string | null
+          funil_id: string
+          id?: string
+          numero?: number
+          origem_id?: string | null
+          responsavel_id?: string | null
+          status?: Database["public"]["Enums"]["status_negocio"]
+          titulo: string
+          updated_at?: string
+          valor?: number | null
+        }
+        Update: {
+          contato_id?: string
+          created_at?: string
+          criado_por?: string | null
+          descricao?: string | null
+          empresa_id?: string
+          etapa_desde?: string
+          etapa_id?: string
+          fechado_em?: string | null
+          funil_id?: string
+          id?: string
+          numero?: number
+          origem_id?: string | null
+          responsavel_id?: string | null
+          status?: Database["public"]["Enums"]["status_negocio"]
+          titulo?: string
+          updated_at?: string
+          valor?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "negocios_contato_id_fkey"
+            columns: ["contato_id"]
+            isOneToOne: false
+            referencedRelation: "contatos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "negocios_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "empresa_membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "negocios_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "negocios_etapa_id_fkey"
+            columns: ["etapa_id"]
+            isOneToOne: false
+            referencedRelation: "etapas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "negocios_funil_id_fkey"
+            columns: ["funil_id"]
+            isOneToOne: false
+            referencedRelation: "funis"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "negocios_origem_id_fkey"
+            columns: ["origem_id"]
+            isOneToOne: false
+            referencedRelation: "origens"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "negocios_responsavel_id_fkey"
+            columns: ["responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "empresa_membros"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      origens: {
+        Row: {
+          ativa: boolean
+          cor: string | null
+          created_at: string
+          empresa_id: string
+          id: string
+          nome: string
+          updated_at: string
+        }
+        Insert: {
+          ativa?: boolean
+          cor?: string | null
+          created_at?: string
+          empresa_id: string
+          id?: string
+          nome: string
+          updated_at?: string
+        }
+        Update: {
+          ativa?: boolean
+          cor?: string | null
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          nome?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "origens_empresa_id_fkey"
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "empresas"
@@ -328,9 +744,32 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      buscar_contato_duplicado: {
+        Args: { p_email: string; p_empresa_id: string; p_telefone: string }
+        Returns: {
+          contato_id: string
+          nome: string
+          responsavel_nome: string
+          visivel: boolean
+        }[]
+      }
       compartilha_empresa: { Args: { p_user_id: string }; Returns: boolean }
       e_plataforma_admin: { Args: never; Returns: boolean }
       membro_ativo: { Args: { p_empresa_id: string }; Returns: boolean }
+      meu_membro_id: { Args: { p_empresa_id: string }; Returns: string }
+      pode_ver_contato: { Args: { p_contato_id: string }; Returns: boolean }
+      pode_ver_contato_linha: {
+        Args: {
+          p_contato_id: string
+          p_criado_por: string
+          p_empresa_id: string
+        }
+        Returns: boolean
+      }
+      pode_ver_responsavel: {
+        Args: { p_empresa_id: string; p_responsavel_id: string }
+        Returns: boolean
+      }
       tem_papel: {
         Args: {
           p_empresa_id: string
@@ -342,6 +781,8 @@ export type Database = {
     Enums: {
       papel_membro: "admin" | "gestor" | "vendedor"
       situacao_empresa: "ativa" | "suspensa" | "cancelada"
+      status_negocio: "aberto" | "ganho" | "perdido"
+      tipo_pessoa: "pf" | "pj"
       tipo_vendedor: "interno" | "representante"
     }
     CompositeTypes: {
@@ -475,6 +916,8 @@ export const Constants = {
     Enums: {
       papel_membro: ["admin", "gestor", "vendedor"],
       situacao_empresa: ["ativa", "suspensa", "cancelada"],
+      status_negocio: ["aberto", "ganho", "perdido"],
+      tipo_pessoa: ["pf", "pj"],
       tipo_vendedor: ["interno", "representante"],
     },
   },
