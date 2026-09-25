@@ -8,9 +8,17 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
   const papel = sessao.atual?.papel;
 
   const itens = [
-    ...(sessao.atual ? [{ href: "/inicio", rotulo: "Início" }] : []),
+    ...(sessao.atual
+      ? [
+          { href: "/inicio", rotulo: "Início" },
+          { href: "/negocios", rotulo: "Negócios" },
+          { href: "/contatos", rotulo: "Contatos" },
+        ]
+      : []),
     ...(papel === "admin"
       ? [
+          { href: "/configuracoes/funil", rotulo: "Funis e etapas" },
+          { href: "/configuracoes/origens", rotulo: "Origens" },
           { href: "/configuracoes/usuarios", rotulo: "Usuários" },
           { href: "/configuracoes/equipes", rotulo: "Equipes" },
         ]
