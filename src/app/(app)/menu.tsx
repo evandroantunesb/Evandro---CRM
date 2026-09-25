@@ -2,6 +2,7 @@
 
 import {
   Building2,
+  Calculator,
   CheckSquare,
   Home,
   KanbanSquare,
@@ -25,6 +26,7 @@ const ICONES: Record<string, LucideIcon> = {
   "/configuracoes/funil": ListTree,
   "/configuracoes/origens": Radio,
   "/configuracoes/listas": Tags,
+  "/configuracoes/calculadora": Calculator,
   "/configuracoes/usuarios": UserCog,
   "/configuracoes/equipes": Users,
   "/super-admin": ShieldCheck,
