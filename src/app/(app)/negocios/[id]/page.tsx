@@ -11,11 +11,11 @@ import { env } from "@/lib/env";
 import { descreverAtividade } from "@/lib/linha-do-tempo";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import type { ModoPreco, TipoLigacao, TipoTarefa } from "@/lib/tipos";
-import { Calculadora } from "./calculadora";
+import { ROTULO_CATEGORIA_ANEXO, type CategoriaAnexo, type ModoPreco, type TipoComponenteKit, type TipoLigacao, type TipoTarefa } from "@/lib/tipos";
 import { EdicaoNegocio } from "./edicao";
 import { EnviarAnexo } from "./enviar-anexo";
 import { Fechamento } from "./fechamento";
+import { KitPersonalizado } from "./kit-personalizado";
 import { NovaNota } from "./nova-nota";
 import { Proposta } from "./proposta";
 
@@ -29,15 +29,16 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
   const { id } = await params;
   const supabase = await criarClienteServidor();
 
-  const [{ data: negocio }, config] = await Promise.all([
+  const [{ data: negocio }, config, { data: parametros }] = await Promise.all([
     supabase
       .from("negocios")
       .select(
-        "id, numero, titulo, valor, descricao, status, funil_id, etapa_id, origem_id, responsavel_id, motivo_perda_id, motivo_perda_detalhe, fechado_em, created_at, updated_at, contatos(id, nome, tipo, telefone, email, cidade, uf)",
+        "id, numero, titulo, valor, descricao, status, funil_id, etapa_id, origem_id, responsavel_id, motivo_perda_id, motivo_perda_detalhe, fechado_em, created_at, updated_at, tipo_telhado, unidade_consumidora, padrao_cliente, estrutura_telhado, contatos(id, nome, tipo, telefone, email, cidade, uf)",
       )
       .eq("id", id)
       .maybeSingle(),
     carregarConfiguracao(atual.empresaId),
+    supabase.from("parametros_calculadora").select("*").eq("empresa_id", atual.empresaId).maybeSingle(),
   ]);
   if (!negocio) notFound();
 
@@ -62,18 +63,24 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
         .order("vence_em"),
       supabase
         .from("anexos")
-        .select("id, nome, tamanho, enviado_por, created_at")
+        .select("id, nome, tamanho, categoria, enviado_por, created_at")
         .eq("negocio_id", id)
         .order("created_at", { ascending: false }),
       supabase.from("negocio_etiquetas").select("etiqueta_id").eq("negocio_id", id),
       supabase
         .from("calculos_solares")
         .select(
-          "id, kit_id, kit_nome, tipo_ligacao, consumo_medio_kwh, tarifa_kwh, geracao_estimada_kwh_mes, economia_mensal, payback_meses, observacoes",
+          "id, kit_nome, tipo_ligacao, consumo_medio_kwh, tarifa_kwh, geracao_estimada_kwh_mes, economia_mensal, payback_meses, observacoes",
         )
         .eq("negocio_id", id)
         .maybeSingle(),
     ]);
+
+  const { data: componentes } = await supabase
+    .from("kit_componentes")
+    .select("tipo, descricao, potencia_w, quantidade")
+    .eq("negocio_id", id)
+    .order("ordem");
 
   const { data: proposta } = await supabase
     .from("propostas")
@@ -177,6 +184,9 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
                 responsavelId: negocio.responsavel_id,
                 valor: negocio.valor,
                 descricao: negocio.descricao,
+                tipoTelhado: negocio.tipo_telhado,
+                unidadeConsumidora: negocio.unidade_consumidora,
+                padraoCliente: negocio.padrao_cliente,
               }}
               etapas={config.etapas.filter(
                 (e) => e.funilId === negocio.funil_id && (e.ativa || e.id === negocio.etapa_id),
@@ -185,15 +195,32 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
               responsaveis={atual.papel === "vendedor" ? [] : config.membros.filter((m) => m.ativo)}
             />
           </Cartao>
-          <Cartao titulo="Calculadora solar">
-            <Calculadora
+          <Cartao titulo="Kit personalizado">
+            <KitPersonalizado
               negocioId={negocio.id}
-              kits={config.kits}
+              negocioValor={negocio.valor}
+              estruturaTelhado={negocio.estrutura_telhado}
+              componentesSalvos={(componentes ?? []).map((c) => ({
+                tipo: c.tipo as TipoComponenteKit,
+                descricao: c.descricao,
+                potenciaW: c.potencia_w,
+                quantidade: c.quantidade,
+              }))}
+              parametros={
+                parametros
+                  ? {
+                      produtividadeKwhKwpMes: parametros.produtividade_kwh_kwp_mes,
+                      percentualFioB: parametros.percentual_fio_b,
+                      disponibilidadeMonoKwh: parametros.disponibilidade_mono_kwh,
+                      disponibilidadeBiKwh: parametros.disponibilidade_bi_kwh,
+                      disponibilidadeTriKwh: parametros.disponibilidade_tri_kwh,
+                    }
+                  : null
+              }
               calculo={
                 calculo
                   ? {
                       id: calculo.id,
-                      kitId: calculo.kit_id,
                       kitNome: calculo.kit_nome,
                       tipoLigacao: calculo.tipo_ligacao as TipoLigacao,
                       consumoMedioKwh: calculo.consumo_medio_kwh,
@@ -367,6 +394,7 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
                   >
                     {a.nome}
                   </a>
+                  {a.categoria !== "geral" && <Selo tom="atencao">{ROTULO_CATEGORIA_ANEXO[a.categoria as CategoriaAnexo]}</Selo>}
                   <span className="text-xs text-zinc-500">{tamanhoLegivel(a.tamanho)}</span>
                   {(souAdmin || a.enviado_por === atual.membroId) && (
                     <form action={apagarAnexo}>

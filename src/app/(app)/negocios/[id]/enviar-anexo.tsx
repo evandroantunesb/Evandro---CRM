@@ -2,8 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
+import { Selecao } from "@/components/ui";
 import { registrarAnexo } from "@/lib/acoes/anexos";
 import { criarClienteNavegador } from "@/lib/supabase/navegador";
+import { CATEGORIAS_ANEXO, ROTULO_CATEGORIA_ANEXO, type CategoriaAnexo } from "@/lib/tipos";
 
 const LIMITE = 20 * 1024 * 1024;
 
@@ -22,6 +24,7 @@ export function EnviarAnexo({ empresaId, negocioId }: { empresaId: string; negoc
   const input = useRef<HTMLInputElement>(null);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [categoria, setCategoria] = useState<CategoriaAnexo>("geral");
 
   async function enviar(arquivos: FileList | null) {
     if (!arquivos?.length) return;
@@ -39,7 +42,14 @@ export function EnviarAnexo({ empresaId, negocioId }: { empresaId: string; negoc
         setErro(`Não foi possível enviar "${arquivo.name}".`);
         continue;
       }
-      const r = await registrarAnexo({ negocioId, caminho, nome: arquivo.name, tamanho: arquivo.size, tipoMime: arquivo.type });
+      const r = await registrarAnexo({
+        negocioId,
+        caminho,
+        nome: arquivo.name,
+        tamanho: arquivo.size,
+        tipoMime: arquivo.type,
+        categoria,
+      });
       if (!r?.ok) setErro(r?.mensagem ?? "Não foi possível registrar o arquivo.");
     }
     setEnviando(false);
@@ -49,6 +59,17 @@ export function EnviarAnexo({ empresaId, negocioId }: { empresaId: string; negoc
 
   return (
     <div className="flex flex-col gap-2">
+      <Selecao
+        rotulo="Categoria do arquivo"
+        value={categoria}
+        onChange={(e) => setCategoria(e.target.value as CategoriaAnexo)}
+      >
+        {CATEGORIAS_ANEXO.map((c) => (
+          <option key={c} value={c}>
+            {ROTULO_CATEGORIA_ANEXO[c]}
+          </option>
+        ))}
+      </Selecao>
       <label className="inline-flex cursor-pointer items-center justify-center rounded-md border border-dashed border-zinc-400 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50">
         {enviando ? "Enviando..." : "Anexar arquivo (foto, conta de luz, PDF)"}
         <input

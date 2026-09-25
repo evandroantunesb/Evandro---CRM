@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { calcular, DISPONIBILIDADE_PADRAO } from "@/lib/calculadora";
+import { calcular, componentesJsonSchema, DISPONIBILIDADE_PADRAO, nomeKitPersonalizado, potenciaKitPersonalizadoKwp } from "@/lib/calculadora";
 import { mensagemErro } from "@/lib/erros";
 import { exigirPapel } from "@/lib/sessao";
 import type { Database } from "@/lib/supabase/database.types";
@@ -18,15 +18,18 @@ type LinhaCalculo = Omit<
 >;
 
 /**
- * Monta a linha de `calculos_solares` a partir do kit e dos parâmetros da
- * empresa. Compartilhado entre "salvar cálculo" (negócio já existe) e a
- * criação de negócio com calculadora embutida (nova proposta).
+ * Monta a linha de `calculos_solares` a partir do kit (personalizado, por
+ * componentes) e dos parâmetros da empresa. Compartilhado entre "salvar kit
+ * e cálculo" (negócio já existe) e a criação de negócio com calculadora
+ * embutida (nova proposta).
  */
 export async function montarLinhaCalculo(
   supabase: SupabaseServidor,
   empresaId: string,
   entrada: {
-    kitId: string;
+    kitNome: string;
+    potenciaKwp: number;
+    precoKit: number;
     tipoLigacao: TipoLigacao;
     consumoMedioKwh: number | null;
     valorFaturaMedio: number | null;
@@ -36,24 +39,22 @@ export async function montarLinhaCalculo(
   if (entrada.consumoMedioKwh == null && entrada.valorFaturaMedio == null) {
     return { ok: false, mensagem: "Informe o consumo médio ou o valor médio da fatura." };
   }
+  if (entrada.potenciaKwp <= 0) {
+    return { ok: false, mensagem: "Informe ao menos um módulo com potência para calcular." };
+  }
   const consumoMedioKwh = entrada.consumoMedioKwh ?? entrada.valorFaturaMedio! / entrada.tarifaKwh;
 
-  const [{ data: kit }, { data: parametros }] = await Promise.all([
-    supabase
-      .from("kits_solares")
-      .select("id, nome, potencia_kwp, preco")
-      .eq("id", entrada.kitId)
-      .eq("empresa_id", empresaId)
-      .maybeSingle(),
-    supabase.from("parametros_calculadora").select("*").eq("empresa_id", empresaId).maybeSingle(),
-  ]);
-  if (!kit) return { ok: false, mensagem: "Kit não encontrado." };
+  const { data: parametros } = await supabase
+    .from("parametros_calculadora")
+    .select("*")
+    .eq("empresa_id", empresaId)
+    .maybeSingle();
   if (!parametros) return { ok: false, mensagem: "Parâmetros da calculadora não configurados." };
 
   const disponibilidadeKwh = parametros[DISPONIBILIDADE_PADRAO[entrada.tipoLigacao]] as number;
   const resultado = calcular({
-    potenciaKwp: kit.potencia_kwp,
-    precoKit: kit.preco,
+    potenciaKwp: entrada.potenciaKwp,
+    precoKit: entrada.precoKit,
     tipoLigacao: entrada.tipoLigacao,
     consumoMedioKwh,
     tarifaKwh: entrada.tarifaKwh,
@@ -66,10 +67,10 @@ export async function montarLinhaCalculo(
     ok: true,
     linha: {
       empresa_id: empresaId,
-      kit_id: kit.id,
-      kit_nome: kit.nome,
-      kit_potencia_kwp: kit.potencia_kwp,
-      kit_preco: kit.preco,
+      kit_id: null,
+      kit_nome: entrada.kitNome,
+      kit_potencia_kwp: entrada.potenciaKwp,
+      kit_preco: entrada.precoKit,
       tipo_ligacao: entrada.tipoLigacao,
       consumo_medio_kwh: consumoMedioKwh,
       valor_fatura_medio: entrada.valorFaturaMedio,
@@ -84,7 +85,9 @@ export async function montarLinhaCalculo(
       conta_sem_solar: resultado.contaSemSolar,
       conta_com_solar: resultado.contaComSolar,
       economia_mensal: resultado.economiaMensal,
-      payback_meses: resultado.paybackMeses,
+      // Sem preço do kit (negócio sem valor definido), o payback não tem
+      // significado — fica em aberto em vez de mostrar "0 meses".
+      payback_meses: entrada.precoKit > 0 ? resultado.paybackMeses : null,
     },
   };
 }
@@ -107,16 +110,22 @@ const numeroBrOpcional = z
   })
   .pipe(z.number().positive().nullable());
 
-export async function salvarCalculo(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+/**
+ * Salva o kit personalizado (módulos, inversor, baterias, outros) e recalcula
+ * o cálculo solar do negócio a partir dele. O preço usado no payback é o
+ * valor do negócio (o kit personalizado não tem preço por item).
+ */
+export async function salvarKitPersonalizado(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
   const { atual } = await exigirPapel();
   const dados = z
     .object({
       negocioId: z.string().uuid(),
-      kitId: z.string().uuid("Escolha um kit"),
       tipoLigacao: z.enum(TIPOS_LIGACAO),
       consumoMedioKwh: numeroBrOpcional,
       valorFaturaMedio: numeroBrOpcional,
       tarifaKwh: numeroBr("Informe a tarifa"),
+      estruturaTelhado: z.string().trim().max(120).optional(),
+      componentes: componentesJsonSchema,
       observacoes: z.string().trim().max(2000, "Máximo de 2.000 caracteres").optional(),
     })
     .refine((d) => d.consumoMedioKwh != null || d.valorFaturaMedio != null, {
@@ -128,10 +137,21 @@ export async function salvarCalculo(_: ResultadoAcao, formData: FormData): Promi
   const d = dados.data;
 
   const supabase = await criarClienteServidor();
-  const montado = await montarLinhaCalculo(supabase, atual.empresaId, d);
+  const { data: negocio } = await supabase.from("negocios").select("valor").eq("id", d.negocioId).maybeSingle();
+  if (!negocio) return { ok: false, mensagem: "Negócio não encontrado." };
+
+  const montado = await montarLinhaCalculo(supabase, atual.empresaId, {
+    kitNome: nomeKitPersonalizado(d.componentes),
+    potenciaKwp: potenciaKitPersonalizadoKwp(d.componentes),
+    precoKit: negocio.valor ?? 0,
+    tipoLigacao: d.tipoLigacao,
+    consumoMedioKwh: d.consumoMedioKwh,
+    valorFaturaMedio: d.valorFaturaMedio,
+    tarifaKwh: d.tarifaKwh,
+  });
   if (!montado.ok) return montado;
 
-  const { error } = await supabase.from("calculos_solares").upsert(
+  const { error: erroCalculo } = await supabase.from("calculos_solares").upsert(
     {
       ...montado.linha,
       negocio_id: d.negocioId,
@@ -141,10 +161,31 @@ export async function salvarCalculo(_: ResultadoAcao, formData: FormData): Promi
     },
     { onConflict: "negocio_id", ignoreDuplicates: false },
   );
-  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível salvar o cálculo.") };
+  if (erroCalculo) return { ok: false, mensagem: mensagemErro(erroCalculo, "Não foi possível salvar o cálculo.") };
+
+  await supabase.from("negocios").update({ estrutura_telhado: d.estruturaTelhado || null }).eq("id", d.negocioId);
+
+  // Substitui a lista de componentes (mais simples que sincronizar item a item).
+  await supabase.from("kit_componentes").delete().eq("negocio_id", d.negocioId);
+  if (d.componentes.length) {
+    const { error: erroComponentes } = await supabase.from("kit_componentes").insert(
+      d.componentes.map((c, i) => ({
+        empresa_id: atual.empresaId,
+        negocio_id: d.negocioId,
+        tipo: c.tipo,
+        descricao: c.descricao,
+        potencia_w: c.potenciaW,
+        quantidade: c.quantidade,
+        ordem: i,
+      })),
+    );
+    if (erroComponentes) {
+      return { ok: false, mensagem: "Cálculo salvo, mas não foi possível salvar os componentes do kit." };
+    }
+  }
 
   revalidatePath(`/negocios/${d.negocioId}`);
-  return { ok: true, mensagem: "Cálculo salvo." };
+  return { ok: true, mensagem: "Kit e cálculo salvos." };
 }
 
 export async function apagarCalculo(formData: FormData) {
@@ -153,7 +194,10 @@ export async function apagarCalculo(formData: FormData) {
   if (!id.success) return;
   const supabase = await criarClienteServidor();
   const { data } = await supabase.from("calculos_solares").delete().eq("id", id.data).select("negocio_id");
-  if (data?.[0]) revalidatePath(`/negocios/${data[0].negocio_id}`);
+  if (data?.[0]) {
+    await supabase.from("kit_componentes").delete().eq("negocio_id", data[0].negocio_id);
+    revalidatePath(`/negocios/${data[0].negocio_id}`);
+  }
 }
 
 const nomeKit = z.string().trim().min(2, "Nome muito curto").max(80, "Nome muito longo");

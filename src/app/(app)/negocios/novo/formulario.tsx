@@ -1,15 +1,15 @@
 "use client";
 
 import { useActionState, useMemo, useState, useTransition } from "react";
+import { EditorComponentesKit, linhasParaComponentes, type LinhaComponente } from "@/components/kit-componentes";
 import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
 import { buscarContatos, criarNegocio, verificarDuplicado, type Duplicado } from "@/lib/acoes/negocios";
-import { calcular } from "@/lib/calculadora";
+import { calcular, DISPONIBILIDADE_PADRAO_CAMEL, potenciaKitPersonalizadoKwp } from "@/lib/calculadora";
 import { formatarMoeda } from "@/lib/formatacao";
 import { ROTULO_TIPO_LIGACAO, TIPOS_LIGACAO, type TipoLigacao } from "@/lib/tipos";
 
 type Opcao = { id: string; nome: string };
 type ContatoEncontrado = { id: string; nome: string; telefone: string | null; email: string | null };
-type Kit = { id: string; nome: string; potenciaKwp: number; preco: number };
 type Parametros = {
   produtividadeKwhKwpMes: number;
   percentualFioB: number;
@@ -25,18 +25,11 @@ function numero(v: string): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-const DISPONIBILIDADE_POR_TIPO: Record<TipoLigacao, keyof Parametros> = {
-  monofasico: "disponibilidadeMonoKwh",
-  bifasico: "disponibilidadeBiKwh",
-  trifasico: "disponibilidadeTriKwh",
-};
-
 export function FormularioNegocio({
   funilId,
   origens,
   responsaveis,
   meuMembroId,
-  kits,
   parametros,
 }: {
   funilId: string;
@@ -44,7 +37,6 @@ export function FormularioNegocio({
   /** Vazio quando quem cria é vendedor: ele sempre fica como responsável. */
   responsaveis: Opcao[];
   meuMembroId: string;
-  kits: Kit[];
   parametros: Parametros | null;
 }) {
   const [resultado, acao, pendente] = useActionState(criarNegocio, null);
@@ -55,33 +47,41 @@ export function FormularioNegocio({
   const [duplicados, setDuplicados] = useState<Duplicado[]>([]);
   const [, iniciar] = useTransition();
 
-  // Calculadora embutida: assim que kit, tipo de ligação, tarifa e consumo
-  // (ou valor da fatura) estão preenchidos, o resultado já aparece — sem
-  // precisar abrir a calculadora separadamente depois de criar o negócio.
-  const [kitId, setKitId] = useState("");
+  // Passo 1 (negócio): a calculadora roda no backend a partir daqui — sem
+  // aparecer como um passo separado. Potência, consumo e tarifa ficam no
+  // negócio, não no contato (que é só dado pessoal/residência do cliente).
+  const [valor, setValor] = useState("");
   const [tipoLigacao, setTipoLigacao] = useState<TipoLigacao>("trifasico");
   const [consumoMedioKwh, setConsumoMedioKwh] = useState("");
   const [valorFaturaMedio, setValorFaturaMedio] = useState("");
   const [tarifaKwh, setTarifaKwh] = useState("");
 
+  // Passo 3 (depois de "Avançar"): personalização do kit.
+  const [mostrarKit, setMostrarKit] = useState(false);
+  const [linhas, setLinhas] = useState<LinhaComponente[]>([]);
+  const [estruturaTelhado, setEstruturaTelhado] = useState("");
+
+  const componentes = useMemo(() => linhasParaComponentes(linhas), [linhas]);
+  const potenciaKwp = potenciaKitPersonalizadoKwp(componentes);
+
   const previa = useMemo(() => {
-    const kit = kits.find((k) => k.id === kitId);
     const tarifa = numero(tarifaKwh);
     const consumo = numero(consumoMedioKwh);
     const fatura = numero(valorFaturaMedio);
-    if (!kit || !parametros || !tarifa || (!consumo && !fatura)) return null;
+    const precoKit = numero(valor);
+    if (!parametros || potenciaKwp <= 0 || !tarifa || (!consumo && !fatura)) return null;
     const consumoMedioFinal = consumo ?? fatura! / tarifa;
     return calcular({
-      potenciaKwp: kit.potenciaKwp,
-      precoKit: kit.preco,
+      potenciaKwp,
+      precoKit: precoKit ?? 0,
       tipoLigacao,
       consumoMedioKwh: consumoMedioFinal,
       tarifaKwh: tarifa,
       produtividadeKwhKwpMes: parametros.produtividadeKwhKwpMes,
       percentualFioB: parametros.percentualFioB,
-      disponibilidadeKwh: parametros[DISPONIBILIDADE_POR_TIPO[tipoLigacao]],
+      disponibilidadeKwh: parametros[DISPONIBILIDADE_PADRAO_CAMEL[tipoLigacao]],
     });
-  }, [kits, kitId, tipoLigacao, consumoMedioKwh, valorFaturaMedio, tarifaKwh, parametros]);
+  }, [parametros, tipoLigacao, consumoMedioKwh, valorFaturaMedio, tarifaKwh, potenciaKwp, valor]);
 
   function pesquisar(termo: string) {
     setBusca(termo);
@@ -98,6 +98,8 @@ export function FormularioNegocio({
   return (
     <form action={acao} className="flex flex-col gap-5">
       <input type="hidden" name="funil_id" value={funilId} />
+      <input type="hidden" name="tipo_ligacao" value={tipoLigacao} />
+      <input type="hidden" name="componentes" value={JSON.stringify(componentes)} />
 
       <fieldset className="grid gap-3 md:grid-cols-2">
         <legend className="mb-2 text-sm font-semibold text-zinc-900">Negócio</legend>
@@ -121,7 +123,56 @@ export function FormularioNegocio({
           </Selecao>
         )}
         <Campo rotulo="Nome do negócio" name="titulo" placeholder="Ex.: Residência 5 kWp" required />
-        <Campo rotulo="Valor estimado (R$)" name="valor" inputMode="decimal" placeholder="Opcional" />
+        <Campo
+          rotulo="Valor estimado (R$)"
+          name="valor"
+          inputMode="decimal"
+          placeholder="Opcional"
+          value={valor}
+          onChange={(e) => setValor(e.target.value)}
+        />
+        <Campo
+          rotulo="Consumo médio (12 meses, kWh)"
+          name="consumo_medio_kwh"
+          inputMode="decimal"
+          placeholder="ex.: 450"
+          value={consumoMedioKwh}
+          onChange={(e) => setConsumoMedioKwh(e.target.value)}
+        />
+        <Campo
+          rotulo="Ou valor médio da fatura (R$)"
+          name="valor_fatura_medio"
+          inputMode="decimal"
+          placeholder="ex.: 450,00"
+          value={valorFaturaMedio}
+          onChange={(e) => setValorFaturaMedio(e.target.value)}
+        />
+        <Campo
+          rotulo="Tarifa (R$/kWh)"
+          name="tarifa_kwh"
+          inputMode="decimal"
+          placeholder="ex.: 0,95"
+          value={tarifaKwh}
+          onChange={(e) => setTarifaKwh(e.target.value)}
+        />
+        <Selecao
+          rotulo="Tipo de ligação"
+          value={tipoLigacao}
+          onChange={(e) => setTipoLigacao(e.target.value as TipoLigacao)}
+        >
+          {TIPOS_LIGACAO.map((t) => (
+            <option key={t} value={t}>
+              {ROTULO_TIPO_LIGACAO[t]}
+            </option>
+          ))}
+        </Selecao>
+        <Campo rotulo="Unidade consumidora" name="unidade_consumidora" placeholder="Opcional" />
+        <Campo rotulo="Padrão do cliente" name="padrao_cliente" placeholder="Opcional" />
+        <Campo rotulo="Tipo do telhado" name="tipo_telhado" placeholder="Ex.: cerâmico, metálico, laje, solo" />
+        <div className="flex flex-col gap-1 text-sm">
+          <span className="font-medium text-zinc-700">CNH (opcional)</span>
+          <input type="file" name="anexo_cnh_negocio" accept="image/*,.pdf" className="text-sm" />
+        </div>
         <label className="flex flex-col gap-1 text-sm md:col-span-2">
           <span className="font-medium text-zinc-700">Descrição</span>
           <textarea name="descricao" rows={2} className="rounded-md border border-zinc-300 px-3 py-2" />
@@ -235,62 +286,46 @@ export function FormularioNegocio({
             ))}
           </div>
         )}
+
+        <div className="grid gap-3 md:grid-cols-2">
+          <div className="flex flex-col gap-1 text-sm">
+            <span className="font-medium text-zinc-700">CNH / documento do cliente (opcional)</span>
+            <input type="file" name="anexo_cnh_contato" accept="image/*,.pdf" className="text-sm" />
+          </div>
+          <div className="flex flex-col gap-1 text-sm">
+            <span className="font-medium text-zinc-700">Fatura do gerador (opcional)</span>
+            <input type="file" name="anexo_fatura_gerador" accept="image/*,.pdf" className="text-sm" />
+          </div>
+          <div className="flex flex-col gap-1 text-sm md:col-span-2">
+            <span className="font-medium text-zinc-700">Fatura dos beneficiários (quando aplicável)</span>
+            <input type="file" name="anexo_fatura_beneficiario" accept="image/*,.pdf" multiple className="text-sm" />
+          </div>
+        </div>
       </fieldset>
 
-      {kits.length > 0 && parametros && (
+      {!mostrarKit && (
+        <Botao type="button" onClick={() => setMostrarKit(true)} className="self-start">
+          Avançar
+        </Botao>
+      )}
+
+      {mostrarKit && (
         <fieldset className="flex flex-col gap-3">
-          <legend className="mb-2 text-sm font-semibold text-zinc-900">Calculadora solar (opcional)</legend>
-          <p className="-mt-1 text-xs text-zinc-500">
-            Escolha o kit e informe o consumo para já sair daqui com a economia e o payback calculados.
-          </p>
-          <div className="grid gap-3 md:grid-cols-2">
-            <Selecao rotulo="Kit" name="kit_id" value={kitId} onChange={(e) => setKitId(e.target.value)}>
-              <option value="">Calcular depois</option>
-              {kits.map((k) => (
-                <option key={k.id} value={k.id}>
-                  {k.nome} · {k.potenciaKwp.toLocaleString("pt-BR")} kWp · {formatarMoeda(k.preco)}
-                </option>
-              ))}
-            </Selecao>
-            <Selecao
-              rotulo="Tipo de ligação"
-              name="tipo_ligacao"
-              value={tipoLigacao}
-              onChange={(e) => setTipoLigacao(e.target.value as TipoLigacao)}
-            >
-              {TIPOS_LIGACAO.map((t) => (
-                <option key={t} value={t}>
-                  {ROTULO_TIPO_LIGACAO[t]}
-                </option>
-              ))}
-            </Selecao>
-            <Campo
-              rotulo="Consumo médio (kWh/mês)"
-              name="consumo_medio_kwh"
-              inputMode="decimal"
-              placeholder="ex.: 450"
-              value={consumoMedioKwh}
-              onChange={(e) => setConsumoMedioKwh(e.target.value)}
-            />
-            <Campo
-              rotulo="Ou valor médio da fatura (R$)"
-              name="valor_fatura_medio"
-              inputMode="decimal"
-              placeholder="ex.: 450,00"
-              value={valorFaturaMedio}
-              onChange={(e) => setValorFaturaMedio(e.target.value)}
-            />
-            <Campo
-              rotulo="Tarifa (R$/kWh)"
-              name="tarifa_kwh"
-              inputMode="decimal"
-              placeholder="ex.: 0,95"
-              value={tarifaKwh}
-              onChange={(e) => setTarifaKwh(e.target.value)}
-            />
-          </div>
+          <legend className="mb-2 text-sm font-semibold text-zinc-900">Kit personalizado</legend>
+          <EditorComponentesKit linhas={linhas} onChange={setLinhas} />
+          <Campo
+            rotulo="Estrutura do telhado"
+            name="estrutura_telhado"
+            value={estruturaTelhado}
+            onChange={(e) => setEstruturaTelhado(e.target.value)}
+            placeholder="Ex.: perfil de alumínio, gancho"
+          />
           {previa && (
             <dl className="grid grid-cols-2 gap-3 rounded-lg bg-amber-50 px-4 py-3 text-sm md:grid-cols-4">
+              <div>
+                <dt className="text-zinc-500">Potência do kit</dt>
+                <dd className="font-medium text-zinc-900">{potenciaKwp.toLocaleString("pt-BR")} kWp</dd>
+              </div>
               <div>
                 <dt className="text-zinc-500">Geração estimada</dt>
                 <dd className="font-medium text-zinc-900">{previa.geracaoEstimadaKwhMes.toLocaleString("pt-BR")} kWh/mês</dd>
@@ -307,13 +342,13 @@ export function FormularioNegocio({
               </div>
             </dl>
           )}
+
+          <Mensagem resultado={resultado} />
+          <Botao type="submit" disabled={pendente || (modo === "existente" && !contato)} className="self-start">
+            {pendente ? "Salvando..." : "Salvar negócio"}
+          </Botao>
         </fieldset>
       )}
-
-      <Mensagem resultado={resultado} />
-      <Botao type="submit" disabled={pendente || (modo === "existente" && !contato)} className="self-start">
-        {pendente ? "Salvando..." : "Salvar negócio"}
-      </Botao>
     </form>
   );
 }

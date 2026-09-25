@@ -28,7 +28,6 @@ export default async function NovoNegocio({ searchParams }: PageProps<"/negocios
           origens={config.origens.filter((o) => o.ativa)}
           responsaveis={atual.papel === "vendedor" ? [] : config.membros.filter((m) => m.ativo)}
           meuMembroId={atual.membroId}
-          kits={config.kits.filter((k) => k.ativo)}
           parametros={
             parametros
               ? {

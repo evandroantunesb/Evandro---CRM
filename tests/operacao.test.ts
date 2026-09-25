@@ -252,4 +252,29 @@ describe("anexos", () => {
       .insert({ empresa_id: empresa, negocio_id: negocio, nome: "x", caminho: `${outra}/${negocio}/x`, tamanho: 1 });
     expect(error).not.toBeNull();
   });
+
+  it("categoria nasce 'geral' por padrão e aceita CNH/faturas; rejeita valor fora da lista", async () => {
+    const caminho = `${empresa}/${negocio}/${sufixo}-categoria.txt`;
+    await vendedor1.cliente.storage.from("anexos").upload(caminho, arquivo());
+    const { data } = await vendedor1.cliente
+      .from("anexos")
+      .insert({ empresa_id: empresa, negocio_id: negocio, nome: "categoria.txt", caminho, tamanho: 12 })
+      .select("categoria")
+      .single();
+    expect(data!.categoria).toBe("geral");
+
+    const caminhoCnh = `${empresa}/${negocio}/${sufixo}-cnh.txt`;
+    await vendedor1.cliente.storage.from("anexos").upload(caminhoCnh, arquivo());
+    const { error: erroCnh } = await vendedor1.cliente
+      .from("anexos")
+      .insert({ empresa_id: empresa, negocio_id: negocio, nome: "cnh.txt", caminho: caminhoCnh, tamanho: 12, categoria: "cnh" });
+    expect(erroCnh).toBeNull();
+
+    const caminhoInvalido = `${empresa}/${negocio}/${sufixo}-invalido.txt`;
+    await vendedor1.cliente.storage.from("anexos").upload(caminhoInvalido, arquivo());
+    const { error: erroInvalido } = await vendedor1.cliente
+      .from("anexos")
+      .insert({ empresa_id: empresa, negocio_id: negocio, nome: "x.txt", caminho: caminhoInvalido, tamanho: 12, categoria: "outra_coisa" });
+    expect(erroInvalido).not.toBeNull();
+  });
 });

@@ -61,6 +61,26 @@ export const ROTULO_TIPO_LIGACAO: Record<TipoLigacao, string> = {
   trifasico: "Trifásico",
 };
 
+export const TIPOS_COMPONENTE_KIT = ["modulo", "inversor", "bateria", "outro"] as const;
+export type TipoComponenteKit = (typeof TIPOS_COMPONENTE_KIT)[number];
+
+export const ROTULO_TIPO_COMPONENTE_KIT: Record<TipoComponenteKit, string> = {
+  modulo: "Módulo",
+  inversor: "Inversor",
+  bateria: "Bateria",
+  outro: "Outro",
+};
+
+export const CATEGORIAS_ANEXO = ["geral", "cnh", "fatura_gerador", "fatura_beneficiario"] as const;
+export type CategoriaAnexo = (typeof CATEGORIAS_ANEXO)[number];
+
+export const ROTULO_CATEGORIA_ANEXO: Record<CategoriaAnexo, string> = {
+  geral: "Geral",
+  cnh: "CNH / documento",
+  fatura_gerador: "Fatura do gerador",
+  fatura_beneficiario: "Fatura dos beneficiários",
+};
+
 export const MODOS_PRECO = ["sem_preco", "parcelado", "avista", "completo"] as const;
 export type ModoPreco = (typeof MODOS_PRECO)[number];
 
