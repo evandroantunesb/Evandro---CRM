@@ -7,10 +7,10 @@ export function TelaPublica({ titulo, children }: { titulo: string; children: Re
   return (
     <main className="flex min-h-screen">
       <section className="relative hidden w-1/2 overflow-hidden bg-carvao lg:block">
-        <Image src="/marca/paisagem.jpg" alt="" fill priority sizes="50vw" className="object-cover opacity-80" />
+        <Image src="/marca/paisagem.jpg" alt="" fill priority sizes="50vw" className="object-cover object-[65%_center] opacity-80" />
         <div className="absolute inset-0 bg-linear-to-t from-carvao via-carvao/40 to-carvao/20" />
         <div className="relative flex h-full flex-col justify-between p-12 text-offwhite">
-          <LogoRaion tom="claro" altura={30} />
+          <LogoRaion tom="claro" altura={34} />
           <div className="max-w-md">
             <p className="font-titulo text-4xl leading-tight font-light">
               Relacionamentos de hoje.
@@ -27,7 +27,7 @@ export function TelaPublica({ titulo, children }: { titulo: string; children: Re
       <section className="flex flex-1 items-center justify-center p-6">
         <div className="w-full max-w-sm">
           <div className="mb-10 lg:hidden">
-            <LogoRaion altura={28} />
+            <LogoRaion altura={32} />
           </div>
           <p className="mb-2 text-[11px] font-medium tracking-[0.3em] text-zinc-500 uppercase">CRM para negócios que vão mais longe</p>
           <h1 className="mb-8 text-3xl font-semibold text-carvao">{titulo}</h1>

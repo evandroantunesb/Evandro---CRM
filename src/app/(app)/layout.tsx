@@ -43,7 +43,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
       <aside className="flex flex-col gap-5 bg-carvao p-4 text-offwhite md:sticky md:top-0 md:h-screen md:w-64 md:p-5">
         <div className="flex items-center justify-between gap-3 md:block">
           <Link href="/inicio" aria-label="Início">
-            <LogoRaion tom="claro" altura={24} />
+            <LogoRaion tom="claro" altura={28} />
           </Link>
           {sessao.vinculos.length > 1 ? (
             <form action={trocarEmpresa} className="flex gap-1 md:mt-5">
