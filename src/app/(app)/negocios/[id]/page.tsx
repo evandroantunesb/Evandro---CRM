@@ -33,7 +33,7 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
     supabase
       .from("negocios")
       .select(
-        "id, numero, titulo, valor, descricao, status, funil_id, etapa_id, origem_id, responsavel_id, motivo_perda_id, motivo_perda_detalhe, fechado_em, created_at, updated_at, tipo_telhado, unidade_consumidora, padrao_cliente, estrutura_telhado, contatos(id, nome, tipo, telefone, email, cidade, uf)",
+        "id, numero, titulo, valor, descricao, status, funil_id, etapa_id, origem_id, responsavel_id, motivo_perda_id, motivo_perda_detalhe, fechado_em, created_at, updated_at, tipo_telhado, unidade_consumidora, padrao_cliente, estrutura_telhado, consumo_medio_kwh, valor_fatura_medio, contatos(id, nome, tipo, telefone, email, cidade, uf)",
       )
       .eq("id", id)
       .maybeSingle(),
@@ -187,6 +187,8 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
                 tipoTelhado: negocio.tipo_telhado,
                 unidadeConsumidora: negocio.unidade_consumidora,
                 padraoCliente: negocio.padrao_cliente,
+                consumoMedioKwh: negocio.consumo_medio_kwh,
+                valorFaturaMedio: negocio.valor_fatura_medio,
               }}
               etapas={config.etapas.filter(
                 (e) => e.funilId === negocio.funil_id && (e.ativa || e.id === negocio.etapa_id),
@@ -200,6 +202,9 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
               negocioId={negocio.id}
               negocioValor={negocio.valor}
               estruturaTelhado={negocio.estrutura_telhado}
+              padraoCliente={negocio.padrao_cliente}
+              consumoMedioKwhPadrao={negocio.consumo_medio_kwh}
+              valorFaturaMedioPadrao={negocio.valor_fatura_medio}
               componentesSalvos={(componentes ?? []).map((c) => ({
                 tipo: c.tipo as TipoComponenteKit,
                 descricao: c.descricao,

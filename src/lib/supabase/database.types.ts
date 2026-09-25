@@ -955,6 +955,7 @@ export type Database = {
       }
       negocios: {
         Row: {
+          consumo_medio_kwh: number | null
           contato_id: string
           created_at: string
           criado_por: string | null
@@ -978,8 +979,10 @@ export type Database = {
           unidade_consumidora: string | null
           updated_at: string
           valor: number | null
+          valor_fatura_medio: number | null
         }
         Insert: {
+          consumo_medio_kwh?: number | null
           contato_id: string
           created_at?: string
           criado_por?: string | null
@@ -1003,8 +1006,10 @@ export type Database = {
           unidade_consumidora?: string | null
           updated_at?: string
           valor?: number | null
+          valor_fatura_medio?: number | null
         }
         Update: {
+          consumo_medio_kwh?: number | null
           contato_id?: string
           created_at?: string
           criado_por?: string | null
@@ -1028,6 +1033,7 @@ export type Database = {
           unidade_consumidora?: string | null
           updated_at?: string
           valor?: number | null
+          valor_fatura_medio?: number | null
         }
         Relationships: [
           {
