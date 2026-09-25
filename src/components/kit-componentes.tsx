@@ -1,6 +1,8 @@
 "use client";
 
+import { useState, useTransition } from "react";
 import { Botao, Campo } from "@/components/ui";
+import { buscarComponentesCatalogo } from "@/lib/acoes/opensolar";
 import { ROTULO_TIPO_COMPONENTE_KIT, TIPOS_COMPONENTE_KIT, type TipoComponenteKit } from "@/lib/tipos";
 
 export type LinhaComponente = { tipo: TipoComponenteKit; descricao: string; potenciaW: string; quantidade: string };
@@ -26,6 +28,61 @@ export function linhasParaComponentes(linhas: LinhaComponente[]) {
       potenciaW: numero(l.potenciaW),
       quantidade: Math.max(1, Math.round(numero(l.quantidade) ?? 1)),
     }));
+}
+
+/**
+ * Campo "Modelo / descrição": pra módulo e inversor, busca no catálogo técnico
+ * (OpenSolar) conforme digita e preenche a potência junto ao escolher um resultado.
+ * Continua aceitando texto livre (a busca é só um atalho).
+ */
+function CampoModeloComBusca({
+  tipo,
+  valor,
+  placeholder,
+  onChangeTexto,
+  onSelecionar,
+}: {
+  tipo: TipoComponenteKit;
+  valor: string;
+  placeholder: string;
+  onChangeTexto: (v: string) => void;
+  onSelecionar: (descricao: string, potenciaW: string) => void;
+}) {
+  const [resultados, setResultados] = useState<{ id: number; descricao: string; potenciaW: number | null }[]>([]);
+  const [, iniciar] = useTransition();
+  const pesquisavel = tipo === "modulo" || tipo === "inversor";
+
+  function pesquisar(termo: string) {
+    onChangeTexto(termo);
+    if (!pesquisavel) return;
+    if (termo.trim().length < 2) return setResultados([]);
+    iniciar(async () => setResultados(await buscarComponentesCatalogo(tipo, termo)));
+  }
+
+  return (
+    <div className="relative">
+      <Campo rotulo="Modelo / descrição" value={valor} onChange={(e) => pesquisar(e.target.value)} placeholder={placeholder} />
+      {resultados.length > 0 && (
+        <ul className="absolute z-10 mt-1 w-full rounded-md border border-zinc-200 bg-white text-sm shadow-md">
+          {resultados.map((r) => (
+            <li key={r.id}>
+              <button
+                type="button"
+                onClick={() => {
+                  onSelecionar(r.descricao, r.potenciaW != null ? String(r.potenciaW) : "");
+                  setResultados([]);
+                }}
+                className="block w-full px-3 py-2 text-left hover:bg-zinc-50"
+              >
+                {r.descricao}
+                {r.potenciaW != null && <span className="text-zinc-400"> · {r.potenciaW} W</span>}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 /** Editor do kit personalizado: módulos, inversor, baterias e outros itens (múltiplos de cada). */
@@ -65,11 +122,12 @@ export function EditorComponentesKit({
             {doTipo.length === 0 && <p className="text-xs text-zinc-400">Nenhum item.</p>}
             {doTipo.map(({ l, i }) => (
               <div key={i} className="grid grid-cols-2 items-end gap-2 rounded-lg bg-zinc-50 p-2 md:grid-cols-[2fr_1fr_1fr_auto]">
-                <Campo
-                  rotulo="Modelo / descrição"
-                  value={l.descricao}
-                  onChange={(e) => atualizar(i, { descricao: e.target.value })}
+                <CampoModeloComBusca
+                  tipo={tipo}
+                  valor={l.descricao}
                   placeholder={tipo === "modulo" ? "Ex.: Canadian 550 W" : "Ex.: Growatt 5 kW"}
+                  onChangeTexto={(v) => atualizar(i, { descricao: v })}
+                  onSelecionar={(descricao, potenciaW) => atualizar(i, { descricao, potenciaW })}
                 />
                 <Campo
                   rotulo="Potência (W)"
