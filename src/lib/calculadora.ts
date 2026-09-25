@@ -125,6 +125,21 @@ export const componentesJsonSchema = z
     }
   });
 
+/**
+ * Sugere quantos módulos de uma dada potência cobririam o consumo informado
+ * (100% de compensação, modo comercial). Sugestão de partida pro vendedor —
+ * não considera Fio B/disponibilidade nem espaço de telhado.
+ */
+export function sugerirQuantidadeModulos(
+  consumoMedioKwh: number,
+  produtividadeKwhKwpMes: number,
+  potenciaModuloW: number,
+): number | null {
+  if (consumoMedioKwh <= 0 || produtividadeKwhKwpMes <= 0 || potenciaModuloW <= 0) return null;
+  const potenciaNecessariaKwp = consumoMedioKwh / produtividadeKwhKwpMes;
+  return Math.max(1, Math.ceil((potenciaNecessariaKwp * 1000) / potenciaModuloW));
+}
+
 /** Nome de exibição do kit a partir dos componentes escolhidos. */
 export function nomeKitPersonalizado(componentes: ComponenteKit[]): string {
   const modulo = componentes.find((c) => c.tipo === "modulo");

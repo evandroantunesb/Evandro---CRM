@@ -4,7 +4,12 @@ import { useActionState, useMemo, useState, useTransition } from "react";
 import { EditorComponentesKit, linhasParaComponentes, type LinhaComponente } from "@/components/kit-componentes";
 import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
 import { buscarContatos, criarNegocio, verificarDuplicado, type Duplicado } from "@/lib/acoes/negocios";
-import { calcular, DISPONIBILIDADE_PADRAO_CAMEL, potenciaKitPersonalizadoKwp } from "@/lib/calculadora";
+import {
+  calcular,
+  DISPONIBILIDADE_PADRAO_CAMEL,
+  potenciaKitPersonalizadoKwp,
+  sugerirQuantidadeModulos,
+} from "@/lib/calculadora";
 import { formatarMoeda } from "@/lib/formatacao";
 import { ROTULO_TIPO_LIGACAO, TIPOS_LIGACAO, type TipoLigacao } from "@/lib/tipos";
 
@@ -84,6 +89,24 @@ export function FormularioNegocio({
     setUltimoPrecoSugerido(precoSugerido);
     if (precoSugerido != null && !valorTocado) setValor(String(precoSugerido));
   }
+
+  // Consumo médio em kWh, vindo do campo direto ou calculado a partir da fatura + tarifa.
+  const consumoMedioEstimado = useMemo(() => {
+    const tarifa = numero(tarifaKwh);
+    const consumo = numero(consumoMedioKwh);
+    const fatura = numero(valorFaturaMedio);
+    if (consumo) return consumo;
+    if (fatura && tarifa) return fatura / tarifa;
+    return null;
+  }, [consumoMedioKwh, valorFaturaMedio, tarifaKwh]);
+
+  // Sugere a quantidade de módulos pro consumo já informado, assim que o
+  // vendedor escolhe (ou digita) a potência de um módulo.
+  const sugerirQuantidadeModulo = useMemo(() => {
+    if (!parametros || !consumoMedioEstimado) return undefined;
+    return (potenciaW: number) =>
+      sugerirQuantidadeModulos(consumoMedioEstimado, parametros.produtividadeKwhKwpMes, potenciaW);
+  }, [parametros, consumoMedioEstimado]);
 
   const previa = useMemo(() => {
     const tarifa = numero(tarifaKwh);
@@ -343,7 +366,7 @@ export function FormularioNegocio({
       {mostrarKit && (
         <fieldset className="flex flex-col gap-3">
           <legend className="mb-2 text-sm font-semibold text-zinc-900">Kit personalizado</legend>
-          <EditorComponentesKit linhas={linhas} onChange={setLinhas} />
+          <EditorComponentesKit linhas={linhas} onChange={setLinhas} sugerirQuantidadeModulo={sugerirQuantidadeModulo} />
           <Campo
             rotulo="Estrutura do telhado"
             name="estrutura_telhado"

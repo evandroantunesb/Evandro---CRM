@@ -105,15 +105,34 @@ function CampoModeloComBusca({
 export function EditorComponentesKit({
   linhas,
   onChange,
+  sugerirQuantidadeModulo,
 }: {
   linhas: LinhaComponente[];
   onChange: (linhas: LinhaComponente[]) => void;
+  /** Dado o consumo já informado no formulário, sugere quantos módulos de uma potência cobririam ele. */
+  sugerirQuantidadeModulo?: (potenciaW: number) => number | null;
 }) {
   function adicionar(tipo: TipoComponenteKit) {
     onChange([...linhas, novaLinhaComponente(tipo)]);
   }
   function atualizar(indice: number, patch: Partial<LinhaComponente>) {
-    onChange(linhas.map((l, i) => (i === indice ? { ...l, ...patch } : l)));
+    onChange(
+      linhas.map((l, i) => {
+        if (i !== indice) return l;
+        const atualizada = { ...l, ...patch };
+        // Ao (re)definir a potência de um módulo com quantidade ainda no padrão,
+        // já sugere quantos módulos cobririam o consumo informado.
+        if (atualizada.tipo === "modulo" && patch.potenciaW && sugerirQuantidadeModulo) {
+          const quantidadeAtual = l.quantidade.trim();
+          if (quantidadeAtual === "" || quantidadeAtual === "1") {
+            const potenciaNum = numero(patch.potenciaW);
+            const sugestao = potenciaNum != null ? sugerirQuantidadeModulo(potenciaNum) : null;
+            if (sugestao) atualizada.quantidade = String(sugestao);
+          }
+        }
+        return atualizada;
+      }),
+    );
   }
   function remover(indice: number) {
     onChange(linhas.filter((_, i) => i !== indice));
@@ -135,6 +154,11 @@ export function EditorComponentesKit({
                 + Adicionar {ROTULO_TIPO_COMPONENTE_KIT[tipo].toLowerCase()}
               </button>
             </div>
+            {tipo === "modulo" && sugerirQuantidadeModulo && (
+              <p className="text-xs text-zinc-400">
+                Ao escolher a potência do módulo, a quantidade é sugerida a partir do consumo informado — ajuste se precisar.
+              </p>
+            )}
             {doTipo.length === 0 && <p className="text-xs text-zinc-400">Nenhum item.</p>}
             {doTipo.map(({ l, i }) => (
               <div key={i} className="grid grid-cols-2 items-end gap-2 rounded-lg bg-zinc-50 p-2 md:grid-cols-[2fr_1fr_1fr_auto]">
