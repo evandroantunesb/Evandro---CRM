@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { obterSessao } from "@/lib/sessao";
 import { trocarEmpresa } from "@/lib/acoes/empresa-atual";
 import { ROTULO_PAPEL } from "@/lib/tipos";
@@ -55,7 +56,9 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
         </div>
         <Menu itens={itens} />
         <div className="flex items-center justify-between gap-2 text-sm md:mt-auto md:block md:border-t md:border-zinc-200 md:pt-3">
-          <p className="truncate font-medium text-zinc-900">{sessao.nome}</p>
+          <Link href="/perfil" className="block truncate font-medium text-zinc-900 hover:underline" title="Meu perfil">
+            {sessao.nome}
+          </Link>
           {papel && <p className="text-zinc-500">{ROTULO_PAPEL[papel]}</p>}
           <form action="/sair" method="post" className="md:mt-2">
             <button className="text-zinc-600 hover:underline">Sair</button>

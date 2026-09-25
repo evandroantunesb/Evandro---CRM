@@ -5,7 +5,7 @@ import { exigirSuperAdmin } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { ROTULO_PAPEL, ROTULO_TIPO_VENDEDOR, type Papel, type TipoVendedor } from "@/lib/tipos";
 import { alterarSituacao } from "../../actions";
-import { FormularioAdmin } from "../../formularios";
+import { FormularioAdmin, FormularioEdicaoEmpresa } from "../../formularios";
 import { SeloSituacao } from "../../situacao";
 
 export default async function Empresa({ params }: PageProps<"/super-admin/empresas/[id]">) {
@@ -31,6 +31,9 @@ export default async function Empresa({ params }: PageProps<"/super-admin/empres
         <h1 className="text-2xl font-semibold text-zinc-900">{empresa.nome}</h1>
         <SeloSituacao situacao={empresa.situacao} />
       </div>
+      <Cartao titulo="Dados da empresa">
+        <FormularioEdicaoEmpresa empresa={{ id: empresa.id, nome: empresa.nome, cnpj: empresa.cnpj }} />
+      </Cartao>
       <Cartao titulo="Situação">
         <p className="mb-3 text-sm text-zinc-600">
           Empresa suspensa ou cancelada perde o acesso na hora. Os dados continuam guardados.

@@ -13,10 +13,14 @@ export async function garantirUsuario(email: string, nome: string): Promise<{ us
 
   const { data: existente } = await admin
     .from("perfis")
-    .select("id")
+    .select("id, nome")
     .eq("email", emailNormalizado)
     .maybeSingle();
-  if (existente) return { userId: existente.id, novo: false };
+  if (existente) {
+    // Conta criada sem nome (ex.: pelo painel do Supabase): aproveita o nome informado.
+    if (!existente.nome?.trim() && nome.trim()) await admin.from("perfis").update({ nome: nome.trim() }).eq("id", existente.id);
+    return { userId: existente.id, novo: false };
+  }
 
   const { data, error } = await admin.auth.admin.inviteUserByEmail(emailNormalizado, {
     data: { nome },

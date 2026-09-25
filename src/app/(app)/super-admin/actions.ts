@@ -86,3 +86,24 @@ export async function alterarSituacao(formData: FormData) {
   revalidatePath("/super-admin");
   revalidatePath(`/super-admin/empresas/${dados.empresaId}`);
 }
+
+export async function editarEmpresa(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  await exigirSuperAdmin();
+  const dados = z
+    .object({
+      empresaId: z.string().uuid(),
+      nome: z.string().trim().min(2, "Informe o nome da empresa").max(120, "Nome muito longo"),
+      cnpj: z.string().trim().max(20, "CNPJ inválido").optional(),
+    })
+    .safeParse(Object.fromEntries(formData));
+  if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
+
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase
+    .from("empresas")
+    .update({ nome: dados.data.nome, cnpj: dados.data.cnpj || null })
+    .eq("id", dados.data.empresaId);
+  if (error) return { ok: false, mensagem: "Não foi possível salvar." };
+  revalidatePath("/", "layout");
+  return { ok: true, mensagem: "Empresa atualizada." };
+}
