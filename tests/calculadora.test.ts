@@ -1,6 +1,6 @@
 /** Calculadora solar (modo comercial): geração, desconto de disponibilidade e Fio B, payback. */
 import { describe, expect, it } from "vitest";
-import { calcular, potenciaKitPersonalizadoKwp } from "@/lib/calculadora";
+import { calcular, potenciaKitPersonalizadoKwp, sugerirQuantidadeModulos } from "@/lib/calculadora";
 
 describe("calcular", () => {
   it("desconta a disponibilidade mínima quando o kit cobre todo o consumo", () => {
@@ -98,5 +98,22 @@ describe("potenciaKitPersonalizadoKwp", () => {
 
   it("zero quando não há componentes", () => {
     expect(potenciaKitPersonalizadoKwp([])).toBe(0);
+  });
+});
+
+describe("sugerirQuantidadeModulos", () => {
+  it("arredonda pra cima a quantidade que cobre 100% do consumo", () => {
+    // Precisa de 500/120 = 4,1667 kWp; com módulo de 550W, 4166,67/550 = 7,58 → 8.
+    expect(sugerirQuantidadeModulos(500, 120, 550)).toBe(8);
+  });
+
+  it("sugere no mínimo 1 módulo quando o consumo é baixo", () => {
+    expect(sugerirQuantidadeModulos(10, 120, 550)).toBe(1);
+  });
+
+  it("retorna null com consumo, produtividade ou potência inválidos", () => {
+    expect(sugerirQuantidadeModulos(0, 120, 550)).toBeNull();
+    expect(sugerirQuantidadeModulos(500, 0, 550)).toBeNull();
+    expect(sugerirQuantidadeModulos(500, 120, 0)).toBeNull();
   });
 });

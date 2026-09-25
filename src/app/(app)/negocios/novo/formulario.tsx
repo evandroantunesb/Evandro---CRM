@@ -4,7 +4,12 @@ import { useActionState, useMemo, useState, useTransition } from "react";
 import { EditorComponentesKit, linhasParaComponentes, type LinhaComponente } from "@/components/kit-componentes";
 import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
 import { buscarContatos, criarNegocio, verificarDuplicado, type Duplicado } from "@/lib/acoes/negocios";
-import { calcular, DISPONIBILIDADE_PADRAO_CAMEL, potenciaKitPersonalizadoKwp } from "@/lib/calculadora";
+import {
+  calcular,
+  DISPONIBILIDADE_PADRAO_CAMEL,
+  potenciaKitPersonalizadoKwp,
+  sugerirQuantidadeModulos,
+} from "@/lib/calculadora";
 import { formatarMoeda } from "@/lib/formatacao";
 import { ROTULO_TIPO_LIGACAO, TIPOS_LIGACAO, type TipoLigacao } from "@/lib/tipos";
 
@@ -51,6 +56,7 @@ export function FormularioNegocio({
   // aparecer como um passo separado. Potência, consumo e tarifa ficam no
   // negócio, não no contato (que é só dado pessoal/residência do cliente).
   const [valor, setValor] = useState("");
+  const [valorTocado, setValorTocado] = useState(false);
   const [tipoLigacao, setTipoLigacao] = useState<TipoLigacao>("trifasico");
   const [consumoMedioKwh, setConsumoMedioKwh] = useState("");
   const [valorFaturaMedio, setValorFaturaMedio] = useState("");
@@ -63,6 +69,44 @@ export function FormularioNegocio({
 
   const componentes = useMemo(() => linhasParaComponentes(linhas), [linhas]);
   const potenciaKwp = potenciaKitPersonalizadoKwp(componentes);
+
+  // Soma dos preços de referência (teste) vindos do catálogo, só pra sugerir
+  // um valor de negócio enquanto não há planilha/distribuidor real.
+  const precoSugerido = useMemo(() => {
+    const soma = linhas.reduce((acc, l) => {
+      const precoUnitario = l.precoEstimadoUnitario ? Number(l.precoEstimadoUnitario) : NaN;
+      const quantidade = Number(l.quantidade) || 0;
+      return Number.isFinite(precoUnitario) ? acc + precoUnitario * quantidade : acc;
+    }, 0);
+    return soma > 0 ? Math.round(soma) : null;
+  }, [linhas]);
+
+  // Preenche "Valor estimado" com a sugestão assim que ela aparecer/mudar,
+  // a não ser que o vendedor já tenha digitado algo à mão (sem useEffect,
+  // ajustando durante a renderização — mesmo padrão usado no kit salvo).
+  const [ultimoPrecoSugerido, setUltimoPrecoSugerido] = useState<number | null>(null);
+  if (precoSugerido !== ultimoPrecoSugerido) {
+    setUltimoPrecoSugerido(precoSugerido);
+    if (precoSugerido != null && !valorTocado) setValor(String(precoSugerido));
+  }
+
+  // Consumo médio em kWh, vindo do campo direto ou calculado a partir da fatura + tarifa.
+  const consumoMedioEstimado = useMemo(() => {
+    const tarifa = numero(tarifaKwh);
+    const consumo = numero(consumoMedioKwh);
+    const fatura = numero(valorFaturaMedio);
+    if (consumo) return consumo;
+    if (fatura && tarifa) return fatura / tarifa;
+    return null;
+  }, [consumoMedioKwh, valorFaturaMedio, tarifaKwh]);
+
+  // Sugere a quantidade de módulos pro consumo já informado, assim que o
+  // vendedor escolhe (ou digita) a potência de um módulo.
+  const sugerirQuantidadeModulo = useMemo(() => {
+    if (!parametros || !consumoMedioEstimado) return undefined;
+    return (potenciaW: number) =>
+      sugerirQuantidadeModulos(consumoMedioEstimado, parametros.produtividadeKwhKwpMes, potenciaW);
+  }, [parametros, consumoMedioEstimado]);
 
   const previa = useMemo(() => {
     const tarifa = numero(tarifaKwh);
@@ -123,14 +167,24 @@ export function FormularioNegocio({
           </Selecao>
         )}
         <Campo rotulo="Nome do negócio" name="titulo" placeholder="Ex.: Residência 5 kWp" required />
-        <Campo
-          rotulo="Valor estimado (R$)"
-          name="valor"
-          inputMode="decimal"
-          placeholder="Opcional"
-          value={valor}
-          onChange={(e) => setValor(e.target.value)}
-        />
+        <div className="flex flex-col gap-1">
+          <Campo
+            rotulo="Valor estimado (R$)"
+            name="valor"
+            inputMode="decimal"
+            placeholder="Opcional"
+            value={valor}
+            onChange={(e) => {
+              setValor(e.target.value);
+              setValorTocado(true);
+            }}
+          />
+          {!valorTocado && precoSugerido != null && (
+            <p className="text-xs text-zinc-400">
+              Preenchido com preço de referência do catálogo (estimativa de teste, não é cotação real) — ajuste se precisar.
+            </p>
+          )}
+        </div>
         <Campo
           rotulo="Consumo médio (12 meses, kWh)"
           name="consumo_medio_kwh"
@@ -312,7 +366,7 @@ export function FormularioNegocio({
       {mostrarKit && (
         <fieldset className="flex flex-col gap-3">
           <legend className="mb-2 text-sm font-semibold text-zinc-900">Kit personalizado</legend>
-          <EditorComponentesKit linhas={linhas} onChange={setLinhas} />
+          <EditorComponentesKit linhas={linhas} onChange={setLinhas} sugerirQuantidadeModulo={sugerirQuantidadeModulo} />
           <Campo
             rotulo="Estrutura do telhado"
             name="estrutura_telhado"
