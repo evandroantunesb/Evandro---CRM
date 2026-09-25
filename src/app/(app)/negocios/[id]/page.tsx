@@ -10,7 +10,8 @@ import { carregarConfiguracao, formatarDataHora, formatarMoeda } from "@/lib/crm
 import { descreverAtividade } from "@/lib/linha-do-tempo";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import type { TipoTarefa } from "@/lib/tipos";
+import type { TipoLigacao, TipoTarefa } from "@/lib/tipos";
+import { Calculadora } from "./calculadora";
 import { EdicaoNegocio } from "./edicao";
 import { EnviarAnexo } from "./enviar-anexo";
 import { Fechamento } from "./fechamento";
@@ -38,7 +39,7 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
   ]);
   if (!negocio) notFound();
 
-  const [{ data: atividades }, { data: notas }, { data: tarefas }, { data: anexos }, { data: marcadas }] =
+  const [{ data: atividades }, { data: notas }, { data: tarefas }, { data: anexos }, { data: marcadas }, { data: calculo }] =
     await Promise.all([
       supabase
         .from("atividades")
@@ -63,6 +64,13 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
         .eq("negocio_id", id)
         .order("created_at", { ascending: false }),
       supabase.from("negocio_etiquetas").select("etiqueta_id").eq("negocio_id", id),
+      supabase
+        .from("calculos_solares")
+        .select(
+          "id, kit_id, kit_nome, tipo_ligacao, consumo_medio_kwh, tarifa_kwh, geracao_estimada_kwh_mes, economia_mensal, payback_meses, observacoes",
+        )
+        .eq("negocio_id", id)
+        .maybeSingle(),
     ]);
 
   const contato = negocio.contatos as unknown as {
@@ -160,6 +168,28 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
               )}
               origens={config.origens.filter((o) => o.ativa || o.id === negocio.origem_id)}
               responsaveis={atual.papel === "vendedor" ? [] : config.membros.filter((m) => m.ativo)}
+            />
+          </Cartao>
+          <Cartao titulo="Calculadora solar">
+            <Calculadora
+              negocioId={negocio.id}
+              kits={config.kits}
+              calculo={
+                calculo
+                  ? {
+                      id: calculo.id,
+                      kitId: calculo.kit_id,
+                      kitNome: calculo.kit_nome,
+                      tipoLigacao: calculo.tipo_ligacao as TipoLigacao,
+                      consumoMedioKwh: calculo.consumo_medio_kwh,
+                      tarifaKwh: calculo.tarifa_kwh,
+                      geracaoEstimadaKwhMes: calculo.geracao_estimada_kwh_mes,
+                      economiaMensal: calculo.economia_mensal,
+                      paybackMeses: calculo.payback_meses,
+                      observacoes: calculo.observacoes,
+                    }
+                  : null
+              }
             />
           </Cartao>
           <Cartao titulo="Tarefas">

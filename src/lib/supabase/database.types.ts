@@ -147,6 +147,132 @@ export type Database = {
           },
         ]
       }
+      calculos_solares: {
+        Row: {
+          atualizado_por: string | null
+          consumo_medio_kwh: number
+          conta_com_solar: number
+          conta_sem_solar: number
+          created_at: string
+          criado_por: string | null
+          custo_fio_b: number
+          disponibilidade_kwh: number
+          economia_mensal: number
+          empresa_id: string
+          geracao_estimada_kwh_mes: number
+          id: string
+          kit_id: string | null
+          kit_nome: string
+          kit_potencia_kwp: number
+          kit_preco: number
+          kwh_compensado: number
+          kwh_faturado: number
+          negocio_id: string
+          observacoes: string | null
+          payback_meses: number | null
+          percentual_fio_b: number
+          produtividade_kwh_kwp_mes: number
+          tarifa_kwh: number
+          tipo_ligacao: Database["public"]["Enums"]["tipo_ligacao"]
+          updated_at: string
+          valor_fatura_medio: number | null
+        }
+        Insert: {
+          atualizado_por?: string | null
+          consumo_medio_kwh: number
+          conta_com_solar: number
+          conta_sem_solar: number
+          created_at?: string
+          criado_por?: string | null
+          custo_fio_b: number
+          disponibilidade_kwh: number
+          economia_mensal: number
+          empresa_id: string
+          geracao_estimada_kwh_mes: number
+          id?: string
+          kit_id?: string | null
+          kit_nome: string
+          kit_potencia_kwp: number
+          kit_preco: number
+          kwh_compensado: number
+          kwh_faturado: number
+          negocio_id: string
+          observacoes?: string | null
+          payback_meses?: number | null
+          percentual_fio_b: number
+          produtividade_kwh_kwp_mes: number
+          tarifa_kwh: number
+          tipo_ligacao?: Database["public"]["Enums"]["tipo_ligacao"]
+          updated_at?: string
+          valor_fatura_medio?: number | null
+        }
+        Update: {
+          atualizado_por?: string | null
+          consumo_medio_kwh?: number
+          conta_com_solar?: number
+          conta_sem_solar?: number
+          created_at?: string
+          criado_por?: string | null
+          custo_fio_b?: number
+          disponibilidade_kwh?: number
+          economia_mensal?: number
+          empresa_id?: string
+          geracao_estimada_kwh_mes?: number
+          id?: string
+          kit_id?: string | null
+          kit_nome?: string
+          kit_potencia_kwp?: number
+          kit_preco?: number
+          kwh_compensado?: number
+          kwh_faturado?: number
+          negocio_id?: string
+          observacoes?: string | null
+          payback_meses?: number | null
+          percentual_fio_b?: number
+          produtividade_kwh_kwp_mes?: number
+          tarifa_kwh?: number
+          tipo_ligacao?: Database["public"]["Enums"]["tipo_ligacao"]
+          updated_at?: string
+          valor_fatura_medio?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calculos_solares_atualizado_por_fkey"
+            columns: ["atualizado_por"]
+            isOneToOne: false
+            referencedRelation: "empresa_membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calculos_solares_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "empresa_membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calculos_solares_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calculos_solares_kit_id_fkey"
+            columns: ["kit_id"]
+            isOneToOne: false
+            referencedRelation: "kits_solares"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calculos_solares_negocio_id_fkey"
+            columns: ["negocio_id"]
+            isOneToOne: true
+            referencedRelation: "negocios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contatos: {
         Row: {
           cidade: string | null
@@ -604,6 +730,50 @@ export type Database = {
           },
         ]
       }
+      kits_solares: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          descricao: string | null
+          empresa_id: string
+          id: string
+          nome: string
+          potencia_kwp: number
+          preco: number
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          empresa_id: string
+          id?: string
+          nome: string
+          potencia_kwp: number
+          preco: number
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          empresa_id?: string
+          id?: string
+          nome?: string
+          potencia_kwp?: number
+          preco?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kits_solares_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       logs_auditoria: {
         Row: {
           acao: string
@@ -939,6 +1109,44 @@ export type Database = {
           },
         ]
       }
+      parametros_calculadora: {
+        Row: {
+          disponibilidade_bi_kwh: number
+          disponibilidade_mono_kwh: number
+          disponibilidade_tri_kwh: number
+          empresa_id: string
+          percentual_fio_b: number
+          produtividade_kwh_kwp_mes: number
+          updated_at: string
+        }
+        Insert: {
+          disponibilidade_bi_kwh?: number
+          disponibilidade_mono_kwh?: number
+          disponibilidade_tri_kwh?: number
+          empresa_id: string
+          percentual_fio_b?: number
+          produtividade_kwh_kwp_mes?: number
+          updated_at?: string
+        }
+        Update: {
+          disponibilidade_bi_kwh?: number
+          disponibilidade_mono_kwh?: number
+          disponibilidade_tri_kwh?: number
+          empresa_id?: string
+          percentual_fio_b?: number
+          produtividade_kwh_kwp_mes?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parametros_calculadora_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: true
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       perfis: {
         Row: {
           created_at: string
@@ -1107,6 +1315,7 @@ export type Database = {
       papel_membro: "admin" | "gestor" | "vendedor"
       situacao_empresa: "ativa" | "suspensa" | "cancelada"
       status_negocio: "aberto" | "ganho" | "perdido"
+      tipo_ligacao: "monofasico" | "bifasico" | "trifasico"
       tipo_pessoa: "pf" | "pj"
       tipo_tarefa:
         | "ligacao"
@@ -1249,6 +1458,7 @@ export const Constants = {
       papel_membro: ["admin", "gestor", "vendedor"],
       situacao_empresa: ["ativa", "suspensa", "cancelada"],
       status_negocio: ["aberto", "ganho", "perdido"],
+      tipo_ligacao: ["monofasico", "bifasico", "trifasico"],
       tipo_pessoa: ["pf", "pj"],
       tipo_tarefa: [
         "ligacao",

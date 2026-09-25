@@ -51,3 +51,12 @@ export const ROTULO_CAMPO_OBRIGATORIO: Record<CampoObrigatorio, string> = {
   contato_documento: "CPF/CNPJ do contato",
   contato_cidade: "Cidade do contato",
 };
+
+export const TIPOS_LIGACAO = ["monofasico", "bifasico", "trifasico"] as const;
+export type TipoLigacao = (typeof TIPOS_LIGACAO)[number];
+
+export const ROTULO_TIPO_LIGACAO: Record<TipoLigacao, string> = {
+  monofasico: "Monofásico",
+  bifasico: "Bifásico",
+  trifasico: "Trifásico",
+};
