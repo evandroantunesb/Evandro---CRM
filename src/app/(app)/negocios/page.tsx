@@ -1,3 +1,4 @@
+import { Settings2 } from "lucide-react";
 import Link from "next/link";
 import { Botao, Selecao } from "@/components/ui";
 import { carregarConfiguracao, formatarDataHora, formatarMoeda, situacaoPrazo, tempoDesde } from "@/lib/crm";
@@ -92,9 +93,19 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-semibold text-zinc-900">Negócios</h1>
-        <Link href={`/negocios/novo?funil=${funil.id}`} className="ml-auto">
-          <Botao>Adicionar negócio</Botao>
-        </Link>
+        <div className="ml-auto flex items-center gap-2">
+          {atual.papel === "admin" && (
+            <Link href="/configuracoes/funil">
+              <Botao variante="secundario" className="gap-1.5">
+                <Settings2 className="h-4 w-4" />
+                Editar etapas
+              </Botao>
+            </Link>
+          )}
+          <Link href={`/negocios/novo?funil=${funil.id}`}>
+            <Botao>Adicionar negócio</Botao>
+          </Link>
+        </div>
       </div>
       <form className="flex flex-wrap items-center gap-2" action="/negocios">
         {funisAtivos.length > 1 && (
