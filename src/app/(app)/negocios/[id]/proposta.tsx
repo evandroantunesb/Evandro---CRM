@@ -73,6 +73,11 @@ export function Proposta({
           <a href={linkWhatsapp} target="_blank" rel="noopener noreferrer">
             <Botao type="button">Enviar no WhatsApp</Botao>
           </a>
+          <a href={`/proposta/${proposta.token}/pdf`} target="_blank" rel="noopener noreferrer">
+            <Botao type="button" variante="secundario">
+              Baixar PDF
+            </Botao>
+          </a>
         </div>
       </div>
 
