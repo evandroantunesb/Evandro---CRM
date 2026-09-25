@@ -20,6 +20,9 @@ export function EdicaoNegocio({
     responsavelId: string | null;
     valor: number | null;
     descricao: string | null;
+    tipoTelhado: string | null;
+    unidadeConsumidora: string | null;
+    padraoCliente: string | null;
   };
   etapas: Opcao[];
   origens: Opcao[];
@@ -59,6 +62,14 @@ export function EdicaoNegocio({
         name="valor"
         inputMode="decimal"
         defaultValue={negocio.valor != null ? String(negocio.valor).replace(".", ",") : ""}
+      />
+      <Campo rotulo="Unidade consumidora" name="unidade_consumidora" defaultValue={negocio.unidadeConsumidora ?? ""} />
+      <Campo rotulo="Padrão do cliente" name="padrao_cliente" defaultValue={negocio.padraoCliente ?? ""} />
+      <Campo
+        rotulo="Tipo do telhado"
+        name="tipo_telhado"
+        placeholder="Ex.: cerâmico, metálico, laje, solo"
+        defaultValue={negocio.tipoTelhado ?? ""}
       />
       <label className="flex flex-col gap-1 text-sm md:col-span-2">
         <span className="font-medium text-zinc-700">Descrição</span>

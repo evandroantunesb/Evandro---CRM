@@ -1,6 +1,6 @@
 /** Calculadora solar (modo comercial): geração, desconto de disponibilidade e Fio B, payback. */
 import { describe, expect, it } from "vitest";
-import { calcular } from "@/lib/calculadora";
+import { calcular, potenciaKitPersonalizadoKwp } from "@/lib/calculadora";
 
 describe("calcular", () => {
   it("desconta a disponibilidade mínima quando o kit cobre todo o consumo", () => {
@@ -76,5 +76,27 @@ describe("calcular", () => {
     expect(r.kwhFaturado).toBe(50);
     expect(r.kwhCompensado).toBe(0);
     expect(r.economiaMensal).toBe(0);
+  });
+});
+
+describe("potenciaKitPersonalizadoKwp", () => {
+  it("soma só os módulos (potência × quantidade), ignorando inversor/bateria/outro", () => {
+    const kwp = potenciaKitPersonalizadoKwp([
+      { tipo: "modulo", potenciaW: 550, quantidade: 10 },
+      { tipo: "modulo", potenciaW: 450, quantidade: 2 },
+      { tipo: "inversor", potenciaW: 5000, quantidade: 1 },
+      { tipo: "bateria", potenciaW: null, quantidade: 2 },
+    ]);
+    // (550*10 + 450*2) / 1000 = 6.4 kWp
+    expect(kwp).toBe(6.4);
+  });
+
+  it("ignora módulos sem potência informada", () => {
+    const kwp = potenciaKitPersonalizadoKwp([{ tipo: "modulo", potenciaW: null, quantidade: 10 }]);
+    expect(kwp).toBe(0);
+  });
+
+  it("zero quando não há componentes", () => {
+    expect(potenciaKitPersonalizadoKwp([])).toBe(0);
   });
 });

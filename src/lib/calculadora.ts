@@ -1,4 +1,5 @@
-import type { TipoLigacao } from "@/lib/tipos";
+import { z } from "zod";
+import { TIPOS_COMPONENTE_KIT, type TipoLigacao } from "@/lib/tipos";
 
 export type EntradaCalculo = {
   potenciaKwp: number;
@@ -71,3 +72,63 @@ export const DISPONIBILIDADE_PADRAO: Record<TipoLigacao, "disponibilidade_mono_k
   bifasico: "disponibilidade_bi_kwh",
   trifasico: "disponibilidade_tri_kwh",
 };
+
+/** Mesma coisa que DISPONIBILIDADE_PADRAO, para os parâmetros já carregados em camelCase no cliente. */
+export const DISPONIBILIDADE_PADRAO_CAMEL: Record<
+  TipoLigacao,
+  "disponibilidadeMonoKwh" | "disponibilidadeBiKwh" | "disponibilidadeTriKwh"
+> = {
+  monofasico: "disponibilidadeMonoKwh",
+  bifasico: "disponibilidadeBiKwh",
+  trifasico: "disponibilidadeTriKwh",
+};
+
+/**
+ * Potência total do kit personalizado: soma da potência dos módulos
+ * (os únicos componentes com potência elétrica relevante para o cálculo).
+ * Inversor, bateria e outros itens são só especificação técnica.
+ */
+export function potenciaKitPersonalizadoKwp(
+  componentes: { tipo: string; potenciaW: number | null; quantidade: number }[],
+): number {
+  const totalWp = componentes
+    .filter((c) => c.tipo === "modulo" && c.potenciaW)
+    .reduce((soma, c) => soma + c.potenciaW! * c.quantidade, 0);
+  return Math.round((totalWp / 1000) * 100) / 100;
+}
+
+/** Um item do kit personalizado (módulo, inversor, bateria ou outro). */
+export const componenteKitSchema = z.object({
+  tipo: z.enum(TIPOS_COMPONENTE_KIT),
+  descricao: z.string().trim().min(1, "Descreva o componente").max(120, "Descrição muito longa"),
+  potenciaW: z.number().positive().nullable(),
+  quantidade: z.number().int().positive(),
+});
+export type ComponenteKit = z.infer<typeof componenteKitSchema>;
+
+/** Os componentes vêm do formulário como JSON (lista dinâmica de tamanho variável). */
+export const componentesJsonSchema = z
+  .string()
+  .default("[]")
+  .transform((v, ctx) => {
+    try {
+      const bruto = JSON.parse(v);
+      const r = z.array(componenteKitSchema).max(50, "No máximo 50 componentes").safeParse(bruto);
+      if (!r.success) {
+        ctx.addIssue({ code: "custom", message: "Componentes do kit inválidos" });
+        return z.NEVER;
+      }
+      return r.data;
+    } catch {
+      ctx.addIssue({ code: "custom", message: "Componentes do kit inválidos" });
+      return z.NEVER;
+    }
+  });
+
+/** Nome de exibição do kit a partir dos componentes escolhidos. */
+export function nomeKitPersonalizado(componentes: ComponenteKit[]): string {
+  const modulo = componentes.find((c) => c.tipo === "modulo");
+  if (!modulo) return "Kit personalizado";
+  const potenciaKwp = potenciaKitPersonalizadoKwp(componentes);
+  return `Kit personalizado · ${potenciaKwp.toLocaleString("pt-BR")} kWp (${modulo.descricao})`;
+}

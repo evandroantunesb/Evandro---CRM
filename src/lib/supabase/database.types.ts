@@ -37,6 +37,7 @@ export type Database = {
       anexos: {
         Row: {
           caminho: string
+          categoria: string
           created_at: string
           empresa_id: string
           enviado_por: string | null
@@ -48,6 +49,7 @@ export type Database = {
         }
         Insert: {
           caminho: string
+          categoria?: string
           created_at?: string
           empresa_id: string
           enviado_por?: string | null
@@ -59,6 +61,7 @@ export type Database = {
         }
         Update: {
           caminho?: string
+          categoria?: string
           created_at?: string
           empresa_id?: string
           enviado_por?: string | null
@@ -733,6 +736,57 @@ export type Database = {
           },
         ]
       }
+      kit_componentes: {
+        Row: {
+          created_at: string
+          descricao: string
+          empresa_id: string
+          id: string
+          negocio_id: string
+          ordem: number
+          potencia_w: number | null
+          quantidade: number
+          tipo: Database["public"]["Enums"]["tipo_componente_kit"]
+        }
+        Insert: {
+          created_at?: string
+          descricao: string
+          empresa_id: string
+          id?: string
+          negocio_id: string
+          ordem?: number
+          potencia_w?: number | null
+          quantidade?: number
+          tipo: Database["public"]["Enums"]["tipo_componente_kit"]
+        }
+        Update: {
+          created_at?: string
+          descricao?: string
+          empresa_id?: string
+          id?: string
+          negocio_id?: string
+          ordem?: number
+          potencia_w?: number | null
+          quantidade?: number
+          tipo?: Database["public"]["Enums"]["tipo_componente_kit"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kit_componentes_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kit_componentes_negocio_id_fkey"
+            columns: ["negocio_id"]
+            isOneToOne: false
+            referencedRelation: "negocios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       kits_solares: {
         Row: {
           ativo: boolean
@@ -906,6 +960,7 @@ export type Database = {
           criado_por: string | null
           descricao: string | null
           empresa_id: string
+          estrutura_telhado: string | null
           etapa_desde: string
           etapa_id: string
           fechado_em: string | null
@@ -915,9 +970,12 @@ export type Database = {
           motivo_perda_id: string | null
           numero: number
           origem_id: string | null
+          padrao_cliente: string | null
           responsavel_id: string | null
           status: Database["public"]["Enums"]["status_negocio"]
+          tipo_telhado: string | null
           titulo: string
+          unidade_consumidora: string | null
           updated_at: string
           valor: number | null
         }
@@ -927,6 +985,7 @@ export type Database = {
           criado_por?: string | null
           descricao?: string | null
           empresa_id: string
+          estrutura_telhado?: string | null
           etapa_desde?: string
           etapa_id: string
           fechado_em?: string | null
@@ -936,9 +995,12 @@ export type Database = {
           motivo_perda_id?: string | null
           numero?: number
           origem_id?: string | null
+          padrao_cliente?: string | null
           responsavel_id?: string | null
           status?: Database["public"]["Enums"]["status_negocio"]
+          tipo_telhado?: string | null
           titulo: string
+          unidade_consumidora?: string | null
           updated_at?: string
           valor?: number | null
         }
@@ -948,6 +1010,7 @@ export type Database = {
           criado_por?: string | null
           descricao?: string | null
           empresa_id?: string
+          estrutura_telhado?: string | null
           etapa_desde?: string
           etapa_id?: string
           fechado_em?: string | null
@@ -957,9 +1020,12 @@ export type Database = {
           motivo_perda_id?: string | null
           numero?: number
           origem_id?: string | null
+          padrao_cliente?: string | null
           responsavel_id?: string | null
           status?: Database["public"]["Enums"]["status_negocio"]
+          tipo_telhado?: string | null
           titulo?: string
+          unidade_consumidora?: string | null
           updated_at?: string
           valor?: number | null
         }
@@ -1413,6 +1479,7 @@ export type Database = {
       papel_membro: "admin" | "gestor" | "vendedor"
       situacao_empresa: "ativa" | "suspensa" | "cancelada"
       status_negocio: "aberto" | "ganho" | "perdido"
+      tipo_componente_kit: "modulo" | "inversor" | "bateria" | "outro"
       tipo_ligacao: "monofasico" | "bifasico" | "trifasico"
       tipo_pessoa: "pf" | "pj"
       tipo_tarefa:
@@ -1557,6 +1624,7 @@ export const Constants = {
       papel_membro: ["admin", "gestor", "vendedor"],
       situacao_empresa: ["ativa", "suspensa", "cancelada"],
       status_negocio: ["aberto", "ganho", "perdido"],
+      tipo_componente_kit: ["modulo", "inversor", "bateria", "outro"],
       tipo_ligacao: ["monofasico", "bifasico", "trifasico"],
       tipo_pessoa: ["pf", "pj"],
       tipo_tarefa: [

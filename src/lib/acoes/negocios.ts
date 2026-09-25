@@ -4,9 +4,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { montarLinhaCalculo } from "@/lib/acoes/calculadora";
+import { enviarAnexoNoServidor } from "@/lib/acoes/anexos";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { mensagemErro } from "@/lib/erros";
+import { componentesJsonSchema, nomeKitPersonalizado, potenciaKitPersonalizadoKwp } from "@/lib/calculadora";
 import { TIPOS_LIGACAO, type ResultadoAcao } from "@/lib/tipos";
 
 const uuidOpcional = z
@@ -42,19 +44,26 @@ const esquemaNovo = z.object({
   responsavel_id: uuidOpcional,
   valor: valorOpcional,
   descricao: z.string().trim().optional(),
+  // Dados de instalação: ficam no negócio, não no contato (que é só dado
+  // pessoal/residência do cliente).
+  unidade_consumidora: z.string().trim().max(60).optional(),
+  padrao_cliente: z.string().trim().max(60).optional(),
+  tipo_telhado: z.string().trim().max(60).optional(),
+  estrutura_telhado: z.string().trim().max(120).optional(),
   contato_id: uuidOpcional,
   contato_tipo: z.enum(["pf", "pj"]).default("pf"),
   contato_nome: z.string().trim().optional(),
   contato_telefone: z.string().trim().optional(),
   contato_email: z.union([z.literal(""), z.string().trim().email("E-mail do contato inválido")]).optional(),
   contato_endereco: z.string().trim().max(300, "Endereço muito longo").optional(),
-  // Calculadora solar: opcional — quando o kit é escolhido, o cálculo já
+  // Calculadora solar: roda no backend a partir do kit personalizado (não é
+  // um passo separado) — quando os dados estão completos, o cálculo já
   // fica pronto junto com o negócio (fluxo de "nova proposta").
-  kit_id: uuidOpcional,
   tipo_ligacao: z.enum(TIPOS_LIGACAO).optional(),
   consumo_medio_kwh: numeroBrOpcional,
   valor_fatura_medio: numeroBrOpcional,
   tarifa_kwh: numeroBrOpcional,
+  componentes: componentesJsonSchema,
 });
 
 export async function criarNegocio(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
@@ -110,6 +119,10 @@ export async function criarNegocio(_: ResultadoAcao, formData: FormData): Promis
       valor: d.valor,
       descricao: d.descricao || null,
       contato_id: contatoId,
+      unidade_consumidora: d.unidade_consumidora || null,
+      padrao_cliente: d.padrao_cliente || null,
+      tipo_telhado: d.tipo_telhado || null,
+      estrutura_telhado: d.estrutura_telhado || null,
     })
     .select("id")
     .single();
@@ -117,11 +130,14 @@ export async function criarNegocio(_: ResultadoAcao, formData: FormData): Promis
     return { ok: false, mensagem: mensagemErro(error, "Não foi possível criar o negócio. Confira o responsável escolhido.") };
   }
 
-  // Kit escolhido junto com o negócio: já deixa o cálculo pronto, sem o
-  // vendedor precisar abrir a calculadora à parte (fluxo de "nova proposta").
-  if (d.kit_id && d.tipo_ligacao && d.tarifa_kwh != null) {
+  // Kit personalizado montado junto com o negócio: já deixa o cálculo
+  // pronto, sem o vendedor precisar abrir a calculadora à parte (fluxo de
+  // "nova proposta"). O cálculo roda no backend — não é um passo visível.
+  if (d.tipo_ligacao && d.tarifa_kwh != null && d.componentes.length) {
     const montado = await montarLinhaCalculo(supabase, atual.empresaId, {
-      kitId: d.kit_id,
+      kitNome: nomeKitPersonalizado(d.componentes),
+      potenciaKwp: potenciaKitPersonalizadoKwp(d.componentes),
+      precoKit: d.valor ?? 0,
       tipoLigacao: d.tipo_ligacao,
       consumoMedioKwh: d.consumo_medio_kwh,
       valorFaturaMedio: d.valor_fatura_medio,
@@ -134,10 +150,48 @@ export async function criarNegocio(_: ResultadoAcao, formData: FormData): Promis
         atualizado_por: atual.membroId,
         criado_por: atual.membroId,
       });
+      await supabase.from("kit_componentes").insert(
+        d.componentes.map((c, i) => ({
+          empresa_id: atual.empresaId,
+          negocio_id: negocio.id,
+          tipo: c.tipo,
+          descricao: c.descricao,
+          potencia_w: c.potenciaW,
+          quantidade: c.quantidade,
+          ordem: i,
+        })),
+      );
     }
-    // Um kit mal escolhido não deve impedir a criação do negócio — o
+    // Um kit mal preenchido não deve impedir a criação do negócio — o
     // vendedor ainda pode calcular depois, direto na página do negócio.
   }
+
+  // Anexos escolhidos ainda na criação (CNH, faturas): só dá para subir
+  // depois que o negócio existe (a pasta no Storage é por negócio).
+  const anexos: { campo: string; categoria: "cnh" | "fatura_gerador" | "fatura_beneficiario" }[] = [
+    { campo: "anexo_cnh_negocio", categoria: "cnh" },
+    { campo: "anexo_cnh_contato", categoria: "cnh" },
+    { campo: "anexo_fatura_gerador", categoria: "fatura_gerador" },
+  ];
+  await Promise.all([
+    ...anexos.flatMap(({ campo, categoria }) =>
+      formData
+        .getAll(campo)
+        .filter((v): v is File => v instanceof File && v.size > 0)
+        .map((arquivo) => enviarAnexoNoServidor(supabase, { empresaId: atual.empresaId, negocioId: negocio.id, arquivo, categoria })),
+    ),
+    ...formData
+      .getAll("anexo_fatura_beneficiario")
+      .filter((v): v is File => v instanceof File && v.size > 0)
+      .map((arquivo) =>
+        enviarAnexoNoServidor(supabase, {
+          empresaId: atual.empresaId,
+          negocioId: negocio.id,
+          arquivo,
+          categoria: "fatura_beneficiario",
+        }),
+      ),
+  ]);
 
   revalidatePath("/negocios");
   redirect(`/negocios/${negocio.id}`);
@@ -169,6 +223,9 @@ const esquemaEdicao = z.object({
   responsavel_id: uuidOpcional,
   valor: valorOpcional,
   descricao: z.string().trim().optional(),
+  unidade_consumidora: z.string().trim().max(60).optional(),
+  padrao_cliente: z.string().trim().max(60).optional(),
+  tipo_telhado: z.string().trim().max(60).optional(),
 });
 
 export async function editarNegocio(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
@@ -186,6 +243,9 @@ export async function editarNegocio(_: ResultadoAcao, formData: FormData): Promi
       origem_id: d.origem_id,
       valor: d.valor,
       descricao: d.descricao || null,
+      unidade_consumidora: d.unidade_consumidora || null,
+      padrao_cliente: d.padrao_cliente || null,
+      tipo_telhado: d.tipo_telhado || null,
       ...(atual.papel !== "vendedor" && d.responsavel_id ? { responsavel_id: d.responsavel_id } : {}),
     })
     .eq("id", d.negocioId)
