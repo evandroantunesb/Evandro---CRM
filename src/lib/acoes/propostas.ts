@@ -31,17 +31,28 @@ export async function gerarLinkProposta(_: ResultadoAcao, formData: FormData): P
   return { ok: true, mensagem: "Proposta pronta." };
 }
 
-export async function definirModoPreco(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+/** Preço e quais seções aparecem na proposta pública (o vendedor decide, por negócio). */
+export async function definirExibicaoProposta(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
   const { atual } = await exigirPapel();
   const dados = z
-    .object({ negocioId: z.string().uuid(), modoPreco: z.enum(MODOS_PRECO) })
+    .object({
+      negocioId: z.string().uuid(),
+      modoPreco: z.enum(MODOS_PRECO),
+      mostrarSistema: z.literal("on").optional(),
+      mostrarEconomia: z.literal("on").optional(),
+    })
     .safeParse(Object.fromEntries(formData));
   if (!dados.success) return { ok: false, mensagem: "Dados inválidos." };
 
   const supabase = await criarClienteServidor();
   const { error } = await supabase
     .from("propostas")
-    .update({ modo_preco: dados.data.modoPreco, atualizado_por: atual.membroId })
+    .update({
+      modo_preco: dados.data.modoPreco,
+      mostrar_sistema: dados.data.mostrarSistema === "on",
+      mostrar_economia: dados.data.mostrarEconomia === "on",
+      atualizado_por: atual.membroId,
+    })
     .eq("negocio_id", dados.data.negocioId);
   if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível salvar.") };
 

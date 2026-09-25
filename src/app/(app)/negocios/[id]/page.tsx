@@ -84,7 +84,7 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
 
   const { data: proposta } = await supabase
     .from("propostas")
-    .select("id, token, modo_preco")
+    .select("id, token, modo_preco, mostrar_sistema, mostrar_economia")
     .eq("negocio_id", id)
     .maybeSingle();
   const { data: aberturas } = proposta
@@ -244,6 +244,8 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
                   ? {
                       token: proposta.token,
                       modoPreco: proposta.modo_preco as ModoPreco,
+                      mostrarSistema: proposta.mostrar_sistema,
+                      mostrarEconomia: proposta.mostrar_economia,
                       aberturas: aberturas?.length ?? 0,
                       ultimaAbertura: aberturas?.[0]?.aberta_em ?? null,
                     }
