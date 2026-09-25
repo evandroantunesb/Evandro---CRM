@@ -5,7 +5,14 @@ import { Botao, Campo } from "@/components/ui";
 import { buscarComponentesCatalogo } from "@/lib/acoes/opensolar";
 import { ROTULO_TIPO_COMPONENTE_KIT, TIPOS_COMPONENTE_KIT, type TipoComponenteKit } from "@/lib/tipos";
 
-export type LinhaComponente = { tipo: TipoComponenteKit; descricao: string; potenciaW: string; quantidade: string };
+export type LinhaComponente = {
+  tipo: TipoComponenteKit;
+  descricao: string;
+  potenciaW: string;
+  quantidade: string;
+  /** Preço de referência (teste) vindo do catálogo ao selecionar — nunca é salvo, só usado pra sugerir o valor do negócio. */
+  precoEstimadoUnitario?: string;
+};
 
 export function novaLinhaComponente(tipo: TipoComponenteKit): LinhaComponente {
   return { tipo, descricao: "", potenciaW: "", quantidade: "1" };
@@ -46,9 +53,11 @@ function CampoModeloComBusca({
   valor: string;
   placeholder: string;
   onChangeTexto: (v: string) => void;
-  onSelecionar: (descricao: string, potenciaW: string) => void;
+  onSelecionar: (descricao: string, potenciaW: string, precoEstimadoUnitario: string) => void;
 }) {
-  const [resultados, setResultados] = useState<{ id: number; descricao: string; potenciaW: number | null }[]>([]);
+  const [resultados, setResultados] = useState<
+    { id: number; descricao: string; potenciaW: number | null; precoEstimadoBRL: number | null }[]
+  >([]);
   const [, iniciar] = useTransition();
   const pesquisavel = tipo === "modulo" || tipo === "inversor";
 
@@ -69,13 +78,20 @@ function CampoModeloComBusca({
               <button
                 type="button"
                 onClick={() => {
-                  onSelecionar(r.descricao, r.potenciaW != null ? String(r.potenciaW) : "");
+                  onSelecionar(
+                    r.descricao,
+                    r.potenciaW != null ? String(r.potenciaW) : "",
+                    r.precoEstimadoBRL != null ? String(r.precoEstimadoBRL) : "",
+                  );
                   setResultados([]);
                 }}
                 className="block w-full px-3 py-2 text-left hover:bg-zinc-50"
               >
                 {r.descricao}
                 {r.potenciaW != null && <span className="text-zinc-400"> · {r.potenciaW} W</span>}
+                {r.precoEstimadoBRL != null && (
+                  <span className="text-zinc-400"> · ~R$ {r.precoEstimadoBRL.toLocaleString("pt-BR")} (estimado)</span>
+                )}
               </button>
             </li>
           ))}
@@ -127,7 +143,9 @@ export function EditorComponentesKit({
                   valor={l.descricao}
                   placeholder={tipo === "modulo" ? "Ex.: Canadian 550 W" : "Ex.: Growatt 5 kW"}
                   onChangeTexto={(v) => atualizar(i, { descricao: v })}
-                  onSelecionar={(descricao, potenciaW) => atualizar(i, { descricao, potenciaW })}
+                  onSelecionar={(descricao, potenciaW, precoEstimadoUnitario) =>
+                    atualizar(i, { descricao, potenciaW, precoEstimadoUnitario })
+                  }
                 />
                 <Campo
                   rotulo="Potência (W)"

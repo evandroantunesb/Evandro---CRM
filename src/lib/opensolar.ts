@@ -7,7 +7,23 @@ import { z } from "zod";
  * em memória do projeto ("raion-api-fornecedor-pesquisa").
  */
 
-export type ComponenteCatalogo = { id: number; descricao: string; potenciaW: number | null };
+export type ComponenteCatalogo = {
+  id: number;
+  descricao: string;
+  potenciaW: number | null;
+  /** Preço de referência (teste) estimado a partir de preço médio de mercado por watt — não é cotação real. */
+  precoEstimadoBRL: number | null;
+};
+
+/**
+ * R$/W médios de mercado (varejo BR, pesquisado em 2026-09-25) usados só pra
+ * estimar um preço de teste enquanto não há planilha de kits nem preço de
+ * distribuidor. Nunca usar como cotação real — ver aviso na UI.
+ */
+const REFERENCIA_RS_POR_WATT: Record<"modulo" | "inversor", number> = {
+  modulo: 1.6,
+  inversor: 0.65,
+};
 
 const esquemaModulo = z.object({
   id: z.number(),
@@ -59,10 +75,12 @@ export async function buscarModulosCatalogo(termo: string): Promise<ComponenteCa
     .filter((r) => r.success)
     .map((r) => {
       const m = r.data!;
+      const potenciaW = potenciaWattsDoJson(m.data, "kw_stc");
       return {
         id: m.id,
         descricao: `${m.manufacturer_name} ${m.code}`,
-        potenciaW: potenciaWattsDoJson(m.data, "kw_stc"),
+        potenciaW,
+        precoEstimadoBRL: potenciaW != null ? Math.round(potenciaW * REFERENCIA_RS_POR_WATT.modulo) : null,
       };
     })
     .filter((c) => !t || c.descricao.toLowerCase().includes(t));
@@ -78,10 +96,12 @@ export async function buscarInversoresCatalogo(termo: string): Promise<Component
     .filter((r) => r.success)
     .map((r) => {
       const inv = r.data!;
+      const potenciaW = potenciaWattsDoJson(inv.data, "kw_stc", "kw_rated", "power_rating");
       return {
         id: inv.id,
         descricao: `${inv.manufacturer_name} ${inv.code}`,
-        potenciaW: potenciaWattsDoJson(inv.data, "kw_stc", "kw_rated", "power_rating"),
+        potenciaW,
+        precoEstimadoBRL: potenciaW != null ? Math.round(potenciaW * REFERENCIA_RS_POR_WATT.inversor) : null,
       };
     })
     .filter((c) => !t || c.descricao.toLowerCase().includes(t));

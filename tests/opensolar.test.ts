@@ -53,7 +53,7 @@ describe("buscarModulosCatalogo", () => {
     );
 
     const r = await buscarModulosCatalogo("panasonic");
-    expect(r).toEqual([{ id: 1555772, descricao: "Panasonic VBHN325SA16", potenciaW: 325 }]);
+    expect(r).toEqual([{ id: 1555772, descricao: "Panasonic VBHN325SA16", potenciaW: 325, precoEstimadoBRL: 520 }]);
   });
 
   it("sem termo, devolve todos os módulos ativados", async () => {
