@@ -141,16 +141,19 @@ function CardKanban({ card, colunas }: { card: Card; colunas: Coluna[] }) {
       style={estilo}
       {...listeners}
       {...attributes}
-      className={`touch-manipulation rounded-md border border-zinc-200 bg-white p-3 text-sm shadow-sm ${
+      className={`relative touch-manipulation rounded-md border border-zinc-200 bg-white p-3 text-sm shadow-sm ${
         isDragging ? "z-10 cursor-grabbing opacity-80 shadow-lg" : "cursor-grab"
       }`}
     >
-      <Link href={`/negocios/${card.id}`} className="font-medium text-zinc-900 hover:underline">
-        {card.contato}
+      <div className="absolute top-2 right-2">
+        <MoverEtapa negocioId={card.id} etapaAtualId={card.etapaId} etapas={colunas} compacto />
+      </div>
+      <Link href={`/negocios/${card.id}`} className="-m-1 block rounded-md p-1 pr-6 hover:bg-zinc-50">
+        <p className="font-medium text-zinc-900">{card.contato}</p>
+        <p className="truncate text-zinc-600">
+          #{card.numero} · {card.titulo}
+        </p>
       </Link>
-      <p className="truncate text-zinc-600">
-        #{card.numero} · {card.titulo}
-      </p>
       {(card.etiquetas.length > 0 || card.tarefa === "atrasada" || card.tarefa === "hoje") && (
         <div className="mt-1.5 flex flex-wrap gap-1 text-xs">
           {(card.tarefa === "atrasada" || card.tarefa === "hoje") && (
@@ -171,9 +174,6 @@ function CardKanban({ card, colunas }: { card: Card; colunas: Coluna[] }) {
         {card.origem && <span className="rounded bg-zinc-100 px-1.5 py-0.5">{card.origem}</span>}
         <span>{card.responsavel}</span>
         <span className="ml-auto">{card.desde}</span>
-      </div>
-      <div className="mt-2">
-        <MoverEtapa negocioId={card.id} etapaAtualId={card.etapaId} etapas={colunas} compacto />
       </div>
     </article>
   );

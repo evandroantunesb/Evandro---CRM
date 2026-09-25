@@ -1,67 +1,87 @@
 "use client";
 
+import { ChevronDown, MoreVertical } from "lucide-react";
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { moverEtapa } from "@/lib/acoes/negocios";
+import { ItemMenuSuspenso, MenuSuspenso, RotuloMenuSuspenso } from "@/components/menu-suspenso";
 
 /**
- * Botão "Mover para »": alternativa ao arrastar no Kanban, essencial no celular
+ * Menu "Mover para": alternativa ao arrastar no Kanban, essencial no celular
  * (onde arrastar cards é difícil) e útil na página do negócio pra trocar de etapa sem editar o card inteiro.
+ * No card do Kanban (compacto) também abre o negócio, pra deixar claro onde editar.
  */
 export function MoverEtapa({
   negocioId,
   etapaAtualId,
   etapas,
-  onMovido,
   compacto = false,
 }: {
   negocioId: string;
   etapaAtualId: string;
   etapas: { id: string; nome: string }[];
-  onMovido?: (etapaId: string) => void;
   compacto?: boolean;
 }) {
   const [pendente, iniciar] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
   const destinos = etapas.filter((e) => e.id !== etapaAtualId);
-  if (!destinos.length) return null;
 
   function mover(etapaId: string) {
     setErro(null);
     iniciar(async () => {
       const r = await moverEtapa(negocioId, etapaId);
-      if (r?.ok) onMovido?.(etapaId);
-      else setErro(r?.mensagem ?? "Não foi possível mover.");
+      if (!r?.ok) setErro(r?.mensagem ?? "Não foi possível mover.");
     });
   }
 
+  if (!destinos.length && !compacto) return null;
+
   return (
     <div className="inline-flex flex-col">
-      <select
-        aria-label="Mover para"
-        disabled={pendente}
-        defaultValue=""
-        onClick={(e) => e.stopPropagation()}
-        onPointerDown={(e) => e.stopPropagation()}
-        onChange={(e) => {
-          const v = e.target.value;
-          e.target.value = "";
-          if (v) mover(v);
-        }}
-        className={
-          compacto
-            ? "rounded-md border border-zinc-200 bg-white px-1.5 py-1 text-xs text-zinc-600 outline-none disabled:opacity-50"
-            : "rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-carvao outline-none hover:border-dourado disabled:opacity-50"
+      <MenuSuspenso
+        trigger={({ alternar }) =>
+          compacto ? (
+            <button
+              type="button"
+              aria-label="Opções do negócio"
+              disabled={pendente}
+              onClick={alternar}
+              className="rounded-md p-1 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 disabled:opacity-50"
+            >
+              <MoreVertical size={16} />
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={pendente}
+              onClick={alternar}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-carvao transition-colors hover:border-dourado disabled:opacity-50"
+            >
+              {pendente ? "Movendo..." : "Mover para"}
+              <ChevronDown size={14} />
+            </button>
+          )
         }
       >
-        <option value="" disabled>
-          {pendente ? "Movendo..." : "Mover para »"}
-        </option>
-        {destinos.map((e) => (
-          <option key={e.id} value={e.id}>
-            {e.nome}
-          </option>
-        ))}
-      </select>
+        {compacto && (
+          <>
+            <Link href={`/negocios/${negocioId}`} className="block px-3 py-1.5 text-sm font-medium text-zinc-800 hover:bg-zinc-50">
+              Abrir negócio
+            </Link>
+            {destinos.length > 0 && <div className="my-1 border-t border-zinc-100" />}
+          </>
+        )}
+        {destinos.length > 0 && (
+          <>
+            {compacto && <RotuloMenuSuspenso>Mover para</RotuloMenuSuspenso>}
+            {destinos.map((e) => (
+              <ItemMenuSuspenso key={e.id} onClick={() => mover(e.id)} disabled={pendente}>
+                {e.nome}
+              </ItemMenuSuspenso>
+            ))}
+          </>
+        )}
+      </MenuSuspenso>
       {erro && <p className="mt-1 text-xs text-red-700">{erro}</p>}
     </div>
   );
