@@ -3,10 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { montarLinhaCalculo } from "@/lib/acoes/calculadora";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { mensagemErro } from "@/lib/erros";
-import type { ResultadoAcao } from "@/lib/tipos";
+import { TIPOS_LIGACAO, type ResultadoAcao } from "@/lib/tipos";
 
 const uuidOpcional = z
   .string()
@@ -25,6 +26,15 @@ const valorOpcional = z
   })
   .pipe(z.number().nonnegative("Valor inválido").nullable());
 
+const numeroBrOpcional = z
+  .string()
+  .optional()
+  .transform((v) => {
+    if (!v || !v.trim()) return null;
+    return Number(v.includes(",") ? v.replace(/\./g, "").replace(",", ".") : v);
+  })
+  .pipe(z.number().positive().nullable());
+
 const esquemaNovo = z.object({
   titulo: z.string().trim().min(2, "Informe o nome do negócio"),
   funil_id: z.string().uuid(),
@@ -37,6 +47,14 @@ const esquemaNovo = z.object({
   contato_nome: z.string().trim().optional(),
   contato_telefone: z.string().trim().optional(),
   contato_email: z.union([z.literal(""), z.string().trim().email("E-mail do contato inválido")]).optional(),
+  contato_endereco: z.string().trim().max(300, "Endereço muito longo").optional(),
+  // Calculadora solar: opcional — quando o kit é escolhido, o cálculo já
+  // fica pronto junto com o negócio (fluxo de "nova proposta").
+  kit_id: uuidOpcional,
+  tipo_ligacao: z.enum(TIPOS_LIGACAO).optional(),
+  consumo_medio_kwh: numeroBrOpcional,
+  valor_fatura_medio: numeroBrOpcional,
+  tarifa_kwh: numeroBrOpcional,
 });
 
 export async function criarNegocio(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
@@ -60,6 +78,7 @@ export async function criarNegocio(_: ResultadoAcao, formData: FormData): Promis
         nome: d.contato_nome,
         telefone: d.contato_telefone || null,
         email: d.contato_email || null,
+        endereco: d.contato_endereco || null,
       })
       .select("id")
       .single();
@@ -96,6 +115,28 @@ export async function criarNegocio(_: ResultadoAcao, formData: FormData): Promis
     .single();
   if (error || !negocio) {
     return { ok: false, mensagem: mensagemErro(error, "Não foi possível criar o negócio. Confira o responsável escolhido.") };
+  }
+
+  // Kit escolhido junto com o negócio: já deixa o cálculo pronto, sem o
+  // vendedor precisar abrir a calculadora à parte (fluxo de "nova proposta").
+  if (d.kit_id && d.tipo_ligacao && d.tarifa_kwh != null) {
+    const montado = await montarLinhaCalculo(supabase, atual.empresaId, {
+      kitId: d.kit_id,
+      tipoLigacao: d.tipo_ligacao,
+      consumoMedioKwh: d.consumo_medio_kwh,
+      valorFaturaMedio: d.valor_fatura_medio,
+      tarifaKwh: d.tarifa_kwh,
+    });
+    if (montado.ok) {
+      await supabase.from("calculos_solares").insert({
+        ...montado.linha,
+        negocio_id: negocio.id,
+        atualizado_por: atual.membroId,
+        criado_por: atual.membroId,
+      });
+    }
+    // Um kit mal escolhido não deve impedir a criação do negócio — o
+    // vendedor ainda pode calcular depois, direto na página do negócio.
   }
 
   revalidatePath("/negocios");
