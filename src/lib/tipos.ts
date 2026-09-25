@@ -60,3 +60,13 @@ export const ROTULO_TIPO_LIGACAO: Record<TipoLigacao, string> = {
   bifasico: "Bifásico",
   trifasico: "Trifásico",
 };
+
+export const MODOS_PRECO = ["sem_preco", "parcelado", "avista", "completo"] as const;
+export type ModoPreco = (typeof MODOS_PRECO)[number];
+
+export const ROTULO_MODO_PRECO: Record<ModoPreco, string> = {
+  sem_preco: "Sem preço (só a economia)",
+  parcelado: "Só parcelado",
+  avista: "Só à vista",
+  completo: "Completo (à vista e parcelado)",
+};

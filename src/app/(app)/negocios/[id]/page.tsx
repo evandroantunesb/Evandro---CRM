@@ -7,15 +7,17 @@ import { apagarAnexo } from "@/lib/acoes/anexos";
 import { alternarEtiqueta } from "@/lib/acoes/negocios";
 import { apagarNota } from "@/lib/acoes/notas";
 import { carregarConfiguracao, formatarDataHora, formatarMoeda } from "@/lib/crm";
+import { env } from "@/lib/env";
 import { descreverAtividade } from "@/lib/linha-do-tempo";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import type { TipoLigacao, TipoTarefa } from "@/lib/tipos";
+import type { ModoPreco, TipoLigacao, TipoTarefa } from "@/lib/tipos";
 import { Calculadora } from "./calculadora";
 import { EdicaoNegocio } from "./edicao";
 import { EnviarAnexo } from "./enviar-anexo";
 import { Fechamento } from "./fechamento";
 import { NovaNota } from "./nova-nota";
+import { Proposta } from "./proposta";
 
 function tamanhoLegivel(bytes: number) {
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
@@ -72,6 +74,19 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
         .eq("negocio_id", id)
         .maybeSingle(),
     ]);
+
+  const { data: proposta } = await supabase
+    .from("propostas")
+    .select("id, token, modo_preco")
+    .eq("negocio_id", id)
+    .maybeSingle();
+  const { data: aberturas } = proposta
+    ? await supabase
+        .from("propostas_aberturas")
+        .select("aberta_em")
+        .eq("proposta_id", proposta.id)
+        .order("aberta_em", { ascending: false })
+    : { data: null };
 
   const contato = negocio.contatos as unknown as {
     id: string;
@@ -187,6 +202,23 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
                       economiaMensal: calculo.economia_mensal,
                       paybackMeses: calculo.payback_meses,
                       observacoes: calculo.observacoes,
+                    }
+                  : null
+              }
+            />
+          </Cartao>
+          <Cartao titulo="Proposta">
+            <Proposta
+              negocioId={negocio.id}
+              temCalculo={!!calculo}
+              siteUrl={env.siteUrl}
+              proposta={
+                proposta
+                  ? {
+                      token: proposta.token,
+                      modoPreco: proposta.modo_preco as ModoPreco,
+                      aberturas: aberturas?.length ?? 0,
+                      ultimaAbertura: aberturas?.[0]?.aberta_em ?? null,
                     }
                   : null
               }
