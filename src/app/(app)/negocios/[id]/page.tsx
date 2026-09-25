@@ -214,6 +214,10 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
                       disponibilidadeMonoKwh: parametros.disponibilidade_mono_kwh,
                       disponibilidadeBiKwh: parametros.disponibilidade_bi_kwh,
                       disponibilidadeTriKwh: parametros.disponibilidade_tri_kwh,
+                      custoInstalacaoPorModulo: parametros.custo_instalacao_por_modulo,
+                      custoMaterialCaPorKwp: parametros.custo_material_ca_por_kwp,
+                      custoEngenharia: parametros.custo_engenharia,
+                      comissaoPercentual: parametros.comissao_percentual,
                     }
                   : null
               }

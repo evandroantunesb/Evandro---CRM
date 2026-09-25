@@ -6,6 +6,7 @@ import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
 import { salvarKitPersonalizado } from "@/lib/acoes/calculadora";
 import {
   calcular,
+  custosInternosEstimados,
   DISPONIBILIDADE_PADRAO_CAMEL,
   potenciaKitPersonalizadoKwp,
   sugerirQuantidadeModulos,
@@ -38,6 +39,10 @@ type Parametros = {
   disponibilidadeMonoKwh: number;
   disponibilidadeBiKwh: number;
   disponibilidadeTriKwh: number;
+  custoInstalacaoPorModulo: number;
+  custoMaterialCaPorKwp: number;
+  custoEngenharia: number;
+  comissaoPercentual: number;
 };
 
 function numeroBr(v: number) {
@@ -109,6 +114,20 @@ export function KitPersonalizado({
     return (potenciaW: number) =>
       sugerirQuantidadeModulos(consumoMedioEstimado, parametros.produtividadeKwhKwpMes, potenciaW);
   }, [parametros, consumoMedioEstimado]);
+
+  // Preço de referência (teste) do catálogo + custos internos configurados —
+  // só informativo aqui, já que o valor do negócio é editado em "Dados do negócio".
+  const precoSugerido = useMemo(() => {
+    if (!parametros) return null;
+    const somaComponentes = linhas.reduce((acc, l) => {
+      const precoUnitario = l.precoEstimadoUnitario ? Number(l.precoEstimadoUnitario) : NaN;
+      const quantidade = Number(l.quantidade) || 0;
+      return Number.isFinite(precoUnitario) ? acc + precoUnitario * quantidade : acc;
+    }, 0);
+    if (somaComponentes <= 0) return null;
+    const quantidadeModulos = componentes.filter((c) => c.tipo === "modulo").reduce((acc, c) => acc + c.quantidade, 0);
+    return custosInternosEstimados(somaComponentes, quantidadeModulos, potenciaKwp, parametros).total;
+  }, [linhas, componentes, potenciaKwp, parametros]);
 
   const previa = useMemo(() => {
     if (!parametros) return null;
@@ -194,6 +213,12 @@ export function KitPersonalizado({
       <input type="hidden" name="negocioId" value={negocioId} />
       <input type="hidden" name="componentes" value={JSON.stringify(componentes)} />
       <EditorComponentesKit linhas={linhas} onChange={setLinhas} sugerirQuantidadeModulo={sugerirQuantidadeModulo} />
+      {precoSugerido != null && (
+        <p className="-mt-1 text-xs text-zinc-400">
+          Preço sugerido (catálogo + custos internos, estimativa de teste): {formatarMoeda(precoSugerido)} — ajuste em
+          &ldquo;Dados do negócio&rdquo; se quiser usar.
+        </p>
+      )}
       <Campo
         rotulo="Estrutura do telhado"
         name="estruturaTelhado"
