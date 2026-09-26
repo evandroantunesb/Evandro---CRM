@@ -25,6 +25,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
           { href: "/configuracoes/origens", rotulo: "Origens", grupo: "Configurações" },
           { href: "/configuracoes/listas", rotulo: "Etiquetas e motivos", grupo: "Configurações" },
           { href: "/configuracoes/calculadora", rotulo: "Kits e calculadora", grupo: "Configurações" },
+          { href: "/configuracoes/contrato", rotulo: "Modelo de contrato", grupo: "Configurações" },
           { href: "/configuracoes/usuarios", rotulo: "Usuários", grupo: "Configurações" },
           { href: "/configuracoes/equipes", rotulo: "Equipes", grupo: "Configurações" },
         ]

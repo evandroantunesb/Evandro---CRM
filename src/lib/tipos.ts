@@ -81,6 +81,15 @@ export const ROTULO_CATEGORIA_ANEXO: Record<CategoriaAnexo, string> = {
   fatura_beneficiario: "Fatura dos beneficiários",
 };
 
+export const STATUS_CONTRATO = ["rascunho", "aguardando_assinatura", "assinado"] as const;
+export type StatusContrato = (typeof STATUS_CONTRATO)[number];
+
+export const ROTULO_STATUS_CONTRATO: Record<StatusContrato, string> = {
+  rascunho: "Rascunho",
+  aguardando_assinatura: "Aguardando assinatura",
+  assinado: "Assinado",
+};
+
 export const MODOS_PRECO = ["sem_preco", "parcelado", "avista", "completo"] as const;
 export type ModoPreco = (typeof MODOS_PRECO)[number];
 

@@ -345,6 +345,74 @@ export type Database = {
           },
         ]
       }
+      contratos: {
+        Row: {
+          atualizado_por: string | null
+          conteudo: string
+          created_at: string
+          criado_por: string | null
+          empresa_id: string
+          id: string
+          negocio_id: string
+          status: Database["public"]["Enums"]["status_contrato"]
+          token: string
+          updated_at: string
+        }
+        Insert: {
+          atualizado_por?: string | null
+          conteudo: string
+          created_at?: string
+          criado_por?: string | null
+          empresa_id: string
+          id?: string
+          negocio_id: string
+          status?: Database["public"]["Enums"]["status_contrato"]
+          token?: string
+          updated_at?: string
+        }
+        Update: {
+          atualizado_por?: string | null
+          conteudo?: string
+          created_at?: string
+          criado_por?: string | null
+          empresa_id?: string
+          id?: string
+          negocio_id?: string
+          status?: Database["public"]["Enums"]["status_contrato"]
+          token?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contratos_atualizado_por_fkey"
+            columns: ["atualizado_por"]
+            isOneToOne: false
+            referencedRelation: "empresa_membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contratos_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "empresa_membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contratos_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contratos_negocio_id_fkey"
+            columns: ["negocio_id"]
+            isOneToOne: true
+            referencedRelation: "negocios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       empresa_membros: {
         Row: {
           ativo: boolean
@@ -870,6 +938,45 @@ export type Database = {
             foreignKeyName: "logs_auditoria_empresa_id_fkey"
             columns: ["empresa_id"]
             isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      modelos_contrato: {
+        Row: {
+          atualizado_por: string | null
+          conteudo: string
+          created_at: string
+          empresa_id: string
+          updated_at: string
+        }
+        Insert: {
+          atualizado_por?: string | null
+          conteudo?: string
+          created_at?: string
+          empresa_id: string
+          updated_at?: string
+        }
+        Update: {
+          atualizado_por?: string | null
+          conteudo?: string
+          created_at?: string
+          empresa_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "modelos_contrato_atualizado_por_fkey"
+            columns: ["atualizado_por"]
+            isOneToOne: false
+            referencedRelation: "empresa_membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "modelos_contrato_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: true
             referencedRelation: "empresas"
             referencedColumns: ["id"]
           },
@@ -1478,6 +1585,7 @@ export type Database = {
       modo_preco_proposta: "sem_preco" | "parcelado" | "avista" | "completo"
       papel_membro: "admin" | "gestor" | "vendedor"
       situacao_empresa: "ativa" | "suspensa" | "cancelada"
+      status_contrato: "rascunho" | "aguardando_assinatura" | "assinado"
       status_negocio: "aberto" | "ganho" | "perdido"
       tipo_componente_kit: "modulo" | "inversor" | "bateria" | "outro"
       tipo_ligacao: "monofasico" | "bifasico" | "trifasico"
@@ -1623,6 +1731,7 @@ export const Constants = {
       modo_preco_proposta: ["sem_preco", "parcelado", "avista", "completo"],
       papel_membro: ["admin", "gestor", "vendedor"],
       situacao_empresa: ["ativa", "suspensa", "cancelada"],
+      status_contrato: ["rascunho", "aguardando_assinatura", "assinado"],
       status_negocio: ["aberto", "ganho", "perdido"],
       tipo_componente_kit: ["modulo", "inversor", "bateria", "outro"],
       tipo_ligacao: ["monofasico", "bifasico", "trifasico"],
