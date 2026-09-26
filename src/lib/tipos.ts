@@ -81,6 +81,23 @@ export const ROTULO_CATEGORIA_ANEXO: Record<CategoriaAnexo, string> = {
   fatura_beneficiario: "Fatura dos beneficiários",
 };
 
+export const TIPOS_PLANO = ["gratuito", "pago"] as const;
+export type TipoPlano = (typeof TIPOS_PLANO)[number];
+
+export const ROTULO_TIPO_PLANO: Record<TipoPlano, string> = {
+  gratuito: "Gratuito",
+  pago: "Pago",
+};
+
+export const MODELOS_COBRANCA = ["por_usuario", "fixo", "fixo_mais_usuario"] as const;
+export type ModeloCobranca = (typeof MODELOS_COBRANCA)[number];
+
+export const ROTULO_MODELO_COBRANCA: Record<ModeloCobranca, string> = {
+  por_usuario: "Por usuário ativo",
+  fixo: "Fixo mensal",
+  fixo_mais_usuario: "Fixo + por usuário",
+};
+
 export const MODOS_PRECO = ["sem_preco", "parcelado", "avista", "completo"] as const;
 export type ModoPreco = (typeof MODOS_PRECO)[number];
 
