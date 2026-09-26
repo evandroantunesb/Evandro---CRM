@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useMemo, useState, useTransition } from "react";
+import { CampoArquivo } from "@/components/campo-arquivo";
 import { EditorComponentesKit, linhasParaComponentes, type LinhaComponente } from "@/components/kit-componentes";
 import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
 import { buscarContatos, criarNegocio, verificarDuplicado, type Duplicado } from "@/lib/acoes/negocios";
@@ -223,10 +224,7 @@ export function FormularioNegocio({
         <Campo rotulo="Unidade consumidora" name="unidade_consumidora" placeholder="Opcional" />
         <Campo rotulo="Padrão do cliente" name="padrao_cliente" placeholder="Opcional" />
         <Campo rotulo="Tipo do telhado" name="tipo_telhado" placeholder="Ex.: cerâmico, metálico, laje, solo" />
-        <div className="flex flex-col gap-1 text-sm">
-          <span className="font-medium text-zinc-700">CNH (opcional)</span>
-          <input type="file" name="anexo_cnh_negocio" accept="image/*,.pdf" className="text-sm" />
-        </div>
+        <CampoArquivo rotulo="CNH (opcional)" name="anexo_cnh_negocio" accept="image/*,.pdf" />
         <label className="flex flex-col gap-1 text-sm md:col-span-2">
           <span className="font-medium text-zinc-700">Descrição</span>
           <textarea name="descricao" rows={2} className="rounded-md border border-zinc-300 px-3 py-2" />
@@ -342,17 +340,15 @@ export function FormularioNegocio({
         )}
 
         <div className="grid gap-3 md:grid-cols-2">
-          <div className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-zinc-700">CNH / documento do cliente (opcional)</span>
-            <input type="file" name="anexo_cnh_contato" accept="image/*,.pdf" className="text-sm" />
-          </div>
-          <div className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-zinc-700">Fatura do gerador (opcional)</span>
-            <input type="file" name="anexo_fatura_gerador" accept="image/*,.pdf" className="text-sm" />
-          </div>
-          <div className="flex flex-col gap-1 text-sm md:col-span-2">
-            <span className="font-medium text-zinc-700">Fatura dos beneficiários (quando aplicável)</span>
-            <input type="file" name="anexo_fatura_beneficiario" accept="image/*,.pdf" multiple className="text-sm" />
+          <CampoArquivo rotulo="CNH / documento do cliente (opcional)" name="anexo_cnh_contato" accept="image/*,.pdf" />
+          <CampoArquivo rotulo="Fatura do gerador (opcional)" name="anexo_fatura_gerador" accept="image/*,.pdf" />
+          <div className="md:col-span-2">
+            <CampoArquivo
+              rotulo="Fatura dos beneficiários (quando aplicável)"
+              name="anexo_fatura_beneficiario"
+              accept="image/*,.pdf"
+              multiple
+            />
           </div>
         </div>
       </fieldset>
