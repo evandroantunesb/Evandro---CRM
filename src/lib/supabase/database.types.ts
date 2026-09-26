@@ -684,6 +684,70 @@ export type Database = {
           },
         ]
       }
+      gamification_rules: {
+        Row: {
+          ativa: boolean
+          condicao: Json | null
+          created_at: string
+          criado_por: string | null
+          empresa_id: string
+          evento_tipo: string
+          id: string
+          limite_periodo: Database["public"]["Enums"]["periodo_limite_regra"] | null
+          limite_quantidade: number | null
+          nome: string
+          pontos: number
+          updated_at: string
+        }
+        Insert: {
+          ativa?: boolean
+          condicao?: Json | null
+          created_at?: string
+          criado_por?: string | null
+          empresa_id: string
+          evento_tipo: string
+          id?: string
+          limite_periodo?:
+            | Database["public"]["Enums"]["periodo_limite_regra"]
+            | null
+          limite_quantidade?: number | null
+          nome: string
+          pontos: number
+          updated_at?: string
+        }
+        Update: {
+          ativa?: boolean
+          condicao?: Json | null
+          created_at?: string
+          criado_por?: string | null
+          empresa_id?: string
+          evento_tipo?: string
+          id?: string
+          limite_periodo?:
+            | Database["public"]["Enums"]["periodo_limite_regra"]
+            | null
+          limite_quantidade?: number | null
+          nome?: string
+          pontos?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gamification_rules_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "empresa_membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gamification_rules_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       historico_etapas: {
         Row: {
           empresa_id: string
@@ -1258,6 +1322,90 @@ export type Database = {
         }
         Relationships: []
       }
+      point_ledger: {
+        Row: {
+          created_at: string
+          descricao: string
+          empresa_id: string
+          estornado: boolean
+          estornado_em: string | null
+          estornado_por: string | null
+          evento_id: number | null
+          id: string
+          membro_id: string
+          pontos: number
+          referencia_id: string | null
+          referencia_tipo: string | null
+          regra_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          descricao?: string
+          empresa_id: string
+          estornado?: boolean
+          estornado_em?: string | null
+          estornado_por?: string | null
+          evento_id?: number | null
+          id?: string
+          membro_id: string
+          pontos: number
+          referencia_id?: string | null
+          referencia_tipo?: string | null
+          regra_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          descricao?: string
+          empresa_id?: string
+          estornado?: boolean
+          estornado_em?: string | null
+          estornado_por?: string | null
+          evento_id?: number | null
+          id?: string
+          membro_id?: string
+          pontos?: number
+          referencia_id?: string | null
+          referencia_tipo?: string | null
+          regra_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "point_ledger_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "point_ledger_estornado_por_fkey"
+            columns: ["estornado_por"]
+            isOneToOne: false
+            referencedRelation: "empresa_membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "point_ledger_evento_id_fkey"
+            columns: ["evento_id"]
+            isOneToOne: false
+            referencedRelation: "eventos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "point_ledger_membro_id_fkey"
+            columns: ["membro_id"]
+            isOneToOne: false
+            referencedRelation: "empresa_membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "point_ledger_regra_id_fkey"
+            columns: ["regra_id"]
+            isOneToOne: false
+            referencedRelation: "gamification_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       propostas: {
         Row: {
           atualizado_por: string | null
@@ -1438,6 +1586,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      avaliar_condicao_regra: {
+        Args: { p_condicao: Json; p_payload: Json }
+        Returns: boolean
+      }
       buscar_contato_duplicado: {
         Args: { p_email: string; p_empresa_id: string; p_telefone: string }
         Returns: {
@@ -1477,6 +1629,7 @@ export type Database = {
     Enums: {
       modo_preco_proposta: "sem_preco" | "parcelado" | "avista" | "completo"
       papel_membro: "admin" | "gestor" | "vendedor"
+      periodo_limite_regra: "dia" | "mes"
       situacao_empresa: "ativa" | "suspensa" | "cancelada"
       status_negocio: "aberto" | "ganho" | "perdido"
       tipo_componente_kit: "modulo" | "inversor" | "bateria" | "outro"
@@ -1622,6 +1775,7 @@ export const Constants = {
     Enums: {
       modo_preco_proposta: ["sem_preco", "parcelado", "avista", "completo"],
       papel_membro: ["admin", "gestor", "vendedor"],
+      periodo_limite_regra: ["dia", "mes"],
       situacao_empresa: ["ativa", "suspensa", "cancelada"],
       status_negocio: ["aberto", "ganho", "perdido"],
       tipo_componente_kit: ["modulo", "inversor", "bateria", "outro"],

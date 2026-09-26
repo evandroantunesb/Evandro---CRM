@@ -90,3 +90,23 @@ export const ROTULO_MODO_PRECO: Record<ModoPreco, string> = {
   avista: "Só à vista",
   completo: "Completo (à vista e parcelado)",
 };
+
+export const OPERADORES_CONDICAO = ["=", "!=", ">=", ">", "<=", "<"] as const;
+export type OperadorCondicao = (typeof OPERADORES_CONDICAO)[number];
+
+export const ROTULO_OPERADOR_CONDICAO: Record<OperadorCondicao, string> = {
+  "=": "é igual a",
+  "!=": "é diferente de",
+  ">=": "é maior ou igual a",
+  ">": "é maior que",
+  "<=": "é menor ou igual a",
+  "<": "é menor que",
+};
+
+export const PERIODOS_LIMITE_REGRA = ["dia", "mes"] as const;
+export type PeriodoLimiteRegra = (typeof PERIODOS_LIMITE_REGRA)[number];
+
+export const ROTULO_PERIODO_LIMITE_REGRA: Record<PeriodoLimiteRegra, string> = {
+  dia: "por dia",
+  mes: "por mês",
+};
