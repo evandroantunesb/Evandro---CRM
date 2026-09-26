@@ -353,6 +353,7 @@ export type Database = {
           id: string
           papel: Database["public"]["Enums"]["papel_membro"]
           recebe_leads: boolean
+          recebeu_lead_em: string | null
           tipo_vendedor: Database["public"]["Enums"]["tipo_vendedor"] | null
           updated_at: string
           user_id: string
@@ -364,6 +365,7 @@ export type Database = {
           id?: string
           papel?: Database["public"]["Enums"]["papel_membro"]
           recebe_leads?: boolean
+          recebeu_lead_em?: string | null
           tipo_vendedor?: Database["public"]["Enums"]["tipo_vendedor"] | null
           updated_at?: string
           user_id: string
@@ -375,6 +377,7 @@ export type Database = {
           id?: string
           papel?: Database["public"]["Enums"]["papel_membro"]
           recebe_leads?: boolean
+          recebeu_lead_em?: string | null
           tipo_vendedor?: Database["public"]["Enums"]["tipo_vendedor"] | null
           updated_at?: string
           user_id?: string
@@ -642,6 +645,64 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      formularios: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          empresa_id: string
+          funil_id: string
+          id: string
+          nome: string
+          origem_id: string
+          token: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          empresa_id: string
+          funil_id: string
+          id?: string
+          nome: string
+          origem_id: string
+          token?: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          empresa_id?: string
+          funil_id?: string
+          id?: string
+          nome?: string
+          origem_id?: string
+          token?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "formularios_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "formularios_funil_id_fkey"
+            columns: ["funil_id"]
+            isOneToOne: false
+            referencedRelation: "funis"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "formularios_origem_id_fkey"
+            columns: ["origem_id"]
+            isOneToOne: false
+            referencedRelation: "origens"
             referencedColumns: ["id"]
           },
         ]
