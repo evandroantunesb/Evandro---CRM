@@ -646,6 +646,56 @@ export type Database = {
           },
         ]
       }
+      fechamentos_mensais: {
+        Row: {
+          created_at: string
+          empresa_id: string
+          id: string
+          pago: boolean
+          pago_em: string | null
+          referencia: string
+          registrado_por: string | null
+          usuarios_ativos: number
+          valor_fixo: number
+          valor_por_usuario: number
+          valor_total: number
+        }
+        Insert: {
+          created_at?: string
+          empresa_id: string
+          id?: string
+          pago?: boolean
+          pago_em?: string | null
+          referencia: string
+          registrado_por?: string | null
+          usuarios_ativos?: number
+          valor_fixo?: number
+          valor_por_usuario?: number
+          valor_total?: number
+        }
+        Update: {
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          pago?: boolean
+          pago_em?: string | null
+          referencia?: string
+          registrado_por?: string | null
+          usuarios_ativos?: number
+          valor_fixo?: number
+          valor_por_usuario?: number
+          valor_total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fechamentos_mensais_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       funis: {
         Row: {
           ativo: boolean
@@ -1243,6 +1293,57 @@ export type Database = {
         }
         Relationships: []
       }
+      planos_empresa: {
+        Row: {
+          atualizado_por: string | null
+          created_at: string
+          dia_vencimento: number | null
+          empresa_id: string
+          limite_usuarios: number | null
+          modelo_cobranca: Database["public"]["Enums"]["modelo_cobranca"] | null
+          tipo: Database["public"]["Enums"]["tipo_plano"]
+          updated_at: string
+          valor_fixo: number | null
+          valor_por_usuario: number | null
+        }
+        Insert: {
+          atualizado_por?: string | null
+          created_at?: string
+          dia_vencimento?: number | null
+          empresa_id: string
+          limite_usuarios?: number | null
+          modelo_cobranca?:
+            | Database["public"]["Enums"]["modelo_cobranca"]
+            | null
+          tipo?: Database["public"]["Enums"]["tipo_plano"]
+          updated_at?: string
+          valor_fixo?: number | null
+          valor_por_usuario?: number | null
+        }
+        Update: {
+          atualizado_por?: string | null
+          created_at?: string
+          dia_vencimento?: number | null
+          empresa_id?: string
+          limite_usuarios?: number | null
+          modelo_cobranca?:
+            | Database["public"]["Enums"]["modelo_cobranca"]
+            | null
+          tipo?: Database["public"]["Enums"]["tipo_plano"]
+          updated_at?: string
+          valor_fixo?: number | null
+          valor_por_usuario?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planos_empresa_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: true
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       plataforma_admins: {
         Row: {
           created_at: string
@@ -1475,6 +1576,7 @@ export type Database = {
       }
     }
     Enums: {
+      modelo_cobranca: "por_usuario" | "fixo" | "fixo_mais_usuario"
       modo_preco_proposta: "sem_preco" | "parcelado" | "avista" | "completo"
       papel_membro: "admin" | "gestor" | "vendedor"
       situacao_empresa: "ativa" | "suspensa" | "cancelada"
@@ -1482,6 +1584,7 @@ export type Database = {
       tipo_componente_kit: "modulo" | "inversor" | "bateria" | "outro"
       tipo_ligacao: "monofasico" | "bifasico" | "trifasico"
       tipo_pessoa: "pf" | "pj"
+      tipo_plano: "gratuito" | "pago"
       tipo_tarefa:
         | "ligacao"
         | "whatsapp"
@@ -1620,6 +1723,7 @@ export const Constants = {
   },
   public: {
     Enums: {
+      modelo_cobranca: ["por_usuario", "fixo", "fixo_mais_usuario"],
       modo_preco_proposta: ["sem_preco", "parcelado", "avista", "completo"],
       papel_membro: ["admin", "gestor", "vendedor"],
       situacao_empresa: ["ativa", "suspensa", "cancelada"],
@@ -1627,6 +1731,7 @@ export const Constants = {
       tipo_componente_kit: ["modulo", "inversor", "bateria", "outro"],
       tipo_ligacao: ["monofasico", "bifasico", "trifasico"],
       tipo_pessoa: ["pf", "pj"],
+      tipo_plano: ["gratuito", "pago"],
       tipo_tarefa: [
         "ligacao",
         "whatsapp",
