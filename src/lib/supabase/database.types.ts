@@ -1840,6 +1840,12 @@ export type Database = {
           status: Database["public"]["Enums"]["status_resgate"]
           updated_at: string
         }
+        SetofOptions: {
+          from: "*"
+          to: "resgates"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       avaliar_condicao_regra: {
         Args: { p_condicao: Json; p_payload: Json }
@@ -1891,6 +1897,12 @@ export type Database = {
           recompensa_id: string
           status: Database["public"]["Enums"]["status_resgate"]
           updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "resgates"
+          isOneToOne: true
+          isSetofReturn: false
         }
       }
       tem_papel: {
