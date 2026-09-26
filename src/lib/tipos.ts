@@ -90,3 +90,23 @@ export const ROTULO_MODO_PRECO: Record<ModoPreco, string> = {
   avista: "Só à vista",
   completo: "Completo (à vista e parcelado)",
 };
+
+export const METRICAS_META = ["receita", "negocios_ganhos", "reunioes", "conversao", "tarefas_concluidas"] as const;
+export type MetricaMeta = (typeof METRICAS_META)[number];
+
+export const ROTULO_METRICA_META: Record<MetricaMeta, string> = {
+  receita: "Receita (negócios ganhos)",
+  negocios_ganhos: "Negócios ganhos (quantidade)",
+  reunioes: "Reuniões realizadas",
+  conversao: "Taxa de conversão (%)",
+  tarefas_concluidas: "Tarefas concluídas",
+};
+
+/** Unidade de exibição de cada métrica: moeda, quantidade inteira ou percentual. */
+export const UNIDADE_METRICA_META: Record<MetricaMeta, "moeda" | "quantidade" | "percentual"> = {
+  receita: "moeda",
+  negocios_ganhos: "quantidade",
+  reunioes: "quantidade",
+  conversao: "percentual",
+  tarefas_concluidas: "quantidade",
+};

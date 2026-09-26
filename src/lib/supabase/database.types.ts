@@ -875,6 +875,73 @@ export type Database = {
           },
         ]
       }
+      metas: {
+        Row: {
+          ativa: boolean
+          created_at: string
+          criado_por: string | null
+          empresa_id: string
+          id: string
+          membro_id: string
+          metrica: Database["public"]["Enums"]["metrica_meta"]
+          periodo_fim: string
+          periodo_inicio: string
+          titulo: string
+          updated_at: string
+          valor_alvo: number
+        }
+        Insert: {
+          ativa?: boolean
+          created_at?: string
+          criado_por?: string | null
+          empresa_id: string
+          id?: string
+          membro_id: string
+          metrica: Database["public"]["Enums"]["metrica_meta"]
+          periodo_fim: string
+          periodo_inicio: string
+          titulo: string
+          updated_at?: string
+          valor_alvo: number
+        }
+        Update: {
+          ativa?: boolean
+          created_at?: string
+          criado_por?: string | null
+          empresa_id?: string
+          id?: string
+          membro_id?: string
+          metrica?: Database["public"]["Enums"]["metrica_meta"]
+          periodo_fim?: string
+          periodo_inicio?: string
+          titulo?: string
+          updated_at?: string
+          valor_alvo?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "metas_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "empresa_membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "metas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "metas_membro_id_fkey"
+            columns: ["membro_id"]
+            isOneToOne: false
+            referencedRelation: "empresa_membros"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       motivos_perda: {
         Row: {
           ativo: boolean
@@ -1475,6 +1542,12 @@ export type Database = {
       }
     }
     Enums: {
+      metrica_meta:
+        | "receita"
+        | "negocios_ganhos"
+        | "reunioes"
+        | "conversao"
+        | "tarefas_concluidas"
       modo_preco_proposta: "sem_preco" | "parcelado" | "avista" | "completo"
       papel_membro: "admin" | "gestor" | "vendedor"
       situacao_empresa: "ativa" | "suspensa" | "cancelada"
@@ -1620,6 +1693,13 @@ export const Constants = {
   },
   public: {
     Enums: {
+      metrica_meta: [
+        "receita",
+        "negocios_ganhos",
+        "reunioes",
+        "conversao",
+        "tarefas_concluidas",
+      ],
       modo_preco_proposta: ["sem_preco", "parcelado", "avista", "completo"],
       papel_membro: ["admin", "gestor", "vendedor"],
       situacao_empresa: ["ativa", "suspensa", "cancelada"],
