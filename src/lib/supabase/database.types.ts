@@ -1740,6 +1740,13 @@ export type Database = {
         Args: { p_empresa_id: string; p_responsavel_id: string }
         Returns: boolean
       }
+      ranking_gamificacao: {
+        Args: { p_desde?: string; p_empresa_id: string }
+        Returns: {
+          membro_id: string
+          total_pontos: number
+        }[]
+      }
       tem_papel: {
         Args: {
           p_empresa_id: string

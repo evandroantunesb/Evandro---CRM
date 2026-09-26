@@ -14,6 +14,7 @@ import {
   ShieldCheck,
   Star,
   Tags,
+  Trophy,
   UserCog,
   Users,
   UsersRound,
@@ -36,6 +37,7 @@ const ICONES: Record<string, LucideIcon> = {
   "/configuracoes/usuarios": UserCog,
   "/configuracoes/equipes": Users,
   "/gamificacao/jornada": Rocket,
+  "/gamificacao/ranking": Trophy,
   "/gamificacao/extrato": Star,
   "/super-admin": ShieldCheck,
 };
