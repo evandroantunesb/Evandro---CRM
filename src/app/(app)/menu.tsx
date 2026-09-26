@@ -10,6 +10,7 @@ import {
   KanbanSquare,
   ListTree,
   Radio,
+  Rocket,
   ShieldCheck,
   Star,
   Tags,
@@ -34,6 +35,7 @@ const ICONES: Record<string, LucideIcon> = {
   "/configuracoes/gamificacao": Award,
   "/configuracoes/usuarios": UserCog,
   "/configuracoes/equipes": Users,
+  "/gamificacao/jornada": Rocket,
   "/gamificacao/extrato": Star,
   "/super-admin": ShieldCheck,
 };
