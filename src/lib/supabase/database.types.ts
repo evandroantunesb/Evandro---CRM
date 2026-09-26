@@ -276,6 +276,99 @@ export type Database = {
           },
         ]
       }
+      conquistas: {
+        Row: {
+          ativa: boolean
+          created_at: string
+          criterio: Json
+          descricao: string
+          empresa_id: string
+          icone: string
+          id: string
+          nome: string
+          updated_at: string
+          xp_bonus: number
+        }
+        Insert: {
+          ativa?: boolean
+          created_at?: string
+          criterio: Json
+          descricao?: string
+          empresa_id: string
+          icone?: string
+          id?: string
+          nome: string
+          updated_at?: string
+          xp_bonus?: number
+        }
+        Update: {
+          ativa?: boolean
+          created_at?: string
+          criterio?: Json
+          descricao?: string
+          empresa_id?: string
+          icone?: string
+          id?: string
+          nome?: string
+          updated_at?: string
+          xp_bonus?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conquistas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conquistas_desbloqueadas: {
+        Row: {
+          conquista_id: string
+          desbloqueada_em: string
+          empresa_id: string
+          id: string
+          membro_id: string
+        }
+        Insert: {
+          conquista_id: string
+          desbloqueada_em?: string
+          empresa_id: string
+          id?: string
+          membro_id: string
+        }
+        Update: {
+          conquista_id?: string
+          desbloqueada_em?: string
+          empresa_id?: string
+          id?: string
+          membro_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conquistas_desbloqueadas_conquista_id_fkey"
+            columns: ["conquista_id"]
+            isOneToOne: false
+            referencedRelation: "conquistas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conquistas_desbloqueadas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conquistas_desbloqueadas_membro_id_fkey"
+            columns: ["membro_id"]
+            isOneToOne: false
+            referencedRelation: "empresa_membros"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contatos: {
         Row: {
           cidade: string | null
@@ -1148,6 +1241,35 @@ export type Database = {
             columns: ["responsavel_id"]
             isOneToOne: false
             referencedRelation: "empresa_membros"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      niveis_gamificacao: {
+        Row: {
+          empresa_id: string
+          nivel: number
+          nome: string | null
+          xp_minimo: number
+        }
+        Insert: {
+          empresa_id: string
+          nivel: number
+          nome?: string | null
+          xp_minimo: number
+        }
+        Update: {
+          empresa_id?: string
+          nivel?: number
+          nome?: string | null
+          xp_minimo?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "niveis_gamificacao_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
             referencedColumns: ["id"]
           },
         ]
