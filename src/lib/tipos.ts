@@ -110,3 +110,13 @@ export const ROTULO_PERIODO_LIMITE_REGRA: Record<PeriodoLimiteRegra, string> = {
   dia: "por dia",
   mes: "por mês",
 };
+
+export const STATUS_RESGATE = ["solicitado", "aprovado", "entregue", "cancelado"] as const;
+export type StatusResgate = (typeof STATUS_RESGATE)[number];
+
+export const ROTULO_STATUS_RESGATE: Record<StatusResgate, string> = {
+  solicitado: "Solicitado",
+  aprovado: "Aprovado",
+  entregue: "Entregue",
+  cancelado: "Cancelado",
+};

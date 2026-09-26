@@ -1624,6 +1624,121 @@ export type Database = {
           },
         ]
       }
+      recompensas: {
+        Row: {
+          ativa: boolean
+          created_at: string
+          criado_por: string | null
+          custo_pontos: number
+          descricao: string
+          empresa_id: string
+          estoque: number | null
+          id: string
+          limite_por_membro: number | null
+          nome: string
+          updated_at: string
+          validade_ate: string | null
+        }
+        Insert: {
+          ativa?: boolean
+          created_at?: string
+          criado_por?: string | null
+          custo_pontos: number
+          descricao?: string
+          empresa_id: string
+          estoque?: number | null
+          id?: string
+          limite_por_membro?: number | null
+          nome: string
+          updated_at?: string
+          validade_ate?: string | null
+        }
+        Update: {
+          ativa?: boolean
+          created_at?: string
+          criado_por?: string | null
+          custo_pontos?: number
+          descricao?: string
+          empresa_id?: string
+          estoque?: number | null
+          id?: string
+          limite_por_membro?: number | null
+          nome?: string
+          updated_at?: string
+          validade_ate?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recompensas_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "empresa_membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recompensas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      resgates: {
+        Row: {
+          created_at: string
+          empresa_id: string
+          id: string
+          membro_id: string
+          pontos_debitados: number
+          recompensa_id: string
+          status: Database["public"]["Enums"]["status_resgate"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          empresa_id: string
+          id?: string
+          membro_id: string
+          pontos_debitados: number
+          recompensa_id: string
+          status?: Database["public"]["Enums"]["status_resgate"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          membro_id?: string
+          pontos_debitados?: number
+          recompensa_id?: string
+          status?: Database["public"]["Enums"]["status_resgate"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resgates_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resgates_membro_id_fkey"
+            columns: ["membro_id"]
+            isOneToOne: false
+            referencedRelation: "empresa_membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resgates_recompensa_id_fkey"
+            columns: ["recompensa_id"]
+            isOneToOne: false
+            referencedRelation: "recompensas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tarefas: {
         Row: {
           concluida_em: string | null
@@ -1710,6 +1825,28 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      atualizar_status_resgate: {
+        Args: {
+          p_novo_status: Database["public"]["Enums"]["status_resgate"]
+          p_resgate_id: string
+        }
+        Returns: {
+          created_at: string
+          empresa_id: string
+          id: string
+          membro_id: string
+          pontos_debitados: number
+          recompensa_id: string
+          status: Database["public"]["Enums"]["status_resgate"]
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "resgates"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       avaliar_condicao_regra: {
         Args: { p_condicao: Json; p_payload: Json }
         Returns: boolean
@@ -1749,6 +1886,25 @@ export type Database = {
           total_pontos: number
         }[]
       }
+      solicitar_resgate: {
+        Args: { p_recompensa_id: string }
+        Returns: {
+          created_at: string
+          empresa_id: string
+          id: string
+          membro_id: string
+          pontos_debitados: number
+          recompensa_id: string
+          status: Database["public"]["Enums"]["status_resgate"]
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "resgates"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       tem_papel: {
         Args: {
           p_empresa_id: string
@@ -1763,6 +1919,7 @@ export type Database = {
       periodo_limite_regra: "dia" | "mes"
       situacao_empresa: "ativa" | "suspensa" | "cancelada"
       status_negocio: "aberto" | "ganho" | "perdido"
+      status_resgate: "solicitado" | "aprovado" | "entregue" | "cancelado"
       tipo_componente_kit: "modulo" | "inversor" | "bateria" | "outro"
       tipo_ligacao: "monofasico" | "bifasico" | "trifasico"
       tipo_pessoa: "pf" | "pj"
@@ -1909,6 +2066,7 @@ export const Constants = {
       periodo_limite_regra: ["dia", "mes"],
       situacao_empresa: ["ativa", "suspensa", "cancelada"],
       status_negocio: ["aberto", "ganho", "perdido"],
+      status_resgate: ["solicitado", "aprovado", "entregue", "cancelado"],
       tipo_componente_kit: ["modulo", "inversor", "bateria", "outro"],
       tipo_ligacao: ["monofasico", "bifasico", "trifasico"],
       tipo_pessoa: ["pf", "pj"],

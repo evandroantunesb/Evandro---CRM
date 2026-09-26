@@ -193,3 +193,74 @@ export async function apagarConquista(formData: FormData) {
   await supabase.from("conquistas").delete().eq("id", id.data);
   revalidatePath(CAMINHO);
 }
+
+const esquemaRecompensa = z.object({
+  nome: z.string().trim().min(2, "Nome muito curto").max(80, "Nome muito longo"),
+  descricao: z.string().trim().max(200).optional().or(z.literal("").transform(() => undefined)),
+  custoPontos: z.coerce.number().int().positive("Informe o custo em pontos."),
+  estoque: z.coerce.number().int().min(0).optional().or(z.literal("").transform(() => undefined)),
+  limitePorMembro: z.coerce.number().int().positive().optional().or(z.literal("").transform(() => undefined)),
+  validadeAte: z.string().trim().optional().or(z.literal("").transform(() => undefined)),
+});
+
+export async function criarRecompensa(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  const { atual } = await exigirPapel("admin");
+  const dados = esquemaRecompensa.safeParse(Object.fromEntries(formData));
+  if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
+
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.from("recompensas").insert({
+    empresa_id: atual.empresaId,
+    nome: dados.data.nome,
+    descricao: dados.data.descricao ?? "",
+    custo_pontos: dados.data.custoPontos,
+    estoque: dados.data.estoque ?? null,
+    limite_por_membro: dados.data.limitePorMembro ?? null,
+    validade_ate: dados.data.validadeAte ?? null,
+    criado_por: atual.membroId,
+  });
+  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível criar a recompensa.") };
+
+  revalidatePath(CAMINHO);
+  revalidatePath("/gamificacao/loja");
+  return { ok: true, mensagem: "Recompensa criada." };
+}
+
+export async function editarRecompensa(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  await exigirPapel("admin");
+  const id = z.string().uuid().safeParse(formData.get("id"));
+  const dados = esquemaRecompensa.safeParse(Object.fromEntries(formData));
+  if (!id.success || !dados.success) {
+    return { ok: false, mensagem: dados.success ? "Dados inválidos." : dados.error.issues[0].message };
+  }
+
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase
+    .from("recompensas")
+    .update({
+      nome: dados.data.nome,
+      descricao: dados.data.descricao ?? "",
+      custo_pontos: dados.data.custoPontos,
+      estoque: dados.data.estoque ?? null,
+      limite_por_membro: dados.data.limitePorMembro ?? null,
+      validade_ate: dados.data.validadeAte ?? null,
+      ativa: formData.get("ativa") === "on",
+    })
+    .eq("id", id.data);
+  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível salvar.") };
+
+  revalidatePath(CAMINHO);
+  revalidatePath("/gamificacao/loja");
+  return { ok: true, mensagem: "Salvo." };
+}
+
+export async function apagarRecompensa(formData: FormData) {
+  await exigirPapel("admin");
+  const id = z.string().uuid().safeParse(formData.get("id"));
+  if (!id.success) return;
+
+  const supabase = await criarClienteServidor();
+  await supabase.from("recompensas").delete().eq("id", id.data);
+  revalidatePath(CAMINHO);
+  revalidatePath("/gamificacao/loja");
+}

@@ -3,12 +3,12 @@ import { EVENTOS_GAMIFICACAO } from "@/lib/gamificacao";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import type { OperadorCondicao, PeriodoLimiteRegra } from "@/lib/tipos";
-import { LinhaConquista, LinhaNivel, LinhaRegra, NovaConquista, NovoNivel, NovaRegra } from "./formularios";
+import { LinhaConquista, LinhaNivel, LinhaRecompensa, LinhaRegra, NovaConquista, NovaRecompensa, NovoNivel, NovaRegra } from "./formularios";
 
 export default async function ConfigGamificacao() {
   const { atual } = await exigirPapel("admin");
   const supabase = await criarClienteServidor();
-  const [{ data: regras }, { data: niveis }, { data: conquistas }] = await Promise.all([
+  const [{ data: regras }, { data: niveis }, { data: conquistas }, { data: recompensas }] = await Promise.all([
     supabase
       .from("gamification_rules")
       .select("id, nome, evento_tipo, condicao, pontos, limite_periodo, limite_quantidade, ativa")
@@ -18,6 +18,11 @@ export default async function ConfigGamificacao() {
     supabase
       .from("conquistas")
       .select("id, nome, descricao, icone, criterio, xp_bonus, ativa")
+      .eq("empresa_id", atual.empresaId)
+      .order("created_at"),
+    supabase
+      .from("recompensas")
+      .select("id, nome, descricao, custo_pontos, estoque, limite_por_membro, validade_ate, ativa")
       .eq("empresa_id", atual.empresaId)
       .order("created_at"),
   ]);
@@ -83,6 +88,31 @@ export default async function ConfigGamificacao() {
               valorPontos: (c.criterio as { metrica: string; valor: number }).valor,
               xpBonus: c.xp_bonus,
               ativa: c.ativa,
+            }}
+          />
+        ))}
+      </Cartao>
+
+      <p className="mt-4 text-sm text-zinc-600">
+        A loja de recompensas deixa o colaborador trocar pontos por prêmios. O saldo é debitado assim que ele resgata;
+        cancelar um resgate devolve os pontos.
+      </p>
+      <Cartao titulo="Nova recompensa">
+        <NovaRecompensa />
+      </Cartao>
+      <Cartao titulo={`Recompensas (${recompensas?.length ?? 0})`}>
+        {(recompensas ?? []).map((r) => (
+          <LinhaRecompensa
+            key={r.id}
+            recompensa={{
+              id: r.id,
+              nome: r.nome,
+              descricao: r.descricao,
+              custoPontos: r.custo_pontos,
+              estoque: r.estoque,
+              limitePorMembro: r.limite_por_membro,
+              validadeAte: r.validade_ate,
+              ativa: r.ativa,
             }}
           />
         ))}
