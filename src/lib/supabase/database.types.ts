@@ -786,7 +786,9 @@ export type Database = {
           empresa_id: string
           evento_tipo: string
           id: string
-          limite_periodo: Database["public"]["Enums"]["periodo_limite_regra"] | null
+          limite_periodo:
+            | Database["public"]["Enums"]["periodo_limite_regra"]
+            | null
           limite_quantidade: number | null
           nome: string
           pontos: number
