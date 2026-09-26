@@ -24,10 +24,17 @@ export default async function ConfigCaptura() {
       const funil = f.funis as unknown as { nome: string } | null;
       const origem = f.origens as unknown as { nome: string } | null;
       const link = `${env.siteUrl}/captura/${f.token}`;
+      let qrCode: string | null = null;
+      try {
+        qrCode = await QRCode.toDataURL(link, { margin: 1, width: 224 });
+      } catch (erro) {
+        // O link funciona sem o QR Code — não vale derrubar a página inteira por isso.
+        console.error("Falha ao gerar QR Code do formulário", f.id, erro);
+      }
       return {
         formulario: { id: f.id, nome: f.nome, ativo: f.ativo, funil: funil?.nome ?? "—", origem: origem?.nome ?? "—" },
         link,
-        qrCode: await QRCode.toDataURL(link, { margin: 1, width: 224 }),
+        qrCode,
       };
     }),
   );

@@ -11,15 +11,21 @@ export function LinkFormulario({
 }: {
   formulario: { id: string; nome: string; funil: string; origem: string; ativo: boolean };
   link: string;
-  qrCode: string;
+  qrCode: string | null;
 }) {
   const [resultado, acao, pendente] = useActionState(alternarFormulario, null);
   const [copiado, setCopiado] = useState(false);
 
   return (
     <div className="flex flex-col gap-3 border-t border-zinc-100 py-4 first:border-t-0 first:pt-0 sm:flex-row sm:items-start">
-      {/* eslint-disable-next-line @next/next/no-img-element -- data: URL gerada localmente, sem otimização de imagem remota. */}
-      <img src={qrCode} alt={`QR Code do formulário ${formulario.nome}`} width={112} height={112} className="rounded-md border border-zinc-200" />
+      {qrCode ? (
+        // eslint-disable-next-line @next/next/no-img-element -- data: URL gerada localmente, sem otimização de imagem remota.
+        <img src={qrCode} alt={`QR Code do formulário ${formulario.nome}`} width={112} height={112} className="rounded-md border border-zinc-200" />
+      ) : (
+        <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-md border border-dashed border-zinc-300 px-2 text-center text-xs text-zinc-400">
+          QR Code indisponível
+        </div>
+      )}
       <div className="flex flex-1 flex-col gap-2">
         <div>
           <p className="font-medium text-zinc-900">{formulario.nome}</p>
