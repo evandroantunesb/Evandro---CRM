@@ -10,7 +10,19 @@ import {
   type OperadorCondicao,
   type PeriodoLimiteRegra,
 } from "@/lib/tipos";
-import { apagarConquista, apagarNivel, apagarRegra, criarConquista, criarRegra, editarConquista, editarRegra, salvarNivel } from "./actions";
+import {
+  apagarConquista,
+  apagarNivel,
+  apagarRecompensa,
+  apagarRegra,
+  criarConquista,
+  criarRecompensa,
+  criarRegra,
+  editarConquista,
+  editarRecompensa,
+  editarRegra,
+  salvarNivel,
+} from "./actions";
 
 type EventoOpcao = { tipo: string; rotulo: string; campos: readonly string[] };
 
@@ -234,6 +246,74 @@ export function LinhaConquista({ conquista }: { conquista: ConquistaSalva }) {
           Salvar
         </Botao>
         <button type="submit" formAction={apagarConquista} className="text-xs text-zinc-400 hover:text-red-700">
+          Apagar
+        </button>
+        <Mensagem resultado={resultado} />
+      </div>
+    </form>
+  );
+}
+
+export type RecompensaSalva = {
+  id: string;
+  nome: string;
+  descricao: string;
+  custoPontos: number;
+  estoque: number | null;
+  limitePorMembro: number | null;
+  validadeAte: string | null;
+  ativa: boolean;
+};
+
+export function NovaRecompensa() {
+  const [resultado, acao, pendente] = useActionState(criarRecompensa, null);
+  return (
+    <form action={acao} className="flex flex-col gap-3">
+      <Campo rotulo="Nome" name="nome" placeholder="Ex.: Vale-presente R$ 100" required />
+      <Campo rotulo="Descrição (opcional)" name="descricao" />
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Campo rotulo="Custo em pontos" name="custoPontos" type="number" min={1} step={1} required />
+        <Campo rotulo="Estoque (opcional)" name="estoque" type="number" min={0} step={1} placeholder="Ilimitado" />
+        <Campo rotulo="Limite por colaborador (opcional)" name="limitePorMembro" type="number" min={1} step={1} placeholder="Sem limite" />
+      </div>
+      <Campo rotulo="Validade (opcional)" name="validadeAte" type="date" />
+      <Botao type="submit" disabled={pendente} className="self-start">
+        Criar recompensa
+      </Botao>
+      <Mensagem resultado={resultado} />
+    </form>
+  );
+}
+
+export function LinhaRecompensa({ recompensa }: { recompensa: RecompensaSalva }) {
+  const [resultado, acao, pendente] = useActionState(editarRecompensa, null);
+  return (
+    <form action={acao} className="flex flex-col gap-3 border-t border-zinc-100 py-3 first:border-t-0">
+      <input type="hidden" name="id" value={recompensa.id} />
+      <Campo rotulo="Nome" name="nome" defaultValue={recompensa.nome} required />
+      <Campo rotulo="Descrição" name="descricao" defaultValue={recompensa.descricao} />
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Campo rotulo="Custo em pontos" name="custoPontos" type="number" min={1} step={1} defaultValue={recompensa.custoPontos} required />
+        <Campo rotulo="Estoque" name="estoque" type="number" min={0} step={1} defaultValue={recompensa.estoque ?? undefined} placeholder="Ilimitado" />
+        <Campo
+          rotulo="Limite por colaborador"
+          name="limitePorMembro"
+          type="number"
+          min={1}
+          step={1}
+          defaultValue={recompensa.limitePorMembro ?? undefined}
+          placeholder="Sem limite"
+        />
+      </div>
+      <Campo rotulo="Validade" name="validadeAte" type="date" defaultValue={recompensa.validadeAte ?? ""} />
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="flex items-center gap-1 text-sm text-zinc-700">
+          <input type="checkbox" name="ativa" defaultChecked={recompensa.ativa} /> Ativa
+        </label>
+        <Botao type="submit" variante="secundario" disabled={pendente}>
+          Salvar
+        </Botao>
+        <button type="submit" formAction={apagarRecompensa} className="text-xs text-zinc-400 hover:text-red-700">
           Apagar
         </button>
         <Mensagem resultado={resultado} />
