@@ -1312,7 +1312,9 @@ export type Database = {
           dia_vencimento?: number | null
           empresa_id: string
           limite_usuarios?: number | null
-          modelo_cobranca?: Database["public"]["Enums"]["modelo_cobranca"] | null
+          modelo_cobranca?:
+            | Database["public"]["Enums"]["modelo_cobranca"]
+            | null
           tipo?: Database["public"]["Enums"]["tipo_plano"]
           updated_at?: string
           valor_fixo?: number | null
@@ -1324,7 +1326,9 @@ export type Database = {
           dia_vencimento?: number | null
           empresa_id?: string
           limite_usuarios?: number | null
-          modelo_cobranca?: Database["public"]["Enums"]["modelo_cobranca"] | null
+          modelo_cobranca?:
+            | Database["public"]["Enums"]["modelo_cobranca"]
+            | null
           tipo?: Database["public"]["Enums"]["tipo_plano"]
           updated_at?: string
           valor_fixo?: number | null
