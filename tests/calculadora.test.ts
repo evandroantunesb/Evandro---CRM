@@ -1,6 +1,6 @@
 /** Calculadora solar (modo comercial): geração, desconto de disponibilidade e Fio B, payback. */
 import { describe, expect, it } from "vitest";
-import { calcular, potenciaKitPersonalizadoKwp, sugerirQuantidadeModulos } from "@/lib/calculadora";
+import { calcular, custosInternosEstimados, potenciaKitPersonalizadoKwp, sugerirQuantidadeModulos } from "@/lib/calculadora";
 
 describe("calcular", () => {
   it("desconta a disponibilidade mínima quando o kit cobre todo o consumo", () => {
@@ -115,5 +115,33 @@ describe("sugerirQuantidadeModulos", () => {
     expect(sugerirQuantidadeModulos(0, 120, 550)).toBeNull();
     expect(sugerirQuantidadeModulos(500, 0, 550)).toBeNull();
     expect(sugerirQuantidadeModulos(500, 120, 0)).toBeNull();
+  });
+});
+
+describe("custosInternosEstimados", () => {
+  it("soma instalação por módulo, material CA por kWp e engenharia, com comissão sobre o subtotal", () => {
+    // instalação: 8 × 150 = 1200; material CA: 4,4 × 300 = 1320; engenharia: 500
+    // subtotal: 10000 (componentes) + 1200 + 1320 + 500 = 13020; comissão 5% = 651
+    const r = custosInternosEstimados(10000, 8, 4.4, {
+      custoInstalacaoPorModulo: 150,
+      custoMaterialCaPorKwp: 300,
+      custoEngenharia: 500,
+      comissaoPercentual: 0.05,
+    });
+    expect(r.custoInstalacao).toBe(1200);
+    expect(r.custoMaterialCa).toBe(1320);
+    expect(r.custoEngenharia).toBe(500);
+    expect(r.comissao).toBe(651);
+    expect(r.total).toBe(13671);
+  });
+
+  it("zero em tudo quando os parâmetros não estão configurados", () => {
+    const r = custosInternosEstimados(10000, 8, 4.4, {
+      custoInstalacaoPorModulo: 0,
+      custoMaterialCaPorKwp: 0,
+      custoEngenharia: 0,
+      comissaoPercentual: 0,
+    });
+    expect(r.total).toBe(10000);
   });
 });

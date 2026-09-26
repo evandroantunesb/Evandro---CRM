@@ -1180,6 +1180,10 @@ export type Database = {
       }
       parametros_calculadora: {
         Row: {
+          comissao_percentual: number
+          custo_engenharia: number
+          custo_instalacao_por_modulo: number
+          custo_material_ca_por_kwp: number
           disponibilidade_bi_kwh: number
           disponibilidade_mono_kwh: number
           disponibilidade_tri_kwh: number
@@ -1189,6 +1193,10 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          comissao_percentual?: number
+          custo_engenharia?: number
+          custo_instalacao_por_modulo?: number
+          custo_material_ca_por_kwp?: number
           disponibilidade_bi_kwh?: number
           disponibilidade_mono_kwh?: number
           disponibilidade_tri_kwh?: number
@@ -1198,6 +1206,10 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          comissao_percentual?: number
+          custo_engenharia?: number
+          custo_instalacao_por_modulo?: number
+          custo_material_ca_por_kwp?: number
           disponibilidade_bi_kwh?: number
           disponibilidade_mono_kwh?: number
           disponibilidade_tri_kwh?: number
