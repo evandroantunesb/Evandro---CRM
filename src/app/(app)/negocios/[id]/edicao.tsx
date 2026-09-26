@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { CampoArquivo } from "@/components/campo-arquivo";
 import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
 import { editarNegocio } from "@/lib/acoes/negocios";
 
@@ -87,10 +88,7 @@ export function EdicaoNegocio({
         placeholder="Ex.: cerâmico, metálico, laje, solo"
         defaultValue={negocio.tipoTelhado ?? ""}
       />
-      <div className="flex flex-col gap-1 text-sm">
-        <span className="font-medium text-zinc-700">Fatura de energia (opcional)</span>
-        <input type="file" name="anexo_fatura_energia" accept="image/*,.pdf" className="text-sm" />
-      </div>
+      <CampoArquivo rotulo="Fatura de energia (opcional)" name="anexo_fatura_energia" accept="image/*,.pdf" />
       <label className="flex flex-col gap-1 text-sm md:col-span-2">
         <span className="font-medium text-zinc-700">Descrição</span>
         <textarea
