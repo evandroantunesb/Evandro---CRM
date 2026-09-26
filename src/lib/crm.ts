@@ -69,6 +69,8 @@ export async function carregarConfiguracao(empresaId: string) {
   };
 }
 
+export type Configuracao = Awaited<ReturnType<typeof carregarConfiguracao>>;
+
 export {
   formatarMoeda,
   formatarDataHora,

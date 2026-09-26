@@ -19,6 +19,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
           { href: "/contatos", rotulo: "Contatos" },
         ]
       : []),
+    ...(papel === "admin" || papel === "gestor" ? [{ href: "/painel", rotulo: "Painel" }] : []),
     ...(papel === "admin"
       ? [
           { href: "/configuracoes/funil", rotulo: "Funis e etapas", grupo: "Configurações" },
