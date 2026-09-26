@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ListaTarefas } from "@/components/lista-tarefas";
+import { MoverEtapa } from "@/components/mover-etapa";
 import { NovaTarefa } from "@/components/nova-tarefa";
 import { Cartao, Selo } from "@/components/ui";
 import { apagarAnexo } from "@/lib/acoes/anexos";
@@ -156,6 +157,13 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
               {e.nome}
             </span>
           ))}
+        {negocio.status === "aberto" && (
+          <MoverEtapa
+            negocioId={negocio.id}
+            etapaAtualId={negocio.etapa_id}
+            etapas={config.etapas.filter((e) => e.funilId === negocio.funil_id && e.ativa)}
+          />
+        )}
       </div>
       <p className="text-sm text-zinc-600">
         {negocio.titulo}

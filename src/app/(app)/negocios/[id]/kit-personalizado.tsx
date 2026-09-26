@@ -4,7 +4,12 @@ import { useActionState, useMemo, useState } from "react";
 import { EditorComponentesKit, linhasParaComponentes, type LinhaComponente } from "@/components/kit-componentes";
 import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
 import { salvarKitPersonalizado } from "@/lib/acoes/calculadora";
-import { calcular, DISPONIBILIDADE_PADRAO_CAMEL, potenciaKitPersonalizadoKwp } from "@/lib/calculadora";
+import {
+  calcular,
+  DISPONIBILIDADE_PADRAO_CAMEL,
+  potenciaKitPersonalizadoKwp,
+  sugerirQuantidadeModulos,
+} from "@/lib/calculadora";
 import { formatarMoeda } from "@/lib/formatacao";
 import { ROTULO_TIPO_COMPONENTE_KIT, ROTULO_TIPO_LIGACAO, TIPOS_LIGACAO, type TipoComponenteKit, type TipoLigacao } from "@/lib/tipos";
 
@@ -97,6 +102,24 @@ export function KitPersonalizado({
 
   const componentes = useMemo(() => linhasParaComponentes(linhas), [linhas]);
   const potenciaKwp = potenciaKitPersonalizadoKwp(componentes);
+
+  // Consumo médio em kWh, vindo do campo direto ou calculado a partir da fatura + tarifa.
+  const consumoMedioEstimado = useMemo(() => {
+    const tarifa = numero(tarifaKwh);
+    const consumo = numero(consumoMedioKwh);
+    const fatura = numero(valorFaturaMedio);
+    if (consumo) return consumo;
+    if (fatura && tarifa) return fatura / tarifa;
+    return null;
+  }, [consumoMedioKwh, valorFaturaMedio, tarifaKwh]);
+
+  // Sugere a quantidade de módulos pro consumo já informado, assim que o
+  // vendedor escolhe (ou digita) a potência de um módulo.
+  const sugerirQuantidadeModulo = useMemo(() => {
+    if (!parametros || !consumoMedioEstimado) return undefined;
+    return (potenciaW: number) =>
+      sugerirQuantidadeModulos(consumoMedioEstimado, parametros.produtividadeKwhKwpMes, potenciaW);
+  }, [parametros, consumoMedioEstimado]);
 
   const previa = useMemo(() => {
     if (!parametros) return null;
@@ -191,7 +214,7 @@ export function KitPersonalizado({
           Favor adicionar o padrão atual do cliente (em &quot;Dados do negócio&quot;) para conferir compatibilidade com o kit.
         </p>
       )}
-      <EditorComponentesKit linhas={linhas} onChange={setLinhas} />
+      <EditorComponentesKit linhas={linhas} onChange={setLinhas} sugerirQuantidadeModulo={sugerirQuantidadeModulo} />
       <Campo
         rotulo="Estrutura do telhado"
         name="estruturaTelhado"
