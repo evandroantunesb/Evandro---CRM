@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { CampoArquivo } from "@/components/campo-arquivo";
 import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
 import { editarNegocio } from "@/lib/acoes/negocios";
 
@@ -23,6 +24,8 @@ export function EdicaoNegocio({
     tipoTelhado: string | null;
     unidadeConsumidora: string | null;
     padraoCliente: string | null;
+    consumoMedioKwh: number | null;
+    valorFaturaMedio: number | null;
   };
   etapas: Opcao[];
   origens: Opcao[];
@@ -63,6 +66,20 @@ export function EdicaoNegocio({
         inputMode="decimal"
         defaultValue={negocio.valor != null ? String(negocio.valor).replace(".", ",") : ""}
       />
+      <Campo
+        rotulo="Valor da fatura (R$)"
+        name="valor_fatura_medio"
+        inputMode="decimal"
+        placeholder="ex.: 450,00"
+        defaultValue={negocio.valorFaturaMedio != null ? String(negocio.valorFaturaMedio).replace(".", ",") : ""}
+      />
+      <Campo
+        rotulo="Consumo médio (12 meses, kWh)"
+        name="consumo_medio_kwh"
+        inputMode="decimal"
+        placeholder="ex.: 450"
+        defaultValue={negocio.consumoMedioKwh != null ? String(negocio.consumoMedioKwh).replace(".", ",") : ""}
+      />
       <Campo rotulo="Unidade consumidora" name="unidade_consumidora" defaultValue={negocio.unidadeConsumidora ?? ""} />
       <Campo rotulo="Padrão do cliente" name="padrao_cliente" defaultValue={negocio.padraoCliente ?? ""} />
       <Campo
@@ -71,6 +88,7 @@ export function EdicaoNegocio({
         placeholder="Ex.: cerâmico, metálico, laje, solo"
         defaultValue={negocio.tipoTelhado ?? ""}
       />
+      <CampoArquivo rotulo="Fatura de energia (opcional)" name="anexo_fatura_energia" accept="image/*,.pdf" />
       <label className="flex flex-col gap-1 text-sm md:col-span-2">
         <span className="font-medium text-zinc-700">Descrição</span>
         <textarea

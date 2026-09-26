@@ -123,6 +123,8 @@ export async function criarNegocio(_: ResultadoAcao, formData: FormData): Promis
       padrao_cliente: d.padrao_cliente || null,
       tipo_telhado: d.tipo_telhado || null,
       estrutura_telhado: d.estrutura_telhado || null,
+      consumo_medio_kwh: d.consumo_medio_kwh,
+      valor_fatura_medio: d.valor_fatura_medio,
     })
     .select("id")
     .single();
@@ -226,6 +228,8 @@ const esquemaEdicao = z.object({
   unidade_consumidora: z.string().trim().max(60).optional(),
   padrao_cliente: z.string().trim().max(60).optional(),
   tipo_telhado: z.string().trim().max(60).optional(),
+  consumo_medio_kwh: numeroBrOpcional,
+  valor_fatura_medio: numeroBrOpcional,
 });
 
 export async function editarNegocio(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
@@ -246,11 +250,23 @@ export async function editarNegocio(_: ResultadoAcao, formData: FormData): Promi
       unidade_consumidora: d.unidade_consumidora || null,
       padrao_cliente: d.padrao_cliente || null,
       tipo_telhado: d.tipo_telhado || null,
+      consumo_medio_kwh: d.consumo_medio_kwh,
+      valor_fatura_medio: d.valor_fatura_medio,
       ...(atual.papel !== "vendedor" && d.responsavel_id ? { responsavel_id: d.responsavel_id } : {}),
     })
     .eq("id", d.negocioId)
     .select("id");
   if (error || !data?.length) return { ok: false, mensagem: mensagemErro(error, "Não foi possível salvar.") };
+
+  const arquivoFatura = formData.get("anexo_fatura_energia");
+  if (arquivoFatura instanceof File && arquivoFatura.size > 0) {
+    await enviarAnexoNoServidor(supabase, {
+      empresaId: atual.empresaId,
+      negocioId: d.negocioId,
+      arquivo: arquivoFatura,
+      categoria: "fatura_gerador",
+    });
+  }
 
   revalidatePath("/negocios");
   revalidatePath(`/negocios/${d.negocioId}`);
