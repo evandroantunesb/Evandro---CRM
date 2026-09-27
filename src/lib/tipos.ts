@@ -90,3 +90,11 @@ export const ROTULO_MODO_PRECO: Record<ModoPreco, string> = {
   avista: "Só à vista",
   completo: "Completo (à vista e parcelado)",
 };
+
+export const TIPOS_CALCULO_COMISSAO = ["percentual", "multiplicador"] as const;
+export type TipoCalculoComissao = (typeof TIPOS_CALCULO_COMISSAO)[number];
+
+export const ROTULO_TIPO_CALCULO_COMISSAO: Record<TipoCalculoComissao, string> = {
+  percentual: "Percentual sobre o resultado",
+  multiplicador: "Multiplicador sobre o resultado",
+};

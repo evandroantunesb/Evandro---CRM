@@ -276,6 +276,80 @@ export type Database = {
           },
         ]
       }
+      comissoes_calculadas: {
+        Row: {
+          calculado_por: string | null
+          created_at: string
+          empresa_id: string
+          faixa_aplicada: Json | null
+          id: string
+          membro_id: string
+          plano_id: string | null
+          referencia: string
+          resultado_apurado: number
+          salario_base: number
+          valor_comissao: number
+          valor_total: number
+        }
+        Insert: {
+          calculado_por?: string | null
+          created_at?: string
+          empresa_id: string
+          faixa_aplicada?: Json | null
+          id?: string
+          membro_id: string
+          plano_id?: string | null
+          referencia: string
+          resultado_apurado?: number
+          salario_base?: number
+          valor_comissao?: number
+          valor_total?: number
+        }
+        Update: {
+          calculado_por?: string | null
+          created_at?: string
+          empresa_id?: string
+          faixa_aplicada?: Json | null
+          id?: string
+          membro_id?: string
+          plano_id?: string | null
+          referencia?: string
+          resultado_apurado?: number
+          salario_base?: number
+          valor_comissao?: number
+          valor_total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comissoes_calculadas_calculado_por_fkey"
+            columns: ["calculado_por"]
+            isOneToOne: false
+            referencedRelation: "empresa_membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comissoes_calculadas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comissoes_calculadas_membro_id_fkey"
+            columns: ["membro_id"]
+            isOneToOne: false
+            referencedRelation: "empresa_membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comissoes_calculadas_plano_id_fkey"
+            columns: ["plano_id"]
+            isOneToOne: false
+            referencedRelation: "planos_comissao"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contatos: {
         Row: {
           cidade: string | null
@@ -1243,6 +1317,70 @@ export type Database = {
         }
         Relationships: []
       }
+      planos_comissao: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          criado_por: string | null
+          empresa_id: string
+          faixas: Json
+          id: string
+          membro_id: string
+          meta_ote: number | null
+          salario_base: number | null
+          tipo_calculo: Database["public"]["Enums"]["tipo_calculo_comissao"]
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          criado_por?: string | null
+          empresa_id: string
+          faixas?: Json
+          id?: string
+          membro_id: string
+          meta_ote?: number | null
+          salario_base?: number | null
+          tipo_calculo?: Database["public"]["Enums"]["tipo_calculo_comissao"]
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          criado_por?: string | null
+          empresa_id?: string
+          faixas?: Json
+          id?: string
+          membro_id?: string
+          meta_ote?: number | null
+          salario_base?: number | null
+          tipo_calculo?: Database["public"]["Enums"]["tipo_calculo_comissao"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planos_comissao_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "empresa_membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "planos_comissao_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "planos_comissao_membro_id_fkey"
+            columns: ["membro_id"]
+            isOneToOne: false
+            referencedRelation: "empresa_membros"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       plataforma_admins: {
         Row: {
           created_at: string
@@ -1479,6 +1617,7 @@ export type Database = {
       papel_membro: "admin" | "gestor" | "vendedor"
       situacao_empresa: "ativa" | "suspensa" | "cancelada"
       status_negocio: "aberto" | "ganho" | "perdido"
+      tipo_calculo_comissao: "percentual" | "multiplicador"
       tipo_componente_kit: "modulo" | "inversor" | "bateria" | "outro"
       tipo_ligacao: "monofasico" | "bifasico" | "trifasico"
       tipo_pessoa: "pf" | "pj"
@@ -1624,6 +1763,7 @@ export const Constants = {
       papel_membro: ["admin", "gestor", "vendedor"],
       situacao_empresa: ["ativa", "suspensa", "cancelada"],
       status_negocio: ["aberto", "ganho", "perdido"],
+      tipo_calculo_comissao: ["percentual", "multiplicador"],
       tipo_componente_kit: ["modulo", "inversor", "bateria", "outro"],
       tipo_ligacao: ["monofasico", "bifasico", "trifasico"],
       tipo_pessoa: ["pf", "pj"],
