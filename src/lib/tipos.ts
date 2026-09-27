@@ -98,6 +98,15 @@ export const ROTULO_MODELO_COBRANCA: Record<ModeloCobranca, string> = {
   fixo_mais_usuario: "Fixo + por usuário",
 };
 
+export const STATUS_CONTRATO = ["rascunho", "aguardando_assinatura", "assinado"] as const;
+export type StatusContrato = (typeof STATUS_CONTRATO)[number];
+
+export const ROTULO_STATUS_CONTRATO: Record<StatusContrato, string> = {
+  rascunho: "Rascunho",
+  aguardando_assinatura: "Aguardando assinatura",
+  assinado: "Assinado",
+};
+
 export const MODOS_PRECO = ["sem_preco", "parcelado", "avista", "completo"] as const;
 export type ModoPreco = (typeof MODOS_PRECO)[number];
 
@@ -106,4 +115,52 @@ export const ROTULO_MODO_PRECO: Record<ModoPreco, string> = {
   parcelado: "Só parcelado",
   avista: "Só à vista",
   completo: "Completo (à vista e parcelado)",
+};
+
+export const OPERADORES_CONDICAO = ["=", "!=", ">=", ">", "<=", "<"] as const;
+export type OperadorCondicao = (typeof OPERADORES_CONDICAO)[number];
+
+export const ROTULO_OPERADOR_CONDICAO: Record<OperadorCondicao, string> = {
+  "=": "é igual a",
+  "!=": "é diferente de",
+  ">=": "é maior ou igual a",
+  ">": "é maior que",
+  "<=": "é menor ou igual a",
+  "<": "é menor que",
+};
+
+export const PERIODOS_LIMITE_REGRA = ["dia", "mes"] as const;
+export type PeriodoLimiteRegra = (typeof PERIODOS_LIMITE_REGRA)[number];
+
+export const ROTULO_PERIODO_LIMITE_REGRA: Record<PeriodoLimiteRegra, string> = {
+  dia: "por dia",
+  mes: "por mês",
+};
+
+export const METRICAS_META = ["receita", "negocios_ganhos", "reunioes", "conversao", "tarefas_concluidas"] as const;
+export type MetricaMeta = (typeof METRICAS_META)[number];
+
+export const ROTULO_METRICA_META: Record<MetricaMeta, string> = {
+  receita: "Receita (negócios ganhos)",
+  negocios_ganhos: "Negócios ganhos (quantidade)",
+  reunioes: "Reuniões realizadas",
+  conversao: "Taxa de conversão (%)",
+  tarefas_concluidas: "Tarefas concluídas",
+};
+
+/** Unidade de exibição de cada métrica: moeda, quantidade inteira ou percentual. */
+export const UNIDADE_METRICA_META: Record<MetricaMeta, "moeda" | "quantidade" | "percentual"> = {
+  receita: "moeda",
+  negocios_ganhos: "quantidade",
+  reunioes: "quantidade",
+  conversao: "percentual",
+  tarefas_concluidas: "quantidade",
+};
+
+export const TIPOS_CALCULO_COMISSAO = ["percentual", "multiplicador"] as const;
+export type TipoCalculoComissao = (typeof TIPOS_CALCULO_COMISSAO)[number];
+
+export const ROTULO_TIPO_CALCULO_COMISSAO: Record<TipoCalculoComissao, string> = {
+  percentual: "Percentual sobre o resultado",
+  multiplicador: "Multiplicador sobre o resultado",
 };
