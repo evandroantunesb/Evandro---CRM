@@ -1693,6 +1693,7 @@ export type Database = {
       }
       compartilha_empresa: { Args: { p_user_id: string }; Returns: boolean }
       e_plataforma_admin: { Args: never; Returns: boolean }
+      empresa_da_pasta_marca: { Args: { p_caminho: string }; Returns: string }
       incrementar_preenchimento_formulario: {
         Args: { p_id: string }
         Returns: undefined
