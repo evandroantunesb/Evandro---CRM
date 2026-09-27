@@ -1505,11 +1505,14 @@ export type Database = {
       propostas: {
         Row: {
           atualizado_por: string | null
+          blocos_emitidos: Json | null
+          capa_variante: Database["public"]["Enums"]["proposta_modelo_capa"] | null
           created_at: string
           criado_por: string | null
           empresa_id: string
           id: string
           mensagem: string | null
+          modelo_id: string | null
           modo_preco: Database["public"]["Enums"]["modo_preco_proposta"]
           negocio_id: string
           token: string
@@ -1517,11 +1520,14 @@ export type Database = {
         }
         Insert: {
           atualizado_por?: string | null
+          blocos_emitidos?: Json | null
+          capa_variante?: Database["public"]["Enums"]["proposta_modelo_capa"] | null
           created_at?: string
           criado_por?: string | null
           empresa_id: string
           id?: string
           mensagem?: string | null
+          modelo_id?: string | null
           modo_preco?: Database["public"]["Enums"]["modo_preco_proposta"]
           negocio_id: string
           token?: string
@@ -1529,11 +1535,14 @@ export type Database = {
         }
         Update: {
           atualizado_por?: string | null
+          blocos_emitidos?: Json | null
+          capa_variante?: Database["public"]["Enums"]["proposta_modelo_capa"] | null
           created_at?: string
           criado_por?: string | null
           empresa_id?: string
           id?: string
           mensagem?: string | null
+          modelo_id?: string | null
           modo_preco?: Database["public"]["Enums"]["modo_preco_proposta"]
           negocio_id?: string
           token?: string
@@ -1559,6 +1568,13 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "propostas_modelo_id_fkey"
+            columns: ["modelo_id"]
+            isOneToOne: false
+            referencedRelation: "proposta_modelos"
             referencedColumns: ["id"]
           },
           {
