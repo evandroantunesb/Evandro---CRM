@@ -1737,57 +1737,6 @@ export type Database = {
         }
         Relationships: []
       }
-      planos_empresa: {
-        Row: {
-          atualizado_por: string | null
-          created_at: string
-          dia_vencimento: number | null
-          empresa_id: string
-          limite_usuarios: number | null
-          modelo_cobranca: Database["public"]["Enums"]["modelo_cobranca"] | null
-          tipo: Database["public"]["Enums"]["tipo_plano"]
-          updated_at: string
-          valor_fixo: number | null
-          valor_por_usuario: number | null
-        }
-        Insert: {
-          atualizado_por?: string | null
-          created_at?: string
-          dia_vencimento?: number | null
-          empresa_id: string
-          limite_usuarios?: number | null
-          modelo_cobranca?:
-            | Database["public"]["Enums"]["modelo_cobranca"]
-            | null
-          tipo?: Database["public"]["Enums"]["tipo_plano"]
-          updated_at?: string
-          valor_fixo?: number | null
-          valor_por_usuario?: number | null
-        }
-        Update: {
-          atualizado_por?: string | null
-          created_at?: string
-          dia_vencimento?: number | null
-          empresa_id?: string
-          limite_usuarios?: number | null
-          modelo_cobranca?:
-            | Database["public"]["Enums"]["modelo_cobranca"]
-            | null
-          tipo?: Database["public"]["Enums"]["tipo_plano"]
-          updated_at?: string
-          valor_fixo?: number | null
-          valor_por_usuario?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "planos_empresa_empresa_id_fkey"
-            columns: ["empresa_id"]
-            isOneToOne: true
-            referencedRelation: "empresas"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       planos_comissao: {
         Row: {
           ativo: boolean
@@ -1848,6 +1797,57 @@ export type Database = {
             columns: ["membro_id"]
             isOneToOne: false
             referencedRelation: "empresa_membros"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      planos_empresa: {
+        Row: {
+          atualizado_por: string | null
+          created_at: string
+          dia_vencimento: number | null
+          empresa_id: string
+          limite_usuarios: number | null
+          modelo_cobranca: Database["public"]["Enums"]["modelo_cobranca"] | null
+          tipo: Database["public"]["Enums"]["tipo_plano"]
+          updated_at: string
+          valor_fixo: number | null
+          valor_por_usuario: number | null
+        }
+        Insert: {
+          atualizado_por?: string | null
+          created_at?: string
+          dia_vencimento?: number | null
+          empresa_id: string
+          limite_usuarios?: number | null
+          modelo_cobranca?:
+            | Database["public"]["Enums"]["modelo_cobranca"]
+            | null
+          tipo?: Database["public"]["Enums"]["tipo_plano"]
+          updated_at?: string
+          valor_fixo?: number | null
+          valor_por_usuario?: number | null
+        }
+        Update: {
+          atualizado_por?: string | null
+          created_at?: string
+          dia_vencimento?: number | null
+          empresa_id?: string
+          limite_usuarios?: number | null
+          modelo_cobranca?:
+            | Database["public"]["Enums"]["modelo_cobranca"]
+            | null
+          tipo?: Database["public"]["Enums"]["tipo_plano"]
+          updated_at?: string
+          valor_fixo?: number | null
+          valor_por_usuario?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planos_empresa_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: true
+            referencedRelation: "empresas"
             referencedColumns: ["id"]
           },
         ]
