@@ -88,6 +88,9 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
     .select("id, token, modo_preco")
     .eq("negocio_id", id)
     .maybeSingle();
+  const { data: modelosProposta } = proposta
+    ? { data: null }
+    : await supabase.from("proposta_modelos").select("id, nome, padrao").eq("empresa_id", atual.empresaId).eq("status", "publicado").order("nome");
   const { data: aberturas } = proposta
     ? await supabase
         .from("propostas_aberturas")
@@ -247,6 +250,7 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
               negocioId={negocio.id}
               temCalculo={!!calculo}
               siteUrl={env.siteUrl}
+              modelos={(modelosProposta ?? []).map((m) => ({ id: m.id, nome: m.nome, padrao: m.padrao }))}
               proposta={
                 proposta
                   ? {
