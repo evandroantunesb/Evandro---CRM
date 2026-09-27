@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { env } from "@/lib/env";
 
-const ROTAS_PUBLICAS = ["/login", "/recuperar-senha", "/auth", "/proposta", "/captura"];
+const ROTAS_PUBLICAS = ["/login", "/recuperar-senha", "/auth", "/proposta", "/captura", "/contrato"];
 
 export async function atualizarSessao(request: NextRequest) {
   let response = NextResponse.next({ request });

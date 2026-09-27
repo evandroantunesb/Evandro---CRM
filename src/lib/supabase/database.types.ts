@@ -419,6 +419,74 @@ export type Database = {
           },
         ]
       }
+      contratos: {
+        Row: {
+          atualizado_por: string | null
+          conteudo: string
+          created_at: string
+          criado_por: string | null
+          empresa_id: string
+          id: string
+          negocio_id: string
+          status: Database["public"]["Enums"]["status_contrato"]
+          token: string
+          updated_at: string
+        }
+        Insert: {
+          atualizado_por?: string | null
+          conteudo: string
+          created_at?: string
+          criado_por?: string | null
+          empresa_id: string
+          id?: string
+          negocio_id: string
+          status?: Database["public"]["Enums"]["status_contrato"]
+          token?: string
+          updated_at?: string
+        }
+        Update: {
+          atualizado_por?: string | null
+          conteudo?: string
+          created_at?: string
+          criado_por?: string | null
+          empresa_id?: string
+          id?: string
+          negocio_id?: string
+          status?: Database["public"]["Enums"]["status_contrato"]
+          token?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contratos_atualizado_por_fkey"
+            columns: ["atualizado_por"]
+            isOneToOne: false
+            referencedRelation: "empresa_membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contratos_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "empresa_membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contratos_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contratos_negocio_id_fkey"
+            columns: ["negocio_id"]
+            isOneToOne: true
+            referencedRelation: "negocios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       empresa_membros: {
         Row: {
           ativo: boolean
@@ -1061,6 +1129,112 @@ export type Database = {
           },
         ]
       }
+      metas: {
+        Row: {
+          ativa: boolean
+          created_at: string
+          criado_por: string | null
+          empresa_id: string
+          id: string
+          membro_id: string
+          metrica: Database["public"]["Enums"]["metrica_meta"]
+          periodo_fim: string
+          periodo_inicio: string
+          titulo: string
+          updated_at: string
+          valor_alvo: number
+        }
+        Insert: {
+          ativa?: boolean
+          created_at?: string
+          criado_por?: string | null
+          empresa_id: string
+          id?: string
+          membro_id: string
+          metrica: Database["public"]["Enums"]["metrica_meta"]
+          periodo_fim: string
+          periodo_inicio: string
+          titulo: string
+          updated_at?: string
+          valor_alvo: number
+        }
+        Update: {
+          ativa?: boolean
+          created_at?: string
+          criado_por?: string | null
+          empresa_id?: string
+          id?: string
+          membro_id?: string
+          metrica?: Database["public"]["Enums"]["metrica_meta"]
+          periodo_fim?: string
+          periodo_inicio?: string
+          titulo?: string
+          updated_at?: string
+          valor_alvo?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "metas_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "empresa_membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "metas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "metas_membro_id_fkey"
+            columns: ["membro_id"]
+            isOneToOne: false
+            referencedRelation: "empresa_membros"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      modelos_contrato: {
+        Row: {
+          atualizado_por: string | null
+          conteudo: string
+          created_at: string
+          empresa_id: string
+          updated_at: string
+        }
+        Insert: {
+          atualizado_por?: string | null
+          conteudo?: string
+          created_at?: string
+          empresa_id: string
+          updated_at?: string
+        }
+        Update: {
+          atualizado_por?: string | null
+          conteudo?: string
+          created_at?: string
+          empresa_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "modelos_contrato_atualizado_por_fkey"
+            columns: ["atualizado_por"]
+            isOneToOne: false
+            referencedRelation: "empresa_membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "modelos_contrato_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: true
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       motivos_perda: {
         Row: {
           ativo: boolean
@@ -1141,6 +1315,7 @@ export type Database = {
       }
       negocios: {
         Row: {
+          consumo_medio_kwh: number | null
           contato_id: string
           created_at: string
           criado_por: string | null
@@ -1167,6 +1342,7 @@ export type Database = {
           valor_conta_energia: number | null
         }
         Insert: {
+          consumo_medio_kwh?: number | null
           contato_id: string
           created_at?: string
           criado_por?: string | null
@@ -1193,6 +1369,7 @@ export type Database = {
           valor_conta_energia?: number | null
         }
         Update: {
+          consumo_medio_kwh?: number | null
           contato_id?: string
           created_at?: string
           criado_por?: string | null
@@ -1369,6 +1546,10 @@ export type Database = {
       }
       parametros_calculadora: {
         Row: {
+          comissao_percentual: number
+          custo_engenharia: number
+          custo_instalacao_por_modulo: number
+          custo_material_ca_por_kwp: number
           disponibilidade_bi_kwh: number
           disponibilidade_mono_kwh: number
           disponibilidade_tri_kwh: number
@@ -1378,6 +1559,10 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          comissao_percentual?: number
+          custo_engenharia?: number
+          custo_instalacao_por_modulo?: number
+          custo_material_ca_por_kwp?: number
           disponibilidade_bi_kwh?: number
           disponibilidade_mono_kwh?: number
           disponibilidade_tri_kwh?: number
@@ -1387,6 +1572,10 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          comissao_percentual?: number
+          custo_engenharia?: number
+          custo_instalacao_por_modulo?: number
+          custo_material_ca_por_kwp?: number
           disponibilidade_bi_kwh?: number
           disponibilidade_mono_kwh?: number
           disponibilidade_tri_kwh?: number
@@ -1699,6 +1888,8 @@ export type Database = {
           mensagem: string | null
           modelo_id: string | null
           modo_preco: Database["public"]["Enums"]["modo_preco_proposta"]
+          mostrar_economia: boolean
+          mostrar_sistema: boolean
           negocio_id: string
           token: string
           updated_at: string
@@ -1716,6 +1907,8 @@ export type Database = {
           mensagem?: string | null
           modelo_id?: string | null
           modo_preco?: Database["public"]["Enums"]["modo_preco_proposta"]
+          mostrar_economia?: boolean
+          mostrar_sistema?: boolean
           negocio_id: string
           token?: string
           updated_at?: string
@@ -1733,6 +1926,8 @@ export type Database = {
           mensagem?: string | null
           modelo_id?: string | null
           modo_preco?: Database["public"]["Enums"]["modo_preco_proposta"]
+          mostrar_economia?: boolean
+          mostrar_sistema?: boolean
           negocio_id?: string
           token?: string
           updated_at?: string
@@ -1936,12 +2131,19 @@ export type Database = {
       }
     }
     Enums: {
+      metrica_meta:
+        | "receita"
+        | "negocios_ganhos"
+        | "reunioes"
+        | "conversao"
+        | "tarefas_concluidas"
       modo_preco_proposta: "sem_preco" | "parcelado" | "avista" | "completo"
       papel_membro: "admin" | "gestor" | "vendedor"
       proposta_bloco_quebra: "auto" | "nova_pagina" | "pagina_exclusiva"
       proposta_modelo_capa: "foto" | "minimalista" | "tecnica"
       proposta_modelo_status: "rascunho" | "publicado" | "arquivado"
       situacao_empresa: "ativa" | "suspensa" | "cancelada"
+      status_contrato: "rascunho" | "aguardando_assinatura" | "assinado"
       status_negocio: "aberto" | "ganho" | "perdido"
       tipo_calculo_comissao: "percentual" | "multiplicador"
       tipo_componente_kit: "modulo" | "inversor" | "bateria" | "outro"
@@ -2085,12 +2287,20 @@ export const Constants = {
   },
   public: {
     Enums: {
+      metrica_meta: [
+        "receita",
+        "negocios_ganhos",
+        "reunioes",
+        "conversao",
+        "tarefas_concluidas",
+      ],
       modo_preco_proposta: ["sem_preco", "parcelado", "avista", "completo"],
       papel_membro: ["admin", "gestor", "vendedor"],
       proposta_bloco_quebra: ["auto", "nova_pagina", "pagina_exclusiva"],
       proposta_modelo_capa: ["foto", "minimalista", "tecnica"],
       proposta_modelo_status: ["rascunho", "publicado", "arquivado"],
       situacao_empresa: ["ativa", "suspensa", "cancelada"],
+      status_contrato: ["rascunho", "aguardando_assinatura", "assinado"],
       status_negocio: ["aberto", "ganho", "perdido"],
       tipo_calculo_comissao: ["percentual", "multiplicador"],
       tipo_componente_kit: ["modulo", "inversor", "bateria", "outro"],

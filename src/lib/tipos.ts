@@ -81,6 +81,15 @@ export const ROTULO_CATEGORIA_ANEXO: Record<CategoriaAnexo, string> = {
   fatura_beneficiario: "Fatura dos beneficiários",
 };
 
+export const STATUS_CONTRATO = ["rascunho", "aguardando_assinatura", "assinado"] as const;
+export type StatusContrato = (typeof STATUS_CONTRATO)[number];
+
+export const ROTULO_STATUS_CONTRATO: Record<StatusContrato, string> = {
+  rascunho: "Rascunho",
+  aguardando_assinatura: "Aguardando assinatura",
+  assinado: "Assinado",
+};
+
 export const MODOS_PRECO = ["sem_preco", "parcelado", "avista", "completo"] as const;
 export type ModoPreco = (typeof MODOS_PRECO)[number];
 
@@ -89,6 +98,26 @@ export const ROTULO_MODO_PRECO: Record<ModoPreco, string> = {
   parcelado: "Só parcelado",
   avista: "Só à vista",
   completo: "Completo (à vista e parcelado)",
+};
+
+export const METRICAS_META = ["receita", "negocios_ganhos", "reunioes", "conversao", "tarefas_concluidas"] as const;
+export type MetricaMeta = (typeof METRICAS_META)[number];
+
+export const ROTULO_METRICA_META: Record<MetricaMeta, string> = {
+  receita: "Receita (negócios ganhos)",
+  negocios_ganhos: "Negócios ganhos (quantidade)",
+  reunioes: "Reuniões realizadas",
+  conversao: "Taxa de conversão (%)",
+  tarefas_concluidas: "Tarefas concluídas",
+};
+
+/** Unidade de exibição de cada métrica: moeda, quantidade inteira ou percentual. */
+export const UNIDADE_METRICA_META: Record<MetricaMeta, "moeda" | "quantidade" | "percentual"> = {
+  receita: "moeda",
+  negocios_ganhos: "quantidade",
+  reunioes: "quantidade",
+  conversao: "percentual",
+  tarefas_concluidas: "quantidade",
 };
 
 export const TIPOS_CALCULO_COMISSAO = ["percentual", "multiplicador"] as const;

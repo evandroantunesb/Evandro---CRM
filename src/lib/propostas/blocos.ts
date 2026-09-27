@@ -67,59 +67,59 @@ export type DefinicaoBloco = {
 export const BLOCOS_PROPOSTA: DefinicaoBloco[] = [
   // Capa e identificação
   { tipo: "cover", categoria: "capa", nome: "Capa", descricao: "Capa fotográfica, minimalista ou técnica, com a identidade da empresa.", implementado: true },
-  { tipo: "proposal_identity", categoria: "capa", nome: "Dados do documento", descricao: "Número, data, validade, vendedor, cidade e tipo de imóvel.", implementado: false },
-  { tipo: "cover_benefits", categoria: "capa", nome: "Benefícios da capa", descricao: "Até quatro itens com ícone e texto.", implementado: false },
+  { tipo: "proposal_identity", categoria: "capa", nome: "Dados do documento", descricao: "Número, data, validade, vendedor, cidade e tipo de imóvel.", implementado: true },
+  { tipo: "cover_benefits", categoria: "capa", nome: "Benefícios da capa", descricao: "Até quatro itens com ícone e texto.", implementado: true },
 
   // Institucional
-  { tipo: "about_company", categoria: "institucional", nome: "Quem somos", descricao: "Título, texto e foto opcional da empresa.", implementado: false },
-  { tipo: "company_highlights", categoria: "institucional", nome: "Diferenciais", descricao: "Até seis destaques com ícones.", implementado: false },
-  { tipo: "company_numbers", categoria: "institucional", nome: "Nossos números", descricao: "Indicadores institucionais cadastrados.", implementado: false },
-  { tipo: "team_and_certifications", categoria: "institucional", nome: "Equipe e qualificações", descricao: "Texto, foto e registros da equipe.", implementado: false },
-  { tipo: "portfolio", categoria: "institucional", nome: "Nossos projetos", descricao: "Projetos e fotos autorizados para uso comercial.", implementado: false },
-  { tipo: "testimonials", categoria: "institucional", nome: "Depoimentos", descricao: "Depoimentos de clientes autorizados.", implementado: false },
+  { tipo: "about_company", categoria: "institucional", nome: "Quem somos", descricao: "Título, texto e foto opcional da empresa.", implementado: true },
+  { tipo: "company_highlights", categoria: "institucional", nome: "Diferenciais", descricao: "Até seis destaques com ícones.", implementado: true },
+  { tipo: "company_numbers", categoria: "institucional", nome: "Nossos números", descricao: "Indicadores institucionais cadastrados.", implementado: true },
+  { tipo: "team_and_certifications", categoria: "institucional", nome: "Equipe e qualificações", descricao: "Texto, foto e registros da equipe.", implementado: true },
+  { tipo: "portfolio", categoria: "institucional", nome: "Nossos projetos", descricao: "Projetos e fotos autorizados para uso comercial.", implementado: true },
+  { tipo: "testimonials", categoria: "institucional", nome: "Depoimentos", descricao: "Depoimentos de clientes autorizados.", implementado: true },
 
   // Educação sobre energia solar
-  { tipo: "solar_benefits", categoria: "educativo", nome: "Benefícios da energia solar", descricao: "Lista editável de benefícios.", implementado: false },
+  { tipo: "solar_benefits", categoria: "educativo", nome: "Benefícios da energia solar", descricao: "Lista editável de benefícios.", implementado: true },
   { tipo: "how_it_works", categoria: "educativo", nome: "Como funciona", descricao: "Quatro passos numerados com diagrama ilustrativo.", implementado: true },
-  { tipo: "day_night", categoria: "educativo", nome: "Geração dia/noite", descricao: "Explicação de acordo com o tipo de sistema.", implementado: false },
-  { tipo: "solar_faq", categoria: "educativo", nome: "Perguntas frequentes", descricao: "Perguntas e respostas editáveis.", implementado: false },
+  { tipo: "day_night", categoria: "educativo", nome: "Geração dia/noite", descricao: "Explicação de acordo com o tipo de sistema.", implementado: true },
+  { tipo: "solar_faq", categoria: "educativo", nome: "Perguntas frequentes", descricao: "Perguntas e respostas editáveis.", implementado: true },
 
   // Diagnóstico e sistema
-  { tipo: "customer_profile", categoria: "diagnostico", nome: "Perfil do cliente/projeto", descricao: "Nome, local, tipo e objetivo.", implementado: false },
-  { tipo: "current_consumption", categoria: "diagnostico", nome: "Consumo atual", descricao: "kWh, valor da conta, distribuidora e período.", implementado: false },
-  { tipo: "consumption_chart", categoria: "diagnostico", nome: "Histórico de consumo", descricao: "12 meses de consumo.", implementado: false },
+  { tipo: "customer_profile", categoria: "diagnostico", nome: "Perfil do cliente/projeto", descricao: "Nome, local, tipo e objetivo.", implementado: true },
+  { tipo: "current_consumption", categoria: "diagnostico", nome: "Consumo atual", descricao: "kWh, valor da conta, distribuidora e período.", implementado: true },
+  { tipo: "consumption_chart", categoria: "diagnostico", nome: "Histórico de consumo", descricao: "12 meses de consumo.", implementado: true },
   { tipo: "system_summary", categoria: "diagnostico", nome: "Seu sistema fotovoltaico", descricao: "Cards com potência, módulos, geração média e economia.", implementado: true },
   { tipo: "equipment_summary", categoria: "diagnostico", nome: "Principais equipamentos", descricao: "Módulos, inversor e estrutura, sem marcas fixas.", implementado: true },
-  { tipo: "equipment_table", categoria: "diagnostico", nome: "Relação técnica detalhada", descricao: "Quantidade, tipo, potência e modelo dos equipamentos.", implementado: false },
-  { tipo: "installation_layout", categoria: "diagnostico", nome: "Layout da instalação", descricao: "Imagem do projeto enviada pela empresa.", implementado: false },
+  { tipo: "equipment_table", categoria: "diagnostico", nome: "Relação técnica detalhada", descricao: "Quantidade, tipo, potência e modelo dos equipamentos.", implementado: true },
+  { tipo: "installation_layout", categoria: "diagnostico", nome: "Layout da instalação", descricao: "Imagem do projeto enviada pela empresa.", implementado: true },
 
   // Produção e geração
   { tipo: "generation_monthly_chart", categoria: "geracao", nome: "Geração estimada por mês", descricao: "Gráfico de janeiro a dezembro, mesma fonte do resumo do sistema.", implementado: true },
-  { tipo: "generation_vs_consumption", categoria: "geracao", nome: "Consumo × geração", descricao: "Duas séries mensais comparadas.", implementado: false },
-  { tipo: "generation_summary", categoria: "geracao", nome: "Resumo energético", descricao: "Média mensal, total anual e cobertura estimada.", implementado: false },
-  { tipo: "simulation_assumptions", categoria: "geracao", nome: "Premissas técnicas", descricao: "Coordenadas, orientação, inclinação, perdas e fonte do cálculo.", implementado: false },
-  { tipo: "long_term_generation", categoria: "geracao", nome: "Projeção de longo prazo", descricao: "Horizonte e hipóteses de degradação.", implementado: false },
+  { tipo: "generation_vs_consumption", categoria: "geracao", nome: "Consumo × geração", descricao: "Duas séries mensais comparadas.", implementado: true },
+  { tipo: "generation_summary", categoria: "geracao", nome: "Resumo energético", descricao: "Média mensal, total anual e cobertura estimada.", implementado: true },
+  { tipo: "simulation_assumptions", categoria: "geracao", nome: "Premissas técnicas", descricao: "Coordenadas, orientação, inclinação, perdas e fonte do cálculo.", implementado: true },
+  { tipo: "long_term_generation", categoria: "geracao", nome: "Projeção de longo prazo", descricao: "Horizonte e hipóteses de degradação.", implementado: true },
 
   // Economia e investimento
   { tipo: "before_after_bill", categoria: "economia", nome: "Conta antes × depois", descricao: "Gráfico de duas barras com valores em R$.", implementado: true },
-  { tipo: "savings_summary", categoria: "economia", nome: "Economia estimada", descricao: "Economia mensal, anual e retorno, quando válidos.", implementado: false },
-  { tipo: "cashflow_payback", categoria: "economia", nome: "Retorno/fluxo de caixa", descricao: "Gráfico de retorno do investimento.", implementado: false },
+  { tipo: "savings_summary", categoria: "economia", nome: "Economia estimada", descricao: "Economia mensal, anual e retorno, quando válidos.", implementado: true },
+  { tipo: "cashflow_payback", categoria: "economia", nome: "Retorno/fluxo de caixa", descricao: "Gráfico de retorno do investimento.", implementado: true },
   { tipo: "investment_main", categoria: "economia", nome: "Valor total da proposta", descricao: "Preço em destaque tipográfico.", implementado: true, obrigatorioNoComercial: true },
   { tipo: "payment_options", categoria: "economia", nome: "Condições de pagamento", descricao: "À vista, parcelado ou financiamento, só quando informado.", implementado: true },
   { tipo: "included_services", categoria: "economia", nome: "O que está incluso", descricao: "Itens realmente contemplados na proposta.", implementado: true },
-  { tipo: "extra_costs", categoria: "economia", nome: "Itens e serviços adicionais", descricao: "Opções e valores adicionais, quando aplicável.", implementado: false },
-  { tipo: "validity_timeline", categoria: "economia", nome: "Validade e prazo", descricao: "Data limite da proposta e prazo estimado.", implementado: false },
+  { tipo: "extra_costs", categoria: "economia", nome: "Itens e serviços adicionais", descricao: "Opções e valores adicionais, quando aplicável.", implementado: true },
+  { tipo: "validity_timeline", categoria: "economia", nome: "Validade e prazo", descricao: "Data limite da proposta e prazo estimado.", implementado: true },
 
   // Execução, suporte e fechamento
-  { tipo: "project_steps", categoria: "fechamento", nome: "Etapas da instalação", descricao: "Cronograma editável do projeto.", implementado: false },
-  { tipo: "warranties", categoria: "fechamento", nome: "Garantias", descricao: "Itens, condições e prazos documentados.", implementado: false },
-  { tipo: "support_maintenance", categoria: "fechamento", nome: "Suporte e manutenção", descricao: "Serviços efetivamente oferecidos.", implementado: false },
-  { tipo: "scope_inclusions_exclusions", categoria: "fechamento", nome: "Inclusões e exclusões", descricao: "Listas configuradas pela empresa.", implementado: false },
-  { tipo: "commercial_conditions", categoria: "fechamento", nome: "Condições comerciais", descricao: "Texto aprovado e validade.", implementado: false },
+  { tipo: "project_steps", categoria: "fechamento", nome: "Etapas da instalação", descricao: "Cronograma editável do projeto.", implementado: true },
+  { tipo: "warranties", categoria: "fechamento", nome: "Garantias", descricao: "Itens, condições e prazos documentados.", implementado: true },
+  { tipo: "support_maintenance", categoria: "fechamento", nome: "Suporte e manutenção", descricao: "Serviços efetivamente oferecidos.", implementado: true },
+  { tipo: "scope_inclusions_exclusions", categoria: "fechamento", nome: "Inclusões e exclusões", descricao: "Listas configuradas pela empresa.", implementado: true },
+  { tipo: "commercial_conditions", categoria: "fechamento", nome: "Condições comerciais", descricao: "Texto aprovado e validade.", implementado: true },
   { tipo: "next_steps", categoria: "fechamento", nome: "Próximos passos", descricao: "Faixa de fechamento com CTA (WhatsApp, link ou texto).", implementado: true },
-  { tipo: "company_contacts", categoria: "fechamento", nome: "Contatos finais", descricao: "Dados da empresa e/ou do vendedor.", implementado: false },
-  { tipo: "custom_content", categoria: "fechamento", nome: "Texto/imagem livre", descricao: "Editor de texto sanitizado com imagem opcional.", implementado: false },
-  { tipo: "pdf_attachment", categoria: "fechamento", nome: "Anexo externo", descricao: "PDFs adicionais anexados à proposta.", implementado: false },
+  { tipo: "company_contacts", categoria: "fechamento", nome: "Contatos finais", descricao: "Dados da empresa e/ou do vendedor.", implementado: true },
+  { tipo: "custom_content", categoria: "fechamento", nome: "Texto/imagem livre", descricao: "Editor de texto sanitizado com imagem opcional.", implementado: true },
+  { tipo: "pdf_attachment", categoria: "fechamento", nome: "Anexo externo", descricao: "PDFs adicionais anexados à proposta.", implementado: true },
 ];
 
 export const TIPOS_BLOCO_PROPOSTA = BLOCOS_PROPOSTA.map((b) => b.tipo);

@@ -140,6 +140,47 @@ export function sugerirQuantidadeModulos(
   return Math.max(1, Math.ceil((potenciaNecessariaKwp * 1000) / potenciaModuloW));
 }
 
+export type ParametrosCustosInternos = {
+  custoInstalacaoPorModulo: number;
+  custoMaterialCaPorKwp: number;
+  custoEngenharia: number;
+  comissaoPercentual: number;
+};
+
+export type CustosInternosEstimados = {
+  custoInstalacao: number;
+  custoMaterialCa: number;
+  custoEngenharia: number;
+  comissao: number;
+  total: number;
+};
+
+/**
+ * Soma os custos internos configuráveis (material CA, instalação por módulo,
+ * engenharia, comissão) ao preço já estimado dos componentes, pra sugerir um
+ * ponto de partida de preço final — o vendedor continua livre pra editar.
+ * Comissão incide sobre componentes + instalação + material CA + engenharia.
+ */
+export function custosInternosEstimados(
+  precoComponentesBRL: number,
+  quantidadeModulos: number,
+  potenciaKwp: number,
+  parametros: ParametrosCustosInternos,
+): CustosInternosEstimados {
+  const custoInstalacao = arredondar(parametros.custoInstalacaoPorModulo * quantidadeModulos, 2);
+  const custoMaterialCa = arredondar(parametros.custoMaterialCaPorKwp * potenciaKwp, 2);
+  const custoEngenharia = arredondar(parametros.custoEngenharia, 2);
+  const subtotal = precoComponentesBRL + custoInstalacao + custoMaterialCa + custoEngenharia;
+  const comissao = arredondar(subtotal * parametros.comissaoPercentual, 2);
+  return {
+    custoInstalacao,
+    custoMaterialCa,
+    custoEngenharia,
+    comissao,
+    total: arredondar(subtotal + comissao, 2),
+  };
+}
+
 /** Nome de exibição do kit a partir dos componentes escolhidos. */
 export function nomeKitPersonalizado(componentes: ComponenteKit[]): string {
   const modulo = componentes.find((c) => c.tipo === "modulo");
