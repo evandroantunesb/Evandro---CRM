@@ -21,16 +21,26 @@ export default async function ConstrutorModelo({ params }: PageProps<"/configura
 
   const { data: blocosData } = await supabase
     .from("proposta_modelo_blocos")
-    .select("id, tipo, ativo, quebra_pagina")
+    .select("id, tipo, ativo, quebra_pagina, config")
     .eq("modelo_id", id)
     .order("ordem", { ascending: true });
   const blocos = blocosData ?? [];
 
   return (
     <div className="flex flex-col gap-4 pt-4">
-      <Link href="/configuracoes/propostas" className="inline-flex w-fit items-center gap-1 text-sm text-zinc-500 hover:text-carvao">
-        <ArrowLeft size={14} /> Voltar aos modelos
-      </Link>
+      <div className="flex items-center justify-between gap-3">
+        <Link href="/configuracoes/propostas" className="inline-flex w-fit items-center gap-1 text-sm text-zinc-500 hover:text-carvao">
+          <ArrowLeft size={14} /> Voltar aos modelos
+        </Link>
+        <Link
+          href={`/configuracoes/propostas/modelos/${id}/pdf`}
+          target="_blank"
+          rel="noreferrer"
+          className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-carvao hover:border-dourado"
+        >
+          Pré-visualizar PDF
+        </Link>
+      </div>
       <DetalhesModelo modelo={{ id: modelo.id, nome: modelo.nome, descricao: modelo.descricao, capaVariante: modelo.capa_variante }} />
       <div className="flex flex-col gap-2">
         <h2 className="text-base font-semibold text-zinc-900">Blocos do modelo</h2>
@@ -39,7 +49,7 @@ export default async function ConstrutorModelo({ params }: PageProps<"/configura
           <BlocoLinha
             key={b.id}
             modeloId={id}
-            bloco={{ id: b.id, tipo: b.tipo, ativo: b.ativo, quebraPagina: b.quebra_pagina }}
+            bloco={{ id: b.id, tipo: b.tipo, ativo: b.ativo, quebraPagina: b.quebra_pagina, config: b.config }}
             posicao={i}
             total={blocos.length}
           />

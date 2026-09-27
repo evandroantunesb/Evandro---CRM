@@ -5,8 +5,9 @@ import { useActionState } from "react";
 import { Mensagem, Selecao, Selo } from "@/components/ui";
 import { alternarBlocoModelo, definirQuebraBlocoModelo, moverBlocoModelo, removerBlocoModelo } from "@/lib/acoes/proposta-modelos";
 import { definicaoDoBloco, NOME_CATEGORIA_BLOCO } from "@/lib/propostas/blocos";
+import { ConfiguracaoBloco } from "./configuracao-bloco";
 
-type Bloco = { id: string; tipo: string; ativo: boolean; quebraPagina: "auto" | "nova_pagina" | "pagina_exclusiva" };
+type Bloco = { id: string; tipo: string; ativo: boolean; quebraPagina: "auto" | "nova_pagina" | "pagina_exclusiva"; config: unknown };
 
 export function BlocoLinha({ modeloId, bloco, posicao, total }: { modeloId: string; bloco: Bloco; posicao: number; total: number }) {
   const def = definicaoDoBloco(bloco.tipo);
@@ -97,6 +98,7 @@ export function BlocoLinha({ modeloId, bloco, posicao, total }: { modeloId: stri
         </div>
       </div>
       <Mensagem resultado={resAtivo ?? resMover ?? resQuebra ?? resRemover} />
+      <ConfiguracaoBloco modeloId={modeloId} blocoId={bloco.id} tipo={bloco.tipo} config={bloco.config} />
     </div>
   );
 }
