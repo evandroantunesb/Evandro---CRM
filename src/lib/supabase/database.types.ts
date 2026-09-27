@@ -751,6 +751,51 @@ export type Database = {
           },
         ]
       }
+      google_agenda_conexoes: {
+        Row: {
+          created_at: string
+          email_google: string | null
+          empresa_id: string
+          id: string
+          membro_id: string
+          refresh_token: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email_google?: string | null
+          empresa_id: string
+          id?: string
+          membro_id: string
+          refresh_token: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email_google?: string | null
+          empresa_id?: string
+          id?: string
+          membro_id?: string
+          refresh_token?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_agenda_conexoes_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_agenda_conexoes_membro_id_fkey"
+            columns: ["membro_id"]
+            isOneToOne: true
+            referencedRelation: "empresa_membros"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       historico_etapas: {
         Row: {
           empresa_id: string
@@ -1625,6 +1670,7 @@ export type Database = {
           created_at: string
           criado_por: string | null
           empresa_id: string
+          google_evento_id: string | null
           id: string
           negocio_id: string | null
           responsavel_id: string | null
@@ -1639,6 +1685,7 @@ export type Database = {
           created_at?: string
           criado_por?: string | null
           empresa_id: string
+          google_evento_id?: string | null
           id?: string
           negocio_id?: string | null
           responsavel_id?: string | null
@@ -1653,6 +1700,7 @@ export type Database = {
           created_at?: string
           criado_por?: string | null
           empresa_id?: string
+          google_evento_id?: string | null
           id?: string
           negocio_id?: string | null
           responsavel_id?: string | null
