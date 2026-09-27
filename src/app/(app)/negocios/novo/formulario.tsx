@@ -38,12 +38,15 @@ function numero(v: string): number | null {
 
 export function FormularioNegocio({
   funilId,
+  etapaId,
   origens,
   responsaveis,
   meuMembroId,
   parametros,
 }: {
   funilId: string;
+  /** Etapa pré-selecionada (ex.: "Adicionar negócio" numa coluna do Kanban); senão usa a etapa inicial do funil. */
+  etapaId?: string;
   origens: Opcao[];
   /** Vazio quando quem cria é vendedor: ele sempre fica como responsável. */
   responsaveis: Opcao[];
@@ -153,6 +156,7 @@ export function FormularioNegocio({
   return (
     <form action={acao} className="flex flex-col gap-5">
       <input type="hidden" name="funil_id" value={funilId} />
+      {etapaId && <input type="hidden" name="etapa_id" value={etapaId} />}
       <input type="hidden" name="tipo_ligacao" value={tipoLigacao} />
       <input type="hidden" name="componentes" value={JSON.stringify(componentes)} />
 

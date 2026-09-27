@@ -2,7 +2,7 @@ import { Cartao, Selo } from "@/components/ui";
 import { carregarConfiguracao } from "@/lib/crm";
 import { exigirPapel } from "@/lib/sessao";
 import { alternarFunil, definirInicial, reordenarEtapa } from "./actions";
-import { AlternarEtapa, CamposObrigatorios, NovaEtapa, NovoFunil, Renomear } from "./formularios";
+import { AlternarEtapa, CamposObrigatorios, CorEtapa, NovaEtapa, NovoFunil, Renomear } from "./formularios";
 
 export default async function ConfigFunil() {
   const { atual } = await exigirPapel("admin");
@@ -36,6 +36,7 @@ export default async function ConfigFunil() {
               {doFunil.map((etapa, i) => (
                 <li key={etapa.id} className="flex flex-wrap items-center gap-2 border-t border-zinc-100 py-2">
                   <span className="w-5 text-sm text-zinc-400">{i + 1}</span>
+                  <CorEtapa etapaId={etapa.id} cor={etapa.cor} />
                   <Renomear tabela="etapas" id={etapa.id} nome={etapa.nome} />
                   {etapa.inicial ? (
                     <Selo tom="atencao">Inicial</Selo>

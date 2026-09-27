@@ -50,3 +50,23 @@ export function tempoDesde(iso: string, agora = Date.now()) {
   const d = Math.floor(h / 24);
   return `há ${d} ${d === 1 ? "dia" : "dias"}`;
 }
+
+/** Início do dia atual (00:00, fuso de Brasília), como timestamp. */
+export function inicioDoDia(agora = Date.now()) {
+  const dia = new Date(agora).toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+  return new Date(`${dia}T00:00:00-03:00`).getTime();
+}
+
+/** Fim da semana atual (domingo 23:59:59, fuso de Brasília), como timestamp. */
+export function fimDaSemana(agora = Date.now()) {
+  const [ano, mes, dia] = new Date(agora)
+    .toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" })
+    .split("-")
+    .map(Number);
+  const base = new Date(Date.UTC(ano, mes - 1, dia));
+  base.setUTCDate(base.getUTCDate() + ((7 - base.getUTCDay()) % 7));
+  const y = base.getUTCFullYear();
+  const m = String(base.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(base.getUTCDate()).padStart(2, "0");
+  return new Date(`${y}-${m}-${d}T23:59:59-03:00`).getTime();
+}
