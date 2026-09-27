@@ -1,14 +1,17 @@
 "use client";
 
+import { Eye } from "lucide-react";
 import { useActionState, useState } from "react";
 import { Botao, Mensagem, Selecao } from "@/components/ui";
-import { definirModoPreco, gerarLinkProposta } from "@/lib/acoes/propostas";
+import { definirExibicaoProposta, gerarLinkProposta } from "@/lib/acoes/propostas";
 import { formatarDataHora } from "@/lib/formatacao";
 import { MODOS_PRECO, ROTULO_MODO_PRECO, type ModoPreco } from "@/lib/tipos";
 
 export type PropostaSalva = {
   token: string;
   modoPreco: ModoPreco;
+  mostrarSistema: boolean;
+  mostrarEconomia: boolean;
   aberturas: number;
   ultimaAbertura: string | null;
 };
@@ -29,7 +32,7 @@ export function Proposta({
   modelos: ModeloDisponivel[];
 }) {
   const [resultadoGerar, acaoGerar, gerando] = useActionState(gerarLinkProposta, null);
-  const [resultadoModo, acaoModo] = useActionState(definirModoPreco, null);
+  const [resultadoExibicao, acaoExibicao] = useActionState(definirExibicaoProposta, null);
   const [copiado, setCopiado] = useState(false);
 
   if (!temCalculo) {
@@ -96,7 +99,7 @@ export function Proposta({
         </div>
       </div>
 
-      <form action={acaoModo} className="flex items-end gap-2">
+      <form action={acaoExibicao} className="flex flex-col gap-3 rounded-lg border border-zinc-200 p-3">
         <input type="hidden" name="negocioId" value={negocioId} />
         <Selecao rotulo="Como mostrar o preço" name="modoPreco" defaultValue={proposta.modoPreco}>
           {MODOS_PRECO.map((m) => (
@@ -105,19 +108,36 @@ export function Proposta({
             </option>
           ))}
         </Selecao>
-        <Botao type="submit" variante="secundario">
+        <div className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium text-zinc-700">Seções na proposta</span>
+          <label className="flex items-center gap-2 text-sm text-zinc-700">
+            <input type="checkbox" name="mostrarSistema" defaultChecked={proposta.mostrarSistema} className="rounded border-zinc-300" />
+            O sistema (kit, potência, geração)
+          </label>
+          <label className="flex items-center gap-2 text-sm text-zinc-700">
+            <input type="checkbox" name="mostrarEconomia" defaultChecked={proposta.mostrarEconomia} className="rounded border-zinc-300" />
+            Sua economia (conta, economia, payback)
+          </label>
+        </div>
+        <Botao type="submit" variante="secundario" className="self-start">
           Salvar
         </Botao>
+        <Mensagem resultado={resultadoExibicao} />
       </form>
-      <Mensagem resultado={resultadoModo} />
 
-      <p className="text-sm text-zinc-600">
+      <div
+        className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${
+          proposta.aberturas > 0 ? "bg-amber-50 text-zinc-700" : "bg-zinc-50 text-zinc-500"
+        }`}
+        title="Quantas vezes o cliente abriu o link e quando foi a última vez"
+      >
+        <Eye size={16} className={proposta.aberturas > 0 ? "text-dourado" : "text-zinc-400"} />
         {proposta.aberturas === 0
           ? "O cliente ainda não abriu o link."
           : `Aberta ${proposta.aberturas} ${proposta.aberturas === 1 ? "vez" : "vezes"}${
               proposta.ultimaAbertura ? ` · última em ${formatarDataHora(proposta.ultimaAbertura)}` : ""
             }`}
-      </p>
+      </div>
     </div>
   );
 }

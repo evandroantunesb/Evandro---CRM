@@ -1561,6 +1561,8 @@ export type Database = {
           mensagem: string | null
           modelo_id: string | null
           modo_preco: Database["public"]["Enums"]["modo_preco_proposta"]
+          mostrar_economia: boolean
+          mostrar_sistema: boolean
           negocio_id: string
           token: string
           updated_at: string
@@ -1578,6 +1580,8 @@ export type Database = {
           mensagem?: string | null
           modelo_id?: string | null
           modo_preco?: Database["public"]["Enums"]["modo_preco_proposta"]
+          mostrar_economia?: boolean
+          mostrar_sistema?: boolean
           negocio_id: string
           token?: string
           updated_at?: string
@@ -1595,6 +1599,8 @@ export type Database = {
           mensagem?: string | null
           modelo_id?: string | null
           modo_preco?: Database["public"]["Enums"]["modo_preco_proposta"]
+          mostrar_economia?: boolean
+          mostrar_sistema?: boolean
           negocio_id?: string
           token?: string
           updated_at?: string
