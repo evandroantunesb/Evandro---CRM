@@ -13,16 +13,20 @@ export type PropostaSalva = {
   ultimaAbertura: string | null;
 };
 
+export type ModeloDisponivel = { id: string; nome: string; padrao: boolean };
+
 export function Proposta({
   negocioId,
   temCalculo,
   proposta,
   siteUrl,
+  modelos,
 }: {
   negocioId: string;
   temCalculo: boolean;
   proposta: PropostaSalva | null;
   siteUrl: string;
+  modelos: ModeloDisponivel[];
 }) {
   const [resultadoGerar, acaoGerar, gerando] = useActionState(gerarLinkProposta, null);
   const [resultadoModo, acaoModo] = useActionState(definirModoPreco, null);
@@ -33,10 +37,21 @@ export function Proposta({
   }
 
   if (!proposta) {
+    const padrao = modelos.find((m) => m.padrao);
     return (
       <form action={acaoGerar} className="flex flex-col gap-3">
         <input type="hidden" name="negocioId" value={negocioId} />
         <p className="text-sm text-zinc-600">Gere um link para enviar a proposta ao cliente, sem precisar de PDF.</p>
+        {modelos.length > 0 && (
+          <Selecao rotulo="Modelo de proposta" name="modeloId" defaultValue={padrao?.id ?? modelos[0]!.id}>
+            {modelos.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.nome}
+                {m.padrao ? " (padrão)" : ""}
+              </option>
+            ))}
+          </Selecao>
+        )}
         <Mensagem resultado={resultadoGerar} />
         <Botao type="submit" disabled={gerando} className="self-start">
           {gerando ? "Gerando..." : "Gerar link da proposta"}
@@ -72,6 +87,11 @@ export function Proposta({
           </Botao>
           <a href={linkWhatsapp} target="_blank" rel="noopener noreferrer">
             <Botao type="button">Enviar no WhatsApp</Botao>
+          </a>
+          <a href={`/proposta/${proposta.token}/pdf`} target="_blank" rel="noopener noreferrer">
+            <Botao type="button" variante="secundario">
+              Baixar PDF
+            </Botao>
           </a>
         </div>
       </div>

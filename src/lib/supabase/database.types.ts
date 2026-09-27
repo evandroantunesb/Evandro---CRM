@@ -421,6 +421,7 @@ export type Database = {
           id: string
           papel: Database["public"]["Enums"]["papel_membro"]
           recebe_leads: boolean
+          recebeu_lead_em: string | null
           tipo_vendedor: Database["public"]["Enums"]["tipo_vendedor"] | null
           updated_at: string
           user_id: string
@@ -432,6 +433,7 @@ export type Database = {
           id?: string
           papel?: Database["public"]["Enums"]["papel_membro"]
           recebe_leads?: boolean
+          recebeu_lead_em?: string | null
           tipo_vendedor?: Database["public"]["Enums"]["tipo_vendedor"] | null
           updated_at?: string
           user_id: string
@@ -443,6 +445,7 @@ export type Database = {
           id?: string
           papel?: Database["public"]["Enums"]["papel_membro"]
           recebe_leads?: boolean
+          recebeu_lead_em?: string | null
           tipo_vendedor?: Database["public"]["Enums"]["tipo_vendedor"] | null
           updated_at?: string
           user_id?: string
@@ -714,6 +717,70 @@ export type Database = {
           },
         ]
       }
+      formularios: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          empresa_id: string
+          funil_id: string
+          id: string
+          nome: string
+          origem_id: string
+          preenchimentos: number
+          token: string
+          updated_at: string
+          visualizacoes: number
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          empresa_id: string
+          funil_id: string
+          id?: string
+          nome: string
+          origem_id: string
+          preenchimentos?: number
+          token?: string
+          updated_at?: string
+          visualizacoes?: number
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          empresa_id?: string
+          funil_id?: string
+          id?: string
+          nome?: string
+          origem_id?: string
+          preenchimentos?: number
+          token?: string
+          updated_at?: string
+          visualizacoes?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "formularios_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "formularios_funil_id_fkey"
+            columns: ["funil_id"]
+            isOneToOne: false
+            referencedRelation: "funis"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "formularios_origem_id_fkey"
+            columns: ["origem_id"]
+            isOneToOne: false
+            referencedRelation: "origens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       funis: {
         Row: {
           ativo: boolean
@@ -748,6 +815,51 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      google_agenda_conexoes: {
+        Row: {
+          created_at: string
+          email_google: string | null
+          empresa_id: string
+          id: string
+          membro_id: string
+          refresh_token: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email_google?: string | null
+          empresa_id: string
+          id?: string
+          membro_id: string
+          refresh_token: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email_google?: string | null
+          empresa_id?: string
+          id?: string
+          membro_id?: string
+          refresh_token?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_agenda_conexoes_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_agenda_conexoes_membro_id_fkey"
+            columns: ["membro_id"]
+            isOneToOne: true
+            referencedRelation: "empresa_membros"
             referencedColumns: ["id"]
           },
         ]
@@ -1085,6 +1197,7 @@ export type Database = {
           unidade_consumidora: string | null
           updated_at: string
           valor: number | null
+          valor_conta_energia: number | null
         }
         Insert: {
           contato_id: string
@@ -1110,6 +1223,7 @@ export type Database = {
           unidade_consumidora?: string | null
           updated_at?: string
           valor?: number | null
+          valor_conta_energia?: number | null
         }
         Update: {
           contato_id?: string
@@ -1135,6 +1249,7 @@ export type Database = {
           unidade_consumidora?: string | null
           updated_at?: string
           valor?: number | null
+          valor_conta_energia?: number | null
         }
         Relationships: [
           {
@@ -1365,14 +1480,193 @@ export type Database = {
         }
         Relationships: []
       }
+      proposta_identidades: {
+        Row: {
+          atualizado_por: string | null
+          cor_destaque: string | null
+          cor_primaria: string | null
+          created_at: string
+          empresa_id: string
+          foto_capa_url: string | null
+          id: string
+          logo_escuro_url: string | null
+          logo_url: string | null
+          nome_exibicao: string | null
+          rodape_texto: string | null
+          updated_at: string
+          whatsapp: string | null
+        }
+        Insert: {
+          atualizado_por?: string | null
+          cor_destaque?: string | null
+          cor_primaria?: string | null
+          created_at?: string
+          empresa_id: string
+          foto_capa_url?: string | null
+          id?: string
+          logo_escuro_url?: string | null
+          logo_url?: string | null
+          nome_exibicao?: string | null
+          rodape_texto?: string | null
+          updated_at?: string
+          whatsapp?: string | null
+        }
+        Update: {
+          atualizado_por?: string | null
+          cor_destaque?: string | null
+          cor_primaria?: string | null
+          created_at?: string
+          empresa_id?: string
+          foto_capa_url?: string | null
+          id?: string
+          logo_escuro_url?: string | null
+          logo_url?: string | null
+          nome_exibicao?: string | null
+          rodape_texto?: string | null
+          updated_at?: string
+          whatsapp?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposta_identidades_atualizado_por_fkey"
+            columns: ["atualizado_por"]
+            isOneToOne: false
+            referencedRelation: "empresa_membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposta_identidades_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: true
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proposta_modelo_blocos: {
+        Row: {
+          ativo: boolean
+          config: Json
+          created_at: string
+          id: string
+          modelo_id: string
+          ordem: number
+          quebra_pagina: Database["public"]["Enums"]["proposta_bloco_quebra"]
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          config?: Json
+          created_at?: string
+          id?: string
+          modelo_id: string
+          ordem?: number
+          quebra_pagina?: Database["public"]["Enums"]["proposta_bloco_quebra"]
+          tipo: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          config?: Json
+          created_at?: string
+          id?: string
+          modelo_id?: string
+          ordem?: number
+          quebra_pagina?: Database["public"]["Enums"]["proposta_bloco_quebra"]
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposta_modelo_blocos_modelo_id_fkey"
+            columns: ["modelo_id"]
+            isOneToOne: false
+            referencedRelation: "proposta_modelos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proposta_modelos: {
+        Row: {
+          atualizado_por: string | null
+          capa_variante: Database["public"]["Enums"]["proposta_modelo_capa"]
+          created_at: string
+          criado_por: string | null
+          descricao: string | null
+          empresa_id: string
+          id: string
+          nome: string
+          padrao: boolean
+          revisao: number
+          status: Database["public"]["Enums"]["proposta_modelo_status"]
+          updated_at: string
+        }
+        Insert: {
+          atualizado_por?: string | null
+          capa_variante?: Database["public"]["Enums"]["proposta_modelo_capa"]
+          created_at?: string
+          criado_por?: string | null
+          descricao?: string | null
+          empresa_id: string
+          id?: string
+          nome: string
+          padrao?: boolean
+          revisao?: number
+          status?: Database["public"]["Enums"]["proposta_modelo_status"]
+          updated_at?: string
+        }
+        Update: {
+          atualizado_por?: string | null
+          capa_variante?: Database["public"]["Enums"]["proposta_modelo_capa"]
+          created_at?: string
+          criado_por?: string | null
+          descricao?: string | null
+          empresa_id?: string
+          id?: string
+          nome?: string
+          padrao?: boolean
+          revisao?: number
+          status?: Database["public"]["Enums"]["proposta_modelo_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposta_modelos_atualizado_por_fkey"
+            columns: ["atualizado_por"]
+            isOneToOne: false
+            referencedRelation: "empresa_membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposta_modelos_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "empresa_membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposta_modelos_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       propostas: {
         Row: {
           atualizado_por: string | null
+          blocos_emitidos: Json | null
+          capa_variante:
+            | Database["public"]["Enums"]["proposta_modelo_capa"]
+            | null
           created_at: string
           criado_por: string | null
           empresa_id: string
           id: string
           mensagem: string | null
+          modelo_id: string | null
           modo_preco: Database["public"]["Enums"]["modo_preco_proposta"]
           negocio_id: string
           token: string
@@ -1380,11 +1674,16 @@ export type Database = {
         }
         Insert: {
           atualizado_por?: string | null
+          blocos_emitidos?: Json | null
+          capa_variante?:
+            | Database["public"]["Enums"]["proposta_modelo_capa"]
+            | null
           created_at?: string
           criado_por?: string | null
           empresa_id: string
           id?: string
           mensagem?: string | null
+          modelo_id?: string | null
           modo_preco?: Database["public"]["Enums"]["modo_preco_proposta"]
           negocio_id: string
           token?: string
@@ -1392,11 +1691,16 @@ export type Database = {
         }
         Update: {
           atualizado_por?: string | null
+          blocos_emitidos?: Json | null
+          capa_variante?:
+            | Database["public"]["Enums"]["proposta_modelo_capa"]
+            | null
           created_at?: string
           criado_por?: string | null
           empresa_id?: string
           id?: string
           mensagem?: string | null
+          modelo_id?: string | null
           modo_preco?: Database["public"]["Enums"]["modo_preco_proposta"]
           negocio_id?: string
           token?: string
@@ -1422,6 +1726,13 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "propostas_modelo_id_fkey"
+            columns: ["modelo_id"]
+            isOneToOne: false
+            referencedRelation: "proposta_modelos"
             referencedColumns: ["id"]
           },
           {
@@ -1466,6 +1777,7 @@ export type Database = {
           created_at: string
           criado_por: string | null
           empresa_id: string
+          google_evento_id: string | null
           id: string
           negocio_id: string | null
           responsavel_id: string | null
@@ -1480,6 +1792,7 @@ export type Database = {
           created_at?: string
           criado_por?: string | null
           empresa_id: string
+          google_evento_id?: string | null
           id?: string
           negocio_id?: string | null
           responsavel_id?: string | null
@@ -1494,6 +1807,7 @@ export type Database = {
           created_at?: string
           criado_por?: string | null
           empresa_id?: string
+          google_evento_id?: string | null
           id?: string
           negocio_id?: string | null
           responsavel_id?: string | null
@@ -1556,6 +1870,15 @@ export type Database = {
       }
       compartilha_empresa: { Args: { p_user_id: string }; Returns: boolean }
       e_plataforma_admin: { Args: never; Returns: boolean }
+      empresa_da_pasta_marca: { Args: { p_caminho: string }; Returns: string }
+      incrementar_preenchimento_formulario: {
+        Args: { p_id: string }
+        Returns: undefined
+      }
+      incrementar_visualizacao_formulario: {
+        Args: { p_id: string }
+        Returns: undefined
+      }
       membro_ativo: { Args: { p_empresa_id: string }; Returns: boolean }
       meu_membro_id: { Args: { p_empresa_id: string }; Returns: string }
       pode_ver_contato: { Args: { p_contato_id: string }; Returns: boolean }
@@ -1584,6 +1907,9 @@ export type Database = {
     Enums: {
       modo_preco_proposta: "sem_preco" | "parcelado" | "avista" | "completo"
       papel_membro: "admin" | "gestor" | "vendedor"
+      proposta_bloco_quebra: "auto" | "nova_pagina" | "pagina_exclusiva"
+      proposta_modelo_capa: "foto" | "minimalista" | "tecnica"
+      proposta_modelo_status: "rascunho" | "publicado" | "arquivado"
       situacao_empresa: "ativa" | "suspensa" | "cancelada"
       status_contrato: "rascunho" | "aguardando_assinatura" | "assinado"
       status_negocio: "aberto" | "ganho" | "perdido"
@@ -1730,6 +2056,9 @@ export const Constants = {
     Enums: {
       modo_preco_proposta: ["sem_preco", "parcelado", "avista", "completo"],
       papel_membro: ["admin", "gestor", "vendedor"],
+      proposta_bloco_quebra: ["auto", "nova_pagina", "pagina_exclusiva"],
+      proposta_modelo_capa: ["foto", "minimalista", "tecnica"],
+      proposta_modelo_status: ["rascunho", "publicado", "arquivado"],
       situacao_empresa: ["ativa", "suspensa", "cancelada"],
       status_contrato: ["rascunho", "aguardando_assinatura", "assinado"],
       status_negocio: ["aberto", "ganho", "perdido"],
