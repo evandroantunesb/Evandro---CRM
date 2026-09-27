@@ -8,10 +8,14 @@ import type { ResultadoAcao } from "@/lib/tipos";
 const esquema = z.object({
   token: z.string().min(1),
   nome: z.string().trim().min(2, "Informe seu nome"),
-  telefone: z.string().trim().min(8, "Informe um telefone válido"),
+  telefone: z
+    .string()
+    .trim()
+    .transform((v) => v.replace(/\D/g, ""))
+    .refine((v) => v.length === 10 || v.length === 11, "Informe um telefone com DDD"),
   email: z.union([z.literal(""), z.string().trim().email("E-mail inválido")]).optional(),
   cidade: z.string().trim().max(120).optional(),
-  unidade_consumidora: z.string().trim().max(60).optional(),
+  valor_conta_energia: z.coerce.number({ message: "Informe o valor da sua conta de energia" }).positive("Informe um valor válido"),
 });
 
 /**
@@ -78,13 +82,16 @@ export async function enviarCaptura(_: ResultadoAcao, formData: FormData): Promi
     origem_id: formulario.origem_id,
     responsavel_id: proximo?.id ?? null,
     contato_id: contato.id,
-    unidade_consumidora: d.unidade_consumidora || null,
+    valor_conta_energia: d.valor_conta_energia,
   });
   if (erroNegocio) return { ok: false, mensagem: mensagemErro(erroNegocio, "Não foi possível registrar seu contato.") };
 
   if (proximo) {
     await admin.from("empresa_membros").update({ recebeu_lead_em: new Date().toISOString() }).eq("id", proximo.id);
   }
+
+  const { error: erroMetrica } = await admin.rpc("incrementar_preenchimento_formulario", { p_id: formulario.id });
+  if (erroMetrica) console.error("Falha ao contar preenchimento do formulário", formulario.id, erroMetrica);
 
   return { ok: true, mensagem: "Recebemos seus dados! Em breve um de nossos consultores vai falar com você." };
 }

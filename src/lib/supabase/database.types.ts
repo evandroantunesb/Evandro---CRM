@@ -658,8 +658,10 @@ export type Database = {
           id: string
           nome: string
           origem_id: string
+          preenchimentos: number
           token: string
           updated_at: string
+          visualizacoes: number
         }
         Insert: {
           ativo?: boolean
@@ -669,8 +671,10 @@ export type Database = {
           id?: string
           nome: string
           origem_id: string
+          preenchimentos?: number
           token?: string
           updated_at?: string
+          visualizacoes?: number
         }
         Update: {
           ativo?: boolean
@@ -680,8 +684,10 @@ export type Database = {
           id?: string
           nome?: string
           origem_id?: string
+          preenchimentos?: number
           token?: string
           updated_at?: string
+          visualizacoes?: number
         }
         Relationships: [
           {
@@ -1039,6 +1045,7 @@ export type Database = {
           unidade_consumidora: string | null
           updated_at: string
           valor: number | null
+          valor_conta_energia: number | null
         }
         Insert: {
           contato_id: string
@@ -1064,6 +1071,7 @@ export type Database = {
           unidade_consumidora?: string | null
           updated_at?: string
           valor?: number | null
+          valor_conta_energia?: number | null
         }
         Update: {
           contato_id?: string
@@ -1089,6 +1097,7 @@ export type Database = {
           unidade_consumidora?: string | null
           updated_at?: string
           valor?: number | null
+          valor_conta_energia?: number | null
         }
         Relationships: [
           {
@@ -1510,6 +1519,14 @@ export type Database = {
       }
       compartilha_empresa: { Args: { p_user_id: string }; Returns: boolean }
       e_plataforma_admin: { Args: never; Returns: boolean }
+      incrementar_preenchimento_formulario: {
+        Args: { p_id: string }
+        Returns: undefined
+      }
+      incrementar_visualizacao_formulario: {
+        Args: { p_id: string }
+        Returns: undefined
+      }
       membro_ativo: { Args: { p_empresa_id: string }; Returns: boolean }
       meu_membro_id: { Args: { p_empresa_id: string }; Returns: string }
       pode_ver_contato: { Args: { p_contato_id: string }; Returns: boolean }

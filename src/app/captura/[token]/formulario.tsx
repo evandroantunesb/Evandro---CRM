@@ -1,7 +1,7 @@
 "use client";
 
-import { Gauge, Mail, MapPin, Phone, ShieldCheck, User } from "lucide-react";
-import { useActionState, type InputHTMLAttributes } from "react";
+import { Coins, Mail, MapPin, Phone, ShieldCheck, User } from "lucide-react";
+import { useActionState, useState, type InputHTMLAttributes } from "react";
 import { enviarCaptura } from "@/lib/acoes/captura";
 import { Botao, Mensagem } from "@/components/ui";
 
@@ -21,8 +21,21 @@ function CampoComIcone({
   );
 }
 
+/** Formata como (11) 91234-5678 enquanto digita, sempre exigindo o DDD (2 dígitos iniciais). */
+function formatarTelefone(valor: string) {
+  const digitos = valor.replace(/\D/g, "").slice(0, 11);
+  const ddd = digitos.slice(0, 2);
+  const resto = digitos.slice(2);
+  if (digitos.length === 0) return "";
+  if (digitos.length <= 2) return `(${ddd}`;
+  if (resto.length <= 4) return `(${ddd}) ${resto}`;
+  const separador = resto.length > 8 ? 5 : 4;
+  return `(${ddd}) ${resto.slice(0, separador)}-${resto.slice(separador)}`;
+}
+
 export function FormularioCaptura({ token }: { token: string }) {
   const [resultado, acao, pendente] = useActionState(enviarCaptura, null);
+  const [telefone, setTelefone] = useState("");
 
   if (resultado?.ok) {
     return (
@@ -37,14 +50,29 @@ export function FormularioCaptura({ token }: { token: string }) {
       <form action={acao} className="flex flex-col gap-3">
         <input type="hidden" name="token" value={token} />
         <CampoComIcone icone={User} rotulo="Nome completo" name="nome" placeholder="Seu nome" required />
-        <CampoComIcone icone={Phone} rotulo="Telefone (WhatsApp)" name="telefone" type="tel" placeholder="(00) 90000-0000" required />
+        <CampoComIcone
+          icone={Phone}
+          rotulo="Telefone (WhatsApp), com DDD"
+          name="telefone"
+          type="tel"
+          inputMode="numeric"
+          placeholder="(11) 91234-5678"
+          value={telefone}
+          onChange={(e) => setTelefone(formatarTelefone(e.target.value))}
+          required
+        />
         <CampoComIcone icone={Mail} rotulo="E-mail (opcional)" name="email" type="email" placeholder="voce@email.com" />
         <CampoComIcone icone={MapPin} rotulo="Cidade (opcional)" name="cidade" placeholder="Sua cidade" />
         <CampoComIcone
-          icone={Gauge}
-          rotulo="Número da unidade consumidora (opcional)"
-          name="unidade_consumidora"
-          placeholder="Está na sua conta de luz"
+          icone={Coins}
+          rotulo="Valor da sua conta de energia (R$)"
+          name="valor_conta_energia"
+          type="number"
+          inputMode="decimal"
+          min={0}
+          step="0.01"
+          placeholder="Ex.: 350"
+          required
         />
         <Botao type="submit" disabled={pendente} className="mt-2 justify-center py-3">
           {pendente ? "Enviando..." : "Quero falar com um especialista →"}

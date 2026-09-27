@@ -5,6 +5,8 @@ import {
   CheckCircle2,
   Download,
   ExternalLink,
+  Eye,
+  FileCheck,
   Image as ImageIcon,
   Link2,
   MessageCircle,
@@ -21,7 +23,15 @@ import { Mensagem } from "@/components/ui";
 import { alternarFormulario, apagarFormulario } from "./actions";
 import { PosterFormulario } from "./poster-formulario";
 
-type Formulario = { id: string; nome: string; funil: string; origem: string; ativo: boolean };
+type Formulario = {
+  id: string;
+  nome: string;
+  funil: string;
+  origem: string;
+  ativo: boolean;
+  visualizacoes: number;
+  preenchimentos: number;
+};
 
 function slug(nome: string) {
   return nome.replace(/[^a-zA-Z0-9]+/g, "-").toLowerCase();
@@ -31,14 +41,10 @@ export function CardFormulario({
   formulario,
   link,
   qrCode,
-  selecionado,
-  onVisualizar,
 }: {
   formulario: Formulario;
   link: string;
   qrCode: string | null;
-  selecionado: boolean;
-  onVisualizar: () => void;
 }) {
   const [resultado, acao, pendente] = useActionState(alternarFormulario, null);
   const [resultadoExcluir, acaoExcluir, excluindo] = useActionState(apagarFormulario, null);
@@ -73,9 +79,7 @@ export function CardFormulario({
 
   return (
     <div
-      className={`flex flex-col gap-4 rounded-xl border bg-white p-5 transition-colors ${
-        selecionado ? "border-dourado shadow-[0_0_0_1px_rgba(212,175,55,0.4)]" : "border-zinc-200/80"
-      }`}
+      className="flex flex-col gap-4 rounded-xl border border-zinc-200/80 bg-white p-5"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -89,51 +93,61 @@ export function CardFormulario({
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <form action={acao} className="flex items-center gap-2">
-            <input type="hidden" name="id" value={formulario.id} />
-            <span className={`text-xs font-medium ${formulario.ativo ? "text-green-700" : "text-zinc-500"}`}>
-              {formulario.ativo ? "Ativo" : "Inativo"}
+        <div className="flex flex-col items-end gap-1.5">
+          <p className="flex items-center gap-2 text-[11px] text-zinc-400">
+            <span className="flex items-center gap-1" title="Vezes que a página foi aberta">
+              <Eye size={12} /> {formulario.visualizacoes}
             </span>
-            <label className="relative inline-flex cursor-pointer items-center">
-              <input
-                type="checkbox"
-                name="ativo"
-                defaultChecked={formulario.ativo}
-                onChange={(e) => e.currentTarget.form?.requestSubmit()}
-                disabled={pendente}
-                className="peer sr-only"
-              />
-              <span className="h-6 w-11 rounded-full bg-zinc-300 transition-colors peer-checked:bg-dourado peer-disabled:opacity-50" />
-              <span className="absolute left-1 h-4 w-4 rounded-full bg-white transition-transform peer-checked:translate-x-5" />
-            </label>
-          </form>
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setMenuOpcoes((v) => !v)}
-              aria-label="Mais opções"
-              className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-carvao"
-            >
-              <MoreVertical size={16} />
-            </button>
-            {menuOpcoes && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setMenuOpcoes(false)} />
-                <div className="absolute top-full right-0 z-20 mt-1 w-48 rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMenuOpcoes(false);
-                      setModalExcluir(true);
-                    }}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
-                  >
-                    <Trash2 size={14} /> Excluir formulário
-                  </button>
-                </div>
-              </>
-            )}
+            <span className="flex items-center gap-1" title="Formulários preenchidos">
+              <FileCheck size={12} /> {formulario.preenchimentos}
+            </span>
+          </p>
+          <div className="flex items-center gap-2">
+            <form action={acao} className="flex items-center gap-2">
+              <input type="hidden" name="id" value={formulario.id} />
+              <span className={`text-xs font-medium ${formulario.ativo ? "text-green-700" : "text-zinc-500"}`}>
+                {formulario.ativo ? "Ativo" : "Inativo"}
+              </span>
+              <label className="relative inline-flex cursor-pointer items-center">
+                <input
+                  type="checkbox"
+                  name="ativo"
+                  defaultChecked={formulario.ativo}
+                  onChange={(e) => e.currentTarget.form?.requestSubmit()}
+                  disabled={pendente}
+                  className="peer sr-only"
+                />
+                <span className="h-6 w-11 rounded-full bg-zinc-300 transition-colors peer-checked:bg-dourado peer-disabled:opacity-50" />
+                <span className="absolute left-1 h-4 w-4 rounded-full bg-white transition-transform peer-checked:translate-x-5" />
+              </label>
+            </form>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setMenuOpcoes((v) => !v)}
+                aria-label="Mais opções"
+                className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-carvao"
+              >
+                <MoreVertical size={16} />
+              </button>
+              {menuOpcoes && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setMenuOpcoes(false)} />
+                  <div className="absolute top-full right-0 z-20 mt-1 w-48 rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMenuOpcoes(false);
+                        setModalExcluir(true);
+                      }}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                    >
+                      <Trash2 size={14} /> Excluir formulário
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -191,13 +205,8 @@ export function CardFormulario({
         </a>
         <button
           type="button"
-          onClick={() => {
-            onVisualizar();
-            setModalCelular(true);
-          }}
-          className={`flex flex-col gap-1 rounded-lg border px-3 py-2.5 text-left transition-colors ${
-            selecionado ? "border-dourado bg-dourado/10" : "border-zinc-200 hover:border-dourado"
-          }`}
+          onClick={() => setModalCelular(true)}
+          className="flex flex-col gap-1 rounded-lg border border-zinc-200 px-3 py-2.5 text-left hover:border-dourado"
         >
           <Smartphone size={16} className="text-carvao" />
           <span className="text-xs font-semibold text-carvao">Visualizar no celular</span>

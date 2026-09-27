@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { after } from "next/server";
 import { LogoRaion } from "@/components/marca";
 import { criarClienteAdmin } from "@/lib/supabase/admin";
 import { FormularioCaptura } from "./formulario";
@@ -10,8 +11,19 @@ export default async function CapturaPublica({ params }: PageProps<"/captura/[to
   const { token } = await params;
   const admin = criarClienteAdmin();
 
-  const { data: formulario } = await admin.from("formularios").select("nome, ativo").eq("token", token).maybeSingle();
+  const { data: formulario } = await admin
+    .from("formularios")
+    .select("id, nome, ativo")
+    .eq("token", token)
+    .maybeSingle();
   if (!formulario || !formulario.ativo) notFound();
+
+  // Métrica simples de quantas vezes a página foi aberta — roda depois da resposta ser
+  // enviada, via `after`, pra não atrasar nem arriscar ser cortada no meio (serverless).
+  after(async () => {
+    const { error } = await admin.rpc("incrementar_visualizacao_formulario", { p_id: formulario.id });
+    if (error) console.error("Falha ao contar visualização do formulário", formulario.id, error);
+  });
 
   return (
     <main className="min-h-screen bg-offwhite">

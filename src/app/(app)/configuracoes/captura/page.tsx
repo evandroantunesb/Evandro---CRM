@@ -13,7 +13,7 @@ export default async function ConfigCaptura() {
     carregarConfiguracao(atual.empresaId),
     supabase
       .from("formularios")
-      .select("id, nome, token, ativo, funis(nome), origens(nome)")
+      .select("id, nome, token, ativo, visualizacoes, preenchimentos, funis(nome), origens(nome)")
       .eq("empresa_id", atual.empresaId)
       .order("created_at", { ascending: false }),
   ]);
@@ -31,7 +31,15 @@ export default async function ConfigCaptura() {
         console.error("Falha ao gerar QR Code do formulário", f.id, erro);
       }
       return {
-        formulario: { id: f.id, nome: f.nome, ativo: f.ativo, funil: funil?.nome ?? "—", origem: origem?.nome ?? "—" },
+        formulario: {
+          id: f.id,
+          nome: f.nome,
+          ativo: f.ativo,
+          visualizacoes: f.visualizacoes,
+          preenchimentos: f.preenchimentos,
+          funil: funil?.nome ?? "—",
+          origem: origem?.nome ?? "—",
+        },
         link,
         qrCode,
       };
@@ -39,7 +47,7 @@ export default async function ConfigCaptura() {
   );
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-4">
+    <div className="mx-auto flex max-w-2xl flex-col gap-4">
       <h1 className="text-2xl font-semibold text-zinc-900">Captura de leads</h1>
       <p className="text-sm text-zinc-600">
         Crie um link (e QR Code) para divulgar. Quem preencher o formulário vira um lead novo, já distribuído
