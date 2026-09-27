@@ -1,5 +1,6 @@
 "use client";
 
+import { Eye } from "lucide-react";
 import { useActionState, useState } from "react";
 import { Botao, Mensagem, Selecao } from "@/components/ui";
 import { definirExibicaoProposta, gerarLinkProposta } from "@/lib/acoes/propostas";
@@ -109,13 +110,19 @@ export function Proposta({
         <Mensagem resultado={resultadoExibicao} />
       </form>
 
-      <p className="text-sm text-zinc-600">
+      <div
+        className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${
+          proposta.aberturas > 0 ? "bg-amber-50 text-zinc-700" : "bg-zinc-50 text-zinc-500"
+        }`}
+        title="Quantas vezes o cliente abriu o link e quando foi a última vez"
+      >
+        <Eye size={16} className={proposta.aberturas > 0 ? "text-dourado" : "text-zinc-400"} />
         {proposta.aberturas === 0
           ? "O cliente ainda não abriu o link."
           : `Aberta ${proposta.aberturas} ${proposta.aberturas === 1 ? "vez" : "vezes"}${
               proposta.ultimaAbertura ? ` · última em ${formatarDataHora(proposta.ultimaAbertura)}` : ""
             }`}
-      </p>
+      </div>
     </div>
   );
 }
