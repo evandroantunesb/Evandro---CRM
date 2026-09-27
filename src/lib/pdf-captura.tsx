@@ -13,7 +13,8 @@ const estilos = StyleSheet.create({
   titulo: { fontSize: 22, fontFamily: "Helvetica-Bold", marginBottom: 4, alignSelf: "flex-start" },
   subtitulo: { fontSize: 11, color: CINZA, marginBottom: 32, alignSelf: "flex-start" },
   qr: { width: 240, height: 240, marginBottom: 24 },
-  link: { fontSize: 11, color: CARVAO, marginBottom: 40, textAlign: "center" },
+  link: { fontSize: 11, color: CARVAO, marginBottom: 8, textAlign: "center" },
+  instrucao: { fontSize: 10, color: CINZA, marginBottom: 32, textAlign: "center" },
   rodape: { fontSize: 9, color: CINZA, alignSelf: "flex-start" },
 });
 
@@ -32,6 +33,7 @@ export function CapturaPdfDocument({ nome, link, qrCode }: { nome: string; link:
         {/* eslint-disable-next-line jsx-a11y/alt-text */}
         <Image src={qrCode} style={estilos.qr} />
         <Text style={estilos.link}>{link}</Text>
+        <Text style={estilos.instrucao}>Aponte a câmera do seu celular para se cadastrar.</Text>
         <Text style={estilos.rodape}>Raion CRM · gerado automaticamente</Text>
       </Page>
     </Document>

@@ -1,11 +1,15 @@
 "use client";
 
-import { CheckCircle2, Download, ExternalLink, Link2, Share2, Smartphone, Users, XCircle } from "lucide-react";
+import { CheckCircle2, Download, ExternalLink, Image as ImageIcon, Link2, MessageCircle, Share2, Smartphone, Users, XCircle } from "lucide-react";
 import { useActionState, useState } from "react";
 import { Mensagem } from "@/components/ui";
 import { alternarFormulario } from "./actions";
 
 type Formulario = { id: string; nome: string; funil: string; origem: string; ativo: boolean };
+
+function slug(nome: string) {
+  return nome.replace(/[^a-zA-Z0-9]+/g, "-").toLowerCase();
+}
 
 export function CardFormulario({
   formulario,
@@ -22,24 +26,28 @@ export function CardFormulario({
 }) {
   const [resultado, acao, pendente] = useActionState(alternarFormulario, null);
   const [aviso, setAviso] = useState<string | null>(null);
+  const [menuCompartilhar, setMenuCompartilhar] = useState(false);
 
   function avisar(texto: string) {
     setAviso(texto);
     setTimeout(() => setAviso(null), 2500);
   }
 
+  async function copiarLink() {
+    await navigator.clipboard.writeText(link);
+    avisar("Link copiado!");
+  }
+
   async function compartilhar() {
-    const dados = { title: `Formulário ${formulario.nome}`, text: "Preencha seus dados, é rápido:", url: link };
     if (navigator.share) {
       try {
-        await navigator.share(dados);
+        await navigator.share({ title: `Formulário ${formulario.nome}`, text: "Confira nosso formulário:", url: link });
       } catch {
         // Usuário cancelou o compartilhamento — não é um erro.
       }
       return;
     }
-    await navigator.clipboard.writeText(link);
-    avisar("Link copiado! Cole onde quiser compartilhar.");
+    setMenuCompartilhar((v) => !v);
   }
 
   return (
@@ -50,8 +58,8 @@ export function CardFormulario({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-carvao text-offwhite">
-            <Users size={18} />
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-carvao">
+            <Users size={18} className="text-dourado" />
           </span>
           <div>
             <p className="font-medium text-zinc-900">{formulario.nome}</p>
@@ -85,7 +93,9 @@ export function CardFormulario({
           <div className="flex shrink-0 flex-col items-center gap-1 self-center sm:self-start">
             {/* eslint-disable-next-line @next/next/no-img-element -- data: URL gerada localmente, sem otimização de imagem remota. */}
             <img src={qrCode} alt={`QR Code do formulário ${formulario.nome}`} width={112} height={112} className="rounded-md border border-zinc-200 bg-white" />
-            <p className="max-w-[112px] text-center text-[11px] leading-tight text-zinc-500">Escaneie o QR Code e acesse o formulário</p>
+            <p className="max-w-[112px] text-center text-[11px] leading-tight text-zinc-500">
+              <span className="block font-semibold text-zinc-700">Escaneie o QR Code</span>e acesse o formulário
+            </p>
           </div>
         ) : (
           <div className="flex h-28 w-28 shrink-0 items-center justify-center self-center rounded-md border border-dashed border-zinc-300 px-2 text-center text-xs text-zinc-400 sm:self-start">
@@ -105,10 +115,7 @@ export function CardFormulario({
             />
             <button
               type="button"
-              onClick={() => {
-                navigator.clipboard.writeText(link);
-                avisar("Link copiado!");
-              }}
+              onClick={copiarLink}
               className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-carvao hover:border-dourado"
             >
               Copiar link
@@ -116,7 +123,7 @@ export function CardFormulario({
           </div>
           <p className={`flex items-center gap-1 text-xs ${formulario.ativo ? "text-green-700" : "text-zinc-500"}`}>
             {formulario.ativo ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
-            {formulario.ativo ? "Página no ar e recebendo envios de leads." : "Formulário desativado — não está recebendo envios."}
+            {formulario.ativo ? "Formulário ativo e disponível para captação." : "Este captador está desativado."}
           </p>
         </div>
       </div>
@@ -125,7 +132,7 @@ export function CardFormulario({
         <a
           href={link}
           target="_blank"
-          rel="noreferrer"
+          rel="noopener noreferrer"
           className="flex flex-col gap-1 rounded-lg bg-carvao px-3 py-2.5 text-offwhite hover:bg-zinc-800"
         >
           <ExternalLink size={16} />
@@ -143,19 +150,54 @@ export function CardFormulario({
           <span className="text-xs font-semibold text-carvao">Visualizar no celular</span>
           <span className="text-[11px] text-zinc-500">Veja como o formulário fica no smartphone</span>
         </button>
-        <button
-          type="button"
-          onClick={compartilhar}
-          className="flex flex-col gap-1 rounded-lg border border-zinc-200 px-3 py-2.5 text-left hover:border-dourado"
-        >
-          <Share2 size={16} className="text-carvao" />
-          <span className="text-xs font-semibold text-carvao">Compartilhar</span>
-          <span className="text-[11px] text-zinc-500">Envie o link ou QR Code para sua equipe</span>
-        </button>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={compartilhar}
+            className="flex w-full flex-col gap-1 rounded-lg border border-zinc-200 px-3 py-2.5 text-left hover:border-dourado"
+          >
+            <Share2 size={16} className="text-carvao" />
+            <span className="text-xs font-semibold text-carvao">Compartilhar</span>
+            <span className="text-[11px] text-zinc-500">Envie o link ou QR Code para sua equipe</span>
+          </button>
+          {menuCompartilhar && (
+            <div className="absolute top-full left-0 z-10 mt-1 w-56 rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
+              <button
+                type="button"
+                onClick={() => {
+                  copiarLink();
+                  setMenuCompartilhar(false);
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-carvao hover:bg-zinc-50"
+              >
+                <Link2 size={14} /> Copiar link
+              </button>
+              <a
+                href={`https://wa.me/?text=${encodeURIComponent(`Confira nosso formulário: ${formulario.nome}\n${link}`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setMenuCompartilhar(false)}
+                className="flex items-center gap-2 px-3 py-2 text-sm text-carvao hover:bg-zinc-50"
+              >
+                <MessageCircle size={14} /> Compartilhar pelo WhatsApp
+              </a>
+              {qrCode && (
+                <a
+                  href={qrCode}
+                  download={`raion-qr-${slug(formulario.nome)}.png`}
+                  onClick={() => setMenuCompartilhar(false)}
+                  className="flex items-center gap-2 px-3 py-2 text-sm text-carvao hover:bg-zinc-50"
+                >
+                  <ImageIcon size={14} /> Baixar imagem do QR Code
+                </a>
+              )}
+            </div>
+          )}
+        </div>
         <a
           href={`/configuracoes/captura/${formulario.id}/pdf`}
           target="_blank"
-          rel="noreferrer"
+          rel="noopener noreferrer"
           className="flex flex-col gap-1 rounded-lg border border-zinc-200 px-3 py-2.5 text-left hover:border-dourado"
         >
           <Download size={16} className="text-carvao" />

@@ -30,7 +30,7 @@ export async function GET(_: Request, { params }: RouteContext<"/configuracoes/c
   return new NextResponse(new Uint8Array(buffer), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="captura-${formulario.nome.replace(/[^a-zA-Z0-9]+/g, "-")}.pdf"`,
+      "Content-Disposition": `inline; filename="raion-qr-${formulario.nome.replace(/[^a-zA-Z0-9]+/g, "-").toLowerCase()}.pdf"`,
     },
   });
 }
