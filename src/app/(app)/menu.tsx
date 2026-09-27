@@ -11,6 +11,7 @@ import {
   Radio,
   ShieldCheck,
   Tags,
+  Target,
   UserCog,
   Users,
   UsersRound,
@@ -29,8 +30,10 @@ const ICONES: Record<string, LucideIcon> = {
   "/configuracoes/origens": Radio,
   "/configuracoes/listas": Tags,
   "/configuracoes/calculadora": Calculator,
+  "/configuracoes/metas": Target,
   "/configuracoes/usuarios": UserCog,
   "/configuracoes/equipes": Users,
+  "/gamificacao/metas": Target,
   "/super-admin": ShieldCheck,
 };
 

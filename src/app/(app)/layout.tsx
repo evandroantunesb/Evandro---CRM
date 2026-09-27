@@ -17,6 +17,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
           { href: "/negocios", rotulo: "Negócios" },
           { href: "/tarefas", rotulo: "Tarefas" },
           { href: "/contatos", rotulo: "Contatos" },
+          { href: "/gamificacao/metas", rotulo: "Metas", grupo: "Gamificação" },
         ]
       : []),
     ...(papel === "admin" || papel === "gestor" ? [{ href: "/painel", rotulo: "Painel" }] : []),
@@ -29,6 +30,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
           { href: "/configuracoes/calculadora", rotulo: "Kits e calculadora", grupo: "Configurações" },
           { href: "/configuracoes/propostas", rotulo: "Propostas comerciais", grupo: "Configurações" },
           { href: "/configuracoes/contrato", rotulo: "Modelo de contrato", grupo: "Configurações" },
+          { href: "/configuracoes/metas", rotulo: "Metas", grupo: "Configurações" },
           { href: "/configuracoes/usuarios", rotulo: "Usuários", grupo: "Configurações" },
           { href: "/configuracoes/equipes", rotulo: "Equipes", grupo: "Configurações" },
         ]
