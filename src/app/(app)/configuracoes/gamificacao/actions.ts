@@ -90,3 +90,106 @@ export async function apagarRegra(formData: FormData) {
   await supabase.from("gamification_rules").delete().eq("id", id.data);
   revalidatePath(CAMINHO);
 }
+
+const esquemaNivel = z.object({
+  nivel: z.coerce.number().int().positive(),
+  nome: z.string().trim().max(60).optional().or(z.literal("").transform(() => undefined)),
+  xpMinimo: z.coerce.number().int().min(0),
+});
+
+export async function salvarNivel(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  const { atual } = await exigirPapel("admin");
+  const dados = esquemaNivel.safeParse(Object.fromEntries(formData));
+  if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
+
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase
+    .from("niveis_gamificacao")
+    .upsert(
+      { empresa_id: atual.empresaId, nivel: dados.data.nivel, nome: dados.data.nome ?? null, xp_minimo: dados.data.xpMinimo },
+      { onConflict: "empresa_id,nivel" },
+    );
+  if (error) {
+    return {
+      ok: false,
+      mensagem: error.code === "23505" ? "Já existe um nível com esse XP mínimo." : mensagemErro(error, "Não foi possível salvar o nível."),
+    };
+  }
+
+  revalidatePath(CAMINHO);
+  return { ok: true, mensagem: "Nível salvo." };
+}
+
+export async function apagarNivel(formData: FormData) {
+  const { atual } = await exigirPapel("admin");
+  const nivel = z.coerce.number().int().safeParse(formData.get("nivel"));
+  if (!nivel.success) return;
+
+  const supabase = await criarClienteServidor();
+  await supabase.from("niveis_gamificacao").delete().eq("empresa_id", atual.empresaId).eq("nivel", nivel.data);
+  revalidatePath(CAMINHO);
+}
+
+const esquemaConquista = z.object({
+  nome: z.string().trim().min(2, "Nome muito curto").max(80, "Nome muito longo"),
+  descricao: z.string().trim().max(200).optional().or(z.literal("").transform(() => undefined)),
+  icone: z.string().trim().min(1).max(8).optional().or(z.literal("").transform(() => undefined)),
+  valorPontos: z.coerce.number().int().positive("Informe quantos pontos são necessários."),
+  xpBonus: z.coerce.number().int().min(0).optional().or(z.literal("").transform(() => undefined)),
+});
+
+export async function criarConquista(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  const { atual } = await exigirPapel("admin");
+  const dados = esquemaConquista.safeParse(Object.fromEntries(formData));
+  if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
+
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.from("conquistas").insert({
+    empresa_id: atual.empresaId,
+    nome: dados.data.nome,
+    descricao: dados.data.descricao ?? "",
+    icone: dados.data.icone ?? "🏆",
+    criterio: { metrica: "pontos_acumulados", valor: dados.data.valorPontos },
+    xp_bonus: dados.data.xpBonus ?? 0,
+  });
+  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível criar a conquista.") };
+
+  revalidatePath(CAMINHO);
+  return { ok: true, mensagem: "Conquista criada." };
+}
+
+export async function editarConquista(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  await exigirPapel("admin");
+  const id = z.string().uuid().safeParse(formData.get("id"));
+  const dados = esquemaConquista.safeParse(Object.fromEntries(formData));
+  if (!id.success || !dados.success) {
+    return { ok: false, mensagem: dados.success ? "Dados inválidos." : dados.error.issues[0].message };
+  }
+
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase
+    .from("conquistas")
+    .update({
+      nome: dados.data.nome,
+      descricao: dados.data.descricao ?? "",
+      icone: dados.data.icone ?? "🏆",
+      criterio: { metrica: "pontos_acumulados", valor: dados.data.valorPontos },
+      xp_bonus: dados.data.xpBonus ?? 0,
+      ativa: formData.get("ativa") === "on",
+    })
+    .eq("id", id.data);
+  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível salvar.") };
+
+  revalidatePath(CAMINHO);
+  return { ok: true, mensagem: "Salvo." };
+}
+
+export async function apagarConquista(formData: FormData) {
+  await exigirPapel("admin");
+  const id = z.string().uuid().safeParse(formData.get("id"));
+  if (!id.success) return;
+
+  const supabase = await criarClienteServidor();
+  await supabase.from("conquistas").delete().eq("id", id.data);
+  revalidatePath(CAMINHO);
+}
