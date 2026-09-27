@@ -5,6 +5,7 @@ import {
   Calculator,
   CheckSquare,
   ChevronDown,
+  CircleDollarSign,
   Home,
   KanbanSquare,
   ListTree,
@@ -31,9 +32,11 @@ const ICONES: Record<string, LucideIcon> = {
   "/configuracoes/listas": Tags,
   "/configuracoes/calculadora": Calculator,
   "/configuracoes/metas": Target,
+  "/configuracoes/comissoes": CircleDollarSign,
   "/configuracoes/usuarios": UserCog,
   "/configuracoes/equipes": Users,
   "/gamificacao/metas": Target,
+  "/gamificacao/comissoes": CircleDollarSign,
   "/super-admin": ShieldCheck,
 };
 

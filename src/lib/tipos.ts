@@ -119,3 +119,11 @@ export const UNIDADE_METRICA_META: Record<MetricaMeta, "moeda" | "quantidade" | 
   conversao: "percentual",
   tarefas_concluidas: "quantidade",
 };
+
+export const TIPOS_CALCULO_COMISSAO = ["percentual", "multiplicador"] as const;
+export type TipoCalculoComissao = (typeof TIPOS_CALCULO_COMISSAO)[number];
+
+export const ROTULO_TIPO_CALCULO_COMISSAO: Record<TipoCalculoComissao, string> = {
+  percentual: "Percentual sobre o resultado",
+  multiplicador: "Multiplicador sobre o resultado",
+};
