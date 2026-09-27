@@ -5,9 +5,11 @@ import { LogoRaion } from "@/components/marca";
  * Pôster A4 de captação (mesma composição usada no PDF exportado): peça para o
  * cliente final ler, sem nenhum texto administrativo (nome do formulário, URL, status).
  */
-export function PosterFormulario({ qrCode }: { qrCode: string | null }) {
+export function PosterFormulario({ qrCode, className }: { qrCode: string | null; className?: string }) {
   return (
-    <div className="mx-auto flex aspect-[210/297] w-full max-w-[320px] flex-col items-center bg-offwhite px-6 py-8 text-center">
+    <div
+      className={`mx-auto flex aspect-[210/297] flex-col items-center bg-offwhite px-6 py-8 text-center ${className ?? "w-full max-w-[320px]"}`}
+    >
       <div className="flex w-full justify-center">
         <LogoRaion altura={26} />
       </div>

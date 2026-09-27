@@ -295,24 +295,10 @@ export function CardFormulario({
 
       {modalCelular && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-carvao/80 p-2 sm:p-6"
+          className="fixed inset-0 z-50 flex cursor-pointer items-center justify-center bg-carvao p-4"
           onClick={() => setModalCelular(false)}
         >
-          <div
-            className="relative flex h-full w-full max-w-sm flex-col overflow-hidden rounded-[2rem] border-[8px] border-carvao bg-white shadow-2xl sm:h-[92vh]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mx-auto mb-1 h-4 w-24 shrink-0 rounded-b-lg bg-carvao" />
-            <button
-              type="button"
-              onClick={() => setModalCelular(false)}
-              aria-label="Fechar"
-              className="absolute top-3 right-3 z-10 rounded-full bg-carvao/70 p-1.5 text-offwhite hover:bg-carvao"
-            >
-              <X size={16} />
-            </button>
-            <iframe src={link} title={`Formulário ${formulario.nome}`} className="w-full flex-1 border-0" />
-          </div>
+          <PosterFormulario qrCode={qrCode} className="h-full max-h-full w-auto max-w-full" />
         </div>
       )}
 
