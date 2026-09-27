@@ -4,9 +4,66 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prazoParaIso } from "@/lib/crm";
 import { mensagemErro } from "@/lib/erros";
+import { apagarEvento, criarEvento, obterAccessToken } from "@/lib/google-agenda";
 import { exigirPapel } from "@/lib/sessao";
+import { criarClienteAdmin } from "@/lib/supabase/admin";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { TIPOS_TAREFA, type ResultadoAcao } from "@/lib/tipos";
+
+const DURACAO_EVENTO_MINUTOS = 30;
+
+/** Cria o evento na Agenda do responsável, se ele tiver a conta conectada. Nunca falha a criação da tarefa. */
+async function sincronizarCriacao(
+  supabase: Awaited<ReturnType<typeof criarClienteServidor>>,
+  tarefaId: string,
+  responsavelId: string | null,
+  titulo: string,
+  venceEmIso: string,
+) {
+  if (!responsavelId) return;
+  try {
+    const admin = criarClienteAdmin();
+    const { data: conexao } = await admin
+      .from("google_agenda_conexoes")
+      .select("refresh_token")
+      .eq("membro_id", responsavelId)
+      .maybeSingle();
+    if (!conexao) return;
+
+    const accessToken = await obterAccessToken(conexao.refresh_token);
+    if (!accessToken) return;
+
+    const inicio = new Date(venceEmIso);
+    const fim = new Date(inicio.getTime() + DURACAO_EVENTO_MINUTOS * 60 * 1000);
+    const eventoId = await criarEvento(accessToken, {
+      titulo,
+      inicioIso: inicio.toISOString(),
+      fimIso: fim.toISOString(),
+    });
+    if (eventoId) await supabase.from("tarefas").update({ google_evento_id: eventoId }).eq("id", tarefaId);
+  } catch {
+    // Falha na integração nunca deve impedir a criação da tarefa.
+  }
+}
+
+/** Apaga o evento correspondente na Agenda do responsável, se houver. Best-effort. */
+async function sincronizarExclusao(responsavelId: string | null, eventoId: string | null) {
+  if (!responsavelId || !eventoId) return;
+  try {
+    const admin = criarClienteAdmin();
+    const { data: conexao } = await admin
+      .from("google_agenda_conexoes")
+      .select("refresh_token")
+      .eq("membro_id", responsavelId)
+      .maybeSingle();
+    if (!conexao) return;
+    const accessToken = await obterAccessToken(conexao.refresh_token);
+    if (!accessToken) return;
+    await apagarEvento(accessToken, eventoId);
+  } catch {
+    // Best-effort.
+  }
+}
 
 const esquemaTarefa = z.object({
   negocioId: z
@@ -38,16 +95,24 @@ export async function criarTarefa(_: ResultadoAcao, formData: FormData): Promise
   const d = dados.data;
 
   const supabase = await criarClienteServidor();
-  const { error } = await supabase.from("tarefas").insert({
-    empresa_id: atual.empresaId,
-    negocio_id: d.negocioId,
-    titulo: d.titulo,
-    tipo: d.tipo,
-    vence_em: prazoParaIso(d.vence_em),
-    // Vendedor sempre cria para si; o banco confere quem pode atribuir para quem.
-    responsavel_id: atual.papel === "vendedor" ? atual.membroId : (d.responsavel_id ?? atual.membroId),
-  });
+  const venceEmIso = prazoParaIso(d.vence_em);
+  // Vendedor sempre cria para si; o banco confere quem pode atribuir para quem.
+  const responsavelId = atual.papel === "vendedor" ? atual.membroId : (d.responsavel_id ?? atual.membroId);
+  const { data: tarefa, error } = await supabase
+    .from("tarefas")
+    .insert({
+      empresa_id: atual.empresaId,
+      negocio_id: d.negocioId,
+      titulo: d.titulo,
+      tipo: d.tipo,
+      vence_em: venceEmIso,
+      responsavel_id: responsavelId,
+    })
+    .select("id")
+    .single();
   if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível criar a tarefa.") };
+
+  await sincronizarCriacao(supabase, tarefa.id, responsavelId, d.titulo, venceEmIso);
 
   atualizarTelas(d.negocioId);
   return { ok: true, mensagem: "Tarefa criada." };
@@ -75,6 +140,12 @@ export async function apagarTarefa(formData: FormData) {
   const id = z.string().uuid().safeParse(formData.get("tarefaId"));
   if (!id.success) return;
   const supabase = await criarClienteServidor();
-  const { data } = await supabase.from("tarefas").delete().eq("id", id.data).select("negocio_id");
-  atualizarTelas(data?.[0]?.negocio_id ?? null);
+  const { data } = await supabase
+    .from("tarefas")
+    .delete()
+    .eq("id", id.data)
+    .select("negocio_id, responsavel_id, google_evento_id");
+  const tarefa = data?.[0];
+  atualizarTelas(tarefa?.negocio_id ?? null);
+  await sincronizarExclusao(tarefa?.responsavel_id ?? null, tarefa?.google_evento_id ?? null);
 }
