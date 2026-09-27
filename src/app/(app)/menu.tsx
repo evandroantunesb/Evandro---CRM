@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Award,
   Building2,
   Calculator,
   CheckSquare,
@@ -11,6 +12,7 @@ import {
   ListTree,
   Radio,
   ShieldCheck,
+  Star,
   Tags,
   Target,
   UserCog,
@@ -31,10 +33,12 @@ const ICONES: Record<string, LucideIcon> = {
   "/configuracoes/origens": Radio,
   "/configuracoes/listas": Tags,
   "/configuracoes/calculadora": Calculator,
+  "/configuracoes/gamificacao": Award,
   "/configuracoes/metas": Target,
   "/configuracoes/comissoes": CircleDollarSign,
   "/configuracoes/usuarios": UserCog,
   "/configuracoes/equipes": Users,
+  "/gamificacao/extrato": Star,
   "/gamificacao/metas": Target,
   "/gamificacao/comissoes": CircleDollarSign,
   "/super-admin": ShieldCheck,
