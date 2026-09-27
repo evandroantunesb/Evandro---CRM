@@ -2,8 +2,11 @@ import { notFound } from "next/navigation";
 import { LogoRaion } from "@/components/marca";
 import { Cartao } from "@/components/ui";
 import { formatarMoeda } from "@/lib/formatacao";
+import { montarDadosSistemaProposta } from "@/lib/propostas/pdf-dados";
+import type { BlocoRenderizavel, IdentidadeProposta } from "@/lib/propostas/pdf-tipos";
 import { criarClienteAdmin } from "@/lib/supabase/admin";
 import { ROTULO_TIPO_LIGACAO, type ModoPreco, type TipoLigacao } from "@/lib/tipos";
+import { ModeloPaginaBlocos } from "./pagina-blocos";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +17,9 @@ export default async function PropostaPublica({ params }: PageProps<"/proposta/[
 
   const { data: proposta } = await admin
     .from("propostas")
-    .select("id, negocio_id, modo_preco, mensagem, negocios(titulo, contatos(nome, endereco, cidade, uf))")
+    .select(
+      "id, empresa_id, negocio_id, modo_preco, mensagem, modelo_id, capa_variante, blocos_emitidos, negocios(titulo, contatos(nome, endereco, cidade, uf))",
+    )
     .eq("token", token)
     .maybeSingle();
   if (!proposta) notFound();
@@ -39,6 +44,72 @@ export default async function PropostaPublica({ params }: PageProps<"/proposta/[
   if (!calculo || !contato) notFound();
 
   const modoPreco = proposta.modo_preco as ModoPreco;
+
+  // Proposta emitida com um modelo do construtor: mostra os mesmos blocos
+  // configurados (igual ao PDF novo). Sem modelo (proposta antiga, ou
+  // empresa que ainda não montou nenhum modelo): mantém o layout fixo de sempre.
+  if (proposta.modelo_id && proposta.blocos_emitidos && proposta.capa_variante) {
+    const [{ data: componentesData }, { data: identidadeData }] = await Promise.all([
+      admin.from("kit_componentes").select("tipo, descricao, potencia_w, quantidade").eq("negocio_id", proposta.negocio_id).order("ordem"),
+      admin.from("proposta_identidades").select("nome_exibicao, cor_primaria, cor_destaque, whatsapp, rodape_texto").eq("empresa_id", proposta.empresa_id).maybeSingle(),
+    ]);
+
+    const dados = montarDadosSistemaProposta({ contato, calculo, modoPreco, componentes: componentesData ?? [] });
+
+    const blocosEmitidos = proposta.blocos_emitidos as unknown as {
+      tipo: string;
+      ordem: number;
+      ativo: boolean;
+      quebra_pagina: "auto" | "nova_pagina" | "pagina_exclusiva";
+      config: unknown;
+    }[];
+    const blocos: BlocoRenderizavel[] = blocosEmitidos.map((b) => ({
+      tipo: b.tipo as BlocoRenderizavel["tipo"],
+      ordem: b.ordem,
+      ativo: b.ativo,
+      quebraPagina: b.quebra_pagina,
+      config: b.config,
+    }));
+    const identidade: IdentidadeProposta = {
+      nomeExibicao: identidadeData?.nome_exibicao ?? "",
+      corPrimaria: identidadeData?.cor_primaria ?? "",
+      corDestaque: identidadeData?.cor_destaque ?? "",
+      whatsapp: identidadeData?.whatsapp ?? "",
+      rodapeTexto: identidadeData?.rodape_texto ?? "",
+      logoUrl: null,
+      logoEscuroUrl: null,
+      fotoCapaUrl: null,
+    };
+
+    return (
+      <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-6 px-6 py-10">
+        <LogoRaion altura={32} />
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-medium tracking-[0.3em] text-zinc-500 uppercase">Proposta de energia solar</p>
+            <h1 className="mt-1 text-2xl font-semibold text-carvao">{contato.nome}</h1>
+            {(contato.endereco || contato.cidade) && (
+              <p className="text-sm text-zinc-600">{[contato.endereco, contato.cidade, contato.uf].filter(Boolean).join(" · ")}</p>
+            )}
+          </div>
+          <a
+            href={`/proposta/${token}/pdf`}
+            target="_blank"
+            rel="noreferrer"
+            className="shrink-0 rounded-lg border border-zinc-300 px-3 py-2 text-sm font-medium text-carvao hover:border-dourado"
+          >
+            Baixar PDF
+          </a>
+        </div>
+
+        {proposta.mensagem && <p className="text-sm whitespace-pre-wrap text-zinc-700">{proposta.mensagem}</p>}
+
+        <ModeloPaginaBlocos blocos={blocos} identidade={identidade} dados={dados} />
+
+        {identidade.rodapeTexto && <p className="text-xs text-zinc-400">{identidade.rodapeTexto}</p>}
+      </main>
+    );
+  }
 
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-6 px-6 py-10">
