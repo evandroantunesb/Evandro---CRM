@@ -6,6 +6,7 @@ import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
 import { salvarKitPersonalizado } from "@/lib/acoes/calculadora";
 import {
   calcular,
+  custosInternosEstimados,
   DISPONIBILIDADE_PADRAO_CAMEL,
   potenciaKitPersonalizadoKwp,
   sugerirQuantidadeModulos,
@@ -38,6 +39,10 @@ type Parametros = {
   disponibilidadeMonoKwh: number;
   disponibilidadeBiKwh: number;
   disponibilidadeTriKwh: number;
+  custoInstalacaoPorModulo: number;
+  custoMaterialCaPorKwp: number;
+  custoEngenharia: number;
+  comissaoPercentual: number;
 };
 
 function numeroBr(v: number) {
@@ -55,6 +60,9 @@ export function KitPersonalizado({
   negocioId,
   negocioValor,
   estruturaTelhado,
+  padraoCliente,
+  consumoMedioKwhPadrao,
+  valorFaturaMedioPadrao,
   componentesSalvos,
   calculo,
   parametros,
@@ -62,6 +70,9 @@ export function KitPersonalizado({
   negocioId: string;
   negocioValor: number | null;
   estruturaTelhado: string | null;
+  padraoCliente: string | null;
+  consumoMedioKwhPadrao: number | null;
+  valorFaturaMedioPadrao: number | null;
   componentesSalvos: ComponenteSalvo[];
   calculo: CalculoSalvo | null;
   parametros: Parametros | null;
@@ -85,8 +96,13 @@ export function KitPersonalizado({
   );
   const [estrutura, setEstrutura] = useState(estruturaTelhado ?? "");
   const [tipoLigacao, setTipoLigacao] = useState<TipoLigacao>(calculo?.tipoLigacao ?? "trifasico");
-  const [consumoMedioKwh, setConsumoMedioKwh] = useState(calculo ? numeroBr(calculo.consumoMedioKwh) : "");
-  const [valorFaturaMedio, setValorFaturaMedio] = useState("");
+  const [consumoMedioKwh, setConsumoMedioKwh] = useState(() => {
+    if (calculo) return numeroBr(calculo.consumoMedioKwh);
+    return consumoMedioKwhPadrao != null ? numeroBr(consumoMedioKwhPadrao) : "";
+  });
+  const [valorFaturaMedio, setValorFaturaMedio] = useState(() =>
+    !calculo && valorFaturaMedioPadrao != null ? numeroBr(valorFaturaMedioPadrao) : "",
+  );
   const [tarifaKwh, setTarifaKwh] = useState(calculo ? numeroBr(calculo.tarifaKwh) : "");
 
   const componentes = useMemo(() => linhasParaComponentes(linhas), [linhas]);
@@ -109,6 +125,20 @@ export function KitPersonalizado({
     return (potenciaW: number) =>
       sugerirQuantidadeModulos(consumoMedioEstimado, parametros.produtividadeKwhKwpMes, potenciaW);
   }, [parametros, consumoMedioEstimado]);
+
+  // Preço de referência (teste) do catálogo + custos internos configurados —
+  // só informativo aqui, já que o valor do negócio é editado em "Dados do negócio".
+  const precoSugerido = useMemo(() => {
+    if (!parametros) return null;
+    const somaComponentes = linhas.reduce((acc, l) => {
+      const precoUnitario = l.precoEstimadoUnitario ? Number(l.precoEstimadoUnitario) : NaN;
+      const quantidade = Number(l.quantidade) || 0;
+      return Number.isFinite(precoUnitario) ? acc + precoUnitario * quantidade : acc;
+    }, 0);
+    if (somaComponentes <= 0) return null;
+    const quantidadeModulos = componentes.filter((c) => c.tipo === "modulo").reduce((acc, c) => acc + c.quantidade, 0);
+    return custosInternosEstimados(somaComponentes, quantidadeModulos, potenciaKwp, parametros).total;
+  }, [linhas, componentes, potenciaKwp, parametros]);
 
   const previa = useMemo(() => {
     if (!parametros) return null;
@@ -136,6 +166,11 @@ export function KitPersonalizado({
   if (calculo && !editando) {
     return (
       <div className="flex flex-col gap-3">
+        {!padraoCliente && (
+          <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            Favor adicionar o padrão atual do cliente (em &quot;Dados do negócio&quot;) para conferir compatibilidade com o kit.
+          </p>
+        )}
         <dl className="grid grid-cols-2 gap-3 text-sm">
           <div>
             <dt className="text-zinc-500">Kit</dt>
@@ -193,7 +228,18 @@ export function KitPersonalizado({
     <form action={acao} className="flex flex-col gap-3">
       <input type="hidden" name="negocioId" value={negocioId} />
       <input type="hidden" name="componentes" value={JSON.stringify(componentes)} />
+      {!padraoCliente && (
+        <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          Favor adicionar o padrão atual do cliente (em &quot;Dados do negócio&quot;) para conferir compatibilidade com o kit.
+        </p>
+      )}
       <EditorComponentesKit linhas={linhas} onChange={setLinhas} sugerirQuantidadeModulo={sugerirQuantidadeModulo} />
+      {precoSugerido != null && (
+        <p className="-mt-1 text-xs text-zinc-400">
+          Preço sugerido (catálogo + custos internos, estimativa de teste): {formatarMoeda(precoSugerido)} — ajuste em
+          &ldquo;Dados do negócio&rdquo; se quiser usar.
+        </p>
+      )}
       <Campo
         rotulo="Estrutura do telhado"
         name="estruturaTelhado"
