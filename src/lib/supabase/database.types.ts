@@ -1067,6 +1067,7 @@ export type Database = {
       }
       negocios: {
         Row: {
+          consumo_medio_kwh: number | null
           contato_id: string
           created_at: string
           criado_por: string | null
@@ -1093,6 +1094,7 @@ export type Database = {
           valor_conta_energia: number | null
         }
         Insert: {
+          consumo_medio_kwh?: number | null
           contato_id: string
           created_at?: string
           criado_por?: string | null
@@ -1119,6 +1121,7 @@ export type Database = {
           valor_conta_energia?: number | null
         }
         Update: {
+          consumo_medio_kwh?: number | null
           contato_id?: string
           created_at?: string
           criado_por?: string | null

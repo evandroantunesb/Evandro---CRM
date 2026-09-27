@@ -55,6 +55,9 @@ export function KitPersonalizado({
   negocioId,
   negocioValor,
   estruturaTelhado,
+  padraoCliente,
+  consumoMedioKwhPadrao,
+  valorFaturaMedioPadrao,
   componentesSalvos,
   calculo,
   parametros,
@@ -62,6 +65,9 @@ export function KitPersonalizado({
   negocioId: string;
   negocioValor: number | null;
   estruturaTelhado: string | null;
+  padraoCliente: string | null;
+  consumoMedioKwhPadrao: number | null;
+  valorFaturaMedioPadrao: number | null;
   componentesSalvos: ComponenteSalvo[];
   calculo: CalculoSalvo | null;
   parametros: Parametros | null;
@@ -85,8 +91,13 @@ export function KitPersonalizado({
   );
   const [estrutura, setEstrutura] = useState(estruturaTelhado ?? "");
   const [tipoLigacao, setTipoLigacao] = useState<TipoLigacao>(calculo?.tipoLigacao ?? "trifasico");
-  const [consumoMedioKwh, setConsumoMedioKwh] = useState(calculo ? numeroBr(calculo.consumoMedioKwh) : "");
-  const [valorFaturaMedio, setValorFaturaMedio] = useState("");
+  const [consumoMedioKwh, setConsumoMedioKwh] = useState(() => {
+    if (calculo) return numeroBr(calculo.consumoMedioKwh);
+    return consumoMedioKwhPadrao != null ? numeroBr(consumoMedioKwhPadrao) : "";
+  });
+  const [valorFaturaMedio, setValorFaturaMedio] = useState(() =>
+    !calculo && valorFaturaMedioPadrao != null ? numeroBr(valorFaturaMedioPadrao) : "",
+  );
   const [tarifaKwh, setTarifaKwh] = useState(calculo ? numeroBr(calculo.tarifaKwh) : "");
 
   const componentes = useMemo(() => linhasParaComponentes(linhas), [linhas]);
@@ -136,6 +147,11 @@ export function KitPersonalizado({
   if (calculo && !editando) {
     return (
       <div className="flex flex-col gap-3">
+        {!padraoCliente && (
+          <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            Favor adicionar o padrão atual do cliente (em &quot;Dados do negócio&quot;) para conferir compatibilidade com o kit.
+          </p>
+        )}
         <dl className="grid grid-cols-2 gap-3 text-sm">
           <div>
             <dt className="text-zinc-500">Kit</dt>
@@ -193,6 +209,11 @@ export function KitPersonalizado({
     <form action={acao} className="flex flex-col gap-3">
       <input type="hidden" name="negocioId" value={negocioId} />
       <input type="hidden" name="componentes" value={JSON.stringify(componentes)} />
+      {!padraoCliente && (
+        <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          Favor adicionar o padrão atual do cliente (em &quot;Dados do negócio&quot;) para conferir compatibilidade com o kit.
+        </p>
+      )}
       <EditorComponentesKit linhas={linhas} onChange={setLinhas} sugerirQuantidadeModulo={sugerirQuantidadeModulo} />
       <Campo
         rotulo="Estrutura do telhado"
