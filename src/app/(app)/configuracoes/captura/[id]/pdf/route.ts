@@ -23,9 +23,9 @@ export async function GET(_: Request, { params }: RouteContext<"/configuracoes/c
   if (!formulario) return new NextResponse("Formulário não encontrado.", { status: 404 });
 
   const link = `${env.siteUrl}/captura/${formulario.token}`;
-  const qrCode = await QRCode.toDataURL(link, { margin: 1, width: 440 });
+  const qrCode = await QRCode.toDataURL(link, { margin: 4, width: 440, errorCorrectionLevel: "M" });
 
-  const buffer = await renderToBuffer(CapturaPdfDocument({ nome: formulario.nome, link, qrCode }));
+  const buffer = await renderToBuffer(CapturaPdfDocument({ nome: formulario.nome, qrCode }));
 
   return new NextResponse(new Uint8Array(buffer), {
     headers: {

@@ -1,9 +1,10 @@
 "use client";
 
-import { CheckCircle2, Download, ExternalLink, Image as ImageIcon, Link2, MessageCircle, Share2, Smartphone, Users, XCircle } from "lucide-react";
+import { CheckCircle2, Download, ExternalLink, Image as ImageIcon, Link2, MessageCircle, Share2, Smartphone, Users, X, XCircle } from "lucide-react";
 import { useActionState, useState } from "react";
 import { Mensagem } from "@/components/ui";
 import { alternarFormulario } from "./actions";
+import { PosterFormulario } from "./poster-formulario";
 
 type Formulario = { id: string; nome: string; funil: string; origem: string; ativo: boolean };
 
@@ -27,6 +28,7 @@ export function CardFormulario({
   const [resultado, acao, pendente] = useActionState(alternarFormulario, null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [menuCompartilhar, setMenuCompartilhar] = useState(false);
+  const [modalPoster, setModalPoster] = useState(false);
 
   function avisar(texto: string) {
     setAviso(texto);
@@ -194,19 +196,51 @@ export function CardFormulario({
             </div>
           )}
         </div>
-        <a
-          href={`/configuracoes/captura/${formulario.id}/pdf`}
-          target="_blank"
-          rel="noopener noreferrer"
+        <button
+          type="button"
+          onClick={() => setModalPoster(true)}
           className="flex flex-col gap-1 rounded-lg border border-zinc-200 px-3 py-2.5 text-left hover:border-dourado"
         >
           <Download size={16} className="text-carvao" />
           <span className="text-xs font-semibold text-carvao">Baixar PDF</span>
           <span className="text-[11px] text-zinc-500">Exporte o QR Code para impressão</span>
-        </a>
+        </button>
       </div>
       {aviso && <p className="text-xs text-green-700">{aviso}</p>}
       {resultado && !resultado.ok && <Mensagem resultado={resultado} />}
+
+      {modalPoster && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-carvao/70 p-4"
+          onClick={() => setModalPoster(false)}
+        >
+          <div
+            className="flex max-h-full w-full max-w-sm flex-col gap-4 rounded-xl bg-white p-4 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-zinc-900">Pôster para captação</p>
+              <button type="button" onClick={() => setModalPoster(false)} aria-label="Fechar" className="text-zinc-400 hover:text-carvao">
+                <X size={18} />
+              </button>
+            </div>
+            <p className="text-xs text-zinc-500">
+              Pronto pra mostrar na tela do celular ou baixar em PDF pra imprimir e expor em feiras e balcões.
+            </p>
+            <div className="overflow-auto rounded-lg bg-zinc-100 p-4">
+              <PosterFormulario qrCode={qrCode} />
+            </div>
+            <a
+              href={`/configuracoes/captura/${formulario.id}/pdf`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 rounded-lg bg-carvao px-4 py-2.5 text-sm font-medium text-offwhite hover:bg-zinc-800"
+            >
+              <Download size={16} /> Baixar PDF
+            </a>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

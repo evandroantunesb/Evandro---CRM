@@ -26,7 +26,7 @@ export default async function ConfigCaptura() {
       const link = `${env.siteUrl}/captura/${f.token}`;
       let qrCode: string | null = null;
       try {
-        qrCode = await QRCode.toDataURL(link, { margin: 1, width: 224 });
+        qrCode = await QRCode.toDataURL(link, { margin: 4, width: 224, errorCorrectionLevel: "M" });
       } catch (erro) {
         // O link funciona sem o QR Code — não vale derrubar a página inteira por isso.
         console.error("Falha ao gerar QR Code do formulário", f.id, erro);
