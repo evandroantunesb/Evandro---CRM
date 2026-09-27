@@ -10,6 +10,7 @@ import {
   Gift,
   Home,
   KanbanSquare,
+  LayoutDashboard,
   ListTree,
   Radio,
   Rocket,
@@ -42,6 +43,7 @@ const ICONES: Record<string, LucideIcon> = {
   "/configuracoes/resgates": Gift,
   "/configuracoes/usuarios": UserCog,
   "/configuracoes/equipes": Users,
+  "/gamificacao": LayoutDashboard,
   "/gamificacao/jornada": Rocket,
   "/gamificacao/ranking": Trophy,
   "/gamificacao/loja": Gift,
@@ -72,7 +74,11 @@ function ItemMenu({ item, ativo }: { item: Item; ativo: boolean }) {
 export function Menu({ itens }: { itens: Item[] }) {
   const caminho = usePathname();
   const [grupoAberto, setGrupoAberto] = useState<string | null>(null);
-  const ehAtivo = (href: string) => caminho === href || caminho.startsWith(`${href}/`);
+  // Prefixo mais específico vence: evita que uma rota "pai" (ex.: /gamificacao)
+  // fique marcada como ativa junto com uma rota "filha" mais específica.
+  const correspondentes = itens.filter((i) => caminho === i.href || caminho.startsWith(`${i.href}/`));
+  const hrefAtivo = correspondentes.sort((a, b) => b.href.length - a.href.length)[0]?.href;
+  const ehAtivo = (href: string) => href === hrefAtivo;
 
   // No celular, agrupa os itens que têm "grupo" atrás de um botão expansível,
   // em vez de espalhar tudo numa única faixa horizontal.

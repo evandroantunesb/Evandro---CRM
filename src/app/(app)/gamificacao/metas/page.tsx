@@ -1,9 +1,9 @@
 import { Cartao, Selo } from "@/components/ui";
 import { carregarConfiguracao } from "@/lib/crm";
 import { formatarMoeda } from "@/lib/formatacao";
-import { calcularProgresso, limitesPeriodo, type Meta } from "@/lib/metas";
+import { calcularProgresso, calcularRealizado, type Meta } from "@/lib/metas";
 import { exigirPapel } from "@/lib/sessao";
-import { criarClienteServidor, type SupabaseServidor } from "@/lib/supabase/server";
+import { criarClienteServidor } from "@/lib/supabase/server";
 import { ROTULO_METRICA_META, UNIDADE_METRICA_META, type MetricaMeta } from "@/lib/tipos";
 
 function formatarValor(unidade: "moeda" | "quantidade" | "percentual", valor: number) {
@@ -14,50 +14,6 @@ function formatarValor(unidade: "moeda" | "quantidade" | "percentual", valor: nu
 
 function formatarData(isoData: string) {
   return new Date(`${isoData}T00:00:00Z`).toLocaleDateString("pt-BR", { timeZone: "UTC" });
-}
-
-/** Realizado de uma meta: consulta negócios/tarefas do colaborador no período, respeitando o RLS de sempre. */
-async function calcularRealizado(supabase: SupabaseServidor, meta: Meta) {
-  const { inicioIso, fimExclusivoIso } = limitesPeriodo(meta.periodoInicio, meta.periodoFim);
-
-  if (meta.metrica === "receita" || meta.metrica === "negocios_ganhos") {
-    const { data } = await supabase
-      .from("negocios")
-      .select("valor")
-      .eq("responsavel_id", meta.membroId)
-      .eq("status", "ganho")
-      .gte("fechado_em", inicioIso)
-      .lt("fechado_em", fimExclusivoIso)
-      .limit(10000);
-    const linhas = data ?? [];
-    return meta.metrica === "receita" ? linhas.reduce((soma, n) => soma + (n.valor ?? 0), 0) : linhas.length;
-  }
-
-  if (meta.metrica === "conversao") {
-    const { data } = await supabase
-      .from("negocios")
-      .select("status")
-      .eq("responsavel_id", meta.membroId)
-      .in("status", ["ganho", "perdido"])
-      .gte("fechado_em", inicioIso)
-      .lt("fechado_em", fimExclusivoIso)
-      .limit(10000);
-    const linhas = data ?? [];
-    const ganhos = linhas.filter((n) => n.status === "ganho").length;
-    return linhas.length > 0 ? (ganhos / linhas.length) * 100 : 0;
-  }
-
-  // reunioes | tarefas_concluidas
-  let consulta = supabase
-    .from("tarefas")
-    .select("id", { count: "exact", head: true })
-    .eq("responsavel_id", meta.membroId)
-    .not("concluida_em", "is", null)
-    .gte("concluida_em", inicioIso)
-    .lt("concluida_em", fimExclusivoIso);
-  if (meta.metrica === "reunioes") consulta = consulta.eq("tipo", "reuniao");
-  const { count } = await consulta;
-  return count ?? 0;
 }
 
 export default async function MinhasMetas() {
