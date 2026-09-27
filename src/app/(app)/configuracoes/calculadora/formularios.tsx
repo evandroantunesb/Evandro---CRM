@@ -71,6 +71,10 @@ export function FormularioParametros({
     disponibilidadeMonoKwh: number;
     disponibilidadeBiKwh: number;
     disponibilidadeTriKwh: number;
+    custoInstalacaoPorModulo: number;
+    custoMaterialCaPorKwp: number;
+    custoEngenharia: number;
+    comissaoPercentual: number;
   };
 }) {
   const [resultado, acao, pendente] = useActionState(editarParametros, null);
@@ -111,6 +115,41 @@ export function FormularioParametros({
           inputMode="decimal"
           defaultValue={String(parametros.disponibilidadeTriKwh).replace(".", ",")}
           required
+        />
+      </div>
+      <p className="mt-2 text-sm font-medium text-zinc-700">Custos internos (opcional)</p>
+      <p className="-mt-2 text-xs text-zinc-500">
+        Somados automaticamente ao preço sugerido do negócio junto com o preço estimado dos componentes do catálogo —
+        o vendedor continua livre pra editar o valor final.
+      </p>
+      <div className="grid grid-cols-2 gap-2">
+        <Campo
+          rotulo="Instalação por módulo (R$)"
+          name="custo_instalacao_por_modulo"
+          inputMode="decimal"
+          defaultValue={String(parametros.custoInstalacaoPorModulo).replace(".", ",")}
+          placeholder="0"
+        />
+        <Campo
+          rotulo="Material CA por kWp (R$)"
+          name="custo_material_ca_por_kwp"
+          inputMode="decimal"
+          defaultValue={String(parametros.custoMaterialCaPorKwp).replace(".", ",")}
+          placeholder="0"
+        />
+        <Campo
+          rotulo="Engenharia (R$, fixo por projeto)"
+          name="custo_engenharia"
+          inputMode="decimal"
+          defaultValue={String(parametros.custoEngenharia).replace(".", ",")}
+          placeholder="0"
+        />
+        <Campo
+          rotulo="Comissão (% sobre o subtotal)"
+          name="comissao_percentual"
+          inputMode="decimal"
+          defaultValue={String(parametros.comissaoPercentual * 100).replace(".", ",")}
+          placeholder="0"
         />
       </div>
       <Botao type="submit" disabled={pendente} className="self-start">

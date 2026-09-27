@@ -263,6 +263,14 @@ export async function editarParametros(_: ResultadoAcao, formData: FormData): Pr
     .trim()
     .transform((v) => Number(v.replace(",", ".")) / 100)
     .pipe(z.number().min(0, "Percentual inválido").max(1, "Percentual inválido"));
+  const custoOpcional = z
+    .string()
+    .optional()
+    .transform((v) => {
+      if (!v || !v.trim()) return 0;
+      return Number(v.includes(",") ? v.replace(/\./g, "").replace(",", ".") : v);
+    })
+    .pipe(z.number({ message: "Custo inválido" }).nonnegative("Custo inválido"));
   const dados = z
     .object({
       produtividade_kwh_kwp_mes: numeroBr("Informe a produtividade"),
@@ -270,6 +278,10 @@ export async function editarParametros(_: ResultadoAcao, formData: FormData): Pr
       disponibilidade_mono_kwh: numeroBr("Informe a disponibilidade monofásica"),
       disponibilidade_bi_kwh: numeroBr("Informe a disponibilidade bifásica"),
       disponibilidade_tri_kwh: numeroBr("Informe a disponibilidade trifásica"),
+      custo_instalacao_por_modulo: custoOpcional,
+      custo_material_ca_por_kwp: custoOpcional,
+      custo_engenharia: custoOpcional,
+      comissao_percentual: percentual,
     })
     .safeParse(Object.fromEntries(formData));
   if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };

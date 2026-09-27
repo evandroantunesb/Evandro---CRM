@@ -12,7 +12,16 @@ import { env } from "@/lib/env";
 import { descreverAtividade } from "@/lib/linha-do-tempo";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { ROTULO_CATEGORIA_ANEXO, type CategoriaAnexo, type ModoPreco, type TipoComponenteKit, type TipoLigacao, type TipoTarefa } from "@/lib/tipos";
+import {
+  ROTULO_CATEGORIA_ANEXO,
+  type CategoriaAnexo,
+  type ModoPreco,
+  type StatusContrato,
+  type TipoComponenteKit,
+  type TipoLigacao,
+  type TipoTarefa,
+} from "@/lib/tipos";
+import { Contrato } from "./contrato";
 import { EdicaoNegocio } from "./edicao";
 import { EnviarAnexo } from "./enviar-anexo";
 import { Fechamento } from "./fechamento";
@@ -34,7 +43,7 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
     supabase
       .from("negocios")
       .select(
-        "id, numero, titulo, valor, descricao, status, funil_id, etapa_id, origem_id, responsavel_id, motivo_perda_id, motivo_perda_detalhe, fechado_em, created_at, updated_at, tipo_telhado, unidade_consumidora, padrao_cliente, estrutura_telhado, contatos(id, nome, tipo, telefone, email, cidade, uf)",
+        "id, numero, titulo, valor, descricao, status, funil_id, etapa_id, origem_id, responsavel_id, motivo_perda_id, motivo_perda_detalhe, fechado_em, created_at, updated_at, tipo_telhado, unidade_consumidora, padrao_cliente, estrutura_telhado, consumo_medio_kwh, valor_conta_energia, contatos(id, nome, tipo, telefone, email, cidade, uf)",
       )
       .eq("id", id)
       .maybeSingle(),
@@ -85,7 +94,7 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
 
   const { data: proposta } = await supabase
     .from("propostas")
-    .select("id, token, modo_preco")
+    .select("id, token, modo_preco, mostrar_sistema, mostrar_economia")
     .eq("negocio_id", id)
     .maybeSingle();
   const { data: modelosProposta } = proposta
@@ -98,6 +107,12 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
         .eq("proposta_id", proposta.id)
         .order("aberta_em", { ascending: false })
     : { data: null };
+
+  const { data: contrato } = await supabase
+    .from("contratos")
+    .select("token, status")
+    .eq("negocio_id", id)
+    .maybeSingle();
 
   const contato = negocio.contatos as unknown as {
     id: string;
@@ -198,6 +213,8 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
                 tipoTelhado: negocio.tipo_telhado,
                 unidadeConsumidora: negocio.unidade_consumidora,
                 padraoCliente: negocio.padrao_cliente,
+                consumoMedioKwh: negocio.consumo_medio_kwh,
+                valorContaEnergia: negocio.valor_conta_energia,
               }}
               etapas={config.etapas.filter(
                 (e) => e.funilId === negocio.funil_id && (e.ativa || e.id === negocio.etapa_id),
@@ -211,6 +228,9 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
               negocioId={negocio.id}
               negocioValor={negocio.valor}
               estruturaTelhado={negocio.estrutura_telhado}
+              padraoCliente={negocio.padrao_cliente}
+              consumoMedioKwhPadrao={negocio.consumo_medio_kwh}
+              valorFaturaMedioPadrao={negocio.valor_conta_energia}
               componentesSalvos={(componentes ?? []).map((c) => ({
                 tipo: c.tipo as TipoComponenteKit,
                 descricao: c.descricao,
@@ -225,6 +245,10 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
                       disponibilidadeMonoKwh: parametros.disponibilidade_mono_kwh,
                       disponibilidadeBiKwh: parametros.disponibilidade_bi_kwh,
                       disponibilidadeTriKwh: parametros.disponibilidade_tri_kwh,
+                      custoInstalacaoPorModulo: parametros.custo_instalacao_por_modulo,
+                      custoMaterialCaPorKwp: parametros.custo_material_ca_por_kwp,
+                      custoEngenharia: parametros.custo_engenharia,
+                      comissaoPercentual: parametros.comissao_percentual,
                     }
                   : null
               }
@@ -256,11 +280,20 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
                   ? {
                       token: proposta.token,
                       modoPreco: proposta.modo_preco as ModoPreco,
+                      mostrarSistema: proposta.mostrar_sistema,
+                      mostrarEconomia: proposta.mostrar_economia,
                       aberturas: aberturas?.length ?? 0,
                       ultimaAbertura: aberturas?.[0]?.aberta_em ?? null,
                     }
                   : null
               }
+            />
+          </Cartao>
+          <Cartao titulo="Contrato">
+            <Contrato
+              negocioId={negocio.id}
+              siteUrl={env.siteUrl}
+              contrato={contrato ? { token: contrato.token, status: contrato.status as StatusContrato } : null}
             />
           </Cartao>
           <Cartao titulo="Tarefas">

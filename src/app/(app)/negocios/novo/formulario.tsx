@@ -1,11 +1,13 @@
 "use client";
 
 import { useActionState, useMemo, useState, useTransition } from "react";
+import { CampoArquivo } from "@/components/campo-arquivo";
 import { EditorComponentesKit, linhasParaComponentes, type LinhaComponente } from "@/components/kit-componentes";
 import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
 import { buscarContatos, criarNegocio, verificarDuplicado, type Duplicado } from "@/lib/acoes/negocios";
 import {
   calcular,
+  custosInternosEstimados,
   DISPONIBILIDADE_PADRAO_CAMEL,
   potenciaKitPersonalizadoKwp,
   sugerirQuantidadeModulos,
@@ -21,6 +23,10 @@ type Parametros = {
   disponibilidadeMonoKwh: number;
   disponibilidadeBiKwh: number;
   disponibilidadeTriKwh: number;
+  custoInstalacaoPorModulo: number;
+  custoMaterialCaPorKwp: number;
+  custoEngenharia: number;
+  comissaoPercentual: number;
 };
 
 /** Aceita "450", "450,5" e "1.234,56"; string vazia ou inválida vira null. */
@@ -70,16 +76,21 @@ export function FormularioNegocio({
   const componentes = useMemo(() => linhasParaComponentes(linhas), [linhas]);
   const potenciaKwp = potenciaKitPersonalizadoKwp(componentes);
 
-  // Soma dos preços de referência (teste) vindos do catálogo, só pra sugerir
-  // um valor de negócio enquanto não há planilha/distribuidor real.
+  // Soma dos preços de referência (teste) vindos do catálogo, mais os custos
+  // internos configurados (instalação, material CA, engenharia, comissão),
+  // só pra sugerir um valor de negócio enquanto não há planilha/distribuidor real.
   const precoSugerido = useMemo(() => {
-    const soma = linhas.reduce((acc, l) => {
+    const somaComponentes = linhas.reduce((acc, l) => {
       const precoUnitario = l.precoEstimadoUnitario ? Number(l.precoEstimadoUnitario) : NaN;
       const quantidade = Number(l.quantidade) || 0;
       return Number.isFinite(precoUnitario) ? acc + precoUnitario * quantidade : acc;
     }, 0);
-    return soma > 0 ? Math.round(soma) : null;
-  }, [linhas]);
+    if (somaComponentes <= 0) return null;
+    if (!parametros) return Math.round(somaComponentes);
+    const quantidadeModulos = componentes.filter((c) => c.tipo === "modulo").reduce((acc, c) => acc + c.quantidade, 0);
+    const custos = custosInternosEstimados(somaComponentes, quantidadeModulos, potenciaKwp, parametros);
+    return Math.round(custos.total);
+  }, [linhas, componentes, potenciaKwp, parametros]);
 
   // Preenche "Valor estimado" com a sugestão assim que ela aparecer/mudar,
   // a não ser que o vendedor já tenha digitado algo à mão (sem useEffect,
@@ -181,7 +192,8 @@ export function FormularioNegocio({
           />
           {!valorTocado && precoSugerido != null && (
             <p className="text-xs text-zinc-400">
-              Preenchido com preço de referência do catálogo (estimativa de teste, não é cotação real) — ajuste se precisar.
+              Preenchido com preço de referência do catálogo + custos internos configurados (estimativa, não é cotação real)
+              — ajuste se precisar.
             </p>
           )}
         </div>
@@ -223,10 +235,7 @@ export function FormularioNegocio({
         <Campo rotulo="Unidade consumidora" name="unidade_consumidora" placeholder="Opcional" />
         <Campo rotulo="Padrão do cliente" name="padrao_cliente" placeholder="Opcional" />
         <Campo rotulo="Tipo do telhado" name="tipo_telhado" placeholder="Ex.: cerâmico, metálico, laje, solo" />
-        <div className="flex flex-col gap-1 text-sm">
-          <span className="font-medium text-zinc-700">CNH (opcional)</span>
-          <input type="file" name="anexo_cnh_negocio" accept="image/*,.pdf" className="text-sm" />
-        </div>
+        <CampoArquivo rotulo="CNH (opcional)" name="anexo_cnh_negocio" accept="image/*,.pdf" />
         <label className="flex flex-col gap-1 text-sm md:col-span-2">
           <span className="font-medium text-zinc-700">Descrição</span>
           <textarea name="descricao" rows={2} className="rounded-md border border-zinc-300 px-3 py-2" />
@@ -342,17 +351,15 @@ export function FormularioNegocio({
         )}
 
         <div className="grid gap-3 md:grid-cols-2">
-          <div className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-zinc-700">CNH / documento do cliente (opcional)</span>
-            <input type="file" name="anexo_cnh_contato" accept="image/*,.pdf" className="text-sm" />
-          </div>
-          <div className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-zinc-700">Fatura do gerador (opcional)</span>
-            <input type="file" name="anexo_fatura_gerador" accept="image/*,.pdf" className="text-sm" />
-          </div>
-          <div className="flex flex-col gap-1 text-sm md:col-span-2">
-            <span className="font-medium text-zinc-700">Fatura dos beneficiários (quando aplicável)</span>
-            <input type="file" name="anexo_fatura_beneficiario" accept="image/*,.pdf" multiple className="text-sm" />
+          <CampoArquivo rotulo="CNH / documento do cliente (opcional)" name="anexo_cnh_contato" accept="image/*,.pdf" />
+          <CampoArquivo rotulo="Fatura do gerador (opcional)" name="anexo_fatura_gerador" accept="image/*,.pdf" />
+          <div className="md:col-span-2">
+            <CampoArquivo
+              rotulo="Fatura dos beneficiários (quando aplicável)"
+              name="anexo_fatura_beneficiario"
+              accept="image/*,.pdf"
+              multiple
+            />
           </div>
         </div>
       </fieldset>
