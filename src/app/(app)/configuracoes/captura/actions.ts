@@ -63,3 +63,19 @@ export async function alternarFormulario(_: ResultadoAcao, formData: FormData): 
   revalidatePath(CAMINHO);
   return { ok: true, mensagem: "Salvo." };
 }
+
+export async function apagarFormulario(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  const { atual } = await exigirPapel("admin");
+  const id = z.string().uuid().safeParse(formData.get("id"));
+  if (!id.success) return { ok: false, mensagem: "Dados inválidos." };
+
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase
+    .from("formularios")
+    .delete()
+    .eq("id", id.data)
+    .eq("empresa_id", atual.empresaId);
+  if (error) return { ok: false, mensagem: "Não foi possível excluir o formulário." };
+  revalidatePath(CAMINHO);
+  return { ok: true, mensagem: "Formulário excluído." };
+}

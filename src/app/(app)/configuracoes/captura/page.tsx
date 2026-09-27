@@ -1,10 +1,9 @@
 import QRCode from "qrcode";
-import { Cartao } from "@/components/ui";
 import { carregarConfiguracao } from "@/lib/crm";
 import { env } from "@/lib/env";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { NovoFormulario } from "./formularios";
+import { NovoFormularioColapsavel } from "./formularios";
 import { PainelFormularios } from "./painel-formularios";
 
 export default async function ConfigCaptura() {
@@ -46,9 +45,7 @@ export default async function ConfigCaptura() {
         Crie um link (e QR Code) para divulgar. Quem preencher o formulário vira um lead novo, já distribuído
         automaticamente entre os vendedores marcados para receber leads.
       </p>
-      <Cartao titulo="Novo formulário">
-        <NovoFormulario funis={funis.filter((f) => f.ativo)} origens={origens.filter((o) => o.ativa)} />
-      </Cartao>
+      <NovoFormularioColapsavel funis={funis.filter((f) => f.ativo)} origens={origens.filter((o) => o.ativa)} />
       <h2 className="text-sm font-semibold tracking-wide text-zinc-500 uppercase">Formulários ({lista.length})</h2>
       <PainelFormularios itens={lista} />
     </div>

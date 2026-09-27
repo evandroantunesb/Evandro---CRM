@@ -1,8 +1,42 @@
 "use client";
 
+import { ChevronDown } from "lucide-react";
 import { useActionState, useState } from "react";
-import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
+import { Botao, Campo, Cartao, Mensagem, Selecao } from "@/components/ui";
 import { criarFormulario, criarOrigemRapida } from "./actions";
+
+export function NovoFormularioColapsavel({
+  funis,
+  origens,
+}: {
+  funis: { id: string; nome: string }[];
+  origens: { id: string; nome: string }[];
+}) {
+  const [aberto, setAberto] = useState(false);
+
+  return (
+    <Cartao
+      titulo="Novo formulário"
+      acao={
+        <button
+          type="button"
+          onClick={() => setAberto((v) => !v)}
+          aria-expanded={aberto}
+          className="flex items-center gap-1 rounded-lg border border-zinc-200 px-3 py-1.5 text-sm font-medium text-carvao hover:border-dourado"
+        >
+          {aberto ? "Fechar" : "Criar formulário"}
+          <ChevronDown size={14} className={`transition-transform ${aberto ? "rotate-180" : ""}`} />
+        </button>
+      }
+    >
+      {aberto ? (
+        <NovoFormulario funis={funis} origens={origens} />
+      ) : (
+        <p className="text-sm text-zinc-500">Clique em &ldquo;Criar formulário&rdquo; para cadastrar um novo link de captação.</p>
+      )}
+    </Cartao>
+  );
+}
 
 export function NovoFormulario({
   funis,

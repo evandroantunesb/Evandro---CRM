@@ -1,9 +1,24 @@
 "use client";
 
-import { CheckCircle2, Download, ExternalLink, Image as ImageIcon, Link2, MessageCircle, Share2, Smartphone, Users, X, XCircle } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Download,
+  ExternalLink,
+  Image as ImageIcon,
+  Link2,
+  MessageCircle,
+  MoreVertical,
+  Share2,
+  Smartphone,
+  Trash2,
+  Users,
+  X,
+  XCircle,
+} from "lucide-react";
 import { useActionState, useState } from "react";
 import { Mensagem } from "@/components/ui";
-import { alternarFormulario } from "./actions";
+import { alternarFormulario, apagarFormulario } from "./actions";
 import { PosterFormulario } from "./poster-formulario";
 
 type Formulario = { id: string; nome: string; funil: string; origem: string; ativo: boolean };
@@ -26,9 +41,13 @@ export function CardFormulario({
   onVisualizar: () => void;
 }) {
   const [resultado, acao, pendente] = useActionState(alternarFormulario, null);
+  const [resultadoExcluir, acaoExcluir, excluindo] = useActionState(apagarFormulario, null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [menuCompartilhar, setMenuCompartilhar] = useState(false);
+  const [menuOpcoes, setMenuOpcoes] = useState(false);
+  const [modalExcluir, setModalExcluir] = useState(false);
   const [modalPoster, setModalPoster] = useState(false);
+  const [modalCelular, setModalCelular] = useState(false);
 
   function avisar(texto: string) {
     setAviso(texto);
@@ -70,24 +89,53 @@ export function CardFormulario({
             </p>
           </div>
         </div>
-        <form action={acao} className="flex items-center gap-2">
-          <input type="hidden" name="id" value={formulario.id} />
-          <span className={`text-xs font-medium ${formulario.ativo ? "text-green-700" : "text-zinc-500"}`}>
-            {formulario.ativo ? "Ativo" : "Inativo"}
-          </span>
-          <label className="relative inline-flex cursor-pointer items-center">
-            <input
-              type="checkbox"
-              name="ativo"
-              defaultChecked={formulario.ativo}
-              onChange={(e) => e.currentTarget.form?.requestSubmit()}
-              disabled={pendente}
-              className="peer sr-only"
-            />
-            <span className="h-6 w-11 rounded-full bg-zinc-300 transition-colors peer-checked:bg-dourado peer-disabled:opacity-50" />
-            <span className="absolute left-1 h-4 w-4 rounded-full bg-white transition-transform peer-checked:translate-x-5" />
-          </label>
-        </form>
+        <div className="flex items-center gap-2">
+          <form action={acao} className="flex items-center gap-2">
+            <input type="hidden" name="id" value={formulario.id} />
+            <span className={`text-xs font-medium ${formulario.ativo ? "text-green-700" : "text-zinc-500"}`}>
+              {formulario.ativo ? "Ativo" : "Inativo"}
+            </span>
+            <label className="relative inline-flex cursor-pointer items-center">
+              <input
+                type="checkbox"
+                name="ativo"
+                defaultChecked={formulario.ativo}
+                onChange={(e) => e.currentTarget.form?.requestSubmit()}
+                disabled={pendente}
+                className="peer sr-only"
+              />
+              <span className="h-6 w-11 rounded-full bg-zinc-300 transition-colors peer-checked:bg-dourado peer-disabled:opacity-50" />
+              <span className="absolute left-1 h-4 w-4 rounded-full bg-white transition-transform peer-checked:translate-x-5" />
+            </label>
+          </form>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setMenuOpcoes((v) => !v)}
+              aria-label="Mais opções"
+              className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-carvao"
+            >
+              <MoreVertical size={16} />
+            </button>
+            {menuOpcoes && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setMenuOpcoes(false)} />
+                <div className="absolute top-full right-0 z-20 mt-1 w-48 rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpcoes(false);
+                      setModalExcluir(true);
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                  >
+                    <Trash2 size={14} /> Excluir formulário
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="flex flex-col gap-3 rounded-lg bg-zinc-50 p-3 sm:flex-row">
@@ -143,14 +191,17 @@ export function CardFormulario({
         </a>
         <button
           type="button"
-          onClick={onVisualizar}
+          onClick={() => {
+            onVisualizar();
+            setModalCelular(true);
+          }}
           className={`flex flex-col gap-1 rounded-lg border px-3 py-2.5 text-left transition-colors ${
             selecionado ? "border-dourado bg-dourado/10" : "border-zinc-200 hover:border-dourado"
           }`}
         >
           <Smartphone size={16} className="text-carvao" />
           <span className="text-xs font-semibold text-carvao">Visualizar no celular</span>
-          <span className="text-[11px] text-zinc-500">Veja como o formulário fica no smartphone</span>
+          <span className="text-[11px] text-zinc-500">Mostre a tela cheia como um cartão de visita</span>
         </button>
         <div className="relative">
           <button
@@ -238,6 +289,74 @@ export function CardFormulario({
             >
               <Download size={16} /> Baixar PDF
             </a>
+          </div>
+        </div>
+      )}
+
+      {modalCelular && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-carvao/80 p-2 sm:p-6"
+          onClick={() => setModalCelular(false)}
+        >
+          <div
+            className="relative flex h-full w-full max-w-sm flex-col overflow-hidden rounded-[2rem] border-[8px] border-carvao bg-white shadow-2xl sm:h-[92vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mx-auto mb-1 h-4 w-24 shrink-0 rounded-b-lg bg-carvao" />
+            <button
+              type="button"
+              onClick={() => setModalCelular(false)}
+              aria-label="Fechar"
+              className="absolute top-3 right-3 z-10 rounded-full bg-carvao/70 p-1.5 text-offwhite hover:bg-carvao"
+            >
+              <X size={16} />
+            </button>
+            <iframe src={link} title={`Formulário ${formulario.nome}`} className="w-full flex-1 border-0" />
+          </div>
+        </div>
+      )}
+
+      {modalExcluir && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-carvao/70 p-4"
+          onClick={() => setModalExcluir(false)}
+        >
+          <div
+            className="flex w-full max-w-sm flex-col gap-4 rounded-xl bg-white p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-600">
+                <AlertTriangle size={18} />
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-zinc-900">Excluir formulário?</p>
+                <p className="mt-1 text-xs text-zinc-500">
+                  O formulário &ldquo;{formulario.nome}&rdquo; e seu QR Code serão apagados permanentemente. Os leads
+                  já capturados não são afetados. Essa ação não pode ser desfeita.
+                </p>
+              </div>
+            </div>
+            {resultadoExcluir && !resultadoExcluir.ok && <Mensagem resultado={resultadoExcluir} />}
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setModalExcluir(false)}
+                className="rounded-lg border border-zinc-200 px-3 py-2 text-sm font-medium text-carvao hover:border-zinc-300"
+              >
+                Cancelar
+              </button>
+              <form action={acaoExcluir}>
+                <input type="hidden" name="id" value={formulario.id} />
+                <button
+                  type="submit"
+                  disabled={excluindo}
+                  className="flex items-center gap-2 rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                >
+                  <Trash2 size={14} /> {excluindo ? "Excluindo…" : "Excluir"}
+                </button>
+              </form>
+            </div>
           </div>
         </div>
       )}
