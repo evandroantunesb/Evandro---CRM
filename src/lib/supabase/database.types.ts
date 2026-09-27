@@ -1506,7 +1506,9 @@ export type Database = {
         Row: {
           atualizado_por: string | null
           blocos_emitidos: Json | null
-          capa_variante: Database["public"]["Enums"]["proposta_modelo_capa"] | null
+          capa_variante:
+            | Database["public"]["Enums"]["proposta_modelo_capa"]
+            | null
           created_at: string
           criado_por: string | null
           empresa_id: string
@@ -1521,7 +1523,9 @@ export type Database = {
         Insert: {
           atualizado_por?: string | null
           blocos_emitidos?: Json | null
-          capa_variante?: Database["public"]["Enums"]["proposta_modelo_capa"] | null
+          capa_variante?:
+            | Database["public"]["Enums"]["proposta_modelo_capa"]
+            | null
           created_at?: string
           criado_por?: string | null
           empresa_id: string
@@ -1536,7 +1540,9 @@ export type Database = {
         Update: {
           atualizado_por?: string | null
           blocos_emitidos?: Json | null
-          capa_variante?: Database["public"]["Enums"]["proposta_modelo_capa"] | null
+          capa_variante?:
+            | Database["public"]["Enums"]["proposta_modelo_capa"]
+            | null
           created_at?: string
           criado_por?: string | null
           empresa_id?: string
