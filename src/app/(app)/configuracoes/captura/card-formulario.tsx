@@ -298,7 +298,7 @@ export function CardFormulario({
           className="fixed inset-0 z-50 flex cursor-pointer items-center justify-center bg-carvao p-4"
           onClick={() => setModalCelular(false)}
         >
-          <PosterFormulario qrCode={qrCode} className="h-full max-h-full w-auto max-w-full" />
+          <PosterFormulario qrCode={qrCode} variante="cheio" className="h-auto max-h-full w-full max-w-[480px]" />
         </div>
       )}
 
