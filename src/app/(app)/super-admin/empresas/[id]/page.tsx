@@ -5,7 +5,7 @@ import { exigirSuperAdmin } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { ROTULO_PAPEL, ROTULO_TIPO_VENDEDOR, type Papel, type TipoVendedor } from "@/lib/tipos";
 import { alterarSituacao } from "../../actions";
-import { FormularioAdmin, FormularioEdicaoEmpresa } from "../../formularios";
+import { FormularioAdmin, FormularioEdicaoEmpresa, FormularioPlano } from "../../formularios";
 import { SeloSituacao } from "../../situacao";
 
 export default async function Empresa({ params }: PageProps<"/super-admin/empresas/[id]">) {
@@ -13,11 +13,18 @@ export default async function Empresa({ params }: PageProps<"/super-admin/empres
   const { id } = await params;
   const supabase = await criarClienteServidor();
 
-  const { data: empresa } = await supabase
-    .from("empresas")
-    .select("id, nome, cnpj, situacao, created_at, empresa_membros(id, papel, tipo_vendedor, ativo, perfis(nome, email))")
-    .eq("id", id)
-    .maybeSingle();
+  const [{ data: empresa }, { data: plano }] = await Promise.all([
+    supabase
+      .from("empresas")
+      .select("id, nome, cnpj, situacao, created_at, empresa_membros(id, papel, tipo_vendedor, ativo, perfis(nome, email))")
+      .eq("id", id)
+      .maybeSingle(),
+    supabase
+      .from("planos_empresa")
+      .select("tipo, modelo_cobranca, valor_fixo, valor_por_usuario, dia_vencimento, limite_usuarios")
+      .eq("empresa_id", id)
+      .maybeSingle(),
+  ]);
   if (!empresa) notFound();
 
   const outrasSituacoes = (["ativa", "suspensa", "cancelada"] as const).filter((s) => s !== empresa.situacao);
@@ -49,6 +56,9 @@ export default async function Empresa({ params }: PageProps<"/super-admin/empres
             </form>
           ))}
         </div>
+      </Cartao>
+      <Cartao titulo="Plano e cobrança">
+        <FormularioPlano empresaId={empresa.id} plano={plano ?? null} />
       </Cartao>
       <Cartao titulo="Adicionar admin">
         <FormularioAdmin empresaId={empresa.id} />

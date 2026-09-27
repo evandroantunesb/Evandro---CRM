@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Manrope } from "next/font/google";
 import "./globals.css";
 
@@ -8,7 +8,10 @@ const manrope = Manrope({ variable: "--font-manrope", subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "Raion CRM",
   description: "CRM para negócios que vão mais longe.",
+  appleWebApp: { capable: true, statusBarStyle: "default", title: "Raion CRM" },
 };
+
+export const viewport: Viewport = { themeColor: "#0F0F10" };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (

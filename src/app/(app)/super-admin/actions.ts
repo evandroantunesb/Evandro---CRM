@@ -87,6 +87,52 @@ export async function alterarSituacao(formData: FormData) {
   revalidatePath(`/super-admin/empresas/${dados.empresaId}`);
 }
 
+const esquemaPlano = z
+  .object({
+    empresaId: z.string().uuid(),
+    tipo: z.enum(["gratuito", "pago"]),
+    modeloCobranca: z.enum(["por_usuario", "fixo", "fixo_mais_usuario"]).optional(),
+    valorFixo: z.string().trim().optional(),
+    valorPorUsuario: z.string().trim().optional(),
+    diaVencimento: z.string().trim().optional(),
+    limiteUsuarios: z.string().trim().optional(),
+  })
+  .transform((d) => ({
+    empresaId: d.empresaId,
+    tipo: d.tipo,
+    modeloCobranca: d.tipo === "pago" ? (d.modeloCobranca ?? null) : null,
+    valorFixo: d.valorFixo ? Number(d.valorFixo) : null,
+    valorPorUsuario: d.valorPorUsuario ? Number(d.valorPorUsuario) : null,
+    diaVencimento: d.diaVencimento ? Number(d.diaVencimento) : null,
+    limiteUsuarios: d.limiteUsuarios ? Number(d.limiteUsuarios) : null,
+  }));
+
+/** Só o super-admin define plano e valor de cobrança de cada empresa. */
+export async function salvarPlano(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  const sessao = await exigirSuperAdmin();
+  const dados = esquemaPlano.safeParse(Object.fromEntries(formData));
+  if (!dados.success) return { ok: false, mensagem: "Dados do plano inválidos." };
+  if (dados.data.tipo === "pago" && !dados.data.modeloCobranca) {
+    return { ok: false, mensagem: "Escolha o modelo de cobrança do plano pago." };
+  }
+
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.from("planos_empresa").upsert({
+    empresa_id: dados.data.empresaId,
+    tipo: dados.data.tipo,
+    modelo_cobranca: dados.data.modeloCobranca,
+    valor_fixo: dados.data.valorFixo,
+    valor_por_usuario: dados.data.valorPorUsuario,
+    dia_vencimento: dados.data.diaVencimento,
+    limite_usuarios: dados.data.limiteUsuarios,
+    atualizado_por: sessao.userId,
+  });
+  if (error) return { ok: false, mensagem: "Não foi possível salvar o plano." };
+  revalidatePath(`/super-admin/empresas/${dados.data.empresaId}`);
+  revalidatePath("/super-admin/cobranca");
+  return { ok: true, mensagem: "Plano salvo." };
+}
+
 export async function editarEmpresa(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
   await exigirSuperAdmin();
   const dados = z
