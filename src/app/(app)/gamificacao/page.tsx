@@ -156,10 +156,12 @@ export default async function GamificacaoDashboard({ searchParams }: { searchPar
     const dia = Math.floor((new Date(l.created_at).getTime() - atualMes.inicio.getTime()) / 86_400_000);
     if (dia >= 0 && dia < diasNoPeriodo) porDia[dia] += l.pontos;
   }
-  let acumulado = 0;
   const hoje = new Date();
   const diasComDados = periodo === "mes" ? Math.floor((hoje.getTime() - atualMes.inicio.getTime()) / 86_400_000) + 1 : diasNoPeriodo;
-  const serieAcumulada = porDia.slice(0, Math.max(2, Math.min(diasComDados, diasNoPeriodo))).map((v) => (acumulado += v));
+  const serieAcumulada = porDia.slice(0, Math.max(2, Math.min(diasComDados, diasNoPeriodo))).reduce<number[]>((acc, v) => {
+    acc.push((acc.at(-1) ?? 0) + v);
+    return acc;
+  }, []);
 
   // Ações que mais geram pontos --------------------------------------------
   const porAcao = new Map<string, number>();
@@ -204,7 +206,11 @@ export default async function GamificacaoDashboard({ searchParams }: { searchPar
 
   // Minhas conquistas + atividade recente ---------------------------------
   const nomeConquista = new Map((conquistas ?? []).map((c) => [c.id, c]));
-  const minhasConquistas = (desbloqueadas ?? []).map((d) => ({ desbloqueadaEm: d.desbloqueada_em, ...nomeConquista.get(d.conquista_id) }));
+  const minhasConquistas = (desbloqueadas ?? []).map((d) => ({
+    conquistaId: d.conquista_id,
+    desbloqueadaEm: d.desbloqueada_em,
+    ...nomeConquista.get(d.conquista_id),
+  }));
 
   const meuSaldo = meuTotalXp;
   const atividadeRecente = (pontosPeriodo ?? []).slice(0, 8);
@@ -323,7 +329,7 @@ export default async function GamificacaoDashboard({ searchParams }: { searchPar
           ) : (
             <ul className="flex flex-col gap-2.5">
               {minhasConquistas.map((c) => (
-                <li key={c.conquista_id} className="flex items-center gap-2.5 text-sm">
+                <li key={c.conquistaId} className="flex items-center gap-2.5 text-sm">
                   <span className="text-xl">{c.icone ?? "🏆"}</span>
                   <div className="flex flex-1 flex-col">
                     <span className="text-zinc-900">{c.nome ?? "(conquista removida)"}</span>
