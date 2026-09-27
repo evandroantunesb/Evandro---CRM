@@ -1,5 +1,6 @@
 import { LogOut } from "lucide-react";
 import Link from "next/link";
+import { Avatar } from "@/components/avatar";
 import { LogoRaion } from "@/components/marca";
 import { obterSessao } from "@/lib/sessao";
 import { trocarEmpresa } from "@/lib/acoes/empresa-atual";
@@ -42,13 +43,6 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
     ...(sessao.superAdmin ? [{ href: "/super-admin", rotulo: "Super-admin", grupo: "Plataforma" }] : []),
   ];
 
-  const iniciais = sessao.nome
-    .split(/[\s@]/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0]!.toUpperCase())
-    .join("");
-
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
       <aside className="flex flex-col gap-5 bg-carvao p-4 text-offwhite md:sticky md:top-0 md:h-screen md:w-64 md:overflow-y-auto md:p-5">
@@ -80,9 +74,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
         </div>
         <Menu itens={itens} />
         <div className="hidden items-center gap-3 border-t border-white/10 pt-4 md:mt-auto md:flex">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-dourado/15 text-xs font-semibold text-dourado">
-            {iniciais}
-          </span>
+          <Avatar nome={sessao.nome} tamanho={36} />
           <Link href="/perfil" className="min-w-0 flex-1" title="Meu perfil">
             <span className="block truncate text-sm font-medium text-offwhite hover:underline">{sessao.nome}</span>
             {papel && <span className="block text-xs text-offwhite/50">{ROTULO_PAPEL[papel]}</span>}

@@ -40,6 +40,7 @@ const numeroBrOpcional = z
 const esquemaNovo = z.object({
   titulo: z.string().trim().min(2, "Informe o nome do negócio"),
   funil_id: z.string().uuid(),
+  etapa_id: uuidOpcional,
   origem_id: uuidOpcional,
   responsavel_id: uuidOpcional,
   valor: valorOpcional,
@@ -95,16 +96,26 @@ export async function criarNegocio(_: ResultadoAcao, formData: FormData): Promis
     contatoId = contato.id;
   }
 
-  const { data: etapaInicial } = await supabase
-    .from("etapas")
-    .select("id")
-    .eq("funil_id", d.funil_id)
-    .eq("ativa", true)
-    .order("inicial", { ascending: false })
-    .order("ordem")
-    .limit(1)
-    .single();
-  if (!etapaInicial) return { ok: false, mensagem: "O funil não tem etapas ativas." };
+  // Etapa pré-selecionada (ex.: "Adicionar negócio" numa coluna do Kanban), se pertencer ao funil e estiver ativa;
+  // senão cai na etapa inicial do funil, como sempre foi.
+  let etapaId = d.etapa_id;
+  if (etapaId) {
+    const { data: etapa } = await supabase.from("etapas").select("id").eq("id", etapaId).eq("funil_id", d.funil_id).eq("ativa", true).maybeSingle();
+    etapaId = etapa?.id ?? null;
+  }
+  if (!etapaId) {
+    const { data: etapaInicial } = await supabase
+      .from("etapas")
+      .select("id")
+      .eq("funil_id", d.funil_id)
+      .eq("ativa", true)
+      .order("inicial", { ascending: false })
+      .order("ordem")
+      .limit(1)
+      .single();
+    if (!etapaInicial) return { ok: false, mensagem: "O funil não tem etapas ativas." };
+    etapaId = etapaInicial.id;
+  }
 
   const { data: negocio, error } = await supabase
     .from("negocios")
@@ -112,7 +123,7 @@ export async function criarNegocio(_: ResultadoAcao, formData: FormData): Promis
       empresa_id: atual.empresaId,
       titulo: d.titulo,
       funil_id: d.funil_id,
-      etapa_id: etapaInicial.id,
+      etapa_id: etapaId,
       origem_id: d.origem_id,
       // Vendedor sempre fica como responsável; admin e gestor podem escolher.
       responsavel_id: atual.papel === "vendedor" ? null : d.responsavel_id,

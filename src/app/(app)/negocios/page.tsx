@@ -1,13 +1,28 @@
-import { Settings2 } from "lucide-react";
+import { Briefcase, CalendarClock, SlidersHorizontal, Settings2, TrendingUp, Wallet, X } from "lucide-react";
+import { cookies } from "next/headers";
 import Link from "next/link";
-import { Botao, Selecao } from "@/components/ui";
-import { carregarConfiguracao, formatarDataHora, formatarMoeda, situacaoPrazo, tempoDesde } from "@/lib/crm";
-import { exigirPapel } from "@/lib/sessao";
+import { Botao, Campo, Selecao } from "@/components/ui";
+import {
+  carregarConfiguracao,
+  fimDaSemana,
+  formatarMoeda,
+  inicioDoDia,
+  situacaoPrazo,
+  tempoDesde,
+} from "@/lib/crm";
+import { COOKIE_VISAO_NEGOCIOS, exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
+import { Indicadores, type Indicador } from "./indicadores";
 import { Kanban, type Card } from "./kanban";
+import { ListaFechados, ListaNegocios } from "./lista";
+import { VisaoToggle } from "./visao-toggle";
 
 function dataLimite(diasAtras: number) {
   return new Date(Date.now() - diasAtras * 24 * 60 * 60 * 1000).toISOString();
+}
+
+function agoraMs() {
+  return Date.now();
 }
 
 export default async function Negocios({ searchParams }: PageProps<"/negocios">) {
@@ -23,11 +38,19 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
   const colunas = config.etapas.filter((e) => e.funilId === funil.id && e.ativa);
   const status = (["aberto", "ganho", "perdido"] as const).find((s) => s === texto("status")) ?? "aberto";
   const etiqueta = config.etiquetas.find((e) => e.id === texto("etiqueta"));
+  const etapaFiltro = colunas.find((e) => e.id === texto("etapa"));
+  const valorMin = texto("valorMin") ? Number(texto("valorMin")) : null;
+  const valorMax = texto("valorMax") ? Number(texto("valorMax")) : null;
+  const atrasados = texto("atrasados") === "1";
+  const semProxima = texto("semProxima") === "1";
+
+  const visao = (["kanban", "lista"] as const).find((v) => v === texto("visao")) ?? ((await cookies()).get(COOKIE_VISAO_NEGOCIOS)?.value as "kanban" | "lista" | undefined) ?? "kanban";
+
   const supabase = await criarClienteServidor();
   let consulta = supabase
     .from("negocios")
     .select(
-      `id, numero, titulo, valor, etapa_id, etapa_desde, origem_id, responsavel_id, fechado_em, motivo_perda_id,
+      `id, numero, titulo, valor, etapa_id, etapa_desde, updated_at, origem_id, responsavel_id, fechado_em, motivo_perda_id,
        contatos!inner(nome, telefone, email), negocio_etiquetas${etiqueta ? "!inner" : ""}(etiqueta_id)`,
     )
     .eq("empresa_id", atual.empresaId)
@@ -38,6 +61,11 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
   if (texto("responsavel")) consulta = consulta.eq("responsavel_id", texto("responsavel"));
   if (texto("origem")) consulta = consulta.eq("origem_id", texto("origem"));
   if (etiqueta) consulta = consulta.eq("negocio_etiquetas.etiqueta_id", etiqueta.id);
+  if (etapaFiltro) consulta = consulta.eq("etapa_id", etapaFiltro.id);
+  if (texto("criadoDe")) consulta = consulta.gte("created_at", texto("criadoDe"));
+  if (texto("criadoAte")) consulta = consulta.lte("created_at", `${texto("criadoAte")}T23:59:59`);
+  if (valorMin != null && Number.isFinite(valorMin)) consulta = consulta.gte("valor", valorMin);
+  if (valorMax != null && Number.isFinite(valorMax)) consulta = consulta.lte("valor", valorMax);
   const busca = texto("q")
     .replace(/[%,()]/g, "")
     .trim();
@@ -64,7 +92,7 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
       .not("negocio_id", "is", null)
       .order("vence_em")
       .limit(5000),
-    // Contagens pra barra de conversão do Kanban (só faz sentido na visão "aberto").
+    // Contagens pra taxa de conversão (só faz sentido na visão "aberto").
     status === "aberto"
       ? supabase
           .from("negocios")
@@ -85,15 +113,98 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
       : { count: 0 },
   ]);
 
-  const cards = montarCards(data ?? [], config, pendentes ?? []);
+  let cards = montarCards(data ?? [], config, pendentes ?? []);
+  if (atrasados) cards = cards.filter((c) => c.tarefa === "atrasada");
+  if (semProxima) cards = cards.filter((c) => c.tarefa === "nenhuma");
 
   const podeFiltrarResponsavel = atual.papel !== "vendedor";
+
+  // Base de todos os filtros ativos, usada para montar os links (alternância de visão, chips, limpar filtros)
+  // sem perder o que já está escolhido.
+  const baseParams: Record<string, string> = {};
+  for (const [chave, valor] of Object.entries({
+    funil: funil.id,
+    status,
+    q: busca,
+    responsavel: texto("responsavel"),
+    origem: texto("origem"),
+    etiqueta: etiqueta?.id ?? "",
+    etapa: etapaFiltro?.id ?? "",
+    criadoDe: texto("criadoDe"),
+    criadoAte: texto("criadoAte"),
+    valorMin: texto("valorMin"),
+    valorMax: texto("valorMax"),
+    atrasados: atrasados ? "1" : "",
+    semProxima: semProxima ? "1" : "",
+  })) {
+    if (valor) baseParams[chave] = valor;
+  }
+  const paraQuery = (params: Record<string, string>) => new URLSearchParams(params).toString();
+  const queryVisao = paraQuery(baseParams);
+  const linkLimpar = `/negocios?${paraQuery({ funil: funil.id, status, ...(visao !== "kanban" ? { visao } : {}) })}`;
+
+  const chips: { rotulo: string; remover: string }[] = [];
+  const semChave = (...chaves: string[]) => {
+    const p = { ...baseParams };
+    for (const c of chaves) delete p[c];
+    return `/negocios?${paraQuery(p)}${visao !== "kanban" ? `${paraQuery(p) ? "&" : ""}visao=${visao}` : ""}`;
+  };
+  if (busca) chips.push({ rotulo: `Busca: "${busca}"`, remover: semChave("q") });
+  if (texto("responsavel")) {
+    const nome = config.membros.find((m) => m.id === texto("responsavel"))?.nome ?? "";
+    chips.push({ rotulo: `Responsável: ${nome}`, remover: semChave("responsavel") });
+  }
+  if (texto("origem")) {
+    const nome = config.origens.find((o) => o.id === texto("origem"))?.nome ?? "";
+    chips.push({ rotulo: `Origem: ${nome}`, remover: semChave("origem") });
+  }
+  if (etiqueta) chips.push({ rotulo: `Etiqueta: ${etiqueta.nome}`, remover: semChave("etiqueta") });
+  if (etapaFiltro) chips.push({ rotulo: `Etapa: ${etapaFiltro.nome}`, remover: semChave("etapa") });
+  if (texto("criadoDe") || texto("criadoAte")) {
+    chips.push({ rotulo: "Período de criação", remover: semChave("criadoDe", "criadoAte") });
+  }
+  if (texto("valorMin") || texto("valorMax")) {
+    chips.push({ rotulo: "Faixa de valor", remover: semChave("valorMin", "valorMax") });
+  }
+  if (atrasados) chips.push({ rotulo: "Com tarefa atrasada", remover: semChave("atrasados") });
+  if (semProxima) chips.push({ rotulo: "Sem próxima atividade", remover: semChave("semProxima") });
+
+  const agora = agoraMs();
+  const indicadores: Indicador[] = [
+    { Icone: Briefcase, valor: String(cards.length), legenda: "Negócios em andamento" },
+    {
+      Icone: Wallet,
+      valor: formatarMoeda(cards.reduce((soma, c) => soma + (c.valorNumerico ?? 0), 0)) || "R$ 0,00",
+      legenda: "Valor potencial",
+    },
+    {
+      Icone: TrendingUp,
+      valor: (() => {
+        const fechados = (ganhos30d ?? 0) + (perdidos30d ?? 0);
+        return fechados > 0 ? `${Math.round(((ganhos30d ?? 0) / fechados) * 100)}%` : "—";
+      })(),
+      legenda: "Taxa de conversão (30 dias)",
+    },
+    {
+      Icone: CalendarClock,
+      valor: String(
+        cards.filter(
+          (c) => c.tarefaVenceEm && new Date(c.tarefaVenceEm).getTime() >= inicioDoDia(agora) && new Date(c.tarefaVenceEm).getTime() <= fimDaSemana(agora),
+        ).length,
+      ),
+      legenda: "Vencem esta semana",
+    },
+  ];
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-semibold text-zinc-900">Negócios</h1>
+        <div>
+          <h1 className="text-2xl font-semibold text-zinc-900">Negócios</h1>
+          <p className="text-sm text-zinc-500">Acompanhe e gerencie todos os seus negócios no funil de vendas.</p>
+        </div>
         <div className="ml-auto flex items-center gap-2">
+          {status === "aberto" && <VisaoToggle visao={visao} query={queryVisao ? `${queryVisao}&` : ""} />}
           {atual.papel === "admin" && (
             <Link href="/configuracoes/funil">
               <Botao variante="secundario" className="gap-1.5">
@@ -107,70 +218,120 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
           </Link>
         </div>
       </div>
-      <form className="flex flex-wrap items-center gap-2" action="/negocios">
-        {funisAtivos.length > 1 && (
-          <Selecao name="funil" defaultValue={funil.id} aria-label="Funil">
-            {funisAtivos.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.nome}
-              </option>
-            ))}
-          </Selecao>
-        )}
-        <input
-          name="q"
-          defaultValue={busca}
-          placeholder="Buscar por nome, telefone ou e-mail"
-          className="min-w-56 flex-1 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm"
-        />
-        {podeFiltrarResponsavel && (
-          <Selecao name="responsavel" defaultValue={texto("responsavel")} aria-label="Responsável">
-            <option value="">Todos os responsáveis</option>
-            {config.membros
-              .filter((m) => m.ativo)
-              .map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.nome}
+      <form className="flex flex-col gap-2" action="/negocios">
+        {visao !== "kanban" && <input type="hidden" name="visao" value={visao} />}
+        <div className="flex flex-wrap items-center gap-2">
+          {funisAtivos.length > 1 && (
+            <Selecao name="funil" defaultValue={funil.id} aria-label="Funil">
+              {funisAtivos.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.nome}
                 </option>
               ))}
+            </Selecao>
+          )}
+          <input
+            name="q"
+            defaultValue={busca}
+            placeholder="Buscar por nome, telefone ou e-mail"
+            className="min-w-56 flex-1 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm"
+          />
+          {podeFiltrarResponsavel && (
+            <Selecao name="responsavel" defaultValue={texto("responsavel")} aria-label="Responsável">
+              <option value="">Todos os responsáveis</option>
+              {config.membros
+                .filter((m) => m.ativo)
+                .map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.nome}
+                  </option>
+                ))}
+            </Selecao>
+          )}
+          <Selecao name="status" defaultValue={status} aria-label="Situação">
+            <option value="aberto">Em andamento</option>
+            <option value="ganho">Ganhos</option>
+            <option value="perdido">Perdidos</option>
           </Selecao>
-        )}
-        <Selecao name="status" defaultValue={status} aria-label="Situação">
-          <option value="aberto">Em andamento</option>
-          <option value="ganho">Ganhos</option>
-          <option value="perdido">Perdidos</option>
-        </Selecao>
-        {config.etiquetas.length > 0 && (
-          <Selecao name="etiqueta" defaultValue={etiqueta?.id ?? ""} aria-label="Etiqueta">
-            <option value="">Todas as etiquetas</option>
-            {config.etiquetas.map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.nome}
+          {config.etiquetas.length > 0 && (
+            <Selecao name="etiqueta" defaultValue={etiqueta?.id ?? ""} aria-label="Etiqueta">
+              <option value="">Todas as etiquetas</option>
+              {config.etiquetas.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.nome}
+                </option>
+              ))}
+            </Selecao>
+          )}
+          <Selecao name="origem" defaultValue={texto("origem")} aria-label="Origem">
+            <option value="">Todas as origens</option>
+            {config.origens.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.nome}
               </option>
             ))}
           </Selecao>
+          <Botao type="submit" variante="secundario">
+            Filtrar
+          </Botao>
+        </div>
+        <details className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm">
+          <summary className="flex cursor-pointer items-center gap-1.5 font-medium text-zinc-700">
+            <SlidersHorizontal size={14} /> Filtros avançados
+          </summary>
+          <div className="mt-3 flex flex-wrap items-end gap-3">
+            <Selecao rotulo="Etapa" name="etapa" defaultValue={etapaFiltro?.id ?? ""}>
+              <option value="">Todas as etapas</option>
+              {colunas.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nome}
+                </option>
+              ))}
+            </Selecao>
+            <Campo rotulo="Criado de" type="date" name="criadoDe" defaultValue={texto("criadoDe")} />
+            <Campo rotulo="Criado até" type="date" name="criadoAte" defaultValue={texto("criadoAte")} />
+            <Campo rotulo="Valor mínimo" type="number" name="valorMin" defaultValue={texto("valorMin")} min={0} />
+            <Campo rotulo="Valor máximo" type="number" name="valorMax" defaultValue={texto("valorMax")} min={0} />
+            <label className="flex items-center gap-1.5 pb-2">
+              <input type="checkbox" name="atrasados" value="1" defaultChecked={atrasados} />
+              Só com tarefa atrasada
+            </label>
+            <label className="flex items-center gap-1.5 pb-2">
+              <input type="checkbox" name="semProxima" value="1" defaultChecked={semProxima} />
+              Sem próxima atividade
+            </label>
+            <Botao type="submit" variante="secundario">
+              Aplicar
+            </Botao>
+          </div>
+        </details>
+        {chips.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {chips.map((c) => (
+              <Link
+                key={c.rotulo}
+                href={c.remover}
+                className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2.5 py-1 text-xs text-zinc-700 hover:bg-zinc-200"
+              >
+                {c.rotulo}
+                <X size={11} />
+              </Link>
+            ))}
+            <Link href={linkLimpar} className="text-xs text-zinc-500 underline hover:text-zinc-800">
+              Limpar filtros
+            </Link>
+          </div>
         )}
-        <Selecao name="origem" defaultValue={texto("origem")} aria-label="Origem">
-          <option value="">Todas as origens</option>
-          {config.origens.map((o) => (
-            <option key={o.id} value={o.id}>
-              {o.nome}
-            </option>
-          ))}
-        </Selecao>
-        <Botao type="submit" variante="secundario">
-          Filtrar
-        </Botao>
       </form>
+      {status === "aberto" && <Indicadores itens={indicadores} />}
       {status === "aberto" ? (
-        <Kanban
-          key={cards.map((c) => c.id + c.etapaId).join()}
-          colunas={colunas}
-          cards={cards}
-          metricas={{ ganhos30d: ganhos30d ?? 0, perdidos30d: perdidos30d ?? 0 }}
-        />
+        visao === "kanban" ? (
+          <Kanban key={cards.map((c) => c.id + c.etapaId).join()} colunas={colunas} cards={cards} funilId={funil.id} />
+        ) : (
+          <ListaNegocios cards={cards} colunas={colunas} />
+        )
       ) : (
-        <ListaFechados status={status} cards={cards} linhas={data ?? []} config={config} />
+        <ListaFechados status={status} cards={cards} linhas={data ?? []} motivos={config.motivos} />
       )}
     </div>
   );
@@ -183,6 +344,7 @@ type LinhaNegocio = {
   valor: number | null;
   etapa_id: string;
   etapa_desde: string;
+  updated_at: string;
   origem_id: string | null;
   responsavel_id: string | null;
   fechado_em: string | null;
@@ -218,6 +380,7 @@ function montarCards(
       valorNumerico: n.valor,
       etapaId: n.etapa_id,
       desde: tempoDesde(n.etapa_desde, agora),
+      atualizadoEm: n.updated_at,
       tarefa: tarefaProxima ? situacaoPrazo(tarefaProxima.vence_em, agora) : "nenhuma",
       tarefaTitulo: tarefaProxima?.titulo ?? null,
       tarefaVenceEm: tarefaProxima?.vence_em ?? null,
@@ -227,64 +390,4 @@ function montarCards(
       }),
     };
   });
-}
-
-function ListaFechados({
-  status,
-  cards,
-  linhas,
-  config,
-}: {
-  status: "ganho" | "perdido";
-  cards: Card[];
-  linhas: LinhaNegocio[];
-  config: Configuracao;
-}) {
-  if (!cards.length) {
-    return (
-      <p className="text-sm text-zinc-600">
-        Nenhum negócio {status === "ganho" ? "ganho" : "perdido"} com esses filtros.
-      </p>
-    );
-  }
-  const motivo = new Map(config.motivos.map((m) => [m.id, m.nome]));
-  const porId = new Map(linhas.map((l) => [l.id, l]));
-  return (
-    <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white">
-      <table className="w-full text-left text-sm">
-        <thead className="bg-zinc-50 text-zinc-600">
-          <tr>
-            <th className="px-3 py-2 font-medium">Cliente</th>
-            <th className="px-3 py-2 font-medium">Valor</th>
-            <th className="px-3 py-2 font-medium">Responsável</th>
-            <th className="px-3 py-2 font-medium">{status === "ganho" ? "Origem" : "Motivo"}</th>
-            <th className="px-3 py-2 font-medium">Fechado em</th>
-          </tr>
-        </thead>
-        <tbody>
-          {cards.map((c) => {
-            const l = porId.get(c.id)!;
-            return (
-              <tr key={c.id} className="border-t border-zinc-100">
-                <td className="px-3 py-2">
-                  <Link href={`/negocios/${c.id}`} className="font-medium text-amber-700 hover:underline">
-                    {c.contato}
-                  </Link>
-                  <span className="block text-xs text-zinc-500">
-                    #{c.numero} · {c.titulo}
-                  </span>
-                </td>
-                <td className="px-3 py-2">{c.valor}</td>
-                <td className="px-3 py-2">{c.responsavel}</td>
-                <td className="px-3 py-2">
-                  {status === "ganho" ? c.origem : l.motivo_perda_id ? motivo.get(l.motivo_perda_id) : ""}
-                </td>
-                <td className="px-3 py-2 whitespace-nowrap">{l.fechado_em ? formatarDataHora(l.fechado_em) : ""}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
 }

@@ -3,7 +3,7 @@
 import { useActionState } from "react";
 import { Botao, Mensagem } from "@/components/ui";
 import { CAMPOS_OBRIGATORIOS, ROTULO_CAMPO_OBRIGATORIO } from "@/lib/tipos";
-import { alternarEtapa, criarEtapa, criarFunil, definirCamposObrigatorios, renomear } from "./actions";
+import { alternarEtapa, criarEtapa, criarFunil, definirCamposObrigatorios, definirCorEtapa, renomear } from "./actions";
 
 const inputClasse = "min-w-0 flex-1 rounded-md border border-zinc-300 px-3 py-1.5 text-sm";
 
@@ -59,6 +59,23 @@ export function AlternarEtapa({ etapaId, ativa }: { etapaId: string; ativa: bool
         {ativa ? "Desativar" : "Reativar"}
       </button>
       {resultado && !resultado.ok && <span className="text-sm text-red-700">{resultado.mensagem}</span>}
+    </form>
+  );
+}
+
+/** Cor de acento da etapa, mostrada na coluna do Kanban. */
+export function CorEtapa({ etapaId, cor }: { etapaId: string; cor: string | null }) {
+  return (
+    <form action={definirCorEtapa} className="flex items-center gap-1" title="Cor da etapa no Kanban">
+      <input type="hidden" name="etapaId" value={etapaId} />
+      <input
+        type="color"
+        name="cor"
+        defaultValue={cor ?? "#a1a1aa"}
+        aria-label="Cor da etapa"
+        className="h-6 w-6 cursor-pointer rounded border border-zinc-300 p-0"
+        onChange={(e) => e.currentTarget.form?.requestSubmit()}
+      />
     </form>
   );
 }

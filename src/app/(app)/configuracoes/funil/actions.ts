@@ -137,6 +137,24 @@ export async function alternarFunil(formData: FormData) {
   concluir("");
 }
 
+const corHex = z
+  .string()
+  .trim()
+  .regex(/^#[0-9a-fA-F]{6}$/, "Cor inválida")
+  .optional()
+  .transform((v) => v || null);
+
+export async function definirCorEtapa(formData: FormData) {
+  await exigirPapel("admin");
+  const etapaId = z.string().uuid().safeParse(formData.get("etapaId"));
+  const cor = corHex.safeParse(formData.get("cor"));
+  if (!etapaId.success || !cor.success) return;
+
+  const supabase = await criarClienteServidor();
+  await supabase.from("etapas").update({ cor: cor.data }).eq("id", etapaId.data);
+  concluir("");
+}
+
 export async function definirCamposObrigatorios(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
   await exigirPapel("admin");
   const etapaId = z.string().uuid().safeParse(formData.get("etapaId"));

@@ -7,7 +7,7 @@ import { FormularioNegocio } from "./formulario";
 
 export default async function NovoNegocio({ searchParams }: PageProps<"/negocios/novo">) {
   const { atual } = await exigirPapel();
-  const { funil } = await searchParams;
+  const { funil, etapa } = await searchParams;
   const supabase = await criarClienteServidor();
   const [config, { data: parametros }] = await Promise.all([
     carregarConfiguracao(atual.empresaId),
@@ -15,6 +15,7 @@ export default async function NovoNegocio({ searchParams }: PageProps<"/negocios
   ]);
   const funilEscolhido = config.funis.find((f) => f.id === funil && f.ativo) ?? config.funis.find((f) => f.ativo);
   if (!funilEscolhido) return <p className="text-sm text-zinc-600">Nenhum funil ativo.</p>;
+  const etapaEscolhida = config.etapas.find((e) => e.id === etapa && e.funilId === funilEscolhido.id && e.ativa);
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
@@ -25,6 +26,7 @@ export default async function NovoNegocio({ searchParams }: PageProps<"/negocios
       <Cartao>
         <FormularioNegocio
           funilId={funilEscolhido.id}
+          etapaId={etapaEscolhida?.id}
           origens={config.origens.filter((o) => o.ativa)}
           responsaveis={atual.papel === "vendedor" ? [] : config.membros.filter((m) => m.ativo)}
           meuMembroId={atual.membroId}

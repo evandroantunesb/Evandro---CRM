@@ -8,6 +8,7 @@ export type Etapa = {
   ordem: number;
   inicial: boolean;
   ativa: boolean;
+  cor: string | null;
   camposObrigatorios: string[];
 };
 export type Funil = { id: string; nome: string; ativo: boolean };
@@ -24,7 +25,7 @@ export async function carregarConfiguracao(empresaId: string) {
     supabase.from("funis").select("id, nome, ativo").eq("empresa_id", empresaId).order("ordem").order("created_at"),
     supabase
       .from("etapas")
-      .select("id, funil_id, nome, ordem, inicial, ativa, campos_obrigatorios")
+      .select("id, funil_id, nome, ordem, inicial, ativa, cor, campos_obrigatorios")
       .eq("empresa_id", empresaId)
       .order("ordem"),
     supabase.from("origens").select("id, nome, cor, ativa").eq("empresa_id", empresaId).order("nome"),
@@ -47,6 +48,7 @@ export async function carregarConfiguracao(empresaId: string) {
       ordem: e.ordem,
       inicial: e.inicial,
       ativa: e.ativa,
+      cor: e.cor,
       camposObrigatorios: e.campos_obrigatorios,
     })) as Etapa[],
     origens: (origens.data ?? []) as Origem[],
@@ -78,4 +80,6 @@ export {
   situacaoPrazo,
   prazoParaIso,
   tempoDesde,
+  inicioDoDia,
+  fimDaSemana,
 } from "@/lib/formatacao";

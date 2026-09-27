@@ -6,6 +6,8 @@ import { criarClienteServidor } from "@/lib/supabase/server";
 import type { Papel, TipoVendedor } from "@/lib/tipos";
 
 export const COOKIE_EMPRESA = "raion_empresa";
+/** Preferência de visualização (Kanban/Lista) da tela de Negócios, por navegador. */
+export const COOKIE_VISAO_NEGOCIOS = "raion_negocios_visao";
 
 export type Vinculo = {
   membroId: string;
