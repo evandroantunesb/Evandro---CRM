@@ -101,6 +101,14 @@ export function CardModelo({ modelo }: { modelo: Modelo }) {
         >
           Editar blocos
         </Link>
+        <Link
+          href={`/configuracoes/propostas/modelos/${modelo.id}/pdf`}
+          target="_blank"
+          rel="noreferrer"
+          className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-carvao hover:border-dourado"
+        >
+          Pré-visualizar PDF
+        </Link>
         {!arquivado && (
           <form action={acaoPublicar}>
             <input type="hidden" name="id" value={modelo.id} />
