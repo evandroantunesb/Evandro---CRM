@@ -40,7 +40,12 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
           { href: "/configuracoes/equipes", rotulo: "Equipes", grupo: "Configurações" },
         ]
       : []),
-    ...(sessao.superAdmin ? [{ href: "/super-admin", rotulo: "Super-admin", grupo: "Plataforma" }] : []),
+    ...(sessao.superAdmin
+      ? [
+          { href: "/super-admin", rotulo: "Super-admin", grupo: "Plataforma" },
+          { href: "/super-admin/cobranca", rotulo: "Cobrança", grupo: "Plataforma" },
+        ]
+      : []),
   ];
 
   return (
