@@ -6,6 +6,7 @@ import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
 import { buscarContatos, criarNegocio, verificarDuplicado, type Duplicado } from "@/lib/acoes/negocios";
 import {
   calcular,
+  custosInternosEstimados,
   DISPONIBILIDADE_PADRAO_CAMEL,
   potenciaKitPersonalizadoKwp,
   sugerirQuantidadeModulos,
@@ -21,6 +22,10 @@ type Parametros = {
   disponibilidadeMonoKwh: number;
   disponibilidadeBiKwh: number;
   disponibilidadeTriKwh: number;
+  custoInstalacaoPorModulo: number;
+  custoMaterialCaPorKwp: number;
+  custoEngenharia: number;
+  comissaoPercentual: number;
 };
 
 /** Aceita "450", "450,5" e "1.234,56"; string vazia ou inválida vira null. */
@@ -70,16 +75,21 @@ export function FormularioNegocio({
   const componentes = useMemo(() => linhasParaComponentes(linhas), [linhas]);
   const potenciaKwp = potenciaKitPersonalizadoKwp(componentes);
 
-  // Soma dos preços de referência (teste) vindos do catálogo, só pra sugerir
-  // um valor de negócio enquanto não há planilha/distribuidor real.
+  // Soma dos preços de referência (teste) vindos do catálogo, mais os custos
+  // internos configurados (instalação, material CA, engenharia, comissão),
+  // só pra sugerir um valor de negócio enquanto não há planilha/distribuidor real.
   const precoSugerido = useMemo(() => {
-    const soma = linhas.reduce((acc, l) => {
+    const somaComponentes = linhas.reduce((acc, l) => {
       const precoUnitario = l.precoEstimadoUnitario ? Number(l.precoEstimadoUnitario) : NaN;
       const quantidade = Number(l.quantidade) || 0;
       return Number.isFinite(precoUnitario) ? acc + precoUnitario * quantidade : acc;
     }, 0);
-    return soma > 0 ? Math.round(soma) : null;
-  }, [linhas]);
+    if (somaComponentes <= 0) return null;
+    if (!parametros) return Math.round(somaComponentes);
+    const quantidadeModulos = componentes.filter((c) => c.tipo === "modulo").reduce((acc, c) => acc + c.quantidade, 0);
+    const custos = custosInternosEstimados(somaComponentes, quantidadeModulos, potenciaKwp, parametros);
+    return Math.round(custos.total);
+  }, [linhas, componentes, potenciaKwp, parametros]);
 
   // Preenche "Valor estimado" com a sugestão assim que ela aparecer/mudar,
   // a não ser que o vendedor já tenha digitado algo à mão (sem useEffect,
@@ -181,7 +191,8 @@ export function FormularioNegocio({
           />
           {!valorTocado && precoSugerido != null && (
             <p className="text-xs text-zinc-400">
-              Preenchido com preço de referência do catálogo (estimativa de teste, não é cotação real) — ajuste se precisar.
+              Preenchido com preço de referência do catálogo + custos internos configurados (estimativa, não é cotação real)
+              — ajuste se precisar.
             </p>
           )}
         </div>
