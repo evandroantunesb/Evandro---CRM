@@ -353,6 +353,7 @@ export type Database = {
           id: string
           papel: Database["public"]["Enums"]["papel_membro"]
           recebe_leads: boolean
+          recebeu_lead_em: string | null
           tipo_vendedor: Database["public"]["Enums"]["tipo_vendedor"] | null
           updated_at: string
           user_id: string
@@ -364,6 +365,7 @@ export type Database = {
           id?: string
           papel?: Database["public"]["Enums"]["papel_membro"]
           recebe_leads?: boolean
+          recebeu_lead_em?: string | null
           tipo_vendedor?: Database["public"]["Enums"]["tipo_vendedor"] | null
           updated_at?: string
           user_id: string
@@ -375,6 +377,7 @@ export type Database = {
           id?: string
           papel?: Database["public"]["Enums"]["papel_membro"]
           recebe_leads?: boolean
+          recebeu_lead_em?: string | null
           tipo_vendedor?: Database["public"]["Enums"]["tipo_vendedor"] | null
           updated_at?: string
           user_id?: string
@@ -642,6 +645,70 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      formularios: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          empresa_id: string
+          funil_id: string
+          id: string
+          nome: string
+          origem_id: string
+          preenchimentos: number
+          token: string
+          updated_at: string
+          visualizacoes: number
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          empresa_id: string
+          funil_id: string
+          id?: string
+          nome: string
+          origem_id: string
+          preenchimentos?: number
+          token?: string
+          updated_at?: string
+          visualizacoes?: number
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          empresa_id?: string
+          funil_id?: string
+          id?: string
+          nome?: string
+          origem_id?: string
+          preenchimentos?: number
+          token?: string
+          updated_at?: string
+          visualizacoes?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "formularios_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "formularios_funil_id_fkey"
+            columns: ["funil_id"]
+            isOneToOne: false
+            referencedRelation: "funis"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "formularios_origem_id_fkey"
+            columns: ["origem_id"]
+            isOneToOne: false
+            referencedRelation: "origens"
             referencedColumns: ["id"]
           },
         ]
@@ -978,6 +1045,7 @@ export type Database = {
           unidade_consumidora: string | null
           updated_at: string
           valor: number | null
+          valor_conta_energia: number | null
         }
         Insert: {
           contato_id: string
@@ -1003,6 +1071,7 @@ export type Database = {
           unidade_consumidora?: string | null
           updated_at?: string
           valor?: number | null
+          valor_conta_energia?: number | null
         }
         Update: {
           contato_id?: string
@@ -1028,6 +1097,7 @@ export type Database = {
           unidade_consumidora?: string | null
           updated_at?: string
           valor?: number | null
+          valor_conta_energia?: number | null
         }
         Relationships: [
           {
@@ -1449,6 +1519,14 @@ export type Database = {
       }
       compartilha_empresa: { Args: { p_user_id: string }; Returns: boolean }
       e_plataforma_admin: { Args: never; Returns: boolean }
+      incrementar_preenchimento_formulario: {
+        Args: { p_id: string }
+        Returns: undefined
+      }
+      incrementar_visualizacao_formulario: {
+        Args: { p_id: string }
+        Returns: undefined
+      }
       membro_ativo: { Args: { p_empresa_id: string }; Returns: boolean }
       meu_membro_id: { Args: { p_empresa_id: string }; Returns: string }
       pode_ver_contato: { Args: { p_contato_id: string }; Returns: boolean }

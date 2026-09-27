@@ -5,6 +5,10 @@ import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { Kanban, type Card } from "./kanban";
 
+function dataLimite(diasAtras: number) {
+  return new Date(Date.now() - diasAtras * 24 * 60 * 60 * 1000).toISOString();
+}
+
 export default async function Negocios({ searchParams }: PageProps<"/negocios">) {
   const { atual } = await exigirPapel();
   const filtros = await searchParams;
@@ -47,17 +51,37 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
       { referencedTable: "contatos" },
     );
   }
-  const [{ data }, { data: pendentes }] = await Promise.all([
+  const trintaDiasAtras = dataLimite(30);
+  const [{ data }, { data: pendentes }, { count: ganhos30d }, { count: perdidos30d }] = await Promise.all([
     consulta,
     // Tarefas em aberto dos negócios, para o indicador de próxima ação no card.
     supabase
       .from("tarefas")
-      .select("negocio_id, vence_em")
+      .select("negocio_id, vence_em, titulo")
       .eq("empresa_id", atual.empresaId)
       .is("concluida_em", null)
       .not("negocio_id", "is", null)
       .order("vence_em")
       .limit(5000),
+    // Contagens pra barra de conversão do Kanban (só faz sentido na visão "aberto").
+    status === "aberto"
+      ? supabase
+          .from("negocios")
+          .select("id", { count: "exact", head: true })
+          .eq("empresa_id", atual.empresaId)
+          .eq("funil_id", funil.id)
+          .eq("status", "ganho")
+          .gte("fechado_em", trintaDiasAtras)
+      : { count: 0 },
+    status === "aberto"
+      ? supabase
+          .from("negocios")
+          .select("id", { count: "exact", head: true })
+          .eq("empresa_id", atual.empresaId)
+          .eq("funil_id", funil.id)
+          .eq("status", "perdido")
+          .gte("fechado_em", trintaDiasAtras)
+      : { count: 0 },
   ]);
 
   const cards = montarCards(data ?? [], config, pendentes ?? []);
@@ -128,7 +152,12 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
         </Botao>
       </form>
       {status === "aberto" ? (
-        <Kanban key={cards.map((c) => c.id + c.etapaId).join()} colunas={colunas} cards={cards} />
+        <Kanban
+          key={cards.map((c) => c.id + c.etapaId).join()}
+          colunas={colunas}
+          cards={cards}
+          metricas={{ ganhos30d: ganhos30d ?? 0, perdidos30d: perdidos30d ?? 0 }}
+        />
       ) : (
         <ListaFechados status={status} cards={cards} linhas={data ?? []} config={config} />
       )}
@@ -156,31 +185,37 @@ type Configuracao = Awaited<ReturnType<typeof carregarConfiguracao>>;
 function montarCards(
   linhas: LinhaNegocio[],
   config: Configuracao,
-  pendentes: { negocio_id: string | null; vence_em: string }[],
+  pendentes: { negocio_id: string | null; vence_em: string; titulo: string }[],
 ): Card[] {
   const nomeMembro = new Map(config.membros.map((m) => [m.id, m.nome]));
   const nomeOrigem = new Map(config.origens.map((o) => [o.id, o.nome]));
   const etiquetas = new Map(config.etiquetas.map((e) => [e.id, e]));
   // Vêm ordenadas pelo prazo: a primeira de cada negócio é a próxima.
-  const proxima = new Map<string, string>();
-  for (const t of pendentes) if (t.negocio_id && !proxima.has(t.negocio_id)) proxima.set(t.negocio_id, t.vence_em);
+  const proxima = new Map<string, { vence_em: string; titulo: string }>();
+  for (const t of pendentes) if (t.negocio_id && !proxima.has(t.negocio_id)) proxima.set(t.negocio_id, t);
   const agora = Date.now();
-  return linhas.map((n) => ({
-    id: n.id,
-    numero: n.numero,
-    titulo: n.titulo,
-    contato: (n.contatos as { nome: string }).nome,
-    responsavel: n.responsavel_id ? (nomeMembro.get(n.responsavel_id) ?? "") : "Sem responsável",
-    origem: n.origem_id ? (nomeOrigem.get(n.origem_id) ?? null) : null,
-    valor: formatarMoeda(n.valor),
-    etapaId: n.etapa_id,
-    desde: tempoDesde(n.etapa_desde, agora),
-    tarefa: proxima.has(n.id) ? situacaoPrazo(proxima.get(n.id)!, agora) : "nenhuma",
-    etiquetas: n.negocio_etiquetas.flatMap((ne) => {
-      const e = etiquetas.get(ne.etiqueta_id);
-      return e ? [{ nome: e.nome, cor: e.cor }] : [];
-    }),
-  }));
+  return linhas.map((n) => {
+    const tarefaProxima = proxima.get(n.id);
+    return {
+      id: n.id,
+      numero: n.numero,
+      titulo: n.titulo,
+      contato: (n.contatos as { nome: string }).nome,
+      responsavel: n.responsavel_id ? (nomeMembro.get(n.responsavel_id) ?? "") : "Sem responsável",
+      origem: n.origem_id ? (nomeOrigem.get(n.origem_id) ?? null) : null,
+      valor: formatarMoeda(n.valor),
+      valorNumerico: n.valor,
+      etapaId: n.etapa_id,
+      desde: tempoDesde(n.etapa_desde, agora),
+      tarefa: tarefaProxima ? situacaoPrazo(tarefaProxima.vence_em, agora) : "nenhuma",
+      tarefaTitulo: tarefaProxima?.titulo ?? null,
+      tarefaVenceEm: tarefaProxima?.vence_em ?? null,
+      etiquetas: n.negocio_etiquetas.flatMap((ne) => {
+        const e = etiquetas.get(ne.etiqueta_id);
+        return e ? [{ nome: e.nome, cor: e.cor }] : [];
+      }),
+    };
+  });
 }
 
 function ListaFechados({
