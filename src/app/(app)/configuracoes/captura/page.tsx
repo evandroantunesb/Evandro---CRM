@@ -4,8 +4,8 @@ import { carregarConfiguracao } from "@/lib/crm";
 import { env } from "@/lib/env";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { LinkFormulario } from "./link-formulario";
 import { NovoFormulario } from "./formularios";
+import { PainelFormularios } from "./painel-formularios";
 
 export default async function ConfigCaptura() {
   const { atual } = await exigirPapel("admin");
@@ -40,7 +40,7 @@ export default async function ConfigCaptura() {
   );
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-4">
+    <div className="mx-auto flex max-w-6xl flex-col gap-4">
       <h1 className="text-2xl font-semibold text-zinc-900">Captura de leads</h1>
       <p className="text-sm text-zinc-600">
         Crie um link (e QR Code) para divulgar. Quem preencher o formulário vira um lead novo, já distribuído
@@ -49,12 +49,8 @@ export default async function ConfigCaptura() {
       <Cartao titulo="Novo formulário">
         <NovoFormulario funis={funis.filter((f) => f.ativo)} origens={origens.filter((o) => o.ativa)} />
       </Cartao>
-      <Cartao titulo={`Formulários (${lista.length})`}>
-        {lista.length === 0 && <p className="text-sm text-zinc-500">Nenhum formulário criado ainda.</p>}
-        {lista.map(({ formulario, link, qrCode }) => (
-          <LinkFormulario key={formulario.id} formulario={formulario} link={link} qrCode={qrCode} />
-        ))}
-      </Cartao>
+      <h2 className="text-sm font-semibold tracking-wide text-zinc-500 uppercase">Formulários ({lista.length})</h2>
+      <PainelFormularios itens={lista} />
     </div>
   );
 }

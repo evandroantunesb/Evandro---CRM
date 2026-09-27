@@ -14,14 +14,22 @@ export default async function CapturaPublica({ params }: PageProps<"/captura/[to
   if (!formulario || !formulario.ativo) notFound();
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col gap-6 px-6 py-10">
-      <LogoRaion altura={32} />
-      <div>
-        <p className="text-xs font-medium tracking-[0.3em] text-zinc-500 uppercase">Energia solar</p>
-        <h1 className="mt-1 text-2xl font-semibold text-carvao">Fale com um consultor</h1>
-        <p className="mt-1 text-sm text-zinc-600">Deixe seus dados que retornamos com uma proposta.</p>
+    <main className="min-h-screen bg-offwhite">
+      <div className="bg-[radial-gradient(circle_at_top,_rgba(212,175,55,0.35),_transparent_60%),linear-gradient(180deg,#0F0F10_0%,#0F0F10_100%)] px-6 pt-10 pb-16">
+        <div className="mx-auto max-w-md">
+          <LogoRaion tom="claro" altura={32} />
+          <p className="mt-6 text-xs font-medium tracking-[0.3em] text-dourado uppercase">Energia solar</p>
+          <h1 className="mt-1 text-3xl leading-tight font-semibold text-offwhite">
+            Transforme sua economia de energia em realidade
+          </h1>
+          <p className="mt-2 text-sm text-offwhite/70">
+            Preencha o formulário e fale com nosso time. É rápido e sem compromisso.
+          </p>
+        </div>
       </div>
-      <FormularioCaptura token={token} />
+      <div className="mx-auto -mt-8 max-w-md px-6 pb-10">
+        <FormularioCaptura token={token} />
+      </div>
     </main>
   );
 }
