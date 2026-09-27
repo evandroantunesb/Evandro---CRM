@@ -1,5 +1,6 @@
 "use client";
 
+import { Eye } from "lucide-react";
 import { useActionState, useState } from "react";
 import { Botao, Mensagem, Selecao } from "@/components/ui";
 import { definirModoPreco, gerarLinkProposta } from "@/lib/acoes/propostas";
@@ -111,13 +112,16 @@ export function Proposta({
       </form>
       <Mensagem resultado={resultadoModo} />
 
-      <p className="text-sm text-zinc-600">
-        {proposta.aberturas === 0
-          ? "O cliente ainda não abriu o link."
-          : `Aberta ${proposta.aberturas} ${proposta.aberturas === 1 ? "vez" : "vezes"}${
-              proposta.ultimaAbertura ? ` · última em ${formatarDataHora(proposta.ultimaAbertura)}` : ""
-            }`}
-      </p>
+      {proposta.aberturas === 0 ? (
+        <p className="text-sm text-zinc-600">O cliente ainda não abriu o link.</p>
+      ) : (
+        <p className="flex items-center gap-2 text-[11px] text-zinc-400">
+          <span className="flex items-center gap-1" title="Vezes que o cliente abriu o link">
+            <Eye size={12} /> {proposta.aberturas}
+          </span>
+          {proposta.ultimaAbertura && <span>última em {formatarDataHora(proposta.ultimaAbertura)}</span>}
+        </p>
+      )}
     </div>
   );
 }
