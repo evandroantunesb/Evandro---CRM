@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const ICONES: Record<string, LucideIcon> = {
   "/inicio": Home,
@@ -74,6 +74,18 @@ function ItemMenu({ item, ativo }: { item: Item; ativo: boolean }) {
 export function Menu({ itens }: { itens: Item[] }) {
   const caminho = usePathname();
   const [grupoAberto, setGrupoAberto] = useState<string | null>(null);
+  const [transbordaNaFaixa, setTransbordaNaFaixa] = useState(false);
+  const faixaRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const faixa = faixaRef.current;
+    if (!faixa) return;
+    const verificar = () => setTransbordaNaFaixa(faixa.scrollWidth > faixa.clientWidth + 1);
+    verificar();
+    const observador = new ResizeObserver(verificar);
+    observador.observe(faixa);
+    return () => observador.disconnect();
+  }, [itens, grupoAberto]);
   // Prefixo mais específico vence: evita que uma rota "pai" (ex.: /gamificacao)
   // fique marcada como ativa junto com uma rota "filha" mais específica.
   const correspondentes = itens.filter((i) => caminho === i.href || caminho.startsWith(`${i.href}/`));
@@ -93,7 +105,11 @@ export function Menu({ itens }: { itens: Item[] }) {
 
   return (
     <nav className="flex flex-col gap-1">
-      <div className="flex flex-row gap-1 overflow-x-auto md:hidden">
+      <div
+        ref={faixaRef}
+        className="flex flex-row gap-1 overflow-x-auto md:hidden"
+        style={transbordaNaFaixa ? { maskImage: "linear-gradient(to right, black calc(100% - 24px), transparent)" } : undefined}
+      >
         {principais.map((item) => (
           <ItemMenu key={item.href} item={item} ativo={ehAtivo(item.href)} />
         ))}
@@ -118,10 +134,12 @@ export function Menu({ itens }: { itens: Item[] }) {
       {grupos.map(
         (grupo) =>
           grupoAberto === grupo.nome && (
-            <div key={grupo.nome} className="flex flex-col gap-1 rounded-lg bg-white/[0.03] p-1 md:hidden">
-              {grupo.itens.map((item) => (
-                <ItemMenu key={item.href} item={item} ativo={ehAtivo(item.href)} />
-              ))}
+            <div key={grupo.nome} className="max-h-[50vh] overflow-y-auto rounded-lg bg-white/[0.03] p-1 md:hidden">
+              <div className="flex flex-col gap-1">
+                {grupo.itens.map((item) => (
+                  <ItemMenu key={item.href} item={item} ativo={ehAtivo(item.href)} />
+                ))}
+              </div>
             </div>
           ),
       )}
