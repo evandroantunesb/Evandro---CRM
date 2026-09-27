@@ -203,11 +203,11 @@ export function CardFormulario({
           <span className="text-xs font-semibold text-carvao">Visualizar no celular</span>
           <span className="text-[11px] text-zinc-500">Mostre a tela cheia como um cartão de visita</span>
         </button>
-        <div className="relative">
+        <div className="relative flex h-full">
           <button
             type="button"
             onClick={compartilhar}
-            className="flex w-full flex-col gap-1 rounded-lg border border-zinc-200 px-3 py-2.5 text-left hover:border-dourado"
+            className="flex w-full flex-1 flex-col gap-1 rounded-lg border border-zinc-200 px-3 py-2.5 text-left hover:border-dourado"
           >
             <Share2 size={16} className="text-carvao" />
             <span className="text-xs font-semibold text-carvao">Compartilhar</span>
