@@ -1328,6 +1328,180 @@ export type Database = {
         }
         Relationships: []
       }
+      proposta_identidades: {
+        Row: {
+          atualizado_por: string | null
+          cor_destaque: string | null
+          cor_primaria: string | null
+          created_at: string
+          empresa_id: string
+          foto_capa_url: string | null
+          id: string
+          logo_escuro_url: string | null
+          logo_url: string | null
+          nome_exibicao: string | null
+          rodape_texto: string | null
+          updated_at: string
+          whatsapp: string | null
+        }
+        Insert: {
+          atualizado_por?: string | null
+          cor_destaque?: string | null
+          cor_primaria?: string | null
+          created_at?: string
+          empresa_id: string
+          foto_capa_url?: string | null
+          id?: string
+          logo_escuro_url?: string | null
+          logo_url?: string | null
+          nome_exibicao?: string | null
+          rodape_texto?: string | null
+          updated_at?: string
+          whatsapp?: string | null
+        }
+        Update: {
+          atualizado_por?: string | null
+          cor_destaque?: string | null
+          cor_primaria?: string | null
+          created_at?: string
+          empresa_id?: string
+          foto_capa_url?: string | null
+          id?: string
+          logo_escuro_url?: string | null
+          logo_url?: string | null
+          nome_exibicao?: string | null
+          rodape_texto?: string | null
+          updated_at?: string
+          whatsapp?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposta_identidades_atualizado_por_fkey"
+            columns: ["atualizado_por"]
+            isOneToOne: false
+            referencedRelation: "empresa_membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposta_identidades_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: true
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proposta_modelo_blocos: {
+        Row: {
+          ativo: boolean
+          config: Json
+          created_at: string
+          id: string
+          modelo_id: string
+          ordem: number
+          quebra_pagina: Database["public"]["Enums"]["proposta_bloco_quebra"]
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          config?: Json
+          created_at?: string
+          id?: string
+          modelo_id: string
+          ordem?: number
+          quebra_pagina?: Database["public"]["Enums"]["proposta_bloco_quebra"]
+          tipo: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          config?: Json
+          created_at?: string
+          id?: string
+          modelo_id?: string
+          ordem?: number
+          quebra_pagina?: Database["public"]["Enums"]["proposta_bloco_quebra"]
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposta_modelo_blocos_modelo_id_fkey"
+            columns: ["modelo_id"]
+            isOneToOne: false
+            referencedRelation: "proposta_modelos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proposta_modelos: {
+        Row: {
+          atualizado_por: string | null
+          capa_variante: Database["public"]["Enums"]["proposta_modelo_capa"]
+          created_at: string
+          criado_por: string | null
+          descricao: string | null
+          empresa_id: string
+          id: string
+          nome: string
+          padrao: boolean
+          revisao: number
+          status: Database["public"]["Enums"]["proposta_modelo_status"]
+          updated_at: string
+        }
+        Insert: {
+          atualizado_por?: string | null
+          capa_variante?: Database["public"]["Enums"]["proposta_modelo_capa"]
+          created_at?: string
+          criado_por?: string | null
+          descricao?: string | null
+          empresa_id: string
+          id?: string
+          nome: string
+          padrao?: boolean
+          revisao?: number
+          status?: Database["public"]["Enums"]["proposta_modelo_status"]
+          updated_at?: string
+        }
+        Update: {
+          atualizado_por?: string | null
+          capa_variante?: Database["public"]["Enums"]["proposta_modelo_capa"]
+          created_at?: string
+          criado_por?: string | null
+          descricao?: string | null
+          empresa_id?: string
+          id?: string
+          nome?: string
+          padrao?: boolean
+          revisao?: number
+          status?: Database["public"]["Enums"]["proposta_modelo_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposta_modelos_atualizado_por_fkey"
+            columns: ["atualizado_por"]
+            isOneToOne: false
+            referencedRelation: "empresa_membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposta_modelos_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "empresa_membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposta_modelos_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       propostas: {
         Row: {
           atualizado_por: string | null
@@ -1555,6 +1729,9 @@ export type Database = {
     Enums: {
       modo_preco_proposta: "sem_preco" | "parcelado" | "avista" | "completo"
       papel_membro: "admin" | "gestor" | "vendedor"
+      proposta_bloco_quebra: "auto" | "nova_pagina" | "pagina_exclusiva"
+      proposta_modelo_capa: "foto" | "minimalista" | "tecnica"
+      proposta_modelo_status: "rascunho" | "publicado" | "arquivado"
       situacao_empresa: "ativa" | "suspensa" | "cancelada"
       status_negocio: "aberto" | "ganho" | "perdido"
       tipo_componente_kit: "modulo" | "inversor" | "bateria" | "outro"
@@ -1700,6 +1877,9 @@ export const Constants = {
     Enums: {
       modo_preco_proposta: ["sem_preco", "parcelado", "avista", "completo"],
       papel_membro: ["admin", "gestor", "vendedor"],
+      proposta_bloco_quebra: ["auto", "nova_pagina", "pagina_exclusiva"],
+      proposta_modelo_capa: ["foto", "minimalista", "tecnica"],
+      proposta_modelo_status: ["rascunho", "publicado", "arquivado"],
       situacao_empresa: ["ativa", "suspensa", "cancelada"],
       status_negocio: ["aberto", "ganho", "perdido"],
       tipo_componente_kit: ["modulo", "inversor", "bateria", "outro"],
