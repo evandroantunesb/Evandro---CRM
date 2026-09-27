@@ -1,3 +1,4 @@
+import type { SupabaseServidor } from "@/lib/supabase/server";
 import type { MetricaMeta } from "@/lib/tipos";
 
 export type Meta = {
@@ -63,4 +64,48 @@ export function calcularProgresso(valorAlvo: number, realizado: number, periodoI
     necessarioPorDiaRestante: diasRestantes > 0 ? faltante / diasRestantes : null,
     projecaoFinal: mediaDiariaRealizada * diasTotais,
   };
+}
+
+/** Realizado de uma meta: consulta negócios/tarefas do colaborador no período, respeitando o RLS de sempre. */
+export async function calcularRealizado(supabase: SupabaseServidor, meta: Meta) {
+  const { inicioIso, fimExclusivoIso } = limitesPeriodo(meta.periodoInicio, meta.periodoFim);
+
+  if (meta.metrica === "receita" || meta.metrica === "negocios_ganhos") {
+    const { data } = await supabase
+      .from("negocios")
+      .select("valor")
+      .eq("responsavel_id", meta.membroId)
+      .eq("status", "ganho")
+      .gte("fechado_em", inicioIso)
+      .lt("fechado_em", fimExclusivoIso)
+      .limit(10000);
+    const linhas = data ?? [];
+    return meta.metrica === "receita" ? linhas.reduce((soma, n) => soma + (n.valor ?? 0), 0) : linhas.length;
+  }
+
+  if (meta.metrica === "conversao") {
+    const { data } = await supabase
+      .from("negocios")
+      .select("status")
+      .eq("responsavel_id", meta.membroId)
+      .in("status", ["ganho", "perdido"])
+      .gte("fechado_em", inicioIso)
+      .lt("fechado_em", fimExclusivoIso)
+      .limit(10000);
+    const linhas = data ?? [];
+    const ganhos = linhas.filter((n) => n.status === "ganho").length;
+    return linhas.length > 0 ? (ganhos / linhas.length) * 100 : 0;
+  }
+
+  // reunioes | tarefas_concluidas
+  let consulta = supabase
+    .from("tarefas")
+    .select("id", { count: "exact", head: true })
+    .eq("responsavel_id", meta.membroId)
+    .not("concluida_em", "is", null)
+    .gte("concluida_em", inicioIso)
+    .lt("concluida_em", fimExclusivoIso);
+  if (meta.metrica === "reunioes") consulta = consulta.eq("tipo", "reuniao");
+  const { count } = await consulta;
+  return count ?? 0;
 }
