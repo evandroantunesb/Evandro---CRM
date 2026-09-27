@@ -124,7 +124,7 @@ export async function criarNegocio(_: ResultadoAcao, formData: FormData): Promis
       tipo_telhado: d.tipo_telhado || null,
       estrutura_telhado: d.estrutura_telhado || null,
       consumo_medio_kwh: d.consumo_medio_kwh,
-      valor_fatura_medio: d.valor_fatura_medio,
+      valor_conta_energia: d.valor_fatura_medio,
     })
     .select("id")
     .single();
@@ -229,7 +229,7 @@ const esquemaEdicao = z.object({
   padrao_cliente: z.string().trim().max(60).optional(),
   tipo_telhado: z.string().trim().max(60).optional(),
   consumo_medio_kwh: numeroBrOpcional,
-  valor_fatura_medio: numeroBrOpcional,
+  valor_conta_energia: numeroBrOpcional,
 });
 
 export async function editarNegocio(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
@@ -251,7 +251,7 @@ export async function editarNegocio(_: ResultadoAcao, formData: FormData): Promi
       padrao_cliente: d.padrao_cliente || null,
       tipo_telhado: d.tipo_telhado || null,
       consumo_medio_kwh: d.consumo_medio_kwh,
-      valor_fatura_medio: d.valor_fatura_medio,
+      valor_conta_energia: d.valor_conta_energia,
       ...(atual.papel !== "vendedor" && d.responsavel_id ? { responsavel_id: d.responsavel_id } : {}),
     })
     .eq("id", d.negocioId)

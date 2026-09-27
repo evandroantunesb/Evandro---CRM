@@ -25,7 +25,7 @@ export function EdicaoNegocio({
     unidadeConsumidora: string | null;
     padraoCliente: string | null;
     consumoMedioKwh: number | null;
-    valorFaturaMedio: number | null;
+    valorContaEnergia: number | null;
   };
   etapas: Opcao[];
   origens: Opcao[];
@@ -67,11 +67,11 @@ export function EdicaoNegocio({
         defaultValue={negocio.valor != null ? String(negocio.valor).replace(".", ",") : ""}
       />
       <Campo
-        rotulo="Valor da fatura (R$)"
-        name="valor_fatura_medio"
+        rotulo="Valor da conta de energia (R$)"
+        name="valor_conta_energia"
         inputMode="decimal"
         placeholder="ex.: 450,00"
-        defaultValue={negocio.valorFaturaMedio != null ? String(negocio.valorFaturaMedio).replace(".", ",") : ""}
+        defaultValue={negocio.valorContaEnergia != null ? String(negocio.valorContaEnergia).replace(".", ",") : ""}
       />
       <Campo
         rotulo="Consumo médio (12 meses, kWh)"
