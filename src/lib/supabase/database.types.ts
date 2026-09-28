@@ -589,6 +589,7 @@ export type Database = {
           papel: Database["public"]["Enums"]["papel_membro"]
           recebe_leads: boolean
           recebeu_lead_em: string | null
+          status: Database["public"]["Enums"]["status_membro"]
           tipo_vendedor: Database["public"]["Enums"]["tipo_vendedor"] | null
           updated_at: string
           user_id: string
@@ -601,6 +602,7 @@ export type Database = {
           papel?: Database["public"]["Enums"]["papel_membro"]
           recebe_leads?: boolean
           recebeu_lead_em?: string | null
+          status?: Database["public"]["Enums"]["status_membro"]
           tipo_vendedor?: Database["public"]["Enums"]["tipo_vendedor"] | null
           updated_at?: string
           user_id: string
@@ -613,6 +615,7 @@ export type Database = {
           papel?: Database["public"]["Enums"]["papel_membro"]
           recebe_leads?: boolean
           recebeu_lead_em?: string | null
+          status?: Database["public"]["Enums"]["status_membro"]
           tipo_vendedor?: Database["public"]["Enums"]["tipo_vendedor"] | null
           updated_at?: string
           user_id?: string
@@ -2686,6 +2689,7 @@ export type Database = {
       proposta_modelo_status: "rascunho" | "publicado" | "arquivado"
       situacao_empresa: "ativa" | "suspensa" | "cancelada"
       status_contrato: "rascunho" | "aguardando_assinatura" | "assinado"
+      status_membro: "ativo" | "inativo" | "desligado"
       status_negocio: "aberto" | "ganho" | "perdido"
       status_resgate: "solicitado" | "aprovado" | "entregue" | "cancelado"
       tipo_calculo_comissao: "percentual" | "multiplicador"
@@ -2847,6 +2851,7 @@ export const Constants = {
       proposta_modelo_status: ["rascunho", "publicado", "arquivado"],
       situacao_empresa: ["ativa", "suspensa", "cancelada"],
       status_contrato: ["rascunho", "aguardando_assinatura", "assinado"],
+      status_membro: ["ativo", "inativo", "desligado"],
       status_negocio: ["aberto", "ganho", "perdido"],
       status_resgate: ["solicitado", "aprovado", "entregue", "cancelado"],
       tipo_calculo_comissao: ["percentual", "multiplicador"],

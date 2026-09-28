@@ -2,7 +2,17 @@
 
 import { useActionState, useState } from "react";
 import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
-import { PAPEIS, ROTULO_PAPEL, ROTULO_TIPO_VENDEDOR, TIPOS_VENDEDOR, type Papel, type TipoVendedor } from "@/lib/tipos";
+import {
+  PAPEIS,
+  ROTULO_PAPEL,
+  ROTULO_STATUS_MEMBRO,
+  ROTULO_TIPO_VENDEDOR,
+  STATUS_MEMBRO,
+  TIPOS_VENDEDOR,
+  type Papel,
+  type StatusMembro,
+  type TipoVendedor,
+} from "@/lib/tipos";
 import { atualizarMembro, convidarMembro } from "./actions";
 
 export function FormularioConvite() {
@@ -27,10 +37,16 @@ export function FormularioConvite() {
         ))}
       </Selecao>
       {papel !== "vendedor" && <input type="hidden" name="tipo_vendedor" value="interno" />}
+      <Campo
+        rotulo="Senha (opcional)"
+        name="senha"
+        type="text"
+        placeholder="Deixe em branco para gerar automática"
+      />
       <div className="flex flex-col gap-2 md:col-span-2">
         <Mensagem resultado={resultado} />
         <Botao type="submit" disabled={pendente} className="self-start">
-          {pendente ? "Enviando..." : "Enviar convite"}
+          {pendente ? "Criando..." : "Criar usuário"}
         </Botao>
       </div>
     </form>
@@ -44,7 +60,7 @@ export type MembroLinha = {
   papel: Papel;
   tipoVendedor: TipoVendedor | null;
   recebeLeads: boolean;
-  ativo: boolean;
+  status: StatusMembro;
 };
 
 export function LinhaMembro({ membro }: { membro: MembroLinha }) {
@@ -80,9 +96,13 @@ export function LinhaMembro({ membro }: { membro: MembroLinha }) {
       <label className="flex items-center gap-1 text-sm text-zinc-700">
         <input type="checkbox" name="recebe_leads" defaultChecked={membro.recebeLeads} /> Recebe leads
       </label>
-      <label className="flex items-center gap-1 text-sm text-zinc-700">
-        <input type="checkbox" name="ativo" defaultChecked={membro.ativo} /> Ativo
-      </label>
+      <Selecao name="status" defaultValue={membro.status} aria-label="Status">
+        {STATUS_MEMBRO.map((s) => (
+          <option key={s} value={s}>
+            {ROTULO_STATUS_MEMBRO[s]}
+          </option>
+        ))}
+      </Selecao>
       <Botao type="submit" variante="secundario" disabled={pendente}>
         Salvar
       </Botao>

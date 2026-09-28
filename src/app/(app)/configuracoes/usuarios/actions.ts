@@ -2,27 +2,42 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { garantirUsuario } from "@/lib/convites";
+import { criarUsuarioDireto } from "@/lib/convites";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { PAPEIS, TIPOS_VENDEDOR, type ResultadoAcao } from "@/lib/tipos";
+import { PAPEIS, TIPOS_VENDEDOR, STATUS_MEMBRO, type ResultadoAcao } from "@/lib/tipos";
 
 const esquemaConvite = z.object({
   nome: z.string().trim().min(2, "Informe o nome"),
   email: z.string().trim().email("E-mail inválido"),
   papel: z.enum(PAPEIS),
   tipo_vendedor: z.enum(TIPOS_VENDEDOR),
+  senha: z
+    .string()
+    .trim()
+    .min(8, "A senha precisa ter pelo menos 8 caracteres")
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
 });
 
+function gerarSenhaTemporaria(): string {
+  const alfabeto = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+  let senha = "";
+  for (let i = 0; i < 10; i++) senha += alfabeto[Math.floor(Math.random() * alfabeto.length)];
+  return senha;
+}
+
+/** Cadastra vendedor/representante direto, com senha própria — sem depender de convite por e-mail. */
 export async function convidarMembro(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
   const { atual } = await exigirPapel("admin");
   const dados = esquemaConvite.safeParse(Object.fromEntries(formData));
   if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
 
+  const senha = dados.data.senha ?? gerarSenhaTemporaria();
   let userId: string;
   let novo: boolean;
   try {
-    ({ userId, novo } = await garantirUsuario(dados.data.email, dados.data.nome));
+    ({ userId, novo } = await criarUsuarioDireto(dados.data.email, dados.data.nome, senha));
   } catch (e) {
     return { ok: false, mensagem: (e as Error).message };
   }
@@ -44,7 +59,7 @@ export async function convidarMembro(_: ResultadoAcao, formData: FormData): Prom
   return {
     ok: true,
     mensagem: novo
-      ? `Convite enviado para ${dados.data.email}.`
+      ? `Usuário criado. Senha temporária: ${senha} — repasse pra pessoa (ela pode trocar em Meu perfil).`
       : `${dados.data.email} já tinha conta e foi adicionado à empresa.`,
   };
 }
@@ -54,7 +69,7 @@ const esquemaAtualizacao = z.object({
   papel: z.enum(PAPEIS),
   tipo_vendedor: z.enum(TIPOS_VENDEDOR),
   recebe_leads: z.enum(["on"]).optional(),
-  ativo: z.enum(["on"]).optional(),
+  status: z.enum(STATUS_MEMBRO),
 });
 
 export async function atualizarMembro(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
@@ -69,7 +84,7 @@ export async function atualizarMembro(_: ResultadoAcao, formData: FormData): Pro
       papel: dados.data.papel,
       tipo_vendedor: dados.data.papel === "vendedor" ? dados.data.tipo_vendedor : null,
       recebe_leads: dados.data.recebe_leads === "on",
-      ativo: dados.data.ativo === "on",
+      status: dados.data.status,
     })
     .eq("id", dados.data.membroId)
     .eq("empresa_id", atual.empresaId);
