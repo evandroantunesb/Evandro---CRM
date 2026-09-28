@@ -67,11 +67,21 @@ export function Mensagem({ resultado }: { resultado: { ok: boolean; mensagem: st
   );
 }
 
-export function Cartao({ titulo, children, acao }: { titulo?: string; children: ReactNode; acao?: ReactNode }) {
+export function Cartao({
+  titulo,
+  children,
+  acao,
+  className = "",
+}: {
+  titulo?: string;
+  children: ReactNode;
+  acao?: ReactNode;
+  className?: string;
+}) {
   return (
-    <section className="rounded-xl border border-zinc-200/80 bg-white p-5 shadow-[0_1px_2px_rgba(15,15,16,0.04)]">
+    <section className={`rounded-xl border border-zinc-200/80 bg-white p-5 shadow-[0_1px_2px_rgba(15,15,16,0.04)] ${className}`}>
       {(titulo || acao) && (
-        <div className="mb-3 flex items-center justify-between gap-2">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           {titulo && <h2 className="text-base font-semibold text-zinc-900">{titulo}</h2>}
           {acao}
         </div>
