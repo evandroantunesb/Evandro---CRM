@@ -12,7 +12,7 @@ export type Etapa = {
   camposObrigatorios: string[];
 };
 export type Funil = { id: string; nome: string; ativo: boolean };
-export type Origem = { id: string; nome: string; cor: string | null; ativa: boolean };
+export type Origem = { id: string; nome: string; cor: string | null; ativa: boolean; prazoAutoAprovacaoMinutos: number };
 export type ItemLista = { id: string; nome: string; ativo: boolean };
 export type Etiqueta = { id: string; nome: string; cor: string | null; ativa: boolean };
 export type MembroResumo = { id: string; nome: string; papel: string; ativo: boolean };
@@ -28,7 +28,11 @@ export async function carregarConfiguracao(empresaId: string) {
       .select("id, funil_id, nome, ordem, inicial, ativa, cor, campos_obrigatorios")
       .eq("empresa_id", empresaId)
       .order("ordem"),
-    supabase.from("origens").select("id, nome, cor, ativa").eq("empresa_id", empresaId).order("nome"),
+    supabase
+      .from("origens")
+      .select("id, nome, cor, ativa, prazo_auto_aprovacao_minutos")
+      .eq("empresa_id", empresaId)
+      .order("nome"),
     supabase.from("empresa_membros").select("id, papel, ativo, perfis(nome, email)").eq("empresa_id", empresaId),
     supabase.from("motivos_perda").select("id, nome, ativo").eq("empresa_id", empresaId).order("created_at"),
     supabase.from("etiquetas").select("id, nome, cor, ativa").eq("empresa_id", empresaId).order("nome"),
@@ -51,7 +55,13 @@ export async function carregarConfiguracao(empresaId: string) {
       cor: e.cor,
       camposObrigatorios: e.campos_obrigatorios,
     })) as Etapa[],
-    origens: (origens.data ?? []) as Origem[],
+    origens: (origens.data ?? []).map((o) => ({
+      id: o.id,
+      nome: o.nome,
+      cor: o.cor,
+      ativa: o.ativa,
+      prazoAutoAprovacaoMinutos: o.prazo_auto_aprovacao_minutos,
+    })) as Origem[],
     membros: (membros.data ?? [])
       .map((m) => {
         const p = m.perfis as unknown as { nome: string; email: string } | null;

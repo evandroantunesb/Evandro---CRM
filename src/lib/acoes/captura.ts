@@ -74,7 +74,7 @@ export async function enviarCaptura(_: ResultadoAcao, formData: FormData): Promi
 
   const { data: formulario } = await admin
     .from("formularios")
-    .select("id, nome, empresa_id, funil_id, origem_id, ativo")
+    .select("id, nome, empresa_id, funil_id, origem_id, ativo, origens(prazo_auto_aprovacao_minutos)")
     .eq("token", d.token)
     .maybeSingle();
   if (!formulario || !formulario.ativo) return { ok: false, mensagem: "Este formulário não está mais disponível." };
@@ -104,7 +104,11 @@ export async function enviarCaptura(_: ResultadoAcao, formData: FormData): Promi
   if (erroContato || !contato) return { ok: false, mensagem: mensagemErro(erroContato, "Não foi possível registrar seu contato.") };
 
   // Rodízio: escolhe quem está ativo e marcado para receber leads, dando
-  // preferência a quem está há mais tempo sem receber (ou nunca recebeu).
+  // preferência a quem está há mais tempo sem receber (ou nunca recebeu). O
+  // negócio nasce sem responsável (fica visível pro gestor, ver
+  // pode_ver_responsavel) e a sugestão do rodízio vira uma pendência de
+  // aprovação — só é atribuído de fato quando o gestor aprova ou quando o
+  // prazo da origem expira sozinho (expirar_atribuicoes_leads, via pg_cron).
   const { data: proximo } = await admin
     .from("empresa_membros")
     .select("id")
@@ -123,7 +127,6 @@ export async function enviarCaptura(_: ResultadoAcao, formData: FormData): Promi
       funil_id: formulario.funil_id,
       etapa_id: etapaInicial.id,
       origem_id: formulario.origem_id,
-      responsavel_id: proximo?.id ?? null,
       contato_id: contato.id,
       valor_conta_energia: d.valor_conta_energia,
     })
@@ -132,7 +135,17 @@ export async function enviarCaptura(_: ResultadoAcao, formData: FormData): Promi
   if (erroNegocio || !negocio) return { ok: false, mensagem: mensagemErro(erroNegocio, "Não foi possível registrar seu contato.") };
 
   if (proximo) {
-    await admin.from("empresa_membros").update({ recebeu_lead_em: new Date().toISOString() }).eq("id", proximo.id);
+    const origem = formulario.origens as unknown as { prazo_auto_aprovacao_minutos: number } | null;
+    const prazoMinutos = origem?.prazo_auto_aprovacao_minutos ?? 60;
+    const expiraEm = new Date(Date.now() + prazoMinutos * 60_000).toISOString();
+    const { error: erroAtribuicao } = await admin.from("atribuicoes_leads").insert({
+      empresa_id: formulario.empresa_id,
+      negocio_id: negocio.id,
+      membro_sugerido_id: proximo.id,
+      expira_em: expiraEm,
+    });
+    if (erroAtribuicao) console.error("Falha ao criar pendência de atribuição do lead", negocio.id, erroAtribuicao);
+    else await admin.from("empresa_membros").update({ recebeu_lead_em: new Date().toISOString() }).eq("id", proximo.id);
   }
 
   // Etiqueta com o nome do formulário, pra dar pra ver no Kanban de qual

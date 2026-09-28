@@ -1,12 +1,18 @@
 import { Cartao } from "@/components/ui";
 import { carregarConfiguracao, formatarMoeda } from "@/lib/crm";
-import { carregarIndicadores } from "@/lib/painel";
+import { carregarAtribuicoesPendentes, carregarIndicadores } from "@/lib/painel";
 import { exigirPapel } from "@/lib/sessao";
+import { LinhaAtribuicaoPendente } from "./atribuicoes-pendentes";
 
 export default async function Painel() {
   const { atual } = await exigirPapel("admin", "gestor");
   const config = await carregarConfiguracao(atual.empresaId);
-  const indicadores = await carregarIndicadores(atual.empresaId, config);
+  const [indicadores, atribuicoesPendentes] = await Promise.all([
+    carregarIndicadores(atual.empresaId, config),
+    carregarAtribuicoesPendentes(atual.empresaId),
+  ]);
+  const vendedores = config.membros.filter((m) => m.ativo && m.papel === "vendedor");
+  const agora = new Date();
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-4">
@@ -18,6 +24,23 @@ export default async function Painel() {
         <Estatistica rotulo="Negócios perdidos" valor={indicadores.perdidos.total} destaque="negativo" />
         <Estatistica rotulo="Tarefas atrasadas" valor={indicadores.tarefasAtrasadas} destaque={indicadores.tarefasAtrasadas ? "negativo" : "neutro"} />
       </div>
+
+      {atribuicoesPendentes.length > 0 && (
+        <Cartao titulo={`Leads aguardando aprovação (${atribuicoesPendentes.length})`}>
+          <p className="mb-2 text-sm text-zinc-600">
+            O rodízio sugeriu um vendedor pra cada lead abaixo. Aprove a sugestão ou escolha outro vendedor — sem decisão, o
+            lead é atribuído sozinho pro sugerido quando o prazo da origem vencer.
+          </p>
+          {atribuicoesPendentes.map((a) => (
+            <LinhaAtribuicaoPendente
+              key={a.id}
+              atribuicao={a}
+              minutosRestantes={Math.round((new Date(a.expiraEm).getTime() - agora.getTime()) / 60_000)}
+              vendedores={vendedores}
+            />
+          ))}
+        </Cartao>
+      )}
 
       <Cartao titulo="Leads por origem">
         {indicadores.porOrigem.length === 0 ? (
