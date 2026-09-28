@@ -31,4 +31,4 @@ jobs:
             exit 1
           fi
       - run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
-      - run: supabase db push --include-all
+      - run: supabase db push
