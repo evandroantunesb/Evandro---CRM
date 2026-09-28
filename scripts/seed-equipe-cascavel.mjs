@@ -10,6 +10,16 @@ import { createClient } from "@supabase/supabase-js";
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY_PROD;
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? "vando12star@gmail.com";
+const SENHA_VENDEDORES_TESTE = "123456";
+
+/** Regras padrão de gamificação, criadas só se a empresa não tiver nenhuma regra ativa. */
+const REGRAS_PADRAO_GAMIFICACAO = [
+  { nome: "Negócio criado", evento_tipo: "deal.created", pontos: 5 },
+  { nome: "Etapa do funil avançada", evento_tipo: "deal.stage_changed", pontos: 2 },
+  { nome: "Negócio ganho", evento_tipo: "deal.won", pontos: 50 },
+  { nome: "Tarefa concluída", evento_tipo: "task.completed", pontos: 3 },
+  { nome: "Nota registrada", evento_tipo: "note.created", pontos: 1 },
+];
 
 if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
   console.error("Faltam SUPABASE_URL e/ou SUPABASE_SERVICE_ROLE_KEY no ambiente.");
@@ -115,6 +125,28 @@ async function garantirVendedor(empresaId, { nome, email }) {
   return { membroId: membro.id, userId: usuario.id, novo: true };
 }
 
+/** Define uma senha conhecida pro vendedor de teste poder logar (senão nasce com senha aleatória, irrecuperável). */
+async function garantirSenhaConhecida(userId, senha) {
+  const { error } = await db.auth.admin.updateUserById(userId, { password: senha });
+  if (error) throw error;
+  console.log(`  senha definida: ${senha}`);
+}
+
+/** Cria as regras padrão de gamificação só se a empresa ainda não tiver nenhuma regra ativa. */
+async function garantirRegrasPadrao(empresaId, adminEmail) {
+  const { data: existentes, error } = await db.from("gamification_rules").select("id").eq("empresa_id", empresaId).eq("ativa", true).limit(1);
+  if (error) throw error;
+  if (existentes && existentes.length > 0) return false;
+
+  const clienteAdmin = await clienteComoAdmin(adminEmail);
+  const { error: eInsert } = await clienteAdmin
+    .from("gamification_rules")
+    .insert(REGRAS_PADRAO_GAMIFICACAO.map((r) => ({ empresa_id: empresaId, ...r, ativa: true })));
+  if (eInsert) throw eInsert;
+  console.log(`Regras padrão de gamificação criadas: ${REGRAS_PADRAO_GAMIFICACAO.map((r) => r.nome).join(", ")}`);
+  return true;
+}
+
 async function garantirEquipe(empresaId, nome, membroIds) {
   let { data: equipe } = await db.from("equipes").select("id").eq("empresa_id", empresaId).eq("nome", nome).maybeSingle();
   if (!equipe) {
@@ -164,6 +196,31 @@ async function carregarRegrasAtivas(empresaId) {
   const { data, error } = await db.from("gamification_rules").select("*").eq("empresa_id", empresaId).eq("ativa", true);
   if (error) throw error;
   return data ?? [];
+}
+
+/**
+ * gamification_rules só aceita insert/update/delete de usuários autenticados
+ * com papel admin (revogado até de service_role, ver migration) — então pra
+ * criar regras aqui é preciso agir como o próprio admin, não como service role.
+ * Gera um magic link pro admin e troca por uma sessão de verdade, sem senha.
+ */
+async function clienteComoAdmin(adminEmail) {
+  const { data: link, error } = await db.auth.admin.generateLink({ type: "magiclink", email: adminEmail });
+  if (error) throw error;
+  const tokenHash = link.properties?.hashed_token;
+  if (!tokenHash) throw new Error("Não recebi hashed_token do generateLink pro admin.");
+
+  const clienteVerificacao = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+  const { data: sessao, error: eVerify } = await clienteVerificacao.auth.verifyOtp({ type: "magiclink", token_hash: tokenHash });
+  if (eVerify) throw eVerify;
+
+  const clienteAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+  const { error: eSessao } = await clienteAdmin.auth.setSession({
+    access_token: sessao.session.access_token,
+    refresh_token: sessao.session.refresh_token,
+  });
+  if (eSessao) throw eSessao;
+  return clienteAdmin;
 }
 
 async function garantirNegocioComProposta(empresaId, { titulo, contato, negocio, kit, gerarProposta, vendedorUserId }) {
@@ -260,8 +317,33 @@ async function garantirNegocioComProposta(empresaId, { titulo, contato, negocio,
   return { negocioId: negocioRow.id, novo: !negocioJaExistia, vendedorUserId };
 }
 
+/**
+ * Registra o evento (dispara o motor de gamificação) se ainda não tiver sido
+ * registrado antes pra esse negócio — checagem por eventos existentes, não só
+ * por "negócio novo", pra também funcionar como backfill quando as regras são
+ * criadas depois dos negócios já existirem.
+ *
+ * A checagem exige o mesmo ator_id: negócios/tarefas têm gatilho próprio que
+ * já cria um evento automático no insert, mas com ator_id nulo quando quem
+ * insere é a service role (sem auth.uid()) — e o motor de gamificação ignora
+ * eventos com ator_id nulo. Sem essa condição, esse evento automático "sem
+ * dono" seria confundido com o evento já registrado e o insert manual abaixo
+ * (o único capaz de gerar pontos) seria pulado silenciosamente.
+ */
 async function registrarEvento(empresaId, { tipo, atorUserId, negocioId }, regrasPorTipo) {
   if (!regrasPorTipo.has(tipo)) return;
+
+  const { data: existente } = await db
+    .from("eventos")
+    .select("id")
+    .eq("empresa_id", empresaId)
+    .eq("tipo", tipo)
+    .eq("entidade", "negocio")
+    .eq("entidade_id", negocioId)
+    .eq("ator_id", atorUserId)
+    .maybeSingle();
+  if (existente) return;
+
   const { error } = await db.from("eventos").insert({
     empresa_id: empresaId,
     tipo,
@@ -282,13 +364,10 @@ async function main() {
   const { funilId, etapas } = await carregarEtapas(empresaId);
   const etapaPorOrdem = (i) => etapas[Math.min(i, etapas.length - 1)].id;
   const parametros = await carregarParametrosCalculadora(empresaId);
+  await garantirRegrasPadrao(empresaId, ADMIN_EMAIL);
   const regras = await carregarRegrasAtivas(empresaId);
   const regrasPorTipo = new Map(regras.map((r) => [r.evento_tipo, r]));
-  if (regras.length === 0) {
-    console.log("Nenhuma regra de gamificação ativa nessa empresa — pontos não serão lançados (o Kanban ainda será populado normalmente).");
-  } else {
-    console.log(`Regras de gamificação ativas encontradas: ${[...regrasPorTipo.keys()].join(", ")}`);
-  }
+  console.log(`Regras de gamificação ativas: ${[...regrasPorTipo.keys()].join(", ") || "nenhuma"}`);
 
   const perfis = [
     { chave: "alto", nome: "Camila Fernandes", email: "camila.fernandes.teste@raioncrm-demo.com.br" },
@@ -301,6 +380,7 @@ async function main() {
   for (const perfil of perfis) {
     console.log(`- ${perfil.nome} (${perfil.chave})`);
     vendedores[perfil.chave] = { ...perfil, ...(await garantirVendedor(empresaId, perfil)) };
+    await garantirSenhaConhecida(vendedores[perfil.chave].userId, SENHA_VENDEDORES_TESTE);
   }
 
   console.log("\nCriando equipe...");
@@ -352,10 +432,8 @@ async function main() {
     kit: kitPadrao(16, 550, 1.1),
     gerarProposta: true,
   });
-  if (rGanho.novo) {
-    await registrarEvento(empresaId, { tipo: "deal.created", atorUserId: vendedores.alto.userId, negocioId: rGanho.negocioId }, regrasPorTipo);
-    await registrarEvento(empresaId, { tipo: "deal.won", atorUserId: vendedores.alto.userId, negocioId: rGanho.negocioId }, regrasPorTipo);
-  }
+  await registrarEvento(empresaId, { tipo: "deal.created", atorUserId: vendedores.alto.userId, negocioId: rGanho.negocioId }, regrasPorTipo);
+  await registrarEvento(empresaId, { tipo: "deal.won", atorUserId: vendedores.alto.userId, negocioId: rGanho.negocioId }, regrasPorTipo);
 
   for (const [i, [titulo, kw, consumo, etapaIdx, valor]] of [
     ["Sistema solar residencial — Cliente Cascavel Alto 2", 10, 380, 3, 19800],
@@ -378,7 +456,7 @@ async function main() {
       kit: kitPadrao(Math.round((kw * 1000) / 550), 550, 1.1),
       gerarProposta: true,
     });
-    if (r.novo) await registrarEvento(empresaId, { tipo: "deal.created", atorUserId: vendedores.alto.userId, negocioId: r.negocioId }, regrasPorTipo);
+    await registrarEvento(empresaId, { tipo: "deal.created", atorUserId: vendedores.alto.userId, negocioId: r.negocioId }, regrasPorTipo);
   }
 
   console.log("\n--- Rafael Souza (médio desempenho) ---");
@@ -404,7 +482,7 @@ async function main() {
       kit: kitPadrao(Math.round((kw * 1000) / 550), 550, 1.1),
       gerarProposta: true,
     });
-    if (r.novo) await registrarEvento(empresaId, { tipo: "deal.created", atorUserId: vendedores.medio.userId, negocioId: r.negocioId }, regrasPorTipo);
+    await registrarEvento(empresaId, { tipo: "deal.created", atorUserId: vendedores.medio.userId, negocioId: r.negocioId }, regrasPorTipo);
   }
 
   console.log("\n--- Bruno Lima (baixo desempenho) ---");
@@ -430,7 +508,7 @@ async function main() {
       kit: kitPadrao(Math.round((kw * 1000) / 550), 550, 1.1),
       gerarProposta: true,
     });
-    if (r.novo) await registrarEvento(empresaId, { tipo: "deal.created", atorUserId: vendedores.baixo.userId, negocioId: r.negocioId }, regrasPorTipo);
+    await registrarEvento(empresaId, { tipo: "deal.created", atorUserId: vendedores.baixo.userId, negocioId: r.negocioId }, regrasPorTipo);
   }
 
   console.log("\nConcluído.");
