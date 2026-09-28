@@ -1,0 +1,23 @@
+name: Popular Equipe Cascavel (dados de teste)
+
+# Só roda quando disparado manualmente — nunca em push/PR — porque grava
+# dados fictícios direto na produção (idempotente: pode rodar mais de uma vez sem duplicar).
+on:
+  workflow_dispatch:
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Rodar seed
+        env:
+          SUPABASE_URL: https://${{ secrets.SUPABASE_PROJECT_ID }}.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY_PROD }}
+        run: node scripts/seed-equipe-cascavel.mjs
