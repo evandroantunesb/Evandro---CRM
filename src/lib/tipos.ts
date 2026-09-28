@@ -15,6 +15,15 @@ export const ROTULO_TIPO_VENDEDOR: Record<TipoVendedor, string> = {
   representante: "Representante",
 };
 
+export const STATUS_MEMBRO = ["ativo", "inativo", "desligado"] as const;
+export type StatusMembro = (typeof STATUS_MEMBRO)[number];
+
+export const ROTULO_STATUS_MEMBRO: Record<StatusMembro, string> = {
+  ativo: "Ativo",
+  inativo: "Inativo",
+  desligado: "Desligado",
+};
+
 /** Resultado padrão das Server Actions usadas com useActionState. */
 export type ResultadoAcao = { ok: boolean; mensagem: string } | null;
 
