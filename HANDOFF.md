@@ -78,12 +78,9 @@ Contexto para uma nova sessão continuar sem repetir trabalho. Leia junto com `C
 
 ## 9. Instruções que não podem se perder (💬)
 
-- Nunca mesclar PR sem o "mescle"/aprovação do Evandro. Nunca pedir senhas/tokens no chat.
-- Repositório público: nada de senhas, tokens ou dados de cliente em arquivos.
-- Sonnet como padrão; Opus só com justificativa técnica; nunca afirmar troca de modelo não executada.
-- Atualizar `PROGRESS.md` ao concluir cada funcionalidade; `CLAUDE.md`/`docs/` só com mudança permanente.
-- Pendências menores: anotar e seguir sem travar o ritmo; dados técnicos da calculadora e merges sempre perguntam antes.
-- Quando o Evandro for limpar/trocar de conversa, oferecer um resumo ultra-conciso em tópicos.
+- Regras permanentes de merge/segredos, seleção de modelo, pendências pequenas, calculadora solar e atualização de `PROGRESS.md`/`CLAUDE.md`/`docs/`: ver `CLAUDE.md` (§Execução, §Modelos, §Continuidade) — não duplicadas aqui pra não desalinhar com o arquivo fonte.
+- Gestão de thread (manter a mesma durante uma funcionalidade, nova thread só ao começar algo independente ou histórico muito extenso, nunca criar thread sozinho): ver `CLAUDE.md` §Threads.
+- Quando o Evandro for limpar/trocar de conversa, oferecer um resumo ultra-conciso em tópicos (só aqui, não está no `CLAUDE.md`).
 
 ## 10. Tarefa em execução antes da troca de thread
 
