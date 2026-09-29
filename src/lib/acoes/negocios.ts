@@ -17,16 +17,14 @@ const uuidOpcional = z
   .transform((v) => (v ? v : null))
   .pipe(z.string().uuid().nullable());
 
-const valorOpcional = z
-  .string()
-  .optional()
-  .transform((v) => {
-    if (!v || !v.trim()) return null;
-    // Aceita "18.500,00", "18500,5" e "18500.50".
-    const limpo = v.includes(",") ? v.replace(/\./g, "").replace(",", ".") : v;
-    return Number(limpo);
-  })
-  .pipe(z.number().nonnegative("Valor inválido").nullable());
+// Valor é obrigatório nos formulários de negócio (criar e editar); captura
+// pública e rodízio continuam criando negócios sem valor.
+const valorObrigatorio = z
+  .string({ error: "Informe o valor do negócio." })
+  .trim()
+  .min(1, "Informe o valor do negócio.")
+  .transform((v) => Number(v.includes(",") ? v.replace(/\./g, "").replace(",", ".") : v))
+  .pipe(z.number({ error: "Valor inválido" }).positive("Informe um valor maior que zero."));
 
 const numeroBrOpcional = z
   .string()
@@ -43,7 +41,7 @@ const esquemaNovo = z.object({
   etapa_id: uuidOpcional,
   origem_id: uuidOpcional,
   responsavel_id: uuidOpcional,
-  valor: valorOpcional,
+  valor: valorObrigatorio,
   descricao: z.string().trim().optional(),
   // Dados de instalação: ficam no negócio, não no contato (que é só dado
   // pessoal/residência do cliente).
@@ -77,9 +75,7 @@ export async function criarNegocio(_: ResultadoAcao, formData: FormData): Promis
   let contatoId = d.contato_id;
   if (!contatoId) {
     if (!d.contato_nome || d.contato_nome.length < 2) return { ok: false, mensagem: "Informe o nome do contato." };
-    if (!d.contato_telefone && !d.contato_email) {
-      return { ok: false, mensagem: "Informe o telefone ou o e-mail do contato." };
-    }
+    if (!d.contato_telefone) return { ok: false, mensagem: "Informe o telefone do contato." };
     const { data: contato, error } = await supabase
       .from("contatos")
       .insert({
@@ -234,7 +230,7 @@ const esquemaEdicao = z.object({
   etapa_id: z.string().uuid(),
   origem_id: uuidOpcional,
   responsavel_id: uuidOpcional,
-  valor: valorOpcional,
+  valor: valorObrigatorio,
   descricao: z.string().trim().optional(),
   unidade_consumidora: z.string().trim().max(60).optional(),
   padrao_cliente: z.string().trim().max(60).optional(),

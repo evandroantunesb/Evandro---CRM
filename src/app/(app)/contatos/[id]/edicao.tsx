@@ -26,7 +26,7 @@ export function EdicaoContato({ contato }: { contato: ContatoEdicao }) {
         <option value="pj">Empresa</option>
       </Selecao>
       <Campo rotulo="Nome / razão social" name="nome" defaultValue={contato.nome} required />
-      <Campo rotulo="Telefone / WhatsApp" name="telefone" type="tel" defaultValue={contato.telefone ?? ""} />
+      <Campo rotulo="Telefone / WhatsApp" name="telefone" type="tel" required defaultValue={contato.telefone ?? ""} />
       <Campo rotulo="Telefone secundário" name="telefone2" type="tel" defaultValue={contato.telefone2 ?? ""} />
       <Campo rotulo="E-mail" name="email" type="email" defaultValue={contato.email ?? ""} />
       <Campo rotulo="CPF / CNPJ" name="documento" defaultValue={contato.documento ?? ""} />

@@ -16,7 +16,7 @@ const esquema = z.object({
   contatoId: z.string().uuid(),
   tipo: z.enum(["pf", "pj"]),
   nome: z.string().trim().min(2, "Informe o nome"),
-  telefone: opcional,
+  telefone: z.string({ error: "Informe o telefone" }).trim().min(1, "Informe o telefone"),
   telefone2: opcional,
   email: z.union([z.literal(""), z.string().trim().email("E-mail inválido")]).transform((v) => v || null),
   documento: opcional,

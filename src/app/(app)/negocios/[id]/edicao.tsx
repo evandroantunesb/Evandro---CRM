@@ -64,6 +64,7 @@ export function EdicaoNegocio({
         rotulo="Valor (R$)"
         name="valor"
         inputMode="decimal"
+        required
         defaultValue={negocio.valor != null ? String(negocio.valor).replace(".", ",") : ""}
       />
       <Campo
