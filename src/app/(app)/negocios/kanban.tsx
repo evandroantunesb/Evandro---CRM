@@ -100,26 +100,30 @@ function ColunaKanban({
   return (
     <section
       ref={setNodeRef}
-      className={`flex w-72 shrink-0 flex-col rounded-lg p-2 ${isOver ? "bg-amber-50 ring-2 ring-amber-300" : "bg-zinc-100"}`}
+      className={`flex w-72 shrink-0 flex-col rounded-xl p-2 transition-colors ${
+        isOver ? "bg-amber-50 ring-2 ring-dourado" : "bg-zinc-100"
+      }`}
     >
-      <header className="px-1 pt-1 pb-2">
+      <header className="px-1.5 pt-1.5 pb-2">
         <div className="flex items-center justify-between gap-2">
-          <h2 className="truncate text-sm font-semibold text-zinc-800" title={coluna.nome}>
+          <h2 className="font-titulo truncate text-sm font-semibold text-carvao" title={coluna.nome}>
             {coluna.nome}
           </h2>
-          <span className="shrink-0 rounded-full bg-white px-2 text-xs text-zinc-600">{cards.length}</span>
+          <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-xs font-medium text-zinc-600 shadow-sm">
+            {cards.length}
+          </span>
         </div>
         {soma > 0 && <p className="mt-0.5 text-xs text-zinc-500">{formatarMoeda(soma)}</p>}
         <div className="mt-2 h-[3px] rounded-full" style={{ background: coluna.cor ?? "#d4d4d8" }} />
       </header>
       <div className="flex flex-col gap-2">
         {cards.map((c) => (
-          <CardKanban key={c.id} card={c} colunas={colunas} />
+          <CardKanban key={c.id} card={c} colunas={colunas} corEtapa={coluna.cor} />
         ))}
         {!cards.length && <p className="px-1 py-4 text-center text-xs text-zinc-400">Arraste um negócio para cá</p>}
         <Link
           href={`/negocios/novo?funil=${funilId}&etapa=${coluna.id}`}
-          className="mt-1 flex items-center justify-center gap-1 rounded-md border border-dashed border-zinc-300 py-1.5 text-xs font-medium text-zinc-500 hover:border-dourado hover:text-carvao"
+          className="mt-1 flex items-center justify-center gap-1 rounded-md border border-dashed border-zinc-300 py-1.5 text-xs font-medium text-zinc-500 transition-colors hover:border-dourado hover:text-carvao"
         >
           <Plus size={13} /> Adicionar negócio
         </Link>
@@ -145,17 +149,17 @@ function PrazoOuDesde({ card }: { card: Card }) {
   return <span className="ml-auto">{card.desde}</span>;
 }
 
-function CardKanban({ card, colunas }: { card: Card; colunas: Coluna[] }) {
+function CardKanban({ card, colunas, corEtapa }: { card: Card; colunas: Coluna[]; corEtapa: string | null }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: card.id });
   const estilo = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined;
   return (
     <article
       ref={setNodeRef}
-      style={estilo}
+      style={{ ...estilo, borderLeftColor: corEtapa ?? "#d4d4d8" }}
       {...listeners}
       {...attributes}
-      className={`relative touch-manipulation rounded-md border border-zinc-200 bg-white p-3 text-sm shadow-sm ${
-        isDragging ? "z-10 cursor-grabbing opacity-80 shadow-lg" : "cursor-grab"
+      className={`relative touch-manipulation rounded-md border border-l-4 border-zinc-200 bg-white p-3 text-sm shadow-sm transition-shadow ${
+        isDragging ? "z-10 cursor-grabbing opacity-80 shadow-lg" : "cursor-grab hover:shadow-md"
       }`}
     >
       <div className="absolute top-2 right-2 flex items-center gap-1">
@@ -163,23 +167,27 @@ function CardKanban({ card, colunas }: { card: Card; colunas: Coluna[] }) {
         <MoverEtapa negocioId={card.id} etapaAtualId={card.etapaId} etapas={colunas} compacto />
       </div>
       <Link href={`/negocios/${card.id}`} className="-m-1 block rounded-md p-1 pr-16 hover:bg-zinc-50">
-        <p className="truncate font-medium text-zinc-900">{card.contato}</p>
+        <p className="truncate font-medium text-carvao">{card.contato}</p>
         <p className="truncate text-zinc-600">
           #{card.numero} · {card.titulo}
         </p>
       </Link>
       {(card.origem || card.etiquetas.length > 0) && (
         <div className="mt-1.5 flex flex-wrap gap-1 text-xs">
-          {card.origem && <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-zinc-600">{card.origem}</span>}
+          {card.origem && <span className="rounded-full bg-zinc-100 px-1.5 py-0.5 text-zinc-600">{card.origem}</span>}
           {card.etiquetas.map((e) => (
-            <span key={e.nome} className="rounded px-1.5 py-0.5 text-white" style={{ background: e.cor ?? "#71717a" }}>
+            <span
+              key={e.nome}
+              className="rounded-full px-1.5 py-0.5 text-white"
+              style={{ background: e.cor ?? "#71717a" }}
+            >
               {e.nome}
             </span>
           ))}
         </div>
       )}
-      <div className="mt-2 flex items-center gap-x-2 text-xs text-zinc-500">
-        {card.valor && <span className="font-medium text-zinc-800">{card.valor}</span>}
+      <div className="mt-2 flex items-center gap-x-2 border-t border-zinc-100 pt-2 text-xs text-zinc-500">
+        {card.valor && <span className="font-semibold text-carvao">{card.valor}</span>}
         <PrazoOuDesde card={card} />
       </div>
     </article>
