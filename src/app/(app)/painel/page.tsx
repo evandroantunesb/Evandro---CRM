@@ -1,22 +1,28 @@
 import Link from "next/link";
 import { Cartao, Selo } from "@/components/ui";
 import { carregarConfiguracao, formatarMoeda, tempoDesde } from "@/lib/crm";
-import { DIAS_PARADO_PADRAO } from "@/lib/leads-parados";
-import { carregarAtribuicoesPendentes, carregarIndicadores, carregarLeadsParadosPainel, carregarTarefasAtrasadasLista } from "@/lib/painel";
+import {
+  carregarAtribuicoesPendentes,
+  carregarIndicadores,
+  carregarLeadsParadosPainel,
+  carregarPropostasParadasPainel,
+  carregarTarefasAtrasadasLista,
+} from "@/lib/painel";
 import { exigirPapel } from "@/lib/sessao";
 import { LinhaAtribuicaoPendente } from "./atribuicoes-pendentes";
+import { LinhaParado } from "./linha-parado";
 
 export default async function Painel() {
   const { atual } = await exigirPapel("admin", "gestor");
   const config = await carregarConfiguracao(atual.empresaId);
-  const [indicadores, atribuicoesPendentes, tarefasAtrasadas, leadsParados] = await Promise.all([
+  const [indicadores, atribuicoesPendentes, tarefasAtrasadas, leadsParados, propostasParadas] = await Promise.all([
     carregarIndicadores(atual.empresaId, config),
     carregarAtribuicoesPendentes(atual.empresaId),
     carregarTarefasAtrasadasLista(atual.empresaId, config),
-    carregarLeadsParadosPainel(atual.empresaId),
+    carregarLeadsParadosPainel(atual.empresaId, config.diasConsideradoParado),
+    carregarPropostasParadasPainel(atual.empresaId, config.diasConsideradoParado),
   ]);
   const vendedores = config.membros.filter((m) => m.ativo && m.papel === "vendedor");
-  const nomeMembro = new Map(config.membros.map((m) => [m.id, m.nome]));
   const agora = new Date();
 
   return (
@@ -75,22 +81,44 @@ export default async function Painel() {
       {leadsParados.length > 0 && (
         <Cartao titulo={`Leads parados (${leadsParados.length})`}>
           <p className="mb-2 text-sm text-zinc-600">
-            Sem mudar de etapa nem ganhar uma nota nova há mais de {DIAS_PARADO_PADRAO} dias.
+            Sem mudar de etapa nem ganhar uma nota nova há mais de {config.diasConsideradoParado} dias.
           </p>
           <ul className="flex flex-col">
             {leadsParados.map((n) => (
-              <li key={n.id} className="flex items-center gap-3 border-t border-zinc-100 py-2.5 first:border-t-0">
-                <div className="min-w-0 flex-1">
-                  <Link href={`/negocios/${n.id}`} className="truncate text-sm font-medium text-zinc-900 hover:underline">
-                    {n.contatoNome}
-                  </Link>
-                  <p className="truncate text-xs text-zinc-500">
-                    #{n.numero} {n.titulo}
-                    {n.responsavelId ? ` · ${nomeMembro.get(n.responsavelId) ?? "—"}` : ""}
-                  </p>
-                </div>
-                <Selo tom="atencao">{tempoDesde(n.ultimaAtividadeEm, agora.getTime())}</Selo>
-              </li>
+              <LinhaParado
+                key={n.id}
+                negocioId={n.id}
+                numero={n.numero}
+                titulo={n.titulo}
+                contatoNome={n.contatoNome}
+                responsavelId={n.responsavelId}
+                ultimaAtividadeEm={n.ultimaAtividadeEm}
+                agora={agora.getTime()}
+                vendedores={vendedores}
+              />
+            ))}
+          </ul>
+        </Cartao>
+      )}
+
+      {propostasParadas.length > 0 && (
+        <Cartao titulo={`Propostas paradas (${propostasParadas.length})`}>
+          <p className="mb-2 text-sm text-zinc-600">
+            Proposta gerada, sem o cliente abrir de novo nem mudar de etapa há mais de {config.diasConsideradoParado} dias.
+          </p>
+          <ul className="flex flex-col">
+            {propostasParadas.map((n) => (
+              <LinhaParado
+                key={n.id}
+                negocioId={n.id}
+                numero={n.numero}
+                titulo={n.titulo}
+                contatoNome={n.contatoNome}
+                responsavelId={n.responsavelId}
+                ultimaAtividadeEm={n.ultimaAtividadeEm}
+                agora={agora.getTime()}
+                vendedores={vendedores}
+              />
             ))}
           </ul>
         </Cartao>

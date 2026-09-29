@@ -717,6 +717,7 @@ export type Database = {
           cnpj: string | null
           created_at: string
           created_by: string | null
+          dias_considerado_parado: number
           id: string
           nome: string
           seq_negocio: number
@@ -727,6 +728,7 @@ export type Database = {
           cnpj?: string | null
           created_at?: string
           created_by?: string | null
+          dias_considerado_parado?: number
           id?: string
           nome: string
           seq_negocio?: number
@@ -737,6 +739,7 @@ export type Database = {
           cnpj?: string | null
           created_at?: string
           created_by?: string | null
+          dias_considerado_parado?: number
           id?: string
           nome?: string
           seq_negocio?: number

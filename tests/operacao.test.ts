@@ -1,6 +1,7 @@
 /** Regras da operação: tarefas, notas, anexos, etiquetas, ganho/perda e campos obrigatórios. */
 import { beforeAll, describe, expect, it } from "vitest";
 import { carregarLeadsParados } from "@/lib/leads-parados";
+import { carregarPropostasParadas } from "@/lib/propostas-paradas";
 import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
 
 let admin: Usuario;
@@ -245,6 +246,81 @@ describe("leads parados", () => {
 
     const paradosVendedor2 = await carregarLeadsParados(servico, empresa, { diasLimite: 7, responsavelId: membro[vendedor2.id] });
     expect(paradosVendedor2.map((p) => p.id)).toContain(id);
+  });
+});
+
+describe("propostas paradas", () => {
+  async function criarNegocioComProposta(cliente: Usuario["cliente"], titulo: string, diasEtapa: number, diasProposta: number) {
+    const { data: c } = await servico.from("contatos").insert({ empresa_id: empresa, nome: titulo }).select("id").single();
+    const { data: n, error } = await cliente
+      .from("negocios")
+      .insert({ empresa_id: empresa, titulo, contato_id: c!.id, funil_id: funil, etapa_id: etapas[0].id })
+      .select("id")
+      .single();
+    if (error) throw error;
+    await servico
+      .from("negocios")
+      .update({ etapa_desde: new Date(Date.now() - diasEtapa * 86_400_000).toISOString() })
+      .eq("id", n!.id);
+
+    const { data: p, error: erroProposta } = await servico
+      .from("propostas")
+      .insert({ empresa_id: empresa, negocio_id: n!.id })
+      .select("id")
+      .single();
+    if (erroProposta) throw erroProposta;
+    await servico
+      .from("propostas")
+      .update({ created_at: new Date(Date.now() - diasProposta * 86_400_000).toISOString() })
+      .eq("id", p!.id);
+
+    return { negocioId: n!.id, propostaId: p!.id };
+  }
+
+  it("sinaliza negócio com proposta gerada há mais de 7 dias, sem abertura", async () => {
+    const { negocioId } = await criarNegocioComProposta(vendedor1.cliente, "Proposta parada 9 dias", 10, 9);
+    const parados = await carregarPropostasParadas(servico, empresa, { diasLimite: 7 });
+    expect(parados.map((p) => p.id)).toContain(negocioId);
+  });
+
+  it("não sinaliza se o cliente abriu o link recentemente, mesmo com proposta antiga", async () => {
+    const { negocioId, propostaId } = await criarNegocioComProposta(vendedor1.cliente, "Proposta reaberta", 10, 9);
+    await servico.from("propostas_aberturas").insert({ proposta_id: propostaId });
+    const parados = await carregarPropostasParadas(servico, empresa, { diasLimite: 7 });
+    expect(parados.map((p) => p.id)).not.toContain(negocioId);
+  });
+
+  it("não sinaliza negócio ainda dentro do prazo", async () => {
+    const { negocioId } = await criarNegocioComProposta(vendedor1.cliente, "Proposta recente", 1, 1);
+    const parados = await carregarPropostasParadas(servico, empresa, { diasLimite: 7 });
+    expect(parados.map((p) => p.id)).not.toContain(negocioId);
+  });
+
+  it("não sinaliza negócio sem proposta gerada, mesmo parado há muito tempo", async () => {
+    const { data: c } = await servico.from("contatos").insert({ empresa_id: empresa, nome: "Sem proposta" }).select("id").single();
+    const { data: n, error } = await vendedor1.cliente
+      .from("negocios")
+      .insert({ empresa_id: empresa, titulo: "Sem proposta", contato_id: c!.id, funil_id: funil, etapa_id: etapas[0].id })
+      .select("id")
+      .single();
+    if (error) throw error;
+    await servico
+      .from("negocios")
+      .update({ etapa_desde: new Date(Date.now() - 30 * 86_400_000).toISOString() })
+      .eq("id", n!.id);
+
+    const parados = await carregarPropostasParadas(servico, empresa, { diasLimite: 7 });
+    expect(parados.map((p) => p.id)).not.toContain(n!.id);
+  });
+
+  it("respeita o filtro por responsável", async () => {
+    const { negocioId } = await criarNegocioComProposta(vendedor2.cliente, "Proposta parada do vendedor2", 10, 9);
+
+    const paradosVendedor1 = await carregarPropostasParadas(servico, empresa, { diasLimite: 7, responsavelId: membro[vendedor1.id] });
+    expect(paradosVendedor1.map((p) => p.id)).not.toContain(negocioId);
+
+    const paradosVendedor2 = await carregarPropostasParadas(servico, empresa, { diasLimite: 7, responsavelId: membro[vendedor2.id] });
+    expect(paradosVendedor2.map((p) => p.id)).toContain(negocioId);
   });
 });
 

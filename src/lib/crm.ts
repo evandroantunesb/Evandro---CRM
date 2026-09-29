@@ -21,7 +21,8 @@ export type KitSolar = { id: string; nome: string; potenciaKwp: number; preco: n
 /** Configurações da empresa usadas em quase todas as telas do CRM. */
 export async function carregarConfiguracao(empresaId: string) {
   const supabase = await criarClienteServidor();
-  const [funis, etapas, origens, membros, motivos, etiquetas, kits] = await Promise.all([
+  const [empresa, funis, etapas, origens, membros, motivos, etiquetas, kits] = await Promise.all([
+    supabase.from("empresas").select("dias_considerado_parado").eq("id", empresaId).single(),
     supabase.from("funis").select("id, nome, ativo").eq("empresa_id", empresaId).order("ordem").order("created_at"),
     supabase
       .from("etapas")
@@ -44,6 +45,7 @@ export async function carregarConfiguracao(empresaId: string) {
   ]);
 
   return {
+    diasConsideradoParado: empresa.data?.dias_considerado_parado ?? 7,
     funis: (funis.data ?? []) as Funil[],
     etapas: (etapas.data ?? []).map((e) => ({
       id: e.id,
@@ -82,6 +84,13 @@ export async function carregarConfiguracao(empresaId: string) {
 }
 
 export type Configuracao = Awaited<ReturnType<typeof carregarConfiguracao>>;
+
+/** Só o prazo de inatividade — pra quem precisa dele sem carregar o resto de [[carregarConfiguracao]] (ex.: o sininho no menu). */
+export async function carregarDiasConsideradoParado(empresaId: string): Promise<number> {
+  const supabase = await criarClienteServidor();
+  const { data } = await supabase.from("empresas").select("dias_considerado_parado").eq("id", empresaId).single();
+  return data?.dias_considerado_parado ?? 7;
+}
 
 export {
   formatarMoeda,

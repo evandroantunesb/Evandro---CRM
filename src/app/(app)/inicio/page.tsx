@@ -22,6 +22,7 @@ import { Cartao, Selo } from "@/components/ui";
 import { carregarConfiguracao, formatarMoeda, inicioDoDia, tempoDesde } from "@/lib/crm";
 import { carregarLeadsParados } from "@/lib/leads-parados";
 import { calcularProgresso, calcularRealizado, type Meta } from "@/lib/metas";
+import { carregarPropostasParadas } from "@/lib/propostas-paradas";
 import { obterSessao } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { ROTULO_PAPEL, type TipoTarefa } from "@/lib/tipos";
@@ -224,10 +225,12 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
     .limit(4);
   if (pessoal) consultaLeadsAguardandoLista = consultaLeadsAguardandoLista.eq("responsavel_id", atual.membroId);
 
-  const [{ count: leadsAguardando }, { data: leadsAguardandoLista }, leadsParados] = await Promise.all([
+  const filtroResponsavel = pessoal ? { responsavelId: atual.membroId } : {};
+  const [{ count: leadsAguardando }, { data: leadsAguardandoLista }, leadsParados, propostasParadas] = await Promise.all([
     etapasIniciais.length ? consultaLeadsAguardandoCount : Promise.resolve({ count: 0 }),
     etapasIniciais.length ? consultaLeadsAguardandoLista : Promise.resolve({ data: [] }),
-    carregarLeadsParados(supabase, atual.empresaId, pessoal ? { responsavelId: atual.membroId } : {}),
+    carregarLeadsParados(supabase, atual.empresaId, { ...filtroResponsavel, diasLimite: config.diasConsideradoParado }),
+    carregarPropostasParadas(supabase, atual.empresaId, { ...filtroResponsavel, diasLimite: config.diasConsideradoParado }),
   ]);
 
   // KPIs -------------------------------------------------------------------
@@ -296,8 +299,16 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
     ? Array.from({ length: diaHoje }, (_, i) => ({ dia: i + 1, valor: (meta.valorAlvo / diasNoMes) * (i + 1) }))
     : null;
 
-  // Prioridades: tarefas atrasadas + leads aguardando contato + leads parados ------
-  type Prioridade = { id: string; icone: LucideIcon; titulo: string; subtitulo: string; badge: "atrasado" | "pendente" | "parado"; tempo: string; href: string };
+  // Prioridades: tarefas atrasadas + leads aguardando contato + leads/propostas parados ------
+  type Prioridade = {
+    id: string;
+    icone: LucideIcon;
+    titulo: string;
+    subtitulo: string;
+    badge: "atrasado" | "pendente" | "parado" | "proposta_parada";
+    tempo: string;
+    href: string;
+  };
   const prioridadesAtrasadas: Prioridade[] = (tarefasAtrasadas ?? []).map((t) => {
     const negocio = t.negocios as unknown as { id: string; contatos: { nome: string } | null } | null;
     return {
@@ -331,8 +342,17 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
     tempo: tempoDesde(n.ultimaAtividadeEm, agora.getTime()),
     href: `/negocios/${n.id}`,
   }));
-  const prioridades = [...prioridadesAtrasadas, ...prioridadesParadas, ...prioridadesLeads].slice(0, 4);
-  const totalPendencias = (tarefasAtrasadasTotal ?? 0) + (leadsAguardando ?? 0) + leadsParados.length;
+  const prioridadesPropostasParadas: Prioridade[] = propostasParadas.map((n) => ({
+    id: `pp-${n.id}`,
+    icone: FileText,
+    titulo: n.contatoNome,
+    subtitulo: `#${n.numero} ${n.titulo} · proposta sem retorno`,
+    badge: "proposta_parada",
+    tempo: tempoDesde(n.ultimaAtividadeEm, agora.getTime()),
+    href: `/negocios/${n.id}`,
+  }));
+  const prioridades = [...prioridadesAtrasadas, ...prioridadesParadas, ...prioridadesPropostasParadas, ...prioridadesLeads].slice(0, 4);
+  const totalPendencias = (tarefasAtrasadasTotal ?? 0) + (leadsAguardando ?? 0) + leadsParados.length + propostasParadas.length;
 
   // Agenda de hoje -----------------------------------------------------------
   const agendaHoje: TarefaLista[] = (tarefasHoje ?? []).map((t) => {
@@ -386,7 +406,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
       : `Você tem ${tarefasHoje?.length ?? 0} tarefa${(tarefasHoje?.length ?? 0) === 1 ? "" : "s"} hoje e ${tarefasAtrasadasTotal ?? 0} cliente${(tarefasAtrasadasTotal ?? 0) === 1 ? "" : "s"} aguardando retorno.`
     : totalPendencias === 0
       ? "A equipe está em dia."
-      : `A equipe tem ${totalPendencias} pendência${totalPendencias === 1 ? "" : "s"} hoje (tarefas atrasadas + leads aguardando contato + leads parados).`;
+      : `A equipe tem ${totalPendencias} pendência${totalPendencias === 1 ? "" : "s"} hoje (tarefas atrasadas + leads aguardando contato + leads e propostas parados).`;
 
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-4">
@@ -488,7 +508,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
                       <p className="truncate text-xs text-zinc-500">{p.subtitulo}</p>
                     </Link>
                     <Selo tom={p.badge === "atrasado" ? "negativo" : "atencao"}>
-                      {{ atrasado: "Atrasado", pendente: "Pendente", parado: "Parado" }[p.badge]}
+                      {{ atrasado: "Atrasado", pendente: "Pendente", parado: "Parado", proposta_parada: "Proposta parada" }[p.badge]}
                     </Selo>
                     <span className="hidden shrink-0 text-xs text-zinc-500 sm:inline">{p.tempo}</span>
                   </li>
