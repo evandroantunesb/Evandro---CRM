@@ -30,6 +30,8 @@ Resumo do estado do desenvolvimento. **Atualize ao concluir cada funcionalidade:
 - **PR #62 — backup diário do banco de produção** para o repositório privado `raion-crm-backups`. Aguardando o Evandro criar os secrets `BACKUP_ENCRYPTION_KEY` e `BACKUP_REPO_TOKEN`.
 - **PRs do Dependabot abertas:** #55–#58 (Actions), #60 (TypeScript 6), #61 (`@types/node` 26). Atualizações maiores: revisar com cuidado antes de mesclar.
 
+- **PR #65 — campos obrigatórios:** valor do negócio (> 0) ao criar/editar e telefone do contato (novo contato e edição), no formulário e na ação do servidor. Arquivos: `src/lib/acoes/negocios.ts`, `src/lib/acoes/contatos.ts`, `negocios/novo/formulario.tsx`, `negocios/[id]/edicao.tsx`, `contatos/[id]/edicao.tsx`. Captura pública, rodízio e regras por etapa não mudam. Aguardando CI e merge.
+
 ## Decisões técnicas relevantes
 
 - Migrations aplicadas em produção só via `banco-producao.yml` com `--include-all` (corrige o travamento de 28–29/09).
@@ -52,4 +54,4 @@ Resumo do estado do desenvolvimento. **Atualize ao concluir cada funcionalidade:
 1. Mesclar a PR #63 (documentação de contexto).
 2. Criar os secrets do backup, mesclar a PR #62 e rodar o backup uma vez manualmente.
 3. Revisar as PRs do Dependabot (#60 e #61 são versões maiores).
-4. Escolher o próximo item com o Evandro (sugestão: campos obrigatórios em negócio/contato). Contexto completo da troca de thread em `HANDOFF.md`.
+4. Mesclar a PR #65 (campos obrigatórios) e escolher o próximo item com o Evandro. Contexto completo da troca de thread em `HANDOFF.md`.
