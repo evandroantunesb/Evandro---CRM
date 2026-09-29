@@ -187,7 +187,7 @@ export function FormularioNegocio({
             rotulo="Valor estimado (R$)"
             name="valor"
             inputMode="decimal"
-            placeholder="Opcional"
+            required
             value={valor}
             onChange={(e) => {
               setValor(e.target.value);
@@ -310,6 +310,7 @@ export function FormularioNegocio({
               rotulo="Telefone / WhatsApp"
               name="contato_telefone"
               type="tel"
+              required
               onBlur={(e) => conferirDuplicado(e.currentTarget.form!)}
             />
             <Campo
