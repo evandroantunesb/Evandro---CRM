@@ -11,9 +11,10 @@ CRM de funil de vendas para empresas de energia solar, multiempresa (SaaS revend
 3. **Não leia** `node_modules/`, `.next/`, `dist/`, `build/`, `out/`, `coverage/`, `pnpm-lock.yaml`, arquivos gerados ou logs longos, salvo necessidade explícita. Exceção prevista no `AGENTS.md`: a documentação do Next em `node_modules/next/dist/docs/`, só a página relevante.
 4. **Mexa só nos arquivos da funcionalidade pedida.** Nada de refatorar, reformatar ou "melhorar" código vizinho sem pedido.
 5. **Evite agentes paralelos** e buscas amplas quando o caminho já está descrito aqui; use-os só para trabalho realmente independente.
-6. **Ao terminar qualquer tarefa, atualize o `PROGRESS.md`**: o que mudou (com o número da PR) e o que falta. Se a mudança alterar arquitetura, regra de negócio ou convenção descrita aqui, atualize também este arquivo.
-7. **Nunca mescle PR sem aprovação do Evandro.** Nunca peça senhas, tokens ou chaves no chat — ele cadastra secrets direto no GitHub/Vercel/Supabase.
-8. Não altere identidade visual, logo ou regras de negócio sem pedido explícito.
+6. **Ao concluir cada funcionalidade, atualize o `PROGRESS.md`** com: alterações realizadas (com número da PR), arquivos modificados, decisões técnicas e próximas tarefas.
+7. **Este `CLAUDE.md` só muda com mudança permanente** de arquitetura ou de regras do projeto — não a cada entrega. Não releia arquivos à toa.
+8. **Nunca mescle PR sem aprovação do Evandro.** Nunca peça senhas, tokens ou chaves no chat — ele cadastra secrets direto no GitHub/Vercel/Supabase.
+9. Não altere identidade visual, logo ou regras de negócio sem pedido explícito.
 
 ## Stack
 

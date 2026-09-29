@@ -1,6 +1,6 @@
 # Progresso — Raion CRM
 
-Resumo do estado do desenvolvimento. **Atualize ao fim de cada tarefa** (o que mudou, com número da PR, e o que falta). Última atualização: 2026-09-29.
+Resumo do estado do desenvolvimento. **Atualize ao concluir cada funcionalidade:** alterações (com número da PR), arquivos modificados, decisões técnicas e próximas tarefas. Última atualização: 2026-09-29.
 
 ## Em produção
 
