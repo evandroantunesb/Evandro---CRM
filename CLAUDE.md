@@ -40,9 +40,14 @@ Objetivas: o que mudou, arquivos envolvidos, testes feitos e pendências. Não r
 
 ## Continuidade
 
-- Ao concluir cada funcionalidade, atualize o `PROGRESS.md`: alterações (com número da PR), arquivos modificados, decisões técnicas e próximas tarefas. Curto — sem documentação extensa a cada pequena alteração.
-- Este `CLAUDE.md` e os `docs/` só mudam com decisão permanente de arquitetura ou regra.
-- Uma nova thread deve conseguir continuar só com estes arquivos, sem depender do histórico da conversa.
+Política de atualização de documentação (evita gastar token documentando à toa):
+
+- Não atualize toda a documentação a cada alteração de código. Ajuste pequeno (CSS, espaçamento, cor, texto, componente, correção pontual) não exige atualizar `PROGRESS.md` nem `CLAUDE.md`, a menos que mude uma regra documentada.
+- Atualize o `PROGRESS.md` só: ao concluir uma funcionalidade/etapa relevante, em mudança significativa de andamento, em bloqueio importante, antes de encerrar ou trocar de thread, ou quando o Evandro pedir. Numa sequência de alterações pequenas da mesma funcionalidade, acumule e registre de uma vez só ao concluir a etapa. Conteúdo: alterações (com número da PR), arquivos modificados, decisões técnicas e próximas tarefas — curto.
+- Atualize o `CLAUDE.md` só com decisão permanente de arquitetura, novo padrão de desenvolvimento, mudança relevante nas regras gerais ou pedido explícito do Evandro. Atualize a documentação de um módulo em `docs/` só quando suas regras de negócio, contratos ou comportamentos documentados mudarem.
+- Prefira edição pontual a reescrever o arquivo inteiro; preserve a estrutura existente. Evite repetir a mesma informação em documentos diferentes. Sem auditoria completa da documentação sem pedido explícito.
+- Exceção às regras acima: nunca deixe a documentação desatualizada quando uma mudança importante afeta o funcionamento ou a continuidade do desenvolvimento.
+- Uma nova thread deve conseguir continuar só com `CLAUDE.md`, `docs/` e `PROGRESS.md`, sem depender do histórico da conversa — por isso, antes de trocar de thread, garanta que pendências, decisões relevantes e a próxima ação estejam registradas.
 
 ## Stack e comandos
 
