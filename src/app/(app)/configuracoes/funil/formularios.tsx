@@ -3,7 +3,15 @@
 import { useActionState } from "react";
 import { Botao, Mensagem } from "@/components/ui";
 import { CAMPOS_OBRIGATORIOS, ROTULO_CAMPO_OBRIGATORIO } from "@/lib/tipos";
-import { alternarEtapa, criarEtapa, criarFunil, definirCamposObrigatorios, definirCorEtapa, renomear } from "./actions";
+import {
+  alternarEtapa,
+  criarEtapa,
+  criarFunil,
+  definirCamposObrigatorios,
+  definirCorEtapa,
+  definirDiasConsideradoParado,
+  renomear,
+} from "./actions";
 
 const inputClasse = "min-w-0 flex-1 rounded-md border border-zinc-300 px-3 py-1.5 text-sm";
 
@@ -14,6 +22,28 @@ export function NovoFunil() {
       <input name="nome" placeholder="Nome do novo funil (ex.: Pós-venda)" className={inputClasse} required />
       <Botao type="submit" disabled={pendente}>
         Criar funil
+      </Botao>
+      <Mensagem resultado={resultado} />
+    </form>
+  );
+}
+
+export function DiasConsideradoParado({ dias }: { dias: number }) {
+  const [resultado, acao, pendente] = useActionState(definirDiasConsideradoParado, null);
+  return (
+    <form action={acao} className="flex flex-wrap items-center gap-2">
+      <input
+        type="number"
+        name="dias"
+        min={1}
+        max={365}
+        defaultValue={dias}
+        className={`${inputClasse} max-w-20 flex-none`}
+        required
+      />
+      <span className="text-sm text-zinc-600">dias sem atividade pra considerar &quot;parado&quot; (leads e propostas)</span>
+      <Botao type="submit" variante="secundario" disabled={pendente}>
+        Salvar
       </Botao>
       <Mensagem resultado={resultado} />
     </form>

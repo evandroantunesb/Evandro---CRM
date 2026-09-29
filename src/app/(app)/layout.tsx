@@ -1,7 +1,9 @@
-import { LogOut } from "lucide-react";
+import { Bell, LogOut } from "lucide-react";
 import Link from "next/link";
 import { Avatar } from "@/components/avatar";
 import { LogoRaion } from "@/components/marca";
+import { carregarDiasConsideradoParado } from "@/lib/crm";
+import { contarPendencias } from "@/lib/notificacoes";
 import { obterSessao } from "@/lib/sessao";
 import { trocarEmpresa } from "@/lib/acoes/empresa-atual";
 import { ROTULO_PAPEL } from "@/lib/tipos";
@@ -10,6 +12,12 @@ import { Menu } from "./menu";
 export default async function LayoutApp({ children }: { children: React.ReactNode }) {
   const sessao = await obterSessao();
   const papel = sessao.atual?.papel;
+
+  let pendencias = 0;
+  if (sessao.atual) {
+    const dias = await carregarDiasConsideradoParado(sessao.atual.empresaId);
+    pendencias = await contarPendencias(sessao.atual.empresaId, sessao.atual.membroId, sessao.atual.papel, dias);
+  }
 
   const itens = [
     ...(sessao.atual
@@ -82,6 +90,15 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
             )
           )}
         </div>
+        {sessao.atual && (
+          <Link
+            href={papel === "vendedor" ? "/inicio" : "/painel"}
+            className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-offwhite hover:border-dourado"
+          >
+            <Bell size={16} />
+            {pendencias > 0 ? `${pendencias} pendência${pendencias === 1 ? "" : "s"}` : "Nenhuma pendência"}
+          </Link>
+        )}
         <Menu itens={itens} />
         <div className="hidden items-center gap-3 border-t border-white/10 pt-4 md:mt-auto md:flex">
           <Avatar nome={sessao.nome} tamanho={36} />

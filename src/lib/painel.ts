@@ -1,9 +1,10 @@
 import "server-only";
 import { carregarLeadsParados, type LeadParado } from "@/lib/leads-parados";
+import { carregarPropostasParadas, type PropostaParada } from "@/lib/propostas-paradas";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import type { Configuracao } from "@/lib/crm";
 
-export type { LeadParado };
+export type { LeadParado, PropostaParada };
 
 type LinhaNegocio = {
   status: "aberto" | "ganho" | "perdido";
@@ -90,9 +91,15 @@ export async function carregarTarefasAtrasadasLista(empresaId: string, config: C
 }
 
 /** Negócios abertos sem mudança de etapa nem nota nova há dias — mesma regra de [[carregarLeadsParados]], empresa toda. */
-export async function carregarLeadsParadosPainel(empresaId: string): Promise<LeadParado[]> {
+export async function carregarLeadsParadosPainel(empresaId: string, diasLimite: number): Promise<LeadParado[]> {
   const supabase = await criarClienteServidor();
-  return carregarLeadsParados(supabase, empresaId);
+  return carregarLeadsParados(supabase, empresaId, { diasLimite });
+}
+
+/** Negócios abertos com proposta gerada sem atividade há dias — mesma regra de [[carregarPropostasParadas]], empresa toda. */
+export async function carregarPropostasParadasPainel(empresaId: string, diasLimite: number): Promise<PropostaParada[]> {
+  const supabase = await criarClienteServidor();
+  return carregarPropostasParadas(supabase, empresaId, { diasLimite });
 }
 
 export async function carregarIndicadores(empresaId: string, config: Configuracao) {
