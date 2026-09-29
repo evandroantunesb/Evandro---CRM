@@ -1,5 +1,6 @@
 /** Regras da operação: tarefas, notas, anexos, etiquetas, ganho/perda e campos obrigatórios. */
 import { beforeAll, describe, expect, it } from "vitest";
+import { carregarLeadsParados } from "@/lib/leads-parados";
 import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
 
 let admin: Usuario;
@@ -198,6 +199,52 @@ describe("notas", () => {
     await admin.cliente.from("notas").update({ texto: "editado pelo admin" }).eq("id", nota);
     const { data } = await servico.from("notas").select("texto").eq("id", nota).single();
     expect(data!.texto).toBe("Cliente pediu visita sábado");
+  });
+});
+
+describe("leads parados", () => {
+  async function criarNegocioBackdatado(cliente: Usuario["cliente"], titulo: string, diasAtras: number) {
+    const { data: c } = await servico.from("contatos").insert({ empresa_id: empresa, nome: titulo }).select("id").single();
+    const { data: n, error } = await cliente
+      .from("negocios")
+      .insert({ empresa_id: empresa, titulo, contato_id: c!.id, funil_id: funil, etapa_id: etapas[0].id })
+      .select("id")
+      .single();
+    if (error) throw error;
+    await servico
+      .from("negocios")
+      .update({ etapa_desde: new Date(Date.now() - diasAtras * 86_400_000).toISOString() })
+      .eq("id", n!.id);
+    return n!.id;
+  }
+
+  it("sinaliza negócio aberto sem mudança de etapa nem nota há mais de 7 dias", async () => {
+    const id = await criarNegocioBackdatado(vendedor1.cliente, "Negócio parado 8 dias", 8);
+    const parados = await carregarLeadsParados(servico, empresa, { diasLimite: 7 });
+    expect(parados.map((p) => p.id)).toContain(id);
+  });
+
+  it("não sinaliza se teve nota recente, mesmo com etapa antiga", async () => {
+    const id = await criarNegocioBackdatado(vendedor1.cliente, "Negócio com nota recente", 8);
+    await servico.from("notas").insert({ empresa_id: empresa, negocio_id: id, texto: "Retomei contato hoje" });
+    const parados = await carregarLeadsParados(servico, empresa, { diasLimite: 7 });
+    expect(parados.map((p) => p.id)).not.toContain(id);
+  });
+
+  it("não sinaliza negócio ainda dentro do prazo", async () => {
+    const id = await criarNegocioBackdatado(vendedor1.cliente, "Negócio recente", 2);
+    const parados = await carregarLeadsParados(servico, empresa, { diasLimite: 7 });
+    expect(parados.map((p) => p.id)).not.toContain(id);
+  });
+
+  it("respeita o filtro por responsável", async () => {
+    const id = await criarNegocioBackdatado(vendedor2.cliente, "Negócio parado do vendedor2", 8);
+
+    const paradosVendedor1 = await carregarLeadsParados(servico, empresa, { diasLimite: 7, responsavelId: membro[vendedor1.id] });
+    expect(paradosVendedor1.map((p) => p.id)).not.toContain(id);
+
+    const paradosVendedor2 = await carregarLeadsParados(servico, empresa, { diasLimite: 7, responsavelId: membro[vendedor2.id] });
+    expect(paradosVendedor2.map((p) => p.id)).toContain(id);
   });
 });
 

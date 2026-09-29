@@ -20,6 +20,7 @@ import { redirect } from "next/navigation";
 import { ListaTarefas, type TarefaLista } from "@/components/lista-tarefas";
 import { Cartao, Selo } from "@/components/ui";
 import { carregarConfiguracao, formatarMoeda, inicioDoDia, tempoDesde } from "@/lib/crm";
+import { carregarLeadsParados } from "@/lib/leads-parados";
 import { calcularProgresso, calcularRealizado, type Meta } from "@/lib/metas";
 import { obterSessao } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
@@ -223,9 +224,10 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
     .limit(4);
   if (pessoal) consultaLeadsAguardandoLista = consultaLeadsAguardandoLista.eq("responsavel_id", atual.membroId);
 
-  const [{ count: leadsAguardando }, { data: leadsAguardandoLista }] = await Promise.all([
+  const [{ count: leadsAguardando }, { data: leadsAguardandoLista }, leadsParados] = await Promise.all([
     etapasIniciais.length ? consultaLeadsAguardandoCount : Promise.resolve({ count: 0 }),
     etapasIniciais.length ? consultaLeadsAguardandoLista : Promise.resolve({ data: [] }),
+    carregarLeadsParados(supabase, atual.empresaId, pessoal ? { responsavelId: atual.membroId } : {}),
   ]);
 
   // KPIs -------------------------------------------------------------------
@@ -294,8 +296,8 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
     ? Array.from({ length: diaHoje }, (_, i) => ({ dia: i + 1, valor: (meta.valorAlvo / diasNoMes) * (i + 1) }))
     : null;
 
-  // Prioridades: tarefas atrasadas + leads aguardando primeiro contato ------
-  type Prioridade = { id: string; icone: LucideIcon; titulo: string; subtitulo: string; badge: "atrasado" | "pendente"; tempo: string; href: string };
+  // Prioridades: tarefas atrasadas + leads aguardando contato + leads parados ------
+  type Prioridade = { id: string; icone: LucideIcon; titulo: string; subtitulo: string; badge: "atrasado" | "pendente" | "parado"; tempo: string; href: string };
   const prioridadesAtrasadas: Prioridade[] = (tarefasAtrasadas ?? []).map((t) => {
     const negocio = t.negocios as unknown as { id: string; contatos: { nome: string } | null } | null;
     return {
@@ -320,8 +322,17 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
       href: `/negocios/${n.id}`,
     };
   });
-  const prioridades = [...prioridadesAtrasadas, ...prioridadesLeads].slice(0, 4);
-  const totalPendencias = (tarefasAtrasadasTotal ?? 0) + (leadsAguardando ?? 0);
+  const prioridadesParadas: Prioridade[] = leadsParados.map((n) => ({
+    id: `p-${n.id}`,
+    icone: BriefcaseBusiness,
+    titulo: n.contatoNome,
+    subtitulo: `#${n.numero} ${n.titulo} · sem atividade`,
+    badge: "parado",
+    tempo: tempoDesde(n.ultimaAtividadeEm, agora.getTime()),
+    href: `/negocios/${n.id}`,
+  }));
+  const prioridades = [...prioridadesAtrasadas, ...prioridadesParadas, ...prioridadesLeads].slice(0, 4);
+  const totalPendencias = (tarefasAtrasadasTotal ?? 0) + (leadsAguardando ?? 0) + leadsParados.length;
 
   // Agenda de hoje -----------------------------------------------------------
   const agendaHoje: TarefaLista[] = (tarefasHoje ?? []).map((t) => {
@@ -375,7 +386,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
       : `Você tem ${tarefasHoje?.length ?? 0} tarefa${(tarefasHoje?.length ?? 0) === 1 ? "" : "s"} hoje e ${tarefasAtrasadasTotal ?? 0} cliente${(tarefasAtrasadasTotal ?? 0) === 1 ? "" : "s"} aguardando retorno.`
     : totalPendencias === 0
       ? "A equipe está em dia."
-      : `A equipe tem ${totalPendencias} pendência${totalPendencias === 1 ? "" : "s"} hoje (tarefas atrasadas + leads aguardando contato).`;
+      : `A equipe tem ${totalPendencias} pendência${totalPendencias === 1 ? "" : "s"} hoje (tarefas atrasadas + leads aguardando contato + leads parados).`;
 
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-4">
@@ -476,7 +487,9 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
                       <p className="truncate text-sm font-medium text-zinc-900">{p.titulo}</p>
                       <p className="truncate text-xs text-zinc-500">{p.subtitulo}</p>
                     </Link>
-                    <Selo tom={p.badge === "atrasado" ? "negativo" : "atencao"}>{p.badge === "atrasado" ? "Atrasado" : "Pendente"}</Selo>
+                    <Selo tom={p.badge === "atrasado" ? "negativo" : "atencao"}>
+                      {{ atrasado: "Atrasado", pendente: "Pendente", parado: "Parado" }[p.badge]}
+                    </Selo>
                     <span className="hidden shrink-0 text-xs text-zinc-500 sm:inline">{p.tempo}</span>
                   </li>
                 );
