@@ -14,6 +14,12 @@ const esquema = z.object({
     .regex(/^#[0-9a-fA-F]{6}$/)
     .optional()
     .or(z.literal("").transform(() => undefined)),
+  prazo_auto_aprovacao_minutos: z.coerce
+    .number()
+    .int()
+    .min(1, "Mínimo 1 minuto")
+    .max(10080, "Máximo 7 dias (10080 minutos)")
+    .optional(),
 });
 
 export async function criarOrigem(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
@@ -41,7 +47,14 @@ export async function editarOrigem(_: ResultadoAcao, formData: FormData): Promis
   const supabase = await criarClienteServidor();
   const { error } = await supabase
     .from("origens")
-    .update({ nome: dados.data.nome, cor: dados.data.cor ?? null, ativa: formData.get("ativa") === "on" })
+    .update({
+      nome: dados.data.nome,
+      cor: dados.data.cor ?? null,
+      ativa: formData.get("ativa") === "on",
+      ...(dados.data.prazo_auto_aprovacao_minutos !== undefined
+        ? { prazo_auto_aprovacao_minutos: dados.data.prazo_auto_aprovacao_minutos }
+        : {}),
+    })
     .eq("id", id.data);
   if (error) {
     return { ok: false, mensagem: error.code === "23505" ? "Já existe uma origem com esse nome." : "Não foi possível salvar." };

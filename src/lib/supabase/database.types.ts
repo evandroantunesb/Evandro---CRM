@@ -150,6 +150,81 @@ export type Database = {
           },
         ]
       }
+      atribuicoes_leads: {
+        Row: {
+          created_at: string
+          decidido_em: string | null
+          decidido_por: string | null
+          empresa_id: string
+          expira_em: string
+          id: string
+          membro_final_id: string | null
+          membro_sugerido_id: string
+          negocio_id: string
+          status: Database["public"]["Enums"]["status_atribuicao_lead"]
+        }
+        Insert: {
+          created_at?: string
+          decidido_em?: string | null
+          decidido_por?: string | null
+          empresa_id: string
+          expira_em: string
+          id?: string
+          membro_final_id?: string | null
+          membro_sugerido_id: string
+          negocio_id: string
+          status?: Database["public"]["Enums"]["status_atribuicao_lead"]
+        }
+        Update: {
+          created_at?: string
+          decidido_em?: string | null
+          decidido_por?: string | null
+          empresa_id?: string
+          expira_em?: string
+          id?: string
+          membro_final_id?: string | null
+          membro_sugerido_id?: string
+          negocio_id?: string
+          status?: Database["public"]["Enums"]["status_atribuicao_lead"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "atribuicoes_leads_decidido_por_fkey"
+            columns: ["decidido_por"]
+            isOneToOne: false
+            referencedRelation: "empresa_membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atribuicoes_leads_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atribuicoes_leads_membro_final_id_fkey"
+            columns: ["membro_final_id"]
+            isOneToOne: false
+            referencedRelation: "empresa_membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atribuicoes_leads_membro_sugerido_id_fkey"
+            columns: ["membro_sugerido_id"]
+            isOneToOne: false
+            referencedRelation: "empresa_membros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atribuicoes_leads_negocio_id_fkey"
+            columns: ["negocio_id"]
+            isOneToOne: false
+            referencedRelation: "negocios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       calculos_solares: {
         Row: {
           atualizado_por: string | null
@@ -1755,6 +1830,7 @@ export type Database = {
           empresa_id: string
           id: string
           nome: string
+          prazo_auto_aprovacao_minutos: number
           updated_at: string
         }
         Insert: {
@@ -1764,6 +1840,7 @@ export type Database = {
           empresa_id: string
           id?: string
           nome: string
+          prazo_auto_aprovacao_minutos?: number
           updated_at?: string
         }
         Update: {
@@ -1773,6 +1850,7 @@ export type Database = {
           empresa_id?: string
           id?: string
           nome?: string
+          prazo_auto_aprovacao_minutos?: number
           updated_at?: string
         }
         Relationships: [
@@ -2576,6 +2654,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      aprovar_atribuicao_lead: {
+        Args: { p_id: string; p_membro_final_id?: string }
+        Returns: undefined
+      }
       atualizar_status_resgate: {
         Args: {
           p_novo_status: Database["public"]["Enums"]["status_resgate"]
@@ -2612,8 +2694,13 @@ export type Database = {
         }[]
       }
       compartilha_empresa: { Args: { p_user_id: string }; Returns: boolean }
+      decidir_atribuicao_lead: {
+        Args: { p_automatico: boolean; p_id: string; p_membro_final_id: string }
+        Returns: undefined
+      }
       e_plataforma_admin: { Args: never; Returns: boolean }
       empresa_da_pasta_marca: { Args: { p_caminho: string }; Returns: string }
+      expirar_atribuicoes_leads: { Args: never; Returns: undefined }
       incrementar_preenchimento_formulario: {
         Args: { p_id: string }
         Returns: undefined
@@ -2688,6 +2775,11 @@ export type Database = {
       proposta_modelo_capa: "foto" | "minimalista" | "tecnica"
       proposta_modelo_status: "rascunho" | "publicado" | "arquivado"
       situacao_empresa: "ativa" | "suspensa" | "cancelada"
+      status_atribuicao_lead:
+        | "pendente"
+        | "aprovada"
+        | "reatribuida"
+        | "expirada"
       status_contrato: "rascunho" | "aguardando_assinatura" | "assinado"
       status_membro: "ativo" | "inativo" | "desligado"
       status_negocio: "aberto" | "ganho" | "perdido"
@@ -2850,6 +2942,12 @@ export const Constants = {
       proposta_modelo_capa: ["foto", "minimalista", "tecnica"],
       proposta_modelo_status: ["rascunho", "publicado", "arquivado"],
       situacao_empresa: ["ativa", "suspensa", "cancelada"],
+      status_atribuicao_lead: [
+        "pendente",
+        "aprovada",
+        "reatribuida",
+        "expirada",
+      ],
       status_contrato: ["rascunho", "aguardando_assinatura", "assinado"],
       status_membro: ["ativo", "inativo", "desligado"],
       status_negocio: ["aberto", "ganho", "perdido"],
