@@ -6,6 +6,10 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    ignore:
+      # @types/node acompanha a versão do Node usada no projeto (22); só sobe junto com ela.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     groups:
       atualizacoes-menores:
         update-types:
