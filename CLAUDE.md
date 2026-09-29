@@ -18,6 +18,15 @@ CRM de funil de vendas para empresas de energia solar, multiempresa (SaaS revend
 - Execute direto quando um único agente resolve. Nada de agentes paralelos para tarefas simples.
 - Se precisar de agentes, dê escopo fechado e sem sobreposição; não crie agentes só para revisar de novo o que já foi validado.
 
+## Modelos
+
+O modelo principal é escolhido pelo Evandro; nunca diga que trocou de modelo se a troca não foi executada de fato.
+
+- **Sonnet (padrão):** telas e componentes, CSS/responsividade, formulários, CRUD, bugs simples e intermediários, ajustes em funcionalidades existentes, refatorações pequenas, docs pontuais e tudo com requisitos e arquitetura já definidos.
+- **Opus (só com justificativa técnica):** arquitetura, planejamento de funcionalidade ou regra de negócio complexa, bug difícil entre vários módulos ou que o Sonnet não resolveu, refatoração estrutural, decisões de segurança/escalabilidade. Concluído o planejamento, a implementação volta ao Sonnet.
+- Muitos arquivos não justificam Opus: antes, tente dividir a tarefa em etapas menores. Ao receber uma tarefa, avalie a complexidade e, se Opus fizer sentido, recomende-o dizendo por quê.
+- Agentes: quando forem mesmo necessários, passe `model: "sonnet"` para trabalho de implementação; Opus só nos casos acima.
+
 ## Execução
 
 - Uma funcionalidade por vez, com alterações mínimas e só nos arquivos dela. Sem refatoração fora do escopo.
