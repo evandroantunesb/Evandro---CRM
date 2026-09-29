@@ -60,10 +60,16 @@ function saudacao(agora = new Date()) {
   return "Boa noite";
 }
 
-export default async function Inicio() {
+export default async function Inicio({ searchParams }: { searchParams: Promise<{ visao?: string | string[] }> }) {
   const sessao = await obterSessao();
   const atual = sessao.atual;
   if (!atual) redirect(sessao.superAdmin ? "/super-admin" : "/sem-acesso");
+
+  // Vendedor só vê a própria operação; admin/gestor pode alternar pra visão da empresa toda (?visao=equipe).
+  const podeVerEquipe = atual.papel !== "vendedor";
+  const visaoParam = (await searchParams).visao;
+  const visaoSolicitada = Array.isArray(visaoParam) ? visaoParam[0] : visaoParam;
+  const pessoal = !(podeVerEquipe && visaoSolicitada === "equipe");
 
   const supabase = await criarClienteServidor();
   const agora = new Date();
@@ -73,6 +79,83 @@ export default async function Inicio() {
   const mesAtual = limitesMes(0, agora);
   const mesPassado = limitesMes(1, agora);
   const hojeStr = paraDataCurta(agora);
+
+  // Consultas que mudam de escopo conforme a visão (Pessoal filtra por responsavel_id; Equipe é a empresa toda).
+  let consultaLeadsHoje = supabase
+    .from("negocios")
+    .select("id", { count: "exact", head: true })
+    .eq("empresa_id", atual.empresaId)
+    .gte("created_at", new Date(hojeInicio).toISOString())
+    .lt("created_at", new Date(hojeFimExclusivo).toISOString());
+  if (pessoal) consultaLeadsHoje = consultaLeadsHoje.eq("responsavel_id", atual.membroId);
+
+  let consultaLeadsOntem = supabase
+    .from("negocios")
+    .select("id", { count: "exact", head: true })
+    .eq("empresa_id", atual.empresaId)
+    .gte("created_at", new Date(ontemInicio).toISOString())
+    .lt("created_at", new Date(hojeInicio).toISOString());
+  if (pessoal) consultaLeadsOntem = consultaLeadsOntem.eq("responsavel_id", atual.membroId);
+
+  let consultaNegociosAtivos = supabase.from("negocios").select("valor").eq("empresa_id", atual.empresaId).eq("status", "aberto").limit(10000);
+  if (pessoal) consultaNegociosAtivos = consultaNegociosAtivos.eq("responsavel_id", atual.membroId);
+
+  let consultaPropostasAbertas = supabase
+    .from("propostas")
+    .select("id, negocios!inner(valor, status, responsavel_id)")
+    .eq("negocios.empresa_id", atual.empresaId)
+    .eq("negocios.status", "aberto")
+    .limit(10000);
+  if (pessoal) consultaPropostasAbertas = consultaPropostasAbertas.eq("negocios.responsavel_id", atual.membroId);
+
+  let consultaMetas = supabase
+    .from("metas")
+    .select("id, titulo, metrica, membro_id, periodo_inicio, periodo_fim, valor_alvo, ativa")
+    .eq("empresa_id", atual.empresaId)
+    .eq("ativa", true)
+    .eq("metrica", "receita")
+    .lte("periodo_inicio", hojeStr)
+    .gte("periodo_fim", hojeStr)
+    .order("periodo_inicio", { ascending: false });
+  consultaMetas = pessoal ? consultaMetas.eq("membro_id", atual.membroId).limit(1) : consultaMetas.limit(50);
+
+  let consultaNegociosMes = supabase
+    .from("negocios")
+    .select("valor, fechado_em")
+    .eq("empresa_id", atual.empresaId)
+    .eq("status", "ganho")
+    .gte("fechado_em", mesAtual.inicioIso)
+    .lt("fechado_em", mesAtual.fimExclusivoIso)
+    .limit(10000);
+  if (pessoal) consultaNegociosMes = consultaNegociosMes.eq("responsavel_id", atual.membroId);
+
+  let consultaNegociosMesPassado = supabase
+    .from("negocios")
+    .select("valor, fechado_em")
+    .eq("empresa_id", atual.empresaId)
+    .eq("status", "ganho")
+    .gte("fechado_em", mesPassado.inicioIso)
+    .lt("fechado_em", mesPassado.fimExclusivoIso)
+    .limit(10000);
+  if (pessoal) consultaNegociosMesPassado = consultaNegociosMesPassado.eq("responsavel_id", atual.membroId);
+
+  let consultaTarefasAtrasadasTotal = supabase
+    .from("tarefas")
+    .select("id", { count: "exact", head: true })
+    .eq("empresa_id", atual.empresaId)
+    .is("concluida_em", null)
+    .lt("vence_em", agora.toISOString());
+  if (pessoal) consultaTarefasAtrasadasTotal = consultaTarefasAtrasadasTotal.eq("responsavel_id", atual.membroId);
+
+  let consultaTarefasAtrasadas = supabase
+    .from("tarefas")
+    .select("id, titulo, tipo, vence_em, negocios(id, contatos(nome))")
+    .eq("empresa_id", atual.empresaId)
+    .is("concluida_em", null)
+    .lt("vence_em", agora.toISOString())
+    .order("vence_em", { ascending: true })
+    .limit(4);
+  if (pessoal) consultaTarefasAtrasadas = consultaTarefasAtrasadas.eq("responsavel_id", atual.membroId);
 
   const [
     config,
@@ -92,79 +175,15 @@ export default async function Inicio() {
     { count: conquistasCount },
   ] = await Promise.all([
     carregarConfiguracao(atual.empresaId),
-    supabase
-      .from("negocios")
-      .select("id", { count: "exact", head: true })
-      .eq("empresa_id", atual.empresaId)
-      .eq("responsavel_id", atual.membroId)
-      .gte("created_at", new Date(hojeInicio).toISOString())
-      .lt("created_at", new Date(hojeFimExclusivo).toISOString()),
-    supabase
-      .from("negocios")
-      .select("id", { count: "exact", head: true })
-      .eq("empresa_id", atual.empresaId)
-      .eq("responsavel_id", atual.membroId)
-      .gte("created_at", new Date(ontemInicio).toISOString())
-      .lt("created_at", new Date(hojeInicio).toISOString()),
-    supabase
-      .from("negocios")
-      .select("valor")
-      .eq("empresa_id", atual.empresaId)
-      .eq("responsavel_id", atual.membroId)
-      .eq("status", "aberto")
-      .limit(10000),
-    supabase
-      .from("propostas")
-      .select("id, negocios!inner(valor, status, responsavel_id)")
-      .eq("negocios.empresa_id", atual.empresaId)
-      .eq("negocios.responsavel_id", atual.membroId)
-      .eq("negocios.status", "aberto")
-      .limit(10000),
-    supabase
-      .from("metas")
-      .select("id, titulo, metrica, membro_id, periodo_inicio, periodo_fim, valor_alvo, ativa")
-      .eq("empresa_id", atual.empresaId)
-      .eq("membro_id", atual.membroId)
-      .eq("ativa", true)
-      .eq("metrica", "receita")
-      .lte("periodo_inicio", hojeStr)
-      .gte("periodo_fim", hojeStr)
-      .order("periodo_inicio", { ascending: false })
-      .limit(1),
-    supabase
-      .from("negocios")
-      .select("valor, fechado_em")
-      .eq("empresa_id", atual.empresaId)
-      .eq("responsavel_id", atual.membroId)
-      .eq("status", "ganho")
-      .gte("fechado_em", mesAtual.inicioIso)
-      .lt("fechado_em", mesAtual.fimExclusivoIso)
-      .limit(10000),
-    supabase
-      .from("negocios")
-      .select("valor, fechado_em")
-      .eq("empresa_id", atual.empresaId)
-      .eq("responsavel_id", atual.membroId)
-      .eq("status", "ganho")
-      .gte("fechado_em", mesPassado.inicioIso)
-      .lt("fechado_em", mesPassado.fimExclusivoIso)
-      .limit(10000),
-    supabase
-      .from("tarefas")
-      .select("id", { count: "exact", head: true })
-      .eq("empresa_id", atual.empresaId)
-      .eq("responsavel_id", atual.membroId)
-      .is("concluida_em", null)
-      .lt("vence_em", agora.toISOString()),
-    supabase
-      .from("tarefas")
-      .select("id, titulo, tipo, vence_em, negocios(id, contatos(nome))")
-      .eq("empresa_id", atual.empresaId)
-      .eq("responsavel_id", atual.membroId)
-      .is("concluida_em", null)
-      .lt("vence_em", agora.toISOString())
-      .order("vence_em", { ascending: true })
-      .limit(4),
+    consultaLeadsHoje,
+    consultaLeadsOntem,
+    consultaNegociosAtivos,
+    consultaPropostasAbertas,
+    consultaMetas,
+    consultaNegociosMes,
+    consultaNegociosMesPassado,
+    consultaTarefasAtrasadasTotal,
+    consultaTarefasAtrasadas,
     supabase
       .from("tarefas")
       .select("id, titulo, tipo, vence_em, concluida_em, negocios(id, numero, contatos(nome))")
@@ -186,27 +205,27 @@ export default async function Inicio() {
 
   // Leads aguardando primeiro contato: negócios abertos ainda na etapa inicial do funil.
   const etapasIniciais = config.etapas.filter((e) => e.inicial).map((e) => e.id);
+  let consultaLeadsAguardandoCount = supabase
+    .from("negocios")
+    .select("id", { count: "exact", head: true })
+    .eq("empresa_id", atual.empresaId)
+    .eq("status", "aberto")
+    .in("etapa_id", etapasIniciais);
+  if (pessoal) consultaLeadsAguardandoCount = consultaLeadsAguardandoCount.eq("responsavel_id", atual.membroId);
+
+  let consultaLeadsAguardandoLista = supabase
+    .from("negocios")
+    .select("id, created_at, contatos(nome)")
+    .eq("empresa_id", atual.empresaId)
+    .eq("status", "aberto")
+    .in("etapa_id", etapasIniciais)
+    .order("created_at", { ascending: true })
+    .limit(4);
+  if (pessoal) consultaLeadsAguardandoLista = consultaLeadsAguardandoLista.eq("responsavel_id", atual.membroId);
+
   const [{ count: leadsAguardando }, { data: leadsAguardandoLista }] = await Promise.all([
-    etapasIniciais.length
-      ? supabase
-          .from("negocios")
-          .select("id", { count: "exact", head: true })
-          .eq("empresa_id", atual.empresaId)
-          .eq("responsavel_id", atual.membroId)
-          .eq("status", "aberto")
-          .in("etapa_id", etapasIniciais)
-      : Promise.resolve({ count: 0 }),
-    etapasIniciais.length
-      ? supabase
-          .from("negocios")
-          .select("id, created_at, contatos(nome)")
-          .eq("empresa_id", atual.empresaId)
-          .eq("responsavel_id", atual.membroId)
-          .eq("status", "aberto")
-          .in("etapa_id", etapasIniciais)
-          .order("created_at", { ascending: true })
-          .limit(4)
-      : Promise.resolve({ data: [] }),
+    etapasIniciais.length ? consultaLeadsAguardandoCount : Promise.resolve({ count: 0 }),
+    etapasIniciais.length ? consultaLeadsAguardandoLista : Promise.resolve({ data: [] }),
   ]);
 
   // KPIs -------------------------------------------------------------------
@@ -214,22 +233,43 @@ export default async function Inicio() {
   const propostasLinhas = (propostasAbertas ?? []) as unknown as { id: string; negocios: { valor: number | null } }[];
   const valorPropostas = propostasLinhas.reduce((s, p) => s + (p.negocios?.valor ?? 0), 0);
 
-  const metaLinha = metasLinhas?.[0];
-  const meta: Meta | null = metaLinha
-    ? {
-        id: metaLinha.id,
-        titulo: metaLinha.titulo,
-        metrica: "receita",
-        membroId: metaLinha.membro_id,
-        periodoInicio: metaLinha.periodo_inicio,
-        periodoFim: metaLinha.periodo_fim,
-        valorAlvo: metaLinha.valor_alvo,
-        ativa: metaLinha.ativa,
-      }
-    : null;
+  const metasAtivas: Meta[] = (metasLinhas ?? []).map((m) => ({
+    id: m.id,
+    titulo: m.titulo,
+    metrica: "receita",
+    membroId: m.membro_id,
+    periodoInicio: m.periodo_inicio,
+    periodoFim: m.periodo_fim,
+    valorAlvo: m.valor_alvo,
+    ativa: m.ativa,
+  }));
+  // Não existe meta coletiva no schema (metas.membro_id é obrigatório) — na visão Equipe, "meta do mês"
+  // vira progresso médio das metas individuais ativas, mesmo padrão do dashboard de Gamificação.
+  const meta: Meta | null = pessoal ? (metasAtivas[0] ?? null) : null;
   const progressoMeta = meta
     ? calcularProgresso(meta.valorAlvo, await calcularRealizado(supabase, meta), meta.periodoInicio, meta.periodoFim, agora)
     : null;
+
+  let metaKpiValor: string;
+  let metaKpiRodape: string;
+  let metaKpiBarra: number | null;
+  if (pessoal) {
+    metaKpiValor = progressoMeta ? `${progressoMeta.percentual.toFixed(0)}%` : "—";
+    metaKpiRodape = meta ? `${formatarMoeda(progressoMeta!.realizado)} de ${formatarMoeda(meta.valorAlvo)}` : "Nenhuma meta configurada";
+    metaKpiBarra = progressoMeta ? Math.min(100, progressoMeta.percentual) : null;
+  } else {
+    const progressosEquipe = await Promise.all(
+      metasAtivas.map(async (m) => calcularProgresso(m.valorAlvo, await calcularRealizado(supabase, m), m.periodoInicio, m.periodoFim, agora)),
+    );
+    const progressoMedioEquipe = progressosEquipe.length
+      ? progressosEquipe.reduce((s, p) => s + Math.min(p.percentual, 100), 0) / progressosEquipe.length
+      : null;
+    metaKpiValor = progressoMedioEquipe === null ? "—" : `${progressoMedioEquipe.toFixed(0)}%`;
+    metaKpiRodape = metasAtivas.length
+      ? `Progresso médio de ${metasAtivas.length} meta${metasAtivas.length === 1 ? "" : "s"} ativa${metasAtivas.length === 1 ? "" : "s"}`
+      : "Nenhuma meta ativa na equipe";
+    metaKpiBarra = progressoMedioEquipe;
+  }
 
   // Gráfico de desempenho: vendas acumuladas do mês corrente -----------------
   const diasNoMes = Math.round((mesAtual.fimExclusivo.getTime() - mesAtual.inicio.getTime()) / 86_400_000);
@@ -316,6 +356,7 @@ export default async function Inicio() {
     : 100;
   const rankingOrdenado = (rankingBruto ?? []).slice().sort((a, b) => b.total_pontos - a.total_pontos);
   const minhaPosicao = rankingOrdenado.findIndex((r) => r.membro_id === atual.membroId);
+  const nomeMembroRanking = new Map(config.membros.map((m) => [m.id, m.nome]));
 
   // Ações rápidas --------------------------------------------------------------
   const acoesRapidas = [
@@ -328,10 +369,13 @@ export default async function Inicio() {
   ];
 
   const primeiroNome = sessao.nome.split(" ")[0];
-  const subtitulo =
-    (tarefasHoje?.length ?? 0) === 0 && totalPendencias === 0
+  const subtitulo = pessoal
+    ? (tarefasHoje?.length ?? 0) === 0 && totalPendencias === 0
       ? "Sua agenda está em dia."
-      : `Você tem ${tarefasHoje?.length ?? 0} tarefa${(tarefasHoje?.length ?? 0) === 1 ? "" : "s"} hoje e ${tarefasAtrasadasTotal ?? 0} cliente${(tarefasAtrasadasTotal ?? 0) === 1 ? "" : "s"} aguardando retorno.`;
+      : `Você tem ${tarefasHoje?.length ?? 0} tarefa${(tarefasHoje?.length ?? 0) === 1 ? "" : "s"} hoje e ${tarefasAtrasadasTotal ?? 0} cliente${(tarefasAtrasadasTotal ?? 0) === 1 ? "" : "s"} aguardando retorno.`
+    : totalPendencias === 0
+      ? "A equipe está em dia."
+      : `A equipe tem ${totalPendencias} pendência${totalPendencias === 1 ? "" : "s"} hoje (tarefas atrasadas + leads aguardando contato).`;
 
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-4">
@@ -345,13 +389,35 @@ export default async function Inicio() {
           </h1>
           <p className="text-sm text-zinc-500">{subtitulo}</p>
         </div>
-        <Link
-          href="/negocios/novo"
-          className="inline-flex items-center justify-center gap-2 rounded-lg bg-dourado px-4 py-2 text-sm font-medium text-carvao transition-colors hover:bg-amber-400"
-        >
-          <Plus size={16} />
-          Novo negócio
-        </Link>
+        <div className="flex flex-wrap items-center gap-3">
+          {podeVerEquipe && (
+            <div className="inline-flex rounded-lg border border-zinc-200 bg-white p-0.5">
+              <Link
+                href="/inicio?visao=pessoal"
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  pessoal ? "bg-carvao text-offwhite" : "text-zinc-600 hover:text-zinc-900"
+                }`}
+              >
+                Pessoal
+              </Link>
+              <Link
+                href="/inicio?visao=equipe"
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  !pessoal ? "bg-carvao text-offwhite" : "text-zinc-600 hover:text-zinc-900"
+                }`}
+              >
+                Equipe
+              </Link>
+            </div>
+          )}
+          <Link
+            href="/negocios/novo"
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-dourado px-4 py-2 text-sm font-medium text-carvao transition-colors hover:bg-amber-400"
+          >
+            <Plus size={16} />
+            Novo negócio
+          </Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -376,16 +442,16 @@ export default async function Inicio() {
         />
         <Kpi
           Icone={Target}
-          valor={progressoMeta ? `${progressoMeta.percentual.toFixed(0)}%` : "—"}
-          legenda="Meta do mês"
-          rodape={meta ? `${formatarMoeda(progressoMeta!.realizado)} de ${formatarMoeda(meta.valorAlvo)}` : "Nenhuma meta configurada"}
-          barra={progressoMeta ? Math.min(100, progressoMeta.percentual) : null}
+          valor={metaKpiValor}
+          legenda={pessoal ? "Meta do mês" : "Metas da equipe"}
+          rodape={metaKpiRodape}
+          barra={metaKpiBarra}
         />
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.14fr_1fr]">
         <Cartao
-          titulo="Minhas prioridades hoje"
+          titulo={pessoal ? "Minhas prioridades hoje" : "Prioridades da equipe hoje"}
           acao={
             <div className="flex items-center gap-2">
               {totalPendencias > 0 && <Selo tom="negativo">{totalPendencias} pendências</Selo>}
@@ -396,7 +462,7 @@ export default async function Inicio() {
           }
         >
           {!prioridades.length ? (
-            <p className="text-sm text-zinc-500">Nenhuma prioridade pendente. Sua operação está em dia.</p>
+            <p className="text-sm text-zinc-500">{pessoal ? "Nenhuma prioridade pendente. Sua operação está em dia." : "Nenhuma prioridade pendente. A equipe está em dia."}</p>
           ) : (
             <ul className="flex flex-col">
               {prioridades.map((p) => {
@@ -419,7 +485,7 @@ export default async function Inicio() {
           )}
         </Cartao>
 
-        <Cartao titulo="Meu desempenho no mês">
+        <Cartao titulo={pessoal ? "Meu desempenho no mês" : "Desempenho da equipe no mês"}>
           {acumuladoMes.length < 2 ? (
             <p className="text-sm text-zinc-500">Ainda não há dados suficientes neste período.</p>
           ) : (
@@ -439,39 +505,63 @@ export default async function Inicio() {
         </Cartao>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.14fr_1fr]">
-        <Cartao titulo="Minha agenda de hoje" acao={<Link href="/tarefas" className="text-sm text-dourado hover:underline">Ver agenda completa →</Link>}>
-          <ListaTarefas tarefas={agendaHoje} vazio="Nenhuma tarefa agendada para hoje." />
-        </Cartao>
+      {pessoal ? (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.14fr_1fr]">
+          <Cartao titulo="Minha agenda de hoje" acao={<Link href="/tarefas" className="text-sm text-dourado hover:underline">Ver agenda completa →</Link>}>
+            <ListaTarefas tarefas={agendaHoje} vazio="Nenhuma tarefa agendada para hoje." />
+          </Cartao>
 
-        <Cartao
-          titulo="Minha jornada no Raion"
-          className="border-green-100 bg-[#F1FFF6]"
-          acao={<Link href="/gamificacao/jornada" className="text-sm text-[#137B43] hover:underline">Ver minha jornada →</Link>}
-        >
-          <div className="flex items-center gap-3">
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#137B43] text-white">
-              <Trophy size={22} />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-lg font-semibold text-zinc-900">Nível {meuNivel.nivel}{meuNivel.nome && <span className="ml-1 text-sm font-normal text-zinc-500">{meuNivel.nome}</span>}</p>
-              <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-white">
-                <div className="h-full rounded-full bg-dourado" style={{ width: `${progressoNivel}%` }} />
+          <Cartao
+            titulo="Minha jornada no Raion"
+            className="border-green-100 bg-[#F1FFF6]"
+            acao={<Link href="/gamificacao/jornada" className="text-sm text-[#137B43] hover:underline">Ver minha jornada →</Link>}
+          >
+            <div className="flex items-center gap-3">
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#137B43] text-white">
+                <Trophy size={22} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-lg font-semibold text-zinc-900">Nível {meuNivel.nivel}{meuNivel.nome && <span className="ml-1 text-sm font-normal text-zinc-500">{meuNivel.nome}</span>}</p>
+                <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-white">
+                  <div className="h-full rounded-full bg-dourado" style={{ width: `${progressoNivel}%` }} />
+                </div>
+                {proximoNivel && (
+                  <p className="mt-1 text-xs text-zinc-600">
+                    {meuTotalXp.toLocaleString("pt-BR")} / {proximoNivel.xp_minimo.toLocaleString("pt-BR")} pontos para o próximo nível
+                  </p>
+                )}
               </div>
-              {proximoNivel && (
-                <p className="mt-1 text-xs text-zinc-600">
-                  {meuTotalXp.toLocaleString("pt-BR")} / {proximoNivel.xp_minimo.toLocaleString("pt-BR")} pontos para o próximo nível
-                </p>
-              )}
             </div>
-          </div>
-          <div className="mt-3 grid grid-cols-3 gap-2">
-            <MiniCartaoJornada valor={meuTotalXp.toLocaleString("pt-BR")} legenda="Pontos" />
-            <MiniCartaoJornada valor={minhaPosicao >= 0 ? `${minhaPosicao + 1}º` : "—"} legenda="Ranking" />
-            <MiniCartaoJornada valor={String(conquistasCount ?? 0)} legenda="Conquistas" />
-          </div>
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              <MiniCartaoJornada valor={meuTotalXp.toLocaleString("pt-BR")} legenda="Pontos" />
+              <MiniCartaoJornada valor={minhaPosicao >= 0 ? `${minhaPosicao + 1}º` : "—"} legenda="Ranking" />
+              <MiniCartaoJornada valor={String(conquistasCount ?? 0)} legenda="Conquistas" />
+            </div>
+          </Cartao>
+        </div>
+      ) : (
+        <Cartao
+          titulo="Ranking da equipe"
+          className="border-green-100 bg-[#F1FFF6]"
+          acao={<Link href="/gamificacao/ranking" className="text-sm text-[#137B43] hover:underline">Ver ranking completo →</Link>}
+        >
+          {!rankingOrdenado.length ? (
+            <p className="text-sm text-zinc-600">Ainda não há pontuação registrada este mês.</p>
+          ) : (
+            <ul className="flex flex-col">
+              {rankingOrdenado.slice(0, 5).map((r, i) => (
+                <li key={r.membro_id} className="flex items-center gap-3 border-t border-green-100 py-2.5 first:border-t-0">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#137B43] text-sm font-semibold text-white">
+                    {i + 1}º
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-zinc-900">{nomeMembroRanking.get(r.membro_id) ?? "—"}</span>
+                  <span className="shrink-0 text-sm font-semibold text-zinc-900">{r.total_pontos.toLocaleString("pt-BR")} pts</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </Cartao>
-      </div>
+      )}
 
       <Cartao titulo="Ações rápidas">
         <div className="flex flex-wrap gap-2.5">
