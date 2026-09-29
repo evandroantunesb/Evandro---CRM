@@ -20,28 +20,26 @@ Resumo do estado do desenvolvimento. **Atualize ao concluir cada funcionalidade:
 - #52 leads parados + tarefas atrasadas no Painel e na Início.
 - #53 propostas paradas, prazo configurável, botão Reatribuir e sininho de notificações.
 - #54 Dependabot · #59 atualização do CLI da Supabase (formatação de `db:types` com `oxfmt`).
+- #64 leads sem contato: 1ª etapa, sem nota, atribuído há mais de 3h (`empresas.horas_considerado_sem_contato`). Card no Painel com Reatribuir, prioridade na Início e sininho. Migration aplicada em produção e testada pelo Evandro.
+- #44 dashboard unificado de Gamificação (`/gamificacao`) · #48 inclui a redistribuição da carteira ao desligar vendedor.
 - Correção definitiva das migrations travadas: `--include-all` fixo em `banco-producao.yml`.
 
 ## Em andamento
 
-- **PR #63 — contexto do Claude:** `CLAUDE.md` enxuto (regras permanentes), detalhes movidos para `docs/arquitetura.md` e `docs/regras-negocio.md`, `PROGRESS.md` criado e `.claude/settings.json` bloqueando leitura de build, logs e `.env`.
-
-- **Leads sem contato:** negócio na 1ª etapa, sem nota, atribuído há mais de 3h (prazo configurável). Card no Painel com Reatribuir, prioridade na Início e contagem no sininho.
+- **PR #63 — contexto do Claude:** `CLAUDE.md` enxuto (regras permanentes + seleção de modelos), `docs/arquitetura.md`, `docs/regras-negocio.md`, `PROGRESS.md`, `HANDOFF.md` e `.claude/settings.json`. CI verde, aguardando merge.
 - **PR #62 — backup diário do banco de produção** para o repositório privado `raion-crm-backups`. Aguardando o Evandro criar os secrets `BACKUP_ENCRYPTION_KEY` e `BACKUP_REPO_TOKEN`.
 - **PRs do Dependabot abertas:** #55–#58 (Actions), #60 (TypeScript 6), #61 (`@types/node` 26). Atualizações maiores: revisar com cuidado antes de mesclar.
-- **Dashboard unificado de Gamificação** (`/gamificacao`): iniciado em 2026-09-27; confirmar se ficou completo conforme a referência.
 
 ## Decisões técnicas relevantes
 
 - Migrations aplicadas em produção só via `banco-producao.yml` com `--include-all` (corrige o travamento de 28–29/09).
 - Notificações só dentro do app (sininho); canais externos ficam para depois.
-- Prazo de "parado" é por empresa (`empresas.dias_considerado_parado`), vale para leads e propostas.
+- Prazos por empresa: `dias_considerado_parado` (padrão 7, leads e propostas) e `horas_considerado_sem_contato` (padrão 3).
 - Backup do banco independente de plataforma (dump criptografado em repositório privado).
 
 ## Pendências (dependem do Evandro ou sem prazo)
 
-- Gestão de carteira ao desligar vendedor (transferir para outro ou distribuir entre ativos).
-- E-mail de convite não chega: configurar SMTP próprio no Supabase (Resend/Postmark/SendGrid).
+- E-mail de convite: chega com atraso (confirmado pelo Evandro); SMTP próprio só se voltar a incomodar.
 - Leitura automática de CNH/fatura por IA: falta chave de API com visão e definição dos campos.
 - Assinatura eletrônica do contrato (gov.br; ZapSign/Clicksign depois).
 - Notificações fora do app (e-mail/WhatsApp) e aba de notificações com lido/não lido.
@@ -51,7 +49,7 @@ Resumo do estado do desenvolvimento. **Atualize ao concluir cada funcionalidade:
 
 ## Próximos passos
 
-1. Concluir e mesclar "Leads sem contato".
-2. Criar os secrets do backup e mesclar a PR #62.
-3. Revisar as PRs do Dependabot.
-4. Escolher o próximo item das pendências com o Evandro.
+1. Mesclar a PR #63 (documentação de contexto).
+2. Criar os secrets do backup, mesclar a PR #62 e rodar o backup uma vez manualmente.
+3. Revisar as PRs do Dependabot (#60 e #61 são versões maiores).
+4. Escolher o próximo item com o Evandro (sugestão: campos obrigatórios em negócio/contato). Contexto completo da troca de thread em `HANDOFF.md`.
