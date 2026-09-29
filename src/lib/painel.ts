@@ -1,6 +1,9 @@
 import "server-only";
+import { carregarLeadsParados, type LeadParado } from "@/lib/leads-parados";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import type { Configuracao } from "@/lib/crm";
+
+export type { LeadParado };
 
 type LinhaNegocio = {
   status: "aberto" | "ganho" | "perdido";
@@ -49,6 +52,47 @@ export async function carregarAtribuicoesPendentes(empresaId: string): Promise<A
       expiraEm: a.expira_em,
     };
   });
+}
+
+export type TarefaAtrasada = {
+  id: string;
+  titulo: string;
+  venceEm: string;
+  negocioId: string | null;
+  contatoNome: string | null;
+  responsavelNome: string | null;
+};
+
+/** Tarefas em aberto com prazo vencido, da empresa toda — pra follow-up do gestor. */
+export async function carregarTarefasAtrasadasLista(empresaId: string, config: Configuracao): Promise<TarefaAtrasada[]> {
+  const supabase = await criarClienteServidor();
+  const { data } = await supabase
+    .from("tarefas")
+    .select("id, titulo, vence_em, responsavel_id, negocios(id, contatos(nome))")
+    .eq("empresa_id", empresaId)
+    .is("concluida_em", null)
+    .lt("vence_em", new Date().toISOString())
+    .order("vence_em", { ascending: true })
+    .limit(50);
+
+  const nomeMembro = new Map(config.membros.map((m) => [m.id, m.nome]));
+  return (data ?? []).map((t) => {
+    const negocio = t.negocios as unknown as { id: string; contatos: { nome: string } | null } | null;
+    return {
+      id: t.id,
+      titulo: t.titulo,
+      venceEm: t.vence_em,
+      negocioId: negocio?.id ?? null,
+      contatoNome: negocio?.contatos?.nome ?? null,
+      responsavelNome: t.responsavel_id ? (nomeMembro.get(t.responsavel_id) ?? null) : null,
+    };
+  });
+}
+
+/** Negócios abertos sem mudança de etapa nem nota nova há dias — mesma regra de [[carregarLeadsParados]], empresa toda. */
+export async function carregarLeadsParadosPainel(empresaId: string): Promise<LeadParado[]> {
+  const supabase = await criarClienteServidor();
+  return carregarLeadsParados(supabase, empresaId);
 }
 
 export async function carregarIndicadores(empresaId: string, config: Configuracao) {

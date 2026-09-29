@@ -1,17 +1,22 @@
-import { Cartao } from "@/components/ui";
-import { carregarConfiguracao, formatarMoeda } from "@/lib/crm";
-import { carregarAtribuicoesPendentes, carregarIndicadores } from "@/lib/painel";
+import Link from "next/link";
+import { Cartao, Selo } from "@/components/ui";
+import { carregarConfiguracao, formatarMoeda, tempoDesde } from "@/lib/crm";
+import { DIAS_PARADO_PADRAO } from "@/lib/leads-parados";
+import { carregarAtribuicoesPendentes, carregarIndicadores, carregarLeadsParadosPainel, carregarTarefasAtrasadasLista } from "@/lib/painel";
 import { exigirPapel } from "@/lib/sessao";
 import { LinhaAtribuicaoPendente } from "./atribuicoes-pendentes";
 
 export default async function Painel() {
   const { atual } = await exigirPapel("admin", "gestor");
   const config = await carregarConfiguracao(atual.empresaId);
-  const [indicadores, atribuicoesPendentes] = await Promise.all([
+  const [indicadores, atribuicoesPendentes, tarefasAtrasadas, leadsParados] = await Promise.all([
     carregarIndicadores(atual.empresaId, config),
     carregarAtribuicoesPendentes(atual.empresaId),
+    carregarTarefasAtrasadasLista(atual.empresaId, config),
+    carregarLeadsParadosPainel(atual.empresaId),
   ]);
   const vendedores = config.membros.filter((m) => m.ativo && m.papel === "vendedor");
+  const nomeMembro = new Map(config.membros.map((m) => [m.id, m.nome]));
   const agora = new Date();
 
   return (
@@ -39,6 +44,55 @@ export default async function Painel() {
               vendedores={vendedores}
             />
           ))}
+        </Cartao>
+      )}
+
+      {tarefasAtrasadas.length > 0 && (
+        <Cartao titulo={`Tarefas atrasadas (${tarefasAtrasadas.length})`}>
+          <ul className="flex flex-col">
+            {tarefasAtrasadas.map((t) => (
+              <li key={t.id} className="flex items-center gap-3 border-t border-zinc-100 py-2.5 first:border-t-0">
+                <div className="min-w-0 flex-1">
+                  {t.negocioId ? (
+                    <Link href={`/negocios/${t.negocioId}`} className="truncate text-sm font-medium text-zinc-900 hover:underline">
+                      {t.contatoNome ?? t.titulo}
+                    </Link>
+                  ) : (
+                    <p className="truncate text-sm font-medium text-zinc-900">{t.titulo}</p>
+                  )}
+                  <p className="truncate text-xs text-zinc-500">
+                    {t.contatoNome ? t.titulo : "Tarefa"}
+                    {t.responsavelNome ? ` · ${t.responsavelNome}` : ""}
+                  </p>
+                </div>
+                <Selo tom="negativo">{tempoDesde(t.venceEm, agora.getTime())}</Selo>
+              </li>
+            ))}
+          </ul>
+        </Cartao>
+      )}
+
+      {leadsParados.length > 0 && (
+        <Cartao titulo={`Leads parados (${leadsParados.length})`}>
+          <p className="mb-2 text-sm text-zinc-600">
+            Sem mudar de etapa nem ganhar uma nota nova há mais de {DIAS_PARADO_PADRAO} dias.
+          </p>
+          <ul className="flex flex-col">
+            {leadsParados.map((n) => (
+              <li key={n.id} className="flex items-center gap-3 border-t border-zinc-100 py-2.5 first:border-t-0">
+                <div className="min-w-0 flex-1">
+                  <Link href={`/negocios/${n.id}`} className="truncate text-sm font-medium text-zinc-900 hover:underline">
+                    {n.contatoNome}
+                  </Link>
+                  <p className="truncate text-xs text-zinc-500">
+                    #{n.numero} {n.titulo}
+                    {n.responsavelId ? ` · ${nomeMembro.get(n.responsavelId) ?? "—"}` : ""}
+                  </p>
+                </div>
+                <Selo tom="atencao">{tempoDesde(n.ultimaAtividadeEm, agora.getTime())}</Selo>
+              </li>
+            ))}
+          </ul>
         </Cartao>
       )}
 
