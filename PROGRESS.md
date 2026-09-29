@@ -24,10 +24,19 @@ Resumo do estado do desenvolvimento. **Atualize ao concluir cada funcionalidade:
 
 ## Em andamento
 
+- **PR #63 — contexto do Claude:** `CLAUDE.md` enxuto (regras permanentes), detalhes movidos para `docs/arquitetura.md` e `docs/regras-negocio.md`, `PROGRESS.md` criado e `.claude/settings.json` bloqueando leitura de build, logs e `.env`.
+
 - **Leads sem contato:** negócio na 1ª etapa, sem nota, atribuído há mais de 3h (prazo configurável). Card no Painel com Reatribuir, prioridade na Início e contagem no sininho.
 - **PR #62 — backup diário do banco de produção** para o repositório privado `raion-crm-backups`. Aguardando o Evandro criar os secrets `BACKUP_ENCRYPTION_KEY` e `BACKUP_REPO_TOKEN`.
 - **PRs do Dependabot abertas:** #55–#58 (Actions), #60 (TypeScript 6), #61 (`@types/node` 26). Atualizações maiores: revisar com cuidado antes de mesclar.
 - **Dashboard unificado de Gamificação** (`/gamificacao`): iniciado em 2026-09-27; confirmar se ficou completo conforme a referência.
+
+## Decisões técnicas relevantes
+
+- Migrations aplicadas em produção só via `banco-producao.yml` com `--include-all` (corrige o travamento de 28–29/09).
+- Notificações só dentro do app (sininho); canais externos ficam para depois.
+- Prazo de "parado" é por empresa (`empresas.dias_considerado_parado`), vale para leads e propostas.
+- Backup do banco independente de plataforma (dump criptografado em repositório privado).
 
 ## Pendências (dependem do Evandro ou sem prazo)
 
