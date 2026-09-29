@@ -170,6 +170,21 @@ export async function definirDiasConsideradoParado(_: ResultadoAcao, formData: F
   return { ok: true, mensagem: "Salvo." };
 }
 
+export async function definirHorasConsideradoSemContato(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  const { atual } = await exigirPapel("admin");
+  const horas = z.coerce.number().int().min(1, "Informe pelo menos 1 hora").max(168, "No máximo 168 horas").safeParse(formData.get("horas"));
+  if (!horas.success) return { ok: false, mensagem: horas.error.issues[0].message };
+
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.from("empresas").update({ horas_considerado_sem_contato: horas.data }).eq("id", atual.empresaId);
+  if (error) return { ok: false, mensagem: "Não foi possível salvar." };
+
+  revalidatePath(CAMINHO);
+  revalidatePath("/painel");
+  revalidatePath("/inicio");
+  return { ok: true, mensagem: "Salvo." };
+}
+
 export async function definirCamposObrigatorios(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
   await exigirPapel("admin");
   const etapaId = z.string().uuid().safeParse(formData.get("etapaId"));

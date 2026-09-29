@@ -1,6 +1,7 @@
 /** Regras da operação: tarefas, notas, anexos, etiquetas, ganho/perda e campos obrigatórios. */
 import { beforeAll, describe, expect, it } from "vitest";
 import { carregarLeadsParados } from "@/lib/leads-parados";
+import { carregarLeadsSemContato } from "@/lib/leads-sem-contato";
 import { carregarPropostasParadas } from "@/lib/propostas-paradas";
 import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
 
@@ -246,6 +247,59 @@ describe("leads parados", () => {
 
     const paradosVendedor2 = await carregarLeadsParados(servico, empresa, { diasLimite: 7, responsavelId: membro[vendedor2.id] });
     expect(paradosVendedor2.map((p) => p.id)).toContain(id);
+  });
+});
+
+describe("leads sem contato", () => {
+  async function criarLeadBackdatado(cliente: Usuario["cliente"], titulo: string, horasAtras: number) {
+    const { data: c } = await servico.from("contatos").insert({ empresa_id: empresa, nome: titulo }).select("id").single();
+    const { data: n, error } = await cliente
+      .from("negocios")
+      .insert({ empresa_id: empresa, titulo, contato_id: c!.id, funil_id: funil, etapa_id: etapas[0].id })
+      .select("id")
+      .single();
+    if (error) throw error;
+    await servico
+      .from("negocios")
+      .update({ created_at: new Date(Date.now() - horasAtras * 3_600_000).toISOString() })
+      .eq("id", n!.id);
+    return n!.id;
+  }
+
+  it("sinaliza lead novo, na etapa inicial, sem nenhuma nota há mais de 3 horas", async () => {
+    const id = await criarLeadBackdatado(vendedor1.cliente, "Lead sem contato 4h", 4);
+    const semContato = await carregarLeadsSemContato(servico, empresa, { horasLimite: 3 });
+    expect(semContato.map((p) => p.id)).toContain(id);
+  });
+
+  it("não sinaliza se já tem alguma nota registrada", async () => {
+    const id = await criarLeadBackdatado(vendedor1.cliente, "Lead com nota", 4);
+    await servico.from("notas").insert({ empresa_id: empresa, negocio_id: id, texto: "Já liguei" });
+    const semContato = await carregarLeadsSemContato(servico, empresa, { horasLimite: 3 });
+    expect(semContato.map((p) => p.id)).not.toContain(id);
+  });
+
+  it("não sinaliza lead ainda dentro do prazo", async () => {
+    const id = await criarLeadBackdatado(vendedor1.cliente, "Lead recente", 1);
+    const semContato = await carregarLeadsSemContato(servico, empresa, { horasLimite: 3 });
+    expect(semContato.map((p) => p.id)).not.toContain(id);
+  });
+
+  it("não sinaliza negócio que já saiu da etapa inicial", async () => {
+    const id = await criarLeadBackdatado(vendedor1.cliente, "Lead avançado", 4);
+    await servico.from("negocios").update({ etapa_id: etapas[1].id }).eq("id", id);
+    const semContato = await carregarLeadsSemContato(servico, empresa, { horasLimite: 3 });
+    expect(semContato.map((p) => p.id)).not.toContain(id);
+  });
+
+  it("respeita o filtro por responsável", async () => {
+    const id = await criarLeadBackdatado(vendedor2.cliente, "Lead sem contato do vendedor2", 4);
+
+    const semContatoVendedor1 = await carregarLeadsSemContato(servico, empresa, { horasLimite: 3, responsavelId: membro[vendedor1.id] });
+    expect(semContatoVendedor1.map((p) => p.id)).not.toContain(id);
+
+    const semContatoVendedor2 = await carregarLeadsSemContato(servico, empresa, { horasLimite: 3, responsavelId: membro[vendedor2.id] });
+    expect(semContatoVendedor2.map((p) => p.id)).toContain(id);
   });
 });
 

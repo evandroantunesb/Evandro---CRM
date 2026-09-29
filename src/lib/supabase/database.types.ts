@@ -707,6 +707,7 @@ export type Database = {
           created_at: string;
           created_by: string | null;
           dias_considerado_parado: number;
+          horas_considerado_sem_contato: number;
           id: string;
           nome: string;
           seq_negocio: number;
@@ -718,6 +719,7 @@ export type Database = {
           created_at?: string;
           created_by?: string | null;
           dias_considerado_parado?: number;
+          horas_considerado_sem_contato?: number;
           id?: string;
           nome: string;
           seq_negocio?: number;
@@ -729,6 +731,7 @@ export type Database = {
           created_at?: string;
           created_by?: string | null;
           dias_considerado_parado?: number;
+          horas_considerado_sem_contato?: number;
           id?: string;
           nome?: string;
           seq_negocio?: number;

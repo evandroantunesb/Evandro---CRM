@@ -1,10 +1,11 @@
 import "server-only";
 import { carregarLeadsParados, type LeadParado } from "@/lib/leads-parados";
+import { carregarLeadsSemContato, type LeadSemContato } from "@/lib/leads-sem-contato";
 import { carregarPropostasParadas, type PropostaParada } from "@/lib/propostas-paradas";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import type { Configuracao } from "@/lib/crm";
 
-export type { LeadParado, PropostaParada };
+export type { LeadParado, LeadSemContato, PropostaParada };
 
 type LinhaNegocio = {
   status: "aberto" | "ganho" | "perdido";
@@ -100,6 +101,12 @@ export async function carregarLeadsParadosPainel(empresaId: string, diasLimite: 
 export async function carregarPropostasParadasPainel(empresaId: string, diasLimite: number): Promise<PropostaParada[]> {
   const supabase = await criarClienteServidor();
   return carregarPropostasParadas(supabase, empresaId, { diasLimite });
+}
+
+/** Leads novos sem nenhum contato registrado há horas — mesma regra de [[carregarLeadsSemContato]], empresa toda. */
+export async function carregarLeadsSemContatoPainel(empresaId: string, horasLimite: number): Promise<LeadSemContato[]> {
+  const supabase = await criarClienteServidor();
+  return carregarLeadsSemContato(supabase, empresaId, { horasLimite });
 }
 
 export async function carregarIndicadores(empresaId: string, config: Configuracao) {

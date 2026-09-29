@@ -2,7 +2,7 @@ import { Bell, LogOut } from "lucide-react";
 import Link from "next/link";
 import { Avatar } from "@/components/avatar";
 import { LogoRaion } from "@/components/marca";
-import { carregarDiasConsideradoParado } from "@/lib/crm";
+import { carregarDiasConsideradoParado, carregarHorasConsideradoSemContato } from "@/lib/crm";
 import { contarPendencias } from "@/lib/notificacoes";
 import { obterSessao } from "@/lib/sessao";
 import { trocarEmpresa } from "@/lib/acoes/empresa-atual";
@@ -15,8 +15,11 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
 
   let pendencias = 0;
   if (sessao.atual) {
-    const dias = await carregarDiasConsideradoParado(sessao.atual.empresaId);
-    pendencias = await contarPendencias(sessao.atual.empresaId, sessao.atual.membroId, sessao.atual.papel, dias);
+    const [dias, horas] = await Promise.all([
+      carregarDiasConsideradoParado(sessao.atual.empresaId),
+      carregarHorasConsideradoSemContato(sessao.atual.empresaId),
+    ]);
+    pendencias = await contarPendencias(sessao.atual.empresaId, sessao.atual.membroId, sessao.atual.papel, dias, horas);
   }
 
   const itens = [

@@ -1,18 +1,20 @@
 import "server-only";
 import { carregarLeadsParados } from "@/lib/leads-parados";
+import { carregarLeadsSemContato } from "@/lib/leads-sem-contato";
 import { carregarPropostasParadas } from "@/lib/propostas-paradas";
 import { criarClienteServidor } from "@/lib/supabase/server";
 
 /**
  * Total de pendências do usuário logado — soma dos mesmos números do Painel (admin/gestor,
  * empresa toda) ou da Início (vendedor, só a própria carteira): tarefas atrasadas, leads
- * aguardando aprovação (só gestor/admin), leads parados e propostas paradas.
+ * aguardando aprovação (só gestor/admin), leads sem contato, leads parados e propostas paradas.
  */
 export async function contarPendencias(
   empresaId: string,
   membroId: string,
   papel: string,
   diasConsideradoParado: number,
+  horasConsideradoSemContato: number,
 ): Promise<number> {
   const supabase = await criarClienteServidor();
   const ehVendedor = papel === "vendedor";
@@ -26,13 +28,14 @@ export async function contarPendencias(
     .lt("vence_em", new Date().toISOString());
   if (ehVendedor) consultaTarefas = consultaTarefas.eq("responsavel_id", membroId);
 
-  const [leadsParados, propostasParadas, { count: tarefasAtrasadas }] = await Promise.all([
+  const [leadsSemContato, leadsParados, propostasParadas, { count: tarefasAtrasadas }] = await Promise.all([
+    carregarLeadsSemContato(supabase, empresaId, { ...filtro, horasLimite: horasConsideradoSemContato }),
     carregarLeadsParados(supabase, empresaId, { ...filtro, diasLimite: diasConsideradoParado }),
     carregarPropostasParadas(supabase, empresaId, { ...filtro, diasLimite: diasConsideradoParado }),
     consultaTarefas,
   ]);
 
-  let total = leadsParados.length + propostasParadas.length + (tarefasAtrasadas ?? 0);
+  let total = leadsSemContato.length + leadsParados.length + propostasParadas.length + (tarefasAtrasadas ?? 0);
 
   if (!ehVendedor) {
     const { count: aguardando } = await supabase
