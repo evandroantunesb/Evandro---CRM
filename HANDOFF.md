@@ -46,7 +46,7 @@ Contexto para uma nova sessão continuar sem repetir trabalho. Leia junto com `C
 
 ## 5. Pendências em ordem sugerida
 
-1. Evandro mescla a PR #63.
+1. PR #63 mesclada (este arquivo).
 2. Evandro cria os 2 secrets → mesclar #62 → rodar o backup manualmente uma vez para validar.
 3. Revisar as PRs do Dependabot (Actions primeiro; #60/#61 com cuidado, rodando o CI).
 4. Escolher o próximo item com o Evandro. Candidatos já citados por ele: mais estilo nos cards do Kanban; tornar "Valor (R$)" e outros campos obrigatórios.
