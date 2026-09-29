@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(./.next/**)",
+      "Read(./out/**)",
+      "Read(./build/**)",
+      "Read(./dist/**)",
+      "Read(./coverage/**)",
+      "Read(./**/*.log)",
+      "Read(./.env)",
+      "Read(./.env.local)",
+      "Read(./.env.*.local)"
+    ]
+  }
+}

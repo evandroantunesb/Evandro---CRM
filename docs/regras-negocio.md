@@ -1,0 +1,16 @@
+# Regras de negócio — Raion CRM
+
+Não altere nenhuma destas regras sem pedido explícito do Evandro.
+
+- **Funil padrão:** Novo lead → Contato feito → Visita agendada → Proposta enviada → Ganho/Perdido (configurável só por admin).
+- **Distribuição de leads:** rodízio automático entre vendedores ativos, com fila de aprovação do gestor; prazo de auto-aprovação configurável por origem (padrão 1h). Expiração via `pg_cron` a cada 5 min.
+- **Status do vendedor:** Ativo / Inativo / Desligado; só ativos entram no rodízio.
+- **Leads parados:** negócio aberto sem mudar de etapa nem ganhar nota há mais que `empresas.dias_considerado_parado` (padrão 7).
+- **Propostas paradas:** proposta gerada sem o cliente abrir de novo nem mudar etapa no mesmo prazo.
+- Parados aparecem no Painel (com botão Reatribuir), na Início e no sininho de notificações.
+- **Gamificação (pontos padrão):** negócio criado 5, etapa avançada 2, negócio ganho 50, tarefa concluída 3, nota 1. Há níveis, conquistas, ranking, loja de recompensas, metas e comissões.
+- **WhatsApp:** só botão `wa.me` + registro manual (sem API oficial).
+- **Cobrança:** super-admin define plano/valor por empresa; sem gateway de pagamento.
+- **Proposta e contrato** "fotografam" o modelo na geração; editar o modelo depois não muda o documento já gerado. Contrato só pode ser regerado em rascunho.
+- CNH e documentos pessoais são dado sensível (LGPD): acesso restrito.
+- **Dados de teste:** Equipe Cascavel em produção (Camila, Rafael, Bruno; e-mails `*.teste@raioncrm-demo.com.br`), criada por `scripts/seed-equipe-cascavel.mjs`. O repositório é público: senhas não ficam aqui.
