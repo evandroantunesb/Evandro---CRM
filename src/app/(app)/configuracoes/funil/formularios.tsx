@@ -10,6 +10,7 @@ import {
   definirCamposObrigatorios,
   definirCorEtapa,
   definirDiasConsideradoParado,
+  definirHorasConsideradoSemContato,
   renomear,
 } from "./actions";
 
@@ -42,6 +43,28 @@ export function DiasConsideradoParado({ dias }: { dias: number }) {
         required
       />
       <span className="text-sm text-zinc-600">dias sem atividade pra considerar &quot;parado&quot; (leads e propostas)</span>
+      <Botao type="submit" variante="secundario" disabled={pendente}>
+        Salvar
+      </Botao>
+      <Mensagem resultado={resultado} />
+    </form>
+  );
+}
+
+export function HorasConsideradoSemContato({ horas }: { horas: number }) {
+  const [resultado, acao, pendente] = useActionState(definirHorasConsideradoSemContato, null);
+  return (
+    <form action={acao} className="flex flex-wrap items-center gap-2">
+      <input
+        type="number"
+        name="horas"
+        min={1}
+        max={168}
+        defaultValue={horas}
+        className={`${inputClasse} max-w-20 flex-none`}
+        required
+      />
+      <span className="text-sm text-zinc-600">horas sem nenhum contato pra considerar um lead novo &quot;sem contato&quot;</span>
       <Botao type="submit" variante="secundario" disabled={pendente}>
         Salvar
       </Botao>
