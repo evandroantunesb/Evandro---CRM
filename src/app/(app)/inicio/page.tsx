@@ -21,6 +21,7 @@ import { ListaTarefas, type TarefaLista } from "@/components/lista-tarefas";
 import { Cartao, Selo } from "@/components/ui";
 import { carregarConfiguracao, formatarMoeda, inicioDoDia, tempoDesde } from "@/lib/crm";
 import { carregarLeadsParados } from "@/lib/leads-parados";
+import { carregarLeadsSemContato } from "@/lib/leads-sem-contato";
 import { calcularProgresso, calcularRealizado, type Meta } from "@/lib/metas";
 import { carregarPropostasParadas } from "@/lib/propostas-paradas";
 import { obterSessao } from "@/lib/sessao";
@@ -205,30 +206,9 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
       .eq("membro_id", atual.membroId),
   ]);
 
-  // Leads aguardando primeiro contato: negócios abertos ainda na etapa inicial do funil.
-  const etapasIniciais = config.etapas.filter((e) => e.inicial).map((e) => e.id);
-  let consultaLeadsAguardandoCount = supabase
-    .from("negocios")
-    .select("id", { count: "exact", head: true })
-    .eq("empresa_id", atual.empresaId)
-    .eq("status", "aberto")
-    .in("etapa_id", etapasIniciais);
-  if (pessoal) consultaLeadsAguardandoCount = consultaLeadsAguardandoCount.eq("responsavel_id", atual.membroId);
-
-  let consultaLeadsAguardandoLista = supabase
-    .from("negocios")
-    .select("id, created_at, contatos(nome)")
-    .eq("empresa_id", atual.empresaId)
-    .eq("status", "aberto")
-    .in("etapa_id", etapasIniciais)
-    .order("created_at", { ascending: true })
-    .limit(4);
-  if (pessoal) consultaLeadsAguardandoLista = consultaLeadsAguardandoLista.eq("responsavel_id", atual.membroId);
-
   const filtroResponsavel = pessoal ? { responsavelId: atual.membroId } : {};
-  const [{ count: leadsAguardando }, { data: leadsAguardandoLista }, leadsParados, propostasParadas] = await Promise.all([
-    etapasIniciais.length ? consultaLeadsAguardandoCount : Promise.resolve({ count: 0 }),
-    etapasIniciais.length ? consultaLeadsAguardandoLista : Promise.resolve({ data: [] }),
+  const [leadsSemContato, leadsParados, propostasParadas] = await Promise.all([
+    carregarLeadsSemContato(supabase, atual.empresaId, { ...filtroResponsavel, horasLimite: config.horasConsideradoSemContato }),
     carregarLeadsParados(supabase, atual.empresaId, { ...filtroResponsavel, diasLimite: config.diasConsideradoParado }),
     carregarPropostasParadas(supabase, atual.empresaId, { ...filtroResponsavel, diasLimite: config.diasConsideradoParado }),
   ]);
@@ -321,18 +301,15 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
       href: negocio ? `/negocios/${negocio.id}` : "/tarefas",
     };
   });
-  const prioridadesLeads: Prioridade[] = (leadsAguardandoLista ?? []).map((n) => {
-    const contato = n.contatos as unknown as { nome: string } | null;
-    return {
-      id: `l-${n.id}`,
-      icone: UserPlus,
-      titulo: contato?.nome ?? "(sem nome)",
-      subtitulo: "Novo lead · aguardando primeiro contato",
-      badge: "pendente",
-      tempo: tempoDesde(n.created_at, agora.getTime()),
-      href: `/negocios/${n.id}`,
-    };
-  });
+  const prioridadesLeads: Prioridade[] = leadsSemContato.map((n) => ({
+    id: `l-${n.id}`,
+    icone: UserPlus,
+    titulo: n.contatoNome,
+    subtitulo: `#${n.numero} ${n.titulo} · sem contato`,
+    badge: "pendente",
+    tempo: tempoDesde(n.ultimaAtividadeEm, agora.getTime()),
+    href: `/negocios/${n.id}`,
+  }));
   const prioridadesParadas: Prioridade[] = leadsParados.map((n) => ({
     id: `p-${n.id}`,
     icone: BriefcaseBusiness,
@@ -352,7 +329,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
     href: `/negocios/${n.id}`,
   }));
   const prioridades = [...prioridadesAtrasadas, ...prioridadesParadas, ...prioridadesPropostasParadas, ...prioridadesLeads].slice(0, 4);
-  const totalPendencias = (tarefasAtrasadasTotal ?? 0) + (leadsAguardando ?? 0) + leadsParados.length + propostasParadas.length;
+  const totalPendencias = (tarefasAtrasadasTotal ?? 0) + leadsSemContato.length + leadsParados.length + propostasParadas.length;
 
   // Agenda de hoje -----------------------------------------------------------
   const agendaHoje: TarefaLista[] = (tarefasHoje ?? []).map((t) => {
@@ -457,7 +434,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
           valor={String(leadsHoje ?? 0)}
           legenda="Novos leads hoje"
           variacaoPct={variacao(leadsHoje ?? 0, leadsOntem ?? 0)}
-          rodape={`${leadsAguardando ?? 0} aguardando primeiro contato`}
+          rodape={`${leadsSemContato.length} sem contato`}
         />
         <Kpi
           Icone={BriefcaseBusiness}

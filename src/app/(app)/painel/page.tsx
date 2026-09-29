@@ -5,6 +5,7 @@ import {
   carregarAtribuicoesPendentes,
   carregarIndicadores,
   carregarLeadsParadosPainel,
+  carregarLeadsSemContatoPainel,
   carregarPropostasParadasPainel,
   carregarTarefasAtrasadasLista,
 } from "@/lib/painel";
@@ -15,12 +16,13 @@ import { LinhaParado } from "./linha-parado";
 export default async function Painel() {
   const { atual } = await exigirPapel("admin", "gestor");
   const config = await carregarConfiguracao(atual.empresaId);
-  const [indicadores, atribuicoesPendentes, tarefasAtrasadas, leadsParados, propostasParadas] = await Promise.all([
+  const [indicadores, atribuicoesPendentes, tarefasAtrasadas, leadsParados, propostasParadas, leadsSemContato] = await Promise.all([
     carregarIndicadores(atual.empresaId, config),
     carregarAtribuicoesPendentes(atual.empresaId),
     carregarTarefasAtrasadasLista(atual.empresaId, config),
     carregarLeadsParadosPainel(atual.empresaId, config.diasConsideradoParado),
     carregarPropostasParadasPainel(atual.empresaId, config.diasConsideradoParado),
+    carregarLeadsSemContatoPainel(atual.empresaId, config.horasConsideradoSemContato),
   ]);
   const vendedores = config.membros.filter((m) => m.ativo && m.papel === "vendedor");
   const agora = new Date();
@@ -50,6 +52,29 @@ export default async function Painel() {
               vendedores={vendedores}
             />
           ))}
+        </Cartao>
+      )}
+
+      {leadsSemContato.length > 0 && (
+        <Cartao titulo={`Leads sem contato (${leadsSemContato.length})`}>
+          <p className="mb-2 text-sm text-zinc-600">
+            Leads novos, ainda na etapa inicial, sem nenhuma nota registrada há mais de {config.horasConsideradoSemContato} horas.
+          </p>
+          <ul className="flex flex-col">
+            {leadsSemContato.map((n) => (
+              <LinhaParado
+                key={n.id}
+                negocioId={n.id}
+                numero={n.numero}
+                titulo={n.titulo}
+                contatoNome={n.contatoNome}
+                responsavelId={n.responsavelId}
+                ultimaAtividadeEm={n.ultimaAtividadeEm}
+                agora={agora.getTime()}
+                vendedores={vendedores}
+              />
+            ))}
+          </ul>
         </Cartao>
       )}
 

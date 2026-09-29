@@ -2,11 +2,20 @@ import { Cartao, Selo } from "@/components/ui";
 import { carregarConfiguracao } from "@/lib/crm";
 import { exigirPapel } from "@/lib/sessao";
 import { alternarFunil, definirInicial, reordenarEtapa } from "./actions";
-import { AlternarEtapa, CamposObrigatorios, CorEtapa, DiasConsideradoParado, NovaEtapa, NovoFunil, Renomear } from "./formularios";
+import {
+  AlternarEtapa,
+  CamposObrigatorios,
+  CorEtapa,
+  DiasConsideradoParado,
+  HorasConsideradoSemContato,
+  NovaEtapa,
+  NovoFunil,
+  Renomear,
+} from "./formularios";
 
 export default async function ConfigFunil() {
   const { atual } = await exigirPapel("admin");
-  const { funis, etapas, diasConsideradoParado } = await carregarConfiguracao(atual.empresaId);
+  const { funis, etapas, diasConsideradoParado, horasConsideradoSemContato } = await carregarConfiguracao(atual.empresaId);
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
@@ -75,7 +84,10 @@ export default async function ConfigFunil() {
         <NovoFunil />
       </Cartao>
       <Cartao titulo="Alertas de inatividade">
-        <DiasConsideradoParado dias={diasConsideradoParado} />
+        <div className="flex flex-col gap-3">
+          <DiasConsideradoParado dias={diasConsideradoParado} />
+          <HorasConsideradoSemContato horas={horasConsideradoSemContato} />
+        </div>
       </Cartao>
     </div>
   );

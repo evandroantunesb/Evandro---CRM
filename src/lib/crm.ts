@@ -22,7 +22,7 @@ export type KitSolar = { id: string; nome: string; potenciaKwp: number; preco: n
 export async function carregarConfiguracao(empresaId: string) {
   const supabase = await criarClienteServidor();
   const [empresa, funis, etapas, origens, membros, motivos, etiquetas, kits] = await Promise.all([
-    supabase.from("empresas").select("dias_considerado_parado").eq("id", empresaId).single(),
+    supabase.from("empresas").select("dias_considerado_parado, horas_considerado_sem_contato").eq("id", empresaId).single(),
     supabase.from("funis").select("id, nome, ativo").eq("empresa_id", empresaId).order("ordem").order("created_at"),
     supabase
       .from("etapas")
@@ -46,6 +46,7 @@ export async function carregarConfiguracao(empresaId: string) {
 
   return {
     diasConsideradoParado: empresa.data?.dias_considerado_parado ?? 7,
+    horasConsideradoSemContato: empresa.data?.horas_considerado_sem_contato ?? 3,
     funis: (funis.data ?? []) as Funil[],
     etapas: (etapas.data ?? []).map((e) => ({
       id: e.id,
@@ -90,6 +91,13 @@ export async function carregarDiasConsideradoParado(empresaId: string): Promise<
   const supabase = await criarClienteServidor();
   const { data } = await supabase.from("empresas").select("dias_considerado_parado").eq("id", empresaId).single();
   return data?.dias_considerado_parado ?? 7;
+}
+
+/** Só o prazo de "sem contato" — pra quem precisa dele sem carregar o resto de [[carregarConfiguracao]] (ex.: o sininho no menu). */
+export async function carregarHorasConsideradoSemContato(empresaId: string): Promise<number> {
+  const supabase = await criarClienteServidor();
+  const { data } = await supabase.from("empresas").select("horas_considerado_sem_contato").eq("id", empresaId).single();
+  return data?.horas_considerado_sem_contato ?? 3;
 }
 
 export {
