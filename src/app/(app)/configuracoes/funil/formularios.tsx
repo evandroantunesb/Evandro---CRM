@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useRef } from "react";
 import { Botao, Mensagem } from "@/components/ui";
 import { CAMPOS_OBRIGATORIOS, ROTULO_CAMPO_OBRIGATORIO } from "@/lib/tipos";
 import {
@@ -118,16 +118,32 @@ export function AlternarEtapa({ etapaId, ativa }: { etapaId: string; ativa: bool
 
 /** Cor de acento da etapa, mostrada na coluna do Kanban. */
 export function CorEtapa({ etapaId, cor }: { etapaId: string; cor: string | null }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // O onChange do React em <input type="color"> se comporta como o evento nativo "input":
+  // dispara a cada movimento do dedo/mouse dentro do seletor, não só ao confirmar a cor.
+  // Isso inundava a server action de submissões (uma por movimento) e travava a tela.
+  // O evento nativo "change" só dispara quando o seletor fecha com uma cor definida.
+  useEffect(() => {
+    const input = inputRef.current;
+    if (!input) return;
+    function aoConfirmarCor() {
+      input?.form?.requestSubmit();
+    }
+    input.addEventListener("change", aoConfirmarCor);
+    return () => input.removeEventListener("change", aoConfirmarCor);
+  }, []);
+
   return (
     <form action={definirCorEtapa} className="flex items-center gap-1" title="Cor da etapa no Kanban">
       <input type="hidden" name="etapaId" value={etapaId} />
       <input
+        ref={inputRef}
         type="color"
         name="cor"
         defaultValue={cor ?? "#a1a1aa"}
         aria-label="Cor da etapa"
         className="h-6 w-6 cursor-pointer rounded border border-zinc-300 p-0"
-        onChange={(e) => e.currentTarget.form?.requestSubmit()}
       />
     </form>
   );
