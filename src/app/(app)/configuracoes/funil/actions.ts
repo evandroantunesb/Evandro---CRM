@@ -57,17 +57,36 @@ export async function criarEtapa(_: ResultadoAcao, formData: FormData): Promise<
   return concluir("Etapa criada.");
 }
 
-export async function renomear(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+/** Salva de uma vez os nomes dos funis, e os nomes + campos obrigatórios das etapas (botão único "Salvar" no topo da página). */
+export async function salvarFunis(
+  funis: { id: string; nome: string }[],
+  etapas: { id: string; nome: string; camposObrigatorios: string[] }[],
+): Promise<ResultadoAcao> {
   await exigirPapel("admin");
   const dados = z
-    .object({ tabela: z.enum(["funis", "etapas"]), id: z.string().uuid(), nome })
-    .safeParse(Object.fromEntries(formData));
+    .object({
+      funis: z.array(z.object({ id: z.string().uuid(), nome })),
+      etapas: z.array(z.object({ id: z.string().uuid(), nome, camposObrigatorios: z.array(z.enum(CAMPOS_OBRIGATORIOS)) })),
+    })
+    .safeParse({ funis, etapas });
   if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
 
   const supabase = await criarClienteServidor();
-  const { error } = await supabase.from(dados.data.tabela).update({ nome: dados.data.nome }).eq("id", dados.data.id);
-  if (error) return { ok: false, mensagem: "Não foi possível renomear." };
-  return concluir("Salvo.");
+
+  for (const f of dados.data.funis) {
+    const { error } = await supabase.from("funis").update({ nome: f.nome }).eq("id", f.id);
+    if (error) return { ok: false, mensagem: error.code === "23505" ? "Já existe um funil com esse nome." : "Não foi possível salvar os funis." };
+  }
+  for (const e of dados.data.etapas) {
+    const { error } = await supabase.from("etapas").update({ nome: e.nome, campos_obrigatorios: e.camposObrigatorios }).eq("id", e.id);
+    if (error)
+      return {
+        ok: false,
+        mensagem: error.code === "23505" ? "Já existe uma etapa com esse nome neste funil." : "Não foi possível salvar as etapas.",
+      };
+  }
+
+  return concluir("Alterações salvas.");
 }
 
 /** Troca a ordem da etapa com a vizinha de cima ou de baixo. */
@@ -185,14 +204,3 @@ export async function definirHorasConsideradoSemContato(_: ResultadoAcao, formDa
   return { ok: true, mensagem: "Salvo." };
 }
 
-export async function definirCamposObrigatorios(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  await exigirPapel("admin");
-  const etapaId = z.string().uuid().safeParse(formData.get("etapaId"));
-  const campos = z.array(z.enum(CAMPOS_OBRIGATORIOS)).safeParse(formData.getAll("campos"));
-  if (!etapaId.success || !campos.success) return { ok: false, mensagem: "Dados inválidos." };
-
-  const supabase = await criarClienteServidor();
-  const { error } = await supabase.from("etapas").update({ campos_obrigatorios: campos.data }).eq("id", etapaId.data);
-  if (error) return { ok: false, mensagem: "Não foi possível salvar." };
-  return concluir("Campos obrigatórios salvos.");
-}
