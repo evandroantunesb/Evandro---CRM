@@ -77,6 +77,11 @@ export default async function ConfigCalculadora() {
             mpptMaxV: e.mppt_max_v,
             correnteMaxEntradaA: e.corrente_max_entrada_a,
             quantidadeMppt: e.quantidade_mppt,
+            precoReferenciaBRL: e.preco_referencia_brl,
+            datasheetNome: e.datasheet_nome,
+            potenciaDcMaximaEntradaW: e.potencia_dc_maxima_entrada_w,
+            iscMaximoEntradaA: e.isc_maximo_entrada_a,
+            tensaoFasesAc: e.tensao_fases_ac,
           }))}
         />
       </Cartao>
