@@ -1925,6 +1925,54 @@ export type Database = {
           },
         ];
       };
+      notificacoes: {
+        Row: {
+          created_at: string;
+          empresa_id: string;
+          id: string;
+          lida_em: string | null;
+          link: string | null;
+          membro_id: string;
+          mensagem: string;
+          tipo: string;
+        };
+        Insert: {
+          created_at?: string;
+          empresa_id: string;
+          id?: string;
+          lida_em?: string | null;
+          link?: string | null;
+          membro_id: string;
+          mensagem: string;
+          tipo: string;
+        };
+        Update: {
+          created_at?: string;
+          empresa_id?: string;
+          id?: string;
+          lida_em?: string | null;
+          link?: string | null;
+          membro_id?: string;
+          mensagem?: string;
+          tipo?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "notificacoes_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "notificacoes_membro_id_fkey";
+            columns: ["membro_id"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       origens: {
         Row: {
           ativa: boolean;

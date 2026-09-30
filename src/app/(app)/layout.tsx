@@ -1,25 +1,30 @@
-import { Bell, LogOut } from "lucide-react";
+import { LogOut } from "lucide-react";
 import Link from "next/link";
 import { Avatar } from "@/components/avatar";
 import { LogoRaion } from "@/components/marca";
 import { carregarDiasConsideradoParado, carregarHorasConsideradoSemContato } from "@/lib/crm";
-import { contarPendencias } from "@/lib/notificacoes";
+import { carregarNotificacoesNaoLidas, contarPendencias } from "@/lib/notificacoes";
 import { obterSessao } from "@/lib/sessao";
 import { trocarEmpresa } from "@/lib/acoes/empresa-atual";
 import { ROTULO_PAPEL } from "@/lib/tipos";
 import { Menu } from "./menu";
+import { Sininho } from "./sininho";
 
 export default async function LayoutApp({ children }: { children: React.ReactNode }) {
   const sessao = await obterSessao();
   const papel = sessao.atual?.papel;
 
   let pendencias = 0;
+  let notificacoes: Awaited<ReturnType<typeof carregarNotificacoesNaoLidas>> = [];
   if (sessao.atual) {
     const [dias, horas] = await Promise.all([
       carregarDiasConsideradoParado(sessao.atual.empresaId),
       carregarHorasConsideradoSemContato(sessao.atual.empresaId),
     ]);
-    pendencias = await contarPendencias(sessao.atual.empresaId, sessao.atual.membroId, sessao.atual.papel, dias, horas);
+    [pendencias, notificacoes] = await Promise.all([
+      contarPendencias(sessao.atual.empresaId, sessao.atual.membroId, sessao.atual.papel, dias, horas),
+      carregarNotificacoesNaoLidas(sessao.atual.empresaId, sessao.atual.membroId),
+    ]);
   }
 
   const itens = [
@@ -94,13 +99,11 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
           )}
         </div>
         {sessao.atual && (
-          <Link
-            href={papel === "admin" || papel === "gestor" ? "/painel" : "/inicio"}
-            className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-offwhite hover:border-dourado"
-          >
-            <Bell size={16} />
-            {pendencias > 0 ? `${pendencias} pendência${pendencias === 1 ? "" : "s"}` : "Nenhuma pendência"}
-          </Link>
+          <Sininho
+            notificacoes={notificacoes}
+            linkPendencias={papel === "admin" || papel === "gestor" ? "/painel" : "/inicio"}
+            textoPendencias={pendencias > 0 ? `${pendencias} pendência${pendencias === 1 ? "" : "s"}` : "Nenhuma pendência"}
+          />
         )}
         <Menu itens={itens} />
         <div className="hidden items-center gap-3 border-t border-white/10 pt-4 md:mt-auto md:flex">

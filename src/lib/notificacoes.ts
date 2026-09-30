@@ -4,6 +4,22 @@ import { carregarLeadsSemContato } from "@/lib/leads-sem-contato";
 import { carregarPropostasParadas } from "@/lib/propostas-paradas";
 import { criarClienteServidor } from "@/lib/supabase/server";
 
+export type Notificacao = { id: string; tipo: "lead_atribuido" | "tarefa_atribuida"; mensagem: string; link: string | null };
+
+/** Notificações individuais não lidas do sininho (fase 7, spec SDR §45) — só os 2 tipos hoje suportados. */
+export async function carregarNotificacoesNaoLidas(empresaId: string, membroId: string, limite = 8): Promise<Notificacao[]> {
+  const supabase = await criarClienteServidor();
+  const { data } = await supabase
+    .from("notificacoes")
+    .select("id, tipo, mensagem, link")
+    .eq("empresa_id", empresaId)
+    .eq("membro_id", membroId)
+    .is("lida_em", null)
+    .order("created_at", { ascending: false })
+    .limit(limite);
+  return (data ?? []) as Notificacao[];
+}
+
 /**
  * Total de pendências do usuário logado — soma dos mesmos números do Painel (admin/gestor,
  * empresa toda) ou da Início (vendedor, só a própria carteira): tarefas atrasadas, leads

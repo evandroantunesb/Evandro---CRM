@@ -113,6 +113,16 @@ export async function criarTarefa(_: ResultadoAcao, formData: FormData): Promise
   if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível criar a tarefa.") };
 
   await sincronizarCriacao(supabase, tarefa.id, responsavelId, d.titulo, venceEmIso);
+  if (responsavelId && responsavelId !== atual.membroId) {
+    const admin = criarClienteAdmin();
+    await admin.from("notificacoes").insert({
+      empresa_id: atual.empresaId,
+      membro_id: responsavelId,
+      tipo: "tarefa_atribuida",
+      mensagem: `Nova tarefa atribuída: "${d.titulo}"`,
+      link: "/tarefas",
+    });
+  }
 
   atualizarTelas(d.negocioId);
   return { ok: true, mensagem: "Tarefa criada." };
