@@ -1,5 +1,6 @@
 import { Briefcase, Building2, TrendingUp, Users } from "lucide-react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { Cartao, Selo } from "@/components/ui";
@@ -8,6 +9,8 @@ import { criarClienteServidor } from "@/lib/supabase/server";
 
 export default async function Contatos({ searchParams }: PageProps<"/contatos">) {
   const { atual } = await exigirPapel();
+  // SDR não tem acesso à carteira geral de contatos (spec RAION_SDR_REGRAS_PERMISSOES) — só aos contatos dos seus próprios negócios, via /contatos/[id].
+  if (atual.papel === "sdr") redirect("/inicio");
   const { q } = await searchParams;
   const busca = (typeof q === "string" ? q : "").replace(/[%,()]/g, "").trim();
 

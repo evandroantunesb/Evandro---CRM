@@ -2841,7 +2841,7 @@ export type Database = {
       metrica_meta: "receita" | "negocios_ganhos" | "reunioes" | "conversao" | "tarefas_concluidas";
       modelo_cobranca: "por_usuario" | "fixo" | "fixo_mais_usuario";
       modo_preco_proposta: "sem_preco" | "parcelado" | "avista" | "completo";
-      papel_membro: "admin" | "gestor" | "vendedor";
+      papel_membro: "admin" | "gestor" | "vendedor" | "sdr";
       periodo_limite_regra: "dia" | "mes";
       proposta_bloco_quebra: "auto" | "nova_pagina" | "pagina_exclusiva";
       proposta_modelo_capa: "foto" | "minimalista" | "tecnica";
@@ -2980,7 +2980,7 @@ export const Constants = {
       metrica_meta: ["receita", "negocios_ganhos", "reunioes", "conversao", "tarefas_concluidas"],
       modelo_cobranca: ["por_usuario", "fixo", "fixo_mais_usuario"],
       modo_preco_proposta: ["sem_preco", "parcelado", "avista", "completo"],
-      papel_membro: ["admin", "gestor", "vendedor"],
+      papel_membro: ["admin", "gestor", "vendedor", "sdr"],
       periodo_limite_regra: ["dia", "mes"],
       proposta_bloco_quebra: ["auto", "nova_pagina", "pagina_exclusiva"],
       proposta_modelo_capa: ["foto", "minimalista", "tecnica"],
