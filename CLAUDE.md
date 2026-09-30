@@ -12,6 +12,8 @@ CRM de funil de vendas para empresas de energia solar, multiempresa (SaaS revend
 - Busque antes de abrir (`grep`/Glob) e leia só o intervalo de linhas necessário; não carregue o projeto inteiro para mudanças pontuais.
 - Não leia `node_modules/`, `.next/`, `dist/`, `build/`, `out/`, `coverage/`, `pnpm-lock.yaml`, arquivos gerados ou logs longos sem necessidade. Exceção: a página relevante de `node_modules/next/dist/docs/` (ver `AGENTS.md`).
 - Nas respostas, prefira resumo ou diff a arquivos inteiros.
+- Leitura direcionada: localize primeiro o símbolo, função ou componente da tarefa, depois leia o trecho relevante (com o contexto necessário pra entender dependências). Em arquivos acima de ~300 linhas, evite ler o arquivo inteiro por padrão — leia completo quando a implementação, investigação ou segurança da alteração exigir.
+- Não divida arquivos nem refatore só para reduzir consumo de tokens; isso é decisão de arquitetura, não de economia de contexto. Nunca edite manualmente arquivo gerado (ex.: `database.types.ts`) — regenere com o comando correspondente (`pnpm db:types`).
 
 ## Agentes
 
