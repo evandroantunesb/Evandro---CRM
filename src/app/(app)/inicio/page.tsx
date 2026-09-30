@@ -160,6 +160,15 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
   if (funilPrincipal) consultaFunilMes = consultaFunilMes.eq("funil_id", funilPrincipal.id);
   if (pessoal) consultaFunilMes = consultaFunilMes.eq("responsavel_id", atual.membroId);
 
+  // Ganhos recentes: só usado na visão de Equipe (gestor), pra saber de quem foi cada negócio fechado.
+  const consultaGanhosRecentes = supabase
+    .from("negocios")
+    .select("id, numero, valor, fechado_em, responsavel_id, contatos(nome)")
+    .eq("empresa_id", atual.empresaId)
+    .eq("status", "ganho")
+    .order("fechado_em", { ascending: false })
+    .limit(5);
+
   let consultaTarefasAtrasadasTotal = supabase
     .from("tarefas")
     .select("id", { count: "exact", head: true })
@@ -194,6 +203,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
     { data: pontosTotais },
     { data: rankingBruto },
     { count: conquistasCount },
+    { data: ganhosRecentes },
   ] = await Promise.all([
     consultaLeadsHoje,
     consultaLeadsOntem,
@@ -222,6 +232,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
       .from("conquistas_desbloqueadas")
       .select("id", { count: "exact", head: true })
       .eq("membro_id", atual.membroId),
+    consultaGanhosRecentes,
   ]);
 
   const filtroResponsavel = pessoal ? { responsavelId: atual.membroId } : {};
@@ -299,6 +310,20 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
     ...etapasFunil.map((e) => ({ id: e.id, nome: e.nome, cor: e.cor, quantidade: contagemPorEtapa.get(e.id) ?? 0 })),
     { id: "fechado", nome: "Fechado", cor: "#137B43", quantidade: (negociosMes ?? []).length },
   ];
+
+  // Ganhos recentes: quem fechou cada um dos últimos negócios ganhos (visão de Equipe/gestor) -------------------
+  const nomeMembro = new Map(config.membros.map((m) => [m.id, m.nome]));
+  const listaGanhosRecentes = (ganhosRecentes ?? []).map((n) => {
+    const contato = n.contatos as unknown as { nome: string } | null;
+    return {
+      id: n.id,
+      numero: n.numero,
+      contato: contato?.nome ?? "Sem contato",
+      valor: n.valor,
+      fechadoEm: n.fechado_em,
+      vendedor: n.responsavel_id ? (nomeMembro.get(n.responsavel_id) ?? "Ninguém") : "Ninguém",
+    };
+  });
 
   // Gráfico de desempenho: vendas acumuladas do mês corrente -----------------
   const diasNoMes = Math.round((mesAtual.fimExclusivo.getTime() - mesAtual.inicio.getTime()) / 86_400_000);
@@ -560,6 +585,30 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
           )}
         </Cartao>
       </div>
+
+      {!pessoal && (
+        <Cartao titulo="Ganhos recentes">
+          {!listaGanhosRecentes.length ? (
+            <p className="text-sm text-zinc-500">Nenhum negócio ganho ainda.</p>
+          ) : (
+            <ul className="flex flex-col divide-y divide-zinc-100">
+              {listaGanhosRecentes.map((g) => (
+                <li key={g.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 py-2 first:pt-0 last:pb-0">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-carvao">
+                      {g.contato} <span className="font-normal text-zinc-500">· #{g.numero}</span>
+                    </p>
+                    <p className="text-xs text-zinc-500">
+                      {g.vendedor} · {g.fechadoEm ? tempoDesde(g.fechadoEm, agora.getTime()) : ""}
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-sm font-semibold text-carvao">{g.valor != null ? formatarMoeda(g.valor) : "—"}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Cartao>
+      )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.14fr_1fr]">
         {pessoal ? (
