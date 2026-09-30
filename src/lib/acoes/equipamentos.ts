@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { camposTecnicosParaPersistir } from "@/lib/equipamentos";
 import { mensagemErro } from "@/lib/erros";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteAdmin } from "@/lib/supabase/admin";
@@ -52,6 +53,24 @@ const textoOpcional = z
   .optional()
   .transform((v) => (v && v.length ? v : null));
 
+// Percentual opcional digitado em "97,5" (%) — guardado de 0 a 1, igual a `editarParametros`.
+const percentualOpcional = z
+  .string()
+  .trim()
+  .optional()
+  .transform((v) => (!v ? null : Number(v.replace(",", ".")) / 100))
+  .pipe(z.number().min(0, "Percentual inválido").max(1, "Percentual inválido").nullable());
+
+const tipoInversorOpcional = z
+  .enum(["on_grid", "hibrido"])
+  .optional()
+  .transform((v) => v ?? null);
+
+const fasesCaOpcional = z
+  .enum(["monofasico", "trifasico"])
+  .optional()
+  .transform((v) => v ?? null);
+
 const camposModulo = {
   vocV: campoEletricoOpcional,
   iscA: campoEletricoOpcional,
@@ -61,13 +80,20 @@ const camposModulo = {
 };
 
 const camposInversor = {
+  tipoInversor: tipoInversorOpcional,
   tensaoMaxDcV: campoEletricoOpcional,
+  tensaoPartidaV: campoEletricoOpcional,
   mpptMinV: campoEletricoOpcional,
   mpptMaxV: campoEletricoOpcional,
-  correnteMaxEntradaA: campoEletricoOpcional,
   quantidadeMppt: quantidadeMpptOpcional,
-  potenciaDcMaximaEntradaW: campoEletricoOpcional,
+  entradasPorMppt: quantidadeMpptOpcional,
+  correnteMaxEntradaA: campoEletricoOpcional,
   iscMaximoEntradaA: campoEletricoOpcional,
+  potenciaDcMaximaEntradaW: campoEletricoOpcional,
+  tensaoAcV: campoEletricoOpcional,
+  fasesCa: fasesCaOpcional,
+  correnteMaxAcA: campoEletricoOpcional,
+  eficienciaPct: percentualOpcional,
   tensaoFasesAc: textoOpcional,
 };
 
@@ -133,18 +159,8 @@ export async function cadastrarEquipamentoManual(_: ResultadoAcao, formData: For
       preco_referencia_brl: d.precoReferenciaBRL,
       prioridade: d.prioridade,
       ativo: formData.get("ativo") === "on",
-      ...(d.tipo === "modulo"
-        ? { voc_v: d.vocV, isc_a: d.iscA, vmp_v: d.vmpV, imp_a: d.impA, coef_temp_voc_pct_c: d.coefTempVocPctC }
-        : {
-            tensao_max_dc_v: d.tensaoMaxDcV,
-            mppt_min_v: d.mpptMinV,
-            mppt_max_v: d.mpptMaxV,
-            corrente_max_entrada_a: d.correnteMaxEntradaA,
-            quantidade_mppt: d.quantidadeMppt,
-            potencia_dc_maxima_entrada_w: d.potenciaDcMaximaEntradaW,
-            isc_maximo_entrada_a: d.iscMaximoEntradaA,
-            tensao_fases_ac: d.tensaoFasesAc,
-          }),
+      ...camposTecnicosParaPersistir(d.tipo, d),
+      ...(d.tipo === "inversor" ? { tensao_fases_ac: d.tensaoFasesAc } : {}),
     })
     .select("id")
     .single();
@@ -195,18 +211,8 @@ export async function editarEquipamento(_: ResultadoAcao, formData: FormData): P
     prioridade: d.prioridade,
     ativo: formData.get("ativo") === "on",
     preco_referencia_brl: d.precoReferenciaBRL,
-    ...(d.tipo === "modulo"
-      ? { voc_v: d.vocV, isc_a: d.iscA, vmp_v: d.vmpV, imp_a: d.impA, coef_temp_voc_pct_c: d.coefTempVocPctC }
-      : {
-          tensao_max_dc_v: d.tensaoMaxDcV,
-          mppt_min_v: d.mpptMinV,
-          mppt_max_v: d.mpptMaxV,
-          corrente_max_entrada_a: d.correnteMaxEntradaA,
-          quantidade_mppt: d.quantidadeMppt,
-          potencia_dc_maxima_entrada_w: d.potenciaDcMaximaEntradaW,
-          isc_maximo_entrada_a: d.iscMaximoEntradaA,
-          tensao_fases_ac: d.tensaoFasesAc,
-        }),
+    ...camposTecnicosParaPersistir(d.tipo, d),
+    ...(d.tipo === "inversor" ? { tensao_fases_ac: d.tensaoFasesAc } : {}),
   };
 
   const novoArquivo = formData.get("datasheet");

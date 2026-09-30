@@ -27,13 +27,20 @@ export type EquipamentoAtivoLinha = {
   impA: number | null;
   coefTempVocPctC: number | null;
   // Inversor.
+  tipoInversor: "on_grid" | "hibrido" | null;
   tensaoMaxDcV: number | null;
+  tensaoPartidaV: number | null;
   mpptMinV: number | null;
   mpptMaxV: number | null;
   correnteMaxEntradaA: number | null;
   quantidadeMppt: number | null;
+  entradasPorMppt: number | null;
   potenciaDcMaximaEntradaW: number | null;
   iscMaximoEntradaA: number | null;
+  tensaoAcV: number | null;
+  fasesCa: "monofasico" | "trifasico" | null;
+  correnteMaxAcA: number | null;
+  eficienciaPct: number | null;
   tensaoFasesAc: string | null;
 };
 
@@ -123,15 +130,23 @@ function FormularioCadastroManual() {
               </>
             ) : (
               <>
+                <Selecao rotulo="Tipo de inversor" name="tipoInversor" defaultValue="">
+                  <option value="">Não informado</option>
+                  <option value="on_grid">On-grid</option>
+                  <option value="hibrido">Híbrido</option>
+                </Selecao>
                 <Campo
-                  rotulo="Potência/entrada DC máxima (W)"
+                  rotulo="Potência FV/DC máxima recomendada (W)"
                   name="potenciaDcMaximaEntradaW"
                   inputMode="decimal"
                   placeholder="Opcional"
                 />
                 <Campo rotulo="Tensão máx. DC (V)" name="tensaoMaxDcV" inputMode="decimal" placeholder="600" />
+                <Campo rotulo="Tensão de partida (V)" name="tensaoPartidaV" inputMode="decimal" placeholder="120" />
                 <Campo rotulo="MPPT mín. (V)" name="mpptMinV" inputMode="decimal" placeholder="80" />
                 <Campo rotulo="MPPT máx. (V)" name="mpptMaxV" inputMode="decimal" placeholder="550" />
+                <Campo rotulo="Quantidade de MPPTs" name="quantidadeMppt" inputMode="numeric" placeholder="2" />
+                <Campo rotulo="Entradas por MPPT" name="entradasPorMppt" inputMode="numeric" placeholder="2" />
                 <Campo
                   rotulo="Corrente máx. por MPPT (A)"
                   name="correnteMaxEntradaA"
@@ -139,13 +154,19 @@ function FormularioCadastroManual() {
                   placeholder="20"
                 />
                 <Campo
-                  rotulo="Isc máximo por entrada (A)"
+                  rotulo="Isc máximo por MPPT (A)"
                   name="iscMaximoEntradaA"
                   inputMode="decimal"
                   placeholder="Opcional"
                 />
-                <Campo rotulo="Quantidade de MPPTs" name="quantidadeMppt" inputMode="numeric" placeholder="2" />
-                <Campo rotulo="Tensão/fases AC" name="tensaoFasesAc" placeholder="Ex.: 380V trifásico" />
+                <Campo rotulo="Tensão AC (V)" name="tensaoAcV" inputMode="decimal" placeholder="220" />
+                <Selecao rotulo="Fases" name="fasesCa" defaultValue="">
+                  <option value="">Não informado</option>
+                  <option value="monofasico">Monofásico</option>
+                  <option value="trifasico">Trifásico</option>
+                </Selecao>
+                <Campo rotulo="Corrente AC máxima (A)" name="correnteMaxAcA" inputMode="decimal" placeholder="25" />
+                <Campo rotulo="Eficiência (%)" name="eficienciaPct" inputMode="decimal" placeholder="97,5" />
               </>
             )}
           </div>
@@ -253,8 +274,13 @@ function LinhaEquipamento({ item }: { item: EquipamentoAtivoLinha }) {
               </>
             ) : (
               <>
+                <Selecao rotulo="Tipo de inversor" name="tipoInversor" defaultValue={item.tipoInversor ?? ""}>
+                  <option value="">Não informado</option>
+                  <option value="on_grid">On-grid</option>
+                  <option value="hibrido">Híbrido</option>
+                </Selecao>
                 <Campo
-                  rotulo="Potência/entrada DC máxima (W)"
+                  rotulo="Potência FV/DC máxima recomendada (W)"
                   name="potenciaDcMaximaEntradaW"
                   inputMode="decimal"
                   defaultValue={item.potenciaDcMaximaEntradaW ?? ""}
@@ -266,6 +292,13 @@ function LinhaEquipamento({ item }: { item: EquipamentoAtivoLinha }) {
                   inputMode="decimal"
                   defaultValue={item.tensaoMaxDcV ?? ""}
                   placeholder="600"
+                />
+                <Campo
+                  rotulo="Tensão de partida (V)"
+                  name="tensaoPartidaV"
+                  inputMode="decimal"
+                  defaultValue={item.tensaoPartidaV ?? ""}
+                  placeholder="120"
                 />
                 <Campo
                   rotulo="MPPT mín. (V)"
@@ -282,20 +315,6 @@ function LinhaEquipamento({ item }: { item: EquipamentoAtivoLinha }) {
                   placeholder="550"
                 />
                 <Campo
-                  rotulo="Corrente máx. por MPPT (A)"
-                  name="correnteMaxEntradaA"
-                  inputMode="decimal"
-                  defaultValue={item.correnteMaxEntradaA ?? ""}
-                  placeholder="20"
-                />
-                <Campo
-                  rotulo="Isc máximo por entrada (A)"
-                  name="iscMaximoEntradaA"
-                  inputMode="decimal"
-                  defaultValue={item.iscMaximoEntradaA ?? ""}
-                  placeholder="Opcional"
-                />
-                <Campo
                   rotulo="Quantidade de MPPTs"
                   name="quantidadeMppt"
                   inputMode="numeric"
@@ -303,10 +322,51 @@ function LinhaEquipamento({ item }: { item: EquipamentoAtivoLinha }) {
                   placeholder="2"
                 />
                 <Campo
-                  rotulo="Tensão/fases AC"
-                  name="tensaoFasesAc"
-                  defaultValue={item.tensaoFasesAc ?? ""}
-                  placeholder="Ex.: 380V trifásico"
+                  rotulo="Entradas por MPPT"
+                  name="entradasPorMppt"
+                  inputMode="numeric"
+                  defaultValue={item.entradasPorMppt ?? ""}
+                  placeholder="2"
+                />
+                <Campo
+                  rotulo="Corrente máx. por MPPT (A)"
+                  name="correnteMaxEntradaA"
+                  inputMode="decimal"
+                  defaultValue={item.correnteMaxEntradaA ?? ""}
+                  placeholder="20"
+                />
+                <Campo
+                  rotulo="Isc máximo por MPPT (A)"
+                  name="iscMaximoEntradaA"
+                  inputMode="decimal"
+                  defaultValue={item.iscMaximoEntradaA ?? ""}
+                  placeholder="Opcional"
+                />
+                <Campo
+                  rotulo="Tensão AC (V)"
+                  name="tensaoAcV"
+                  inputMode="decimal"
+                  defaultValue={item.tensaoAcV ?? ""}
+                  placeholder="220"
+                />
+                <Selecao rotulo="Fases" name="fasesCa" defaultValue={item.fasesCa ?? ""}>
+                  <option value="">Não informado</option>
+                  <option value="monofasico">Monofásico</option>
+                  <option value="trifasico">Trifásico</option>
+                </Selecao>
+                <Campo
+                  rotulo="Corrente AC máxima (A)"
+                  name="correnteMaxAcA"
+                  inputMode="decimal"
+                  defaultValue={item.correnteMaxAcA ?? ""}
+                  placeholder="25"
+                />
+                <Campo
+                  rotulo="Eficiência (%)"
+                  name="eficienciaPct"
+                  inputMode="decimal"
+                  defaultValue={item.eficienciaPct != null ? item.eficienciaPct * 100 : ""}
+                  placeholder="97,5"
                 />
               </>
             )}

@@ -919,12 +919,16 @@ export type Database = {
         Row: {
           ativo: boolean;
           coef_temp_voc_pct_c: number | null;
+          corrente_max_ac_a: number | null;
           corrente_max_entrada_a: number | null;
           created_at: string;
           datasheet_caminho: string | null;
           datasheet_nome: string | null;
+          eficiencia_pct: number | null;
           empresa_id: string;
+          entradas_por_mppt: number | null;
           fabricante: string;
+          fases_ca: Database["public"]["Enums"]["fases_ca_equipamento"] | null;
           id: string;
           imp_a: number | null;
           isc_a: number | null;
@@ -938,9 +942,12 @@ export type Database = {
           preco_referencia_brl: number | null;
           prioridade: number;
           quantidade_mppt: number | null;
+          tensao_ac_v: number | null;
           tensao_fases_ac: string | null;
           tensao_max_dc_v: number | null;
+          tensao_partida_v: number | null;
           tipo: Database["public"]["Enums"]["tipo_componente_kit"];
+          tipo_inversor: Database["public"]["Enums"]["tipo_inversor_equipamento"] | null;
           updated_at: string;
           vmp_v: number | null;
           voc_v: number | null;
@@ -948,12 +955,16 @@ export type Database = {
         Insert: {
           ativo?: boolean;
           coef_temp_voc_pct_c?: number | null;
+          corrente_max_ac_a?: number | null;
           corrente_max_entrada_a?: number | null;
           created_at?: string;
           datasheet_caminho?: string | null;
           datasheet_nome?: string | null;
+          eficiencia_pct?: number | null;
           empresa_id: string;
+          entradas_por_mppt?: number | null;
           fabricante: string;
+          fases_ca?: Database["public"]["Enums"]["fases_ca_equipamento"] | null;
           id?: string;
           imp_a?: number | null;
           isc_a?: number | null;
@@ -967,9 +978,12 @@ export type Database = {
           preco_referencia_brl?: number | null;
           prioridade?: number;
           quantidade_mppt?: number | null;
+          tensao_ac_v?: number | null;
           tensao_fases_ac?: string | null;
           tensao_max_dc_v?: number | null;
+          tensao_partida_v?: number | null;
           tipo: Database["public"]["Enums"]["tipo_componente_kit"];
+          tipo_inversor?: Database["public"]["Enums"]["tipo_inversor_equipamento"] | null;
           updated_at?: string;
           vmp_v?: number | null;
           voc_v?: number | null;
@@ -977,12 +991,16 @@ export type Database = {
         Update: {
           ativo?: boolean;
           coef_temp_voc_pct_c?: number | null;
+          corrente_max_ac_a?: number | null;
           corrente_max_entrada_a?: number | null;
           created_at?: string;
           datasheet_caminho?: string | null;
           datasheet_nome?: string | null;
+          eficiencia_pct?: number | null;
           empresa_id?: string;
+          entradas_por_mppt?: number | null;
           fabricante?: string;
+          fases_ca?: Database["public"]["Enums"]["fases_ca_equipamento"] | null;
           id?: string;
           imp_a?: number | null;
           isc_a?: number | null;
@@ -996,9 +1014,12 @@ export type Database = {
           preco_referencia_brl?: number | null;
           prioridade?: number;
           quantidade_mppt?: number | null;
+          tensao_ac_v?: number | null;
           tensao_fases_ac?: string | null;
           tensao_max_dc_v?: number | null;
+          tensao_partida_v?: number | null;
           tipo?: Database["public"]["Enums"]["tipo_componente_kit"];
+          tipo_inversor?: Database["public"]["Enums"]["tipo_inversor_equipamento"] | null;
           updated_at?: string;
           vmp_v?: number | null;
           voc_v?: number | null;
@@ -3269,6 +3290,7 @@ export type Database = {
       };
     };
     Enums: {
+      fases_ca_equipamento: "monofasico" | "trifasico";
       metrica_meta: "receita" | "negocios_ganhos" | "reunioes" | "conversao" | "tarefas_concluidas";
       modelo_cobranca: "por_usuario" | "fixo" | "fixo_mais_usuario";
       modo_distribuicao_leads: "somente_vendedores" | "somente_sdr" | "parcial" | "aleatorio";
@@ -3288,6 +3310,7 @@ export type Database = {
       status_resgate: "solicitado" | "aprovado" | "entregue" | "cancelado";
       tipo_calculo_comissao: "percentual" | "multiplicador";
       tipo_componente_kit: "modulo" | "inversor" | "bateria" | "outro";
+      tipo_inversor_equipamento: "on_grid" | "hibrido";
       tipo_ligacao: "monofasico" | "bifasico" | "trifasico";
       tipo_pessoa: "pf" | "pj";
       tipo_plano: "gratuito" | "pago";
@@ -3413,6 +3436,7 @@ export const Constants = {
   },
   public: {
     Enums: {
+      fases_ca_equipamento: ["monofasico", "trifasico"],
       metrica_meta: ["receita", "negocios_ganhos", "reunioes", "conversao", "tarefas_concluidas"],
       modelo_cobranca: ["por_usuario", "fixo", "fixo_mais_usuario"],
       modo_distribuicao_leads: ["somente_vendedores", "somente_sdr", "parcial", "aleatorio"],
@@ -3432,6 +3456,7 @@ export const Constants = {
       status_resgate: ["solicitado", "aprovado", "entregue", "cancelado"],
       tipo_calculo_comissao: ["percentual", "multiplicador"],
       tipo_componente_kit: ["modulo", "inversor", "bateria", "outro"],
+      tipo_inversor_equipamento: ["on_grid", "hibrido"],
       tipo_ligacao: ["monofasico", "bifasico", "trifasico"],
       tipo_pessoa: ["pf", "pj"],
       tipo_plano: ["gratuito", "pago"],
