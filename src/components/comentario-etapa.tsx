@@ -7,7 +7,8 @@ import { moverEtapa } from "@/lib/acoes/negocios";
 
 /**
  * Popup obrigatório ao mover um negócio de etapa: pede um comentário curto sobre o que motivou
- * a mudança (ex.: "liguei para o cliente, pediu um orçamento") e salva como nota do negócio.
+ * a mudança e salva como nota do negócio. Só fecha pelo botão Cancelar (clicar fora não fecha),
+ * pra não perder a mudança de etapa por engano antes do vendedor escrever algo.
  */
 export function ModalComentarioEtapa({
   negocioId,
@@ -40,17 +41,14 @@ export function ModalComentarioEtapa({
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4" onClick={aoCancelar}>
-      <div className="w-full max-w-sm rounded-lg bg-white p-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <div className="mb-1 flex items-center justify-between gap-2">
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4">
+      <div className="w-full max-w-sm rounded-lg bg-white p-4 shadow-xl">
+        <div className="mb-2 flex items-center justify-between gap-2">
           <h3 className="font-titulo text-sm font-semibold text-carvao">Mover para &quot;{etapaNome}&quot;</h3>
           <button type="button" onClick={aoCancelar} aria-label="Cancelar" className="text-zinc-400 hover:text-zinc-700">
             <X size={16} />
           </button>
         </div>
-        <p className="mb-2 text-xs text-zinc-500">
-          Conte o que motivou a mudança (ex.: &quot;liguei para o cliente, pediu um orçamento&quot;).
-        </p>
         <textarea
           value={texto}
           onChange={(e) => setTexto(e.target.value)}

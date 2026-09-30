@@ -6,7 +6,6 @@ import { NovaTarefa } from "@/components/nova-tarefa";
 import { Cartao, Selo } from "@/components/ui";
 import { apagarAnexo } from "@/lib/acoes/anexos";
 import { alternarEtiqueta } from "@/lib/acoes/negocios";
-import { apagarNota } from "@/lib/acoes/notas";
 import { carregarConfiguracao, formatarDataHora, formatarMoeda } from "@/lib/crm";
 import { env } from "@/lib/env";
 import { descreverAtividade } from "@/lib/linha-do-tempo";
@@ -330,12 +329,6 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
                     <span className="flex gap-2 text-xs text-zinc-500">
                       {item.nota.autor_id ? nomes.membro(item.nota.autor_id) : "usuário removido"} ·{" "}
                       {formatarDataHora(item.quando)}
-                      {item.nota.autor_id === atual.membroId && (
-                        <form action={apagarNota} className="ml-auto">
-                          <input type="hidden" name="notaId" value={item.nota.id} />
-                          <button className="hover:text-red-700">Apagar</button>
-                        </form>
-                      )}
                     </span>
                   </li>
                 ) : (

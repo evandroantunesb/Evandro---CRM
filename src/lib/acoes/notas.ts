@@ -25,12 +25,3 @@ export async function criarNota(_: ResultadoAcao, formData: FormData): Promise<R
   revalidatePath(`/negocios/${dados.data.negocioId}`);
   return { ok: true, mensagem: "Nota salva." };
 }
-
-export async function apagarNota(formData: FormData) {
-  await exigirPapel();
-  const id = z.string().uuid().safeParse(formData.get("notaId"));
-  if (!id.success) return;
-  const supabase = await criarClienteServidor();
-  const { data } = await supabase.from("notas").delete().eq("id", id.data).select("negocio_id");
-  if (data?.[0]) revalidatePath(`/negocios/${data[0].negocio_id}`);
-}
