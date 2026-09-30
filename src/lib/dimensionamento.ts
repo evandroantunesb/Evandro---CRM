@@ -3,11 +3,15 @@
  * negócio" — ver especificação V2 enviada pelo Evandro em 2026-09-30).
  *
  * Escopo desta fase: escolhe módulo + inversor entre os equipamentos ativos
- * da empresa (`equipamentos_empresa`) a partir do consumo informado, e
- * calcula o overload (relação DC/AC) de cada combinação. Só valida overload
- * — ainda não valida string/MPPT/tensão (isso depende do catálogo ganhar
- * campos elétricos completos, fase seguinte do plano). Por isso a opção
- * acima do limite não é bloqueada, só marcada como "precisa de confirmação".
+ * da empresa (`equipamentos_empresa`) a partir do consumo informado, calcula
+ * o overload (relação DC/AC) de cada combinação e, quando o catálogo tem os
+ * campos elétricos (Voc/Isc/Vmp/Imp, faixa de MPPT), valida também o
+ * arranjo de strings: tensão de circuito aberto no frio dentro do limite do
+ * inversor e tensão de MPPT da string dentro da faixa de operação. Overload
+ * acima do limite não bloqueia (é decisão comercial, só alerta); string
+ * eletricamente incompatível bloqueia (é risco de queimar equipamento).
+ * Sem os campos elétricos, a opção fica marcada como "não verificada" e
+ * segue disponível — não trava quem ainda não cadastrou datasheet completo.
  */
 
 export type EquipamentoAtivo = {
@@ -16,6 +20,25 @@ export type EquipamentoAtivo = {
   modelo: string;
   potenciaW: number;
   prioridade: number;
+  // Módulo — datasheet em STC.
+  vocV?: number | null;
+  iscA?: number | null;
+  vmpV?: number | null;
+  impA?: number | null;
+  coefTempVocPctC?: number | null;
+  // Inversor.
+  tensaoMaxDcV?: number | null;
+  mpptMinV?: number | null;
+  mpptMaxV?: number | null;
+  correnteMaxEntradaA?: number | null;
+  quantidadeMppt?: number | null;
+};
+
+export type ConfiguracaoString = {
+  modulosPorString: number;
+  quantidadeStrings: number;
+  vocFrioV: number;
+  vmpStringV: number;
 };
 
 export type OpcaoSistemaAutomatico = {
@@ -26,13 +49,68 @@ export type OpcaoSistemaAutomatico = {
   potenciaAcKw: number;
   overloadPct: number;
   validacao: "valido" | "valido_com_alerta";
+  validacaoEletrica: "valido" | "nao_verificado";
+  stringConfig: ConfiguracaoString | null;
 };
 
 const OVERLOAD_ALVO_PCT = 0.15;
+const TEMPERATURA_REFERENCIA_STC_C = 25;
 
 function arredondar(valor: number, casas: number) {
   const fator = 10 ** casas;
   return Math.round(valor * fator) / fator;
+}
+
+/**
+ * Procura um arranjo de módulos em série (string) compatível com o inversor:
+ * Voc no frio dentro do limite de tensão DC, e Vmp da string dentro da faixa
+ * de MPPT. Prefere o maior número de módulos por string que ainda cumpre os
+ * dois limites (menos strings, menos conectores/fusíveis). Quando corrente
+ * máxima de entrada e quantidade de MPPTs também estão cadastradas, exige
+ * que as strings caibam nas entradas sem estourar a corrente.
+ *
+ * Retorna `undefined` quando falta algum dado elétrico pra verificar
+ * (catálogo incompleto), e `null` quando os dados existem mas nenhum
+ * arranjo é eletricamente compatível.
+ */
+function encontrarConfiguracaoString(
+  modulo: EquipamentoAtivo,
+  inversor: EquipamentoAtivo,
+  quantidadeModulos: number,
+  temperaturaMinimaProjetoC: number,
+): ConfiguracaoString | null | undefined {
+  const { vocV, vmpV, coefTempVocPctC } = modulo;
+  const { tensaoMaxDcV, mpptMinV, mpptMaxV } = inversor;
+  if (
+    vocV == null ||
+    vmpV == null ||
+    coefTempVocPctC == null ||
+    tensaoMaxDcV == null ||
+    mpptMinV == null ||
+    mpptMaxV == null
+  ) {
+    return undefined;
+  }
+
+  const fatorTemperatura = 1 + (coefTempVocPctC / 100) * (temperaturaMinimaProjetoC - TEMPERATURA_REFERENCIA_STC_C);
+
+  let melhor: ConfiguracaoString | null = null;
+  for (let modulosPorString = quantidadeModulos; modulosPorString >= 1; modulosPorString--) {
+    const vocFrioV = arredondar(vocV * fatorTemperatura * modulosPorString, 2);
+    const vmpStringV = arredondar(vmpV * modulosPorString, 2);
+    if (vocFrioV > tensaoMaxDcV) continue;
+    if (vmpStringV < mpptMinV || vmpStringV > mpptMaxV) continue;
+
+    const quantidadeStrings = Math.ceil(quantidadeModulos / modulosPorString);
+    if (inversor.correnteMaxEntradaA != null && inversor.quantidadeMppt != null && modulo.impA != null) {
+      const stringsPorMppt = Math.ceil(quantidadeStrings / inversor.quantidadeMppt);
+      if (modulo.impA * stringsPorMppt > inversor.correnteMaxEntradaA) continue;
+    }
+
+    melhor = { modulosPorString, quantidadeStrings, vocFrioV, vmpStringV };
+    break;
+  }
+  return melhor;
 }
 
 function avaliarCombinacao(
@@ -40,11 +118,16 @@ function avaliarCombinacao(
   inversor: EquipamentoAtivo,
   potenciaAlvoKwp: number,
   overloadMaximoPct: number,
-): OpcaoSistemaAutomatico {
+  temperaturaMinimaProjetoC: number,
+): OpcaoSistemaAutomatico | null {
   const quantidadeModulos = Math.max(1, Math.ceil((potenciaAlvoKwp * 1000) / modulo.potenciaW));
   const potenciaDcKwp = arredondar((quantidadeModulos * modulo.potenciaW) / 1000, 2);
   const potenciaAcKw = arredondar(inversor.potenciaW / 1000, 2);
   const overloadPct = arredondar((potenciaDcKwp * 1000) / inversor.potenciaW - 1, 4);
+
+  const configuracaoString = encontrarConfiguracaoString(modulo, inversor, quantidadeModulos, temperaturaMinimaProjetoC);
+  if (configuracaoString === null) return null; // dados elétricos existem, mas nenhum arranjo é seguro — descarta a combinação.
+
   return {
     modulo,
     inversor,
@@ -53,6 +136,8 @@ function avaliarCombinacao(
     potenciaAcKw,
     overloadPct,
     validacao: overloadPct <= overloadMaximoPct ? "valido" : "valido_com_alerta",
+    validacaoEletrica: configuracaoString === undefined ? "nao_verificado" : "valido",
+    stringConfig: configuracaoString ?? null,
   };
 }
 
@@ -69,14 +154,27 @@ export function dimensionarSistemaAutomatico(params: {
   modulos: EquipamentoAtivo[];
   inversores: EquipamentoAtivo[];
   overloadMaximoPct: number;
+  temperaturaMinimaProjetoC: number;
 }): OpcaoSistemaAutomatico[] {
-  const { consumoMedioKwh, margemPct, produtividadeKwhKwpMes, modulos, inversores, overloadMaximoPct } = params;
+  const {
+    consumoMedioKwh,
+    margemPct,
+    produtividadeKwhKwpMes,
+    modulos,
+    inversores,
+    overloadMaximoPct,
+    temperaturaMinimaProjetoC,
+  } = params;
   if (consumoMedioKwh <= 0 || produtividadeKwhKwpMes <= 0 || !modulos.length || !inversores.length) return [];
 
   const potenciaAlvoKwp = (consumoMedioKwh * (1 + margemPct)) / produtividadeKwhKwpMes;
 
   const opcoes = modulos.flatMap((modulo) =>
-    inversores.map((inversor) => avaliarCombinacao(modulo, inversor, potenciaAlvoKwp, overloadMaximoPct)),
+    inversores
+      .map((inversor) =>
+        avaliarCombinacao(modulo, inversor, potenciaAlvoKwp, overloadMaximoPct, temperaturaMinimaProjetoC),
+      )
+      .filter((opcao): opcao is OpcaoSistemaAutomatico => opcao !== null),
   );
 
   opcoes.sort((a, b) => {

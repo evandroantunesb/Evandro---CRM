@@ -77,6 +77,7 @@ export function FormularioParametros({
     comissaoPercentual: number;
     margemDimensionamentoPct: number;
     overloadMaximoPct: number;
+    temperaturaMinimaProjetoC: number;
   };
 }) {
   const [resultado, acao, pendente] = useActionState(editarParametros, null);
@@ -117,6 +118,19 @@ export function FormularioParametros({
           required
         />
       </div>
+      <div className="w-40">
+        <Campo
+          rotulo="Temperatura mínima de projeto (°C)"
+          name="temperatura_minima_projeto_c"
+          inputMode="decimal"
+          defaultValue={String(parametros.temperaturaMinimaProjetoC).replace(".", ",")}
+          required
+        />
+      </div>
+      <p className="-mt-2 text-xs text-zinc-500">
+        Usada pra calcular o Voc (tensão em circuito aberto) no frio, o pior caso pra não estourar a tensão máxima do
+        inversor. Ajuste pela região/telhado mais frio que a empresa atende.
+      </p>
       <div className="grid grid-cols-3 gap-2">
         <Campo
           rotulo="Disponibilidade monofásico (kWh)"

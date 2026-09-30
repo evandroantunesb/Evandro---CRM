@@ -52,6 +52,7 @@ export default async function ConfigCalculadora() {
               comissaoPercentual: parametros.comissao_percentual,
               margemDimensionamentoPct: parametros.margem_dimensionamento_pct,
               overloadMaximoPct: parametros.overload_maximo_pct,
+              temperaturaMinimaProjetoC: parametros.temperatura_minima_projeto_c,
             }}
           />
         )}
@@ -66,6 +67,16 @@ export default async function ConfigCalculadora() {
             potenciaW: e.potencia_w,
             ativo: e.ativo,
             prioridade: e.prioridade,
+            vocV: e.voc_v,
+            iscA: e.isc_a,
+            vmpV: e.vmp_v,
+            impA: e.imp_a,
+            coefTempVocPctC: e.coef_temp_voc_pct_c,
+            tensaoMaxDcV: e.tensao_max_dc_v,
+            mpptMinV: e.mppt_min_v,
+            mpptMaxV: e.mppt_max_v,
+            correnteMaxEntradaA: e.corrente_max_entrada_a,
+            quantidadeMppt: e.quantidade_mppt,
           }))}
         />
       </Cartao>

@@ -749,42 +749,72 @@ export type Database = {
       equipamentos_empresa: {
         Row: {
           ativo: boolean;
+          coef_temp_voc_pct_c: number | null;
+          corrente_max_entrada_a: number | null;
           created_at: string;
           empresa_id: string;
           fabricante: string;
           id: string;
+          imp_a: number | null;
+          isc_a: number | null;
           modelo: string;
+          mppt_max_v: number | null;
+          mppt_min_v: number | null;
           opensolar_id: number | null;
           potencia_w: number;
           prioridade: number;
+          quantidade_mppt: number | null;
+          tensao_max_dc_v: number | null;
           tipo: Database["public"]["Enums"]["tipo_componente_kit"];
           updated_at: string;
+          vmp_v: number | null;
+          voc_v: number | null;
         };
         Insert: {
           ativo?: boolean;
+          coef_temp_voc_pct_c?: number | null;
+          corrente_max_entrada_a?: number | null;
           created_at?: string;
           empresa_id: string;
           fabricante: string;
           id?: string;
+          imp_a?: number | null;
+          isc_a?: number | null;
           modelo: string;
+          mppt_max_v?: number | null;
+          mppt_min_v?: number | null;
           opensolar_id?: number | null;
           potencia_w: number;
           prioridade?: number;
+          quantidade_mppt?: number | null;
+          tensao_max_dc_v?: number | null;
           tipo: Database["public"]["Enums"]["tipo_componente_kit"];
           updated_at?: string;
+          vmp_v?: number | null;
+          voc_v?: number | null;
         };
         Update: {
           ativo?: boolean;
+          coef_temp_voc_pct_c?: number | null;
+          corrente_max_entrada_a?: number | null;
           created_at?: string;
           empresa_id?: string;
           fabricante?: string;
           id?: string;
+          imp_a?: number | null;
+          isc_a?: number | null;
           modelo?: string;
+          mppt_max_v?: number | null;
+          mppt_min_v?: number | null;
           opensolar_id?: number | null;
           potencia_w?: number;
           prioridade?: number;
+          quantidade_mppt?: number | null;
+          tensao_max_dc_v?: number | null;
           tipo?: Database["public"]["Enums"]["tipo_componente_kit"];
           updated_at?: string;
+          vmp_v?: number | null;
+          voc_v?: number | null;
         };
         Relationships: [
           {
@@ -2136,6 +2166,7 @@ export type Database = {
           overload_maximo_pct: number;
           percentual_fio_b: number;
           produtividade_kwh_kwp_mes: number;
+          temperatura_minima_projeto_c: number;
           updated_at: string;
         };
         Insert: {
@@ -2151,6 +2182,7 @@ export type Database = {
           overload_maximo_pct?: number;
           percentual_fio_b?: number;
           produtividade_kwh_kwp_mes?: number;
+          temperatura_minima_projeto_c?: number;
           updated_at?: string;
         };
         Update: {
@@ -2166,6 +2198,7 @@ export type Database = {
           overload_maximo_pct?: number;
           percentual_fio_b?: number;
           produtividade_kwh_kwp_mes?: number;
+          temperatura_minima_projeto_c?: number;
           updated_at?: string;
         };
         Relationships: [
