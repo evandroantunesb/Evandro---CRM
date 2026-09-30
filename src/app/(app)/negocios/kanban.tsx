@@ -34,12 +34,23 @@ export type Card = {
   tarefa: "atrasada" | "hoje" | "futura" | "nenhuma";
   tarefaTitulo: string | null;
   tarefaVenceEm: string | null;
-  etiquetas: { nome: string; cor: string | null }[];
+  etiquetas: { id: string; nome: string; cor: string | null }[];
 };
 
-type Coluna = { id: string; nome: string; cor: string | null };
+type Coluna = { id: string; nome: string; cor: string | null; inicial: boolean };
+export type EtiquetaDisponivel = { id: string; nome: string; cor: string | null };
 
-export function Kanban({ colunas, cards: iniciais, funilId }: { colunas: Coluna[]; cards: Card[]; funilId: string }) {
+export function Kanban({
+  colunas,
+  cards: iniciais,
+  funilId,
+  etiquetas,
+}: {
+  colunas: Coluna[];
+  cards: Card[];
+  funilId: string;
+  etiquetas: EtiquetaDisponivel[];
+}) {
   const [cards, setCards] = useState(iniciais);
   const [erro, setErro] = useState<string | null>(null);
   const [, iniciar] = useTransition();
@@ -77,6 +88,7 @@ export function Kanban({ colunas, cards: iniciais, funilId }: { colunas: Coluna[
             colunas={colunas}
             funilId={funilId}
             cards={cards.filter((c) => c.etapaId === col.id)}
+            etiquetas={etiquetas}
           />
         ))}
       </div>
@@ -89,11 +101,13 @@ function ColunaKanban({
   colunas,
   cards,
   funilId,
+  etiquetas,
 }: {
   coluna: Coluna;
   colunas: Coluna[];
   cards: Card[];
   funilId: string;
+  etiquetas: EtiquetaDisponivel[];
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: coluna.id });
   const soma = cards.reduce((total, c) => total + (c.valorNumerico ?? 0), 0);
@@ -118,15 +132,17 @@ function ColunaKanban({
       </header>
       <div className="flex flex-col gap-2">
         {cards.map((c) => (
-          <CardKanban key={c.id} card={c} colunas={colunas} corEtapa={coluna.cor} />
+          <CardKanban key={c.id} card={c} colunas={colunas} corEtapa={coluna.cor} etiquetas={etiquetas} />
         ))}
         {!cards.length && <p className="px-1 py-4 text-center text-xs text-zinc-400">Arraste um negócio para cá</p>}
-        <Link
-          href={`/negocios/novo?funil=${funilId}&etapa=${coluna.id}`}
-          className="mt-1 flex items-center justify-center gap-1 rounded-md border border-dashed border-zinc-300 py-1.5 text-xs font-medium text-zinc-500 transition-colors hover:border-dourado hover:text-carvao"
-        >
-          <Plus size={13} /> Adicionar negócio
-        </Link>
+        {coluna.inicial && (
+          <Link
+            href={`/negocios/novo?funil=${funilId}&etapa=${coluna.id}`}
+            className="mt-1 flex items-center justify-center gap-1 rounded-md border border-dashed border-zinc-300 py-1.5 text-xs font-medium text-zinc-500 transition-colors hover:border-dourado hover:text-carvao"
+          >
+            <Plus size={13} /> Adicionar negócio
+          </Link>
+        )}
       </div>
     </section>
   );
@@ -149,7 +165,17 @@ function PrazoOuDesde({ card }: { card: Card }) {
   return <span className="ml-auto">{card.desde}</span>;
 }
 
-function CardKanban({ card, colunas, corEtapa }: { card: Card; colunas: Coluna[]; corEtapa: string | null }) {
+function CardKanban({
+  card,
+  colunas,
+  corEtapa,
+  etiquetas,
+}: {
+  card: Card;
+  colunas: Coluna[];
+  corEtapa: string | null;
+  etiquetas: EtiquetaDisponivel[];
+}) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: card.id });
   const estilo = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined;
   return (
@@ -164,7 +190,14 @@ function CardKanban({ card, colunas, corEtapa }: { card: Card; colunas: Coluna[]
     >
       <div className="absolute top-2 right-2 flex items-center gap-1">
         <Avatar nome={card.responsavel} tamanho={22} />
-        <MoverEtapa negocioId={card.id} etapaAtualId={card.etapaId} etapas={colunas} compacto />
+        <MoverEtapa
+          negocioId={card.id}
+          etapaAtualId={card.etapaId}
+          etapas={colunas}
+          compacto
+          etiquetas={etiquetas}
+          etiquetasMarcadas={card.etiquetas.map((e) => e.id)}
+        />
       </div>
       <Link href={`/negocios/${card.id}`} className="-m-1 block rounded-md p-1 pr-16 hover:bg-zinc-50">
         <p className="truncate font-medium text-carvao">{card.contato}</p>
@@ -177,7 +210,7 @@ function CardKanban({ card, colunas, corEtapa }: { card: Card; colunas: Coluna[]
           {card.origem && <span className="rounded-full bg-zinc-100 px-1.5 py-0.5 text-zinc-600">{card.origem}</span>}
           {card.etiquetas.map((e) => (
             <span
-              key={e.nome}
+              key={e.id}
               className="rounded-full px-1.5 py-0.5 text-white"
               style={{ background: e.cor ?? "#71717a" }}
             >
