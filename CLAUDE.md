@@ -32,7 +32,8 @@ O modelo principal é escolhido pelo Evandro; nunca diga que trocou de modelo se
 - Uma funcionalidade por vez, com alterações mínimas e só nos arquivos dela. Sem refatoração fora do escopo.
 - Rode os testes relacionados à mudança; amplie a validação se houver impacto em outras áreas. Diante de erro, investigue a causa antes de tentar de novo.
 - Nunca remova arquivos, dependências, componentes, funcionalidades ou regras de negócio para economizar tokens, nem pule verificações necessárias.
-- Nunca mescle PR sem aprovação do Evandro. Nunca peça senhas, tokens ou chaves no chat.
+- Nunca mescle PR sem aprovação do Evandro, nem decida sozinho dado técnico da calculadora solar — pergunte antes. Nunca peça senhas, tokens ou chaves no chat.
+- Pendência pequena que não bloqueia a funcionalidade atual: registre (`PROGRESS.md`, ver Continuidade) e siga construindo, sem travar o ritmo esperando resposta.
 
 ## Respostas
 
@@ -40,9 +41,20 @@ Objetivas: o que mudou, arquivos envolvidos, testes feitos e pendências. Não r
 
 ## Continuidade
 
-- Ao concluir cada funcionalidade, atualize o `PROGRESS.md`: alterações (com número da PR), arquivos modificados, decisões técnicas e próximas tarefas. Curto — sem documentação extensa a cada pequena alteração.
-- Este `CLAUDE.md` e os `docs/` só mudam com decisão permanente de arquitetura ou regra.
-- Uma nova thread deve conseguir continuar só com estes arquivos, sem depender do histórico da conversa.
+Política de atualização de documentação (evita gastar token documentando à toa):
+
+- Não atualize toda a documentação a cada alteração de código. Ajuste pequeno (CSS, espaçamento, cor, texto, componente, correção pontual) não exige atualizar `PROGRESS.md` nem `CLAUDE.md`, a menos que mude uma regra documentada.
+- Atualize o `PROGRESS.md` só: ao concluir uma funcionalidade/etapa relevante, em mudança significativa de andamento, em bloqueio importante, antes de encerrar ou trocar de thread, ou quando o Evandro pedir. Numa sequência de alterações pequenas da mesma funcionalidade, acumule e registre de uma vez só ao concluir a etapa. Conteúdo: alterações (com número da PR), arquivos modificados, decisões técnicas e próximas tarefas — curto.
+- Atualize o `CLAUDE.md` só com decisão permanente de arquitetura, novo padrão de desenvolvimento, mudança relevante nas regras gerais ou pedido explícito do Evandro. Atualize a documentação de um módulo em `docs/` só quando suas regras de negócio, contratos ou comportamentos documentados mudarem.
+- Prefira edição pontual a reescrever o arquivo inteiro; preserve a estrutura existente. Evite repetir a mesma informação em documentos diferentes. Sem auditoria completa da documentação sem pedido explícito.
+- Exceção às regras acima: nunca deixe a documentação desatualizada quando uma mudança importante afeta o funcionamento ou a continuidade do desenvolvimento.
+
+## Threads
+
+- Mantenha a mesma thread durante implementação, ajustes e testes da mesma funcionalidade.
+- Recomende nova thread só ao iniciar uma funcionalidade independente, ou quando o histórico da atual estiver excessivamente extenso.
+- Nunca crie uma thread nova por conta própria sem autorização do Evandro.
+- Antes de trocar de thread, registre no `PROGRESS.md` o estado atual, pendências e a próxima ação — uma nova thread deve conseguir continuar só com `CLAUDE.md`, `docs/` e `PROGRESS.md`, sem depender do histórico da conversa.
 
 ## Stack e comandos
 
