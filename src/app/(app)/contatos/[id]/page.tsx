@@ -5,6 +5,7 @@ import { carregarConfiguracao, formatarDataHora, formatarMoeda } from "@/lib/crm
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { EdicaoContato } from "./edicao";
+import { ExcluirContato } from "./excluir";
 
 export default async function DetalheContato({ params }: PageProps<"/contatos/[id]">) {
   const { atual } = await exigirPapel();
@@ -34,7 +35,10 @@ export default async function DetalheContato({ params }: PageProps<"/contatos/[i
       <Link href="/contatos" className="text-sm text-zinc-600 hover:underline">
         ← Contatos
       </Link>
-      <h1 className="text-2xl font-semibold text-zinc-900">{contato.nome}</h1>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-2xl font-semibold text-zinc-900">{contato.nome}</h1>
+        {(atual.papel === "admin" || atual.papel === "gestor") && <ExcluirContato contatoId={contato.id} />}
+      </div>
       <Cartao titulo="Dados do contato">
         <EdicaoContato contato={{ ...contato, email: contato.email as string | null }} />
       </Cartao>
