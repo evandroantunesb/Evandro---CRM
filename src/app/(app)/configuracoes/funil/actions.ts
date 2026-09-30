@@ -155,6 +155,22 @@ export async function definirCorEtapa(formData: FormData) {
   concluir("");
 }
 
+const fechaComo = z
+  .enum(["", "ganho", "perdido"])
+  .transform((v) => (v === "" ? null : v));
+
+/** Etapa que fecha o negócio sozinha ao entrar nela: ganho direto, ou perdido pedindo o motivo no popup de mover. */
+export async function definirFechaComoEtapa(formData: FormData) {
+  await exigirPapel("admin");
+  const etapaId = z.string().uuid().safeParse(formData.get("etapaId"));
+  const valor = fechaComo.safeParse(formData.get("fechaComo"));
+  if (!etapaId.success || !valor.success) return;
+
+  const supabase = await criarClienteServidor();
+  await supabase.from("etapas").update({ fecha_como: valor.data }).eq("id", etapaId.data);
+  concluir("");
+}
+
 export async function definirDiasConsideradoParado(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
   const { atual } = await exigirPapel("admin");
   const dias = z.coerce.number().int().min(1, "Informe pelo menos 1 dia").max(365, "No máximo 365 dias").safeParse(formData.get("dias"));

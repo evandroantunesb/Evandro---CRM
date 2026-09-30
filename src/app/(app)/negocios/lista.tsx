@@ -8,7 +8,8 @@ import { MoverEtapa } from "@/components/mover-etapa";
 import { formatarDataHora } from "@/lib/formatacao";
 import type { Card } from "./kanban";
 
-type Coluna = { id: string; nome: string; cor: string | null };
+type Coluna = { id: string; nome: string; cor: string | null; fechaComo?: "ganho" | "perdido" | null };
+type MotivoDisponivel = { id: string; nome: string };
 
 type Campo = "nome" | "etapa" | "valor" | "proxima" | "atualizado";
 
@@ -36,7 +37,15 @@ function Cabecalho({
 }
 
 /** Modo Lista para negócios em aberto: mesma consulta/filtros do Kanban, ordenável (dados já carregados). */
-export function ListaNegocios({ cards, colunas }: { cards: Card[]; colunas: Coluna[] }) {
+export function ListaNegocios({
+  cards,
+  colunas,
+  motivos = [],
+}: {
+  cards: Card[];
+  colunas: Coluna[];
+  motivos?: MotivoDisponivel[];
+}) {
   const [campo, setCampo] = useState<Campo>("atualizado");
   const [ordem, setOrdem] = useState<"asc" | "desc">("desc");
   const nomeEtapa = new Map(colunas.map((c) => [c.id, c]));
@@ -145,7 +154,7 @@ export function ListaNegocios({ cards, colunas }: { cards: Card[]; colunas: Colu
                 </td>
                 <td className="px-3 py-2 whitespace-nowrap text-zinc-500">{formatarDataHora(c.atualizadoEm)}</td>
                 <td className="px-3 py-2">
-                  <MoverEtapa negocioId={c.id} etapaAtualId={c.etapaId} etapas={colunas} compacto />
+                  <MoverEtapa negocioId={c.id} etapaAtualId={c.etapaId} etapas={colunas} compacto motivos={motivos} />
                 </td>
               </tr>
             );

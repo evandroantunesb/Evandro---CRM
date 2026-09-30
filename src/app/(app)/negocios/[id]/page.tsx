@@ -179,6 +179,7 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
             negocioId={negocio.id}
             etapaAtualId={negocio.etapa_id}
             etapas={config.etapas.filter((e) => e.funilId === negocio.funil_id && e.ativa)}
+            motivos={config.motivos}
           />
         )}
       </div>
