@@ -25,6 +25,9 @@ create table public.dimensionamentos_solares (
   quantidade_modulos integer not null check (quantidade_modulos > 0),
   potencia_dc_kwp numeric(8, 2) not null check (potencia_dc_kwp > 0),
   potencia_ac_kw numeric(8, 2) not null check (potencia_ac_kw > 0),
+  -- Pdc/Pac puro e overload (`dc_ac_ratio - 1`) guardados em colunas separadas — Evandro achou
+  -- (2026-09-30) a UI mostrando `dc_ac_ratio` sob o rótulo "overload" (ex.: 210,8% em vez de 110,8%).
+  dc_ac_ratio numeric(6, 4) not null check (dc_ac_ratio > 0),
   overload_pct numeric(6, 4) not null,
   validacao public.tipo_validacao_dimensionamento not null,
   validacao_eletrica public.tipo_validacao_eletrica_dimensionamento not null,

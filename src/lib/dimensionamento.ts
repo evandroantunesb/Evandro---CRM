@@ -87,6 +87,10 @@ export type OpcaoSistemaAutomatico = {
   quantidadeModulos: number;
   potenciaDcKwp: number;
   potenciaAcKw: number;
+  /** Pdc/Pac puro (ex.: 2,108 para 10,54 kWp num inversor de 5 kW) — não confundir com `overloadPct`. */
+  dcAcRatio: number;
+  /** `dcAcRatio - 1` (ex.: 1,108 = 110,8% de overload) — Evandro achou (2026-09-30) a UI mostrando
+   * `dcAcRatio` sob o rótulo "overload"; os dois ficam separados aqui pra não repetir a confusão. */
   overloadPct: number;
   validacao: "valido" | "valido_com_alerta";
   validacaoEletrica: "valido" | "nao_verificado";
@@ -153,6 +157,40 @@ function encontrarConfiguracaoString(
   return melhor;
 }
 
+const CAMPOS_TECNICOS_MODULO: { chave: keyof EquipamentoAtivo; rotulo: string }[] = [
+  { chave: "vocV", rotulo: "Voc (V)" },
+  { chave: "vmpV", rotulo: "Vmp (V)" },
+  { chave: "iscA", rotulo: "Isc (A)" },
+  { chave: "impA", rotulo: "Imp (A)" },
+  { chave: "coefTempVocPctC", rotulo: "Coeficiente de temperatura do Voc (%/°C)" },
+];
+
+const CAMPOS_TECNICOS_INVERSOR: { chave: keyof EquipamentoAtivo; rotulo: string }[] = [
+  { chave: "tensaoMaxDcV", rotulo: "Tensão DC máxima (V)" },
+  { chave: "mpptMinV", rotulo: "MPPT mínimo (V)" },
+  { chave: "mpptMaxV", rotulo: "MPPT máximo (V)" },
+  { chave: "correnteMaxEntradaA", rotulo: "Corrente máxima por MPPT (A)" },
+  { chave: "quantidadeMppt", rotulo: "Quantidade de MPPTs" },
+];
+
+/**
+ * Evandro pediu (2026-09-30) que "String/MPPT não verificados" diga quais campos
+ * específicos faltam, em vez de só apontar que falta algo. Mesma lista de campos que
+ * `encontrarConfiguracaoString` usa pra decidir "não verificado" (mais os opcionais de
+ * corrente/MPPT usados na checagem extra), então o rótulo nunca aponta um campo que o
+ * motor não confere de verdade.
+ */
+export function camposTecnicosFaltantes(modulo: EquipamentoAtivo, inversor: EquipamentoAtivo): string[] {
+  const faltantes: string[] = [];
+  for (const { chave, rotulo } of CAMPOS_TECNICOS_MODULO) {
+    if (modulo[chave] == null) faltantes.push(rotulo);
+  }
+  for (const { chave, rotulo } of CAMPOS_TECNICOS_INVERSOR) {
+    if (inversor[chave] == null) faltantes.push(rotulo);
+  }
+  return faltantes;
+}
+
 function montarOpcao(
   modulo: EquipamentoAtivo,
   inversor: EquipamentoAtivo,
@@ -162,7 +200,8 @@ function montarOpcao(
 ): OpcaoSistemaAutomatico | null {
   const potenciaDcKwp = arredondar((quantidadeModulos * modulo.potenciaW) / 1000, 2);
   const potenciaAcKw = arredondar(inversor.potenciaW / 1000, 2);
-  const overloadPct = arredondar((potenciaDcKwp * 1000) / inversor.potenciaW - 1, 4);
+  const dcAcRatio = arredondar((potenciaDcKwp * 1000) / inversor.potenciaW, 4);
+  const overloadPct = arredondar(dcAcRatio - 1, 4);
 
   const configuracaoString = encontrarConfiguracaoString(modulo, inversor, quantidadeModulos, temperaturaMinimaProjetoC);
   if (configuracaoString === null) return null; // dados elétricos existem, mas nenhum arranjo é seguro — descarta a combinação.
@@ -173,6 +212,7 @@ function montarOpcao(
     quantidadeModulos,
     potenciaDcKwp,
     potenciaAcKw,
+    dcAcRatio,
     overloadPct,
     validacao: overloadPct <= overloadMaximoPct ? "valido" : "valido_com_alerta",
     validacaoEletrica: configuracaoString === undefined ? "nao_verificado" : "valido",

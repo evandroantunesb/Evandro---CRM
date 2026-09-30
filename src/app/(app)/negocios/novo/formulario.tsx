@@ -87,6 +87,10 @@ export function FormularioNegocio({
   const [linhas, setLinhas] = useState<LinhaComponente[]>([]);
   const [estruturaTelhado, setEstruturaTelhado] = useState("");
   const [escolha, setEscolha] = useState<EscolhaDimensionamento | null>(null);
+  // Editor manual some por padrão quando há kit automático disponível (pedido do Evandro,
+  // 2026-09-30) — só aparece ao clicar em "Montar kit manualmente", em vez de ficar sempre
+  // visível embaixo das opções automáticas.
+  const [mostrarEditorManual, setMostrarEditorManual] = useState(false);
 
   const modulosAtivos = useMemo(() => equipamentosAtivos.filter((e) => e.tipo === "modulo"), [equipamentosAtivos]);
   const inversoresAtivos = useMemo(() => equipamentosAtivos.filter((e) => e.tipo === "inversor"), [equipamentosAtivos]);
@@ -495,15 +499,30 @@ export function FormularioNegocio({
           />
           {!escolha && (
             <>
-              {modulosAtivos.length > 0 && inversoresAtivos.length > 0 && (
-                <p className="text-sm font-medium text-zinc-700">Montar kit manualmente</p>
+              {modulosAtivos.length > 0 && inversoresAtivos.length > 0 ? (
+                mostrarEditorManual ? (
+                  <>
+                    <p className="text-sm font-medium text-zinc-700">Montar kit manualmente</p>
+                    <EditorComponentesKit
+                      linhas={linhas}
+                      onChange={setLinhas}
+                      sugerirQuantidadeModulo={sugerirQuantidadeModulo}
+                      catalogoPorTipo={catalogoPorTipo}
+                    />
+                  </>
+                ) : (
+                  <Botao type="button" variante="secundario" onClick={() => setMostrarEditorManual(true)} className="self-start">
+                    Montar kit manualmente
+                  </Botao>
+                )
+              ) : (
+                <EditorComponentesKit
+                  linhas={linhas}
+                  onChange={setLinhas}
+                  sugerirQuantidadeModulo={sugerirQuantidadeModulo}
+                  catalogoPorTipo={catalogoPorTipo}
+                />
               )}
-              <EditorComponentesKit
-                linhas={linhas}
-                onChange={setLinhas}
-                sugerirQuantidadeModulo={sugerirQuantidadeModulo}
-                catalogoPorTipo={catalogoPorTipo}
-              />
             </>
           )}
           <Campo

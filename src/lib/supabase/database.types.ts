@@ -677,6 +677,7 @@ export type Database = {
           consumo_medio_kwh: number;
           created_at: string;
           criado_por: string | null;
+          dc_ac_ratio: number;
           disponibilidade_kwh: number;
           economia_mensal: number;
           empresa_id: string;
@@ -709,6 +710,7 @@ export type Database = {
           consumo_medio_kwh: number;
           created_at?: string;
           criado_por?: string | null;
+          dc_ac_ratio: number;
           disponibilidade_kwh: number;
           economia_mensal: number;
           empresa_id: string;
@@ -741,6 +743,7 @@ export type Database = {
           consumo_medio_kwh?: number;
           created_at?: string;
           criado_por?: string | null;
+          dc_ac_ratio?: number;
           disponibilidade_kwh?: number;
           economia_mensal?: number;
           empresa_id?: string;

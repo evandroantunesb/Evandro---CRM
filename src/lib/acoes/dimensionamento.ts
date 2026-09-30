@@ -101,6 +101,7 @@ export async function salvarDimensionamento(
     quantidade_modulos: opcao.quantidadeModulos,
     potencia_dc_kwp: opcao.potenciaDcKwp,
     potencia_ac_kw: opcao.potenciaAcKw,
+    dc_ac_ratio: opcao.dcAcRatio,
     overload_pct: opcao.overloadPct,
     validacao: opcao.validacao,
     validacao_eletrica: opcao.validacaoEletrica,

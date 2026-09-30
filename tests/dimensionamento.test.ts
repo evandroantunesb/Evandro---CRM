@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 import {
   avaliarCombinacaoEscolhida,
+  camposTecnicosFaltantes,
   dimensionarSistemaAutomatico,
   paraEquipamentoAtivo,
   type EquipamentoAtivo,
@@ -30,6 +31,15 @@ describe("dimensionarSistemaAutomatico", () => {
     expect(opcao.potenciaDcKwp).toBe(8.06);
     expect(opcao.overloadPct).toBeCloseTo(0.24, 2);
     expect(opcao.validacao).toBe("valido");
+  });
+
+  it("separa dcAcRatio (Pdc/Pac) de overloadPct ((Pdc/Pac - 1)) — bug relatado pelo Evandro em 2026-09-30", () => {
+    // 17 módulos de 620W = 10,54 kWp / inversor de 5 kW -> ratio 2,108, overload 110,8% (não 210,8%).
+    const inversor5: EquipamentoAtivo = { id: "i4", fabricante: "Sungrow", modelo: "SG5", potenciaW: 5000, prioridade: 0 };
+    const opcao = avaliarCombinacaoEscolhida(modulo620, inversor5, 17, 0.3, TEMPERATURA_PADRAO_C);
+    expect(opcao?.potenciaDcKwp).toBe(10.54);
+    expect(opcao?.dcAcRatio).toBeCloseTo(2.108, 3);
+    expect(opcao?.overloadPct).toBeCloseTo(1.108, 3);
   });
 
   it("marca overload acima do limite automático como 'valido_com_alerta', não bloqueia", () => {
@@ -290,5 +300,54 @@ describe("paraEquipamentoAtivo", () => {
       correnteMaxEntradaA: 40,
       quantidadeMppt: 2,
     });
+  });
+});
+
+describe("camposTecnicosFaltantes", () => {
+  it("lista todos os campos quando módulo e inversor não têm nenhum dado elétrico", () => {
+    expect(camposTecnicosFaltantes(modulo620, inversor65)).toEqual([
+      "Voc (V)",
+      "Vmp (V)",
+      "Isc (A)",
+      "Imp (A)",
+      "Coeficiente de temperatura do Voc (%/°C)",
+      "Tensão DC máxima (V)",
+      "MPPT mínimo (V)",
+      "MPPT máximo (V)",
+      "Corrente máxima por MPPT (A)",
+      "Quantidade de MPPTs",
+    ]);
+  });
+
+  it("não lista nada quando todos os campos técnicos estão preenchidos", () => {
+    const moduloCompleto: EquipamentoAtivo = {
+      ...modulo620,
+      vocV: 41.5,
+      iscA: 18.5,
+      vmpV: 34.8,
+      impA: 17.8,
+      coefTempVocPctC: -0.26,
+    };
+    const inversorCompleto: EquipamentoAtivo = {
+      ...inversor65,
+      tensaoMaxDcV: 600,
+      mpptMinV: 80,
+      mpptMaxV: 550,
+      correnteMaxEntradaA: 40,
+      quantidadeMppt: 2,
+    };
+    expect(camposTecnicosFaltantes(moduloCompleto, inversorCompleto)).toEqual([]);
+  });
+
+  it("lista só os campos específicos que faltam quando o catálogo está parcialmente preenchido", () => {
+    const moduloParcial: EquipamentoAtivo = { ...modulo620, vocV: 41.5, vmpV: 34.8 };
+    const inversorParcial: EquipamentoAtivo = { ...inversor65, tensaoMaxDcV: 600, mpptMinV: 80, mpptMaxV: 550 };
+    expect(camposTecnicosFaltantes(moduloParcial, inversorParcial)).toEqual([
+      "Isc (A)",
+      "Imp (A)",
+      "Coeficiente de temperatura do Voc (%/°C)",
+      "Corrente máxima por MPPT (A)",
+      "Quantidade de MPPTs",
+    ]);
   });
 });

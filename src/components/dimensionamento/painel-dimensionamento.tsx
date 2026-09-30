@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   avaliarCombinacaoEscolhida,
+  camposTecnicosFaltantes,
   dimensionarSistemaAutomatico,
   type EquipamentoAtivo,
   type OpcaoSistemaAutomatico,
@@ -124,7 +125,9 @@ export function PainelDimensionamento({
                 <span className="text-xs text-amber-700">Overload acima do recomendado — confira</span>
               )}
               {opcao.validacaoEletrica === "nao_verificado" && (
-                <span className="text-xs text-zinc-400">String/MPPT não verificados (sem datasheet completo)</span>
+                <span className="text-xs text-zinc-400">
+                  Não verificado — falta no datasheet: {camposTecnicosFaltantes(opcao.modulo, opcao.inversor).join(", ")}
+                </span>
               )}
             </button>
           );
@@ -150,6 +153,11 @@ export function PainelDimensionamento({
               overload {(opcaoAtual.overloadPct * 100).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}%
               {opcaoAtual.validacao === "valido_com_alerta" && (
                 <span className="ml-1 text-amber-700">(acima do recomendado)</span>
+              )}
+              {opcaoAtual.validacaoEletrica === "nao_verificado" && (
+                <span className="ml-1 text-zinc-400">
+                  · não verificado — falta: {camposTecnicosFaltantes(opcaoAtual.modulo, opcaoAtual.inversor).join(", ")}
+                </span>
               )}
             </p>
           ) : (
