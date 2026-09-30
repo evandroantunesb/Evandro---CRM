@@ -1,4 +1,4 @@
-export const PAPEIS = ["admin", "gestor", "vendedor"] as const;
+export const PAPEIS = ["admin", "gestor", "vendedor", "sdr"] as const;
 export type Papel = (typeof PAPEIS)[number];
 
 export const TIPOS_VENDEDOR = ["interno", "representante"] as const;
@@ -8,6 +8,7 @@ export const ROTULO_PAPEL: Record<Papel, string> = {
   admin: "Admin",
   gestor: "Gestor",
   vendedor: "Vendedor",
+  sdr: "SDR",
 };
 
 export const ROTULO_TIPO_VENDEDOR: Record<TipoVendedor, string> = {

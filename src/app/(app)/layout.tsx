@@ -28,7 +28,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
           { href: "/inicio", rotulo: "Início" },
           { href: "/negocios", rotulo: "Negócios" },
           { href: "/tarefas", rotulo: "Tarefas" },
-          { href: "/contatos", rotulo: "Contatos" },
+          ...(papel !== "sdr" ? [{ href: "/contatos", rotulo: "Contatos" }] : []),
           { href: "/gamificacao", rotulo: "Visão geral", grupo: "Gamificação" },
           { href: "/gamificacao/jornada", rotulo: "Minha jornada", grupo: "Gamificação" },
           { href: "/gamificacao/ranking", rotulo: "Ranking", grupo: "Gamificação" },
@@ -95,7 +95,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
         </div>
         {sessao.atual && (
           <Link
-            href={papel === "vendedor" ? "/inicio" : "/painel"}
+            href={papel === "admin" || papel === "gestor" ? "/painel" : "/inicio"}
             className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-offwhite hover:border-dourado"
           >
             <Bell size={16} />
