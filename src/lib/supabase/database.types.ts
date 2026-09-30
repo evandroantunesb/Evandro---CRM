@@ -1217,6 +1217,81 @@ export type Database = {
           },
         ];
       };
+      handoffs: {
+        Row: {
+          contato_id: string;
+          created_at: string;
+          de_membro_id: string | null;
+          empresa_id: string;
+          id: string;
+          negocio_id: string;
+          observacoes: string | null;
+          para_membro_id: string;
+          qualificacao_snapshot: NonNullable<Json>;
+          status_qualificacao: string;
+        };
+        Insert: {
+          contato_id: string;
+          created_at?: string;
+          de_membro_id?: string | null;
+          empresa_id: string;
+          id?: string;
+          negocio_id: string;
+          observacoes?: string | null;
+          para_membro_id: string;
+          qualificacao_snapshot?: NonNullable<Json>;
+          status_qualificacao: string;
+        };
+        Update: {
+          contato_id?: string;
+          created_at?: string;
+          de_membro_id?: string | null;
+          empresa_id?: string;
+          id?: string;
+          negocio_id?: string;
+          observacoes?: string | null;
+          para_membro_id?: string;
+          qualificacao_snapshot?: NonNullable<Json>;
+          status_qualificacao?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "handoffs_contato_id_fkey";
+            columns: ["contato_id"];
+            isOneToOne: false;
+            referencedRelation: "contatos";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "handoffs_de_membro_id_fkey";
+            columns: ["de_membro_id"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "handoffs_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "handoffs_negocio_id_fkey";
+            columns: ["negocio_id"];
+            isOneToOne: false;
+            referencedRelation: "negocios";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "handoffs_para_membro_id_fkey";
+            columns: ["para_membro_id"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       historico_etapas: {
         Row: {
           empresa_id: string;
@@ -1611,6 +1686,18 @@ export type Database = {
           numero: number;
           origem_id: string | null;
           padrao_cliente: string | null;
+          qualif_busca_financiamento: boolean | null;
+          qualif_distribuidora: string | null;
+          qualif_e_decisor: boolean | null;
+          qualif_imovel_proprio: boolean | null;
+          qualif_objetivo: string | null;
+          qualif_observacoes: string | null;
+          qualif_orcamento_outra_empresa: boolean | null;
+          qualif_outro_decisor: boolean | null;
+          qualif_participantes_decisao: string | null;
+          qualif_possui_conta_energia: boolean | null;
+          qualif_prazo_instalacao: string | null;
+          qualif_tipo_cliente: string | null;
           responsavel_id: string | null;
           status: Database["public"]["Enums"]["status_negocio"];
           tipo_telhado: string | null;
@@ -1638,6 +1725,18 @@ export type Database = {
           numero?: number;
           origem_id?: string | null;
           padrao_cliente?: string | null;
+          qualif_busca_financiamento?: boolean | null;
+          qualif_distribuidora?: string | null;
+          qualif_e_decisor?: boolean | null;
+          qualif_imovel_proprio?: boolean | null;
+          qualif_objetivo?: string | null;
+          qualif_observacoes?: string | null;
+          qualif_orcamento_outra_empresa?: boolean | null;
+          qualif_outro_decisor?: boolean | null;
+          qualif_participantes_decisao?: string | null;
+          qualif_possui_conta_energia?: boolean | null;
+          qualif_prazo_instalacao?: string | null;
+          qualif_tipo_cliente?: string | null;
           responsavel_id?: string | null;
           status?: Database["public"]["Enums"]["status_negocio"];
           tipo_telhado?: string | null;
@@ -1665,6 +1764,18 @@ export type Database = {
           numero?: number;
           origem_id?: string | null;
           padrao_cliente?: string | null;
+          qualif_busca_financiamento?: boolean | null;
+          qualif_distribuidora?: string | null;
+          qualif_e_decisor?: boolean | null;
+          qualif_imovel_proprio?: boolean | null;
+          qualif_objetivo?: string | null;
+          qualif_observacoes?: string | null;
+          qualif_orcamento_outra_empresa?: boolean | null;
+          qualif_outro_decisor?: boolean | null;
+          qualif_participantes_decisao?: string | null;
+          qualif_possui_conta_energia?: boolean | null;
+          qualif_prazo_instalacao?: string | null;
+          qualif_tipo_cliente?: string | null;
           responsavel_id?: string | null;
           status?: Database["public"]["Enums"]["status_negocio"];
           tipo_telhado?: string | null;

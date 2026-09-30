@@ -27,6 +27,7 @@ import { Fechamento } from "./fechamento";
 import { KitPersonalizado } from "./kit-personalizado";
 import { NovaNota } from "./nova-nota";
 import { Proposta } from "./proposta";
+import { Qualificacao } from "./qualificacao";
 
 function tamanhoLegivel(bytes: number) {
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
@@ -42,7 +43,7 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
     supabase
       .from("negocios")
       .select(
-        "id, numero, titulo, valor, descricao, status, funil_id, etapa_id, origem_id, responsavel_id, motivo_perda_id, motivo_perda_detalhe, fechado_em, created_at, updated_at, tipo_telhado, unidade_consumidora, padrao_cliente, estrutura_telhado, consumo_medio_kwh, valor_conta_energia, contatos(id, nome, tipo, telefone, email, cidade, uf)",
+        "id, numero, titulo, valor, descricao, status, funil_id, etapa_id, origem_id, responsavel_id, motivo_perda_id, motivo_perda_detalhe, fechado_em, created_at, updated_at, tipo_telhado, unidade_consumidora, padrao_cliente, estrutura_telhado, consumo_medio_kwh, valor_conta_energia, qualif_tipo_cliente, qualif_possui_conta_energia, qualif_distribuidora, qualif_imovel_proprio, qualif_objetivo, qualif_prazo_instalacao, qualif_busca_financiamento, qualif_orcamento_outra_empresa, qualif_e_decisor, qualif_outro_decisor, qualif_participantes_decisao, qualif_observacoes, contatos(id, nome, tipo, telefone, email, cidade, uf)",
       )
       .eq("id", id)
       .maybeSingle(),
@@ -267,6 +268,27 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
                     }
                   : null
               }
+            />
+          </Cartao>
+          <Cartao titulo="Qualificação SDR">
+            <Qualificacao
+              negocio={{
+                id: negocio.id,
+                qualifTipoCliente: negocio.qualif_tipo_cliente,
+                qualifPossuiContaEnergia: negocio.qualif_possui_conta_energia,
+                qualifDistribuidora: negocio.qualif_distribuidora,
+                qualifImovelProprio: negocio.qualif_imovel_proprio,
+                qualifObjetivo: negocio.qualif_objetivo,
+                qualifPrazoInstalacao: negocio.qualif_prazo_instalacao,
+                qualifBuscaFinanciamento: negocio.qualif_busca_financiamento,
+                qualifOrcamentoOutraEmpresa: negocio.qualif_orcamento_outra_empresa,
+                qualifEDecisor: negocio.qualif_e_decisor,
+                qualifOutroDecisor: negocio.qualif_outro_decisor,
+                qualifParticipantesDecisao: negocio.qualif_participantes_decisao,
+                qualifObservacoes: negocio.qualif_observacoes,
+              }}
+              telefoneContato={contato.telefone}
+              vendedores={config.membros.filter((m) => m.ativo && m.papel === "vendedor")}
             />
           </Cartao>
           <Cartao titulo="Proposta">

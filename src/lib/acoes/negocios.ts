@@ -9,7 +9,8 @@ import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { mensagemErro } from "@/lib/erros";
 import { componentesJsonSchema, nomeKitPersonalizado, potenciaKitPersonalizadoKwp } from "@/lib/calculadora";
-import { TIPOS_LIGACAO, type ResultadoAcao } from "@/lib/tipos";
+import { calcularStatusQualificacao } from "@/lib/qualificacao";
+import { PRAZOS_INSTALACAO_QUALIF, TIPOS_CLIENTE_QUALIF, TIPOS_LIGACAO, type ResultadoAcao } from "@/lib/tipos";
 
 const uuidOpcional = z
   .string()
@@ -34,6 +35,12 @@ const numeroBrOpcional = z
     return Number(v.includes(",") ? v.replace(/\./g, "").replace(",", ".") : v);
   })
   .pipe(z.number().positive().nullable());
+
+/** Selects "sim"/"nao"/"" (não informado) viram boolean | null. */
+const boolOpcional = z
+  .enum(["sim", "nao", ""])
+  .optional()
+  .transform((v) => (v === "sim" ? true : v === "nao" ? false : null));
 
 const esquemaNovo = z.object({
   titulo: z.string().trim().min(2, "Informe o nome do negócio"),
@@ -393,4 +400,117 @@ export async function buscarContatos(termo: string) {
     .order("nome")
     .limit(8);
   return data ?? [];
+}
+
+const esquemaQualificacao = z.object({
+  negocioId: z.string().uuid(),
+  qualif_tipo_cliente: z.enum([...TIPOS_CLIENTE_QUALIF, ""]).optional(),
+  qualif_possui_conta_energia: boolOpcional,
+  qualif_distribuidora: z.string().trim().max(80).optional(),
+  qualif_imovel_proprio: boolOpcional,
+  qualif_objetivo: z.string().trim().max(200).optional(),
+  qualif_prazo_instalacao: z.enum([...PRAZOS_INSTALACAO_QUALIF, ""]).optional(),
+  qualif_busca_financiamento: boolOpcional,
+  qualif_orcamento_outra_empresa: boolOpcional,
+  qualif_e_decisor: boolOpcional,
+  qualif_outro_decisor: boolOpcional,
+  qualif_participantes_decisao: z.string().trim().max(200).optional(),
+  qualif_observacoes: z.string().trim().max(2000).optional(),
+});
+
+/** Salva o bloco "Qualificação SDR" do negócio (spec RAION_SDR_REGRAS_PERMISSOES, fase 4). */
+export async function atualizarQualificacao(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  await exigirPapel();
+  const dados = esquemaQualificacao.safeParse(Object.fromEntries(formData));
+  if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
+  const d = dados.data;
+
+  const supabase = await criarClienteServidor();
+  const { data, error } = await supabase
+    .from("negocios")
+    .update({
+      qualif_tipo_cliente: d.qualif_tipo_cliente || null,
+      qualif_possui_conta_energia: d.qualif_possui_conta_energia,
+      qualif_distribuidora: d.qualif_distribuidora || null,
+      qualif_imovel_proprio: d.qualif_imovel_proprio,
+      qualif_objetivo: d.qualif_objetivo || null,
+      qualif_prazo_instalacao: d.qualif_prazo_instalacao || null,
+      qualif_busca_financiamento: d.qualif_busca_financiamento,
+      qualif_orcamento_outra_empresa: d.qualif_orcamento_outra_empresa,
+      qualif_e_decisor: d.qualif_e_decisor,
+      qualif_outro_decisor: d.qualif_outro_decisor,
+      qualif_participantes_decisao: d.qualif_participantes_decisao || null,
+      qualif_observacoes: d.qualif_observacoes || null,
+    })
+    .eq("id", d.negocioId)
+    .select("id");
+  if (error || !data?.length) return { ok: false, mensagem: mensagemErro(error, "Não foi possível salvar.") };
+
+  revalidatePath(`/negocios/${d.negocioId}`);
+  return { ok: true, mensagem: "Salvo." };
+}
+
+const esquemaHandoff = z.object({
+  negocioId: z.string().uuid(),
+  paraMembroId: z.string().uuid("Escolha o vendedor."),
+  observacoes: z.string().trim().max(1000).optional(),
+});
+
+/**
+ * "Enviar para vendas" (spec RAION_SDR_REGRAS_PERMISSOES, fase 5, §20-22): exige negócio
+ * qualificado, atribui o vendedor escolhido e registra o handoff (snapshot da qualificação,
+ * não só a troca de responsável). Notificação ao vendedor e transferência de tarefas ficam
+ * pra fase futura (§9/§45 da spec).
+ */
+export async function enviarParaVendas(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  const { atual } = await exigirPapel();
+  const dados = esquemaHandoff.safeParse(Object.fromEntries(formData));
+  if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
+  const d = dados.data;
+
+  const supabase = await criarClienteServidor();
+  const { data: negocio, error: erroBusca } = await supabase
+    .from("negocios")
+    .select(
+      "id, empresa_id, contato_id, responsavel_id, qualif_tipo_cliente, qualif_possui_conta_energia, qualif_distribuidora, qualif_imovel_proprio, qualif_objetivo, qualif_prazo_instalacao, qualif_busca_financiamento, qualif_orcamento_outra_empresa, qualif_e_decisor, qualif_outro_decisor, qualif_participantes_decisao, contatos(telefone)",
+    )
+    .eq("id", d.negocioId)
+    .maybeSingle();
+  if (erroBusca || !negocio) return { ok: false, mensagem: "Negócio não encontrado." };
+
+  const contato = negocio.contatos as unknown as { telefone: string | null } | null;
+  const status = calcularStatusQualificacao(!!contato?.telefone, negocio.qualif_objetivo, negocio.qualif_e_decisor);
+  if (status.rotulo !== "Qualificado") {
+    return { ok: false, mensagem: `Qualifique o negócio antes de enviar para vendas (${status.atendidos} de ${status.total} critérios atendidos).` };
+  }
+
+  const { error: erroHandoff } = await supabase.from("handoffs").insert({
+    empresa_id: negocio.empresa_id,
+    negocio_id: negocio.id,
+    contato_id: negocio.contato_id,
+    de_membro_id: negocio.responsavel_id ?? atual.membroId,
+    para_membro_id: d.paraMembroId,
+    status_qualificacao: status.rotulo,
+    qualificacao_snapshot: {
+      tipo_cliente: negocio.qualif_tipo_cliente,
+      possui_conta_energia: negocio.qualif_possui_conta_energia,
+      distribuidora: negocio.qualif_distribuidora,
+      imovel_proprio: negocio.qualif_imovel_proprio,
+      objetivo: negocio.qualif_objetivo,
+      prazo_instalacao: negocio.qualif_prazo_instalacao,
+      busca_financiamento: negocio.qualif_busca_financiamento,
+      orcamento_outra_empresa: negocio.qualif_orcamento_outra_empresa,
+      e_decisor: negocio.qualif_e_decisor,
+      outro_decisor: negocio.qualif_outro_decisor,
+      participantes_decisao: negocio.qualif_participantes_decisao,
+    },
+    observacoes: d.observacoes || null,
+  });
+  if (erroHandoff) return { ok: false, mensagem: mensagemErro(erroHandoff, "Não foi possível registrar o handoff.") };
+
+  const { error: erroResponsavel } = await supabase.from("negocios").update({ responsavel_id: d.paraMembroId }).eq("id", d.negocioId);
+  if (erroResponsavel) return { ok: false, mensagem: mensagemErro(erroResponsavel, "Handoff registrado, mas não foi possível atualizar o responsável.") };
+
+  revalidatePath(`/negocios/${d.negocioId}`);
+  return { ok: true, mensagem: "Enviado para vendas." };
 }
