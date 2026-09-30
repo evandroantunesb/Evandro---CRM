@@ -82,6 +82,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
   const mesAtual = limitesMes(0, agora);
   const mesPassado = limitesMes(1, agora);
   const hojeStr = paraDataCurta(agora);
+  const nomeMesAtual = agora.toLocaleDateString("pt-BR", { month: "long", year: "numeric", timeZone: "America/Sao_Paulo" });
 
   // Consultas que mudam de escopo conforme a visão (Pessoal filtra por responsavel_id; Equipe é a empresa toda).
   let consultaLeadsHoje = supabase
@@ -142,6 +143,23 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
     .limit(10000);
   if (pessoal) consultaNegociosMesPassado = consultaNegociosMesPassado.eq("responsavel_id", atual.membroId);
 
+  const config = await carregarConfiguracao(atual.empresaId);
+  const funilPrincipal = config.funis.find((f) => f.ativo) ?? config.funis[0] ?? null;
+  const etapasFunil = funilPrincipal
+    ? config.etapas.filter((e) => e.funilId === funilPrincipal.id && e.ativa).sort((a, b) => a.ordem - b.ordem)
+    : [];
+
+  let consultaFunilMes = supabase
+    .from("negocios")
+    .select("etapa_id")
+    .eq("empresa_id", atual.empresaId)
+    .eq("status", "aberto")
+    .gte("created_at", mesAtual.inicioIso)
+    .lt("created_at", mesAtual.fimExclusivoIso)
+    .limit(10000);
+  if (funilPrincipal) consultaFunilMes = consultaFunilMes.eq("funil_id", funilPrincipal.id);
+  if (pessoal) consultaFunilMes = consultaFunilMes.eq("responsavel_id", atual.membroId);
+
   let consultaTarefasAtrasadasTotal = supabase
     .from("tarefas")
     .select("id", { count: "exact", head: true })
@@ -161,7 +179,6 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
   if (pessoal) consultaTarefasAtrasadas = consultaTarefasAtrasadas.eq("responsavel_id", atual.membroId);
 
   const [
-    config,
     { count: leadsHoje },
     { count: leadsOntem },
     { data: negociosAtivos },
@@ -169,6 +186,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
     { data: metasLinhas },
     { data: negociosMes },
     { data: negociosMesPassado },
+    { data: funilMes },
     { count: tarefasAtrasadasTotal },
     { data: tarefasAtrasadas },
     { data: tarefasHoje },
@@ -177,7 +195,6 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
     { data: rankingBruto },
     { count: conquistasCount },
   ] = await Promise.all([
-    carregarConfiguracao(atual.empresaId),
     consultaLeadsHoje,
     consultaLeadsOntem,
     consultaNegociosAtivos,
@@ -185,6 +202,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
     consultaMetas,
     consultaNegociosMes,
     consultaNegociosMesPassado,
+    consultaFunilMes,
     consultaTarefasAtrasadasTotal,
     consultaTarefasAtrasadas,
     supabase
@@ -238,10 +256,15 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
   let metaKpiValor: string;
   let metaKpiRodape: string;
   let metaKpiBarra: number | null;
+  let metaComercial: { valorAlvo: number; realizado: number; percentual: number; faltante: number } | null;
   if (pessoal) {
     metaKpiValor = progressoMeta ? `${progressoMeta.percentual.toFixed(0)}%` : "—";
     metaKpiRodape = meta ? `${formatarMoeda(progressoMeta!.realizado)} de ${formatarMoeda(meta.valorAlvo)}` : "Nenhuma meta configurada";
     metaKpiBarra = progressoMeta ? Math.min(100, progressoMeta.percentual) : null;
+    metaComercial =
+      meta && progressoMeta
+        ? { valorAlvo: meta.valorAlvo, realizado: progressoMeta.realizado, percentual: progressoMeta.percentual, faltante: progressoMeta.faltante }
+        : null;
   } else {
     const progressosEquipe = await Promise.all(
       metasAtivas.map(async (m) => calcularProgresso(m.valorAlvo, await calcularRealizado(supabase, m), m.periodoInicio, m.periodoFim, agora)),
@@ -254,7 +277,28 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
       ? `Progresso médio de ${metasAtivas.length} meta${metasAtivas.length === 1 ? "" : "s"} ativa${metasAtivas.length === 1 ? "" : "s"}`
       : "Nenhuma meta ativa na equipe";
     metaKpiBarra = progressoMedioEquipe;
+
+    const valorAlvoEquipe = metasAtivas.reduce((s, m) => s + m.valorAlvo, 0);
+    const realizadoEquipe = progressosEquipe.reduce((s, p) => s + p.realizado, 0);
+    metaComercial = metasAtivas.length
+      ? {
+          valorAlvo: valorAlvoEquipe,
+          realizado: realizadoEquipe,
+          percentual: valorAlvoEquipe > 0 ? (realizadoEquipe / valorAlvoEquipe) * 100 : 0,
+          faltante: Math.max(valorAlvoEquipe - realizadoEquipe, 0),
+        }
+      : null;
   }
+
+  // Resumo do funil: negócios abertos criados este mês, por etapa (mesmo funil/escopo da visão atual) ----------
+  const contagemPorEtapa = new Map<string, number>();
+  for (const n of funilMes ?? []) {
+    contagemPorEtapa.set(n.etapa_id, (contagemPorEtapa.get(n.etapa_id) ?? 0) + 1);
+  }
+  const resumoFunil = [
+    ...etapasFunil.map((e) => ({ id: e.id, nome: e.nome, cor: e.cor, quantidade: contagemPorEtapa.get(e.id) ?? 0 })),
+    { id: "fechado", nome: "Fechado", cor: "#137B43", quantidade: (negociosMes ?? []).length },
+  ];
 
   // Gráfico de desempenho: vendas acumuladas do mês corrente -----------------
   const diasNoMes = Math.round((mesAtual.fimExclusivo.getTime() - mesAtual.inicio.getTime()) / 86_400_000);
@@ -270,6 +314,8 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
     return acc;
   }, []);
   const totalMes = acumuladoMes.at(-1)?.valor ?? 0;
+  const contratosMes = (negociosMes ?? []).length;
+  const ticketMedioMes = contratosMes > 0 ? totalMes / contratosMes : 0;
 
   const totalMesPassadoAteHoje = (negociosMesPassado ?? [])
     .filter((n) => n.fechado_em && new Date(n.fechado_em).getTime() < mesPassado.inicio.getTime() + diaHoje * 86_400_000)
@@ -515,10 +561,32 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
         </Cartao>
       </div>
 
-      {pessoal ? (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.14fr_1fr]">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.14fr_1fr]">
+        {pessoal ? (
           <Cartao titulo="Minha agenda de hoje" acao={<Link href="/tarefas" className="text-sm text-dourado hover:underline">Ver agenda completa →</Link>}>
             <ListaTarefas tarefas={agendaHoje} vazio="Nenhuma tarefa agendada para hoje." />
+          </Cartao>
+        ) : (
+          <Cartao titulo="Meta comercial da equipe" acao={<span className="rounded-md border border-zinc-200 px-2 py-1 text-xs text-zinc-500 capitalize">{nomeMesAtual}</span>}>
+            <MetaComercialConteudo metaComercial={metaComercial} contratos={contratosMes} ticketMedio={ticketMedioMes} vazio="Nenhuma meta ativa na equipe." />
+          </Cartao>
+        )}
+
+        <Cartao titulo="Resumo do funil" acao={<span className="rounded-md border border-zinc-200 px-2 py-1 text-xs text-zinc-500 capitalize">{nomeMesAtual}</span>}>
+          {!resumoFunil.length ? (
+            <p className="text-sm text-zinc-500">Nenhuma etapa configurada no funil.</p>
+          ) : resumoFunil.every((e) => e.quantidade === 0) ? (
+            <p className="text-sm text-zinc-500">Nenhum negócio criado este mês.</p>
+          ) : (
+            <BarrasFunil etapas={resumoFunil} />
+          )}
+        </Cartao>
+      </div>
+
+      {pessoal ? (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.14fr_1fr]">
+          <Cartao titulo="Meta comercial do mês" acao={<span className="rounded-md border border-zinc-200 px-2 py-1 text-xs text-zinc-500 capitalize">{nomeMesAtual}</span>}>
+            <MetaComercialConteudo metaComercial={metaComercial} contratos={contratosMes} ticketMedio={ticketMedioMes} vazio="Nenhuma meta configurada." />
           </Cartao>
 
           <Cartao
@@ -643,6 +711,91 @@ function MiniCartaoJornada({ valor, legenda }: { valor: string; legenda: string 
     <div className="flex flex-col items-center gap-0.5 rounded-lg bg-white px-2 py-2.5 text-center">
       <span className="text-lg font-semibold text-zinc-900">{valor}</span>
       <span className="text-[11px] text-zinc-500">{legenda}</span>
+    </div>
+  );
+}
+
+function BarrasFunil({ etapas }: { etapas: { id: string; nome: string; cor: string | null; quantidade: number }[] }) {
+  const maximo = Math.max(1, ...etapas.map((e) => e.quantidade));
+  return (
+    <div className="flex items-end justify-between gap-2 pt-2">
+      {etapas.map((e) => (
+        <div key={e.id} className="flex min-w-0 flex-1 flex-col items-center gap-1.5">
+          <span className="text-sm font-semibold text-zinc-900 [font-variant-numeric:tabular-nums]">{e.quantidade}</span>
+          <div
+            className="w-full rounded-t-md transition-[height]"
+            style={{ height: `${Math.max(6, (e.quantidade / maximo) * 96)}px`, background: e.cor ?? "var(--color-dourado)" }}
+          />
+          <span className="w-full truncate text-center text-[11px] text-zinc-500" title={e.nome}>
+            {e.nome}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function AnelProgresso({ percentual }: { percentual: number }) {
+  const pct = Math.max(0, Math.min(100, percentual));
+  const raio = 40;
+  const circunferencia = 2 * Math.PI * raio;
+  const offset = circunferencia * (1 - pct / 100);
+  return (
+    <div className="relative flex h-28 w-28 shrink-0 items-center justify-center">
+      <svg viewBox="0 0 100 100" className="h-28 w-28 -rotate-90">
+        <circle cx="50" cy="50" r={raio} fill="none" stroke="var(--color-zinc-100)" strokeWidth="10" />
+        <circle
+          cx="50"
+          cy="50"
+          r={raio}
+          fill="none"
+          stroke="var(--color-dourado)"
+          strokeWidth="10"
+          strokeLinecap="round"
+          strokeDasharray={circunferencia}
+          strokeDashoffset={offset}
+        />
+      </svg>
+      <span className="absolute text-xl font-semibold text-zinc-900">{pct.toFixed(0)}%</span>
+    </div>
+  );
+}
+
+function ValorMeta({ valor, legenda }: { valor: string; legenda: string }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-0.5">
+      <span className="truncate text-base font-semibold text-zinc-900 sm:text-lg">{valor}</span>
+      <span className="text-xs text-zinc-500">{legenda}</span>
+    </div>
+  );
+}
+
+function MetaComercialConteudo({
+  metaComercial,
+  contratos,
+  ticketMedio,
+  vazio,
+}: {
+  metaComercial: { valorAlvo: number; realizado: number; percentual: number; faltante: number } | null;
+  contratos: number;
+  ticketMedio: number;
+  vazio: string;
+}) {
+  if (!metaComercial) return <p className="text-sm text-zinc-500">{vazio}</p>;
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center gap-4">
+        <AnelProgresso percentual={metaComercial.percentual} />
+        <div className="grid flex-1 grid-cols-3 gap-3">
+          <ValorMeta valor={formatarMoeda(metaComercial.valorAlvo)} legenda="Meta" />
+          <ValorMeta valor={formatarMoeda(metaComercial.realizado)} legenda="Realizado" />
+          <ValorMeta valor={formatarMoeda(metaComercial.faltante)} legenda="Faltam" />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3 border-t border-zinc-100 pt-3">
+        <ValorMeta valor={String(contratos)} legenda="Contratos" />
+        <ValorMeta valor={formatarMoeda(ticketMedio)} legenda="Ticket médio" />
+      </div>
     </div>
   );
 }

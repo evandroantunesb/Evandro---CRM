@@ -1,0 +1,24 @@
+name: Popular metas comerciais dos vendedores
+
+# Só roda quando disparado manualmente — nunca em push/PR — porque grava
+# dados direto na produção (idempotente: vendedor que já tem meta ativa no
+# mês é pulado, então pode rodar mais de uma vez sem duplicar).
+on:
+  workflow_dispatch:
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Rodar seed
+        env:
+          SUPABASE_URL: https://${{ secrets.SUPABASE_PROJECT_ID }}.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY_PROD }}
+        run: node scripts/seed-metas-vendedores.mjs
