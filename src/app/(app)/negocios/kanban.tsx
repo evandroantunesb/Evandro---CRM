@@ -39,24 +39,27 @@ export type Card = {
   comentarios: number;
 };
 
-type Coluna = { id: string; nome: string; cor: string | null; inicial: boolean };
+type Coluna = { id: string; nome: string; cor: string | null; inicial: boolean; fechaComo?: "ganho" | "perdido" | null };
 export type EtiquetaDisponivel = { id: string; nome: string; cor: string | null };
+type MotivoDisponivel = { id: string; nome: string };
 
 export function Kanban({
   colunas,
   cards: iniciais,
   funilId,
   etiquetas,
+  motivos = [],
 }: {
   colunas: Coluna[];
   cards: Card[];
   funilId: string;
   etiquetas: EtiquetaDisponivel[];
+  motivos?: MotivoDisponivel[];
 }) {
   const [cards, setCards] = useState(iniciais);
-  const [movimentoPendente, setMovimentoPendente] = useState<{ cardId: string; etapaId: string; etapaNome: string } | null>(
-    null,
-  );
+  const [movimentoPendente, setMovimentoPendente] = useState<
+    { cardId: string; etapaId: string; etapaNome: string; fechaComo?: "ganho" | "perdido" | null } | null
+  >(null);
   const sensores = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
@@ -68,7 +71,7 @@ export function Kanban({
     const card = cards.find((c) => c.id === cardId);
     const coluna = colunas.find((c) => c.id === destino);
     if (!card || !destino || !coluna || card.etapaId === destino) return;
-    setMovimentoPendente({ cardId, etapaId: destino, etapaNome: coluna.nome });
+    setMovimentoPendente({ cardId, etapaId: destino, etapaNome: coluna.nome, fechaComo: coluna.fechaComo });
   }
 
   function aoConcluirMovimento() {
@@ -93,6 +96,7 @@ export function Kanban({
             funilId={funilId}
             cards={cards.filter((c) => c.etapaId === col.id)}
             etiquetas={etiquetas}
+            motivos={motivos}
           />
         ))}
       </div>
@@ -101,6 +105,8 @@ export function Kanban({
           negocioId={movimentoPendente.cardId}
           etapaId={movimentoPendente.etapaId}
           etapaNome={movimentoPendente.etapaNome}
+          precisaMotivoPerda={movimentoPendente.fechaComo === "perdido"}
+          motivos={motivos}
           aoConcluir={aoConcluirMovimento}
           aoCancelar={() => setMovimentoPendente(null)}
         />
@@ -115,12 +121,14 @@ function ColunaKanban({
   cards,
   funilId,
   etiquetas,
+  motivos,
 }: {
   coluna: Coluna;
   colunas: Coluna[];
   cards: Card[];
   funilId: string;
   etiquetas: EtiquetaDisponivel[];
+  motivos: MotivoDisponivel[];
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: coluna.id });
   const soma = cards.reduce((total, c) => total + (c.valorNumerico ?? 0), 0);
@@ -145,7 +153,7 @@ function ColunaKanban({
       </header>
       <div className="flex flex-col gap-2">
         {cards.map((c) => (
-          <CardKanban key={c.id} card={c} colunas={colunas} corEtapa={coluna.cor} etiquetas={etiquetas} />
+          <CardKanban key={c.id} card={c} colunas={colunas} corEtapa={coluna.cor} etiquetas={etiquetas} motivos={motivos} />
         ))}
         {!cards.length && <p className="px-1 py-4 text-center text-xs text-zinc-400">Arraste um negócio para cá</p>}
         {coluna.inicial && (
@@ -183,11 +191,13 @@ function CardKanban({
   colunas,
   corEtapa,
   etiquetas,
+  motivos,
 }: {
   card: Card;
   colunas: Coluna[];
   corEtapa: string | null;
   etiquetas: EtiquetaDisponivel[];
+  motivos: MotivoDisponivel[];
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: card.id });
   const estilo = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined;
@@ -210,6 +220,7 @@ function CardKanban({
           compacto
           etiquetas={etiquetas}
           etiquetasMarcadas={card.etiquetas.map((e) => e.id)}
+          motivos={motivos}
         />
       </div>
       <Link href={`/negocios/${card.id}`} className="-m-1 block rounded-md p-1 pr-16 hover:bg-zinc-50">

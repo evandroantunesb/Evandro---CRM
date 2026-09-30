@@ -334,9 +334,10 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
             cards={cards}
             funilId={funil.id}
             etiquetas={config.etiquetas.filter((e) => e.ativa)}
+            motivos={config.motivos}
           />
         ) : (
-          <ListaNegocios cards={cards} colunas={colunas} />
+          <ListaNegocios cards={cards} colunas={colunas} motivos={config.motivos} />
         )
       ) : (
         <ListaFechados status={status} cards={cards} linhas={data ?? []} motivos={config.motivos} />

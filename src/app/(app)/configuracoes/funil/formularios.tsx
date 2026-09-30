@@ -10,6 +10,7 @@ import {
   definirCamposObrigatorios,
   definirCorEtapa,
   definirDiasConsideradoParado,
+  definirFechaComoEtapa,
   definirHorasConsideradoSemContato,
   renomear,
 } from "./actions";
@@ -129,6 +130,25 @@ export function CorEtapa({ etapaId, cor }: { etapaId: string; cor: string | null
         className="h-6 w-6 cursor-pointer rounded border border-zinc-300 p-0"
         onChange={(e) => e.currentTarget.form?.requestSubmit()}
       />
+    </form>
+  );
+}
+
+/** Faz esta etapa fechar o negócio sozinha: ganho direto, ou perdido pedindo o motivo no popup de mover. */
+export function FechaComoEtapa({ etapaId, fechaComo }: { etapaId: string; fechaComo: "ganho" | "perdido" | null }) {
+  return (
+    <form action={definirFechaComoEtapa} title="Mover um negócio pra esta etapa fecha o status sozinho">
+      <input type="hidden" name="etapaId" value={etapaId} />
+      <select
+        name="fechaComo"
+        defaultValue={fechaComo ?? ""}
+        onChange={(e) => e.currentTarget.form?.requestSubmit()}
+        className="rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm text-zinc-700"
+      >
+        <option value="">Não fecha o negócio</option>
+        <option value="ganho">Marca como ganho</option>
+        <option value="perdido">Marca como perdido</option>
+      </select>
     </form>
   );
 }

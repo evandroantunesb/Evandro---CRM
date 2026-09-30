@@ -10,6 +10,8 @@ export type Etapa = {
   ativa: boolean;
   cor: string | null;
   camposObrigatorios: string[];
+  /** Se preenchida, mover um negócio pra esta etapa marca o status automaticamente (ganho direto; perdido exige motivo no popup). */
+  fechaComo: "ganho" | "perdido" | null;
 };
 export type Funil = { id: string; nome: string; ativo: boolean };
 export type Origem = { id: string; nome: string; cor: string | null; ativa: boolean; prazoAutoAprovacaoMinutos: number };
@@ -26,7 +28,7 @@ export async function carregarConfiguracao(empresaId: string) {
     supabase.from("funis").select("id, nome, ativo").eq("empresa_id", empresaId).order("ordem").order("created_at"),
     supabase
       .from("etapas")
-      .select("id, funil_id, nome, ordem, inicial, ativa, cor, campos_obrigatorios")
+      .select("id, funil_id, nome, ordem, inicial, ativa, cor, campos_obrigatorios, fecha_como")
       .eq("empresa_id", empresaId)
       .order("ordem"),
     supabase
@@ -57,6 +59,7 @@ export async function carregarConfiguracao(empresaId: string) {
       ativa: e.ativa,
       cor: e.cor,
       camposObrigatorios: e.campos_obrigatorios,
+      fechaComo: e.fecha_como,
     })) as Etapa[],
     origens: (origens.data ?? []).map((o) => ({
       id: o.id,

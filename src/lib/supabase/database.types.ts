@@ -828,6 +828,7 @@ export type Database = {
           cor: string | null;
           created_at: string;
           empresa_id: string;
+          fecha_como: Database["public"]["Enums"]["status_negocio"] | null;
           funil_id: string;
           id: string;
           inicial: boolean;
@@ -841,6 +842,7 @@ export type Database = {
           cor?: string | null;
           created_at?: string;
           empresa_id: string;
+          fecha_como?: Database["public"]["Enums"]["status_negocio"] | null;
           funil_id: string;
           id?: string;
           inicial?: boolean;
@@ -854,6 +856,7 @@ export type Database = {
           cor?: string | null;
           created_at?: string;
           empresa_id?: string;
+          fecha_como?: Database["public"]["Enums"]["status_negocio"] | null;
           funil_id?: string;
           id?: string;
           inicial?: boolean;
