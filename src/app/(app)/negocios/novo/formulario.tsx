@@ -59,7 +59,7 @@ export function FormularioNegocio({
   meuMembroId: string;
   parametros: Parametros | null;
   /** Módulos/inversores ativados em "Configurações → Calculadora" pro kit automático — ver `dimensionamento.ts`. */
-  equipamentosAtivos: (EquipamentoAtivo & { tipo: "modulo" | "inversor" })[];
+  equipamentosAtivos: (EquipamentoAtivo & { tipo: "modulo" | "inversor"; precoReferenciaBRL: number | null })[];
 }) {
   const [resultado, acao, pendente] = useActionState(criarNegocio, null);
   const [modo, setModo] = useState<"novo" | "existente">("novo");
@@ -88,6 +88,28 @@ export function FormularioNegocio({
   const modulosAtivos = useMemo(() => equipamentosAtivos.filter((e) => e.tipo === "modulo"), [equipamentosAtivos]);
   const inversoresAtivos = useMemo(() => equipamentosAtivos.filter((e) => e.tipo === "inversor"), [equipamentosAtivos]);
 
+  // Atalho no kit personalizado: escolher um equipamento já cadastrado preenche
+  // modelo, potência e preço de referência de uma vez (ver `kit-componentes.tsx`).
+  const catalogoPorTipo = useMemo(
+    () => ({
+      modulo: modulosAtivos.map((e) => ({
+        id: e.id,
+        fabricante: e.fabricante,
+        modelo: e.modelo,
+        potenciaW: e.potenciaW,
+        precoReferenciaBRL: e.precoReferenciaBRL,
+      })),
+      inversor: inversoresAtivos.map((e) => ({
+        id: e.id,
+        fabricante: e.fabricante,
+        modelo: e.modelo,
+        potenciaW: e.potenciaW,
+        precoReferenciaBRL: e.precoReferenciaBRL,
+      })),
+    }),
+    [modulosAtivos, inversoresAtivos],
+  );
+
   // Produtividade real da região (PVGIS/NASA a partir do endereço do contato — ver `geodados.ts`).
   // Enquanto não vem (ou o endereço não é geocodificável), usa a média configurada em Parâmetros.
   const [produtividadeRegional, setProdutividadeRegional] = useState<{
@@ -106,9 +128,10 @@ export function FormularioNegocio({
   const componentes = useMemo(() => linhasParaComponentes(linhas), [linhas]);
   const potenciaKwp = potenciaKitPersonalizadoKwp(componentes);
 
-  // Soma dos preços de referência (teste) vindos do catálogo, mais os custos
-  // internos configurados (instalação, material CA, engenharia, comissão),
-  // só pra sugerir um valor de negócio enquanto não há planilha/distribuidor real.
+  // Soma dos preços de referência dos itens do kit (preenchidos ao escolher um
+  // equipamento cadastrado — ver `kit-componentes.tsx`), mais os custos internos
+  // configurados (instalação, material CA, engenharia, comissão), só pra sugerir
+  // um valor de negócio enquanto não há planilha/distribuidor real.
   const precoSugerido = useMemo(() => {
     const somaComponentes = linhas.reduce((acc, l) => {
       const precoUnitario = l.precoEstimadoUnitario ? Number(l.precoEstimadoUnitario) : NaN;
@@ -498,7 +521,12 @@ export function FormularioNegocio({
           {sugestoesAutomaticas.length > 0 && (
             <p className="text-sm font-medium text-zinc-700">Ajustar kit manualmente</p>
           )}
-          <EditorComponentesKit linhas={linhas} onChange={setLinhas} sugerirQuantidadeModulo={sugerirQuantidadeModulo} />
+          <EditorComponentesKit
+            linhas={linhas}
+            onChange={setLinhas}
+            sugerirQuantidadeModulo={sugerirQuantidadeModulo}
+            catalogoPorTipo={catalogoPorTipo}
+          />
           <Campo
             rotulo="Estrutura do telhado"
             name="estrutura_telhado"

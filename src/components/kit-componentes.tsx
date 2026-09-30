@@ -1,6 +1,6 @@
 "use client";
 
-import { Botao, Campo } from "@/components/ui";
+import { Botao, Campo, Selecao } from "@/components/ui";
 import { ROTULO_TIPO_COMPONENTE_KIT, TIPOS_COMPONENTE_KIT, type TipoComponenteKit } from "@/lib/tipos";
 
 export type LinhaComponente = {
@@ -8,8 +8,17 @@ export type LinhaComponente = {
   descricao: string;
   potenciaW: string;
   quantidade: string;
-  /** Não preenchido mais — a busca no catálogo externo (OpenSolar) foi removida em 2026-09-30 (não funcionava de forma confiável). */
+  /** Preenchido ao escolher um item do catálogo cadastrado (ver `ItemCatalogoKit`); a busca externa (OpenSolar) foi removida em 2026-09-30. */
   precoEstimadoUnitario?: string;
+};
+
+/** Equipamento cadastrado em Configurações → Equipamentos, oferecido aqui como atalho pra preencher a linha (não é obrigatório usar). */
+export type ItemCatalogoKit = {
+  id: string;
+  fabricante: string;
+  modelo: string;
+  potenciaW: number;
+  precoReferenciaBRL: number | null;
 };
 
 export function novaLinhaComponente(tipo: TipoComponenteKit): LinhaComponente {
@@ -40,11 +49,14 @@ export function EditorComponentesKit({
   linhas,
   onChange,
   sugerirQuantidadeModulo,
+  catalogoPorTipo,
 }: {
   linhas: LinhaComponente[];
   onChange: (linhas: LinhaComponente[]) => void;
   /** Dado o consumo já informado no formulário, sugere quantos módulos de uma potência cobririam ele. */
   sugerirQuantidadeModulo?: (potenciaW: number) => number | null;
+  /** Módulos/inversores ativos em Configurações → Equipamentos, por tipo — atalho opcional pra preencher a linha. */
+  catalogoPorTipo?: Partial<Record<TipoComponenteKit, ItemCatalogoKit[]>>;
 }) {
   function adicionar(tipo: TipoComponenteKit) {
     onChange([...linhas, novaLinhaComponente(tipo)]);
@@ -94,32 +106,59 @@ export function EditorComponentesKit({
               </p>
             )}
             {doTipo.length === 0 && <p className="text-xs text-zinc-400">Nenhum item.</p>}
-            {doTipo.map(({ l, i }) => (
-              <div key={i} className="grid grid-cols-2 items-end gap-2 rounded-lg bg-zinc-50 p-2 md:grid-cols-[2fr_1fr_1fr_auto]">
-                <Campo
-                  rotulo="Modelo / descrição"
-                  value={l.descricao}
-                  onChange={(e) => atualizar(i, { descricao: e.target.value })}
-                  placeholder={tipo === "modulo" ? "Ex.: Canadian 550 W" : "Ex.: Growatt 5 kW"}
-                />
-                <Campo
-                  rotulo="Potência (W)"
-                  inputMode="decimal"
-                  value={l.potenciaW}
-                  onChange={(e) => atualizar(i, { potenciaW: e.target.value })}
-                  placeholder="Opcional"
-                />
-                <Campo
-                  rotulo="Qtd."
-                  inputMode="numeric"
-                  value={l.quantidade}
-                  onChange={(e) => atualizar(i, { quantidade: e.target.value })}
-                />
-                <Botao type="button" variante="secundario" onClick={() => remover(i)}>
-                  Remover
-                </Botao>
-              </div>
-            ))}
+            {doTipo.map(({ l, i }) => {
+              const catalogo = catalogoPorTipo?.[tipo];
+              return (
+                <div key={i} className="flex flex-col gap-2 rounded-lg bg-zinc-50 p-2">
+                  {catalogo && catalogo.length > 0 && (
+                    <Selecao
+                      rotulo="Escolher do catálogo cadastrado (opcional)"
+                      value=""
+                      onChange={(e) => {
+                        const item = catalogo.find((c) => c.id === e.target.value);
+                        if (!item) return;
+                        atualizar(i, {
+                          descricao: `${item.fabricante} ${item.modelo}`,
+                          potenciaW: String(item.potenciaW),
+                          precoEstimadoUnitario: item.precoReferenciaBRL != null ? String(item.precoReferenciaBRL) : undefined,
+                        });
+                      }}
+                    >
+                      <option value="">Digitar manualmente…</option>
+                      {catalogo.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.fabricante} {c.modelo} ({c.potenciaW} W)
+                        </option>
+                      ))}
+                    </Selecao>
+                  )}
+                  <div className="grid grid-cols-2 items-end gap-2 md:grid-cols-[2fr_1fr_1fr_auto]">
+                    <Campo
+                      rotulo="Modelo / descrição"
+                      value={l.descricao}
+                      onChange={(e) => atualizar(i, { descricao: e.target.value, precoEstimadoUnitario: undefined })}
+                      placeholder={tipo === "modulo" ? "Ex.: Canadian 550 W" : "Ex.: Growatt 5 kW"}
+                    />
+                    <Campo
+                      rotulo="Potência (W)"
+                      inputMode="decimal"
+                      value={l.potenciaW}
+                      onChange={(e) => atualizar(i, { potenciaW: e.target.value })}
+                      placeholder="Opcional"
+                    />
+                    <Campo
+                      rotulo="Qtd."
+                      inputMode="numeric"
+                      value={l.quantidade}
+                      onChange={(e) => atualizar(i, { quantidade: e.target.value })}
+                    />
+                    <Botao type="button" variante="secundario" onClick={() => remover(i)}>
+                      Remover
+                    </Botao>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         );
       })}

@@ -66,6 +66,7 @@ export default async function NovoNegocio({ searchParams }: PageProps<"/negocios
             mpptMaxV: e.mppt_max_v,
             correnteMaxEntradaA: e.corrente_max_entrada_a,
             quantidadeMppt: e.quantidade_mppt,
+            precoReferenciaBRL: e.preco_referencia_brl,
           }))}
         />
       </Cartao>
