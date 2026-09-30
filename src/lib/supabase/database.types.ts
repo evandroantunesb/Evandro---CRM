@@ -688,7 +688,9 @@ export type Database = {
           modulo_equipamento_id: string;
           negocio_id: string;
           nome_distribuidora: string | null;
-          origem_distribuidora: Database["public"]["Enums"]["origem_distribuidora_dimensionamento"] | null;
+          origem_distribuidora:
+            | Database["public"]["Enums"]["origem_distribuidora_dimensionamento"]
+            | null;
           origem_produtividade: Database["public"]["Enums"]["origem_produtividade_dimensionamento"];
           origem_tarifa: Database["public"]["Enums"]["origem_tarifa_dimensionamento"];
           overload_maximo_pct: number;
@@ -726,7 +728,9 @@ export type Database = {
           modulo_equipamento_id: string;
           negocio_id: string;
           nome_distribuidora?: string | null;
-          origem_distribuidora?: Database["public"]["Enums"]["origem_distribuidora_dimensionamento"] | null;
+          origem_distribuidora?:
+            | Database["public"]["Enums"]["origem_distribuidora_dimensionamento"]
+            | null;
           origem_produtividade?: Database["public"]["Enums"]["origem_produtividade_dimensionamento"];
           origem_tarifa?: Database["public"]["Enums"]["origem_tarifa_dimensionamento"];
           overload_maximo_pct: number;
@@ -764,7 +768,9 @@ export type Database = {
           modulo_equipamento_id?: string;
           negocio_id?: string;
           nome_distribuidora?: string | null;
-          origem_distribuidora?: Database["public"]["Enums"]["origem_distribuidora_dimensionamento"] | null;
+          origem_distribuidora?:
+            | Database["public"]["Enums"]["origem_distribuidora_dimensionamento"]
+            | null;
           origem_produtividade?: Database["public"]["Enums"]["origem_produtividade_dimensionamento"];
           origem_tarifa?: Database["public"]["Enums"]["origem_tarifa_dimensionamento"];
           overload_maximo_pct?: number;
@@ -1953,6 +1959,41 @@ export type Database = {
           },
         ];
       };
+      motivos_perda: {
+        Row: {
+          ativo: boolean;
+          created_at: string;
+          empresa_id: string;
+          id: string;
+          nome: string;
+          updated_at: string;
+        };
+        Insert: {
+          ativo?: boolean;
+          created_at?: string;
+          empresa_id: string;
+          id?: string;
+          nome: string;
+          updated_at?: string;
+        };
+        Update: {
+          ativo?: boolean;
+          created_at?: string;
+          empresa_id?: string;
+          id?: string;
+          nome?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "motivos_perda_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       municipios_distribuidoras: {
         Row: {
           codigo_ibge: string;
@@ -2011,41 +2052,6 @@ export type Database = {
           uf?: string;
         };
         Relationships: [];
-      };
-      motivos_perda: {
-        Row: {
-          ativo: boolean;
-          created_at: string;
-          empresa_id: string;
-          id: string;
-          nome: string;
-          updated_at: string;
-        };
-        Insert: {
-          ativo?: boolean;
-          created_at?: string;
-          empresa_id: string;
-          id?: string;
-          nome: string;
-          updated_at?: string;
-        };
-        Update: {
-          ativo?: boolean;
-          created_at?: string;
-          empresa_id?: string;
-          id?: string;
-          nome?: string;
-          updated_at?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "motivos_perda_empresa_id_fkey";
-            columns: ["empresa_id"];
-            isOneToOne: false;
-            referencedRelation: "empresas";
-            referencedColumns: ["id"];
-          },
-        ];
       };
       negocio_etiquetas: {
         Row: {
