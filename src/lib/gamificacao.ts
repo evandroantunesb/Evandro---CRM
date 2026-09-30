@@ -6,9 +6,13 @@ export const EVENTOS_GAMIFICACAO = [
   { tipo: "deal.won", rotulo: "Negócio ganho", campos: ["valor"] },
   { tipo: "deal.lost", rotulo: "Negócio perdido", campos: [] },
   { tipo: "deal.reopened", rotulo: "Negócio reaberto", campos: [] },
-  { tipo: "task.created", rotulo: "Tarefa criada", campos: [] },
+  { tipo: "task.created", rotulo: "Tarefa criada", campos: ["tipo"] },
   { tipo: "task.completed", rotulo: "Tarefa concluída", campos: ["no_prazo"] },
   { tipo: "note.created", rotulo: "Nota registrada", campos: [] },
+  { tipo: "deal.first_contact_done", rotulo: "SDR: primeiro contato realizado", campos: [] },
+  { tipo: "deal.energy_bill_received", rotulo: "SDR: conta de energia recebida", campos: [] },
+  { tipo: "handoff.created", rotulo: "SDR: lead entregue para vendas", campos: [] },
+  { tipo: "handoff.won", rotulo: "SDR: lead entregue que virou venda", campos: ["valor"] },
 ] as const;
 
 export type TipoEventoGamificacao = (typeof EVENTOS_GAMIFICACAO)[number]["tipo"];
