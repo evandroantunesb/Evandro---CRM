@@ -15,6 +15,10 @@ create type public.tipo_validacao_dimensionamento as enum ('valido', 'valido_com
 create type public.tipo_validacao_eletrica_dimensionamento as enum ('valido', 'nao_verificado');
 create type public.origem_produtividade_dimensionamento as enum ('padrao', 'pvgis', 'nasa');
 create type public.origem_tarifa_dimensionamento as enum ('manual', 'aneel');
+-- Como a distribuidora foi identificada (Etapa 1 do wizard, 2026-09-30):
+-- resolvida automaticamente a partir do município, ou escolhida manualmente
+-- pelo vendedor (override, que sempre prevalece sobre a automática).
+create type public.origem_distribuidora_dimensionamento as enum ('municipio', 'manual');
 
 create table public.dimensionamentos_solares (
   id uuid primary key default gen_random_uuid(),
@@ -42,6 +46,13 @@ create table public.dimensionamentos_solares (
   origem_produtividade public.origem_produtividade_dimensionamento not null default 'padrao',
   tarifa_kwh numeric(8, 4) not null check (tarifa_kwh > 0),
   origem_tarifa public.origem_tarifa_dimensionamento not null default 'manual',
+  -- Distribuidora usada pra buscar a tarifa (Etapa 1 do wizard) — nulo quando a
+  -- tarifa foi digitada sem nenhuma distribuidora resolvida (fallback antigo).
+  sigla_distribuidora text,
+  nome_distribuidora text,
+  origem_distribuidora public.origem_distribuidora_dimensionamento,
+  tarifa_vigencia_inicio date,
+  tarifa_resolucao_homologatoria text,
   tipo_ligacao public.tipo_ligacao not null default 'trifasico',
   disponibilidade_kwh numeric(6, 2) not null check (disponibilidade_kwh >= 0),
   -- Preço do negócio no momento do cálculo, só para o payback não mudar

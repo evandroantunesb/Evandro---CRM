@@ -687,6 +687,8 @@ export type Database = {
           margem_dimensionamento_pct: number;
           modulo_equipamento_id: string;
           negocio_id: string;
+          nome_distribuidora: string | null;
+          origem_distribuidora: Database["public"]["Enums"]["origem_distribuidora_dimensionamento"] | null;
           origem_produtividade: Database["public"]["Enums"]["origem_produtividade_dimensionamento"];
           origem_tarifa: Database["public"]["Enums"]["origem_tarifa_dimensionamento"];
           overload_maximo_pct: number;
@@ -697,7 +699,10 @@ export type Database = {
           preco_negocio: number;
           produtividade_kwh_kwp_mes: number;
           quantidade_modulos: number;
+          sigla_distribuidora: string | null;
           tarifa_kwh: number;
+          tarifa_resolucao_homologatoria: string | null;
+          tarifa_vigencia_inicio: string | null;
           temperatura_minima_projeto_c: number;
           tipo_ligacao: Database["public"]["Enums"]["tipo_ligacao"];
           updated_at: string;
@@ -720,6 +725,8 @@ export type Database = {
           margem_dimensionamento_pct: number;
           modulo_equipamento_id: string;
           negocio_id: string;
+          nome_distribuidora?: string | null;
+          origem_distribuidora?: Database["public"]["Enums"]["origem_distribuidora_dimensionamento"] | null;
           origem_produtividade?: Database["public"]["Enums"]["origem_produtividade_dimensionamento"];
           origem_tarifa?: Database["public"]["Enums"]["origem_tarifa_dimensionamento"];
           overload_maximo_pct: number;
@@ -730,7 +737,10 @@ export type Database = {
           preco_negocio: number;
           produtividade_kwh_kwp_mes: number;
           quantidade_modulos: number;
+          sigla_distribuidora?: string | null;
           tarifa_kwh: number;
+          tarifa_resolucao_homologatoria?: string | null;
+          tarifa_vigencia_inicio?: string | null;
           temperatura_minima_projeto_c: number;
           tipo_ligacao?: Database["public"]["Enums"]["tipo_ligacao"];
           updated_at?: string;
@@ -753,6 +763,8 @@ export type Database = {
           margem_dimensionamento_pct?: number;
           modulo_equipamento_id?: string;
           negocio_id?: string;
+          nome_distribuidora?: string | null;
+          origem_distribuidora?: Database["public"]["Enums"]["origem_distribuidora_dimensionamento"] | null;
           origem_produtividade?: Database["public"]["Enums"]["origem_produtividade_dimensionamento"];
           origem_tarifa?: Database["public"]["Enums"]["origem_tarifa_dimensionamento"];
           overload_maximo_pct?: number;
@@ -763,7 +775,10 @@ export type Database = {
           preco_negocio?: number;
           produtividade_kwh_kwp_mes?: number;
           quantidade_modulos?: number;
+          sigla_distribuidora?: string | null;
           tarifa_kwh?: number;
+          tarifa_resolucao_homologatoria?: string | null;
+          tarifa_vigencia_inicio?: string | null;
           temperatura_minima_projeto_c?: number;
           tipo_ligacao?: Database["public"]["Enums"]["tipo_ligacao"];
           updated_at?: string;
@@ -1937,6 +1952,65 @@ export type Database = {
             referencedColumns: ["id"];
           },
         ];
+      };
+      municipios_distribuidoras: {
+        Row: {
+          codigo_ibge: string;
+          created_at: string;
+          fonte: string;
+          id: string;
+          nome_distribuidora: string;
+          sigla_distribuidora: string;
+          versao_base: string;
+        };
+        Insert: {
+          codigo_ibge: string;
+          created_at?: string;
+          fonte?: string;
+          id?: string;
+          nome_distribuidora: string;
+          sigla_distribuidora: string;
+          versao_base: string;
+        };
+        Update: {
+          codigo_ibge?: string;
+          created_at?: string;
+          fonte?: string;
+          id?: string;
+          nome_distribuidora?: string;
+          sigla_distribuidora?: string;
+          versao_base?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "municipios_distribuidoras_codigo_ibge_fkey";
+            columns: ["codigo_ibge"];
+            isOneToOne: false;
+            referencedRelation: "municipios_ibge";
+            referencedColumns: ["codigo_ibge"];
+          },
+        ];
+      };
+      municipios_ibge: {
+        Row: {
+          codigo_ibge: string;
+          nome: string;
+          nome_normalizado: string;
+          uf: string;
+        };
+        Insert: {
+          codigo_ibge: string;
+          nome: string;
+          nome_normalizado: string;
+          uf: string;
+        };
+        Update: {
+          codigo_ibge?: string;
+          nome?: string;
+          nome_normalizado?: string;
+          uf?: string;
+        };
+        Relationships: [];
       };
       motivos_perda: {
         Row: {
@@ -3298,6 +3372,7 @@ export type Database = {
       modelo_cobranca: "por_usuario" | "fixo" | "fixo_mais_usuario";
       modo_distribuicao_leads: "somente_vendedores" | "somente_sdr" | "parcial" | "aleatorio";
       modo_preco_proposta: "sem_preco" | "parcelado" | "avista" | "completo";
+      origem_distribuidora_dimensionamento: "municipio" | "manual";
       origem_produtividade_dimensionamento: "padrao" | "pvgis" | "nasa";
       origem_tarifa_dimensionamento: "manual" | "aneel";
       papel_membro: "admin" | "gestor" | "vendedor" | "sdr";
@@ -3444,6 +3519,7 @@ export const Constants = {
       modelo_cobranca: ["por_usuario", "fixo", "fixo_mais_usuario"],
       modo_distribuicao_leads: ["somente_vendedores", "somente_sdr", "parcial", "aleatorio"],
       modo_preco_proposta: ["sem_preco", "parcelado", "avista", "completo"],
+      origem_distribuidora_dimensionamento: ["municipio", "manual"],
       origem_produtividade_dimensionamento: ["padrao", "pvgis", "nasa"],
       origem_tarifa_dimensionamento: ["manual", "aneel"],
       papel_membro: ["admin", "gestor", "vendedor", "sdr"],
