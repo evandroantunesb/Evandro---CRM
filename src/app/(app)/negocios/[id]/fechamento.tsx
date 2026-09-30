@@ -6,17 +6,26 @@ import { alterarStatus } from "@/lib/acoes/negocios";
 
 type Opcao = { id: string; nome: string };
 
+const ROTULO_STATUS = { aberto: "Aberto", ganho: "Ganho", perdido: "Perdido" };
+
 export function Fechamento({
   negocioId,
   status,
   motivos,
+  somenteLeitura,
 }: {
   negocioId: string;
   status: "aberto" | "ganho" | "perdido";
   motivos: Opcao[];
+  /** SDR não pode marcar ganho/perdido (spec RAION_SDR_REGRAS_PERMISSOES §39) — só visualiza o status. */
+  somenteLeitura?: boolean;
 }) {
   const [resultado, acao, pendente] = useActionState(alterarStatus, null);
   const [perdendo, setPerdendo] = useState(false);
+
+  if (somenteLeitura) {
+    return <span className="text-sm text-zinc-700">{ROTULO_STATUS[status]}</span>;
+  }
 
   if (status !== "aberto") {
     return (

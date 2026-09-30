@@ -232,6 +232,15 @@ export async function moverEtapa(negocioId: string, etapaId: string, comentario:
   if (!ids.success) return { ok: false, mensagem: ids.error.issues[0].message };
 
   const supabase = await criarClienteServidor();
+
+  if (atual.papel === "sdr") {
+    // SDR não pode fechar o negócio (spec §39) — nem movendo pra uma etapa que fecha sozinha (ganho/perdido).
+    const { data: etapaDestino } = await supabase.from("etapas").select("fecha_como").eq("id", ids.data.etapaId).maybeSingle();
+    if (etapaDestino?.fecha_como) {
+      return { ok: false, mensagem: "SDR não pode mover o negócio para uma etapa que fecha automaticamente." };
+    }
+  }
+
   const { data, error } = await supabase
     .from("negocios")
     .update(
@@ -280,13 +289,14 @@ export async function editarNegocio(_: ResultadoAcao, formData: FormData): Promi
       titulo: d.titulo,
       etapa_id: d.etapa_id,
       origem_id: d.origem_id,
-      valor: d.valor,
       descricao: d.descricao || null,
       unidade_consumidora: d.unidade_consumidora || null,
       padrao_cliente: d.padrao_cliente || null,
       tipo_telhado: d.tipo_telhado || null,
       consumo_medio_kwh: d.consumo_medio_kwh,
       valor_conta_energia: d.valor_conta_energia,
+      // SDR não pode alterar o valor financeiro do negócio (spec RAION_SDR_REGRAS_PERMISSOES §39) — só na criação.
+      ...(atual.papel !== "sdr" ? { valor: d.valor } : {}),
       ...(atual.papel !== "vendedor" && d.responsavel_id ? { responsavel_id: d.responsavel_id } : {}),
     })
     .eq("id", d.negocioId)
@@ -319,9 +329,10 @@ const esquemaFechamento = z.discriminatedUnion("status", [
   z.object({ negocioId: z.string().uuid(), status: z.literal("aberto") }),
 ]);
 
-/** Marca como ganho, perdido (com motivo) ou reabre. */
+/** Marca como ganho, perdido (com motivo) ou reabre. SDR não fecha negócio (spec §39) — usa "Enviar para vendas". */
 export async function alterarStatus(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  await exigirPapel();
+  const { atual } = await exigirPapel();
+  if (atual.papel === "sdr") return { ok: false, mensagem: "SDR não pode marcar o negócio como ganho ou perdido." };
   const dados = esquemaFechamento.safeParse(Object.fromEntries(formData));
   if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
   const d = dados.data;

@@ -222,6 +222,7 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
               )}
               origens={config.origens.filter((o) => o.ativa || o.id === negocio.origem_id)}
               responsaveis={atual.papel === "vendedor" ? [] : config.membros.filter((m) => m.ativo)}
+              podeEditarValor={atual.papel !== "sdr"}
             />
           </Cartao>
           <Cartao titulo="Kit personalizado">
@@ -291,33 +292,37 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
               vendedores={config.membros.filter((m) => m.ativo && m.papel === "vendedor")}
             />
           </Cartao>
-          <Cartao titulo="Proposta">
-            <Proposta
-              negocioId={negocio.id}
-              temCalculo={!!calculo}
-              siteUrl={env.siteUrl}
-              modelos={(modelosProposta ?? []).map((m) => ({ id: m.id, nome: m.nome, padrao: m.padrao }))}
-              proposta={
-                proposta
-                  ? {
-                      token: proposta.token,
-                      modoPreco: proposta.modo_preco as ModoPreco,
-                      mostrarSistema: proposta.mostrar_sistema,
-                      mostrarEconomia: proposta.mostrar_economia,
-                      aberturas: aberturas?.length ?? 0,
-                      ultimaAbertura: aberturas?.[0]?.aberta_em ?? null,
-                    }
-                  : null
-              }
-            />
-          </Cartao>
-          <Cartao titulo="Contrato">
-            <Contrato
-              negocioId={negocio.id}
-              siteUrl={env.siteUrl}
-              contrato={contrato ? { token: contrato.token, status: contrato.status as StatusContrato } : null}
-            />
-          </Cartao>
+          {atual.papel !== "sdr" && (
+            <Cartao titulo="Proposta">
+              <Proposta
+                negocioId={negocio.id}
+                temCalculo={!!calculo}
+                siteUrl={env.siteUrl}
+                modelos={(modelosProposta ?? []).map((m) => ({ id: m.id, nome: m.nome, padrao: m.padrao }))}
+                proposta={
+                  proposta
+                    ? {
+                        token: proposta.token,
+                        modoPreco: proposta.modo_preco as ModoPreco,
+                        mostrarSistema: proposta.mostrar_sistema,
+                        mostrarEconomia: proposta.mostrar_economia,
+                        aberturas: aberturas?.length ?? 0,
+                        ultimaAbertura: aberturas?.[0]?.aberta_em ?? null,
+                      }
+                    : null
+                }
+              />
+            </Cartao>
+          )}
+          {atual.papel !== "sdr" && (
+            <Cartao titulo="Contrato">
+              <Contrato
+                negocioId={negocio.id}
+                siteUrl={env.siteUrl}
+                contrato={contrato ? { token: contrato.token, status: contrato.status as StatusContrato } : null}
+              />
+            </Cartao>
+          )}
           <Cartao titulo="Tarefas">
             <div className="flex flex-col gap-3">
               <ListaTarefas
@@ -370,6 +375,7 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
               negocioId={negocio.id}
               status={negocio.status}
               motivos={config.motivos.filter((m) => m.ativo || m.id === negocio.motivo_perda_id)}
+              somenteLeitura={atual.papel === "sdr"}
             />
           </Cartao>
           <Cartao titulo="Contato">

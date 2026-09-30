@@ -27,6 +27,7 @@ export async function salvarModeloContrato(_: ResultadoAcao, formData: FormData)
 /** Gera (ou regera, enquanto ainda for rascunho) o contrato do negócio a partir do modelo da empresa. */
 export async function gerarContrato(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
   const { atual } = await exigirPapel();
+  if (atual.papel === "sdr") return { ok: false, mensagem: "SDR não pode gerar contrato (spec RAION_SDR_REGRAS_PERMISSOES §41)." };
   const id = z.string().uuid().safeParse(formData.get("negocioId"));
   if (!id.success) return { ok: false, mensagem: "Negócio inválido." };
 
@@ -94,6 +95,7 @@ export async function gerarContrato(_: ResultadoAcao, formData: FormData): Promi
 
 export async function atualizarStatusContrato(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
   const { atual } = await exigirPapel();
+  if (atual.papel === "sdr") return { ok: false, mensagem: "SDR não pode alterar o status do contrato (spec RAION_SDR_REGRAS_PERMISSOES §41)." };
   const dados = z
     .object({ negocioId: z.string().uuid(), status: z.enum(STATUS_CONTRATO) })
     .safeParse(Object.fromEntries(formData));
