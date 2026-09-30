@@ -206,22 +206,32 @@ export async function criarNegocio(_: ResultadoAcao, formData: FormData): Promis
   redirect(`/negocios/${negocio.id}`);
 }
 
-/** Move o negócio de etapa e registra o comentário obrigatório sobre a mudança como uma nota. */
-export async function moverEtapa(negocioId: string, etapaId: string, comentario: string): Promise<ResultadoAcao> {
+/**
+ * Move o negócio de etapa e registra o comentário obrigatório sobre a mudança como uma nota.
+ * Quando a etapa de destino fecha o negócio como perdido (`etapas.fecha_como`), o popup também exige um
+ * motivo, passado aqui em `motivoPerdaId` — o status e o motivo são gravados junto com a etapa, na mesma
+ * chamada (ganho automático não precisa de motivo, o gatilho do banco cuida sozinho).
+ */
+export async function moverEtapa(negocioId: string, etapaId: string, comentario: string, motivoPerdaId?: string): Promise<ResultadoAcao> {
   const { atual } = await exigirPapel();
   const ids = z
     .object({
       negocioId: z.string().uuid(),
       etapaId: z.string().uuid(),
       comentario: z.string().trim().min(1, "Escreva um comentário sobre a mudança.").max(5000, "Comentário muito longo."),
+      motivoPerdaId: z.string().uuid().optional(),
     })
-    .safeParse({ negocioId, etapaId, comentario });
+    .safeParse({ negocioId, etapaId, comentario, motivoPerdaId: motivoPerdaId || undefined });
   if (!ids.success) return { ok: false, mensagem: ids.error.issues[0].message };
 
   const supabase = await criarClienteServidor();
   const { data, error } = await supabase
     .from("negocios")
-    .update({ etapa_id: ids.data.etapaId })
+    .update(
+      ids.data.motivoPerdaId
+        ? { etapa_id: ids.data.etapaId, status: "perdido", motivo_perda_id: ids.data.motivoPerdaId, motivo_perda_detalhe: ids.data.comentario }
+        : { etapa_id: ids.data.etapaId },
+    )
     .eq("id", ids.data.negocioId)
     .select("id");
   if (error || !data?.length) return { ok: false, mensagem: mensagemErro(error, "Não foi possível mover o negócio.") };
@@ -232,7 +242,7 @@ export async function moverEtapa(negocioId: string, etapaId: string, comentario:
 
   revalidatePath("/negocios");
   revalidatePath(`/negocios/${negocioId}`);
-  return { ok: true, mensagem: "Negócio movido." };
+  return { ok: true, mensagem: ids.data.motivoPerdaId ? "Negócio marcado como perdido." : "Negócio movido." };
 }
 
 const esquemaEdicao = z.object({

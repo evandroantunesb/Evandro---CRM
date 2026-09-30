@@ -8,6 +8,7 @@ import { ItemMenuSuspenso, MenuSuspenso, RotuloMenuSuspenso } from "@/components
 import { ModalComentarioEtapa } from "@/components/comentario-etapa";
 
 type EtiquetaDisponivel = { id: string; nome: string; cor: string | null };
+type MotivoDisponivel = { id: string; nome: string };
 
 /**
  * Menu "Mover para": alternativa ao arrastar no Kanban, essencial no celular
@@ -21,16 +22,20 @@ export function MoverEtapa({
   compacto = false,
   etiquetas = [],
   etiquetasMarcadas = [],
+  motivos = [],
 }: {
   negocioId: string;
   etapaAtualId: string;
-  etapas: { id: string; nome: string }[];
+  etapas: { id: string; nome: string; fechaComo?: "ganho" | "perdido" | null }[];
   compacto?: boolean;
   etiquetas?: EtiquetaDisponivel[];
   etiquetasMarcadas?: string[];
+  motivos?: MotivoDisponivel[];
 }) {
   const [editandoEtiquetas, setEditandoEtiquetas] = useState(false);
-  const [destinoPendente, setDestinoPendente] = useState<{ id: string; nome: string } | null>(null);
+  const [destinoPendente, setDestinoPendente] = useState<{ id: string; nome: string; fechaComo?: "ganho" | "perdido" | null } | null>(
+    null,
+  );
   const destinos = etapas.filter((e) => e.id !== etapaAtualId);
 
   if (!destinos.length && !compacto) return null;
@@ -75,7 +80,7 @@ export function MoverEtapa({
           <>
             {compacto && <RotuloMenuSuspenso>Mover para</RotuloMenuSuspenso>}
             {destinos.map((e) => (
-              <ItemMenuSuspenso key={e.id} onClick={() => setDestinoPendente({ id: e.id, nome: e.nome })}>
+              <ItemMenuSuspenso key={e.id} onClick={() => setDestinoPendente({ id: e.id, nome: e.nome, fechaComo: e.fechaComo })}>
                 {e.nome}
               </ItemMenuSuspenso>
             ))}
@@ -95,6 +100,8 @@ export function MoverEtapa({
           negocioId={negocioId}
           etapaId={destinoPendente.id}
           etapaNome={destinoPendente.nome}
+          precisaMotivoPerda={destinoPendente.fechaComo === "perdido"}
+          motivos={motivos}
           aoConcluir={() => setDestinoPendente(null)}
           aoCancelar={() => setDestinoPendente(null)}
         />

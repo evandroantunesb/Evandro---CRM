@@ -7,6 +7,7 @@ import {
   CamposObrigatorios,
   CorEtapa,
   DiasConsideradoParado,
+  FechaComoEtapa,
   HorasConsideradoSemContato,
   NovaEtapa,
   NovoFunil,
@@ -21,8 +22,10 @@ export default async function ConfigFunil() {
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
       <h1 className="text-2xl font-semibold text-zinc-900">Funis e etapas</h1>
       <p className="text-sm text-zinc-600">
-        A etapa inicial é onde os negócios novos entram. Ganho e perdido não são etapas: ficam como status do negócio.
-        Em cada etapa você pode exigir campos preenchidos (ex.: valor antes de &quot;Proposta enviada&quot;).
+        A etapa inicial é onde os negócios novos entram. Ganho e perdido ficam como status do negócio, separado da
+        etapa — mas se quiser, pode marcar uma etapa pra fechar o negócio sozinha ao entrar nela (ganho direto, ou
+        perdido pedindo o motivo no popup de mover). Em cada etapa você pode exigir campos preenchidos (ex.: valor
+        antes de &quot;Proposta enviada&quot;).
       </p>
       {funis.map((funil) => {
         const doFunil = etapas.filter((e) => e.funilId === funil.id);
@@ -72,6 +75,7 @@ export default async function ConfigFunil() {
                     </form>
                   ))}
                   <AlternarEtapa etapaId={etapa.id} ativa={etapa.ativa} />
+                  <FechaComoEtapa etapaId={etapa.id} fechaComo={etapa.fechaComo} />
                   <CamposObrigatorios etapaId={etapa.id} campos={etapa.camposObrigatorios} />
                 </li>
               ))}
