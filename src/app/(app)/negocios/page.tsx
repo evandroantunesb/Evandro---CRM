@@ -81,7 +81,7 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
     );
   }
   const trintaDiasAtras = dataLimite(30);
-  const [{ data }, { data: pendentes }, { count: ganhos30d }, { count: perdidos30d }] = await Promise.all([
+  const [{ data }, { data: pendentes }, { data: notas }, { count: ganhos30d }, { count: perdidos30d }] = await Promise.all([
     consulta,
     // Tarefas em aberto dos negócios, para o indicador de próxima ação no card.
     supabase
@@ -92,6 +92,8 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
       .not("negocio_id", "is", null)
       .order("vence_em")
       .limit(5000),
+    // Contagem de comentários (notas) por negócio, pro ícone de balão no card.
+    supabase.from("notas").select("negocio_id").eq("empresa_id", atual.empresaId).limit(5000),
     // Contagens pra taxa de conversão (só faz sentido na visão "aberto").
     status === "aberto"
       ? supabase
@@ -113,7 +115,7 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
       : { count: 0 },
   ]);
 
-  let cards = montarCards(data ?? [], config, pendentes ?? []);
+  let cards = montarCards(data ?? [], config, pendentes ?? [], notas ?? []);
   if (atrasados) cards = cards.filter((c) => c.tarefa === "atrasada");
   if (semProxima) cards = cards.filter((c) => c.tarefa === "nenhuma");
 
@@ -365,6 +367,7 @@ function montarCards(
   linhas: LinhaNegocio[],
   config: Configuracao,
   pendentes: { negocio_id: string | null; vence_em: string; titulo: string }[],
+  notas: { negocio_id: string }[],
 ): Card[] {
   const nomeMembro = new Map(config.membros.map((m) => [m.id, m.nome]));
   const nomeOrigem = new Map(config.origens.map((o) => [o.id, o.nome]));
@@ -372,6 +375,8 @@ function montarCards(
   // Vêm ordenadas pelo prazo: a primeira de cada negócio é a próxima.
   const proxima = new Map<string, { vence_em: string; titulo: string }>();
   for (const t of pendentes) if (t.negocio_id && !proxima.has(t.negocio_id)) proxima.set(t.negocio_id, t);
+  const contagemNotas = new Map<string, number>();
+  for (const n of notas) contagemNotas.set(n.negocio_id, (contagemNotas.get(n.negocio_id) ?? 0) + 1);
   const agora = Date.now();
   return linhas.map((n) => {
     const tarefaProxima = proxima.get(n.id);
@@ -394,6 +399,7 @@ function montarCards(
         const e = etiquetas.get(ne.etiqueta_id);
         return e ? [{ id: e.id, nome: e.nome, cor: e.cor }] : [];
       }),
+      comentarios: contagemNotas.get(n.id) ?? 0,
     };
   });
 }

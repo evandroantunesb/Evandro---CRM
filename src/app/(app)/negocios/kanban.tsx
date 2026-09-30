@@ -10,12 +10,12 @@ import {
   useSensors,
   type DragEndEvent,
 } from "@dnd-kit/core";
-import { CalendarClock, Plus } from "lucide-react";
+import { CalendarClock, MessageCircle, Plus } from "lucide-react";
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { Avatar } from "@/components/avatar";
+import { ModalComentarioEtapa } from "@/components/comentario-etapa";
 import { MoverEtapa } from "@/components/mover-etapa";
-import { moverEtapa } from "@/lib/acoes/negocios";
 import { formatarMoeda, formatarPrazo } from "@/lib/formatacao";
 
 export type Card = {
@@ -35,6 +35,8 @@ export type Card = {
   tarefaTitulo: string | null;
   tarefaVenceEm: string | null;
   etiquetas: { id: string; nome: string; cor: string | null }[];
+  /** Quantidade de notas/comentários do negócio. */
+  comentarios: number;
 };
 
 type Coluna = { id: string; nome: string; cor: string | null; inicial: boolean };
@@ -52,8 +54,9 @@ export function Kanban({
   etiquetas: EtiquetaDisponivel[];
 }) {
   const [cards, setCards] = useState(iniciais);
-  const [erro, setErro] = useState<string | null>(null);
-  const [, iniciar] = useTransition();
+  const [movimentoPendente, setMovimentoPendente] = useState<{ cardId: string; etapaId: string; etapaNome: string } | null>(
+    null,
+  );
   const sensores = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
@@ -63,23 +66,24 @@ export function Kanban({
     const cardId = String(evento.active.id);
     const destino = evento.over ? String(evento.over.id) : null;
     const card = cards.find((c) => c.id === cardId);
-    if (!card || !destino || card.etapaId === destino) return;
+    const coluna = colunas.find((c) => c.id === destino);
+    if (!card || !destino || !coluna || card.etapaId === destino) return;
+    setMovimentoPendente({ cardId, etapaId: destino, etapaNome: coluna.nome });
+  }
 
-    const anterior = card.etapaId;
-    setErro(null);
-    setCards((cs) => cs.map((c) => (c.id === cardId ? { ...c, etapaId: destino, desde: "agora" } : c)));
-    iniciar(async () => {
-      const r = await moverEtapa(cardId, destino);
-      if (!r?.ok) {
-        setCards((cs) => cs.map((c) => (c.id === cardId ? { ...c, etapaId: anterior } : c)));
-        setErro(r?.mensagem ?? "Não foi possível mover.");
-      }
-    });
+  function aoConcluirMovimento() {
+    if (!movimentoPendente) return;
+    const { cardId, etapaId } = movimentoPendente;
+    setCards((cs) =>
+      cs.map((c) =>
+        c.id === cardId ? { ...c, etapaId, desde: "agora", comentarios: c.comentarios + 1 } : c,
+      ),
+    );
+    setMovimentoPendente(null);
   }
 
   return (
     <DndContext sensors={sensores} onDragEnd={aoSoltar}>
-      {erro && <p className="mb-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">{erro}</p>}
       <div className="flex gap-3 overflow-x-auto pb-4">
         {colunas.map((col) => (
           <ColunaKanban
@@ -92,6 +96,15 @@ export function Kanban({
           />
         ))}
       </div>
+      {movimentoPendente && (
+        <ModalComentarioEtapa
+          negocioId={movimentoPendente.cardId}
+          etapaId={movimentoPendente.etapaId}
+          etapaNome={movimentoPendente.etapaNome}
+          aoConcluir={aoConcluirMovimento}
+          aoCancelar={() => setMovimentoPendente(null)}
+        />
+      )}
     </DndContext>
   );
 }
@@ -221,6 +234,12 @@ function CardKanban({
       )}
       <div className="mt-2 flex items-center gap-x-2 border-t border-zinc-100 pt-2 text-xs text-zinc-500">
         {card.valor && <span className="font-semibold text-carvao">{card.valor}</span>}
+        {card.comentarios > 0 && (
+          <span className="flex items-center gap-0.5" title={`${card.comentarios} comentário(s)`}>
+            <MessageCircle size={12} />
+            {card.comentarios}
+          </span>
+        )}
         <PrazoOuDesde card={card} />
       </div>
     </article>
