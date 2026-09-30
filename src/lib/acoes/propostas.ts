@@ -17,6 +17,7 @@ const esquemaGerar = z.object({ negocioId: z.string().uuid(), modeloId: z.string
  */
 export async function gerarLinkProposta(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
   const { atual } = await exigirPapel();
+  if (atual.papel === "sdr") return { ok: false, mensagem: "SDR não pode gerar proposta (spec RAION_SDR_REGRAS_PERMISSOES §40)." };
   const dados = esquemaGerar.safeParse({ negocioId: formData.get("negocioId"), modeloId: formData.get("modeloId") || undefined });
   if (!dados.success) return { ok: false, mensagem: "Negócio inválido." };
 
@@ -83,6 +84,7 @@ export async function gerarLinkProposta(_: ResultadoAcao, formData: FormData): P
 /** Preço e quais seções aparecem na proposta pública (o vendedor decide, por negócio). */
 export async function definirExibicaoProposta(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
   const { atual } = await exigirPapel();
+  if (atual.papel === "sdr") return { ok: false, mensagem: "SDR não pode editar a exibição da proposta (spec RAION_SDR_REGRAS_PERMISSOES §40)." };
   const dados = z
     .object({
       negocioId: z.string().uuid(),

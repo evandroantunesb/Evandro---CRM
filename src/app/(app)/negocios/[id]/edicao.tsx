@@ -12,6 +12,7 @@ export function EdicaoNegocio({
   etapas,
   origens,
   responsaveis,
+  podeEditarValor = true,
 }: {
   negocio: {
     id: string;
@@ -30,6 +31,8 @@ export function EdicaoNegocio({
   etapas: Opcao[];
   origens: Opcao[];
   responsaveis: Opcao[];
+  /** SDR não pode alterar o valor financeiro do negócio (spec RAION_SDR_REGRAS_PERMISSOES §39). */
+  podeEditarValor?: boolean;
 }) {
   const [resultado, acao, pendente] = useActionState(editarNegocio, null);
   return (
@@ -65,6 +68,7 @@ export function EdicaoNegocio({
         name="valor"
         inputMode="decimal"
         required
+        readOnly={!podeEditarValor}
         defaultValue={negocio.valor != null ? String(negocio.valor).replace(".", ",") : ""}
       />
       <Campo
