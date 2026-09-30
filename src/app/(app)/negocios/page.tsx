@@ -326,7 +326,13 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
       {status === "aberto" && <Indicadores itens={indicadores} />}
       {status === "aberto" ? (
         visao === "kanban" ? (
-          <Kanban key={cards.map((c) => c.id + c.etapaId).join()} colunas={colunas} cards={cards} funilId={funil.id} />
+          <Kanban
+            key={cards.map((c) => c.id + c.etapaId).join()}
+            colunas={colunas}
+            cards={cards}
+            funilId={funil.id}
+            etiquetas={config.etiquetas.filter((e) => e.ativa)}
+          />
         ) : (
           <ListaNegocios cards={cards} colunas={colunas} />
         )
@@ -386,7 +392,7 @@ function montarCards(
       tarefaVenceEm: tarefaProxima?.vence_em ?? null,
       etiquetas: n.negocio_etiquetas.flatMap((ne) => {
         const e = etiquetas.get(ne.etiqueta_id);
-        return e ? [{ nome: e.nome, cor: e.cor }] : [];
+        return e ? [{ id: e.id, nome: e.nome, cor: e.cor }] : [];
       }),
     };
   });
