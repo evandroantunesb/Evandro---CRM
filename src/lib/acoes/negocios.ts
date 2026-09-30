@@ -206,18 +206,29 @@ export async function criarNegocio(_: ResultadoAcao, formData: FormData): Promis
   redirect(`/negocios/${negocio.id}`);
 }
 
-export async function moverEtapa(negocioId: string, etapaId: string): Promise<ResultadoAcao> {
-  await exigirPapel();
-  const ids = z.object({ negocioId: z.string().uuid(), etapaId: z.string().uuid() }).safeParse({ negocioId, etapaId });
-  if (!ids.success) return { ok: false, mensagem: "Dados inválidos." };
+/** Move o negócio de etapa e registra o comentário obrigatório sobre a mudança como uma nota. */
+export async function moverEtapa(negocioId: string, etapaId: string, comentario: string): Promise<ResultadoAcao> {
+  const { atual } = await exigirPapel();
+  const ids = z
+    .object({
+      negocioId: z.string().uuid(),
+      etapaId: z.string().uuid(),
+      comentario: z.string().trim().min(1, "Escreva um comentário sobre a mudança.").max(5000, "Comentário muito longo."),
+    })
+    .safeParse({ negocioId, etapaId, comentario });
+  if (!ids.success) return { ok: false, mensagem: ids.error.issues[0].message };
 
   const supabase = await criarClienteServidor();
   const { data, error } = await supabase
     .from("negocios")
-    .update({ etapa_id: etapaId })
-    .eq("id", negocioId)
+    .update({ etapa_id: ids.data.etapaId })
+    .eq("id", ids.data.negocioId)
     .select("id");
   if (error || !data?.length) return { ok: false, mensagem: mensagemErro(error, "Não foi possível mover o negócio.") };
+
+  await supabase
+    .from("notas")
+    .insert({ empresa_id: atual.empresaId, negocio_id: ids.data.negocioId, texto: ids.data.comentario });
 
   revalidatePath("/negocios");
   revalidatePath(`/negocios/${negocioId}`);

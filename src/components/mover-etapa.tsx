@@ -3,8 +3,9 @@
 import { ChevronDown, MoreVertical, X } from "lucide-react";
 import Link from "next/link";
 import { useState, useTransition } from "react";
-import { alternarEtiqueta, moverEtapa } from "@/lib/acoes/negocios";
+import { alternarEtiqueta } from "@/lib/acoes/negocios";
 import { ItemMenuSuspenso, MenuSuspenso, RotuloMenuSuspenso } from "@/components/menu-suspenso";
+import { ModalComentarioEtapa } from "@/components/comentario-etapa";
 
 type EtiquetaDisponivel = { id: string; nome: string; cor: string | null };
 
@@ -28,18 +29,9 @@ export function MoverEtapa({
   etiquetas?: EtiquetaDisponivel[];
   etiquetasMarcadas?: string[];
 }) {
-  const [pendente, iniciar] = useTransition();
-  const [erro, setErro] = useState<string | null>(null);
   const [editandoEtiquetas, setEditandoEtiquetas] = useState(false);
+  const [destinoPendente, setDestinoPendente] = useState<{ id: string; nome: string } | null>(null);
   const destinos = etapas.filter((e) => e.id !== etapaAtualId);
-
-  function mover(etapaId: string) {
-    setErro(null);
-    iniciar(async () => {
-      const r = await moverEtapa(negocioId, etapaId);
-      if (!r?.ok) setErro(r?.mensagem ?? "Não foi possível mover.");
-    });
-  }
 
   if (!destinos.length && !compacto) return null;
 
@@ -51,7 +43,6 @@ export function MoverEtapa({
             <button
               type="button"
               aria-label="Opções do negócio"
-              disabled={pendente}
               onClick={alternar}
               className="rounded-md p-1 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 disabled:opacity-50"
             >
@@ -60,11 +51,10 @@ export function MoverEtapa({
           ) : (
             <button
               type="button"
-              disabled={pendente}
               onClick={alternar}
               className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-carvao transition-colors hover:border-dourado disabled:opacity-50"
             >
-              {pendente ? "Movendo..." : "Mover para"}
+              Mover para
               <ChevronDown size={14} />
             </button>
           )
@@ -85,20 +75,28 @@ export function MoverEtapa({
           <>
             {compacto && <RotuloMenuSuspenso>Mover para</RotuloMenuSuspenso>}
             {destinos.map((e) => (
-              <ItemMenuSuspenso key={e.id} onClick={() => mover(e.id)} disabled={pendente}>
+              <ItemMenuSuspenso key={e.id} onClick={() => setDestinoPendente({ id: e.id, nome: e.nome })}>
                 {e.nome}
               </ItemMenuSuspenso>
             ))}
           </>
         )}
       </MenuSuspenso>
-      {erro && <p className="mt-1 text-xs text-red-700">{erro}</p>}
       {editandoEtiquetas && (
         <ModalEtiquetas
           negocioId={negocioId}
           etiquetas={etiquetas}
           marcadas={etiquetasMarcadas}
           aoFechar={() => setEditandoEtiquetas(false)}
+        />
+      )}
+      {destinoPendente && (
+        <ModalComentarioEtapa
+          negocioId={negocioId}
+          etapaId={destinoPendente.id}
+          etapaNome={destinoPendente.nome}
+          aoConcluir={() => setDestinoPendente(null)}
+          aoCancelar={() => setDestinoPendente(null)}
         />
       )}
     </div>
