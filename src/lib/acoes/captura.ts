@@ -1,6 +1,7 @@
 "use server";
 
 import { z } from "zod";
+import { escolherProximoResponsavel } from "@/lib/distribuicao-leads";
 import { mensagemErro } from "@/lib/erros";
 import { criarClienteAdmin } from "@/lib/supabase/admin";
 import type { ResultadoAcao } from "@/lib/tipos";
@@ -74,7 +75,9 @@ export async function enviarCaptura(_: ResultadoAcao, formData: FormData): Promi
 
   const { data: formulario } = await admin
     .from("formularios")
-    .select("id, nome, empresa_id, funil_id, origem_id, ativo, origens(prazo_auto_aprovacao_minutos)")
+    .select(
+      "id, nome, empresa_id, funil_id, origem_id, ativo, origens(prazo_auto_aprovacao_minutos), empresas(modo_distribuicao_leads, percentual_leads_sdr)",
+    )
     .eq("token", d.token)
     .maybeSingle();
   if (!formulario || !formulario.ativo) return { ok: false, mensagem: "Este formulário não está mais disponível." };
@@ -103,21 +106,22 @@ export async function enviarCaptura(_: ResultadoAcao, formData: FormData): Promi
     .single();
   if (erroContato || !contato) return { ok: false, mensagem: mensagemErro(erroContato, "Não foi possível registrar seu contato.") };
 
-  // Rodízio: escolhe quem está ativo e marcado para receber leads, dando
-  // preferência a quem está há mais tempo sem receber (ou nunca recebeu). O
-  // negócio nasce sem responsável (fica visível pro gestor, ver
-  // pode_ver_responsavel) e a sugestão do rodízio vira uma pendência de
-  // aprovação — só é atribuído de fato quando o gestor aprova ou quando o
-  // prazo da origem expira sozinho (expirar_atribuicoes_leads, via pg_cron).
-  const { data: proximo } = await admin
-    .from("empresa_membros")
-    .select("id")
-    .eq("empresa_id", formulario.empresa_id)
-    .eq("ativo", true)
-    .eq("recebe_leads", true)
-    .order("recebeu_lead_em", { ascending: true, nullsFirst: true })
-    .limit(1)
-    .maybeSingle();
+  // Rodízio: escolhe quem está ativo e marcado para receber leads, respeitando o modo de
+  // distribuição da empresa (Configurações > Origens — vendedor/SDR/parcial/aleatório, ver
+  // escolherProximoResponsavel). O negócio nasce sem responsável (fica visível pro gestor, ver
+  // pode_ver_responsavel) e a sugestão do rodízio vira uma pendência de aprovação — só é
+  // atribuído de fato quando o gestor aprova ou quando o prazo da origem expira sozinho
+  // (expirar_atribuicoes_leads, via pg_cron).
+  const empresaConfig = formulario.empresas as unknown as {
+    modo_distribuicao_leads: "somente_vendedores" | "somente_sdr" | "parcial" | "aleatorio";
+    percentual_leads_sdr: number;
+  } | null;
+  const proximo = await escolherProximoResponsavel(
+    admin,
+    formulario.empresa_id,
+    empresaConfig?.modo_distribuicao_leads ?? "somente_vendedores",
+    empresaConfig?.percentual_leads_sdr ?? 50,
+  );
 
   const { data: negocio, error: erroNegocio } = await admin
     .from("negocios")

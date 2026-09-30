@@ -1,11 +1,11 @@
 import { Cartao } from "@/components/ui";
 import { carregarConfiguracao } from "@/lib/crm";
 import { exigirPapel } from "@/lib/sessao";
-import { LinhaOrigem, NovaOrigem } from "./formularios";
+import { DistribuicaoLeads, LinhaOrigem, NovaOrigem } from "./formularios";
 
 export default async function ConfigOrigens() {
   const { atual } = await exigirPapel("admin");
-  const { origens } = await carregarConfiguracao(atual.empresaId);
+  const { origens, modoDistribuicaoLeads, percentualLeadsSdr } = await carregarConfiguracao(atual.empresaId);
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
@@ -22,6 +22,12 @@ export default async function ConfigOrigens() {
         {origens.map((o) => (
           <LinhaOrigem key={o.id} origem={o} />
         ))}
+      </Cartao>
+      <Cartao titulo="Distribuição de leads entre vendedores e SDR">
+        <p className="mb-3 text-sm text-zinc-600">
+          Define como o rodízio escolhe o responsável sugerido quando um lead novo chega.
+        </p>
+        <DistribuicaoLeads modo={modoDistribuicaoLeads} percentual={percentualLeadsSdr} />
       </Cartao>
     </div>
   );

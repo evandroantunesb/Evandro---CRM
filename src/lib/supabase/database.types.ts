@@ -709,7 +709,9 @@ export type Database = {
           dias_considerado_parado: number;
           horas_considerado_sem_contato: number;
           id: string;
+          modo_distribuicao_leads: Database["public"]["Enums"]["modo_distribuicao_leads"];
           nome: string;
+          percentual_leads_sdr: number;
           seq_negocio: number;
           situacao: Database["public"]["Enums"]["situacao_empresa"];
           updated_at: string;
@@ -721,7 +723,9 @@ export type Database = {
           dias_considerado_parado?: number;
           horas_considerado_sem_contato?: number;
           id?: string;
+          modo_distribuicao_leads?: Database["public"]["Enums"]["modo_distribuicao_leads"];
           nome: string;
+          percentual_leads_sdr?: number;
           seq_negocio?: number;
           situacao?: Database["public"]["Enums"]["situacao_empresa"];
           updated_at?: string;
@@ -733,7 +737,9 @@ export type Database = {
           dias_considerado_parado?: number;
           horas_considerado_sem_contato?: number;
           id?: string;
+          modo_distribuicao_leads?: Database["public"]["Enums"]["modo_distribuicao_leads"];
           nome?: string;
+          percentual_leads_sdr?: number;
           seq_negocio?: number;
           situacao?: Database["public"]["Enums"]["situacao_empresa"];
           updated_at?: string;
@@ -2840,6 +2846,7 @@ export type Database = {
     Enums: {
       metrica_meta: "receita" | "negocios_ganhos" | "reunioes" | "conversao" | "tarefas_concluidas";
       modelo_cobranca: "por_usuario" | "fixo" | "fixo_mais_usuario";
+      modo_distribuicao_leads: "somente_vendedores" | "somente_sdr" | "parcial" | "aleatorio";
       modo_preco_proposta: "sem_preco" | "parcelado" | "avista" | "completo";
       papel_membro: "admin" | "gestor" | "vendedor" | "sdr";
       periodo_limite_regra: "dia" | "mes";
@@ -2979,6 +2986,7 @@ export const Constants = {
     Enums: {
       metrica_meta: ["receita", "negocios_ganhos", "reunioes", "conversao", "tarefas_concluidas"],
       modelo_cobranca: ["por_usuario", "fixo", "fixo_mais_usuario"],
+      modo_distribuicao_leads: ["somente_vendedores", "somente_sdr", "parcial", "aleatorio"],
       modo_preco_proposta: ["sem_preco", "parcelado", "avista", "completo"],
       papel_membro: ["admin", "gestor", "vendedor", "sdr"],
       periodo_limite_regra: ["dia", "mes"],

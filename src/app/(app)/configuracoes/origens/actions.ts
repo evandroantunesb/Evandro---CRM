@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import type { ResultadoAcao } from "@/lib/tipos";
+import { MODOS_DISTRIBUICAO_LEADS, type ResultadoAcao } from "@/lib/tipos";
 
 const CAMINHO = "/configuracoes/origens";
 const esquema = z.object({
@@ -59,6 +59,28 @@ export async function editarOrigem(_: ResultadoAcao, formData: FormData): Promis
   if (error) {
     return { ok: false, mensagem: error.code === "23505" ? "Já existe uma origem com esse nome." : "Não foi possível salvar." };
   }
+  revalidatePath(CAMINHO);
+  return { ok: true, mensagem: "Salvo." };
+}
+
+/** Como o rodízio de leads reparte entre vendedores e SDR (pedido do Evandro, 2026-09-30). */
+export async function definirDistribuicaoLeads(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  const { atual } = await exigirPapel("admin");
+  const dados = z
+    .object({
+      modo: z.enum(MODOS_DISTRIBUICAO_LEADS),
+      percentual: z.coerce.number().int().min(0).max(100),
+    })
+    .safeParse(Object.fromEntries(formData));
+  if (!dados.success) return { ok: false, mensagem: "Dados inválidos." };
+
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase
+    .from("empresas")
+    .update({ modo_distribuicao_leads: dados.data.modo, percentual_leads_sdr: dados.data.percentual })
+    .eq("id", atual.empresaId);
+  if (error) return { ok: false, mensagem: "Não foi possível salvar." };
+
   revalidatePath(CAMINHO);
   return { ok: true, mensagem: "Salvo." };
 }
