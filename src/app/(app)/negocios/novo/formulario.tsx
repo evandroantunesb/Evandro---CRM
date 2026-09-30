@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, XCircle } from "lucide-react";
 import { useActionState, useId, useMemo, useState, useTransition } from "react";
 import { CampoArquivo } from "@/components/campo-arquivo";
 import { EditorComponentesKit, linhasParaComponentes, type LinhaComponente } from "@/components/kit-componentes";
@@ -226,6 +226,7 @@ export function FormularioNegocio({
 
   // Kit personalizado (dentro da Etapa 2, escondido até o vendedor pedir).
   const [mostrarKit, setMostrarKit] = useState(false);
+  const [mostrarAlertasExemplo, setMostrarAlertasExemplo] = useState(false);
   const [linhas, setLinhas] = useState<LinhaComponente[]>([]);
   const [estruturaTelhado, setEstruturaTelhado] = useState("");
 
@@ -605,9 +606,35 @@ export function FormularioNegocio({
             </div>
           )}
 
-          <div className="flex items-start gap-2 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-800">
-            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>Combinação compatível · MPPT validado · Voc validado</span>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-start gap-2 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-800">
+              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>Combinação compatível · MPPT validado · Voc validado</span>
+            </div>
+            {!mostrarAlertasExemplo ? (
+              <button
+                type="button"
+                className="self-start text-xs font-medium text-amber-700 hover:underline"
+                onClick={() => setMostrarAlertasExemplo(true)}
+              >
+                Ver outros exemplos de alerta técnico
+              </button>
+            ) : (
+              <>
+                <div className="flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>
+                    Overload acima do recomendado (110%) — limite automático: 30% <em className="text-amber-600">(exemplo)</em>
+                  </span>
+                </div>
+                <div className="flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
+                  <XCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>
+                    Combinação incompatível — motivo: faixa MPPT inválida <em className="text-red-600">(exemplo)</em>
+                  </span>
+                </div>
+              </>
+            )}
           </div>
         </fieldset>
 
