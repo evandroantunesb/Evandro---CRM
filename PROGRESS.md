@@ -28,10 +28,13 @@ Resumo do estado do desenvolvimento. **Atualize ao concluir cada funcionalidade:
 - #78 etapa fecha o negócio automaticamente: cada etapa do Kanban pode ser marcada (Configurações > Funis e etapas) para fechar o negócio sozinha ao receber um card — "Marca como ganho" fecha na hora, "Marca como perdido" sempre passa pelo popup obrigatório de comentário, agora exigindo também o motivo da perda. Corrige o caso em que mover um card pra uma etapa "Ganho" não contava na meta da equipe (etapa e status são conceitos separados desde a fundação; agora dá pra linká-los por etapa, sem mudar funis existentes). Migration `20260930013500_etapa_marca_ganho.sql` adiciona `etapas.fecha_como` e atualiza o gatilho `preparar_negocio()`. Testado e aprovado pelo Evandro.
 - #79 Ganhos recentes na Início do gestor: card com os últimos 5 negócios ganhos (contato, vendedor, valor, há quanto tempo), só na visão Equipe. Pedido do Evandro depois de testar a meta da equipe (PR #77) e não conseguir ver quem tinha fechado o contrato.
 - #80 redesenho visual da tela de Tarefas: 4 KPIs (Hoje/Atrasadas/Próximas/Concluídas na semana), painel "Minhas prioridades", Hoje/Próximas lado a lado — a partir de spec e mockup enviados pelo Evandro. Escopo só visual; automações/recorrência/notificação push da spec ficaram de fora de propósito (o sininho já reflete tarefas atrasadas automaticamente).
+- #82 redesenho visual da tela de Contatos: 4 KPIs (Total, Novos no mês, Com negócio, Sem negócio), tabela restilizada (avatar, badge de negócios) — a partir de spec extensa enviada pelo Evandro. Escopo só visual; restrição de acesso, filtros avançados, export e auditoria ficaram de fora de propósito. Ainda não testado visualmente no navegador.
+- #84 Contatos — gestor passa a ver a carteira inteira da empresa (igual admin); vendedor sem mudança. Exclusão de contato nova (botão na ficha, confirmação), liberada para admin+gestor (RLS e UI). Migration `20260930094500_contatos_visibilidade_gestor.sql`. Ainda não testado com banco real.
+- #85 papel SDR (fase 1 da spec `RAION_SDR_REGRAS_PERMISSOES`): novo valor `sdr` no enum `papel_membro`, selecionável em Configurações > Usuários. Sem RLS nova — o padrão já existente para papéis fora de `{admin,gestor}` (visibilidade restrita ao próprio) cobre o comportamento recomendado pela spec. `/contatos` (carteira geral) redireciona SDR pra `/inicio`; link "Contatos" some do menu para SDR. Corrigido de passagem: bug do sininho que mandava qualquer papel não-vendedor pra `/painel` (agora só admin/gestor). Fases futuras da spec (qualificação, handoff, SLA, automações, gamificação/métricas própria do SDR, visibilidade configurável, motor ABAC) documentadas como próximos passos.
+- #86 Qualificação SDR + handoff (fases 4 e 5 da spec): seção "Qualificação SDR" na ficha do negócio (12 campos novos em `negocios`, reaproveitando os campos que a calculadora solar já usa em vez de duplicar — confirmado com o Evandro) com selo de status (3 critérios fixos: telefone válido, objetivo confirmado, decisor identificado). Ação "Enviar para vendas" — só habilitada com negócio "Qualificado" — registra o handoff numa tabela própria (`handoffs`, com snapshot da qualificação) e atualiza o responsável do negócio. Critérios configuráveis, notificação ao vendedor e lista de handoffs na tela ficam para fase futura. Ainda não testado com banco real nem visualmente.
 
 ## Em andamento
 
-- **PR #82 — redesenho visual da tela de Contatos:** 4 KPIs (Total, Novos no mês, Com negócio, Sem negócio), tabela restilizada (avatar, badge de negócios) — a partir de spec extensa enviada pelo Evandro. Escopo só visual ("vamos estilizar ela"); restrição de acesso a gestor/admin, filtros avançados, export CSV/PDF e auditoria ficaram de fora de propósito (responsável/status são atributos do negócio, não do contato, no schema atual). Aguardando revisão do Evandro.
 - **PR #63 — contexto do Claude:** `CLAUDE.md` enxuto (regras permanentes + seleção de modelos), `docs/arquitetura.md`, `docs/regras-negocio.md`, `PROGRESS.md`, `HANDOFF.md` e `.claude/settings.json`. 
 - **PR #62 — backup diário do banco de produção** para o repositório privado `raion-crm-backups`. Aguardando o Evandro criar os secrets `BACKUP_ENCRYPTION_KEY` e `BACKUP_REPO_TOKEN`.
 - **PRs do Dependabot abertas:** #55–#58 (Actions), #60 (TypeScript 6), #61 (`@types/node` 26). Atualizações maiores: revisar com cuidado antes de mesclar.
@@ -55,8 +58,10 @@ Resumo do estado do desenvolvimento. **Atualize ao concluir cada funcionalidade:
 
 ## Próximos passos
 
-1. Rodar o workflow manual "Popular metas comerciais dos vendedores" (Actions) pra popular a Início (#77) com metas de exemplo.
-2. Mesclar a PR #63 (documentação de contexto).
-3. Criar os secrets do backup, mesclar a PR #62 e rodar o backup uma vez manualmente.
+1. Conferir visualmente as telas restilizadas (Tarefas #80, Contatos #82), o papel SDR (#85) e a qualificação+handoff (#86) — nenhuma testada em navegador ainda.
+2. Rodar o workflow manual "Popular metas comerciais dos vendedores" (Actions) pra popular a Início (#77) com metas de exemplo.
+3. Mesclar a PR #63 (documentação de contexto).
+4. Criar os secrets do backup, mesclar a PR #62 e rodar o backup uma vez manualmente.
+5. Fases futuras da spec de SDR (visibilidade configurável, critérios de qualificação configuráveis, notificação de handoff, SLA, automações, gamificação/métricas própria do SDR, motor de permissões ABAC).
 4. Revisar as PRs do Dependabot (#60 e #61 são versões maiores).
 5. Escolher o próximo item com o Evandro. Contexto completo da troca de thread em `HANDOFF.md`.
