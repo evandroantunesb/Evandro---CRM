@@ -9,6 +9,7 @@ import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { mensagemErro } from "@/lib/erros";
 import { componentesJsonSchema, nomeKitPersonalizado, potenciaKitPersonalizadoKwp } from "@/lib/calculadora";
+import { calcularStatusQualificacao } from "@/lib/qualificacao";
 import { PRAZOS_INSTALACAO_QUALIF, TIPOS_CLIENTE_QUALIF, TIPOS_LIGACAO, type ResultadoAcao } from "@/lib/tipos";
 
 const uuidOpcional = z
@@ -447,4 +448,69 @@ export async function atualizarQualificacao(_: ResultadoAcao, formData: FormData
 
   revalidatePath(`/negocios/${d.negocioId}`);
   return { ok: true, mensagem: "Salvo." };
+}
+
+const esquemaHandoff = z.object({
+  negocioId: z.string().uuid(),
+  paraMembroId: z.string().uuid("Escolha o vendedor."),
+  observacoes: z.string().trim().max(1000).optional(),
+});
+
+/**
+ * "Enviar para vendas" (spec RAION_SDR_REGRAS_PERMISSOES, fase 5, §20-22): exige negócio
+ * qualificado, atribui o vendedor escolhido e registra o handoff (snapshot da qualificação,
+ * não só a troca de responsável). Notificação ao vendedor e transferência de tarefas ficam
+ * pra fase futura (§9/§45 da spec).
+ */
+export async function enviarParaVendas(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  const { atual } = await exigirPapel();
+  const dados = esquemaHandoff.safeParse(Object.fromEntries(formData));
+  if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
+  const d = dados.data;
+
+  const supabase = await criarClienteServidor();
+  const { data: negocio, error: erroBusca } = await supabase
+    .from("negocios")
+    .select(
+      "id, empresa_id, contato_id, responsavel_id, qualif_tipo_cliente, qualif_possui_conta_energia, qualif_distribuidora, qualif_imovel_proprio, qualif_objetivo, qualif_prazo_instalacao, qualif_busca_financiamento, qualif_orcamento_outra_empresa, qualif_e_decisor, qualif_outro_decisor, qualif_participantes_decisao, contatos(telefone)",
+    )
+    .eq("id", d.negocioId)
+    .maybeSingle();
+  if (erroBusca || !negocio) return { ok: false, mensagem: "Negócio não encontrado." };
+
+  const contato = negocio.contatos as unknown as { telefone: string | null } | null;
+  const status = calcularStatusQualificacao(!!contato?.telefone, negocio.qualif_objetivo, negocio.qualif_e_decisor);
+  if (status.rotulo !== "Qualificado") {
+    return { ok: false, mensagem: `Qualifique o negócio antes de enviar para vendas (${status.atendidos} de ${status.total} critérios atendidos).` };
+  }
+
+  const { error: erroHandoff } = await supabase.from("handoffs").insert({
+    empresa_id: negocio.empresa_id,
+    negocio_id: negocio.id,
+    contato_id: negocio.contato_id,
+    de_membro_id: negocio.responsavel_id ?? atual.membroId,
+    para_membro_id: d.paraMembroId,
+    status_qualificacao: status.rotulo,
+    qualificacao_snapshot: {
+      tipo_cliente: negocio.qualif_tipo_cliente,
+      possui_conta_energia: negocio.qualif_possui_conta_energia,
+      distribuidora: negocio.qualif_distribuidora,
+      imovel_proprio: negocio.qualif_imovel_proprio,
+      objetivo: negocio.qualif_objetivo,
+      prazo_instalacao: negocio.qualif_prazo_instalacao,
+      busca_financiamento: negocio.qualif_busca_financiamento,
+      orcamento_outra_empresa: negocio.qualif_orcamento_outra_empresa,
+      e_decisor: negocio.qualif_e_decisor,
+      outro_decisor: negocio.qualif_outro_decisor,
+      participantes_decisao: negocio.qualif_participantes_decisao,
+    },
+    observacoes: d.observacoes || null,
+  });
+  if (erroHandoff) return { ok: false, mensagem: mensagemErro(erroHandoff, "Não foi possível registrar o handoff.") };
+
+  const { error: erroResponsavel } = await supabase.from("negocios").update({ responsavel_id: d.paraMembroId }).eq("id", d.negocioId);
+  if (erroResponsavel) return { ok: false, mensagem: mensagemErro(erroResponsavel, "Handoff registrado, mas não foi possível atualizar o responsável.") };
+
+  revalidatePath(`/negocios/${d.negocioId}`);
+  return { ok: true, mensagem: "Enviado para vendas." };
 }

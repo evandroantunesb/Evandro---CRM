@@ -2,7 +2,8 @@
 
 import { useActionState } from "react";
 import { Botao, Campo, Mensagem, Selecao, Selo } from "@/components/ui";
-import { atualizarQualificacao } from "@/lib/acoes/negocios";
+import { atualizarQualificacao, enviarParaVendas } from "@/lib/acoes/negocios";
+import { calcularStatusQualificacao } from "@/lib/qualificacao";
 import { PRAZOS_INSTALACAO_QUALIF, ROTULO_PRAZO_INSTALACAO_QUALIF, ROTULO_TIPO_CLIENTE_QUALIF, TIPOS_CLIENTE_QUALIF } from "@/lib/tipos";
 
 type Bool = boolean | null;
@@ -17,22 +18,36 @@ function SelecaoSimNao({ rotulo, name, defaultValue }: { rotulo: string; name: s
   );
 }
 
-/**
- * Status calculado a partir de 3 critérios fixos (telefone válido, interesse confirmado,
- * decisor identificado). "Conta acima de X" e "imóvel compatível" ficam de fora até o gestor
- * poder configurar critérios (spec §18 — fase futura, não implementada ainda).
- */
-function calcularStatus(telefoneValido: boolean, objetivo: string | null, eDecisor: Bool) {
-  const criterios = [telefoneValido, !!objetivo, eDecisor !== null];
-  const atendidos = criterios.filter(Boolean).length;
-  const tom = atendidos === criterios.length ? "positivo" : atendidos === 0 ? "neutro" : "atencao";
-  const rotulo = atendidos === criterios.length ? "Qualificado" : atendidos === 0 ? "Não qualificado" : "Parcialmente qualificado";
-  return { rotulo, tom: tom as "positivo" | "neutro" | "atencao", atendidos, total: criterios.length };
+/** "Enviar para vendas" (handoff SDR → vendedor). Só habilitado quando o negócio está qualificado. */
+function EnviarParaVendas({ negocioId, habilitado, vendedores }: { negocioId: string; habilitado: boolean; vendedores: { id: string; nome: string }[] }) {
+  const [resultado, acao, pendente] = useActionState(enviarParaVendas, null);
+  return (
+    <form action={acao} className="flex flex-col gap-2 rounded-lg border border-dourado/30 bg-dourado/5 p-3">
+      <input type="hidden" name="negocioId" value={negocioId} />
+      <span className="text-sm font-medium text-carvao">Enviar para vendas</span>
+      {!habilitado && <span className="text-xs text-zinc-500">Qualifique o negócio (selo acima) antes de enviar.</span>}
+      <div className="flex flex-wrap items-center gap-2">
+        <Selecao name="paraMembroId" defaultValue="" disabled={!habilitado}>
+          <option value="">Escolha o vendedor</option>
+          {vendedores.map((v) => (
+            <option key={v.id} value={v.id}>
+              {v.nome}
+            </option>
+          ))}
+        </Selecao>
+        <Botao type="submit" variante="primario" disabled={!habilitado || pendente}>
+          Enviar
+        </Botao>
+      </div>
+      {resultado && <Mensagem resultado={resultado} />}
+    </form>
+  );
 }
 
 export function Qualificacao({
   negocio,
   telefoneContato,
+  vendedores,
 }: {
   negocio: {
     id: string;
@@ -50,13 +65,15 @@ export function Qualificacao({
     qualifObservacoes: string | null;
   };
   telefoneContato: string | null;
+  vendedores: { id: string; nome: string }[];
 }) {
   const [resultado, acao, pendente] = useActionState(atualizarQualificacao, null);
-  const status = calcularStatus(!!telefoneContato, negocio.qualifObjetivo, negocio.qualifEDecisor);
+  const status = calcularStatusQualificacao(!!telefoneContato, negocio.qualifObjetivo, negocio.qualifEDecisor);
 
   return (
-    <form action={acao} className="flex flex-col gap-3">
-      <input type="hidden" name="negocioId" value={negocio.id} />
+    <div className="flex flex-col gap-3">
+      <form action={acao} className="flex flex-col gap-3">
+        <input type="hidden" name="negocioId" value={negocio.id} />
       <div className="flex items-center gap-2">
         <Selo tom={status.tom}>{status.rotulo}</Selo>
         <span className="text-xs text-zinc-500">
@@ -113,12 +130,14 @@ export function Qualificacao({
           className="rounded-lg border border-zinc-200 px-3 py-2 text-sm"
         />
       </label>
-      <div className="flex items-center gap-2">
-        <Botao type="submit" variante="secundario" disabled={pendente}>
-          Salvar qualificação
-        </Botao>
-        {resultado && <Mensagem resultado={resultado} />}
-      </div>
-    </form>
+        <div className="flex items-center gap-2">
+          <Botao type="submit" variante="secundario" disabled={pendente}>
+            Salvar qualificação
+          </Botao>
+          {resultado && <Mensagem resultado={resultado} />}
+        </div>
+      </form>
+      <EnviarParaVendas negocioId={negocio.id} habilitado={status.rotulo === "Qualificado"} vendedores={vendedores} />
+    </div>
   );
 }

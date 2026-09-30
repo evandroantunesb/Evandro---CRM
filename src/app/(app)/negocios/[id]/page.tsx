@@ -288,6 +288,7 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
                 qualifObservacoes: negocio.qualif_observacoes,
               }}
               telefoneContato={contato.telefone}
+              vendedores={config.membros.filter((m) => m.ativo && m.papel === "vendedor")}
             />
           </Cartao>
           <Cartao titulo="Proposta">
