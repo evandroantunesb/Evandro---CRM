@@ -68,8 +68,8 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
   const atual = sessao.atual;
   if (!atual) redirect(sessao.superAdmin ? "/super-admin" : "/sem-acesso");
 
-  // Vendedor só vê a própria operação; admin/gestor pode alternar pra visão da empresa toda (?visao=equipe).
-  const podeVerEquipe = atual.papel !== "vendedor";
+  // Vendedor e SDR só veem a própria operação (spec RAION_SDR_REGRAS_PERMISSOES §10); admin/gestor pode alternar pra visão da empresa toda (?visao=equipe).
+  const podeVerEquipe = atual.papel === "admin" || atual.papel === "gestor";
   const visaoParam = (await searchParams).visao;
   const visaoSolicitada = Array.isArray(visaoParam) ? visaoParam[0] : visaoParam;
   const pessoal = !(podeVerEquipe && visaoSolicitada === "equipe");
