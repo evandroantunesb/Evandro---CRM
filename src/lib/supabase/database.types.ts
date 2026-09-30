@@ -1298,6 +1298,58 @@ export type Database = {
           },
         ];
       };
+      handoffs_feedback: {
+        Row: {
+          autor_id: string;
+          created_at: string;
+          empresa_id: string;
+          feedback: string;
+          handoff_id: string;
+          id: string;
+          updated_at: string;
+        };
+        Insert: {
+          autor_id: string;
+          created_at?: string;
+          empresa_id: string;
+          feedback: string;
+          handoff_id: string;
+          id?: string;
+          updated_at?: string;
+        };
+        Update: {
+          autor_id?: string;
+          created_at?: string;
+          empresa_id?: string;
+          feedback?: string;
+          handoff_id?: string;
+          id?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "handoffs_feedback_autor_id_fkey";
+            columns: ["autor_id"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "handoffs_feedback_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "handoffs_feedback_handoff_id_fkey";
+            columns: ["handoff_id"];
+            isOneToOne: true;
+            referencedRelation: "handoffs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       historico_etapas: {
         Row: {
           empresa_id: string;

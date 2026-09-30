@@ -24,6 +24,7 @@ import { Contrato } from "./contrato";
 import { EdicaoNegocio } from "./edicao";
 import { EnviarAnexo } from "./enviar-anexo";
 import { Fechamento } from "./fechamento";
+import { FeedbackHandoff } from "./feedback-handoff";
 import { KitPersonalizado } from "./kit-personalizado";
 import { NovaNota } from "./nova-nota";
 import { Proposta } from "./proposta";
@@ -112,6 +113,14 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
     .from("contratos")
     .select("token, status")
     .eq("negocio_id", id)
+    .maybeSingle();
+
+  const { data: ultimoHandoff } = await supabase
+    .from("handoffs")
+    .select("id, para_membro_id, created_at, handoffs_feedback(feedback, autor_id)")
+    .eq("negocio_id", id)
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
 
   const contato = negocio.contatos as unknown as {
@@ -292,6 +301,26 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
               vendedores={config.membros.filter((m) => m.ativo && m.papel === "vendedor")}
             />
           </Cartao>
+          {ultimoHandoff &&
+            (souAdmin || atual.papel === "gestor" || atual.membroId === ultimoHandoff.para_membro_id) &&
+            (() => {
+              const feedbackExistente = ultimoHandoff.handoffs_feedback as unknown as { feedback: string; autor_id: string } | null;
+              const jaContatouLead = (notas ?? []).some(
+                (n) => n.autor_id === ultimoHandoff.para_membro_id && n.created_at > ultimoHandoff.created_at,
+              );
+              return (
+                <Cartao titulo="Feedback do lead (handoff)">
+                  <FeedbackHandoff
+                    negocioId={negocio.id}
+                    handoffId={ultimoHandoff.id}
+                    souAutor={atual.membroId === ultimoHandoff.para_membro_id}
+                    jaContatouLead={jaContatouLead}
+                    feedback={feedbackExistente?.feedback ?? null}
+                    autorNome={feedbackExistente ? nomes.membro(feedbackExistente.autor_id) : null}
+                  />
+                </Cartao>
+              );
+            })()}
           {atual.papel !== "sdr" && (
             <Cartao titulo="Proposta">
               <Proposta
