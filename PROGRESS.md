@@ -36,8 +36,9 @@ Resumo do estado do desenvolvimento. **Atualize ao concluir cada funcionalidade:
 - #89 SDR fase 6: trigger cria tarefa "Realizar primeiro contato" (15 min) quando `responsavel_id` vira SDR. Corrigiu 2 bugs órfãos da #85 (sininho e toggle "Equipe" da Início tratavam SDR como gestor).
 - #90 Distribuição de leads por papel (fora da spec SDR, pedido à parte do Evandro): 4 modos configuráveis em Configurações > Origens — Somente vendedores (padrão), Somente SDR (fallback pro vendedor sem SDR ativo), Parcial (% configurável) e Aleatório. Corrigiu o rodízio, que antes não filtrava por papel nenhum.
 - #91 SDR fase 7 (escopo parcial): tabela `notificacoes` nova + 2 dos 8 tipos da spec (§45) — "novo lead atribuído" e "gestor atribuiu tarefa". Sininho vira dropdown quando há notificação não lida. "Lead devolvido"/"handoff aceito-rejeitado"/"reunião-visita próxima" ficaram fora por dependerem de fluxo ainda não construído.
+- #94 Notificação e feedback do vendedor no handoff SDR (pedido à parte, fora da spec de 60 seções): vendedor recebe notificação (`notificacoes.tipo = 'handoff_recebido'`) ao receber o handoff; sem botão de aceitar/recusar — recusa continua manual via gestor, fora do app. Card "Feedback do lead (handoff)" na ficha do negócio: quem recebeu escreve um texto sobre a qualidade do lead, visível só a admin/gestor e ao próprio autor (tabela `handoffs_feedback`, RLS própria — o SDR nunca vê; métrica futura pra avaliar o SDR). O formulário só libera depois que o vendedor registra uma nota de contato com o lead (pedido do Evandro).
 
-Todas as PRs de #85 a #91 mescladas em 2026-09-30 (`pode dar merge`). Nenhuma testada com banco real nem visualmente no navegador ainda — RLS/triggers/UI dependem de confirmação do Evandro.
+Todas as PRs de #85 a #94 mescladas em 2026-09-30 (`pode dar merge`). Nenhuma testada com banco real nem visualmente no navegador ainda — RLS/triggers/UI dependem de confirmação do Evandro.
 
 ## Em andamento
 
