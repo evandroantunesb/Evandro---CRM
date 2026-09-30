@@ -1,9 +1,10 @@
 "use client";
 
-import { useActionState, useMemo, useState, useTransition } from "react";
+import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight } from "lucide-react";
+import { useActionState, useId, useMemo, useState, useTransition } from "react";
 import { CampoArquivo } from "@/components/campo-arquivo";
 import { EditorComponentesKit, linhasParaComponentes, type LinhaComponente } from "@/components/kit-componentes";
-import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
+import { Botao, Campo, Mensagem, Selecao, Selo } from "@/components/ui";
 import { buscarContatos, criarNegocio, verificarDuplicado, type Duplicado } from "@/lib/acoes/negocios";
 import {
   calcular,
@@ -12,7 +13,7 @@ import {
   potenciaKitPersonalizadoKwp,
   sugerirQuantidadeModulos,
 } from "@/lib/calculadora";
-import { formatarMoeda } from "@/lib/formatacao";
+import { formatarCep, formatarMascaraMoeda, formatarMoeda, formatarTelefoneBr } from "@/lib/formatacao";
 import { ROTULO_TIPO_LIGACAO, TIPOS_LIGACAO, type TipoLigacao } from "@/lib/tipos";
 
 type Opcao = { id: string; nome: string };
@@ -29,11 +30,115 @@ type Parametros = {
   comissaoPercentual: number;
 };
 
+const ESTADOS_BR = [
+  "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG",
+  "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO",
+];
+
+const ETAPAS_WIZARD = [
+  { numero: 1, titulo: "Cliente e consumo" },
+  { numero: 2, titulo: "Sistema recomendado" },
+  { numero: 3, titulo: "Dados técnicos" },
+] as const;
+
 /** Aceita "450", "450,5" e "1.234,56"; string vazia ou inválida vira null. */
 function numero(v: string): number | null {
   if (!v.trim()) return null;
   const n = Number(v.includes(",") ? v.replace(/\./g, "").replace(",", ".") : v);
   return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/** Estimativa ilustrativa (não é o motor de cálculo) só pra prévia mockada da Etapa 2. */
+function estimarSistemaMockKwp(consumoMedioKwh: number | null, produtividadeKwhKwpMes: number) {
+  if (!consumoMedioKwh || !produtividadeKwhKwpMes) return null;
+  return Number(((consumoMedioKwh / produtividadeKwhKwpMes) * 1.24).toFixed(2));
+}
+
+function IndicadorEtapas({ atual }: { atual: 1 | 2 | 3 }) {
+  return (
+    <ol className="flex items-center gap-2 text-sm">
+      {ETAPAS_WIZARD.map((e, i) => (
+        <li key={e.numero} className="flex items-center gap-2">
+          <span
+            className={`flex items-center gap-2 rounded-full px-3 py-1 font-medium ${
+              e.numero === atual
+                ? "bg-carvao text-offwhite"
+                : e.numero < atual
+                  ? "bg-dourado/15 text-carvao"
+                  : "bg-zinc-100 text-zinc-500"
+            }`}
+          >
+            <span
+              className={`flex h-5 w-5 items-center justify-center rounded-full text-xs ${
+                e.numero === atual ? "bg-dourado text-carvao" : e.numero < atual ? "bg-dourado text-carvao" : "bg-zinc-300 text-white"
+              }`}
+            >
+              {e.numero}
+            </span>
+            {e.titulo}
+          </span>
+          {i < ETAPAS_WIZARD.length - 1 && <span className="h-px w-4 bg-zinc-300" aria-hidden />}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/** Card de documento com "leitura automática" simulada: não há OCR real, só a estrutura visual. */
+function CardDocumentoInteligente({
+  titulo,
+  legenda,
+  campos,
+  name,
+  accept,
+}: {
+  titulo: string;
+  legenda: string;
+  campos: string[];
+  name: string;
+  accept?: string;
+}) {
+  const id = useId();
+  const [processado, setProcessado] = useState(false);
+  const [nomeArquivo, setNomeArquivo] = useState("");
+
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-dashed border-zinc-300 p-3">
+      <label htmlFor={id} className="flex cursor-pointer flex-col gap-1">
+        <span className="text-sm font-medium text-zinc-800">{titulo}</span>
+        {!processado && <span className="text-xs text-zinc-500">{legenda}</span>}
+      </label>
+      {processado && (
+        <div className="flex flex-col gap-1 rounded-md bg-green-50 px-3 py-2">
+          <p className="text-sm font-medium text-green-800">Documento processado</p>
+          <ul className="text-xs text-green-700">
+            {campos.map((c) => (
+              <li key={c}>{c}</li>
+            ))}
+          </ul>
+          <div className="flex items-center gap-2 pt-1">
+            <button type="button" className="text-xs font-medium text-amber-700 hover:underline" onClick={() => setProcessado(false)}>
+              Revisar dados
+            </button>
+            <span className="truncate text-xs text-zinc-400">· {nomeArquivo}</span>
+          </div>
+        </div>
+      )}
+      <input
+        id={id}
+        type="file"
+        name={name}
+        accept={accept}
+        className="hidden"
+        onChange={(e) => {
+          const arquivo = e.target.files?.[0];
+          if (!arquivo) return;
+          setNomeArquivo(arquivo.name);
+          setProcessado(true);
+        }}
+      />
+    </div>
+  );
 }
 
 export function FormularioNegocio({
@@ -54,6 +159,9 @@ export function FormularioNegocio({
   parametros: Parametros | null;
 }) {
   const [resultado, acao, pendente] = useActionState(criarNegocio, null);
+  const [etapaAtual, setEtapaAtual] = useState<1 | 2 | 3>(1);
+  const [erroEtapa, setErroEtapa] = useState<string | null>(null);
+
   const [modo, setModo] = useState<"novo" | "existente">("novo");
   const [contato, setContato] = useState<ContatoEncontrado | null>(null);
   const [busca, setBusca] = useState("");
@@ -61,17 +169,62 @@ export function FormularioNegocio({
   const [duplicados, setDuplicados] = useState<Duplicado[]>([]);
   const [, iniciar] = useTransition();
 
-  // Passo 1 (negócio): a calculadora roda no backend a partir daqui — sem
-  // aparecer como um passo separado. Potência, consumo e tarifa ficam no
-  // negócio, não no contato (que é só dado pessoal/residência do cliente).
-  const [valor, setValor] = useState("");
-  const [valorTocado, setValorTocado] = useState(false);
-  const [tipoLigacao, setTipoLigacao] = useState<TipoLigacao>("trifasico");
+  // Cliente (Etapa 1).
+  const [contatoNome, setContatoNome] = useState("");
+  const [contatoTelefone, setContatoTelefone] = useState("");
+  const [contatoEmail, setContatoEmail] = useState("");
+  const emailValido = contatoEmail === "" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contatoEmail);
+
+  // Localização (Etapa 1) — campos estruturados; concatenados no envio pro campo único que o backend já salva.
+  const [cep, setCep] = useState("");
+  const [rua, setRua] = useState("");
+  const [numeroEndereco, setNumeroEndereco] = useState("");
+  const [complemento, setComplemento] = useState("");
+  const [bairro, setBairro] = useState("");
+  const [cidade, setCidade] = useState("");
+  const [uf, setUf] = useState("");
+  const [buscandoCep, setBuscandoCep] = useState(false);
+
+  async function buscarEnderecoPorCep(valor: string) {
+    const limpo = valor.replace(/\D/g, "");
+    if (limpo.length !== 8) return;
+    setBuscandoCep(true);
+    try {
+      const resp = await fetch(`https://viacep.com.br/ws/${limpo}/json/`);
+      const dados = await resp.json();
+      if (!dados.erro) {
+        setRua(dados.logradouro ?? "");
+        setBairro(dados.bairro ?? "");
+        setCidade(dados.localidade ?? "");
+        setUf(dados.uf ?? "");
+      }
+    } catch {
+      // Preenchimento automático é só conveniência — sem CEP, o vendedor preenche à mão.
+    } finally {
+      setBuscandoCep(false);
+    }
+  }
+
+  const enderecoCompleto = useMemo(() => {
+    const partes = [
+      rua && numeroEndereco ? `${rua}, ${numeroEndereco}` : rua,
+      complemento,
+      bairro,
+      cidade && uf ? `${cidade} - ${uf}` : cidade,
+      cep ? `CEP ${cep}` : "",
+    ].filter(Boolean);
+    return partes.join(", ");
+  }, [rua, numeroEndereco, complemento, bairro, cidade, uf, cep]);
+
+  // Consumo (Etapa 1): kWh direto ou valor da conta (com máscara), nunca os dois exigidos.
   const [consumoMedioKwh, setConsumoMedioKwh] = useState("");
   const [valorFaturaMedio, setValorFaturaMedio] = useState("");
   const [tarifaKwh, setTarifaKwh] = useState("");
 
-  // Passo 3 (depois de "Avançar"): personalização do kit.
+  // Dados técnicos (Etapa 3, movidos pra fora do primeiro contato).
+  const [tipoLigacao, setTipoLigacao] = useState<TipoLigacao>("trifasico");
+
+  // Kit personalizado (dentro da Etapa 2, escondido até o vendedor pedir).
   const [mostrarKit, setMostrarKit] = useState(false);
   const [linhas, setLinhas] = useState<LinhaComponente[]>([]);
   const [estruturaTelhado, setEstruturaTelhado] = useState("");
@@ -79,9 +232,6 @@ export function FormularioNegocio({
   const componentes = useMemo(() => linhasParaComponentes(linhas), [linhas]);
   const potenciaKwp = potenciaKitPersonalizadoKwp(componentes);
 
-  // Soma dos preços de referência (teste) vindos do catálogo, mais os custos
-  // internos configurados (instalação, material CA, engenharia, comissão),
-  // só pra sugerir um valor de negócio enquanto não há planilha/distribuidor real.
   const precoSugerido = useMemo(() => {
     const somaComponentes = linhas.reduce((acc, l) => {
       const precoUnitario = l.precoEstimadoUnitario ? Number(l.precoEstimadoUnitario) : NaN;
@@ -95,16 +245,14 @@ export function FormularioNegocio({
     return Math.round(custos.total);
   }, [linhas, componentes, potenciaKwp, parametros]);
 
-  // Preenche "Valor estimado" com a sugestão assim que ela aparecer/mudar,
-  // a não ser que o vendedor já tenha digitado algo à mão (sem useEffect,
-  // ajustando durante a renderização — mesmo padrão usado no kit salvo).
+  const [valor, setValor] = useState("");
+  const [valorTocado, setValorTocado] = useState(false);
   const [ultimoPrecoSugerido, setUltimoPrecoSugerido] = useState<number | null>(null);
   if (precoSugerido !== ultimoPrecoSugerido) {
     setUltimoPrecoSugerido(precoSugerido);
     if (precoSugerido != null && !valorTocado) setValor(String(precoSugerido));
   }
 
-  // Consumo médio em kWh, vindo do campo direto ou calculado a partir da fatura + tarifa.
   const consumoMedioEstimado = useMemo(() => {
     const tarifa = numero(tarifaKwh);
     const consumo = numero(consumoMedioKwh);
@@ -114,8 +262,11 @@ export function FormularioNegocio({
     return null;
   }, [consumoMedioKwh, valorFaturaMedio, tarifaKwh]);
 
-  // Sugere a quantidade de módulos pro consumo já informado, assim que o
-  // vendedor escolhe (ou digita) a potência de um módulo.
+  const sistemaMockKwp = useMemo(
+    () => estimarSistemaMockKwp(consumoMedioEstimado, parametros?.produtividadeKwhKwpMes ?? 120),
+    [consumoMedioEstimado, parametros],
+  );
+
   const sugerirQuantidadeModulo = useMemo(() => {
     if (!parametros || !consumoMedioEstimado) return undefined;
     return (potenciaW: number) =>
@@ -146,11 +297,31 @@ export function FormularioNegocio({
     iniciar(async () => setEncontrados(await buscarContatos(termo)));
   }
 
-  function conferirDuplicado(form: HTMLFormElement) {
-    const tel = (form.elements.namedItem("contato_telefone") as HTMLInputElement)?.value ?? "";
-    const email = (form.elements.namedItem("contato_email") as HTMLInputElement)?.value ?? "";
+  function conferirDuplicado(tel: string, email: string) {
     if (tel.replace(/\D/g, "").length < 8 && !email.includes("@")) return setDuplicados([]);
     iniciar(async () => setDuplicados(await verificarDuplicado(tel, email)));
+  }
+
+  function avancar() {
+    if (etapaAtual === 1) {
+      if (modo === "existente" && !contato) return setErroEtapa("Selecione um contato existente pra continuar.");
+      if (modo === "novo") {
+        if (contatoNome.trim().length < 2) return setErroEtapa("Informe o nome do cliente.");
+        if (contatoTelefone.replace(/\D/g, "").length < 10) return setErroEtapa("Informe um WhatsApp válido.");
+        if (!emailValido) return setErroEtapa("Informe um e-mail válido ou deixe em branco.");
+      }
+      setErroEtapa(null);
+      return setEtapaAtual(2);
+    }
+    if (etapaAtual === 2) {
+      setErroEtapa(null);
+      return setEtapaAtual(3);
+    }
+  }
+
+  function voltar() {
+    setErroEtapa(null);
+    setEtapaAtual((e) => (e === 3 ? 2 : e === 2 ? 1 : e));
   }
 
   return (
@@ -159,33 +330,290 @@ export function FormularioNegocio({
       {etapaId && <input type="hidden" name="etapa_id" value={etapaId} />}
       <input type="hidden" name="tipo_ligacao" value={tipoLigacao} />
       <input type="hidden" name="componentes" value={JSON.stringify(componentes)} />
+      <input type="hidden" name="contato_endereco" value={enderecoCompleto} />
+      <input type="hidden" name="contato_nome" value={contatoNome} />
+      <input type="hidden" name="contato_telefone" value={contatoTelefone} />
+      <input type="hidden" name="contato_email" value={contatoEmail} />
+      <input type="hidden" name="valor" value={valor} />
+      <input type="hidden" name="consumo_medio_kwh" value={consumoMedioKwh} />
+      <input type="hidden" name="valor_fatura_medio" value={valorFaturaMedio} />
+      <input type="hidden" name="tarifa_kwh" value={tarifaKwh} />
+      <input type="hidden" name="estrutura_telhado" value={estruturaTelhado} />
+      {contato && <input type="hidden" name="contato_id" value={contato.id} />}
 
-      <fieldset className="grid gap-3 md:grid-cols-2">
-        <legend className="mb-2 text-sm font-semibold text-zinc-900">Negócio</legend>
-        <Selecao rotulo="Origem" name="origem_id" required defaultValue="">
-          <option value="" disabled>
-            Selecione
-          </option>
-          {origens.map((o) => (
-            <option key={o.id} value={o.id}>
-              {o.nome}
+      <IndicadorEtapas atual={etapaAtual} />
+
+      {/* Etapa 1 — Cliente e consumo */}
+      <div className={etapaAtual === 1 ? "flex flex-col gap-5" : "hidden"}>
+        <fieldset className="grid gap-3 md:grid-cols-2">
+          <legend className="mb-2 text-sm font-semibold text-zinc-900">Negócio</legend>
+          <Campo rotulo="Nome do negócio" name="titulo" placeholder="Ex.: Residência 5 kWp" required />
+          <Selecao rotulo="Origem" name="origem_id" required defaultValue="">
+            <option value="" disabled>
+              Selecione
             </option>
-          ))}
-        </Selecao>
-        {responsaveis.length > 0 && (
-          <Selecao rotulo="Responsável" name="responsavel_id" defaultValue={meuMembroId}>
-            {responsaveis.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.nome}
+            {origens.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.nome}
               </option>
             ))}
           </Selecao>
+          {responsaveis.length > 0 && (
+            <Selecao rotulo="Responsável" name="responsavel_id" defaultValue={meuMembroId}>
+              {responsaveis.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.nome}
+                </option>
+              ))}
+            </Selecao>
+          )}
+        </fieldset>
+
+        <fieldset className="grid gap-3 md:grid-cols-2">
+          <legend className="mb-2 text-sm font-semibold text-zinc-900">Cliente</legend>
+          <div className="flex gap-2 md:col-span-2">
+            <Botao type="button" variante={modo === "novo" ? "primario" : "secundario"} onClick={() => setModo("novo")}>
+              Novo cliente
+            </Botao>
+            <Botao
+              type="button"
+              variante={modo === "existente" ? "primario" : "secundario"}
+              onClick={() => setModo("existente")}
+            >
+              Cliente existente
+            </Botao>
+          </div>
+
+          {modo === "existente" ? (
+            <div className="flex flex-col gap-2 md:col-span-2">
+              {contato ? (
+                <div className="flex items-center justify-between rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm">
+                  <span>
+                    <strong>{contato.nome}</strong> {contato.telefone ?? contato.email}
+                  </span>
+                  <button type="button" className="text-zinc-600 hover:underline" onClick={() => setContato(null)}>
+                    Trocar
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <Campo rotulo="Buscar por nome, telefone ou e-mail" value={busca} onChange={(e) => pesquisar(e.target.value)} />
+                  <ul className="flex flex-col">
+                    {encontrados.map((c) => (
+                      <li key={c.id}>
+                        <button
+                          type="button"
+                          onClick={() => setContato(c)}
+                          className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-zinc-100"
+                        >
+                          <strong>{c.nome}</strong> <span className="text-zinc-500">{c.telefone ?? c.email}</span>
+                        </button>
+                      </li>
+                    ))}
+                    {busca.length >= 2 && !encontrados.length && (
+                      <li className="px-3 py-2 text-sm text-zinc-500">Nenhum contato encontrado.</li>
+                    )}
+                  </ul>
+                </>
+              )}
+            </div>
+          ) : (
+            <>
+              <Campo
+                rotulo="Nome / Razão social"
+                value={contatoNome}
+                onChange={(e) => setContatoNome(e.target.value)}
+                required
+              />
+              <Campo
+                rotulo="WhatsApp"
+                type="tel"
+                inputMode="numeric"
+                value={contatoTelefone}
+                placeholder="(11) 91234-5678"
+                onChange={(e) => setContatoTelefone(formatarTelefoneBr(e.target.value))}
+                onBlur={() => conferirDuplicado(contatoTelefone, contatoEmail)}
+                required
+              />
+              <Campo
+                rotulo="E-mail"
+                type="email"
+                value={contatoEmail}
+                onChange={(e) => setContatoEmail(e.target.value)}
+                onBlur={() => conferirDuplicado(contatoTelefone, contatoEmail)}
+              />
+              {!emailValido && <p className="text-xs text-red-600 md:col-span-2">E-mail inválido.</p>}
+              {duplicados.map((d) => (
+                <div key={d.contatoId} className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900 md:col-span-2">
+                  {d.visivel ? (
+                    <>
+                      Já existe o contato <strong>{d.nome}</strong> com esses dados.{" "}
+                      <button
+                        type="button"
+                        className="font-medium underline"
+                        onClick={() => {
+                          setContato({ id: d.contatoId, nome: d.nome, telefone: null, email: null });
+                          setModo("existente");
+                        }}
+                      >
+                        Usar este contato
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      Esse telefone ou e-mail já é de um cliente
+                      {d.responsavel ? (
+                        <>
+                          {" "}
+                          de <strong>{d.responsavel}</strong>
+                        </>
+                      ) : null}
+                      . Fale com o seu gestor antes de seguir.
+                    </>
+                  )}
+                </div>
+              ))}
+            </>
+          )}
+        </fieldset>
+
+        {modo === "novo" && (
+          <fieldset className="grid gap-3 md:grid-cols-3">
+            <legend className="mb-2 text-sm font-semibold text-zinc-900">Localização</legend>
+            <Campo
+              rotulo="CEP"
+              inputMode="numeric"
+              value={cep}
+              placeholder="00000-000"
+              onChange={(e) => setCep(formatarCep(e.target.value))}
+              onBlur={(e) => buscarEnderecoPorCep(e.target.value)}
+            />
+            {buscandoCep && <p className="self-end text-xs text-zinc-400 md:col-span-2">Buscando endereço…</p>}
+            <div className="md:col-span-2">
+              <Campo rotulo="Rua" value={rua} onChange={(e) => setRua(e.target.value)} />
+            </div>
+            <Campo rotulo="Número" value={numeroEndereco} onChange={(e) => setNumeroEndereco(e.target.value)} />
+            <Campo rotulo="Complemento" value={complemento} onChange={(e) => setComplemento(e.target.value)} />
+            <Campo rotulo="Bairro" value={bairro} onChange={(e) => setBairro(e.target.value)} />
+            <Campo rotulo="Cidade" value={cidade} onChange={(e) => setCidade(e.target.value)} />
+            <Selecao rotulo="Estado" value={uf} onChange={(e) => setUf(e.target.value)}>
+              <option value="">UF</option>
+              {ESTADOS_BR.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </Selecao>
+          </fieldset>
         )}
-        <Campo rotulo="Nome do negócio" name="titulo" placeholder="Ex.: Residência 5 kWp" required />
+
+        <fieldset className="flex flex-col gap-3">
+          <legend className="mb-2 text-sm font-semibold text-zinc-900">Consumo</legend>
+          <div className="grid gap-3 md:grid-cols-2">
+            <Campo
+              rotulo="Consumo médio mensal (kWh)"
+              inputMode="numeric"
+              placeholder="ex.: 780"
+              value={consumoMedioKwh}
+              onChange={(e) => setConsumoMedioKwh(e.target.value.replace(/\D/g, ""))}
+            />
+            <Campo
+              rotulo="Ou valor médio da conta (R$)"
+              inputMode="numeric"
+              placeholder="ex.: 650,00"
+              value={valorFaturaMedio}
+              onChange={(e) => setValorFaturaMedio(formatarMascaraMoeda(e.target.value))}
+            />
+          </div>
+          <p className="text-xs text-zinc-400">Informe uma das duas opções — a outra pode ficar em branco.</p>
+        </fieldset>
+
+        <fieldset className="flex flex-col gap-3">
+          <legend className="mb-2 text-sm font-semibold text-zinc-900">Documentos inteligentes (opcional)</legend>
+          <div className="grid gap-3 md:grid-cols-2">
+            <CardDocumentoInteligente
+              titulo="📄 Anexar CNH"
+              legenda="Preencher cadastro automaticamente"
+              name="anexo_cnh_contato"
+              accept="image/*,.pdf"
+              campos={["Nome encontrado", "CPF encontrado", "Data de nascimento encontrada"]}
+            />
+            <CardDocumentoInteligente
+              titulo="⚡ Anexar conta de energia"
+              legenda="Preencher dados automaticamente"
+              name="anexo_fatura_gerador"
+              accept="image/*,.pdf"
+              campos={["Distribuidora", "Unidade consumidora", "Endereço", "Consumo médio"]}
+            />
+          </div>
+        </fieldset>
+
+        {erroEtapa && <Mensagem resultado={{ ok: false, mensagem: erroEtapa }} />}
+        <div className="flex justify-end">
+          <Botao type="button" onClick={avancar} className="gap-1">
+            Avançar <ChevronRight className="h-4 w-4" />
+          </Botao>
+        </div>
+      </div>
+
+      {/* Etapa 2 — Sistema recomendado */}
+      <div className={etapaAtual === 2 ? "flex flex-col gap-5" : "hidden"}>
+        <fieldset className="flex flex-col gap-3">
+          <legend className="mb-2 text-sm font-semibold text-zinc-900">Resumo do sistema</legend>
+          <dl className="grid grid-cols-2 gap-3 rounded-lg bg-zinc-50 px-4 py-3 text-sm md:grid-cols-3">
+            <div>
+              <dt className="text-zinc-500">Consumo mensal</dt>
+              <dd className="font-medium text-zinc-900">
+                {consumoMedioEstimado ? `${consumoMedioEstimado.toLocaleString("pt-BR")} kWh` : "—"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-zinc-500">Produtividade</dt>
+              <dd className="font-medium text-zinc-900">{parametros?.produtividadeKwhKwpMes ?? 120} kWh/kWp/mês</dd>
+            </div>
+            <div>
+              <dt className="text-zinc-500">Sistema recomendado</dt>
+              <dd className="font-medium text-zinc-900">{sistemaMockKwp ? `${sistemaMockKwp.toLocaleString("pt-BR")} kWp` : "—"}</dd>
+            </div>
+          </dl>
+
+          {sistemaMockKwp && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4">
+              <p className="mb-2 text-sm font-semibold text-zinc-900">Kit recomendado (estimativa)</p>
+              <dl className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
+                <div>
+                  <dt className="text-zinc-500">Potência</dt>
+                  <dd className="font-medium text-zinc-900">{sistemaMockKwp.toLocaleString("pt-BR")} kWp</dd>
+                </div>
+                <div>
+                  <dt className="text-zinc-500">Módulos</dt>
+                  <dd className="font-medium text-zinc-900">{Math.max(1, Math.round((sistemaMockKwp * 1000) / 620))} × 620 W</dd>
+                </div>
+                <div>
+                  <dt className="text-zinc-500">Inversor</dt>
+                  <dd className="font-medium text-zinc-900">exemplo de catálogo</dd>
+                </div>
+                <div>
+                  <dt className="text-zinc-500">Geração / economia / payback</dt>
+                  <dd className="font-medium text-zinc-900">a calcular</dd>
+                </div>
+              </dl>
+              <p className="mt-2 text-xs text-zinc-500">
+                Estimativa ilustrativa — os números reais aparecem ao montar o kit manualmente ou depois de informar a
+                tarifa, na Etapa 3.
+              </p>
+            </div>
+          )}
+
+          <div className="flex items-start gap-2 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-800">
+            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>Combinação compatível · MPPT validado · Voc validado</span>
+          </div>
+        </fieldset>
+
         <div className="flex flex-col gap-1">
           <Campo
-            rotulo="Valor estimado (R$)"
-            name="valor"
+            rotulo="Valor do negócio (R$)"
             inputMode="decimal"
             required
             value={valor}
@@ -201,220 +629,121 @@ export function FormularioNegocio({
             </p>
           )}
         </div>
-        <Campo
-          rotulo="Consumo médio (12 meses, kWh)"
-          name="consumo_medio_kwh"
-          inputMode="decimal"
-          placeholder="ex.: 450"
-          value={consumoMedioKwh}
-          onChange={(e) => setConsumoMedioKwh(e.target.value)}
-        />
-        <Campo
-          rotulo="Ou valor médio da fatura (R$)"
-          name="valor_fatura_medio"
-          inputMode="decimal"
-          placeholder="ex.: 450,00"
-          value={valorFaturaMedio}
-          onChange={(e) => setValorFaturaMedio(e.target.value)}
-        />
-        <Campo
-          rotulo="Tarifa (R$/kWh)"
-          name="tarifa_kwh"
-          inputMode="decimal"
-          placeholder="ex.: 0,95"
-          value={tarifaKwh}
-          onChange={(e) => setTarifaKwh(e.target.value)}
-        />
-        <Selecao
-          rotulo="Tipo de ligação"
-          value={tipoLigacao}
-          onChange={(e) => setTipoLigacao(e.target.value as TipoLigacao)}
-        >
-          {TIPOS_LIGACAO.map((t) => (
-            <option key={t} value={t}>
-              {ROTULO_TIPO_LIGACAO[t]}
-            </option>
-          ))}
-        </Selecao>
-        <Campo rotulo="Unidade consumidora" name="unidade_consumidora" placeholder="Opcional" />
-        <Campo rotulo="Padrão do cliente" name="padrao_cliente" placeholder="Opcional" />
-        <Campo rotulo="Tipo do telhado" name="tipo_telhado" placeholder="Ex.: cerâmico, metálico, laje, solo" />
-        <CampoArquivo rotulo="CNH (opcional)" name="anexo_cnh_negocio" accept="image/*,.pdf" />
-        <label className="flex flex-col gap-1 text-sm md:col-span-2">
-          <span className="font-medium text-zinc-700">Descrição</span>
-          <textarea name="descricao" rows={2} className="rounded-md border border-zinc-300 px-3 py-2" />
-        </label>
-      </fieldset>
 
-      <fieldset className="flex flex-col gap-3">
-        <legend className="mb-2 text-sm font-semibold text-zinc-900">Contato</legend>
-        <div className="flex gap-2">
-          <Botao type="button" variante={modo === "novo" ? "primario" : "secundario"} onClick={() => setModo("novo")}>
-            Novo contato
+        {!mostrarKit ? (
+          <Botao type="button" variante="secundario" onClick={() => setMostrarKit(true)} className="self-start">
+            Montar kit manualmente
           </Botao>
-          <Botao
-            type="button"
-            variante={modo === "existente" ? "primario" : "secundario"}
-            onClick={() => setModo("existente")}
-          >
-            Contato existente
-          </Botao>
-        </div>
-
-        {modo === "existente" ? (
-          <div className="flex flex-col gap-2">
-            {contato ? (
-              <div className="flex items-center justify-between rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm">
-                <span>
-                  <strong>{contato.nome}</strong> {contato.telefone ?? contato.email}
-                </span>
-                <button type="button" className="text-zinc-600 hover:underline" onClick={() => setContato(null)}>
-                  Trocar
-                </button>
-                <input type="hidden" name="contato_id" value={contato.id} />
-              </div>
-            ) : (
+        ) : (
+          <fieldset className="flex flex-col gap-3">
+            <legend className="mb-2 text-sm font-semibold text-zinc-900">Kit personalizado</legend>
+            <EditorComponentesKit linhas={linhas} onChange={setLinhas} sugerirQuantidadeModulo={sugerirQuantidadeModulo} />
+            {previa && (
               <>
-                <Campo
-                  rotulo="Buscar por nome, telefone ou e-mail"
-                  value={busca}
-                  onChange={(e) => pesquisar(e.target.value)}
-                />
-                <ul className="flex flex-col">
-                  {encontrados.map((c) => (
-                    <li key={c.id}>
-                      <button
-                        type="button"
-                        onClick={() => setContato(c)}
-                        className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-zinc-100"
-                      >
-                        <strong>{c.nome}</strong> <span className="text-zinc-500">{c.telefone ?? c.email}</span>
-                      </button>
-                    </li>
-                  ))}
-                  {busca.length >= 2 && !encontrados.length && (
-                    <li className="px-3 py-2 text-sm text-zinc-500">Nenhum contato encontrado.</li>
-                  )}
-                </ul>
+                <dl className="grid grid-cols-2 gap-3 rounded-lg bg-amber-50 px-4 py-3 text-sm md:grid-cols-4">
+                  <div>
+                    <dt className="text-zinc-500">Potência do kit</dt>
+                    <dd className="font-medium text-zinc-900">{potenciaKwp.toLocaleString("pt-BR")} kWp</dd>
+                  </div>
+                  <div>
+                    <dt className="text-zinc-500">Geração estimada</dt>
+                    <dd className="font-medium text-zinc-900">{previa.geracaoEstimadaKwhMes.toLocaleString("pt-BR")} kWh/mês</dd>
+                  </div>
+                  <div>
+                    <dt className="text-zinc-500">Economia estimada</dt>
+                    <dd className="font-medium text-green-700">{formatarMoeda(previa.economiaMensal)}/mês</dd>
+                  </div>
+                  <div>
+                    <dt className="text-zinc-500">Payback estimado</dt>
+                    <dd className="font-medium text-zinc-900">
+                      {previa.paybackMeses != null ? `${previa.paybackMeses.toLocaleString("pt-BR")} meses` : "—"}
+                    </dd>
+                  </div>
+                </dl>
+                {potenciaKwp > 0 && parametros && (previa.geracaoEstimadaKwhMes ?? 0) > 0 ? null : (
+                  <div className="flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                    <span>Confira a combinação de módulo e inversor — faltam dados pra validar o dimensionamento.</span>
+                  </div>
+                )}
               </>
             )}
-          </div>
-        ) : (
-          <div className="grid gap-3 md:grid-cols-2">
-            <Selecao rotulo="Tipo" name="contato_tipo" defaultValue="pf">
-              <option value="pf">Pessoa física</option>
-              <option value="pj">Empresa</option>
-            </Selecao>
-            <Campo rotulo="Nome / razão social" name="contato_nome" required />
-            <Campo
-              rotulo="Telefone / WhatsApp"
-              name="contato_telefone"
-              type="tel"
-              required
-              onBlur={(e) => conferirDuplicado(e.currentTarget.form!)}
-            />
-            <Campo
-              rotulo="E-mail"
-              name="contato_email"
-              type="email"
-              onBlur={(e) => conferirDuplicado(e.currentTarget.form!)}
-            />
-            <div className="md:col-span-2">
-              <Campo rotulo="Endereço" name="contato_endereco" placeholder="Rua, número, bairro" />
-            </div>
-            {duplicados.map((d) => (
-              <div key={d.contatoId} className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900 md:col-span-2">
-                {d.visivel ? (
-                  <>
-                    Já existe o contato <strong>{d.nome}</strong> com esses dados.{" "}
-                    <button
-                      type="button"
-                      className="font-medium underline"
-                      onClick={() => {
-                        setContato({ id: d.contatoId, nome: d.nome, telefone: null, email: null });
-                        setModo("existente");
-                      }}
-                    >
-                      Usar este contato
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    Esse telefone ou e-mail já é de um cliente
-                    {d.responsavel ? (
-                      <>
-                        {" "}
-                        de <strong>{d.responsavel}</strong>
-                      </>
-                    ) : null}
-                    . Fale com o seu gestor antes de seguir.
-                  </>
-                )}
-              </div>
-            ))}
-          </div>
+          </fieldset>
         )}
 
-        <div className="grid gap-3 md:grid-cols-2">
-          <CampoArquivo rotulo="CNH / documento do cliente (opcional)" name="anexo_cnh_contato" accept="image/*,.pdf" />
-          <CampoArquivo rotulo="Fatura do gerador (opcional)" name="anexo_fatura_gerador" accept="image/*,.pdf" />
-          <div className="md:col-span-2">
-            <CampoArquivo
-              rotulo="Fatura dos beneficiários (quando aplicável)"
-              name="anexo_fatura_beneficiario"
-              accept="image/*,.pdf"
-              multiple
-            />
-          </div>
+        {erroEtapa && <Mensagem resultado={{ ok: false, mensagem: erroEtapa }} />}
+        <div className="flex justify-between">
+          <Botao type="button" variante="secundario" onClick={voltar} className="gap-1">
+            <ChevronLeft className="h-4 w-4" /> Voltar
+          </Botao>
+          <Botao type="button" onClick={avancar} className="gap-1">
+            Avançar <ChevronRight className="h-4 w-4" />
+          </Botao>
         </div>
-      </fieldset>
+      </div>
 
-      {!mostrarKit && (
-        <Botao type="button" onClick={() => setMostrarKit(true)} className="self-start">
-          Avançar
-        </Botao>
-      )}
+      {/* Etapa 3 — Dados técnicos e complementares */}
+      <div className={etapaAtual === 3 ? "flex flex-col gap-5" : "hidden"}>
+        <fieldset className="grid gap-3 md:grid-cols-2">
+          <legend className="mb-2 text-sm font-semibold text-zinc-900">Dados da unidade consumidora</legend>
+          <Campo rotulo="Unidade consumidora" name="unidade_consumidora" placeholder="Opcional" />
+          <Campo rotulo="Distribuidora" placeholder="Preenchida automaticamente em breve" disabled />
+          <Campo
+            rotulo="Tarifa ANEEL (R$/kWh)"
+            inputMode="decimal"
+            placeholder="ex.: 0,95"
+            value={tarifaKwh}
+            onChange={(e) => setTarifaKwh(e.target.value)}
+          />
+          <Selecao rotulo="Tipo de ligação" value={tipoLigacao} onChange={(e) => setTipoLigacao(e.target.value as TipoLigacao)}>
+            {TIPOS_LIGACAO.map((t) => (
+              <option key={t} value={t}>
+                {ROTULO_TIPO_LIGACAO[t]}
+              </option>
+            ))}
+          </Selecao>
+        </fieldset>
 
-      {mostrarKit && (
-        <fieldset className="flex flex-col gap-3">
-          <legend className="mb-2 text-sm font-semibold text-zinc-900">Kit personalizado</legend>
-          <EditorComponentesKit linhas={linhas} onChange={setLinhas} sugerirQuantidadeModulo={sugerirQuantidadeModulo} />
+        <fieldset className="grid gap-3 md:grid-cols-2">
+          <legend className="mb-2 text-sm font-semibold text-zinc-900">Características técnicas</legend>
+          <Campo rotulo="Tipo do telhado" name="tipo_telhado" placeholder="Ex.: cerâmico, metálico, laje, solo" />
+          <Campo rotulo="Orientação" placeholder="Ex.: norte" />
+          <Campo rotulo="Inclinação" placeholder="Ex.: 15°" />
+          <Campo rotulo="Área disponível" placeholder="Ex.: 40 m²" />
+          <Campo rotulo="Padrão do cliente" name="padrao_cliente" placeholder="Opcional" />
           <Campo
             rotulo="Estrutura do telhado"
-            name="estrutura_telhado"
             value={estruturaTelhado}
             onChange={(e) => setEstruturaTelhado(e.target.value)}
             placeholder="Ex.: perfil de alumínio, gancho"
           />
-          {previa && (
-            <dl className="grid grid-cols-2 gap-3 rounded-lg bg-amber-50 px-4 py-3 text-sm md:grid-cols-4">
-              <div>
-                <dt className="text-zinc-500">Potência do kit</dt>
-                <dd className="font-medium text-zinc-900">{potenciaKwp.toLocaleString("pt-BR")} kWp</dd>
-              </div>
-              <div>
-                <dt className="text-zinc-500">Geração estimada</dt>
-                <dd className="font-medium text-zinc-900">{previa.geracaoEstimadaKwhMes.toLocaleString("pt-BR")} kWh/mês</dd>
-              </div>
-              <div>
-                <dt className="text-zinc-500">Economia estimada</dt>
-                <dd className="font-medium text-green-700">{formatarMoeda(previa.economiaMensal)}/mês</dd>
-              </div>
-              <div>
-                <dt className="text-zinc-500">Payback estimado</dt>
-                <dd className="font-medium text-zinc-900">
-                  {previa.paybackMeses != null ? `${previa.paybackMeses.toLocaleString("pt-BR")} meses` : "—"}
-                </dd>
-              </div>
-            </dl>
-          )}
+          <label className="flex flex-col gap-1 text-sm md:col-span-2">
+            <span className="font-medium text-zinc-700">Observações técnicas</span>
+            <textarea name="descricao" rows={2} className="rounded-md border border-zinc-300 px-3 py-2" />
+          </label>
+        </fieldset>
 
-          <Mensagem resultado={resultado} />
-          <Botao type="submit" disabled={pendente || (modo === "existente" && !contato)} className="self-start">
+        <fieldset className="grid gap-3 md:grid-cols-2">
+          <legend className="mb-2 text-sm font-semibold text-zinc-900">Documentos</legend>
+          <p className="text-xs text-zinc-400 md:col-span-2">
+            CNH e conta de energia já enviados na Etapa 1 aparecem aqui como anexos do negócio.{" "}
+            <Selo tom="neutro">opcional</Selo>
+          </p>
+          <div className="md:col-span-2">
+            <CampoArquivo rotulo="Fotos e outros documentos" name="anexo_fatura_beneficiario" accept="image/*,.pdf" multiple />
+          </div>
+        </fieldset>
+
+        <Mensagem resultado={resultado} />
+        <div className="flex justify-between">
+          <Botao type="button" variante="secundario" onClick={voltar} className="gap-1">
+            <ChevronLeft className="h-4 w-4" /> Voltar
+          </Botao>
+          <Botao type="submit" disabled={pendente || (modo === "existente" && !contato)}>
             {pendente ? "Salvando..." : "Salvar negócio"}
           </Botao>
-        </fieldset>
-      )}
+        </div>
+      </div>
     </form>
   );
 }

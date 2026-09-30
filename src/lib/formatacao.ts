@@ -6,6 +6,28 @@ export function formatarMoeda(valor: number | null | undefined) {
   return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+/** Máscara de telefone brasileiro (fixo ou celular) a partir do que o usuário digita. */
+export function formatarTelefoneBr(valor: string) {
+  const d = valor.replace(/\D/g, "").slice(0, 11);
+  if (d.length <= 2) return d;
+  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+}
+
+/** Máscara de CEP ("00000-000") a partir do que o usuário digita. */
+export function formatarCep(valor: string) {
+  const d = valor.replace(/\D/g, "").slice(0, 8);
+  return d.length <= 5 ? d : `${d.slice(0, 5)}-${d.slice(5)}`;
+}
+
+/** Máscara monetária progressiva (dígitos → "1.234,56") pra campos de valor digitado. */
+export function formatarMascaraMoeda(valor: string) {
+  const digitos = valor.replace(/\D/g, "");
+  if (!digitos) return "";
+  return (Number(digitos) / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 export function formatarDataHora(iso: string) {
   return new Date(iso).toLocaleString("pt-BR", {
     day: "2-digit",
