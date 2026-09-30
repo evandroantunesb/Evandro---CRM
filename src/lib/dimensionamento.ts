@@ -253,9 +253,14 @@ export function avaliarCombinacaoEscolhida(
 
 /**
  * Retorna até 3 opções (1 recomendada + até 2 alternativas), ranqueadas por:
- * dentro do overload automático primeiro, depois prioridade comercial do
- * equipamento (maior primeiro), depois overload mais próximo de um "ponto
- * ideal" (nem sistema subdimensionado, nem inversor superdimensionado à toa).
+ * prioridade comercial do equipamento (maior primeiro), depois overload mais
+ * próximo de um "ponto ideal" (nem sistema subdimensionado, nem inversor
+ * superdimensionado à toa). Combinações acima de `overloadMaximoPct` NUNCA
+ * entram aqui (Evandro, 2026-09-30: overload acima do limite é risco de
+ * engenharia, não preferência — só pode existir como override manual
+ * explícito, nunca como sugestão automática). Quando nenhuma combinação passa
+ * no limite, retorna `[]`; quem chama mostra que não há kit automático pra
+ * esse consumo com o catálogo atual.
  */
 export function dimensionarSistemaAutomatico(params: {
   consumoMedioKwh: number;
@@ -284,11 +289,10 @@ export function dimensionarSistemaAutomatico(params: {
       .map((inversor) =>
         avaliarCombinacao(modulo, inversor, potenciaAlvoKwp, overloadMaximoPct, temperaturaMinimaProjetoC),
       )
-      .filter((opcao): opcao is OpcaoSistemaAutomatico => opcao !== null),
+      .filter((opcao): opcao is OpcaoSistemaAutomatico => opcao !== null && opcao.validacao === "valido"),
   );
 
   opcoes.sort((a, b) => {
-    if (a.validacao !== b.validacao) return a.validacao === "valido" ? -1 : 1;
     const prioridade = b.modulo.prioridade + b.inversor.prioridade - (a.modulo.prioridade + a.inversor.prioridade);
     if (prioridade !== 0) return prioridade;
     return Math.abs(a.overloadPct - OVERLOAD_ALVO_PCT) - Math.abs(b.overloadPct - OVERLOAD_ALVO_PCT);

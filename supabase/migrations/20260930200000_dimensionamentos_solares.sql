@@ -81,3 +81,43 @@ create policy "apagar dimensionamento" on public.dimensionamentos_solares for de
     public.pode_ver_negocio(negocio_id)
     and (criado_por = public.meu_membro_id(empresa_id) or public.tem_papel(empresa_id, '{admin}'))
   );
+
+-- Auditoria de override manual (pedido do Evandro, 2026-09-30): overload acima do limite
+-- automático (`overload_maximo_pct`) nunca é sugerido pelo motor (ver `dimensionamento.ts`),
+-- só existe quando o vendedor escolhe/ajusta manualmente uma combinação que ultrapassa o
+-- limite — isso precisa ficar registrado na linha do tempo do negócio, não só na tabela.
+create or replace function public.registrar_overload_manual_dimensionamento()
+returns trigger
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_ator uuid := (select auth.uid());
+begin
+  if new.validacao = 'valido_com_alerta' and (
+    tg_op = 'INSERT'
+    or old.overload_pct is distinct from new.overload_pct
+    or old.modulo_equipamento_id is distinct from new.modulo_equipamento_id
+    or old.inversor_equipamento_id is distinct from new.inversor_equipamento_id
+    or old.quantidade_modulos is distinct from new.quantidade_modulos
+  ) then
+    insert into public.atividades (empresa_id, negocio_id, tipo, ator_id, dados)
+      values (
+        new.empresa_id, new.negocio_id, 'dimensionamento_overload_manual', v_ator,
+        jsonb_build_object(
+          'overload_pct', new.overload_pct,
+          'overload_maximo_pct', new.overload_maximo_pct,
+          'potencia_dc_kwp', new.potencia_dc_kwp,
+          'potencia_ac_kw', new.potencia_ac_kw,
+          'quantidade_modulos', new.quantidade_modulos,
+          'modulo_equipamento_id', new.modulo_equipamento_id,
+          'inversor_equipamento_id', new.inversor_equipamento_id
+        )
+      );
+  end if;
+  return null;
+end;
+$$;
+
+create trigger dimensionamentos_solares_registrar_overload
+  after insert or update on public.dimensionamentos_solares
+  for each row execute function public.registrar_overload_manual_dimensionamento();

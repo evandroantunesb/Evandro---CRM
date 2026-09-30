@@ -33,6 +33,11 @@ export function descreverAtividade(tipo: string, dadosJson: Json, nomes: Nomes):
       return "Negócio perdido";
     case "negocio_reaberto":
       return "Negócio reaberto";
+    case "dimensionamento_overload_manual": {
+      const overload = Math.round(Number(d.overload_pct) * 100);
+      const limite = Math.round(Number(d.overload_maximo_pct) * 100);
+      return `Kit com overload de ${overload}% escolhido manualmente (acima do limite automático de ${limite}%)`;
+    }
     case "motivo_perda":
       return `Motivo da perda: ${nomeOu(nomes.motivo, d.motivo_id, "?")}${d.detalhe ? ` (${d.detalhe})` : ""}`;
     case "tarefa_criada":

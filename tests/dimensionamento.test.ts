@@ -42,9 +42,9 @@ describe("dimensionarSistemaAutomatico", () => {
     expect(opcao?.overloadPct).toBeCloseTo(1.108, 3);
   });
 
-  it("marca overload acima do limite automático como 'valido_com_alerta', não bloqueia", () => {
+  it("NUNCA sugere automaticamente combinação acima do limite de overload (Evandro, 2026-09-30: só entra por override manual)", () => {
     // 8,06 kWp / 6 kW = 34,3% de overload, acima do limite de 30% (seção 156 da spec).
-    const [opcao] = dimensionarSistemaAutomatico({
+    const opcoes = dimensionarSistemaAutomatico({
       consumoMedioKwh: 780,
       margemPct: 0.2,
       produtividadeKwhKwpMes: 120,
@@ -53,11 +53,10 @@ describe("dimensionarSistemaAutomatico", () => {
       overloadMaximoPct: 0.3,
       temperaturaMinimaProjetoC: TEMPERATURA_PADRAO_C,
     });
-    expect(opcao.overloadPct).toBeCloseTo(0.343, 2);
-    expect(opcao.validacao).toBe("valido_com_alerta");
+    expect(opcoes).toEqual([]);
   });
 
-  it("prioriza opções válidas sobre opções com alerta, mesmo com prioridade comercial menor", () => {
+  it("prioriza opções válidas, ignorando por completo as que ficariam acima do limite (não aparecem nem como alternativa)", () => {
     const opcoes = dimensionarSistemaAutomatico({
       consumoMedioKwh: 780,
       margemPct: 0.2,
@@ -67,6 +66,7 @@ describe("dimensionarSistemaAutomatico", () => {
       overloadMaximoPct: 0.3,
       temperaturaMinimaProjetoC: TEMPERATURA_PADRAO_C,
     });
+    expect(opcoes.length).toBe(1);
     expect(opcoes[0].inversor.id).toBe("i1");
     expect(opcoes[0].validacao).toBe("valido");
   });

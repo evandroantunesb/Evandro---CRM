@@ -502,7 +502,7 @@ export function FormularioNegocio({
               {modulosAtivos.length > 0 && inversoresAtivos.length > 0 ? (
                 mostrarEditorManual ? (
                   <>
-                    <p className="text-sm font-medium text-zinc-700">Montar kit manualmente</p>
+                    <p className="text-sm font-medium text-zinc-700">Montar kit item por item (fora do catálogo)</p>
                     <EditorComponentesKit
                       linhas={linhas}
                       onChange={setLinhas}
@@ -512,7 +512,7 @@ export function FormularioNegocio({
                   </>
                 ) : (
                   <Botao type="button" variante="secundario" onClick={() => setMostrarEditorManual(true)} className="self-start">
-                    Montar kit manualmente
+                    Montar kit item por item (fora do catálogo)
                   </Botao>
                 )
               ) : (
