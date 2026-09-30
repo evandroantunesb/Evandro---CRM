@@ -14,12 +14,14 @@ export function FeedbackHandoff({
   negocioId,
   handoffId,
   souAutor,
+  jaContatouLead,
   feedback,
   autorNome,
 }: {
   negocioId: string;
   handoffId: string;
   souAutor: boolean;
+  jaContatouLead: boolean;
   feedback: string | null;
   autorNome: string | null;
 }) {
@@ -35,6 +37,14 @@ export function FeedbackHandoff({
           <p className="text-sm text-zinc-500">{autorNome ?? "O vendedor"} ainda não escreveu um feedback sobre este lead.</p>
         )}
       </div>
+    );
+  }
+
+  if (!jaContatouLead && !feedback) {
+    return (
+      <p className="text-sm text-zinc-500">
+        Registre uma nota do contato com o lead (em &quot;Notas e linha do tempo&quot;) pra liberar o feedback aqui.
+      </p>
     );
   }
 

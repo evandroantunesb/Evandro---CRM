@@ -117,7 +117,7 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
 
   const { data: ultimoHandoff } = await supabase
     .from("handoffs")
-    .select("id, para_membro_id, handoffs_feedback(feedback, autor_id)")
+    .select("id, para_membro_id, created_at, handoffs_feedback(feedback, autor_id)")
     .eq("negocio_id", id)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -305,12 +305,16 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
             (souAdmin || atual.papel === "gestor" || atual.membroId === ultimoHandoff.para_membro_id) &&
             (() => {
               const feedbackExistente = ultimoHandoff.handoffs_feedback as unknown as { feedback: string; autor_id: string } | null;
+              const jaContatouLead = (notas ?? []).some(
+                (n) => n.autor_id === ultimoHandoff.para_membro_id && n.created_at > ultimoHandoff.created_at,
+              );
               return (
                 <Cartao titulo="Feedback do lead (handoff)">
                   <FeedbackHandoff
                     negocioId={negocio.id}
                     handoffId={ultimoHandoff.id}
                     souAutor={atual.membroId === ultimoHandoff.para_membro_id}
+                    jaContatouLead={jaContatouLead}
                     feedback={feedbackExistente?.feedback ?? null}
                     autorNome={feedbackExistente ? nomes.membro(feedbackExistente.autor_id) : null}
                   />
