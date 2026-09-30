@@ -1,6 +1,6 @@
 # Progresso — Raion CRM
 
-Resumo do estado do desenvolvimento. **Atualize ao concluir cada funcionalidade:** alterações (com número da PR), arquivos modificados, decisões técnicas e próximas tarefas. Última atualização: 2026-09-29.
+Resumo do estado do desenvolvimento. **Atualize ao concluir cada funcionalidade:** alterações (com número da PR), arquivos modificados, decisões técnicas e próximas tarefas. Última atualização: 2026-09-30.
 
 ## Em produção
 
@@ -24,6 +24,7 @@ Resumo do estado do desenvolvimento. **Atualize ao concluir cada funcionalidade:
 - #65 campos obrigatórios: valor do negócio (> 0) ao criar/editar e telefone do contato, no formulário e no servidor (`src/lib/acoes/negocios.ts`, `src/lib/acoes/contatos.ts` e os 3 formulários). Captura pública, rodízio e regras por etapa não mudam.
 - #44 dashboard unificado de Gamificação (`/gamificacao`) · #48 inclui a redistribuição da carteira ao desligar vendedor.
 - Correção definitiva das migrations travadas: `--include-all` fixo em `banco-producao.yml`.
+- #77 Início: cards "Resumo do funil" (barras por etapa do funil ativo, cor de `etapas.cor`, mais barra "Fechado" com negócios ganhos no mês) e "Meta comercial do mês/da equipe" (anel de progresso + Meta/Realizado/Faltam/Contratos/Ticket médio), nas visões Pessoal e Equipe. Testado e aprovado pelo Evandro. Pendente: rodar o workflow manual "Popular metas comerciais dos vendedores" (`.github/workflows/seed-metas-vendedores.yml`) na aba Actions pra popular metas de exemplo (a visão de equipe fica vazia até então).
 
 ## Em andamento
 
@@ -50,7 +51,8 @@ Resumo do estado do desenvolvimento. **Atualize ao concluir cada funcionalidade:
 
 ## Próximos passos
 
-1. Mesclar a PR #63 (documentação de contexto).
-2. Criar os secrets do backup, mesclar a PR #62 e rodar o backup uma vez manualmente.
-3. Revisar as PRs do Dependabot (#60 e #61 são versões maiores).
-4. Escolher o próximo item com o Evandro (candidato: mais estilo nos cards do Kanban). Contexto completo da troca de thread em `HANDOFF.md`.
+1. Rodar o workflow manual "Popular metas comerciais dos vendedores" (Actions) pra popular a Início (#77) com metas de exemplo.
+2. Mesclar a PR #63 (documentação de contexto).
+3. Criar os secrets do backup, mesclar a PR #62 e rodar o backup uma vez manualmente.
+4. Revisar as PRs do Dependabot (#60 e #61 são versões maiores).
+5. Escolher o próximo item com o Evandro. Contexto completo da troca de thread em `HANDOFF.md`.
