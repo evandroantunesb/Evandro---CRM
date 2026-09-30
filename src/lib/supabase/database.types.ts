@@ -1227,7 +1227,7 @@ export type Database = {
           negocio_id: string;
           observacoes: string | null;
           para_membro_id: string;
-          qualificacao_snapshot: Json;
+          qualificacao_snapshot: NonNullable<Json>;
           status_qualificacao: string;
         };
         Insert: {
@@ -1239,7 +1239,7 @@ export type Database = {
           negocio_id: string;
           observacoes?: string | null;
           para_membro_id: string;
-          qualificacao_snapshot?: Json;
+          qualificacao_snapshot?: NonNullable<Json>;
           status_qualificacao: string;
         };
         Update: {
@@ -1251,7 +1251,7 @@ export type Database = {
           negocio_id?: string;
           observacoes?: string | null;
           para_membro_id?: string;
-          qualificacao_snapshot?: Json;
+          qualificacao_snapshot?: NonNullable<Json>;
           status_qualificacao?: string;
         };
         Relationships: [
