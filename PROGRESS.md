@@ -42,6 +42,11 @@ Todas as PRs de #85 a #94 mescladas em 2026-09-30 (`pode dar merge`). Nenhuma te
 
 ## Em andamento
 
+- **PR #96 — motor único de dimensionamento (branch `feature/negocio-kit-automatico`):** unifica o cálculo do kit (módulo+inversor) numa tabela própria (`dimensionamentos_solares`), sempre recalculado no servidor. Commits já mesclados na PR (CI verde, sem review pendente, ainda não mesclada na `main`):
+  - `8c937bb` completa campos técnicos de inversor em "Equipamentos ativos" (tipo on-grid/híbrido, tensão de partida, entradas por MPPT, tensão/fases/corrente CA, eficiência) — antes o formulário de inversor era quase idêntico ao de módulo.
+  - `30e15d8` separa `dc_ac_ratio` de `overload_pct` (painel mostrava 210,8% em vez de 110,8% — o cálculo já estava certo, só faltava separar os campos), esconde o editor de kit manual atrás de um botão, e mostra os campos técnicos específicos que faltam em vez de "não verificado" genérico.
+  - `378ec4c` regra de negócio: overload acima do limite (`overload_maximo_pct`, padrão 30%) nunca aparece mais como sugestão automática — só via seleção manual explícita (novo seletor módulo+inversor no painel), com auditoria automática na linha do tempo do negócio (trigger `dimensionamentos_solares_registrar_overload`, tipo `dimensionamento_overload_manual`).
+  - `c71b192` base (schema + função pura, **sem UI/action conectada ainda**) pra resolver a distribuidora automaticamente a partir do município (Etapa 1 do wizard) — `src/lib/distribuidoras.ts`, migration `20260930220000_municipios_distribuidoras.sql`. Pausado a pedido do Evandro pra priorizar o redesenho do wizard (próximo item). Faltam: action server (`resolverDistribuidoraPorMunicipio`), reaproveitar `buscarTarifaHomologada` por sigla/distribuidora, wiring no wizard, e importar os dados reais do IBGE/ANEEL (esta sandbox não tem acesso à rede).
 - **PR #63 — contexto do Claude:** `CLAUDE.md` enxuto (regras permanentes + seleção de modelos), `docs/arquitetura.md`, `docs/regras-negocio.md`, `PROGRESS.md`, `HANDOFF.md` e `.claude/settings.json`. 
 - **PR #62 — backup diário do banco de produção** para o repositório privado `raion-crm-backups`. Aguardando o Evandro criar os secrets `BACKUP_ENCRYPTION_KEY` e `BACKUP_REPO_TOKEN`.
 - **PRs do Dependabot abertas:** #55–#58 (Actions), #60 (TypeScript 6), #61 (`@types/node` 26). Atualizações maiores: revisar com cuidado antes de mesclar.
@@ -65,10 +70,11 @@ Todas as PRs de #85 a #94 mescladas em 2026-09-30 (`pode dar merge`). Nenhuma te
 
 ## Próximos passos
 
-1. Conferir visualmente as telas restilizadas (Tarefas #80, Contatos #82), o papel SDR completo (#85/#86/#88/#89/#91) e a distribuição de leads (#90) — nada testado em navegador nem contra banco real ainda (sem Docker local).
-2. Rodar o workflow manual "Popular metas comerciais dos vendedores" (Actions) pra popular a Início (#77) com metas de exemplo.
-3. Mesclar a PR #63 (documentação de contexto).
-4. Criar os secrets do backup, mesclar a PR #62 e rodar o backup uma vez manualmente.
-5. Fases futuras da spec de SDR (fase 8 gamificação, fase 9 métricas, fase 10 testes RLS, visibilidade configurável, devolução de lead, aceite/rejeição de handoff, SLA, motor de permissões ABAC).
-6. Revisar as PRs do Dependabot (#60 e #61 são versões maiores).
-7. Escolher o próximo item com o Evandro. Contexto completo da troca de thread em `HANDOFF.md`.
+1. **Prioridade atual (nova thread, a pedido do Evandro 2026-09-30):** redesenho visual do wizard "Adicionar negócio" em 3 etapas (Cliente e consumo / Sistema recomendado / Dados técnicos e complementares), conforme spec detalhada enviada pelo Evandro no chat. Regras explícitas: **não alterar motor de cálculo, fórmulas, regras elétricas, integrações existentes nem persistência/banco** — só interface, com dados mockados na Etapa 2 (resumo do sistema, kit cards, alertas ✓/⚠/❌) e placeholders visuais de "Documentos inteligentes" (CNH, conta de energia) sem OCR. Etapa 1 ganha bloco Cliente (existente/novo, nome, WhatsApp com máscara/validação BR, e-mail validado) e endereço estruturado (CEP/Rua/Número/Complemento/Bairro/Cidade/Estado, com autofill por CEP) e bloco Consumo (kWh médio OU valor médio da conta em R$); remove dessa tela: valor estimado, tarifa manual, unidade consumidora, tipo de ligação, padrão do cliente, tipo de telhado, documentos obrigatórios, dados técnicos (tudo isso vai pra Etapa 3). Manter os atalhos existentes (Início, Kanban, Contato → "Novo negócio") abrindo o mesmo wizard. Após validação visual pelo Evandro, retomar os ajustes do motor/integrações abaixo.
+2. Depois da validação visual do wizard: retomar a Etapa 1 de tarifa automática (município → distribuidora → tarifa ANEEL), pausada em `c71b192` — falta a action server, o wiring no wizard e os dados reais do IBGE/ANEEL.
+3. Conferir visualmente as telas restilizadas (Tarefas #80, Contatos #82), o papel SDR completo (#85/#86/#88/#89/#91), a distribuição de leads (#90) e o motor único de dimensionamento (PR #96) — nada testado em navegador nem contra banco real ainda (sem Docker local).
+4. Rodar o workflow manual "Popular metas comerciais dos vendedores" (Actions) pra popular a Início (#77) com metas de exemplo.
+5. Mesclar a PR #63 (documentação de contexto) e a PR #96 (motor único de dimensionamento, quando o Evandro aprovar).
+6. Criar os secrets do backup, mesclar a PR #62 e rodar o backup uma vez manualmente.
+7. Fases futuras da spec de SDR (fase 8 gamificação, fase 9 métricas, fase 10 testes RLS, visibilidade configurável, devolução de lead, aceite/rejeição de handoff, SLA, motor de permissões ABAC).
+8. Revisar as PRs do Dependabot (#60 e #61 são versões maiores).
