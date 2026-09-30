@@ -525,3 +525,36 @@ export async function enviarParaVendas(_: ResultadoAcao, formData: FormData): Pr
   revalidatePath(`/negocios/${d.negocioId}`);
   return { ok: true, mensagem: "Enviado para vendas." };
 }
+
+const esquemaFeedbackHandoff = z.object({
+  handoffId: z.string().uuid(),
+  negocioId: z.string().uuid(),
+  feedback: z.string().trim().min(1, "Escreva o feedback.").max(2000),
+});
+
+/**
+ * Feedback do vendedor sobre o lead recebido via handoff (pedido do Evandro 2026-09-30):
+ * visível só a admin/gestor e ao próprio autor — nunca ao SDR que fez o handoff (RLS em
+ * handoffs_feedback garante isso, não só a tela). Serve de métrica pra avaliar o SDR.
+ */
+export async function registrarFeedbackHandoff(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  const { atual } = await exigirPapel();
+  const dados = esquemaFeedbackHandoff.safeParse(Object.fromEntries(formData));
+  if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
+  const d = dados.data;
+
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.from("handoffs_feedback").upsert(
+    {
+      empresa_id: atual.empresaId,
+      handoff_id: d.handoffId,
+      autor_id: atual.membroId,
+      feedback: d.feedback,
+    },
+    { onConflict: "handoff_id" },
+  );
+  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível salvar o feedback.") };
+
+  revalidatePath(`/negocios/${d.negocioId}`);
+  return { ok: true, mensagem: "Feedback salvo." };
+}

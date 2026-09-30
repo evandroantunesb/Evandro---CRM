@@ -4,7 +4,12 @@ import { carregarLeadsSemContato } from "@/lib/leads-sem-contato";
 import { carregarPropostasParadas } from "@/lib/propostas-paradas";
 import { criarClienteServidor } from "@/lib/supabase/server";
 
-export type Notificacao = { id: string; tipo: "lead_atribuido" | "tarefa_atribuida"; mensagem: string; link: string | null };
+export type Notificacao = {
+  id: string;
+  tipo: "lead_atribuido" | "tarefa_atribuida" | "handoff_recebido";
+  mensagem: string;
+  link: string | null;
+};
 
 /** Notificações individuais não lidas do sininho (fase 7, spec SDR §45) — só os 2 tipos hoje suportados. */
 export async function carregarNotificacoesNaoLidas(empresaId: string, membroId: string, limite = 8): Promise<Notificacao[]> {
