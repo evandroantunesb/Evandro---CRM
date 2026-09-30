@@ -671,6 +671,148 @@ export type Database = {
         };
         Relationships: [];
       };
+      dimensionamentos_solares: {
+        Row: {
+          atualizado_por: string | null;
+          consumo_medio_kwh: number;
+          created_at: string;
+          criado_por: string | null;
+          disponibilidade_kwh: number;
+          economia_mensal: number;
+          empresa_id: string;
+          geracao_estimada_kwh_mes: number;
+          id: string;
+          inversor_equipamento_id: string;
+          margem_dimensionamento_pct: number;
+          modulo_equipamento_id: string;
+          negocio_id: string;
+          origem_produtividade: Database["public"]["Enums"]["origem_produtividade_dimensionamento"];
+          origem_tarifa: Database["public"]["Enums"]["origem_tarifa_dimensionamento"];
+          overload_maximo_pct: number;
+          overload_pct: number;
+          payback_meses: number | null;
+          potencia_ac_kw: number;
+          potencia_dc_kwp: number;
+          preco_negocio: number;
+          produtividade_kwh_kwp_mes: number;
+          quantidade_modulos: number;
+          tarifa_kwh: number;
+          temperatura_minima_projeto_c: number;
+          tipo_ligacao: Database["public"]["Enums"]["tipo_ligacao"];
+          updated_at: string;
+          validacao: Database["public"]["Enums"]["tipo_validacao_dimensionamento"];
+          validacao_eletrica: Database["public"]["Enums"]["tipo_validacao_eletrica_dimensionamento"];
+          valor_fatura_medio: number | null;
+        };
+        Insert: {
+          atualizado_por?: string | null;
+          consumo_medio_kwh: number;
+          created_at?: string;
+          criado_por?: string | null;
+          disponibilidade_kwh: number;
+          economia_mensal: number;
+          empresa_id: string;
+          geracao_estimada_kwh_mes: number;
+          id?: string;
+          inversor_equipamento_id: string;
+          margem_dimensionamento_pct: number;
+          modulo_equipamento_id: string;
+          negocio_id: string;
+          origem_produtividade?: Database["public"]["Enums"]["origem_produtividade_dimensionamento"];
+          origem_tarifa?: Database["public"]["Enums"]["origem_tarifa_dimensionamento"];
+          overload_maximo_pct: number;
+          overload_pct: number;
+          payback_meses?: number | null;
+          potencia_ac_kw: number;
+          potencia_dc_kwp: number;
+          preco_negocio: number;
+          produtividade_kwh_kwp_mes: number;
+          quantidade_modulos: number;
+          tarifa_kwh: number;
+          temperatura_minima_projeto_c: number;
+          tipo_ligacao?: Database["public"]["Enums"]["tipo_ligacao"];
+          updated_at?: string;
+          validacao: Database["public"]["Enums"]["tipo_validacao_dimensionamento"];
+          validacao_eletrica: Database["public"]["Enums"]["tipo_validacao_eletrica_dimensionamento"];
+          valor_fatura_medio?: number | null;
+        };
+        Update: {
+          atualizado_por?: string | null;
+          consumo_medio_kwh?: number;
+          created_at?: string;
+          criado_por?: string | null;
+          disponibilidade_kwh?: number;
+          economia_mensal?: number;
+          empresa_id?: string;
+          geracao_estimada_kwh_mes?: number;
+          id?: string;
+          inversor_equipamento_id?: string;
+          margem_dimensionamento_pct?: number;
+          modulo_equipamento_id?: string;
+          negocio_id?: string;
+          origem_produtividade?: Database["public"]["Enums"]["origem_produtividade_dimensionamento"];
+          origem_tarifa?: Database["public"]["Enums"]["origem_tarifa_dimensionamento"];
+          overload_maximo_pct?: number;
+          overload_pct?: number;
+          payback_meses?: number | null;
+          potencia_ac_kw?: number;
+          potencia_dc_kwp?: number;
+          preco_negocio?: number;
+          produtividade_kwh_kwp_mes?: number;
+          quantidade_modulos?: number;
+          tarifa_kwh?: number;
+          temperatura_minima_projeto_c?: number;
+          tipo_ligacao?: Database["public"]["Enums"]["tipo_ligacao"];
+          updated_at?: string;
+          validacao?: Database["public"]["Enums"]["tipo_validacao_dimensionamento"];
+          validacao_eletrica?: Database["public"]["Enums"]["tipo_validacao_eletrica_dimensionamento"];
+          valor_fatura_medio?: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "dimensionamentos_solares_atualizado_por_fkey";
+            columns: ["atualizado_por"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "dimensionamentos_solares_criado_por_fkey";
+            columns: ["criado_por"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "dimensionamentos_solares_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "dimensionamentos_solares_inversor_equipamento_id_fkey";
+            columns: ["inversor_equipamento_id"];
+            isOneToOne: false;
+            referencedRelation: "equipamentos_empresa";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "dimensionamentos_solares_modulo_equipamento_id_fkey";
+            columns: ["modulo_equipamento_id"];
+            isOneToOne: false;
+            referencedRelation: "equipamentos_empresa";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "dimensionamentos_solares_negocio_id_fkey";
+            columns: ["negocio_id"];
+            isOneToOne: true;
+            referencedRelation: "negocios";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       empresa_membros: {
         Row: {
           ativo: boolean;
@@ -3131,6 +3273,8 @@ export type Database = {
       modelo_cobranca: "por_usuario" | "fixo" | "fixo_mais_usuario";
       modo_distribuicao_leads: "somente_vendedores" | "somente_sdr" | "parcial" | "aleatorio";
       modo_preco_proposta: "sem_preco" | "parcelado" | "avista" | "completo";
+      origem_produtividade_dimensionamento: "padrao" | "pvgis" | "nasa";
+      origem_tarifa_dimensionamento: "manual" | "aneel";
       papel_membro: "admin" | "gestor" | "vendedor" | "sdr";
       periodo_limite_regra: "dia" | "mes";
       proposta_bloco_quebra: "auto" | "nova_pagina" | "pagina_exclusiva";
@@ -3148,6 +3292,8 @@ export type Database = {
       tipo_pessoa: "pf" | "pj";
       tipo_plano: "gratuito" | "pago";
       tipo_tarefa: "ligacao" | "whatsapp" | "visita" | "reuniao" | "email" | "outro";
+      tipo_validacao_dimensionamento: "valido" | "valido_com_alerta";
+      tipo_validacao_eletrica_dimensionamento: "valido" | "nao_verificado";
       tipo_vendedor: "interno" | "representante";
     };
     CompositeTypes: {
@@ -3271,6 +3417,8 @@ export const Constants = {
       modelo_cobranca: ["por_usuario", "fixo", "fixo_mais_usuario"],
       modo_distribuicao_leads: ["somente_vendedores", "somente_sdr", "parcial", "aleatorio"],
       modo_preco_proposta: ["sem_preco", "parcelado", "avista", "completo"],
+      origem_produtividade_dimensionamento: ["padrao", "pvgis", "nasa"],
+      origem_tarifa_dimensionamento: ["manual", "aneel"],
       papel_membro: ["admin", "gestor", "vendedor", "sdr"],
       periodo_limite_regra: ["dia", "mes"],
       proposta_bloco_quebra: ["auto", "nova_pagina", "pagina_exclusiva"],
@@ -3288,6 +3436,8 @@ export const Constants = {
       tipo_pessoa: ["pf", "pj"],
       tipo_plano: ["gratuito", "pago"],
       tipo_tarefa: ["ligacao", "whatsapp", "visita", "reuniao", "email", "outro"],
+      tipo_validacao_dimensionamento: ["valido", "valido_com_alerta"],
+      tipo_validacao_eletrica_dimensionamento: ["valido", "nao_verificado"],
       tipo_vendedor: ["interno", "representante"],
     },
   },

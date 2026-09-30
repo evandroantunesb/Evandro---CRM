@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Cartao } from "@/components/ui";
 import { carregarConfiguracao } from "@/lib/crm";
+import { paraEquipamentoAtivo } from "@/lib/dimensionamento";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { FormularioNegocio } from "./formulario";
@@ -50,22 +51,8 @@ export default async function NovoNegocio({ searchParams }: PageProps<"/negocios
               : null
           }
           equipamentosAtivos={(equipamentos ?? []).map((e) => ({
-            id: e.id,
+            ...paraEquipamentoAtivo(e),
             tipo: e.tipo as "modulo" | "inversor",
-            fabricante: e.fabricante,
-            modelo: e.modelo,
-            potenciaW: e.potencia_w,
-            prioridade: e.prioridade,
-            vocV: e.voc_v,
-            iscA: e.isc_a,
-            vmpV: e.vmp_v,
-            impA: e.imp_a,
-            coefTempVocPctC: e.coef_temp_voc_pct_c,
-            tensaoMaxDcV: e.tensao_max_dc_v,
-            mpptMinV: e.mppt_min_v,
-            mpptMaxV: e.mppt_max_v,
-            correnteMaxEntradaA: e.corrente_max_entrada_a,
-            quantidadeMppt: e.quantidade_mppt,
             precoReferenciaBRL: e.preco_referencia_brl,
           }))}
         />

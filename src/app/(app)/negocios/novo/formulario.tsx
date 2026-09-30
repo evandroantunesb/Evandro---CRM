@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useMemo, useState, useTransition } from "react";
 import { CampoArquivo } from "@/components/campo-arquivo";
 import { EditorComponentesKit, linhasParaComponentes, type LinhaComponente } from "@/components/kit-componentes";
+import { PainelDimensionamento, type EscolhaDimensionamento } from "@/components/dimensionamento/painel-dimensionamento";
 import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
 import { buscarTarifaDaEmpresa, type TarifaEncontrada } from "@/lib/acoes/aneel";
 import { buscarProdutividadeRegionalPorEndereco } from "@/lib/acoes/geodados";
@@ -14,7 +15,7 @@ import {
   potenciaKitPersonalizadoKwp,
   sugerirQuantidadeModulos,
 } from "@/lib/calculadora";
-import { dimensionarSistemaAutomatico, type EquipamentoAtivo, type OpcaoSistemaAutomatico } from "@/lib/dimensionamento";
+import type { EquipamentoAtivo } from "@/lib/dimensionamento";
 import { formatarMoeda } from "@/lib/formatacao";
 import { ROTULO_TIPO_LIGACAO, TIPOS_LIGACAO, type TipoLigacao } from "@/lib/tipos";
 
@@ -85,7 +86,7 @@ export function FormularioNegocio({
   const [mostrarKit, setMostrarKit] = useState(false);
   const [linhas, setLinhas] = useState<LinhaComponente[]>([]);
   const [estruturaTelhado, setEstruturaTelhado] = useState("");
-  const [kitAutomaticoId, setKitAutomaticoId] = useState<string | null>(null);
+  const [escolha, setEscolha] = useState<EscolhaDimensionamento | null>(null);
 
   const modulosAtivos = useMemo(() => equipamentosAtivos.filter((e) => e.tipo === "modulo"), [equipamentosAtivos]);
   const inversoresAtivos = useMemo(() => equipamentosAtivos.filter((e) => e.tipo === "inversor"), [equipamentosAtivos]);
@@ -120,6 +121,7 @@ export function FormularioNegocio({
   } | null>(null);
   const [buscandoProdutividade, iniciarBuscaProdutividade] = useTransition();
   const produtividadeKwhKwpMes = produtividadeRegional?.produtividadeKwhKwpMes ?? parametros?.produtividadeKwhKwpMes;
+  const origemProdutividade = produtividadeRegional?.fonte ?? "padrao";
 
   function buscarProdutividadeDoEndereco(endereco: string) {
     setProdutividadeRegional(null);
@@ -183,42 +185,6 @@ export function FormularioNegocio({
     return null;
   }, [consumoMedioKwh, valorFaturaMedio, tarifaKwh]);
 
-  // Kit sugerido automaticamente a partir do consumo informado — ver `dimensionamento.ts`.
-  // Sem equipamento ativo ou sem consumo ainda, fica vazio e o vendedor monta manualmente.
-  const sugestoesAutomaticas = useMemo((): OpcaoSistemaAutomatico[] => {
-    if (!parametros || !produtividadeKwhKwpMes || !consumoMedioEstimado || !modulosAtivos.length || !inversoresAtivos.length)
-      return [];
-    return dimensionarSistemaAutomatico({
-      consumoMedioKwh: consumoMedioEstimado,
-      margemPct: parametros.margemDimensionamentoPct,
-      produtividadeKwhKwpMes,
-      modulos: modulosAtivos,
-      inversores: inversoresAtivos,
-      overloadMaximoPct: parametros.overloadMaximoPct,
-      temperaturaMinimaProjetoC: parametros.temperaturaMinimaProjetoC,
-    });
-  }, [parametros, produtividadeKwhKwpMes, consumoMedioEstimado, modulosAtivos, inversoresAtivos]);
-
-  function usarKitAutomatico(opcao: OpcaoSistemaAutomatico) {
-    const outrosItens = linhas.filter((l) => l.tipo !== "modulo" && l.tipo !== "inversor");
-    setLinhas([
-      {
-        tipo: "modulo",
-        descricao: `${opcao.modulo.fabricante} ${opcao.modulo.modelo}`,
-        potenciaW: String(opcao.modulo.potenciaW),
-        quantidade: String(opcao.quantidadeModulos),
-      },
-      {
-        tipo: "inversor",
-        descricao: `${opcao.inversor.fabricante} ${opcao.inversor.modelo}`,
-        potenciaW: String(opcao.inversor.potenciaW),
-        quantidade: "1",
-      },
-      ...outrosItens,
-    ]);
-    setKitAutomaticoId(`${opcao.modulo.id}-${opcao.inversor.id}`);
-  }
-
   // Sugere a quantidade de módulos pro consumo já informado, assim que o
   // vendedor escolhe (ou digita) a potência de um módulo.
   const sugerirQuantidadeModulo = useMemo(() => {
@@ -226,15 +192,20 @@ export function FormularioNegocio({
     return (potenciaW: number) => sugerirQuantidadeModulos(consumoMedioEstimado, produtividadeKwhKwpMes, potenciaW);
   }, [produtividadeKwhKwpMes, consumoMedioEstimado]);
 
+  // Potência efetiva do kit: vem do painel de dimensionamento quando há uma escolha validada
+  // (motor único); cai pro kit manual (freeform) só quando não há escolha (ex.: empresa ainda
+  // sem catálogo cadastrado).
+  const potenciaKwpEfetiva = escolha ? escolha.opcao.potenciaDcKwp : potenciaKwp;
+
   const previa = useMemo(() => {
     const tarifa = numero(tarifaKwh);
     const consumo = numero(consumoMedioKwh);
     const fatura = numero(valorFaturaMedio);
     const precoKit = numero(valor);
-    if (!parametros || !produtividadeKwhKwpMes || potenciaKwp <= 0 || !tarifa || (!consumo && !fatura)) return null;
+    if (!parametros || !produtividadeKwhKwpMes || potenciaKwpEfetiva <= 0 || !tarifa || (!consumo && !fatura)) return null;
     const consumoMedioFinal = consumo ?? fatura! / tarifa;
     return calcular({
-      potenciaKwp,
+      potenciaKwp: potenciaKwpEfetiva,
       precoKit: precoKit ?? 0,
       tipoLigacao,
       consumoMedioKwh: consumoMedioFinal,
@@ -243,7 +214,7 @@ export function FormularioNegocio({
       percentualFioB: parametros.percentualFioB,
       disponibilidadeKwh: parametros[DISPONIBILIDADE_PADRAO_CAMEL[tipoLigacao]],
     });
-  }, [parametros, produtividadeKwhKwpMes, tipoLigacao, consumoMedioKwh, valorFaturaMedio, tarifaKwh, potenciaKwp, valor]);
+  }, [parametros, produtividadeKwhKwpMes, tipoLigacao, consumoMedioKwh, valorFaturaMedio, tarifaKwh, potenciaKwpEfetiva, valor]);
 
   function pesquisar(termo: string) {
     setBusca(termo);
@@ -263,6 +234,7 @@ export function FormularioNegocio({
       {etapaId && <input type="hidden" name="etapa_id" value={etapaId} />}
       <input type="hidden" name="tipo_ligacao" value={tipoLigacao} />
       <input type="hidden" name="componentes" value={JSON.stringify(componentes)} />
+      <input type="hidden" name="origem_tarifa" value={!tarifaTocada && tarifaAneel ? "aneel" : "manual"} />
 
       <fieldset className="grid gap-3 md:grid-cols-2">
         <legend className="mb-2 text-sm font-semibold text-zinc-900">Negócio</legend>
@@ -510,57 +482,30 @@ export function FormularioNegocio({
       {mostrarKit && (
         <fieldset className="flex flex-col gap-3">
           <legend className="mb-2 text-sm font-semibold text-zinc-900">Kit</legend>
-          {sugestoesAutomaticas.length > 0 && (
-            <div className="flex flex-col gap-2">
-              <p className="text-sm font-medium text-zinc-700">Kit sugerido automaticamente</p>
-              <p className="-mt-1 text-xs text-zinc-500">
-                Calculado a partir do consumo informado e dos equipamentos ativos em Configurações → Calculadora.
-                Escolha uma opção e ajuste manualmente abaixo se precisar.
-              </p>
-              <div className="grid gap-2 md:grid-cols-3">
-                {sugestoesAutomaticas.map((opcao) => {
-                  const id = `${opcao.modulo.id}-${opcao.inversor.id}`;
-                  const selecionado = id === kitAutomaticoId;
-                  return (
-                    <button
-                      type="button"
-                      key={id}
-                      onClick={() => usarKitAutomatico(opcao)}
-                      className={`flex flex-col gap-1 rounded-lg border p-3 text-left text-sm ${
-                        selecionado ? "border-amber-500 bg-amber-50" : "border-zinc-200 hover:bg-zinc-50"
-                      }`}
-                    >
-                      <span className="font-medium text-zinc-900">
-                        {opcao.quantidadeModulos}x {opcao.modulo.fabricante} {opcao.modulo.modelo}
-                      </span>
-                      <span className="text-zinc-600">
-                        + {opcao.inversor.fabricante} {opcao.inversor.modelo}
-                      </span>
-                      <span className="text-zinc-500">
-                        {opcao.potenciaDcKwp.toLocaleString("pt-BR")} kWp · overload{" "}
-                        {(opcao.overloadPct * 100).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}%
-                      </span>
-                      {opcao.validacao === "valido_com_alerta" && (
-                        <span className="text-xs text-amber-700">Overload acima do recomendado — confira</span>
-                      )}
-                      {opcao.validacaoEletrica === "nao_verificado" && (
-                        <span className="text-xs text-zinc-400">String/MPPT não verificados (sem datasheet completo)</span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-          {sugestoesAutomaticas.length > 0 && (
-            <p className="text-sm font-medium text-zinc-700">Ajustar kit manualmente</p>
-          )}
-          <EditorComponentesKit
-            linhas={linhas}
-            onChange={setLinhas}
-            sugerirQuantidadeModulo={sugerirQuantidadeModulo}
-            catalogoPorTipo={catalogoPorTipo}
+          <PainelDimensionamento
+            consumoMedioKwh={consumoMedioEstimado}
+            produtividadeKwhKwpMes={produtividadeKwhKwpMes ?? null}
+            origemProdutividade={origemProdutividade}
+            margemDimensionamentoPct={parametros?.margemDimensionamentoPct ?? 0}
+            overloadMaximoPct={parametros?.overloadMaximoPct ?? 0}
+            temperaturaMinimaProjetoC={parametros?.temperaturaMinimaProjetoC ?? 0}
+            modulos={modulosAtivos}
+            inversores={inversoresAtivos}
+            onEscolha={setEscolha}
           />
+          {!escolha && (
+            <>
+              {modulosAtivos.length > 0 && inversoresAtivos.length > 0 && (
+                <p className="text-sm font-medium text-zinc-700">Montar kit manualmente</p>
+              )}
+              <EditorComponentesKit
+                linhas={linhas}
+                onChange={setLinhas}
+                sugerirQuantidadeModulo={sugerirQuantidadeModulo}
+                catalogoPorTipo={catalogoPorTipo}
+              />
+            </>
+          )}
           <Campo
             rotulo="Estrutura do telhado"
             name="estrutura_telhado"
@@ -572,7 +517,7 @@ export function FormularioNegocio({
             <dl className="grid grid-cols-2 gap-3 rounded-lg bg-amber-50 px-4 py-3 text-sm md:grid-cols-4">
               <div>
                 <dt className="text-zinc-500">Potência do kit</dt>
-                <dd className="font-medium text-zinc-900">{potenciaKwp.toLocaleString("pt-BR")} kWp</dd>
+                <dd className="font-medium text-zinc-900">{potenciaKwpEfetiva.toLocaleString("pt-BR")} kWp</dd>
               </div>
               <div>
                 <dt className="text-zinc-500">Geração estimada</dt>

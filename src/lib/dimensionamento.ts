@@ -34,6 +34,46 @@ export type EquipamentoAtivo = {
   quantidadeMppt?: number | null;
 };
 
+/** Formato de `equipamentos_empresa` como vem do Supabase (snake_case). */
+export type EquipamentoEmpresaRegistro = {
+  id: string;
+  fabricante: string;
+  modelo: string;
+  potencia_w: number;
+  prioridade: number;
+  voc_v: number | null;
+  isc_a: number | null;
+  vmp_v: number | null;
+  imp_a: number | null;
+  coef_temp_voc_pct_c: number | null;
+  tensao_max_dc_v: number | null;
+  mppt_min_v: number | null;
+  mppt_max_v: number | null;
+  corrente_max_entrada_a: number | null;
+  quantidade_mppt: number | null;
+};
+
+/** Converte um registro de `equipamentos_empresa` pro formato que o motor de dimensionamento espera. */
+export function paraEquipamentoAtivo(e: EquipamentoEmpresaRegistro): EquipamentoAtivo {
+  return {
+    id: e.id,
+    fabricante: e.fabricante,
+    modelo: e.modelo,
+    potenciaW: e.potencia_w,
+    prioridade: e.prioridade,
+    vocV: e.voc_v,
+    iscA: e.isc_a,
+    vmpV: e.vmp_v,
+    impA: e.imp_a,
+    coefTempVocPctC: e.coef_temp_voc_pct_c,
+    tensaoMaxDcV: e.tensao_max_dc_v,
+    mpptMinV: e.mppt_min_v,
+    mpptMaxV: e.mppt_max_v,
+    correnteMaxEntradaA: e.corrente_max_entrada_a,
+    quantidadeMppt: e.quantidade_mppt,
+  };
+}
+
 export type ConfiguracaoString = {
   modulosPorString: number;
   quantidadeStrings: number;
@@ -113,14 +153,13 @@ function encontrarConfiguracaoString(
   return melhor;
 }
 
-function avaliarCombinacao(
+function montarOpcao(
   modulo: EquipamentoAtivo,
   inversor: EquipamentoAtivo,
-  potenciaAlvoKwp: number,
+  quantidadeModulos: number,
   overloadMaximoPct: number,
   temperaturaMinimaProjetoC: number,
 ): OpcaoSistemaAutomatico | null {
-  const quantidadeModulos = Math.max(1, Math.ceil((potenciaAlvoKwp * 1000) / modulo.potenciaW));
   const potenciaDcKwp = arredondar((quantidadeModulos * modulo.potenciaW) / 1000, 2);
   const potenciaAcKw = arredondar(inversor.potenciaW / 1000, 2);
   const overloadPct = arredondar((potenciaDcKwp * 1000) / inversor.potenciaW - 1, 4);
@@ -139,6 +178,37 @@ function avaliarCombinacao(
     validacaoEletrica: configuracaoString === undefined ? "nao_verificado" : "valido",
     stringConfig: configuracaoString ?? null,
   };
+}
+
+function avaliarCombinacao(
+  modulo: EquipamentoAtivo,
+  inversor: EquipamentoAtivo,
+  potenciaAlvoKwp: number,
+  overloadMaximoPct: number,
+  temperaturaMinimaProjetoC: number,
+): OpcaoSistemaAutomatico | null {
+  const quantidadeModulos = Math.max(1, Math.ceil((potenciaAlvoKwp * 1000) / modulo.potenciaW));
+  return montarOpcao(modulo, inversor, quantidadeModulos, overloadMaximoPct, temperaturaMinimaProjetoC);
+}
+
+/**
+ * Valida uma combinação módulo+inversor+quantidade escolhida (ou ajustada) manualmente
+ * pelo vendedor — na criação (troca a opção sugerida) ou na edição do sistema — pelas
+ * mesmas regras elétricas do motor automático (Voc no frio, faixa de MPPT, corrente,
+ * overload). É a mesma fonte de verdade usada por `dimensionarSistemaAutomatico`, só que
+ * sem derivar a quantidade a partir do consumo: quem decide a quantidade aqui é o vendedor,
+ * não a meta de potência. Retorna `null` quando a quantidade é inválida (≤ 0) ou quando o
+ * arranjo elétrico não é seguro.
+ */
+export function avaliarCombinacaoEscolhida(
+  modulo: EquipamentoAtivo,
+  inversor: EquipamentoAtivo,
+  quantidadeModulos: number,
+  overloadMaximoPct: number,
+  temperaturaMinimaProjetoC: number,
+): OpcaoSistemaAutomatico | null {
+  if (!Number.isInteger(quantidadeModulos) || quantidadeModulos <= 0) return null;
+  return montarOpcao(modulo, inversor, quantidadeModulos, overloadMaximoPct, temperaturaMinimaProjetoC);
 }
 
 /**

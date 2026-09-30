@@ -1,6 +1,11 @@
 /** Dimensionamento automático do kit (fase 1): escolhe módulo+inversor ativos, calcula overload e valida string. */
 import { describe, expect, it } from "vitest";
-import { dimensionarSistemaAutomatico, type EquipamentoAtivo } from "@/lib/dimensionamento";
+import {
+  avaliarCombinacaoEscolhida,
+  dimensionarSistemaAutomatico,
+  paraEquipamentoAtivo,
+  type EquipamentoAtivo,
+} from "@/lib/dimensionamento";
 
 const TEMPERATURA_PADRAO_C = 5;
 
@@ -180,5 +185,110 @@ describe("dimensionarSistemaAutomatico", () => {
       temperaturaMinimaProjetoC: TEMPERATURA_PADRAO_C,
     });
     expect(opcoes).toEqual([]);
+  });
+});
+
+describe("avaliarCombinacaoEscolhida", () => {
+  it("com a mesma quantidade que o motor automático teria escolhido, dá o mesmo resultado", () => {
+    // Mesmo exemplo da spec: 13 módulos de 620W + inversor 6,5kW -> 8,06 kWp, ~24% de overload.
+    const opcao = avaliarCombinacaoEscolhida(modulo620, inversor65, 13, 0.3, TEMPERATURA_PADRAO_C);
+    expect(opcao?.quantidadeModulos).toBe(13);
+    expect(opcao?.potenciaDcKwp).toBe(8.06);
+    expect(opcao?.overloadPct).toBeCloseTo(0.24, 2);
+    expect(opcao?.validacao).toBe("valido");
+  });
+
+  it("valida uma quantidade escolhida manualmente pelo vendedor, diferente da sugestão automática", () => {
+    // 5 módulos de 620W = 3,1 kWp; overload negativo (sistema bem abaixo do inversor), ainda válido.
+    const opcao = avaliarCombinacaoEscolhida(modulo620, inversor65, 5, 0.3, TEMPERATURA_PADRAO_C);
+    expect(opcao?.quantidadeModulos).toBe(5);
+    expect(opcao?.potenciaDcKwp).toBe(3.1);
+    expect(opcao?.validacao).toBe("valido");
+  });
+
+  it("marca overload acima do limite como 'valido_com_alerta', sem bloquear", () => {
+    // 13 módulos de 620W (8,06 kWp) num inversor de 6 kW -> ~34,3% de overload, acima do limite de 30%.
+    const opcao = avaliarCombinacaoEscolhida(modulo620, inversor6, 13, 0.3, TEMPERATURA_PADRAO_C);
+    expect(opcao?.overloadPct).toBeCloseTo(0.343, 2);
+    expect(opcao?.validacao).toBe("valido_com_alerta");
+  });
+
+  it("rejeita quantidade zero ou negativa", () => {
+    expect(avaliarCombinacaoEscolhida(modulo620, inversor65, 0, 0.3, TEMPERATURA_PADRAO_C)).toBeNull();
+    expect(avaliarCombinacaoEscolhida(modulo620, inversor65, -1, 0.3, TEMPERATURA_PADRAO_C)).toBeNull();
+  });
+
+  it("rejeita a combinação quando a quantidade escolhida não forma nenhuma string eletricamente compatível", () => {
+    const moduloCompleto: EquipamentoAtivo = {
+      ...modulo620,
+      vocV: 41.5,
+      iscA: 18.5,
+      vmpV: 34.8,
+      impA: 17.8,
+      coefTempVocPctC: -0.26,
+    };
+    const inversorIncompativel: EquipamentoAtivo = { ...inversor65, tensaoMaxDcV: 250, mpptMinV: 500, mpptMaxV: 550 };
+    expect(avaliarCombinacaoEscolhida(moduloCompleto, inversorIncompativel, 13, 0.3, TEMPERATURA_PADRAO_C)).toBeNull();
+  });
+
+  it("valida a string (Voc frio + faixa de MPPT) com a quantidade escolhida, quando o catálogo tem dados elétricos", () => {
+    const moduloCompleto: EquipamentoAtivo = {
+      ...modulo620,
+      vocV: 41.5,
+      iscA: 18.5,
+      vmpV: 34.8,
+      impA: 17.8,
+      coefTempVocPctC: -0.26,
+    };
+    const inversorCompleto: EquipamentoAtivo = {
+      ...inversor65,
+      tensaoMaxDcV: 600,
+      mpptMinV: 80,
+      mpptMaxV: 550,
+      correnteMaxEntradaA: 40,
+      quantidadeMppt: 2,
+    };
+    const opcao = avaliarCombinacaoEscolhida(moduloCompleto, inversorCompleto, 13, 0.3, TEMPERATURA_PADRAO_C);
+    expect(opcao?.validacaoEletrica).toBe("valido");
+    expect(opcao?.stringConfig).not.toBeNull();
+  });
+});
+
+describe("paraEquipamentoAtivo", () => {
+  it("converte um registro de equipamentos_empresa (snake_case) para EquipamentoAtivo (camelCase)", () => {
+    const equipamento = paraEquipamentoAtivo({
+      id: "e1",
+      fabricante: "Canadian",
+      modelo: "CS7L-620",
+      potencia_w: 620,
+      prioridade: 5,
+      voc_v: 41.5,
+      isc_a: 18.5,
+      vmp_v: 34.8,
+      imp_a: 17.8,
+      coef_temp_voc_pct_c: -0.26,
+      tensao_max_dc_v: 600,
+      mppt_min_v: 80,
+      mppt_max_v: 550,
+      corrente_max_entrada_a: 40,
+      quantidade_mppt: 2,
+    });
+    expect(equipamento).toEqual({
+      id: "e1",
+      fabricante: "Canadian",
+      modelo: "CS7L-620",
+      potenciaW: 620,
+      prioridade: 5,
+      vocV: 41.5,
+      iscA: 18.5,
+      vmpV: 34.8,
+      impA: 17.8,
+      coefTempVocPctC: -0.26,
+      tensaoMaxDcV: 600,
+      mpptMinV: 80,
+      mpptMaxV: 550,
+      correnteMaxEntradaA: 40,
+      quantidadeMppt: 2,
+    });
   });
 });
