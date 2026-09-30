@@ -2990,8 +2990,11 @@ export type Database = {
           atualizado_em: string;
           id: string;
           modalidade_tarifaria: string | null;
+          resolucao_homologatoria: string | null;
           sigla_distribuidora: string;
           sub_grupo: string;
+          tarifa_final_kwh: number;
+          unidade_terciaria: string | null;
           vigencia_fim: string | null;
           vigencia_inicio: string | null;
           vlr_te: number;
@@ -3001,8 +3004,11 @@ export type Database = {
           atualizado_em?: string;
           id?: string;
           modalidade_tarifaria?: string | null;
+          resolucao_homologatoria?: string | null;
           sigla_distribuidora: string;
           sub_grupo?: string;
+          tarifa_final_kwh: number;
+          unidade_terciaria?: string | null;
           vigencia_fim?: string | null;
           vigencia_inicio?: string | null;
           vlr_te: number;
@@ -3012,8 +3018,11 @@ export type Database = {
           atualizado_em?: string;
           id?: string;
           modalidade_tarifaria?: string | null;
+          resolucao_homologatoria?: string | null;
           sigla_distribuidora?: string;
           sub_grupo?: string;
+          tarifa_final_kwh?: number;
+          unidade_terciaria?: string | null;
           vigencia_fim?: string | null;
           vigencia_inicio?: string | null;
           vlr_te?: number;

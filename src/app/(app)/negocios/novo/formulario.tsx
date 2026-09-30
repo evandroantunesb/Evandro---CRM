@@ -4,7 +4,7 @@ import { useActionState, useEffect, useMemo, useState, useTransition } from "rea
 import { CampoArquivo } from "@/components/campo-arquivo";
 import { EditorComponentesKit, linhasParaComponentes, type LinhaComponente } from "@/components/kit-componentes";
 import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
-import { buscarTarifaDaEmpresa } from "@/lib/acoes/aneel";
+import { buscarTarifaDaEmpresa, type TarifaEncontrada } from "@/lib/acoes/aneel";
 import { buscarProdutividadeRegionalPorEndereco } from "@/lib/acoes/geodados";
 import { buscarContatos, criarNegocio, verificarDuplicado, type Duplicado } from "@/lib/acoes/negocios";
 import {
@@ -129,11 +129,16 @@ export function FormularioNegocio({
 
   // Tarifa homologada real (ANEEL) da distribuidora configurada em
   // Parâmetros — busca uma vez ao abrir a tela; sem configuração ou sem
-  // resposta da ANEEL, o campo segue em branco pra digitar à mão.
+  // resposta da ANEEL, o campo segue em branco pra digitar à mão. Guardamos
+  // o resultado pra deixar claro na tela que é a tarifa homologada (TUSD +
+  // TE regulados), não necessariamente igual ao valor final da conta do
+  // cliente (que pode ter bandeira tarifária, impostos etc.).
+  const [tarifaAneel, setTarifaAneel] = useState<TarifaEncontrada | null>(null);
   const [, iniciarBuscaTarifa] = useTransition();
   useEffect(() => {
     iniciarBuscaTarifa(async () => {
       const tarifa = await buscarTarifaDaEmpresa();
+      setTarifaAneel(tarifa);
       if (tarifa && !tarifaTocada) setTarifaKwh(String(tarifa.tarifaKwh).replace(".", ","));
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -316,17 +321,29 @@ export function FormularioNegocio({
           value={valorFaturaMedio}
           onChange={(e) => setValorFaturaMedio(e.target.value)}
         />
-        <Campo
-          rotulo="Tarifa (R$/kWh)"
-          name="tarifa_kwh"
-          inputMode="decimal"
-          placeholder="ex.: 0,95"
-          value={tarifaKwh}
-          onChange={(e) => {
-            setTarifaTocada(true);
-            setTarifaKwh(e.target.value);
-          }}
-        />
+        <div className="flex flex-col gap-1">
+          <Campo
+            rotulo="Tarifa (R$/kWh)"
+            name="tarifa_kwh"
+            inputMode="decimal"
+            placeholder="ex.: 0,95"
+            value={tarifaKwh}
+            onChange={(e) => {
+              setTarifaTocada(true);
+              setTarifaKwh(e.target.value);
+            }}
+          />
+          {!tarifaTocada && tarifaAneel && (
+            <p className="text-xs text-zinc-400">
+              Tarifa homologada ANEEL (TUSD + TE, subgrupo B1
+              {tarifaAneel.resolucaoHomologatoria ? `, REH ${tarifaAneel.resolucaoHomologatoria}` : ""}
+              {tarifaAneel.vigenciaInicio
+                ? `, vigente desde ${new Date(tarifaAneel.vigenciaInicio).toLocaleDateString("pt-BR")}`
+                : ""}
+              ) — não é necessariamente igual ao valor final da conta do cliente; ajuste se precisar.
+            </p>
+          )}
+        </div>
         <Selecao
           rotulo="Tipo de ligação"
           value={tipoLigacao}

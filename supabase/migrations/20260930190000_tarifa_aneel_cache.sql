@@ -7,13 +7,19 @@
 alter table public.parametros_calculadora
   add column sigla_distribuidora_aneel text;
 
+-- Guarda TUSD/TE separados (unidade original, ver `unidade_terciaria`), a
+-- tarifa final já convertida pra R$/kWh, a resolução homologatória (REH) e
+-- `atualizado_em` como data da própria consulta à ANEEL.
 create table public.tarifas_aneel_cache (
   id uuid primary key default gen_random_uuid(),
   sigla_distribuidora text not null,
   sub_grupo text not null default 'B1',
-  vlr_tusd numeric(10, 6) not null check (vlr_tusd >= 0),
-  vlr_te numeric(10, 6) not null check (vlr_te >= 0),
+  vlr_tusd numeric(12, 6) not null check (vlr_tusd >= 0),
+  vlr_te numeric(12, 6) not null check (vlr_te >= 0),
+  unidade_terciaria text,
+  tarifa_final_kwh numeric(10, 6) not null check (tarifa_final_kwh >= 0),
   modalidade_tarifaria text,
+  resolucao_homologatoria text,
   vigencia_inicio date,
   vigencia_fim date,
   atualizado_em timestamptz not null default now(),
