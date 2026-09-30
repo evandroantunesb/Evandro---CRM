@@ -1,0 +1,93 @@
+/** Dimensionamento automático do kit (fase 1): escolhe módulo+inversor ativos e calcula overload. */
+import { describe, expect, it } from "vitest";
+import { dimensionarSistemaAutomatico, type EquipamentoAtivo } from "@/lib/dimensionamento";
+
+const modulo620: EquipamentoAtivo = { id: "m1", fabricante: "Fab", modelo: "620W", potenciaW: 620, prioridade: 0 };
+const inversor65: EquipamentoAtivo = { id: "i1", fabricante: "Fab", modelo: "6,5kW", potenciaW: 6500, prioridade: 0 };
+const inversor6: EquipamentoAtivo = { id: "i2", fabricante: "Fab", modelo: "6kW", potenciaW: 6000, prioridade: 0 };
+const inversor8: EquipamentoAtivo = { id: "i3", fabricante: "Fab", modelo: "8kW", potenciaW: 8000, prioridade: 0 };
+
+describe("dimensionarSistemaAutomatico", () => {
+  it("recomenda o exemplo da especificação: 13 módulos de 620W + inversor 6,5kW, ~24% de overload", () => {
+    const [opcao] = dimensionarSistemaAutomatico({
+      consumoMedioKwh: 780,
+      margemPct: 0.2,
+      produtividadeKwhKwpMes: 120,
+      modulos: [modulo620],
+      inversores: [inversor65],
+      overloadMaximoPct: 0.3,
+    });
+    // potência alvo = 780*1,2/120 = 7,8 kWp -> 13 módulos de 620W = 8,06 kWp
+    expect(opcao.quantidadeModulos).toBe(13);
+    expect(opcao.potenciaDcKwp).toBe(8.06);
+    expect(opcao.overloadPct).toBeCloseTo(0.24, 2);
+    expect(opcao.validacao).toBe("valido");
+  });
+
+  it("marca overload acima do limite automático como 'valido_com_alerta', não bloqueia", () => {
+    // 8,06 kWp / 6 kW = 34,3% de overload, acima do limite de 30% (seção 156 da spec).
+    const [opcao] = dimensionarSistemaAutomatico({
+      consumoMedioKwh: 780,
+      margemPct: 0.2,
+      produtividadeKwhKwpMes: 120,
+      modulos: [modulo620],
+      inversores: [inversor6],
+      overloadMaximoPct: 0.3,
+    });
+    expect(opcao.overloadPct).toBeCloseTo(0.343, 2);
+    expect(opcao.validacao).toBe("valido_com_alerta");
+  });
+
+  it("prioriza opções válidas sobre opções com alerta, mesmo com prioridade comercial menor", () => {
+    const opcoes = dimensionarSistemaAutomatico({
+      consumoMedioKwh: 780,
+      margemPct: 0.2,
+      produtividadeKwhKwpMes: 120,
+      modulos: [modulo620],
+      inversores: [inversor6, inversor65],
+      overloadMaximoPct: 0.3,
+    });
+    expect(opcoes[0].inversor.id).toBe("i1");
+    expect(opcoes[0].validacao).toBe("valido");
+  });
+
+  it("entre válidas, prioriza prioridade comercial do equipamento", () => {
+    const inversor65Prioritario: EquipamentoAtivo = { ...inversor65, id: "i1b", prioridade: 10 };
+    const opcoes = dimensionarSistemaAutomatico({
+      consumoMedioKwh: 780,
+      margemPct: 0.2,
+      produtividadeKwhKwpMes: 120,
+      modulos: [modulo620],
+      inversores: [inversor8, inversor65Prioritario],
+      overloadMaximoPct: 0.3,
+    });
+    expect(opcoes[0].inversor.id).toBe("i1b");
+  });
+
+  it("retorna até 3 opções, no máximo 1 por módulo", () => {
+    const modulo585: EquipamentoAtivo = { id: "m2", fabricante: "Fab", modelo: "585W", potenciaW: 585, prioridade: 0 };
+    const opcoes = dimensionarSistemaAutomatico({
+      consumoMedioKwh: 780,
+      margemPct: 0.2,
+      produtividadeKwhKwpMes: 120,
+      modulos: [modulo620, modulo585],
+      inversores: [inversor6, inversor65, inversor8],
+      overloadMaximoPct: 0.3,
+    });
+    expect(opcoes.length).toBe(2);
+    expect(new Set(opcoes.map((o) => o.modulo.id)).size).toBe(2);
+  });
+
+  it("retorna vazio sem módulos ou inversores ativos", () => {
+    expect(
+      dimensionarSistemaAutomatico({
+        consumoMedioKwh: 780,
+        margemPct: 0.2,
+        produtividadeKwhKwpMes: 120,
+        modulos: [],
+        inversores: [inversor65],
+        overloadMaximoPct: 0.3,
+      }),
+    ).toEqual([]);
+  });
+});

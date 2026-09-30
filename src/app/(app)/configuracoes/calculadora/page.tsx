@@ -2,14 +2,21 @@ import { Cartao } from "@/components/ui";
 import { carregarConfiguracao } from "@/lib/crm";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
+import { Equipamentos } from "./equipamentos";
 import { FormularioParametros, LinhaKit, NovoKit } from "./formularios";
 
 export default async function ConfigCalculadora() {
   const { atual } = await exigirPapel("admin");
   const supabase = await criarClienteServidor();
-  const [{ kits }, { data: parametros }] = await Promise.all([
+  const [{ kits }, { data: parametros }, { data: equipamentos }] = await Promise.all([
     carregarConfiguracao(atual.empresaId),
     supabase.from("parametros_calculadora").select("*").eq("empresa_id", atual.empresaId).single(),
+    supabase
+      .from("equipamentos_empresa")
+      .select("*")
+      .eq("empresa_id", atual.empresaId)
+      .order("tipo")
+      .order("prioridade", { ascending: false }),
   ]);
 
   return (
@@ -43,9 +50,24 @@ export default async function ConfigCalculadora() {
               custoMaterialCaPorKwp: parametros.custo_material_ca_por_kwp,
               custoEngenharia: parametros.custo_engenharia,
               comissaoPercentual: parametros.comissao_percentual,
+              margemDimensionamentoPct: parametros.margem_dimensionamento_pct,
+              overloadMaximoPct: parametros.overload_maximo_pct,
             }}
           />
         )}
+      </Cartao>
+      <Cartao titulo="Equipamentos ativos (kit automático)">
+        <Equipamentos
+          itens={(equipamentos ?? []).map((e) => ({
+            id: e.id,
+            tipo: e.tipo as "modulo" | "inversor",
+            fabricante: e.fabricante,
+            modelo: e.modelo,
+            potenciaW: e.potencia_w,
+            ativo: e.ativo,
+            prioridade: e.prioridade,
+          }))}
+        />
       </Cartao>
     </div>
   );

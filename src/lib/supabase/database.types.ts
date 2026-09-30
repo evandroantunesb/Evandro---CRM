@@ -746,6 +746,56 @@ export type Database = {
         };
         Relationships: [];
       };
+      equipamentos_empresa: {
+        Row: {
+          ativo: boolean;
+          created_at: string;
+          empresa_id: string;
+          fabricante: string;
+          id: string;
+          modelo: string;
+          opensolar_id: number | null;
+          potencia_w: number;
+          prioridade: number;
+          tipo: Database["public"]["Enums"]["tipo_componente_kit"];
+          updated_at: string;
+        };
+        Insert: {
+          ativo?: boolean;
+          created_at?: string;
+          empresa_id: string;
+          fabricante: string;
+          id?: string;
+          modelo: string;
+          opensolar_id?: number | null;
+          potencia_w: number;
+          prioridade?: number;
+          tipo: Database["public"]["Enums"]["tipo_componente_kit"];
+          updated_at?: string;
+        };
+        Update: {
+          ativo?: boolean;
+          created_at?: string;
+          empresa_id?: string;
+          fabricante?: string;
+          id?: string;
+          modelo?: string;
+          opensolar_id?: number | null;
+          potencia_w?: number;
+          prioridade?: number;
+          tipo?: Database["public"]["Enums"]["tipo_componente_kit"];
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "equipamentos_empresa_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       equipe_membros: {
         Row: {
           created_at: string;
@@ -2082,6 +2132,8 @@ export type Database = {
           disponibilidade_mono_kwh: number;
           disponibilidade_tri_kwh: number;
           empresa_id: string;
+          margem_dimensionamento_pct: number;
+          overload_maximo_pct: number;
           percentual_fio_b: number;
           produtividade_kwh_kwp_mes: number;
           updated_at: string;
@@ -2095,6 +2147,8 @@ export type Database = {
           disponibilidade_mono_kwh?: number;
           disponibilidade_tri_kwh?: number;
           empresa_id: string;
+          margem_dimensionamento_pct?: number;
+          overload_maximo_pct?: number;
           percentual_fio_b?: number;
           produtividade_kwh_kwp_mes?: number;
           updated_at?: string;
@@ -2108,6 +2162,8 @@ export type Database = {
           disponibilidade_mono_kwh?: number;
           disponibilidade_tri_kwh?: number;
           empresa_id?: string;
+          margem_dimensionamento_pct?: number;
+          overload_maximo_pct?: number;
           percentual_fio_b?: number;
           produtividade_kwh_kwp_mes?: number;
           updated_at?: string;

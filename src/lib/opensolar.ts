@@ -9,6 +9,8 @@ import { z } from "zod";
 
 export type ComponenteCatalogo = {
   id: number;
+  fabricante: string;
+  modelo: string;
   descricao: string;
   potenciaW: number | null;
   /** Preço de referência (teste) estimado a partir de preço médio de mercado por watt — não é cotação real. */
@@ -78,6 +80,8 @@ export async function buscarModulosCatalogo(termo: string): Promise<ComponenteCa
       const potenciaW = potenciaWattsDoJson(m.data, "kw_stc");
       return {
         id: m.id,
+        fabricante: m.manufacturer_name,
+        modelo: m.code,
         descricao: `${m.manufacturer_name} ${m.code}`,
         potenciaW,
         precoEstimadoBRL: potenciaW != null ? Math.round(potenciaW * REFERENCIA_RS_POR_WATT.modulo) : null,
@@ -99,6 +103,8 @@ export async function buscarInversoresCatalogo(termo: string): Promise<Component
       const potenciaW = potenciaWattsDoJson(inv.data, "kw_stc", "kw_rated", "power_rating");
       return {
         id: inv.id,
+        fabricante: inv.manufacturer_name,
+        modelo: inv.code,
         descricao: `${inv.manufacturer_name} ${inv.code}`,
         potenciaW,
         precoEstimadoBRL: potenciaW != null ? Math.round(potenciaW * REFERENCIA_RS_POR_WATT.inversor) : null,

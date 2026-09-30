@@ -282,6 +282,8 @@ export async function editarParametros(_: ResultadoAcao, formData: FormData): Pr
       custo_material_ca_por_kwp: custoOpcional,
       custo_engenharia: custoOpcional,
       comissao_percentual: percentual,
+      margem_dimensionamento_pct: percentual,
+      overload_maximo_pct: percentual,
     })
     .safeParse(Object.fromEntries(formData));
   if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };

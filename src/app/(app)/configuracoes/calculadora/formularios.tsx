@@ -75,6 +75,8 @@ export function FormularioParametros({
     custoMaterialCaPorKwp: number;
     custoEngenharia: number;
     comissaoPercentual: number;
+    margemDimensionamentoPct: number;
+    overloadMaximoPct: number;
   };
 }) {
   const [resultado, acao, pendente] = useActionState(editarParametros, null);
@@ -94,6 +96,27 @@ export function FormularioParametros({
         defaultValue={String(parametros.percentualFioB * 100).replace(".", ",")}
         required
       />
+      <p className="mt-1 text-sm font-medium text-zinc-700">Dimensionamento automático</p>
+      <p className="-mt-2 text-xs text-zinc-500">
+        Usados pra montar o kit sozinho a partir do consumo, em &quot;Adicionar negócio&quot; — ver &quot;Equipamentos
+        ativos&quot; abaixo pra escolher os módulos/inversores usados.
+      </p>
+      <div className="grid grid-cols-2 gap-2">
+        <Campo
+          rotulo="Margem de dimensionamento (%)"
+          name="margem_dimensionamento_pct"
+          inputMode="decimal"
+          defaultValue={String(parametros.margemDimensionamentoPct * 100).replace(".", ",")}
+          required
+        />
+        <Campo
+          rotulo="Overload automático máximo (%)"
+          name="overload_maximo_pct"
+          inputMode="decimal"
+          defaultValue={String(parametros.overloadMaximoPct * 100).replace(".", ",")}
+          required
+        />
+      </div>
       <div className="grid grid-cols-3 gap-2">
         <Campo
           rotulo="Disponibilidade monofásico (kWh)"
