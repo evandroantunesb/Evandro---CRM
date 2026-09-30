@@ -16,6 +16,17 @@ export const ROTULO_TIPO_VENDEDOR: Record<TipoVendedor, string> = {
   representante: "Representante",
 };
 
+/** Como o rodízio de leads reparte entre vendedores e SDR (Configurações > Origens, pedido do Evandro 2026-09-30). */
+export const MODOS_DISTRIBUICAO_LEADS = ["somente_vendedores", "somente_sdr", "parcial", "aleatorio"] as const;
+export type ModoDistribuicaoLeads = (typeof MODOS_DISTRIBUICAO_LEADS)[number];
+
+export const ROTULO_MODO_DISTRIBUICAO_LEADS: Record<ModoDistribuicaoLeads, string> = {
+  somente_vendedores: "Somente vendedores",
+  somente_sdr: "Somente SDR",
+  parcial: "Parcial (% pro SDR)",
+  aleatorio: "Aleatório (sorteia entre vendedores e SDR)",
+};
+
 export const STATUS_MEMBRO = ["ativo", "inativo", "desligado"] as const;
 export type StatusMembro = (typeof STATUS_MEMBRO)[number];
 

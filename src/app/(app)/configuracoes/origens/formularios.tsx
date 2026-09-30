@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { Botao, Mensagem } from "@/components/ui";
-import { criarOrigem, editarOrigem } from "./actions";
+import { MODOS_DISTRIBUICAO_LEADS, ROTULO_MODO_DISTRIBUICAO_LEADS, type ModoDistribuicaoLeads } from "@/lib/tipos";
+import { criarOrigem, definirDistribuicaoLeads, editarOrigem } from "./actions";
 
 const inputClasse = "min-w-0 flex-1 rounded-md border border-zinc-300 px-3 py-1.5 text-sm";
 
@@ -57,6 +58,59 @@ export function LinhaOrigem({
         Salvar
       </Botao>
       {resultado && !resultado.ok && <Mensagem resultado={resultado} />}
+    </form>
+  );
+}
+
+export function DistribuicaoLeads({
+  modo,
+  percentual,
+}: {
+  modo: ModoDistribuicaoLeads;
+  percentual: number;
+}) {
+  const [resultado, acao, pendente] = useActionState(definirDistribuicaoLeads, null);
+  const [modoSelecionado, setModoSelecionado] = useState<ModoDistribuicaoLeads>(modo);
+
+  return (
+    <form action={acao} className="flex flex-col gap-3">
+      <label className="flex flex-col gap-1 text-sm text-zinc-700">
+        Modo de distribuição
+        <select
+          name="modo"
+          defaultValue={modo}
+          onChange={(e) => setModoSelecionado(e.target.value as ModoDistribuicaoLeads)}
+          className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm"
+        >
+          {MODOS_DISTRIBUICAO_LEADS.map((m) => (
+            <option key={m} value={m}>
+              {ROTULO_MODO_DISTRIBUICAO_LEADS[m]}
+            </option>
+          ))}
+        </select>
+      </label>
+      {modoSelecionado === "parcial" && (
+        <label className="flex items-center gap-2 text-sm text-zinc-700">
+          % dos leads pro SDR
+          <input
+            name="percentual"
+            type="number"
+            min={0}
+            max={100}
+            defaultValue={percentual}
+            aria-label="Percentual de leads pro SDR"
+            className="w-20 rounded-md border border-zinc-300 px-2 py-1.5 text-sm"
+          />
+          <span className="text-zinc-500">(o restante vai pro vendedor)</span>
+        </label>
+      )}
+      {modoSelecionado !== "parcial" && <input type="hidden" name="percentual" value={percentual} />}
+      <div className="flex items-center gap-2">
+        <Botao type="submit" disabled={pendente}>
+          Salvar
+        </Botao>
+        <Mensagem resultado={resultado} />
+      </div>
     </form>
   );
 }
