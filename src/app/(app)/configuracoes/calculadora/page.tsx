@@ -53,6 +53,7 @@ export default async function ConfigCalculadora() {
               margemDimensionamentoPct: parametros.margem_dimensionamento_pct,
               overloadMaximoPct: parametros.overload_maximo_pct,
               temperaturaMinimaProjetoC: parametros.temperatura_minima_projeto_c,
+              siglaDistribuidoraAneel: parametros.sigla_distribuidora_aneel,
             }}
           />
         )}

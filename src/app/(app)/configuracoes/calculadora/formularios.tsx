@@ -78,6 +78,7 @@ export function FormularioParametros({
     margemDimensionamentoPct: number;
     overloadMaximoPct: number;
     temperaturaMinimaProjetoC: number;
+    siglaDistribuidoraAneel: string | null;
   };
 }) {
   const [resultado, acao, pendente] = useActionState(editarParametros, null);
@@ -97,6 +98,17 @@ export function FormularioParametros({
         defaultValue={String(parametros.percentualFioB * 100).replace(".", ",")}
         required
       />
+      <Campo
+        rotulo="Sigla da distribuidora na ANEEL (opcional)"
+        name="sigla_distribuidora_aneel"
+        defaultValue={parametros.siglaDistribuidoraAneel ?? ""}
+        placeholder="Ex.: CPFL-PAULISTA"
+      />
+      <p className="-mt-2 text-xs text-zinc-500">
+        Preenchendo, o &quot;Valor da tarifa&quot; em &quot;Adicionar negócio&quot; é sugerido a partir da tarifa
+        homologada real da ANEEL (subgrupo B1, atualizada semanalmente); sem isso, continua só digitado à mão. A
+        sigla é a mesma usada nos processos da ANEEL para a distribuidora (SigAgente) — confira no site da agência.
+      </p>
       <p className="mt-1 text-sm font-medium text-zinc-700">Dimensionamento automático</p>
       <p className="-mt-2 text-xs text-zinc-500">
         Usados pra montar o kit sozinho a partir do consumo, em &quot;Adicionar negócio&quot; — ver &quot;Equipamentos

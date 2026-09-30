@@ -1,9 +1,10 @@
 "use client";
 
-import { useActionState, useMemo, useState, useTransition } from "react";
+import { useActionState, useEffect, useMemo, useState, useTransition } from "react";
 import { CampoArquivo } from "@/components/campo-arquivo";
 import { EditorComponentesKit, linhasParaComponentes, type LinhaComponente } from "@/components/kit-componentes";
 import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
+import { buscarTarifaDaEmpresa } from "@/lib/acoes/aneel";
 import { buscarProdutividadeRegionalPorEndereco } from "@/lib/acoes/geodados";
 import { buscarContatos, criarNegocio, verificarDuplicado, type Duplicado } from "@/lib/acoes/negocios";
 import {
@@ -78,6 +79,7 @@ export function FormularioNegocio({
   const [consumoMedioKwh, setConsumoMedioKwh] = useState("");
   const [valorFaturaMedio, setValorFaturaMedio] = useState("");
   const [tarifaKwh, setTarifaKwh] = useState("");
+  const [tarifaTocada, setTarifaTocada] = useState(false);
 
   // Passo 3 (depois de "Avançar"): kit automático, com personalização manual disponível em seguida.
   const [mostrarKit, setMostrarKit] = useState(false);
@@ -124,6 +126,18 @@ export function FormularioNegocio({
     if (endereco.trim().length < 8) return;
     iniciarBuscaProdutividade(async () => setProdutividadeRegional(await buscarProdutividadeRegionalPorEndereco(endereco)));
   }
+
+  // Tarifa homologada real (ANEEL) da distribuidora configurada em
+  // Parâmetros — busca uma vez ao abrir a tela; sem configuração ou sem
+  // resposta da ANEEL, o campo segue em branco pra digitar à mão.
+  const [, iniciarBuscaTarifa] = useTransition();
+  useEffect(() => {
+    iniciarBuscaTarifa(async () => {
+      const tarifa = await buscarTarifaDaEmpresa();
+      if (tarifa && !tarifaTocada) setTarifaKwh(String(tarifa.tarifaKwh).replace(".", ","));
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const componentes = useMemo(() => linhasParaComponentes(linhas), [linhas]);
   const potenciaKwp = potenciaKitPersonalizadoKwp(componentes);
@@ -308,7 +322,10 @@ export function FormularioNegocio({
           inputMode="decimal"
           placeholder="ex.: 0,95"
           value={tarifaKwh}
-          onChange={(e) => setTarifaKwh(e.target.value)}
+          onChange={(e) => {
+            setTarifaTocada(true);
+            setTarifaKwh(e.target.value);
+          }}
         />
         <Selecao
           rotulo="Tipo de ligação"

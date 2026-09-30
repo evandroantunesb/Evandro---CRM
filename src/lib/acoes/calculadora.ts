@@ -276,6 +276,12 @@ export async function editarParametros(_: ResultadoAcao, formData: FormData): Pr
     .trim()
     .transform((v) => Number(v.replace(",", ".")))
     .pipe(z.number({ message: "Temperatura inválida" }).min(-30, "Temperatura inválida").max(30, "Temperatura inválida"));
+  const siglaDistribuidoraOpcional = z
+    .string()
+    .trim()
+    .max(40)
+    .optional()
+    .transform((v) => (v && v.length ? v.toUpperCase() : null));
   const dados = z
     .object({
       produtividade_kwh_kwp_mes: numeroBr("Informe a produtividade"),
@@ -290,6 +296,7 @@ export async function editarParametros(_: ResultadoAcao, formData: FormData): Pr
       margem_dimensionamento_pct: percentual,
       overload_maximo_pct: percentual,
       temperatura_minima_projeto_c: temperaturaProjeto,
+      sigla_distribuidora_aneel: siglaDistribuidoraOpcional,
     })
     .safeParse(Object.fromEntries(formData));
   if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };

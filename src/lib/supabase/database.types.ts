@@ -2211,6 +2211,7 @@ export type Database = {
           overload_maximo_pct: number;
           percentual_fio_b: number;
           produtividade_kwh_kwp_mes: number;
+          sigla_distribuidora_aneel: string | null;
           temperatura_minima_projeto_c: number;
           updated_at: string;
         };
@@ -2227,6 +2228,7 @@ export type Database = {
           overload_maximo_pct?: number;
           percentual_fio_b?: number;
           produtividade_kwh_kwp_mes?: number;
+          sigla_distribuidora_aneel?: string | null;
           temperatura_minima_projeto_c?: number;
           updated_at?: string;
         };
@@ -2243,6 +2245,7 @@ export type Database = {
           overload_maximo_pct?: number;
           percentual_fio_b?: number;
           produtividade_kwh_kwp_mes?: number;
+          sigla_distribuidora_aneel?: string | null;
           temperatura_minima_projeto_c?: number;
           updated_at?: string;
         };
@@ -2981,6 +2984,42 @@ export type Database = {
             referencedColumns: ["id"];
           },
         ];
+      };
+      tarifas_aneel_cache: {
+        Row: {
+          atualizado_em: string;
+          id: string;
+          modalidade_tarifaria: string | null;
+          sigla_distribuidora: string;
+          sub_grupo: string;
+          vigencia_fim: string | null;
+          vigencia_inicio: string | null;
+          vlr_te: number;
+          vlr_tusd: number;
+        };
+        Insert: {
+          atualizado_em?: string;
+          id?: string;
+          modalidade_tarifaria?: string | null;
+          sigla_distribuidora: string;
+          sub_grupo?: string;
+          vigencia_fim?: string | null;
+          vigencia_inicio?: string | null;
+          vlr_te: number;
+          vlr_tusd: number;
+        };
+        Update: {
+          atualizado_em?: string;
+          id?: string;
+          modalidade_tarifaria?: string | null;
+          sigla_distribuidora?: string;
+          sub_grupo?: string;
+          vigencia_fim?: string | null;
+          vigencia_inicio?: string | null;
+          vlr_te?: number;
+          vlr_tusd?: number;
+        };
+        Relationships: [];
       };
     };
     Views: {
