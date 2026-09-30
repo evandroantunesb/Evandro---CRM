@@ -9,7 +9,7 @@ import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { mensagemErro } from "@/lib/erros";
 import { componentesJsonSchema, nomeKitPersonalizado, potenciaKitPersonalizadoKwp } from "@/lib/calculadora";
-import { TIPOS_LIGACAO, type ResultadoAcao } from "@/lib/tipos";
+import { PRAZOS_INSTALACAO_QUALIF, TIPOS_CLIENTE_QUALIF, TIPOS_LIGACAO, type ResultadoAcao } from "@/lib/tipos";
 
 const uuidOpcional = z
   .string()
@@ -34,6 +34,12 @@ const numeroBrOpcional = z
     return Number(v.includes(",") ? v.replace(/\./g, "").replace(",", ".") : v);
   })
   .pipe(z.number().positive().nullable());
+
+/** Selects "sim"/"nao"/"" (não informado) viram boolean | null. */
+const boolOpcional = z
+  .enum(["sim", "nao", ""])
+  .optional()
+  .transform((v) => (v === "sim" ? true : v === "nao" ? false : null));
 
 const esquemaNovo = z.object({
   titulo: z.string().trim().min(2, "Informe o nome do negócio"),
@@ -393,4 +399,52 @@ export async function buscarContatos(termo: string) {
     .order("nome")
     .limit(8);
   return data ?? [];
+}
+
+const esquemaQualificacao = z.object({
+  negocioId: z.string().uuid(),
+  qualif_tipo_cliente: z.enum([...TIPOS_CLIENTE_QUALIF, ""]).optional(),
+  qualif_possui_conta_energia: boolOpcional,
+  qualif_distribuidora: z.string().trim().max(80).optional(),
+  qualif_imovel_proprio: boolOpcional,
+  qualif_objetivo: z.string().trim().max(200).optional(),
+  qualif_prazo_instalacao: z.enum([...PRAZOS_INSTALACAO_QUALIF, ""]).optional(),
+  qualif_busca_financiamento: boolOpcional,
+  qualif_orcamento_outra_empresa: boolOpcional,
+  qualif_e_decisor: boolOpcional,
+  qualif_outro_decisor: boolOpcional,
+  qualif_participantes_decisao: z.string().trim().max(200).optional(),
+  qualif_observacoes: z.string().trim().max(2000).optional(),
+});
+
+/** Salva o bloco "Qualificação SDR" do negócio (spec RAION_SDR_REGRAS_PERMISSOES, fase 4). */
+export async function atualizarQualificacao(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  await exigirPapel();
+  const dados = esquemaQualificacao.safeParse(Object.fromEntries(formData));
+  if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
+  const d = dados.data;
+
+  const supabase = await criarClienteServidor();
+  const { data, error } = await supabase
+    .from("negocios")
+    .update({
+      qualif_tipo_cliente: d.qualif_tipo_cliente || null,
+      qualif_possui_conta_energia: d.qualif_possui_conta_energia,
+      qualif_distribuidora: d.qualif_distribuidora || null,
+      qualif_imovel_proprio: d.qualif_imovel_proprio,
+      qualif_objetivo: d.qualif_objetivo || null,
+      qualif_prazo_instalacao: d.qualif_prazo_instalacao || null,
+      qualif_busca_financiamento: d.qualif_busca_financiamento,
+      qualif_orcamento_outra_empresa: d.qualif_orcamento_outra_empresa,
+      qualif_e_decisor: d.qualif_e_decisor,
+      qualif_outro_decisor: d.qualif_outro_decisor,
+      qualif_participantes_decisao: d.qualif_participantes_decisao || null,
+      qualif_observacoes: d.qualif_observacoes || null,
+    })
+    .eq("id", d.negocioId)
+    .select("id");
+  if (error || !data?.length) return { ok: false, mensagem: mensagemErro(error, "Não foi possível salvar.") };
+
+  revalidatePath(`/negocios/${d.negocioId}`);
+  return { ok: true, mensagem: "Salvo." };
 }

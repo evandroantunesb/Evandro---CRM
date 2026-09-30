@@ -174,6 +174,28 @@ export const ROTULO_TIPO_CALCULO_COMISSAO: Record<TipoCalculoComissao, string> =
   multiplicador: "Multiplicador sobre o resultado",
 };
 
+export const TIPOS_CLIENTE_QUALIF = ["residencial", "comercial", "industrial", "rural", "outro"] as const;
+export type TipoClienteQualif = (typeof TIPOS_CLIENTE_QUALIF)[number];
+
+export const ROTULO_TIPO_CLIENTE_QUALIF: Record<TipoClienteQualif, string> = {
+  residencial: "Residencial",
+  comercial: "Comercial",
+  industrial: "Industrial",
+  rural: "Rural",
+  outro: "Outro",
+};
+
+export const PRAZOS_INSTALACAO_QUALIF = ["imediatamente", "ate_30_dias", "1_3_meses", "3_6_meses", "somente_pesquisando"] as const;
+export type PrazoInstalacaoQualif = (typeof PRAZOS_INSTALACAO_QUALIF)[number];
+
+export const ROTULO_PRAZO_INSTALACAO_QUALIF: Record<PrazoInstalacaoQualif, string> = {
+  imediatamente: "Imediatamente",
+  ate_30_dias: "Até 30 dias",
+  "1_3_meses": "1 a 3 meses",
+  "3_6_meses": "3 a 6 meses",
+  somente_pesquisando: "Somente pesquisando",
+};
+
 export const STATUS_RESGATE = ["solicitado", "aprovado", "entregue", "cancelado"] as const;
 export type StatusResgate = (typeof STATUS_RESGATE)[number];
 
