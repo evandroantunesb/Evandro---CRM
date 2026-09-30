@@ -1,6 +1,6 @@
 # Progresso — Raion CRM
 
-Resumo do estado do desenvolvimento. **Atualize ao concluir cada funcionalidade:** alterações (com número da PR), arquivos modificados, decisões técnicas e próximas tarefas. Última atualização: 2026-09-29.
+Resumo do estado do desenvolvimento. **Atualize ao concluir cada funcionalidade:** alterações (com número da PR), arquivos modificados, decisões técnicas e próximas tarefas. Última atualização: 2026-09-30.
 
 ## Em produção
 
@@ -24,11 +24,16 @@ Resumo do estado do desenvolvimento. **Atualize ao concluir cada funcionalidade:
 - #65 campos obrigatórios: valor do negócio (> 0) ao criar/editar e telefone do contato, no formulário e no servidor (`src/lib/acoes/negocios.ts`, `src/lib/acoes/contatos.ts` e os 3 formulários). Captura pública, rodízio e regras por etapa não mudam.
 - #44 dashboard unificado de Gamificação (`/gamificacao`) · #48 inclui a redistribuição da carteira ao desligar vendedor.
 - Correção definitiva das migrations travadas: `--include-all` fixo em `banco-producao.yml`.
+- **#69 estilo dos cards do Kanban** (borda colorida por etapa, hover, etiquetas em pílula) **+ "Adicionar negócio" só na etapa inicial de cada funil + "Editar etiquetas" no menu de 3 pontinhos do card** (popup reaproveitando a mesma tabela/ação de etiquetas da página do negócio).
+- **#74 regra de leitura direcionada no `CLAUDE.md`** (seção Contexto): localizar o símbolo antes de ler, evitar ler arquivo inteiro acima de ~300 linhas por padrão, nunca dividir/refatorar só por token, nunca editar arquivo gerado à mão.
+- **#75 comentário obrigatório ao mudar de etapa + contagem no card:** mover um negócio de etapa (arrastando ou pelo "Mover para") abre um popup pedindo um comentário obrigatório, salvo como nota do negócio (`moverEtapa` em `src/lib/acoes/negocios.ts` agora exige `comentario`); o card do Kanban mostra um ícone de balão com a contagem de comentários. Notas viraram histórico imutável — não é mais possível apagar (removido da tela e da policy de RLS `autor apaga nota`; editar continua permitido).
 
 ## Em andamento
 
-- **PR #63 — contexto do Claude:** `CLAUDE.md` enxuto (regras permanentes + seleção de modelos), `docs/arquitetura.md`, `docs/regras-negocio.md`, `PROGRESS.md`, `HANDOFF.md` e `.claude/settings.json`. 
 - **PR #62 — backup diário do banco de produção** para o repositório privado `raion-crm-backups`. Aguardando o Evandro criar os secrets `BACKUP_ENCRYPTION_KEY` e `BACKUP_REPO_TOKEN`.
+- **PR #68 — atualização do PROGRESS.md** pós-revisão do Dependabot (aberta, aguardando merge).
+- **PR #70 — correção do travamento ao mudar a cor da etapa** em Configurações > Funis e etapas (aberta, aguardando merge).
+- **PR #71 — botão único "Salvar" em Funis e etapas**, empilhada sobre a #70 (aberta, aguardando merge da #70 primeiro).
 - **PRs do Dependabot abertas:** #55–#58 (Actions), #60 (TypeScript 6), #61 (`@types/node` 26). Atualizações maiores: revisar com cuidado antes de mesclar.
 
 ## Decisões técnicas relevantes
@@ -45,12 +50,11 @@ Resumo do estado do desenvolvimento. **Atualize ao concluir cada funcionalidade:
 - Assinatura eletrônica do contrato (gov.br; ZapSign/Clicksign depois).
 - Notificações fora do app (e-mail/WhatsApp) e aba de notificações com lido/não lido.
 - Planilha real de kits/preços e validação dos parâmetros da calculadora com o engenheiro.
-- Estilo dos cards do Kanban; tornar campos como "Valor (R$)" obrigatórios.
 - Apagar a variável `NEXT_PUBLIC_SITE_URL` antiga no Vercel (não é mais usada).
 
 ## Próximos passos
 
-1. Mesclar a PR #63 (documentação de contexto).
-2. Criar os secrets do backup, mesclar a PR #62 e rodar o backup uma vez manualmente.
+1. Criar os secrets do backup, mesclar a PR #62 e rodar o backup uma vez manualmente.
+2. Mesclar as PRs #68, #70 e #71 (nesta ordem de dependência: #71 está empilhada sobre a #70).
 3. Revisar as PRs do Dependabot (#60 e #61 são versões maiores).
-4. Escolher o próximo item com o Evandro (candidato: mais estilo nos cards do Kanban). Contexto completo da troca de thread em `HANDOFF.md`.
+4. **Em andamento agora (nova thread, 2026-09-30):** redesenho da tela Início dos vendedores a partir de uma imagem de referência que o Evandro enviou. Faltam duas seções novas que não existem hoje: "Resumo do funil" (barras por etapa) e o card expandido "Meta comercial do mês" (aro circular + Meta/Realizado/Faltam/Contratos/Ticket médio). A visão de equipe (`?visao=equipe`, já existe desde a #51) precisa de metas de exemplo cadastradas pros vendedores pra deixar de aparecer vazia — combinado gerar dados de teste (não é preciso o Evandro configurar nada em Configurações > Metas antes). Também checar responsividade/CSS contra a imagem. Ver `src/app/(app)/inicio/page.tsx` (648 linhas) e `src/lib/metas.ts`.
