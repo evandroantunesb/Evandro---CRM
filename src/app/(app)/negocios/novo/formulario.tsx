@@ -12,6 +12,7 @@ import {
   potenciaKitPersonalizadoKwp,
   sugerirQuantidadeModulos,
 } from "@/lib/calculadora";
+import { dimensionarSistemaAutomatico, type EquipamentoAtivo, type OpcaoSistemaAutomatico } from "@/lib/dimensionamento";
 import { formatarMoeda } from "@/lib/formatacao";
 import { ROTULO_TIPO_LIGACAO, TIPOS_LIGACAO, type TipoLigacao } from "@/lib/tipos";
 
@@ -27,6 +28,9 @@ type Parametros = {
   custoMaterialCaPorKwp: number;
   custoEngenharia: number;
   comissaoPercentual: number;
+  margemDimensionamentoPct: number;
+  overloadMaximoPct: number;
+  temperaturaMinimaProjetoC: number;
 };
 
 /** Aceita "450", "450,5" e "1.234,56"; string vazia ou inválida vira null. */
@@ -43,6 +47,7 @@ export function FormularioNegocio({
   responsaveis,
   meuMembroId,
   parametros,
+  equipamentosAtivos,
 }: {
   funilId: string;
   /** Etapa pré-selecionada (ex.: "Adicionar negócio" numa coluna do Kanban); senão usa a etapa inicial do funil. */
@@ -52,6 +57,8 @@ export function FormularioNegocio({
   responsaveis: Opcao[];
   meuMembroId: string;
   parametros: Parametros | null;
+  /** Módulos/inversores ativados em "Configurações → Calculadora" pro kit automático — ver `dimensionamento.ts`. */
+  equipamentosAtivos: (EquipamentoAtivo & { tipo: "modulo" | "inversor" })[];
 }) {
   const [resultado, acao, pendente] = useActionState(criarNegocio, null);
   const [modo, setModo] = useState<"novo" | "existente">("novo");
@@ -71,10 +78,14 @@ export function FormularioNegocio({
   const [valorFaturaMedio, setValorFaturaMedio] = useState("");
   const [tarifaKwh, setTarifaKwh] = useState("");
 
-  // Passo 3 (depois de "Avançar"): personalização do kit.
+  // Passo 3 (depois de "Avançar"): kit automático, com personalização manual disponível em seguida.
   const [mostrarKit, setMostrarKit] = useState(false);
   const [linhas, setLinhas] = useState<LinhaComponente[]>([]);
   const [estruturaTelhado, setEstruturaTelhado] = useState("");
+  const [kitAutomaticoId, setKitAutomaticoId] = useState<string | null>(null);
+
+  const modulosAtivos = useMemo(() => equipamentosAtivos.filter((e) => e.tipo === "modulo"), [equipamentosAtivos]);
+  const inversoresAtivos = useMemo(() => equipamentosAtivos.filter((e) => e.tipo === "inversor"), [equipamentosAtivos]);
 
   const componentes = useMemo(() => linhasParaComponentes(linhas), [linhas]);
   const potenciaKwp = potenciaKitPersonalizadoKwp(componentes);
@@ -113,6 +124,41 @@ export function FormularioNegocio({
     if (fatura && tarifa) return fatura / tarifa;
     return null;
   }, [consumoMedioKwh, valorFaturaMedio, tarifaKwh]);
+
+  // Kit sugerido automaticamente a partir do consumo informado — ver `dimensionamento.ts`.
+  // Sem equipamento ativo ou sem consumo ainda, fica vazio e o vendedor monta manualmente.
+  const sugestoesAutomaticas = useMemo((): OpcaoSistemaAutomatico[] => {
+    if (!parametros || !consumoMedioEstimado || !modulosAtivos.length || !inversoresAtivos.length) return [];
+    return dimensionarSistemaAutomatico({
+      consumoMedioKwh: consumoMedioEstimado,
+      margemPct: parametros.margemDimensionamentoPct,
+      produtividadeKwhKwpMes: parametros.produtividadeKwhKwpMes,
+      modulos: modulosAtivos,
+      inversores: inversoresAtivos,
+      overloadMaximoPct: parametros.overloadMaximoPct,
+      temperaturaMinimaProjetoC: parametros.temperaturaMinimaProjetoC,
+    });
+  }, [parametros, consumoMedioEstimado, modulosAtivos, inversoresAtivos]);
+
+  function usarKitAutomatico(opcao: OpcaoSistemaAutomatico) {
+    const outrosItens = linhas.filter((l) => l.tipo !== "modulo" && l.tipo !== "inversor");
+    setLinhas([
+      {
+        tipo: "modulo",
+        descricao: `${opcao.modulo.fabricante} ${opcao.modulo.modelo}`,
+        potenciaW: String(opcao.modulo.potenciaW),
+        quantidade: String(opcao.quantidadeModulos),
+      },
+      {
+        tipo: "inversor",
+        descricao: `${opcao.inversor.fabricante} ${opcao.inversor.modelo}`,
+        potenciaW: String(opcao.inversor.potenciaW),
+        quantidade: "1",
+      },
+      ...outrosItens,
+    ]);
+    setKitAutomaticoId(`${opcao.modulo.id}-${opcao.inversor.id}`);
+  }
 
   // Sugere a quantidade de módulos pro consumo já informado, assim que o
   // vendedor escolhe (ou digita) a potência de um módulo.
@@ -377,7 +423,52 @@ export function FormularioNegocio({
 
       {mostrarKit && (
         <fieldset className="flex flex-col gap-3">
-          <legend className="mb-2 text-sm font-semibold text-zinc-900">Kit personalizado</legend>
+          <legend className="mb-2 text-sm font-semibold text-zinc-900">Kit</legend>
+          {sugestoesAutomaticas.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <p className="text-sm font-medium text-zinc-700">Kit sugerido automaticamente</p>
+              <p className="-mt-1 text-xs text-zinc-500">
+                Calculado a partir do consumo informado e dos equipamentos ativos em Configurações → Calculadora.
+                Escolha uma opção e ajuste manualmente abaixo se precisar.
+              </p>
+              <div className="grid gap-2 md:grid-cols-3">
+                {sugestoesAutomaticas.map((opcao) => {
+                  const id = `${opcao.modulo.id}-${opcao.inversor.id}`;
+                  const selecionado = id === kitAutomaticoId;
+                  return (
+                    <button
+                      type="button"
+                      key={id}
+                      onClick={() => usarKitAutomatico(opcao)}
+                      className={`flex flex-col gap-1 rounded-lg border p-3 text-left text-sm ${
+                        selecionado ? "border-amber-500 bg-amber-50" : "border-zinc-200 hover:bg-zinc-50"
+                      }`}
+                    >
+                      <span className="font-medium text-zinc-900">
+                        {opcao.quantidadeModulos}x {opcao.modulo.fabricante} {opcao.modulo.modelo}
+                      </span>
+                      <span className="text-zinc-600">
+                        + {opcao.inversor.fabricante} {opcao.inversor.modelo}
+                      </span>
+                      <span className="text-zinc-500">
+                        {opcao.potenciaDcKwp.toLocaleString("pt-BR")} kWp · overload{" "}
+                        {(opcao.overloadPct * 100).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}%
+                      </span>
+                      {opcao.validacao === "valido_com_alerta" && (
+                        <span className="text-xs text-amber-700">Overload acima do recomendado — confira</span>
+                      )}
+                      {opcao.validacaoEletrica === "nao_verificado" && (
+                        <span className="text-xs text-zinc-400">String/MPPT não verificados (sem datasheet completo)</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {sugestoesAutomaticas.length > 0 && (
+            <p className="text-sm font-medium text-zinc-700">Ajustar kit manualmente</p>
+          )}
           <EditorComponentesKit linhas={linhas} onChange={setLinhas} sugerirQuantidadeModulo={sugerirQuantidadeModulo} />
           <Campo
             rotulo="Estrutura do telhado"

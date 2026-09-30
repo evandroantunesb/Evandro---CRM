@@ -9,9 +9,10 @@ export default async function NovoNegocio({ searchParams }: PageProps<"/negocios
   const { atual } = await exigirPapel();
   const { funil, etapa } = await searchParams;
   const supabase = await criarClienteServidor();
-  const [config, { data: parametros }] = await Promise.all([
+  const [config, { data: parametros }, { data: equipamentos }] = await Promise.all([
     carregarConfiguracao(atual.empresaId),
     supabase.from("parametros_calculadora").select("*").eq("empresa_id", atual.empresaId).maybeSingle(),
+    supabase.from("equipamentos_empresa").select("*").eq("empresa_id", atual.empresaId).eq("ativo", true),
   ]);
   const funilEscolhido = config.funis.find((f) => f.id === funil && f.ativo) ?? config.funis.find((f) => f.ativo);
   if (!funilEscolhido) return <p className="text-sm text-zinc-600">Nenhum funil ativo.</p>;
@@ -42,9 +43,30 @@ export default async function NovoNegocio({ searchParams }: PageProps<"/negocios
                   custoMaterialCaPorKwp: parametros.custo_material_ca_por_kwp,
                   custoEngenharia: parametros.custo_engenharia,
                   comissaoPercentual: parametros.comissao_percentual,
+                  margemDimensionamentoPct: parametros.margem_dimensionamento_pct,
+                  overloadMaximoPct: parametros.overload_maximo_pct,
+                  temperaturaMinimaProjetoC: parametros.temperatura_minima_projeto_c,
                 }
               : null
           }
+          equipamentosAtivos={(equipamentos ?? []).map((e) => ({
+            id: e.id,
+            tipo: e.tipo as "modulo" | "inversor",
+            fabricante: e.fabricante,
+            modelo: e.modelo,
+            potenciaW: e.potencia_w,
+            prioridade: e.prioridade,
+            vocV: e.voc_v,
+            iscA: e.isc_a,
+            vmpV: e.vmp_v,
+            impA: e.imp_a,
+            coefTempVocPctC: e.coef_temp_voc_pct_c,
+            tensaoMaxDcV: e.tensao_max_dc_v,
+            mpptMinV: e.mppt_min_v,
+            mpptMaxV: e.mppt_max_v,
+            correnteMaxEntradaA: e.corrente_max_entrada_a,
+            quantidadeMppt: e.quantidade_mppt,
+          }))}
         />
       </Cartao>
     </div>
