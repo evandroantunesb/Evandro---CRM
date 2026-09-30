@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
@@ -36,4 +37,18 @@ export async function editarContato(_: ResultadoAcao, formData: FormData): Promi
 
   revalidatePath(`/contatos/${contatoId}`);
   return { ok: true, mensagem: "Contato salvo." };
+}
+
+/** Só admin/gestor podem excluir um contato (RLS também garante isso no banco). */
+export async function excluirContato(formData: FormData) {
+  await exigirPapel("admin", "gestor");
+  const id = z.string().uuid().safeParse(formData.get("contatoId"));
+  if (!id.success) return;
+
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.from("contatos").delete().eq("id", id.data);
+  if (error) return;
+
+  revalidatePath("/contatos");
+  redirect("/contatos");
 }
