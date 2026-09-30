@@ -644,6 +644,33 @@ export type Database = {
           },
         ];
       };
+      dados_solares_cache: {
+        Row: {
+          atualizado_em: string;
+          fonte: string;
+          id: string;
+          lat_arredondado: number;
+          lon_arredondado: number;
+          produtividade_kwh_kwp_mes: number;
+        };
+        Insert: {
+          atualizado_em?: string;
+          fonte: string;
+          id?: string;
+          lat_arredondado: number;
+          lon_arredondado: number;
+          produtividade_kwh_kwp_mes: number;
+        };
+        Update: {
+          atualizado_em?: string;
+          fonte?: string;
+          id?: string;
+          lat_arredondado?: number;
+          lon_arredondado?: number;
+          produtividade_kwh_kwp_mes?: number;
+        };
+        Relationships: [];
+      };
       empresa_membros: {
         Row: {
           ativo: boolean;

@@ -4,6 +4,7 @@ import { useActionState, useMemo, useState, useTransition } from "react";
 import { CampoArquivo } from "@/components/campo-arquivo";
 import { EditorComponentesKit, linhasParaComponentes, type LinhaComponente } from "@/components/kit-componentes";
 import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
+import { buscarProdutividadeRegionalPorEndereco } from "@/lib/acoes/geodados";
 import { buscarContatos, criarNegocio, verificarDuplicado, type Duplicado } from "@/lib/acoes/negocios";
 import {
   calcular,
@@ -87,6 +88,21 @@ export function FormularioNegocio({
   const modulosAtivos = useMemo(() => equipamentosAtivos.filter((e) => e.tipo === "modulo"), [equipamentosAtivos]);
   const inversoresAtivos = useMemo(() => equipamentosAtivos.filter((e) => e.tipo === "inversor"), [equipamentosAtivos]);
 
+  // Produtividade real da região (PVGIS/NASA a partir do endereço do contato — ver `geodados.ts`).
+  // Enquanto não vem (ou o endereço não é geocodificável), usa a média configurada em Parâmetros.
+  const [produtividadeRegional, setProdutividadeRegional] = useState<{
+    produtividadeKwhKwpMes: number;
+    fonte: "pvgis" | "nasa";
+  } | null>(null);
+  const [buscandoProdutividade, iniciarBuscaProdutividade] = useTransition();
+  const produtividadeKwhKwpMes = produtividadeRegional?.produtividadeKwhKwpMes ?? parametros?.produtividadeKwhKwpMes;
+
+  function buscarProdutividadeDoEndereco(endereco: string) {
+    setProdutividadeRegional(null);
+    if (endereco.trim().length < 8) return;
+    iniciarBuscaProdutividade(async () => setProdutividadeRegional(await buscarProdutividadeRegionalPorEndereco(endereco)));
+  }
+
   const componentes = useMemo(() => linhasParaComponentes(linhas), [linhas]);
   const potenciaKwp = potenciaKitPersonalizadoKwp(componentes);
 
@@ -128,17 +144,18 @@ export function FormularioNegocio({
   // Kit sugerido automaticamente a partir do consumo informado — ver `dimensionamento.ts`.
   // Sem equipamento ativo ou sem consumo ainda, fica vazio e o vendedor monta manualmente.
   const sugestoesAutomaticas = useMemo((): OpcaoSistemaAutomatico[] => {
-    if (!parametros || !consumoMedioEstimado || !modulosAtivos.length || !inversoresAtivos.length) return [];
+    if (!parametros || !produtividadeKwhKwpMes || !consumoMedioEstimado || !modulosAtivos.length || !inversoresAtivos.length)
+      return [];
     return dimensionarSistemaAutomatico({
       consumoMedioKwh: consumoMedioEstimado,
       margemPct: parametros.margemDimensionamentoPct,
-      produtividadeKwhKwpMes: parametros.produtividadeKwhKwpMes,
+      produtividadeKwhKwpMes,
       modulos: modulosAtivos,
       inversores: inversoresAtivos,
       overloadMaximoPct: parametros.overloadMaximoPct,
       temperaturaMinimaProjetoC: parametros.temperaturaMinimaProjetoC,
     });
-  }, [parametros, consumoMedioEstimado, modulosAtivos, inversoresAtivos]);
+  }, [parametros, produtividadeKwhKwpMes, consumoMedioEstimado, modulosAtivos, inversoresAtivos]);
 
   function usarKitAutomatico(opcao: OpcaoSistemaAutomatico) {
     const outrosItens = linhas.filter((l) => l.tipo !== "modulo" && l.tipo !== "inversor");
@@ -163,17 +180,16 @@ export function FormularioNegocio({
   // Sugere a quantidade de módulos pro consumo já informado, assim que o
   // vendedor escolhe (ou digita) a potência de um módulo.
   const sugerirQuantidadeModulo = useMemo(() => {
-    if (!parametros || !consumoMedioEstimado) return undefined;
-    return (potenciaW: number) =>
-      sugerirQuantidadeModulos(consumoMedioEstimado, parametros.produtividadeKwhKwpMes, potenciaW);
-  }, [parametros, consumoMedioEstimado]);
+    if (!produtividadeKwhKwpMes || !consumoMedioEstimado) return undefined;
+    return (potenciaW: number) => sugerirQuantidadeModulos(consumoMedioEstimado, produtividadeKwhKwpMes, potenciaW);
+  }, [produtividadeKwhKwpMes, consumoMedioEstimado]);
 
   const previa = useMemo(() => {
     const tarifa = numero(tarifaKwh);
     const consumo = numero(consumoMedioKwh);
     const fatura = numero(valorFaturaMedio);
     const precoKit = numero(valor);
-    if (!parametros || potenciaKwp <= 0 || !tarifa || (!consumo && !fatura)) return null;
+    if (!parametros || !produtividadeKwhKwpMes || potenciaKwp <= 0 || !tarifa || (!consumo && !fatura)) return null;
     const consumoMedioFinal = consumo ?? fatura! / tarifa;
     return calcular({
       potenciaKwp,
@@ -181,11 +197,11 @@ export function FormularioNegocio({
       tipoLigacao,
       consumoMedioKwh: consumoMedioFinal,
       tarifaKwh: tarifa,
-      produtividadeKwhKwpMes: parametros.produtividadeKwhKwpMes,
+      produtividadeKwhKwpMes,
       percentualFioB: parametros.percentualFioB,
       disponibilidadeKwh: parametros[DISPONIBILIDADE_PADRAO_CAMEL[tipoLigacao]],
     });
-  }, [parametros, tipoLigacao, consumoMedioKwh, valorFaturaMedio, tarifaKwh, potenciaKwp, valor]);
+  }, [parametros, produtividadeKwhKwpMes, tipoLigacao, consumoMedioKwh, valorFaturaMedio, tarifaKwh, potenciaKwp, valor]);
 
   function pesquisar(termo: string) {
     setBusca(termo);
@@ -365,8 +381,21 @@ export function FormularioNegocio({
               type="email"
               onBlur={(e) => conferirDuplicado(e.currentTarget.form!)}
             />
-            <div className="md:col-span-2">
-              <Campo rotulo="Endereço" name="contato_endereco" placeholder="Rua, número, bairro" />
+            <div className="flex flex-col gap-1 md:col-span-2">
+              <Campo
+                rotulo="Endereço"
+                name="contato_endereco"
+                placeholder="Rua, número, bairro, cidade"
+                onBlur={(e) => buscarProdutividadeDoEndereco(e.currentTarget.value)}
+              />
+              {buscandoProdutividade && <p className="text-xs text-zinc-400">Buscando dado de irradiação solar da região...</p>}
+              {!buscandoProdutividade && produtividadeRegional && (
+                <p className="text-xs text-green-700">
+                  Produtividade real da região: {produtividadeRegional.produtividadeKwhKwpMes.toLocaleString("pt-BR")}{" "}
+                  kWh/kWp/mês ({produtividadeRegional.fonte === "pvgis" ? "PVGIS" : "NASA"}) — usada no lugar da média
+                  configurada.
+                </p>
+              )}
             </div>
             {duplicados.map((d) => (
               <div key={d.contatoId} className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900 md:col-span-2">
