@@ -127,7 +127,9 @@ describe("confirmar_pagamento", () => {
     const negocioId = await criarNegocio("Fluxo feliz", membro[closer.id]);
     const contratoId = await criarEAssinarContrato(negocioId, closer.cliente);
 
-    const { data: regra } = await servico
+    // `gamification_rules` revoga insert até de service_role (só admin autenticado cria, via RLS) —
+    // tem que ser `admin.cliente`, não `servico`.
+    const { data: regra } = await admin.cliente
       .from("gamification_rules")
       .insert({ empresa_id: empresa, nome: "Pagamento confirmado", evento_tipo: "pagamento.confirmado", pontos: 25 })
       .select("id")
@@ -227,7 +229,7 @@ describe("estornar_confirmacao_pagamento", () => {
   it("estorna com motivo: ledger marcado, atividade registrada, linha preservada com estornado_*", async () => {
     const negocioId = await criarNegocio("Estorno completo", membro[closer.id]);
     const contratoId = await criarEAssinarContrato(negocioId, closer.cliente);
-    await servico.from("gamification_rules").insert({ empresa_id: empresa, nome: "Pagamento 2", evento_tipo: "pagamento.confirmado", pontos: 25 });
+    await admin.cliente.from("gamification_rules").insert({ empresa_id: empresa, nome: "Pagamento 2", evento_tipo: "pagamento.confirmado", pontos: 25 });
     const { data: conf } = await gestor.cliente.rpc("confirmar_pagamento", { p_contrato_id: contratoId });
 
     const { data: estorno, error } = await gestor.cliente.rpc("estornar_confirmacao_pagamento", {
@@ -264,7 +266,7 @@ describe("estornar_confirmacao_pagamento", () => {
   it("ciclo confirmar → estornar → confirmar de novo: 2 linhas, sem pontos duplicados, mesmo beneficiário", async () => {
     const negocioId = await criarNegocio("Ciclo completo", membro[closer.id]);
     const contratoId = await criarEAssinarContrato(negocioId, closer.cliente);
-    const { data: regra } = await servico
+    const { data: regra } = await admin.cliente
       .from("gamification_rules")
       .insert({ empresa_id: empresa, nome: "Pagamento ciclo", evento_tipo: "pagamento.confirmado", pontos: 25 })
       .select("id")
