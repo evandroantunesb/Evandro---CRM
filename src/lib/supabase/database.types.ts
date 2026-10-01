@@ -414,6 +414,117 @@ export type Database = {
           },
         ];
       };
+      confirmacoes_pagamento: {
+        Row: {
+          beneficiario_membro_id: string;
+          beneficiario_user_id: string;
+          confirmado_em: string;
+          confirmado_por_membro_id: string;
+          confirmado_por_user_id: string;
+          contrato_id: string;
+          empresa_id: string;
+          estornado_em: string | null;
+          estornado_por_membro_id: string | null;
+          estornado_por_user_id: string | null;
+          evento_confirmacao_id: number;
+          evento_estorno_id: number | null;
+          id: string;
+          motivo_estorno: string | null;
+          negocio_id: string;
+        };
+        Insert: {
+          beneficiario_membro_id: string;
+          beneficiario_user_id: string;
+          confirmado_em?: string;
+          confirmado_por_membro_id: string;
+          confirmado_por_user_id: string;
+          contrato_id: string;
+          empresa_id: string;
+          estornado_em?: string | null;
+          estornado_por_membro_id?: string | null;
+          estornado_por_user_id?: string | null;
+          evento_confirmacao_id: number;
+          evento_estorno_id?: number | null;
+          id?: string;
+          motivo_estorno?: string | null;
+          negocio_id: string;
+        };
+        Update: {
+          beneficiario_membro_id?: string;
+          beneficiario_user_id?: string;
+          confirmado_em?: string;
+          confirmado_por_membro_id?: string;
+          confirmado_por_user_id?: string;
+          contrato_id?: string;
+          empresa_id?: string;
+          estornado_em?: string | null;
+          estornado_por_membro_id?: string | null;
+          estornado_por_user_id?: string | null;
+          evento_confirmacao_id?: number;
+          evento_estorno_id?: number | null;
+          id?: string;
+          motivo_estorno?: string | null;
+          negocio_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "confirmacoes_pagamento_beneficiario_membro_id_fkey";
+            columns: ["beneficiario_membro_id"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "confirmacoes_pagamento_confirmado_por_membro_id_fkey";
+            columns: ["confirmado_por_membro_id"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "confirmacoes_pagamento_contrato_id_fkey";
+            columns: ["contrato_id"];
+            isOneToOne: false;
+            referencedRelation: "contratos";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "confirmacoes_pagamento_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "confirmacoes_pagamento_estornado_por_membro_id_fkey";
+            columns: ["estornado_por_membro_id"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "confirmacoes_pagamento_evento_confirmacao_id_fkey";
+            columns: ["evento_confirmacao_id"];
+            isOneToOne: false;
+            referencedRelation: "eventos";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "confirmacoes_pagamento_evento_estorno_id_fkey";
+            columns: ["evento_estorno_id"];
+            isOneToOne: false;
+            referencedRelation: "eventos";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "confirmacoes_pagamento_negocio_id_fkey";
+            columns: ["negocio_id"];
+            isOneToOne: false;
+            referencedRelation: "negocios";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       conquistas: {
         Row: {
           ativa: boolean;
@@ -585,6 +696,7 @@ export type Database = {
           empresa_id: string;
           id: string;
           negocio_id: string;
+          responsavel_assinatura_id: string | null;
           status: Database["public"]["Enums"]["status_contrato"];
           token: string;
           updated_at: string;
@@ -597,6 +709,7 @@ export type Database = {
           empresa_id: string;
           id?: string;
           negocio_id: string;
+          responsavel_assinatura_id?: string | null;
           status?: Database["public"]["Enums"]["status_contrato"];
           token?: string;
           updated_at?: string;
@@ -609,6 +722,7 @@ export type Database = {
           empresa_id?: string;
           id?: string;
           negocio_id?: string;
+          responsavel_assinatura_id?: string | null;
           status?: Database["public"]["Enums"]["status_contrato"];
           token?: string;
           updated_at?: string;
@@ -640,6 +754,13 @@ export type Database = {
             columns: ["negocio_id"];
             isOneToOne: true;
             referencedRelation: "negocios";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "contratos_responsavel_assinatura_id_fkey";
+            columns: ["responsavel_assinatura_id"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
             referencedColumns: ["id"];
           },
         ];
@@ -2969,6 +3090,32 @@ export type Database = {
         }[];
       };
       compartilha_empresa: { Args: { p_user_id: string }; Returns: boolean };
+      confirmar_pagamento: {
+        Args: { p_contrato_id: string };
+        Returns: {
+          beneficiario_membro_id: string;
+          beneficiario_user_id: string;
+          confirmado_em: string;
+          confirmado_por_membro_id: string;
+          confirmado_por_user_id: string;
+          contrato_id: string;
+          empresa_id: string;
+          estornado_em: string | null;
+          estornado_por_membro_id: string | null;
+          estornado_por_user_id: string | null;
+          evento_confirmacao_id: number;
+          evento_estorno_id: number | null;
+          id: string;
+          motivo_estorno: string | null;
+          negocio_id: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "confirmacoes_pagamento";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       decidir_atribuicao_lead: {
         Args: { p_automatico: boolean; p_id: string; p_membro_final_id: string };
         Returns: undefined;
@@ -3002,6 +3149,36 @@ export type Database = {
       e_closer_de_handoff_pendente: { Args: { p_negocio_id: string }; Returns: boolean };
       e_plataforma_admin: { Args: Record<PropertyKey, never>; Returns: boolean };
       empresa_da_pasta_marca: { Args: { p_caminho: string }; Returns: string };
+      estornar_confirmacao_pagamento: {
+        Args: { p_contrato_id: string; p_motivo: string };
+        Returns: {
+          beneficiario_membro_id: string;
+          beneficiario_user_id: string;
+          confirmado_em: string;
+          confirmado_por_membro_id: string;
+          confirmado_por_user_id: string;
+          contrato_id: string;
+          empresa_id: string;
+          estornado_em: string | null;
+          estornado_por_membro_id: string | null;
+          estornado_por_user_id: string | null;
+          evento_confirmacao_id: number;
+          evento_estorno_id: number | null;
+          id: string;
+          motivo_estorno: string | null;
+          negocio_id: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "confirmacoes_pagamento";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      estornar_lancamentos_do_evento: {
+        Args: { p_estornado_por: string; p_evento_id: number };
+        Returns: undefined;
+      };
       estornar_lancamentos_evento: {
         Args: { p_entidade_id: string; p_eventos_tipo: string[] };
         Returns: undefined;
@@ -3052,6 +3229,10 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      status_pagamento_contrato: {
+        Args: { p_contrato_id: string };
+        Returns: Database["public"]["Enums"]["status_pagamento_contrato"] | null;
+      };
       tem_papel: {
         Args: { p_empresa_id: string; p_papeis: Database["public"]["Enums"]["papel_membro"][] };
         Returns: boolean;
@@ -3073,6 +3254,7 @@ export type Database = {
       status_contrato: "rascunho" | "aguardando_assinatura" | "assinado";
       status_membro: "ativo" | "inativo" | "desligado";
       status_negocio: "aberto" | "ganho" | "perdido";
+      status_pagamento_contrato: "pendente" | "confirmado" | "estornado";
       status_resgate: "solicitado" | "aprovado" | "entregue" | "cancelado";
       tipo_calculo_comissao: "percentual" | "multiplicador";
       tipo_componente_kit: "modulo" | "inversor" | "bateria" | "outro";
