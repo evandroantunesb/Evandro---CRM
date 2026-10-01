@@ -93,6 +93,50 @@ export async function gerarContrato(_: ResultadoAcao, formData: FormData): Promi
   return { ok: true, mensagem: "Contrato pronto." };
 }
 
+const esquemaConfirmarPagamento = z.object({
+  negocioId: z.string().uuid(),
+  contratoId: z.string().uuid(),
+});
+
+/**
+ * Confirma o pagamento do contrato (pedido do Evandro, 2026-10-01): só gestor/admin, e
+ * nunca quem é o próprio responsável pelo negócio — tudo validado no RPC `security
+ * definer` (a RLS de `contratos` sozinha não bastaria, ver migration
+ * 20261001250000_gamificacao_pagamento_confirmado.sql).
+ */
+export async function confirmarPagamento(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  await exigirPapel();
+  const dados = esquemaConfirmarPagamento.safeParse(Object.fromEntries(formData));
+  if (!dados.success) return { ok: false, mensagem: "Dados inválidos." };
+
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.rpc("confirmar_pagamento", { p_contrato_id: dados.data.contratoId });
+  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível confirmar o pagamento.") };
+
+  revalidatePath(`/negocios/${dados.data.negocioId}`);
+  return { ok: true, mensagem: "Pagamento confirmado." };
+}
+
+const esquemaEstornarPagamento = esquemaConfirmarPagamento.extend({
+  motivo: z.string().trim().min(1, "Informe o motivo do estorno.").max(1000),
+});
+
+export async function estornarConfirmacaoPagamento(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  await exigirPapel();
+  const dados = esquemaEstornarPagamento.safeParse(Object.fromEntries(formData));
+  if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
+
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.rpc("estornar_confirmacao_pagamento", {
+    p_contrato_id: dados.data.contratoId,
+    p_motivo: dados.data.motivo,
+  });
+  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível estornar a confirmação.") };
+
+  revalidatePath(`/negocios/${dados.data.negocioId}`);
+  return { ok: true, mensagem: "Confirmação de pagamento estornada." };
+}
+
 export async function atualizarStatusContrato(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
   const { atual } = await exigirPapel();
   if (atual.papel === "sdr") return { ok: false, mensagem: "SDR não pode alterar o status do contrato (spec RAION_SDR_REGRAS_PERMISSOES §41)." };

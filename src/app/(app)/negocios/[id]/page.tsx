@@ -16,6 +16,7 @@ import {
   type CategoriaAnexo,
   type ModoPreco,
   type StatusContrato,
+  type StatusPagamentoContrato,
   type TipoComponenteKit,
   type TipoLigacao,
   type TipoTarefa,
@@ -28,6 +29,7 @@ import { FeedbackHandoff } from "./feedback-handoff";
 import { HandoffAceite } from "./handoff-aceite";
 import { KitPersonalizado } from "./kit-personalizado";
 import { NovaNota } from "./nova-nota";
+import { Pagamento } from "./pagamento";
 import { Proposta } from "./proposta";
 import { Qualificacao } from "./qualificacao";
 
@@ -112,9 +114,12 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
 
   const { data: contrato } = await supabase
     .from("contratos")
-    .select("token, status")
+    .select("id, token, status, responsavel_assinatura_id")
     .eq("negocio_id", id)
     .maybeSingle();
+  const { data: statusPagamento } = contrato
+    ? await supabase.rpc("status_pagamento_contrato", { p_contrato_id: contrato.id })
+    : { data: null };
 
   const { data: ultimoHandoff } = await supabase
     .from("handoffs")
@@ -376,6 +381,16 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
                 negocioId={negocio.id}
                 siteUrl={env.siteUrl}
                 contrato={contrato ? { token: contrato.token, status: contrato.status as StatusContrato } : null}
+              />
+            </Cartao>
+          )}
+          {atual.papel !== "sdr" && contrato && statusPagamento && (
+            <Cartao titulo="Pagamento">
+              <Pagamento
+                negocioId={negocio.id}
+                contratoId={contrato.id}
+                status={statusPagamento as StatusPagamentoContrato}
+                podeConfirmar={(souAdmin || atual.papel === "gestor") && contrato.responsavel_assinatura_id !== atual.membroId}
               />
             </Cartao>
           )}

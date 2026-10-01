@@ -138,6 +138,16 @@ export const ROTULO_STATUS_CONTRATO: Record<StatusContrato, string> = {
   assinado: "Assinado",
 };
 
+/** Calculado por `status_pagamento_contrato()` — não existe coluna de status, ver migration. */
+export const STATUS_PAGAMENTO_CONTRATO = ["pendente", "confirmado", "estornado"] as const;
+export type StatusPagamentoContrato = (typeof STATUS_PAGAMENTO_CONTRATO)[number];
+
+export const ROTULO_STATUS_PAGAMENTO_CONTRATO: Record<StatusPagamentoContrato, string> = {
+  pendente: "Aguardando confirmação do pagamento",
+  confirmado: "Pagamento confirmado",
+  estornado: "Confirmação de pagamento estornada",
+};
+
 export const MODOS_PRECO = ["sem_preco", "parcelado", "avista", "completo"] as const;
 export type ModoPreco = (typeof MODOS_PRECO)[number];
 

@@ -19,6 +19,7 @@ export const EVENTOS_GAMIFICACAO = [
   { tipo: "handoff.devolvido", rotulo: "Closer devolveu a oportunidade", campos: [] },
   { tipo: "handoff.won", rotulo: "SDR: lead entregue que virou venda", campos: ["valor"] },
   { tipo: "handoff.contrato_assinado", rotulo: "SDR: contrato assinado da oportunidade originada", campos: [] },
+  { tipo: "pagamento.confirmado", rotulo: "Pagamento confirmado", campos: [] },
 ] as const;
 
 export type TipoEventoGamificacao = (typeof EVENTOS_GAMIFICACAO)[number]["tipo"];
