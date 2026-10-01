@@ -107,18 +107,6 @@ const numeroBr = (mensagem: string) =>
 // (`src/lib/acoes/dimensionamento.ts`), que roda o MESMO motor da Etapa 2 do wizard de criação.
 // Não deixar dois caminhos de cálculo paralelos pro mesmo dado (regra da reconciliação).
 
-export async function apagarCalculo(formData: FormData) {
-  await exigirPapel();
-  const id = z.string().uuid().safeParse(formData.get("calculoId"));
-  if (!id.success) return;
-  const supabase = await criarClienteServidor();
-  const { data } = await supabase.from("calculos_solares").delete().eq("id", id.data).select("negocio_id");
-  if (data?.[0]) {
-    await supabase.from("kit_componentes").delete().eq("negocio_id", data[0].negocio_id);
-    revalidatePath(`/negocios/${data[0].negocio_id}`);
-  }
-}
-
 const nomeKit = z.string().trim().min(2, "Nome muito curto").max(80, "Nome muito longo");
 const potenciaKwp = numeroBr("Informe a potência do kit");
 const precoKit = z
