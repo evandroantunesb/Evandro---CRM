@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Cartao } from "@/components/ui";
 import { carregarConfiguracao } from "@/lib/crm";
+import { paraEquipamentoAtivo } from "@/lib/dimensionamento";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { FormularioNegocio } from "./formulario";
@@ -9,13 +10,25 @@ export default async function NovoNegocio({ searchParams }: PageProps<"/negocios
   const { atual } = await exigirPapel();
   const { funil, etapa } = await searchParams;
   const supabase = await criarClienteServidor();
-  const [config, { data: parametros }] = await Promise.all([
+  const [config, { data: parametros }, { data: equipamentos }] = await Promise.all([
     carregarConfiguracao(atual.empresaId),
     supabase.from("parametros_calculadora").select("*").eq("empresa_id", atual.empresaId).maybeSingle(),
+    // Catálogo ativo pro motor de dimensionamento automático (Fase 4 da reconciliação) — só os
+    // equipamentos ligados em Configurações → Calculadora entram nas opções sugeridas.
+    supabase
+      .from("equipamentos_empresa")
+      .select("*")
+      .eq("empresa_id", atual.empresaId)
+      .eq("ativo", true)
+      .order("tipo")
+      .order("prioridade", { ascending: false }),
   ]);
   const funilEscolhido = config.funis.find((f) => f.id === funil && f.ativo) ?? config.funis.find((f) => f.ativo);
   if (!funilEscolhido) return <p className="text-sm text-zinc-600">Nenhum funil ativo.</p>;
   const etapaEscolhida = config.etapas.find((e) => e.id === etapa && e.funilId === funilEscolhido.id && e.ativa);
+
+  const modulosAtivos = (equipamentos ?? []).filter((e) => e.tipo === "modulo").map(paraEquipamentoAtivo);
+  const inversoresAtivos = (equipamentos ?? []).filter((e) => e.tipo === "inversor").map(paraEquipamentoAtivo);
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
@@ -42,9 +55,16 @@ export default async function NovoNegocio({ searchParams }: PageProps<"/negocios
                   custoMaterialCaPorKwp: parametros.custo_material_ca_por_kwp,
                   custoEngenharia: parametros.custo_engenharia,
                   comissaoPercentual: parametros.comissao_percentual,
+                  margemDimensionamentoPct: parametros.margem_dimensionamento_pct,
+                  overloadMaximoPct: parametros.overload_maximo_pct,
+                  overloadCriticoPct: parametros.overload_critico_pct,
+                  temperaturaMinimaProjetoC: parametros.temperatura_minima_projeto_c,
+                  siglaDistribuidoraAneelFallback: parametros.sigla_distribuidora_aneel,
                 }
               : null
           }
+          modulosAtivos={modulosAtivos}
+          inversoresAtivos={inversoresAtivos}
         />
       </Cartao>
     </div>
