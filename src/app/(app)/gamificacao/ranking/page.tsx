@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Cartao } from "@/components/ui";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
+import { ROTULO_PERFIL_GAMIFICACAO, type PerfilGamificacao } from "@/lib/tipos";
 
 const PERIODOS = [
   { chave: "semana", rotulo: "Semana" },
@@ -9,6 +10,11 @@ const PERIODOS = [
   { chave: "geral", rotulo: "Geral" },
 ] as const;
 type Periodo = (typeof PERIODOS)[number]["chave"];
+
+// Ranking é sempre separado por perfil (decisão do Evandro, 2026-10-01): sem
+// mistura por padrão. cs_farmer ainda não tem gente nesse perfil — fica de
+// fora das abas até existir uso real.
+const PERFIS_RANKING = ["sdr", "closer"] as const satisfies readonly PerfilGamificacao[];
 
 function calcularDesde(periodo: Periodo): string | null {
   const agora = new Date();
@@ -25,14 +31,20 @@ function calcularDesde(periodo: Periodo): string | null {
 
 const MEDALHAS = ["🥇", "🥈", "🥉"];
 
-export default async function Ranking({ searchParams }: { searchParams: Promise<{ periodo?: string }> }) {
+export default async function Ranking({ searchParams }: { searchParams: Promise<{ periodo?: string; perfil?: string }> }) {
   const { atual } = await exigirPapel();
-  const { periodo: periodoParam } = await searchParams;
+  const { periodo: periodoParam, perfil: perfilParam } = await searchParams;
   const periodo = (PERIODOS.some((p) => p.chave === periodoParam) ? periodoParam : "mes") as Periodo;
+  // Minha aba por padrão (sdr/closer); sem perfil (admin/gestor, que só visualiza, não compete), cai na primeira aba.
+  const perfil = (
+    PERFIS_RANKING.includes(perfilParam as (typeof PERFIS_RANKING)[number])
+      ? perfilParam
+      : (atual.perfilGamificacao ?? PERFIS_RANKING[0])
+  ) as (typeof PERFIS_RANKING)[number];
   const supabase = await criarClienteServidor();
 
   const [{ data: pontos }, { data: membros }, { data: niveis }] = await Promise.all([
-    supabase.rpc("ranking_gamificacao", { p_empresa_id: atual.empresaId, p_desde: calcularDesde(periodo) ?? undefined }),
+    supabase.rpc("ranking_gamificacao", { p_empresa_id: atual.empresaId, p_perfil: perfil, p_desde: calcularDesde(periodo) ?? undefined }),
     supabase
       .from("empresa_membros")
       .select("id, ativo, perfis(nome, email)")
@@ -66,13 +78,26 @@ export default async function Ranking({ searchParams }: { searchParams: Promise<
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-semibold text-zinc-900">Ranking</h1>
+        <div className="flex gap-1 rounded-lg bg-zinc-100 p-1">
+          {PERFIS_RANKING.map((p) => (
+            <Link
+              key={p}
+              href={`/gamificacao/ranking?periodo=${periodo}&perfil=${p}`}
+              className={`rounded-md px-3 py-1 text-sm transition-colors ${
+                perfil === p ? "bg-white font-medium text-zinc-900 shadow-sm" : "text-zinc-600 hover:text-zinc-900"
+              }`}
+            >
+              {ROTULO_PERFIL_GAMIFICACAO[p]}
+            </Link>
+          ))}
+        </div>
         <div className="flex gap-1 rounded-lg bg-zinc-100 p-1">
           {PERIODOS.map((p) => (
             <Link
               key={p.chave}
-              href={`/gamificacao/ranking?periodo=${p.chave}`}
+              href={`/gamificacao/ranking?periodo=${p.chave}&perfil=${perfil}`}
               className={`rounded-md px-3 py-1 text-sm transition-colors ${
                 periodo === p.chave ? "bg-white font-medium text-zinc-900 shadow-sm" : "text-zinc-600 hover:text-zinc-900"
               }`}
@@ -82,6 +107,9 @@ export default async function Ranking({ searchParams }: { searchParams: Promise<
           ))}
         </div>
       </div>
+      {!atual.perfilGamificacao && (
+        <p className="text-xs text-zinc-500">Você não compete no ranking comercial (sem perfil de gamificação) — só está visualizando.</p>
+      )}
 
       {!linhas.length && (
         <Cartao>

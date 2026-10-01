@@ -227,7 +227,9 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
       .limit(20),
     supabase.from("niveis_gamificacao").select("nivel, nome, xp_minimo").eq("empresa_id", atual.empresaId).order("xp_minimo"),
     supabase.from("point_ledger").select("pontos").eq("membro_id", atual.membroId).eq("estornado", false).limit(20000),
-    supabase.rpc("ranking_gamificacao", { p_empresa_id: atual.empresaId, p_desde: mesAtual.inicioIso }),
+    atual.perfilGamificacao
+      ? supabase.rpc("ranking_gamificacao", { p_empresa_id: atual.empresaId, p_perfil: atual.perfilGamificacao, p_desde: mesAtual.inicioIso })
+      : Promise.resolve({ data: [] as { membro_id: string; total_pontos: number }[] }),
     supabase
       .from("conquistas_desbloqueadas")
       .select("id", { count: "exact", head: true })

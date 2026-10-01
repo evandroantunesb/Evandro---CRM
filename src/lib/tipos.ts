@@ -4,6 +4,16 @@ export type Papel = (typeof PAPEIS)[number];
 export const TIPOS_VENDEDOR = ["interno", "representante"] as const;
 export type TipoVendedor = (typeof TIPOS_VENDEDOR)[number];
 
+/** Em qual ranking/pontuação a pessoa compete — separado de `papel` (permissão). Gestor/admin não têm perfil (fora do ranking comercial). */
+export const PERFIS_GAMIFICACAO = ["sdr", "closer", "cs_farmer"] as const;
+export type PerfilGamificacao = (typeof PERFIS_GAMIFICACAO)[number];
+
+export const ROTULO_PERFIL_GAMIFICACAO: Record<PerfilGamificacao, string> = {
+  sdr: "SDR",
+  closer: "Closer",
+  cs_farmer: "CS Farmer",
+};
+
 export const ROTULO_PAPEL: Record<Papel, string> = {
   admin: "Admin",
   gestor: "Gestor",

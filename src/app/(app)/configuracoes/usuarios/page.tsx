@@ -1,7 +1,7 @@
 import { Cartao } from "@/components/ui";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import type { Papel, StatusMembro, TipoVendedor } from "@/lib/tipos";
+import type { Papel, PerfilGamificacao, StatusMembro, TipoVendedor } from "@/lib/tipos";
 import { FormularioConvite, LinhaMembro, type MembroLinha } from "./formularios";
 
 export default async function Usuarios() {
@@ -10,7 +10,7 @@ export default async function Usuarios() {
 
   const { data } = await supabase
     .from("empresa_membros")
-    .select("id, papel, tipo_vendedor, recebe_leads, status, perfis(nome, email)")
+    .select("id, papel, tipo_vendedor, perfil_gamificacao, recebe_leads, status, perfis(nome, email)")
     .eq("empresa_id", atual.empresaId)
     .order("created_at");
 
@@ -22,6 +22,7 @@ export default async function Usuarios() {
       email: perfil?.email ?? "",
       papel: m.papel as Papel,
       tipoVendedor: m.tipo_vendedor as TipoVendedor | null,
+      perfilGamificacao: m.perfil_gamificacao as PerfilGamificacao | null,
       recebeLeads: m.recebe_leads,
       status: m.status as StatusMembro,
     };

@@ -651,6 +651,7 @@ export type Database = {
           empresa_id: string;
           id: string;
           papel: Database["public"]["Enums"]["papel_membro"];
+          perfil_gamificacao: Database["public"]["Enums"]["perfil_gamificacao"] | null;
           recebe_leads: boolean;
           recebeu_lead_em: string | null;
           status: Database["public"]["Enums"]["status_membro"];
@@ -664,6 +665,7 @@ export type Database = {
           empresa_id: string;
           id?: string;
           papel?: Database["public"]["Enums"]["papel_membro"];
+          perfil_gamificacao?: Database["public"]["Enums"]["perfil_gamificacao"] | null;
           recebe_leads?: boolean;
           recebeu_lead_em?: string | null;
           status?: Database["public"]["Enums"]["status_membro"];
@@ -677,6 +679,7 @@ export type Database = {
           empresa_id?: string;
           id?: string;
           papel?: Database["public"]["Enums"]["papel_membro"];
+          perfil_gamificacao?: Database["public"]["Enums"]["perfil_gamificacao"] | null;
           recebe_leads?: boolean;
           recebeu_lead_em?: string | null;
           status?: Database["public"]["Enums"]["status_membro"];
@@ -938,6 +941,7 @@ export type Database = {
           entidade_id: string | null;
           id: number;
           payload: NonNullable<Json>;
+          profile_at_event: Database["public"]["Enums"]["perfil_gamificacao"] | null;
           tipo: string;
         };
         Insert: {
@@ -949,6 +953,7 @@ export type Database = {
           entidade_id?: string | null;
           id?: never;
           payload?: NonNullable<Json>;
+          profile_at_event?: Database["public"]["Enums"]["perfil_gamificacao"] | null;
           tipo: string;
         };
         Update: {
@@ -960,6 +965,7 @@ export type Database = {
           entidade_id?: string | null;
           id?: never;
           payload?: NonNullable<Json>;
+          profile_at_event?: Database["public"]["Enums"]["perfil_gamificacao"] | null;
           tipo?: string;
         };
         Relationships: [
@@ -1136,6 +1142,7 @@ export type Database = {
           limite_periodo: Database["public"]["Enums"]["periodo_limite_regra"] | null;
           limite_quantidade: number | null;
           nome: string;
+          perfil_aplicavel: Database["public"]["Enums"]["perfil_gamificacao"] | null;
           pontos: number;
           unica_por_negocio: boolean;
           updated_at: string;
@@ -1151,6 +1158,7 @@ export type Database = {
           limite_periodo?: Database["public"]["Enums"]["periodo_limite_regra"] | null;
           limite_quantidade?: number | null;
           nome: string;
+          perfil_aplicavel?: Database["public"]["Enums"]["perfil_gamificacao"] | null;
           pontos: number;
           unica_por_negocio?: boolean;
           updated_at?: string;
@@ -1166,6 +1174,7 @@ export type Database = {
           limite_periodo?: Database["public"]["Enums"]["periodo_limite_regra"] | null;
           limite_quantidade?: number | null;
           nome?: string;
+          perfil_aplicavel?: Database["public"]["Enums"]["perfil_gamificacao"] | null;
           pontos?: number;
           unica_por_negocio?: boolean;
           updated_at?: string;
@@ -1243,6 +1252,7 @@ export type Database = {
           negocio_id: string;
           observacoes: string | null;
           para_membro_id: string;
+          perfil_sdr_credito: Database["public"]["Enums"]["perfil_gamificacao"] | null;
           qualificacao_snapshot: NonNullable<Json>;
           respondido_em: string | null;
           respondido_por: string | null;
@@ -1259,6 +1269,7 @@ export type Database = {
           negocio_id: string;
           observacoes?: string | null;
           para_membro_id: string;
+          perfil_sdr_credito?: Database["public"]["Enums"]["perfil_gamificacao"] | null;
           qualificacao_snapshot?: NonNullable<Json>;
           respondido_em?: string | null;
           respondido_por?: string | null;
@@ -1275,6 +1286,7 @@ export type Database = {
           negocio_id?: string;
           observacoes?: string | null;
           para_membro_id?: string;
+          perfil_sdr_credito?: Database["public"]["Enums"]["perfil_gamificacao"] | null;
           qualificacao_snapshot?: NonNullable<Json>;
           respondido_em?: string | null;
           respondido_por?: string | null;
@@ -2315,6 +2327,7 @@ export type Database = {
           id: string;
           membro_id: string;
           pontos: number;
+          profile_at_event: Database["public"]["Enums"]["perfil_gamificacao"] | null;
           referencia_id: string | null;
           referencia_tipo: string | null;
           regra_id: string | null;
@@ -2330,6 +2343,7 @@ export type Database = {
           id?: string;
           membro_id: string;
           pontos: number;
+          profile_at_event?: Database["public"]["Enums"]["perfil_gamificacao"] | null;
           referencia_id?: string | null;
           referencia_tipo?: string | null;
           regra_id?: string | null;
@@ -2345,6 +2359,7 @@ export type Database = {
           id?: string;
           membro_id?: string;
           pontos?: number;
+          profile_at_event?: Database["public"]["Enums"]["perfil_gamificacao"] | null;
           referencia_id?: string | null;
           referencia_tipo?: string | null;
           regra_id?: string | null;
@@ -2893,6 +2908,7 @@ export type Database = {
           negocio_id: string;
           observacoes: string | null;
           para_membro_id: string;
+          perfil_sdr_credito: Database["public"]["Enums"]["perfil_gamificacao"] | null;
           qualificacao_snapshot: NonNullable<Json>;
           respondido_em: string | null;
           respondido_por: string | null;
@@ -2959,6 +2975,7 @@ export type Database = {
           negocio_id: string;
           observacoes: string | null;
           para_membro_id: string;
+          perfil_sdr_credito: Database["public"]["Enums"]["perfil_gamificacao"] | null;
           qualificacao_snapshot: NonNullable<Json>;
           respondido_em: string | null;
           respondido_por: string | null;
@@ -2996,7 +3013,11 @@ export type Database = {
         Returns: boolean;
       };
       ranking_gamificacao: {
-        Args: { p_desde?: string; p_empresa_id: string };
+        Args: {
+          p_desde?: string;
+          p_empresa_id: string;
+          p_perfil: Database["public"]["Enums"]["perfil_gamificacao"];
+        };
         Returns: {
           membro_id: string;
           total_pontos: number;
@@ -3032,6 +3053,7 @@ export type Database = {
       modo_distribuicao_leads: "somente_vendedores" | "somente_sdr" | "parcial" | "aleatorio";
       modo_preco_proposta: "sem_preco" | "parcelado" | "avista" | "completo";
       papel_membro: "admin" | "gestor" | "vendedor" | "sdr";
+      perfil_gamificacao: "sdr" | "closer" | "cs_farmer";
       periodo_limite_regra: "dia" | "mes";
       proposta_bloco_quebra: "auto" | "nova_pagina" | "pagina_exclusiva";
       proposta_modelo_capa: "foto" | "minimalista" | "tecnica";
@@ -3172,6 +3194,7 @@ export const Constants = {
       modo_distribuicao_leads: ["somente_vendedores", "somente_sdr", "parcial", "aleatorio"],
       modo_preco_proposta: ["sem_preco", "parcelado", "avista", "completo"],
       papel_membro: ["admin", "gestor", "vendedor", "sdr"],
+      perfil_gamificacao: ["sdr", "closer", "cs_farmer"],
       periodo_limite_regra: ["dia", "mes"],
       proposta_bloco_quebra: ["auto", "nova_pagina", "pagina_exclusiva"],
       proposta_modelo_capa: ["foto", "minimalista", "tecnica"],

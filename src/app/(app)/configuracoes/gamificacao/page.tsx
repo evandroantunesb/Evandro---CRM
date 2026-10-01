@@ -2,7 +2,7 @@ import { Cartao } from "@/components/ui";
 import { EVENTOS_GAMIFICACAO } from "@/lib/gamificacao";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import type { OperadorCondicao, PeriodoLimiteRegra } from "@/lib/tipos";
+import type { OperadorCondicao, PerfilGamificacao, PeriodoLimiteRegra } from "@/lib/tipos";
 import { LinhaConquista, LinhaNivel, LinhaRecompensa, LinhaRegra, NovaConquista, NovaRecompensa, NovoNivel, NovaRegra } from "./formularios";
 
 export default async function ConfigGamificacao() {
@@ -11,7 +11,7 @@ export default async function ConfigGamificacao() {
   const [{ data: regras }, { data: niveis }, { data: conquistas }, { data: recompensas }] = await Promise.all([
     supabase
       .from("gamification_rules")
-      .select("id, nome, evento_tipo, condicao, pontos, limite_periodo, limite_quantidade, unica_por_negocio, ativa")
+      .select("id, nome, evento_tipo, condicao, pontos, perfil_aplicavel, limite_periodo, limite_quantidade, unica_por_negocio, ativa")
       .eq("empresa_id", atual.empresaId)
       .order("created_at"),
     supabase.from("niveis_gamificacao").select("nivel, nome, xp_minimo").eq("empresa_id", atual.empresaId).order("nivel"),
@@ -48,6 +48,7 @@ export default async function ConfigGamificacao() {
               eventoTipo: r.evento_tipo,
               condicao: r.condicao as { campo: string; operador: OperadorCondicao; valor: string } | null,
               pontos: r.pontos,
+              perfilAplicavel: r.perfil_aplicavel as PerfilGamificacao | null,
               limitePeriodo: r.limite_periodo as PeriodoLimiteRegra | null,
               limiteQuantidade: r.limite_quantidade,
               unicaPorNegocio: r.unica_por_negocio,

@@ -6,7 +6,7 @@ import { EVENTOS_GAMIFICACAO } from "@/lib/gamificacao";
 import { mensagemErro } from "@/lib/erros";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { OPERADORES_CONDICAO, PERIODOS_LIMITE_REGRA, type ResultadoAcao } from "@/lib/tipos";
+import { OPERADORES_CONDICAO, PERFIS_GAMIFICACAO, PERIODOS_LIMITE_REGRA, type ResultadoAcao } from "@/lib/tipos";
 
 const CAMINHO = "/configuracoes/gamificacao";
 const TIPOS_EVENTO = EVENTOS_GAMIFICACAO.map((e) => e.tipo);
@@ -16,6 +16,7 @@ const esquema = z
     nome: z.string().trim().min(2, "Nome muito curto").max(80, "Nome muito longo"),
     eventoTipo: z.enum(TIPOS_EVENTO as [string, ...string[]], { message: "Escolha um evento." }),
     pontos: z.coerce.number().int().refine((v) => v !== 0, "Pontos não pode ser zero."),
+    perfilAplicavel: z.enum(PERFIS_GAMIFICACAO).optional().or(z.literal("").transform(() => undefined)),
     condicaoCampo: z.string().trim().optional().or(z.literal("").transform(() => undefined)),
     condicaoOperador: z.enum(OPERADORES_CONDICAO).optional().or(z.literal("").transform(() => undefined)),
     condicaoValor: z.string().trim().optional().or(z.literal("").transform(() => undefined)),
@@ -43,6 +44,7 @@ export async function criarRegra(_: ResultadoAcao, formData: FormData): Promise<
     nome: dados.data.nome,
     evento_tipo: dados.data.eventoTipo,
     pontos: dados.data.pontos,
+    perfil_aplicavel: dados.data.perfilAplicavel ?? null,
     condicao: montarCondicao(dados.data),
     limite_periodo: dados.data.limitePeriodo ?? null,
     limite_quantidade: dados.data.limiteQuantidade ?? null,
@@ -70,6 +72,7 @@ export async function editarRegra(_: ResultadoAcao, formData: FormData): Promise
       nome: dados.data.nome,
       evento_tipo: dados.data.eventoTipo,
       pontos: dados.data.pontos,
+      perfil_aplicavel: dados.data.perfilAplicavel ?? null,
       condicao: montarCondicao(dados.data),
       limite_periodo: dados.data.limitePeriodo ?? null,
       limite_quantidade: dados.data.limiteQuantidade ?? null,
