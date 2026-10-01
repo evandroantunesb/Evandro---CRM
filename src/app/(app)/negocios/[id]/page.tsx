@@ -25,6 +25,7 @@ import { EdicaoNegocio } from "./edicao";
 import { EnviarAnexo } from "./enviar-anexo";
 import { Fechamento } from "./fechamento";
 import { FeedbackHandoff } from "./feedback-handoff";
+import { HandoffAceite } from "./handoff-aceite";
 import { KitPersonalizado } from "./kit-personalizado";
 import { NovaNota } from "./nova-nota";
 import { Proposta } from "./proposta";
@@ -117,7 +118,7 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
 
   const { data: ultimoHandoff } = await supabase
     .from("handoffs")
-    .select("id, para_membro_id, created_at, handoffs_feedback(feedback, autor_id)")
+    .select("id, para_membro_id, de_membro_id, status, motivo_devolucao, created_at, handoffs_feedback(feedback, autor_id)")
     .eq("negocio_id", id)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -302,8 +303,34 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
             />
           </Cartao>
           {ultimoHandoff &&
-            (souAdmin || atual.papel === "gestor" || atual.membroId === ultimoHandoff.para_membro_id) &&
+            (souAdmin ||
+              atual.papel === "gestor" ||
+              atual.membroId === ultimoHandoff.para_membro_id ||
+              atual.membroId === ultimoHandoff.de_membro_id) &&
             (() => {
+              if (ultimoHandoff.status === "pendente") {
+                return (
+                  <Cartao titulo="Oportunidade">
+                    <HandoffAceite
+                      negocioId={negocio.id}
+                      handoffId={ultimoHandoff.id}
+                      deNome={ultimoHandoff.de_membro_id ? nomes.membro(ultimoHandoff.de_membro_id) : "SDR"}
+                      souCloser={atual.membroId === ultimoHandoff.para_membro_id}
+                    />
+                  </Cartao>
+                );
+              }
+              if (ultimoHandoff.status === "devolvido") {
+                return (
+                  <Cartao titulo="Oportunidade">
+                    <div className="flex flex-col gap-1">
+                      <Selo tom="negativo">Devolvido por {nomes.membro(ultimoHandoff.para_membro_id)}</Selo>
+                      <span className="text-sm text-zinc-600">{ultimoHandoff.motivo_devolucao}</span>
+                    </div>
+                  </Cartao>
+                );
+              }
+
               const feedbackExistente = ultimoHandoff.handoffs_feedback as unknown as { feedback: string; autor_id: string } | null;
               const jaContatouLead = (notas ?? []).some(
                 (n) => n.autor_id === ultimoHandoff.para_membro_id && n.created_at > ultimoHandoff.created_at,
