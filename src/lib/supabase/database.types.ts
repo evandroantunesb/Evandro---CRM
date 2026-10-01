@@ -2774,8 +2774,8 @@ export type Database = {
           google_evento_id: string | null;
           id: string;
           negocio_id: string | null;
-          resultado: Database["public"]["Enums"]["resultado_tarefa"] | null;
           responsavel_id: string | null;
+          resultado: Database["public"]["Enums"]["resultado_tarefa"] | null;
           tipo: Database["public"]["Enums"]["tipo_tarefa"];
           titulo: string;
           updated_at: string;
@@ -2790,8 +2790,8 @@ export type Database = {
           google_evento_id?: string | null;
           id?: string;
           negocio_id?: string | null;
-          resultado?: Database["public"]["Enums"]["resultado_tarefa"] | null;
           responsavel_id?: string | null;
+          resultado?: Database["public"]["Enums"]["resultado_tarefa"] | null;
           tipo?: Database["public"]["Enums"]["tipo_tarefa"];
           titulo: string;
           updated_at?: string;
@@ -2806,8 +2806,8 @@ export type Database = {
           google_evento_id?: string | null;
           id?: string;
           negocio_id?: string | null;
-          resultado?: Database["public"]["Enums"]["resultado_tarefa"] | null;
           responsavel_id?: string | null;
+          resultado?: Database["public"]["Enums"]["resultado_tarefa"] | null;
           tipo?: Database["public"]["Enums"]["tipo_tarefa"];
           titulo?: string;
           updated_at?: string;
