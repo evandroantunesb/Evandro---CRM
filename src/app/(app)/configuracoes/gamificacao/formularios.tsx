@@ -4,10 +4,13 @@ import { useActionState, useState } from "react";
 import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
 import {
   OPERADORES_CONDICAO,
+  PERFIS_GAMIFICACAO,
   PERIODOS_LIMITE_REGRA,
   ROTULO_OPERADOR_CONDICAO,
+  ROTULO_PERFIL_GAMIFICACAO,
   ROTULO_PERIODO_LIMITE_REGRA,
   type OperadorCondicao,
+  type PerfilGamificacao,
   type PeriodoLimiteRegra,
 } from "@/lib/tipos";
 import {
@@ -32,11 +35,25 @@ export type RegraSalva = {
   eventoTipo: string;
   condicao: { campo: string; operador: OperadorCondicao; valor: string } | null;
   pontos: number;
+  perfilAplicavel: PerfilGamificacao | null;
   limitePeriodo: PeriodoLimiteRegra | null;
   limiteQuantidade: number | null;
   unicaPorNegocio: boolean;
   ativa: boolean;
 };
+
+function SeletorPerfil({ defaultValue }: { defaultValue: PerfilGamificacao | "" }) {
+  return (
+    <Selecao rotulo="Perfil (opcional)" name="perfilAplicavel" defaultValue={defaultValue}>
+      <option value="">Qualquer perfil</option>
+      {PERFIS_GAMIFICACAO.map((p) => (
+        <option key={p} value={p}>
+          {ROTULO_PERFIL_GAMIFICACAO[p]}
+        </option>
+      ))}
+    </Selecao>
+  );
+}
 
 export function NovaRegra({ eventos }: { eventos: readonly EventoOpcao[] }) {
   const [resultado, acao, pendente] = useActionState(criarRegra, null);
@@ -55,7 +72,10 @@ export function NovaRegra({ eventos }: { eventos: readonly EventoOpcao[] }) {
           ))}
         </Selecao>
       </div>
-      <Campo rotulo="Pontos" name="pontos" type="number" step={1} defaultValue={10} required />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Campo rotulo="Pontos" name="pontos" type="number" step={1} defaultValue={10} required />
+        <SeletorPerfil defaultValue="" />
+      </div>
       <CondicaoTeto campos={campos} />
       <label className="flex items-center gap-1 text-sm text-zinc-700">
         <input type="checkbox" name="unicaPorNegocio" /> Pontua só a primeira vez por negócio (evita pontuar de novo se o card sair e voltar)
@@ -88,7 +108,10 @@ export function LinhaRegra({ regra, eventos }: { regra: RegraSalva; eventos: rea
           ))}
         </Selecao>
       </div>
-      <Campo rotulo="Pontos" name="pontos" type="number" step={1} defaultValue={regra.pontos} required />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Campo rotulo="Pontos" name="pontos" type="number" step={1} defaultValue={regra.pontos} required />
+        <SeletorPerfil defaultValue={regra.perfilAplicavel ?? ""} />
+      </div>
       <CondicaoTeto campos={campos} condicaoInicial={regra.condicao} limitePeriodoInicial={regra.limitePeriodo} limiteQuantidadeInicial={regra.limiteQuantidade} />
       <label className="flex items-center gap-1 text-sm text-zinc-700">
         <input type="checkbox" name="unicaPorNegocio" defaultChecked={regra.unicaPorNegocio} /> Pontua só a primeira vez por negócio (evita pontuar de novo se o card sair e voltar)

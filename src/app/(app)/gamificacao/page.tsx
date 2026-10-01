@@ -94,7 +94,11 @@ export default async function GamificacaoDashboard({ searchParams }: { searchPar
       .gte("fechado_em", anteriorMes.inicioIso)
       .lt("fechado_em", anteriorMes.fimExclusivoIso)
       .limit(10000),
-    supabase.rpc("ranking_gamificacao", { p_empresa_id: atual.empresaId, p_desde: atualMes.inicioIso }),
+    supabase.rpc("ranking_gamificacao", {
+      p_empresa_id: atual.empresaId,
+      p_perfil: atual.perfilGamificacao ?? "closer",
+      p_desde: atualMes.inicioIso,
+    }),
     supabase.from("niveis_gamificacao").select("nivel, nome, xp_minimo").eq("empresa_id", atual.empresaId).order("xp_minimo"),
     supabase.from("point_ledger").select("pontos").eq("membro_id", atual.membroId).eq("estornado", false).limit(20000),
     supabase.from("conquistas").select("id, nome, icone").eq("empresa_id", atual.empresaId).eq("ativa", true),

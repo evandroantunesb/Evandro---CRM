@@ -3,7 +3,7 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import type { Papel, TipoVendedor } from "@/lib/tipos";
+import type { Papel, PerfilGamificacao, TipoVendedor } from "@/lib/tipos";
 
 export const COOKIE_EMPRESA = "raion_empresa";
 /** Preferência de visualização (Kanban/Lista) da tela de Negócios, por navegador. */
@@ -15,6 +15,8 @@ export type Vinculo = {
   empresaNome: string;
   papel: Papel;
   tipoVendedor: TipoVendedor | null;
+  /** Em qual ranking/pontuação a pessoa compete (sdr/closer/cs_farmer) — separado de `papel` (permissão). Null = fora do ranking comercial (típico de admin/gestor). */
+  perfilGamificacao: PerfilGamificacao | null;
 };
 
 export type Sessao = {
@@ -40,7 +42,7 @@ export const obterSessao = cache(async (): Promise<Sessao> => {
     supabase.from("plataforma_admins").select("user_id").eq("user_id", user.id).maybeSingle(),
     supabase
       .from("empresa_membros")
-      .select("id, empresa_id, papel, tipo_vendedor, empresas!inner(nome, situacao)")
+      .select("id, empresa_id, papel, tipo_vendedor, perfil_gamificacao, empresas!inner(nome, situacao)")
       .eq("user_id", user.id)
       .eq("ativo", true)
       .eq("empresas.situacao", "ativa")
@@ -53,6 +55,7 @@ export const obterSessao = cache(async (): Promise<Sessao> => {
     empresaNome: (m.empresas as unknown as { nome: string }).nome,
     papel: m.papel as Papel,
     tipoVendedor: m.tipo_vendedor as TipoVendedor | null,
+    perfilGamificacao: m.perfil_gamificacao as PerfilGamificacao | null,
   }));
 
   const escolhida = (await cookies()).get(COOKIE_EMPRESA)?.value;
