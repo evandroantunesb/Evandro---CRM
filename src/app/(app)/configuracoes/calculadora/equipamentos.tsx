@@ -7,6 +7,7 @@ import {
   apagarEquipamento,
   cadastrarEquipamentoManual,
   editarEquipamento,
+  importarEquipamentosCsv,
   obterUrlDatasheet,
 } from "@/lib/acoes/equipamentos";
 
@@ -62,6 +63,7 @@ export function Equipamentos({ itens }: { itens: EquipamentoAtivoLinha[] }) {
         Prioridade maior aparece primeiro entre as opções tecnicamente válidas.
       </p>
 
+      <FormularioImportacaoCsv />
       <FormularioCadastroManual />
 
       <ListaEquipamentos titulo="Módulos ativos" itens={modulos} />
@@ -70,9 +72,36 @@ export function Equipamentos({ itens }: { itens: EquipamentoAtivoLinha[] }) {
   );
 }
 
+function FormularioImportacaoCsv() {
+  const [resultado, acao, pendente] = useActionState(importarEquipamentosCsv, null);
+  const form = useRef<HTMLFormElement>(null);
+  useEffect(() => {
+    if (resultado?.ok) form.current?.reset();
+  }, [resultado]);
+
+  return (
+    <form ref={form} action={acao} className="flex flex-col gap-2 rounded-lg border border-dashed border-zinc-300 p-3">
+      <p className="text-sm font-medium text-zinc-700">Importar catálogo via CSV</p>
+      <p className="text-xs text-zinc-500">
+        Mesmas colunas de módulo/inversor do cadastro manual (fabricante, modelo, dados elétricos, dimensões,
+        procedência etc.). Reimportar o mesmo arquivo atualiza os equipamentos já cadastrados (por fabricante +
+        modelo) em vez de duplicar.
+      </p>
+      <div className="flex flex-wrap items-end gap-2">
+        <input type="file" name="csv" accept=".csv,text/csv" required className="text-sm" />
+        <Botao type="submit" variante="secundario" disabled={pendente}>
+          {pendente ? "Importando..." : "Importar"}
+        </Botao>
+      </div>
+      <Mensagem resultado={resultado} />
+    </form>
+  );
+}
+
 function FormularioCadastroManual() {
   const [tipo, setTipo] = useState<"modulo" | "inversor">("modulo");
-  const [detalhesAbertos, setDetalhesAbertos] = useState(false);
+  const [tecnicosAbertos, setTecnicosAbertos] = useState(false);
+  const [avancadoAberto, setAvancadoAberto] = useState(false);
   const [resultado, acao, pendente] = useActionState(cadastrarEquipamentoManual, null);
   const form = useRef<HTMLFormElement>(null);
   useEffect(() => {
@@ -108,12 +137,12 @@ function FormularioCadastroManual() {
       </div>
       <button
         type="button"
-        onClick={() => setDetalhesAbertos((v) => !v)}
+        onClick={() => setTecnicosAbertos((v) => !v)}
         className="self-start text-xs font-medium text-amber-700 hover:underline"
       >
-        {detalhesAbertos ? "Ocultar detalhes técnicos" : "Detalhes técnicos"}
+        {tecnicosAbertos ? "Ocultar dados técnicos" : "Dados técnicos"}
       </button>
-      {detalhesAbertos && (
+      {tecnicosAbertos && (
         <div className="flex flex-col gap-2 rounded-md bg-zinc-50 p-2">
           <p className="text-xs text-zinc-500">
             Opcional — sem esses dados o equipamento continua disponível pro kit automático, só fica marcado como
@@ -170,6 +199,21 @@ function FormularioCadastroManual() {
               </>
             )}
           </div>
+        </div>
+      )}
+      <button
+        type="button"
+        onClick={() => setAvancadoAberto((v) => !v)}
+        className="self-start text-xs font-medium text-zinc-500 hover:underline"
+      >
+        {avancadoAberto ? "Ocultar dados avançados/internos" : "Dados avançados/internos"}
+      </button>
+      {avancadoAberto && (
+        <div className="flex flex-col gap-2 rounded-md bg-zinc-50 p-2">
+          <p className="text-xs text-zinc-500">
+            Datasheet e demais campos internos do motor — não aparecem no dia a dia do vendedor, mas ficam
+            persistidos e consultáveis.
+          </p>
           <CampoArquivo rotulo="Datasheet (opcional)" name="datasheet" accept=".pdf,image/*" />
         </div>
       )}

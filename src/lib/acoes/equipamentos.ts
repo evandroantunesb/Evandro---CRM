@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { camposTecnicosParaPersistir } from "@/lib/equipamentos";
+import { analisarCsv, linhasParaObjetos } from "@/lib/csv";
+import { camposTecnicosParaPersistir, linhaCsvParaEquipamento } from "@/lib/equipamentos";
 import { mensagemErro } from "@/lib/erros";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteAdmin } from "@/lib/supabase/admin";
@@ -242,6 +243,57 @@ export async function editarEquipamento(_: ResultadoAcao, formData: FormData): P
   if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível salvar.") };
   revalidatePath(CAMINHO);
   return { ok: true, mensagem: "Salvo." };
+}
+
+const LIMITE_CSV = 2 * 1024 * 1024;
+const LIMITE_LINHAS_CSV = 2000;
+
+/**
+ * Importação em massa do catálogo via CSV (pedido do Evandro, 2026-10-01, pra já deixar
+ * pronto antes de receber a planilha real de módulos/inversores). Mesmas colunas disjuntas
+ * de módulo/inversor do cadastro manual — ver `linhaCsvParaEquipamento` em
+ * `lib/equipamentos.ts`, onde mora toda a lógica de mapeamento (testável sem banco).
+ * Faz upsert por (empresa, tipo, fabricante, modelo): reimportar o mesmo catálogo atualiza
+ * os equipamentos existentes em vez de duplicar.
+ */
+export async function importarEquipamentosCsv(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  const { atual } = await exigirPapel("admin");
+  const arquivo = formData.get("csv");
+  if (!(arquivo instanceof File) || arquivo.size === 0) {
+    return { ok: false, mensagem: "Selecione um arquivo CSV." };
+  }
+  if (arquivo.size > LIMITE_CSV) return { ok: false, mensagem: "Arquivo CSV muito grande (máximo 2 MB)." };
+
+  const texto = await arquivo.text();
+  const linhas = linhasParaObjetos(analisarCsv(texto));
+  if (!linhas.length) return { ok: false, mensagem: "CSV vazio ou sem linhas de dados." };
+  if (linhas.length > LIMITE_LINHAS_CSV) {
+    return { ok: false, mensagem: `CSV com mais de ${LIMITE_LINHAS_CSV} linhas — divida em arquivos menores.` };
+  }
+
+  const erros: string[] = [];
+  const validos = linhas.flatMap((linha, i) => {
+    const resultado = linhaCsvParaEquipamento(linha);
+    if (!resultado.ok) {
+      erros.push(`linha ${i + 2}: ${resultado.erro}`);
+      return [];
+    }
+    return [{ ...resultado.valores, empresa_id: atual.empresaId }];
+  });
+  if (!validos.length) {
+    return { ok: false, mensagem: `Nenhuma linha válida. Erros: ${erros.slice(0, 5).join("; ")}` };
+  }
+
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase
+    .from("equipamentos_empresa")
+    .upsert(validos, { onConflict: "empresa_id,tipo,fabricante,modelo" });
+  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível importar o catálogo.") };
+
+  revalidatePath(CAMINHO);
+  const resumo = `${validos.length} equipamento(s) importado(s)/atualizado(s).`;
+  const avisoErros = erros.length ? ` ${erros.length} linha(s) ignorada(s): ${erros.slice(0, 5).join("; ")}.` : "";
+  return { ok: true, mensagem: resumo + avisoErros };
 }
 
 export async function apagarEquipamento(formData: FormData) {
