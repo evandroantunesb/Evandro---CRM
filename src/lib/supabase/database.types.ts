@@ -931,6 +931,7 @@ export type Database = {
       eventos: {
         Row: {
           ator_id: string | null;
+          beneficiario_id: string | null;
           created_at: string;
           empresa_id: string;
           entidade: string | null;
@@ -941,6 +942,7 @@ export type Database = {
         };
         Insert: {
           ator_id?: string | null;
+          beneficiario_id?: string | null;
           created_at?: string;
           empresa_id: string;
           entidade?: string | null;
@@ -951,6 +953,7 @@ export type Database = {
         };
         Update: {
           ator_id?: string | null;
+          beneficiario_id?: string | null;
           created_at?: string;
           empresa_id?: string;
           entidade?: string | null;
@@ -1236,10 +1239,14 @@ export type Database = {
           de_membro_id: string | null;
           empresa_id: string;
           id: string;
+          motivo_devolucao: string | null;
           negocio_id: string;
           observacoes: string | null;
           para_membro_id: string;
           qualificacao_snapshot: NonNullable<Json>;
+          respondido_em: string | null;
+          respondido_por: string | null;
+          status: string;
           status_qualificacao: string;
         };
         Insert: {
@@ -1248,10 +1255,14 @@ export type Database = {
           de_membro_id?: string | null;
           empresa_id: string;
           id?: string;
+          motivo_devolucao?: string | null;
           negocio_id: string;
           observacoes?: string | null;
           para_membro_id: string;
           qualificacao_snapshot?: NonNullable<Json>;
+          respondido_em?: string | null;
+          respondido_por?: string | null;
+          status?: string;
           status_qualificacao: string;
         };
         Update: {
@@ -1260,10 +1271,14 @@ export type Database = {
           de_membro_id?: string | null;
           empresa_id?: string;
           id?: string;
+          motivo_devolucao?: string | null;
           negocio_id?: string;
           observacoes?: string | null;
           para_membro_id?: string;
           qualificacao_snapshot?: NonNullable<Json>;
+          respondido_em?: string | null;
+          respondido_por?: string | null;
+          status?: string;
           status_qualificacao?: string;
         };
         Relationships: [
@@ -1298,6 +1313,13 @@ export type Database = {
           {
             foreignKeyName: "handoffs_para_membro_id_fkey";
             columns: ["para_membro_id"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "handoffs_respondido_por_fkey";
+            columns: ["respondido_por"];
             isOneToOne: false;
             referencedRelation: "empresa_membros";
             referencedColumns: ["id"];
@@ -2859,6 +2881,31 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      aceitar_handoff: {
+        Args: { p_handoff_id: string };
+        Returns: {
+          contato_id: string;
+          created_at: string;
+          de_membro_id: string | null;
+          empresa_id: string;
+          id: string;
+          motivo_devolucao: string | null;
+          negocio_id: string;
+          observacoes: string | null;
+          para_membro_id: string;
+          qualificacao_snapshot: Json;
+          respondido_em: string | null;
+          respondido_por: string | null;
+          status: string;
+          status_qualificacao: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "handoffs";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       aprovar_atribuicao_lead: {
         Args: { p_id: string; p_membro_final_id?: string };
         Returns: undefined;
@@ -2900,6 +2947,32 @@ export type Database = {
         Args: { p_automatico: boolean; p_id: string; p_membro_final_id: string };
         Returns: undefined;
       };
+      devolver_handoff: {
+        Args: { p_handoff_id: string; p_motivo: string };
+        Returns: {
+          contato_id: string;
+          created_at: string;
+          de_membro_id: string | null;
+          empresa_id: string;
+          id: string;
+          motivo_devolucao: string | null;
+          negocio_id: string;
+          observacoes: string | null;
+          para_membro_id: string;
+          qualificacao_snapshot: Json;
+          respondido_em: string | null;
+          respondido_por: string | null;
+          status: string;
+          status_qualificacao: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "handoffs";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      e_closer_de_handoff_pendente: { Args: { p_negocio_id: string }; Returns: boolean };
       e_plataforma_admin: { Args: Record<PropertyKey, never>; Returns: boolean };
       empresa_da_pasta_marca: { Args: { p_caminho: string }; Returns: string };
       estornar_lancamentos_evento: {
