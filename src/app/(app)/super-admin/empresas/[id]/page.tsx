@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Cartao, Selo } from "@/components/ui";
+import { Botao, Cartao, Selo } from "@/components/ui";
+import { trocarEmpresa } from "@/lib/acoes/empresa-atual";
 import { exigirSuperAdmin } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { ROTULO_PAPEL, ROTULO_TIPO_VENDEDOR, type Papel, type TipoVendedor } from "@/lib/tipos";
@@ -9,9 +10,10 @@ import { FormularioAdmin, FormularioEdicaoEmpresa, FormularioPlano } from "../..
 import { SeloSituacao } from "../../situacao";
 
 export default async function Empresa({ params }: PageProps<"/super-admin/empresas/[id]">) {
-  await exigirSuperAdmin();
+  const sessao = await exigirSuperAdmin();
   const { id } = await params;
   const supabase = await criarClienteServidor();
+  const meuVinculo = sessao.vinculos.find((v) => v.empresaId === id);
 
   const [{ data: empresa }, { data: plano }] = await Promise.all([
     supabase
@@ -38,6 +40,18 @@ export default async function Empresa({ params }: PageProps<"/super-admin/empres
         <h1 className="text-2xl font-semibold text-zinc-900">{empresa.nome}</h1>
         <SeloSituacao situacao={empresa.situacao} />
       </div>
+      {meuVinculo && (
+        <Cartao titulo="Sua visão nesta empresa">
+          <p className="mb-3 text-sm text-zinc-600">
+            Você é {ROTULO_PAPEL[meuVinculo.papel]} aqui. Entre pra ver a empresa como ela aparece pro time, fora do painel de
+            super-admin.
+          </p>
+          <form action={trocarEmpresa}>
+            <input type="hidden" name="empresaId" value={empresa.id} />
+            <Botao type="submit">Entrar nesta empresa</Botao>
+          </form>
+        </Cartao>
+      )}
       <Cartao titulo="Dados da empresa">
         <FormularioEdicaoEmpresa empresa={{ id: empresa.id, nome: empresa.nome, cnpj: empresa.cnpj }} />
       </Cartao>
