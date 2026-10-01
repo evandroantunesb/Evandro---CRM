@@ -135,8 +135,10 @@ describe("contrato assinado credita o SDR de origem", () => {
     const negocioId = await criarNegocio("Negócio redirecionado", membro[sdr1.id]);
     const primeiroHandoff = await enviarEAceitar(negocioId, sdr1, closer);
 
-    // closer (agora responsável) reenvia pra outro closer, com outro SDR como remetente.
-    await enviarEAceitar(negocioId, sdr2, closer2);
+    // closer (responsável atual, único que vê o negócio pra criar outro handoff) reenvia pra
+    // outro closer — de_membro_id do 2º handoff é o próprio closer, igual ao fluxo real
+    // ("Enviar para vendas" usa negocio.responsavel_id como de_membro_id, não quem clica).
+    await enviarEAceitar(negocioId, closer, closer2);
 
     const { data: negocio } = await servico.from("negocios").select("handoff_origem_id, responsavel_id").eq("id", negocioId).single();
     expect(negocio!.handoff_origem_id).toBe(primeiroHandoff.id);
@@ -149,7 +151,7 @@ describe("contrato assinado credita o SDR de origem", () => {
       .eq("entidade_id", negocioId)
       .eq("tipo", "handoff.contrato_assinado")
       .single();
-    // Crédito continua com o sdr1 (origem gravada no 1º aceite), não o sdr2 do reenvio.
+    // Crédito continua com o sdr1 (origem gravada no 1º aceite), mesmo após o reenvio.
     expect(ev!.beneficiario_id).toBe(sdr1.id);
   });
 
