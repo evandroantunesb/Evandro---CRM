@@ -72,6 +72,70 @@ export function camposTecnicosParaPersistir(tipo: TipoEquipamento, entrada: Camp
   };
 }
 
+/**
+ * Dados avançados/internos do formulário de equipamento (procedência, coeficientes extras,
+ * dimensões etc.) — nenhum entra na validação elétrica do motor. Mesma regra de
+ * `camposTecnicosParaPersistir`: módulo e inversor gravam colunas disjuntas; as comuns valem
+ * pros dois.
+ */
+export type CamposAvancadosEntrada = {
+  categoria: string | null;
+  tecnologia: string | null;
+  statusValidacao: string | null;
+  fontePrimaria: string | null;
+  fonteSecundaria: string | null;
+  observacoes: string | null;
+  coefTempPmaxPctC: number | null;
+  coefTempIscPctC: number | null;
+  bifacial: boolean | null;
+  bifacialidadePct: number | null;
+  nmotC: number | null;
+  tensaoMaxSistemaV: number | null;
+  fusivelMaxSerieA: number | null;
+  eficienciaModuloPct: number | null;
+  comprimentoMm: number | null;
+  larguraMm: number | null;
+  espessuraMm: number | null;
+  pesoKg: number | null;
+  potenciaAparenteMaxVa: number | null;
+  tensaoFasesAc: string | null;
+  grauProtecao: string | null;
+};
+
+export function camposAvancadosParaPersistir(tipo: TipoEquipamento, entrada: CamposAvancadosEntrada) {
+  const comuns = {
+    categoria: entrada.categoria,
+    tecnologia: entrada.tecnologia,
+    status_validacao: entrada.statusValidacao,
+    fonte_primaria: entrada.fontePrimaria,
+    fonte_secundaria: entrada.fonteSecundaria,
+    observacoes: entrada.observacoes,
+  };
+  if (tipo === "modulo") {
+    return {
+      ...comuns,
+      coef_temp_pmax_pct_c: entrada.coefTempPmaxPctC,
+      coef_temp_isc_pct_c: entrada.coefTempIscPctC,
+      bifacial: entrada.bifacial,
+      bifacialidade_pct: entrada.bifacialidadePct,
+      nmot_c: entrada.nmotC,
+      tensao_max_sistema_v: entrada.tensaoMaxSistemaV,
+      fusivel_max_serie_a: entrada.fusivelMaxSerieA,
+      eficiencia_modulo_pct: entrada.eficienciaModuloPct,
+      comprimento_mm: entrada.comprimentoMm,
+      largura_mm: entrada.larguraMm,
+      espessura_mm: entrada.espessuraMm,
+      peso_kg: entrada.pesoKg,
+    };
+  }
+  return {
+    ...comuns,
+    potencia_aparente_max_va: entrada.potenciaAparenteMaxVa,
+    tensao_fases_ac: entrada.tensaoFasesAc,
+    grau_protecao: entrada.grauProtecao,
+  };
+}
+
 /** "48.96" -> 48.96; "" ou inválido -> null. CSV usa ponto decimal (formato técnico), não vírgula BR. */
 function numeroCsv(v: string | undefined): number | null {
   if (!v || !v.trim()) return null;
@@ -128,7 +192,7 @@ function fasesCsv(v: string | undefined): FasesCa | null {
  * Converte uma linha do CSV de importação em massa (colunas documentadas em
  * `RAION_equipamentos_teste_10_inversores_10_modulos.csv`, pedido do Evandro em
  * 2026-10-01) nos campos de `equipamentos_empresa`. Pura e testável sem banco —
- * a action `importarEquipamentosCsv` (`lib/acoes/equipamentos.ts`) só faz a
+ * as actions `lerCsvEquipamentos`/`confirmarImportacaoCsv` (`lib/acoes/equipamentos.ts`) só fazem a
  * leitura do arquivo e o upsert; toda a lógica de mapeamento mora aqui.
  */
 export function linhaCsvParaEquipamento(

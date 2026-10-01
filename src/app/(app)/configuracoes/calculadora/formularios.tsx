@@ -3,6 +3,8 @@
 import { useActionState, useEffect, useRef } from "react";
 import { Botao, Campo, Mensagem } from "@/components/ui";
 import { criarKit, editarKit, editarParametros } from "@/lib/acoes/calculadora";
+import { PADROES_DIMENSIONAMENTO } from "@/lib/calculadora";
+import { numeroParaCampo } from "@/lib/formatacao";
 
 const inputClasse = "min-w-0 flex-1 rounded-md border border-zinc-300 px-3 py-1.5 text-sm";
 
@@ -37,7 +39,7 @@ export function LinhaKit({
       <input name="nome" defaultValue={item.nome} aria-label="Nome" className={inputClasse} required />
       <input
         name="potencia_kwp"
-        defaultValue={String(item.potenciaKwp).replace(".", ",")}
+        defaultValue={numeroParaCampo(item.potenciaKwp)}
         aria-label="Potência (kWp)"
         inputMode="decimal"
         className={`${inputClasse} max-w-28`}
@@ -45,7 +47,7 @@ export function LinhaKit({
       />
       <input
         name="preco"
-        defaultValue={String(item.preco).replace(".", ",")}
+        defaultValue={numeroParaCampo(item.preco)}
         aria-label="Preço (R$)"
         inputMode="decimal"
         className={`${inputClasse} max-w-28`}
@@ -62,47 +64,55 @@ export function LinhaKit({
   );
 }
 
+/** Valor como veio do banco — pode faltar (coluna ainda não migrada, registro antigo). */
+type ValorBanco = number | null | undefined;
+
 export function FormularioParametros({
   parametros,
 }: {
   parametros: {
-    produtividadeKwhKwpMes: number;
-    percentualFioB: number;
-    disponibilidadeMonoKwh: number;
-    disponibilidadeBiKwh: number;
-    disponibilidadeTriKwh: number;
-    custoInstalacaoPorModulo: number;
-    custoMaterialCaPorKwp: number;
-    custoEngenharia: number;
-    comissaoPercentual: number;
-    margemDimensionamentoPct: number;
-    overloadMaximoPct: number;
-    overloadCriticoPct: number;
-    temperaturaMinimaProjetoC: number;
-    siglaDistribuidoraAneel: string | null;
+    produtividadeKwhKwpMes: ValorBanco;
+    percentualFioB: ValorBanco;
+    disponibilidadeMonoKwh: ValorBanco;
+    disponibilidadeBiKwh: ValorBanco;
+    disponibilidadeTriKwh: ValorBanco;
+    custoInstalacaoPorModulo: ValorBanco;
+    custoMaterialCaPorKwp: ValorBanco;
+    custoEngenharia: ValorBanco;
+    comissaoPercentual: ValorBanco;
+    margemDimensionamentoPct: ValorBanco;
+    overloadMaximoPct: ValorBanco;
+    overloadCriticoPct: ValorBanco;
+    temperaturaMinimaProjetoC: ValorBanco;
+    siglaDistribuidoraAneel: string | null | undefined;
   };
 }) {
   const [resultado, acao, pendente] = useActionState(editarParametros, null);
+  const p = parametros;
+  // Campos sem padrão do sistema ficam vazios com este aviso, em vez de "NaN"/"undefined".
+  const naoConfigurado = "Não configurado";
   return (
     <form action={acao} className="flex flex-col gap-3">
       <Campo
         rotulo="Produtividade média (kWh por kWp por mês)"
         name="produtividade_kwh_kwp_mes"
         inputMode="decimal"
-        defaultValue={String(parametros.produtividadeKwhKwpMes).replace(".", ",")}
+        defaultValue={numeroParaCampo(p.produtividadeKwhKwpMes)}
+        placeholder={naoConfigurado}
         required
       />
       <Campo
         rotulo="Percentual do Fio B cobrado sobre a energia compensada (%)"
         name="percentual_fio_b"
         inputMode="decimal"
-        defaultValue={String(parametros.percentualFioB * 100).replace(".", ",")}
+        defaultValue={numeroParaCampo(p.percentualFioB, { escala: 100 })}
+        placeholder={naoConfigurado}
         required
       />
       <Campo
         rotulo="Sigla da distribuidora na ANEEL (opcional)"
         name="sigla_distribuidora_aneel"
-        defaultValue={parametros.siglaDistribuidoraAneel ?? ""}
+        defaultValue={p.siglaDistribuidoraAneel ?? ""}
         placeholder="Ex.: CPFL-PAULISTA"
       />
       <p className="-mt-2 text-xs text-zinc-500">
@@ -112,45 +122,50 @@ export function FormularioParametros({
       </p>
       <p className="mt-1 text-sm font-medium text-zinc-700">Dimensionamento automático</p>
       <p className="-mt-2 text-xs text-zinc-500">
-        Usados pra montar o kit sozinho a partir do consumo, em &quot;Adicionar negócio&quot; — ver &quot;Equipamentos
-        ativos&quot; abaixo pra escolher os módulos/inversores usados.
+        Usados pra montar o kit sozinho a partir do consumo, em &quot;Adicionar negócio&quot; — os módulos e inversores
+        que entram na combinação ficam na aba Catálogo.
       </p>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
         <Campo
           rotulo="Margem de dimensionamento (%)"
           name="margem_dimensionamento_pct"
           inputMode="decimal"
-          defaultValue={String(parametros.margemDimensionamentoPct * 100).replace(".", ",")}
+          defaultValue={numeroParaCampo(p.margemDimensionamentoPct, {
+            padrao: PADROES_DIMENSIONAMENTO.margemDimensionamentoPct,
+            escala: 100,
+          })}
           required
         />
         <Campo
           rotulo="Overload automático máximo (%)"
           name="overload_maximo_pct"
           inputMode="decimal"
-          defaultValue={String(parametros.overloadMaximoPct * 100).replace(".", ",")}
+          defaultValue={numeroParaCampo(p.overloadMaximoPct, { padrao: PADROES_DIMENSIONAMENTO.overloadMaximoPct, escala: 100 })}
           required
         />
-      </div>
-      <div className="grid grid-cols-2 gap-2">
         <Campo
           rotulo="Overload crítico (%)"
           name="overload_critico_pct"
           inputMode="decimal"
-          defaultValue={String(parametros.overloadCriticoPct * 100).replace(".", ",")}
+          defaultValue={numeroParaCampo(p.overloadCriticoPct, {
+            padrao: PADROES_DIMENSIONAMENTO.overloadCriticoPct,
+            escala: 100,
+          })}
           required
         />
       </div>
       <p className="-mt-2 text-xs text-zinc-500">
-        Até o overload automático máximo, o kit é sugerido direto. Entre esse limite e o
-        crítico, aparece um aviso leve. Acima do crítico, um alerta forte — mas a escolha
-        manual nunca é bloqueada em nenhuma faixa.
+        Até o overload automático máximo, o kit é sugerido direto. Entre esse limite e o crítico, aparece um aviso
+        leve. Acima do crítico, um alerta forte — mas a escolha manual nunca é bloqueada em nenhuma faixa.
       </p>
-      <div className="w-40">
+      <div className="sm:w-56">
         <Campo
           rotulo="Temperatura mínima de projeto (°C)"
           name="temperatura_minima_projeto_c"
           inputMode="decimal"
-          defaultValue={String(parametros.temperaturaMinimaProjetoC).replace(".", ",")}
+          defaultValue={numeroParaCampo(p.temperaturaMinimaProjetoC, {
+            padrao: PADROES_DIMENSIONAMENTO.temperaturaMinimaProjetoC,
+          })}
           required
         />
       </div>
@@ -158,26 +173,30 @@ export function FormularioParametros({
         Usada pra calcular o Voc (tensão em circuito aberto) no frio, o pior caso pra não estourar a tensão máxima do
         inversor. Ajuste pela região/telhado mais frio que a empresa atende.
       </p>
-      <div className="grid grid-cols-3 gap-2">
+      <p className="mt-1 text-sm font-medium text-zinc-700">Disponibilidade (custo mínimo da distribuidora)</p>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
         <Campo
-          rotulo="Disponibilidade monofásico (kWh)"
+          rotulo="Monofásico (kWh)"
           name="disponibilidade_mono_kwh"
           inputMode="decimal"
-          defaultValue={String(parametros.disponibilidadeMonoKwh).replace(".", ",")}
+          defaultValue={numeroParaCampo(p.disponibilidadeMonoKwh)}
+          placeholder={naoConfigurado}
           required
         />
         <Campo
-          rotulo="Disponibilidade bifásico (kWh)"
+          rotulo="Bifásico (kWh)"
           name="disponibilidade_bi_kwh"
           inputMode="decimal"
-          defaultValue={String(parametros.disponibilidadeBiKwh).replace(".", ",")}
+          defaultValue={numeroParaCampo(p.disponibilidadeBiKwh)}
+          placeholder={naoConfigurado}
           required
         />
         <Campo
-          rotulo="Disponibilidade trifásico (kWh)"
+          rotulo="Trifásico (kWh)"
           name="disponibilidade_tri_kwh"
           inputMode="decimal"
-          defaultValue={String(parametros.disponibilidadeTriKwh).replace(".", ",")}
+          defaultValue={numeroParaCampo(p.disponibilidadeTriKwh)}
+          placeholder={naoConfigurado}
           required
         />
       </div>
@@ -186,33 +205,33 @@ export function FormularioParametros({
         Somados automaticamente ao preço sugerido do negócio junto com o preço estimado dos componentes do catálogo —
         o vendedor continua livre pra editar o valor final.
       </p>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <Campo
           rotulo="Instalação por módulo (R$)"
           name="custo_instalacao_por_modulo"
           inputMode="decimal"
-          defaultValue={String(parametros.custoInstalacaoPorModulo).replace(".", ",")}
+          defaultValue={numeroParaCampo(p.custoInstalacaoPorModulo)}
           placeholder="0"
         />
         <Campo
           rotulo="Material CA por kWp (R$)"
           name="custo_material_ca_por_kwp"
           inputMode="decimal"
-          defaultValue={String(parametros.custoMaterialCaPorKwp).replace(".", ",")}
+          defaultValue={numeroParaCampo(p.custoMaterialCaPorKwp)}
           placeholder="0"
         />
         <Campo
           rotulo="Engenharia (R$, fixo por projeto)"
           name="custo_engenharia"
           inputMode="decimal"
-          defaultValue={String(parametros.custoEngenharia).replace(".", ",")}
+          defaultValue={numeroParaCampo(p.custoEngenharia)}
           placeholder="0"
         />
         <Campo
           rotulo="Comissão (% sobre o subtotal)"
           name="comissao_percentual"
           inputMode="decimal"
-          defaultValue={String(parametros.comissaoPercentual * 100).replace(".", ",")}
+          defaultValue={numeroParaCampo(p.comissaoPercentual, { escala: 100 })}
           placeholder="0"
         />
       </div>
@@ -223,3 +242,4 @@ export function FormularioParametros({
     </form>
   );
 }
+

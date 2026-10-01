@@ -11,6 +11,8 @@ import { criarClienteServidor } from "@/lib/supabase/server";
 import type { TipoLigacao, ResultadoAcao } from "@/lib/tipos";
 
 const CAMINHO_LISTAS = "/configuracoes/listas";
+/** Abas de "Kits e calculadora" (Kits, Parâmetros, Calculadora...) — ver `configuracoes/calculadora/layout.tsx`. */
+const CAMINHO_CALCULADORA = "/configuracoes/calculadora";
 
 type LinhaCalculo = Omit<
   Database["public"]["Tables"]["calculos_solares"]["Insert"],
@@ -132,6 +134,7 @@ export async function criarKit(_: ResultadoAcao, formData: FormData): Promise<Re
   });
   if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível criar o kit.") };
   revalidatePath(CAMINHO_LISTAS);
+  revalidatePath(CAMINHO_CALCULADORA, "layout");
   return { ok: true, mensagem: "Kit criado." };
 }
 
@@ -160,6 +163,7 @@ export async function editarKit(_: ResultadoAcao, formData: FormData): Promise<R
     .eq("id", dados.data.id);
   if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível salvar o kit.") };
   revalidatePath(CAMINHO_LISTAS);
+  revalidatePath(CAMINHO_CALCULADORA, "layout");
   return { ok: true, mensagem: "Salvo." };
 }
 
@@ -222,5 +226,6 @@ export async function editarParametros(_: ResultadoAcao, formData: FormData): Pr
   const { error } = await supabase.from("parametros_calculadora").update(dados.data).eq("empresa_id", atual.empresaId);
   if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível salvar os parâmetros.") };
   revalidatePath(CAMINHO_LISTAS);
+  revalidatePath(CAMINHO_CALCULADORA, "layout");
   return { ok: true, mensagem: "Parâmetros salvos." };
 }
