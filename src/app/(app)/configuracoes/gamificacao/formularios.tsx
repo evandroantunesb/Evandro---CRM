@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useRef, useState } from "react";
 import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
+import { criarClienteNavegador } from "@/lib/supabase/navegador";
 import {
   OPERADORES_CONDICAO,
   PERIODOS_LIMITE_REGRA,
@@ -263,10 +264,83 @@ export type RecompensaSalva = {
   limitePorMembro: number | null;
   validadeAte: string | null;
   ativa: boolean;
+  imagemCaminho: string | null;
 };
 
-export function NovaRecompensa() {
+const LIMITE_IMAGEM = 5 * 1024 * 1024;
+
+function nomeSeguro(nome: string) {
+  const limpo = nome
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .slice(-60);
+  return `${crypto.randomUUID()}-${limpo || "imagem"}`;
+}
+
+function CampoImagemRecompensa({
+  empresaId,
+  caminho,
+  setCaminho,
+  previewUrl,
+}: {
+  empresaId: string;
+  caminho: string | null;
+  setCaminho: (v: string | null) => void;
+  previewUrl: string | null;
+}) {
+  const input = useRef<HTMLInputElement>(null);
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const [previewLocal, setPreviewLocal] = useState<string | null>(null);
+
+  async function enviar(arquivo: File | undefined) {
+    if (!arquivo) return;
+    if (arquivo.size > LIMITE_IMAGEM) {
+      setErro("A imagem passa de 5 MB.");
+      return;
+    }
+    setErro(null);
+    setEnviando(true);
+    const supabase = criarClienteNavegador();
+    const caminhoNovo = `${empresaId}/${nomeSeguro(arquivo.name)}`;
+    const { error } = await supabase.storage.from("recompensas").upload(caminhoNovo, arquivo, { contentType: arquivo.type || undefined });
+    if (error) {
+      setErro("Não foi possível enviar a imagem.");
+    } else {
+      setPreviewLocal(URL.createObjectURL(arquivo));
+      setCaminho(caminhoNovo);
+    }
+    setEnviando(false);
+    if (input.current) input.current.value = "";
+  }
+
+  const mostrar = previewLocal ?? previewUrl;
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-sm font-medium text-zinc-700">Imagem (opcional)</span>
+      <div className="flex items-center gap-3">
+        {mostrar ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={mostrar} alt="" className="h-14 w-14 rounded-lg border border-zinc-200 object-cover bg-zinc-50" />
+        ) : (
+          <div className="flex h-14 w-14 items-center justify-center rounded-lg border border-dashed border-zinc-300 text-[10px] text-zinc-400">Sem imagem</div>
+        )}
+        <label className="inline-flex cursor-pointer items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700 hover:border-dourado">
+          {enviando ? "Enviando..." : "Trocar imagem"}
+          <input ref={input} type="file" accept="image/*" disabled={enviando} className="hidden" onChange={(e) => enviar(e.target.files?.[0])} />
+        </label>
+      </div>
+      {erro && <p className="text-xs text-red-700">{erro}</p>}
+      {caminho && <input type="hidden" name="imagemCaminho" value={caminho} />}
+    </div>
+  );
+}
+
+export function NovaRecompensa({ empresaId }: { empresaId: string }) {
   const [resultado, acao, pendente] = useActionState(criarRecompensa, null);
+  const [imagemCaminho, setImagemCaminho] = useState<string | null>(null);
   return (
     <form action={acao} className="flex flex-col gap-3">
       <Campo rotulo="Nome" name="nome" placeholder="Ex.: Vale-presente R$ 100" required />
@@ -277,6 +351,7 @@ export function NovaRecompensa() {
         <Campo rotulo="Limite por colaborador (opcional)" name="limitePorMembro" type="number" min={1} step={1} placeholder="Sem limite" />
       </div>
       <Campo rotulo="Validade (opcional)" name="validadeAte" type="date" />
+      <CampoImagemRecompensa empresaId={empresaId} caminho={imagemCaminho} setCaminho={setImagemCaminho} previewUrl={null} />
       <Botao type="submit" disabled={pendente} className="self-start">
         Criar recompensa
       </Botao>
@@ -285,8 +360,17 @@ export function NovaRecompensa() {
   );
 }
 
-export function LinhaRecompensa({ recompensa }: { recompensa: RecompensaSalva }) {
+export function LinhaRecompensa({
+  recompensa,
+  empresaId,
+  imagemUrl,
+}: {
+  recompensa: RecompensaSalva;
+  empresaId: string;
+  imagemUrl: string | null;
+}) {
   const [resultado, acao, pendente] = useActionState(editarRecompensa, null);
+  const [imagemCaminho, setImagemCaminho] = useState(recompensa.imagemCaminho);
   return (
     <form action={acao} className="flex flex-col gap-3 border-t border-zinc-100 py-3 first:border-t-0">
       <input type="hidden" name="id" value={recompensa.id} />
@@ -306,6 +390,7 @@ export function LinhaRecompensa({ recompensa }: { recompensa: RecompensaSalva })
         />
       </div>
       <Campo rotulo="Validade" name="validadeAte" type="date" defaultValue={recompensa.validadeAte ?? ""} />
+      <CampoImagemRecompensa empresaId={empresaId} caminho={imagemCaminho} setCaminho={setImagemCaminho} previewUrl={imagemUrl} />
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-1 text-sm text-zinc-700">
           <input type="checkbox" name="ativa" defaultChecked={recompensa.ativa} /> Ativa

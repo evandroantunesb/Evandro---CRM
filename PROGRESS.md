@@ -45,6 +45,7 @@ Todas as PRs de #85 a #94 mescladas em 2026-09-30 (`pode dar merge`). Nenhuma te
 
 ## Em andamento
 
+- **PR #102 — imagem nas recompensas da loja de gamificação:** upload client-side (bucket privado `recompensas`, mesmo padrão de `proposta-marca`) em Configurações > Gamificação; aparece nos cards da Loja e no preview do dashboard. `database.types.ts` editado à mão (sem Docker/Supabase local nesta sessão pra rodar `pnpm db:types`) — conferir que o CI bate byte a byte. Draft, aguardando revisão.
 - **PR #63 — contexto do Claude:** `CLAUDE.md` enxuto (regras permanentes + seleção de modelos), `docs/arquitetura.md`, `docs/regras-negocio.md`, `PROGRESS.md`, `HANDOFF.md` e `.claude/settings.json`. 
 - **PR #62 — backup diário do banco de produção** para o repositório privado `raion-crm-backups`. Aguardando o Evandro criar os secrets `BACKUP_ENCRYPTION_KEY` e `BACKUP_REPO_TOKEN`.
 - **PRs do Dependabot abertas:** #55–#58 (Actions), #60 (TypeScript 6), #61 (`@types/node` 26). Atualizações maiores: revisar com cuidado antes de mesclar.

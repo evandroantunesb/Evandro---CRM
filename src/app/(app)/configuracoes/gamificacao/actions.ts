@@ -201,6 +201,7 @@ const esquemaRecompensa = z.object({
   estoque: z.coerce.number().int().min(0).optional().or(z.literal("").transform(() => undefined)),
   limitePorMembro: z.coerce.number().int().positive().optional().or(z.literal("").transform(() => undefined)),
   validadeAte: z.string().trim().optional().or(z.literal("").transform(() => undefined)),
+  imagemCaminho: z.string().trim().optional().or(z.literal("").transform(() => undefined)),
 });
 
 export async function criarRecompensa(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
@@ -217,6 +218,7 @@ export async function criarRecompensa(_: ResultadoAcao, formData: FormData): Pro
     estoque: dados.data.estoque ?? null,
     limite_por_membro: dados.data.limitePorMembro ?? null,
     validade_ate: dados.data.validadeAte ?? null,
+    imagem_caminho: dados.data.imagemCaminho ?? null,
     criado_por: atual.membroId,
   });
   if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível criar a recompensa.") };
@@ -244,6 +246,7 @@ export async function editarRecompensa(_: ResultadoAcao, formData: FormData): Pr
       estoque: dados.data.estoque ?? null,
       limite_por_membro: dados.data.limitePorMembro ?? null,
       validade_ate: dados.data.validadeAte ?? null,
+      imagem_caminho: dados.data.imagemCaminho ?? null,
       ativa: formData.get("ativa") === "on",
     })
     .eq("id", id.data);

@@ -12,6 +12,8 @@ const TOM_STATUS: Record<StatusResgate, "neutro" | "positivo" | "negativo" | "at
   cancelado: "negativo",
 };
 
+const EXPIRA_SEGUNDOS = 3600;
+
 export default async function LojaDeRecompensas() {
   const { atual } = await exigirPapel();
   const supabase = await criarClienteServidor();
@@ -21,7 +23,7 @@ export default async function LojaDeRecompensas() {
     supabase.from("point_ledger").select("pontos").eq("membro_id", atual.membroId).eq("estornado", false),
     supabase
       .from("recompensas")
-      .select("id, nome, descricao, custo_pontos")
+      .select("id, nome, descricao, custo_pontos, imagem_caminho")
       .eq("empresa_id", atual.empresaId)
       .eq("ativa", true)
       .or(`validade_ate.is.null,validade_ate.gte.${hoje}`)
@@ -35,6 +37,16 @@ export default async function LojaDeRecompensas() {
   ]);
 
   const saldo = (lancamentos ?? []).reduce((soma, l) => soma + l.pontos, 0);
+
+  const imagensRecompensas = Object.fromEntries(
+    await Promise.all(
+      (recompensas ?? []).map(async (r) => {
+        if (!r.imagem_caminho) return [r.id, null] as const;
+        const { data } = await supabase.storage.from("recompensas").createSignedUrl(r.imagem_caminho, EXPIRA_SEGUNDOS);
+        return [r.id, data?.signedUrl ?? null] as const;
+      }),
+    ),
+  );
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4">
@@ -51,6 +63,7 @@ export default async function LojaDeRecompensas() {
             <CartaoRecompensa
               key={r.id}
               recompensa={{ id: r.id, nome: r.nome, descricao: r.descricao, custoPontos: r.custo_pontos }}
+              imagemUrl={imagensRecompensas[r.id] ?? null}
               saldo={saldo}
             />
           ))}

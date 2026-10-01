@@ -2659,6 +2659,7 @@ export type Database = {
           empresa_id: string;
           estoque: number | null;
           id: string;
+          imagem_caminho: string | null;
           limite_por_membro: number | null;
           nome: string;
           updated_at: string;
@@ -2673,6 +2674,7 @@ export type Database = {
           empresa_id: string;
           estoque?: number | null;
           id?: string;
+          imagem_caminho?: string | null;
           limite_por_membro?: number | null;
           nome: string;
           updated_at?: string;
@@ -2687,6 +2689,7 @@ export type Database = {
           empresa_id?: string;
           estoque?: number | null;
           id?: string;
+          imagem_caminho?: string | null;
           limite_por_membro?: number | null;
           nome?: string;
           updated_at?: string;

@@ -5,6 +5,8 @@ import { criarClienteServidor } from "@/lib/supabase/server";
 import type { OperadorCondicao, PeriodoLimiteRegra } from "@/lib/tipos";
 import { LinhaConquista, LinhaNivel, LinhaRecompensa, LinhaRegra, NovaConquista, NovaRecompensa, NovoNivel, NovaRegra } from "./formularios";
 
+const EXPIRA_SEGUNDOS = 3600;
+
 export default async function ConfigGamificacao() {
   const { atual } = await exigirPapel("admin");
   const supabase = await criarClienteServidor();
@@ -22,10 +24,20 @@ export default async function ConfigGamificacao() {
       .order("created_at"),
     supabase
       .from("recompensas")
-      .select("id, nome, descricao, custo_pontos, estoque, limite_por_membro, validade_ate, ativa")
+      .select("id, nome, descricao, custo_pontos, estoque, limite_por_membro, validade_ate, ativa, imagem_caminho")
       .eq("empresa_id", atual.empresaId)
       .order("created_at"),
   ]);
+
+  const imagensRecompensas = Object.fromEntries(
+    await Promise.all(
+      (recompensas ?? []).map(async (r) => {
+        if (!r.imagem_caminho) return [r.id, null] as const;
+        const { data } = await supabase.storage.from("recompensas").createSignedUrl(r.imagem_caminho, EXPIRA_SEGUNDOS);
+        return [r.id, data?.signedUrl ?? null] as const;
+      }),
+    ),
+  );
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
@@ -98,12 +110,14 @@ export default async function ConfigGamificacao() {
         cancelar um resgate devolve os pontos.
       </p>
       <Cartao titulo="Nova recompensa">
-        <NovaRecompensa />
+        <NovaRecompensa empresaId={atual.empresaId} />
       </Cartao>
       <Cartao titulo={`Recompensas (${recompensas?.length ?? 0})`}>
         {(recompensas ?? []).map((r) => (
           <LinhaRecompensa
             key={r.id}
+            empresaId={atual.empresaId}
+            imagemUrl={imagensRecompensas[r.id] ?? null}
             recompensa={{
               id: r.id,
               nome: r.nome,
@@ -113,6 +127,7 @@ export default async function ConfigGamificacao() {
               limitePorMembro: r.limite_por_membro,
               validadeAte: r.validade_ate,
               ativa: r.ativa,
+              imagemCaminho: r.imagem_caminho,
             }}
           />
         ))}
