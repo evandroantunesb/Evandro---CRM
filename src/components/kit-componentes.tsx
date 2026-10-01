@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { Botao, Campo } from "@/components/ui";
 import { ROTULO_TIPO_COMPONENTE_KIT, TIPOS_COMPONENTE_KIT, type TipoComponenteKit } from "@/lib/tipos";
 
@@ -40,7 +39,7 @@ export function linhasParaComponentes(linhas: LinhaComponente[]) {
  * Campo "Modelo / descrição": aceita texto livre. A busca no catálogo técnico (antes via
  * OpenSolar, removida em 2026-09-30) ainda não foi substituída pelo catálogo próprio
  * (`equipamentos_empresa`) — isso é Fase 6 da reconciliação do motor de dimensionamento
- * com o wizard novo. Por enquanto `resultados` nunca é preenchido.
+ * com o wizard novo.
  */
 function CampoModeloComBusca({
   valor,
@@ -53,45 +52,7 @@ function CampoModeloComBusca({
   onChangeTexto: (v: string) => void;
   onSelecionar: (descricao: string, potenciaW: string, precoEstimadoUnitario: string) => void;
 }) {
-  const [resultados] = useState<
-    { id: number; descricao: string; potenciaW: number | null; precoEstimadoBRL: number | null }[]
-  >([]);
-
-  function pesquisar(termo: string) {
-    onChangeTexto(termo);
-  }
-
-  return (
-    <div className="relative">
-      <Campo rotulo="Modelo / descrição" value={valor} onChange={(e) => pesquisar(e.target.value)} placeholder={placeholder} />
-      {resultados.length > 0 && (
-        <ul className="absolute z-10 mt-1 w-full rounded-md border border-zinc-200 bg-white text-sm shadow-md">
-          {resultados.map((r) => (
-            <li key={r.id}>
-              <button
-                type="button"
-                onClick={() => {
-                  onSelecionar(
-                    r.descricao,
-                    r.potenciaW != null ? String(r.potenciaW) : "",
-                    r.precoEstimadoBRL != null ? String(r.precoEstimadoBRL) : "",
-                  );
-                  setResultados([]);
-                }}
-                className="block w-full px-3 py-2 text-left hover:bg-zinc-50"
-              >
-                {r.descricao}
-                {r.potenciaW != null && <span className="text-zinc-400"> · {r.potenciaW} W</span>}
-                {r.precoEstimadoBRL != null && (
-                  <span className="text-zinc-400"> · ~R$ {r.precoEstimadoBRL.toLocaleString("pt-BR")} (estimado)</span>
-                )}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
+  return <Campo rotulo="Modelo / descrição" value={valor} onChange={(e) => onChangeTexto(e.target.value)} placeholder={placeholder} />;
 }
 
 /** Editor do kit personalizado: módulos, inversor, baterias e outros itens (múltiplos de cada). */
