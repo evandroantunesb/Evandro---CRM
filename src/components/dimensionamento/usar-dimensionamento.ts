@@ -22,6 +22,10 @@ export type CamposFormularioDimensionamento = {
    * `salvarDimensionamento` já cai nela sozinho quando nada é enviado). */
   produtividadeKwhKwpMes: number | null;
   origemProdutividade: "pvgis" | "nasa" | null;
+  /** "automatico" (escolheu uma das opções sugeridas) ou "manual" (override via "Selecionar
+   * manualmente") — Fase 5 da reconciliação: grava o componente do kit com a origem certa e audita
+   * o override na linha do tempo do negócio (`salvarDimensionamento`). */
+  origemEscolha: OrigemEscolhaDimensionamento;
 };
 
 export type UsarDimensionamentoParams = {
@@ -188,13 +192,14 @@ export function useDimensionamento(params: UsarDimensionamentoParams): UsarDimen
 
   const produtividadeValida = produtividadeKwhKwpMes != null && origemProdutividade !== "padrao";
   const camposFormulario: CamposFormularioDimensionamento | null =
-    par && opcaoAtual
+    par && opcaoAtual && origem
       ? {
           moduloId: par.modulo.id,
           inversorId: par.inversor.id,
           quantidadeModulos: opcaoAtual.quantidadeModulos,
           produtividadeKwhKwpMes: produtividadeValida ? produtividadeKwhKwpMes! : null,
           origemProdutividade: produtividadeValida ? (origemProdutividade as "pvgis" | "nasa") : null,
+          origemEscolha: origem,
         }
       : null;
 

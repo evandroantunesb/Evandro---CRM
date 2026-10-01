@@ -14,6 +14,12 @@ export const CAMPOS_DIMENSIONAMENTO = {
   quantidadeModulos: "dimensionamento_quantidade_modulos",
   produtividadeKwhKwpMes: "dimensionamento_produtividade_kwh_kwp_mes",
   origemProdutividade: "dimensionamento_origem_produtividade",
+  // Origem da escolha de módulo/inversor ("automatico" | "manual") — Fase 5 da
+  // reconciliação (Evandro, 2026-10-01): quando o vendedor usa "Selecionar
+  // manualmente" no painel pra trocar o módulo/inversor sugerido, esse campo
+  // chega até `salvarDimensionamento` pra gravar o componente com
+  // `origem: "manual"` e registrar o override na linha do tempo do negócio.
+  origemEscolha: "dimensionamento_origem_escolha",
 } as const;
 
 export type CampoDimensionamento = (typeof CAMPOS_DIMENSIONAMENTO)[keyof typeof CAMPOS_DIMENSIONAMENTO];

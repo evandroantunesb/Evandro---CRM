@@ -15,6 +15,7 @@ export function CamposOcultosDimensionamento({ campos }: { campos: CamposFormula
       <input type="hidden" name={CAMPOS_DIMENSIONAMENTO.moduloId} value={campos.moduloId} />
       <input type="hidden" name={CAMPOS_DIMENSIONAMENTO.inversorId} value={campos.inversorId} />
       <input type="hidden" name={CAMPOS_DIMENSIONAMENTO.quantidadeModulos} value={campos.quantidadeModulos} />
+      <input type="hidden" name={CAMPOS_DIMENSIONAMENTO.origemEscolha} value={campos.origemEscolha} />
       {campos.origemProdutividade && campos.produtividadeKwhKwpMes != null && (
         <>
           <input
