@@ -1,5 +1,5 @@
 import { Cartao } from "@/components/ui";
-import { EVENTOS_GAMIFICACAO } from "@/lib/gamificacao";
+import { EVENTOS_GAMIFICACAO, EVENTOS_GAMIFICACAO_SELECIONAVEIS } from "@/lib/gamificacao";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import type { OperadorCondicao, PeriodoLimiteRegra } from "@/lib/tipos";
@@ -36,7 +36,7 @@ export default async function ConfigGamificacao() {
         for satisfeita), o ponto entra automaticamente no extrato do responsável.
       </p>
       <Cartao titulo="Nova regra de pontos">
-        <NovaRegra eventos={EVENTOS_GAMIFICACAO} />
+        <NovaRegra eventos={EVENTOS_GAMIFICACAO_SELECIONAVEIS} />
       </Cartao>
       <Cartao titulo={`Regras de pontos (${regras?.length ?? 0})`}>
         {(regras ?? []).map((r) => (
