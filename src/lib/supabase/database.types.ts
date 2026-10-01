@@ -1782,8 +1782,10 @@ export type Database = {
       };
       kit_componentes: {
         Row: {
+          ativo: boolean;
           created_at: string;
           descricao: string;
+          eh_nucleo_motor: boolean;
           empresa_id: string;
           id: string;
           negocio_id: string;
@@ -1794,8 +1796,10 @@ export type Database = {
           tipo: Database["public"]["Enums"]["tipo_componente_kit"];
         };
         Insert: {
+          ativo?: boolean;
           created_at?: string;
           descricao: string;
+          eh_nucleo_motor?: boolean;
           empresa_id: string;
           id?: string;
           negocio_id: string;
@@ -1806,8 +1810,10 @@ export type Database = {
           tipo: Database["public"]["Enums"]["tipo_componente_kit"];
         };
         Update: {
+          ativo?: boolean;
           created_at?: string;
           descricao?: string;
+          eh_nucleo_motor?: boolean;
           empresa_id?: string;
           id?: string;
           negocio_id?: string;

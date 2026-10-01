@@ -1,11 +1,15 @@
 "use server";
 
-import { calcular, DISPONIBILIDADE_PADRAO } from "@/lib/calculadora";
+import { revalidatePath } from "next/cache";
+import { z } from "zod";
+import { calcular, componentesJsonSchema, DISPONIBILIDADE_PADRAO } from "@/lib/calculadora";
 import { avaliarCombinacaoEscolhida, paraEquipamentoAtivo } from "@/lib/dimensionamento";
+import { CAMPOS_DIMENSIONAMENTO } from "@/lib/dimensionamento-campos";
 import { mensagemErro } from "@/lib/erros";
+import { exigirPapel } from "@/lib/sessao";
 import type { Database } from "@/lib/supabase/database.types";
-import type { SupabaseServidor } from "@/lib/supabase/server";
-import type { TipoLigacao } from "@/lib/tipos";
+import { criarClienteServidor, type SupabaseServidor } from "@/lib/supabase/server";
+import { TIPOS_LIGACAO, type ResultadoAcao, type TipoLigacao } from "@/lib/tipos";
 
 type LinhaDimensionamento = Database["public"]["Tables"]["dimensionamentos_solares"]["Insert"];
 
@@ -178,16 +182,24 @@ export async function salvarDimensionamento(
     },
     { onConflict: "negocio_id" },
   );
-  // Substitui só as linhas que esta função mesma gravou como `origem: "automatico"` (o "slot" do
-  // motor) — nunca os itens que o vendedor adicionou/editou manualmente (bateria, estrutura,
-  // outros, ou um módulo/inversor trocado via override manual, gravado com `origem: "manual"`).
-  // Pedido do Evandro, 2026-10-01 (Fase 5): motor automático + kit manual precisam coexistir.
+  // Slot do núcleo do motor (`eh_nucleo_motor = true`): no máximo 1 módulo principal ATIVO e 1
+  // inversor principal ATIVO por negócio, sempre — nunca duas linhas ativas concorrentes pro mesmo
+  // papel (módulo ou inversor), seja a origem automática ou manual. Trocar o módulo/inversor
+  // principal (automático→manual, manual→automático, ou manual→outro manual) marca a linha
+  // anterior como `ativo = false` em vez de apagá-la (DELETE), preservando o histórico pra
+  // auditoria — o índice único parcial `kit_componentes_nucleo_ativo_unico` garante que só uma
+  // linha de cada papel fique ativa. Nunca toca nos itens que o vendedor adicionou/editou
+  // manualmente (bateria, estrutura, outros — `eh_nucleo_motor = false`, sempre preservados,
+  // múltiplos permitidos). Risco de duplicata identificado na Fase 5, corrigido na Fase 6 — Evandro,
+  // 2026-10-01 (ver migration 20261001040000_kit_componentes_nucleo_motor.sql). A troca em si fica
+  // auditada na linha do tempo do negócio pelo trigger `registrar_override_manual_componente`
+  // (dispara no UPDATE de `dimensionamentos_solares` feito acima, antes desta troca de kit).
   await supabase
     .from("kit_componentes")
-    .delete()
+    .update({ ativo: false })
     .eq("negocio_id", entrada.negocioId)
-    .eq("origem", "automatico")
-    .in("tipo", ["modulo", "inversor"]);
+    .eq("eh_nucleo_motor", true)
+    .eq("ativo", true);
   await supabase.from("kit_componentes").insert([
     {
       empresa_id: empresaId,
@@ -198,6 +210,8 @@ export async function salvarDimensionamento(
       quantidade: opcao.quantidadeModulos,
       ordem: 0,
       origem: origemEscolha,
+      eh_nucleo_motor: true,
+      ativo: true,
     },
     {
       empresa_id: empresaId,
@@ -208,8 +222,137 @@ export async function salvarDimensionamento(
       quantidade: 1,
       ordem: 1,
       origem: origemEscolha,
+      eh_nucleo_motor: true,
+      ativo: true,
     },
   ]);
 
   return { ok: true };
+}
+
+const uuidOpcional = z
+  .string()
+  .optional()
+  .transform((v) => (v ? v : null))
+  .pipe(z.string().uuid().nullable());
+
+const numeroBrOpcional = z
+  .string()
+  .optional()
+  .transform((v) => {
+    if (!v || !v.trim()) return null;
+    return Number(v.includes(",") ? v.replace(/\./g, "").replace(",", ".") : v);
+  })
+  .pipe(z.number().positive().nullable());
+
+// Campos do painel de dimensionamento (hidden inputs simples, sem formatação BR) — mesmo padrão
+// de src/lib/acoes/negocios.ts (criarNegocio), que lê os mesmos nomes de CAMPOS_DIMENSIONAMENTO.
+const numeroOpcional = z
+  .string()
+  .optional()
+  .transform((v) => (v && v.trim() ? Number(v) : null))
+  .pipe(z.number().positive().nullable());
+
+const inteiroOpcional = z
+  .string()
+  .optional()
+  .transform((v) => (v && v.trim() ? Number(v) : null))
+  .pipe(z.number().int().positive().nullable());
+
+const esquemaKitNegocio = z.object({
+  negocioId: z.string().uuid(),
+  estruturaTelhado: z.string().trim().max(120).optional(),
+  tipoLigacao: z.enum(TIPOS_LIGACAO).optional(),
+  consumoMedioKwh: numeroBrOpcional,
+  valorFaturaMedio: numeroBrOpcional,
+  tarifaKwh: numeroBrOpcional,
+  origemTarifa: z.enum(["manual", "aneel"]).optional().default("manual"),
+  // Itens avulsos do kit (bateria, estrutura, acessórios ou módulo/inversor fora do núcleo do
+  // motor) — nunca inclui o módulo/inversor que o painel de dimensionamento administra, que chega
+  // pelos campos CAMPOS_DIMENSIONAMENTO abaixo.
+  componentes: componentesJsonSchema,
+  observacoes: z.string().trim().max(2000, "Máximo de 2.000 caracteres").optional(),
+  [CAMPOS_DIMENSIONAMENTO.moduloId]: uuidOpcional,
+  [CAMPOS_DIMENSIONAMENTO.inversorId]: uuidOpcional,
+  [CAMPOS_DIMENSIONAMENTO.quantidadeModulos]: inteiroOpcional,
+  [CAMPOS_DIMENSIONAMENTO.produtividadeKwhKwpMes]: numeroOpcional,
+  [CAMPOS_DIMENSIONAMENTO.origemProdutividade]: z.enum(["pvgis", "nasa"]).optional(),
+  [CAMPOS_DIMENSIONAMENTO.origemEscolha]: z.enum(["automatico", "manual"]).optional(),
+});
+
+/**
+ * Salva o sistema (módulo/inversor via o motor de dimensionamento) e os itens avulsos do kit
+ * (bateria, estrutura, etc.) de um negócio já existente — a tela "Editar sistema"
+ * (`negocios/[id]/kit-personalizado.tsx`, Fase 6 da reconciliação, Evandro, 2026-10-01), que
+ * reusa o MESMO `<PainelDimensionamento>`/`useDimensionamento` da Etapa 2 do wizard de criação em
+ * vez de ter um caminho de cálculo próprio. Substitui `salvarKitPersonalizado`
+ * (`src/lib/acoes/calculadora.ts`), que calculava por fora do motor real.
+ */
+export async function salvarKitNegocio(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  const { atual } = await exigirPapel();
+  const dados = esquemaKitNegocio.safeParse(Object.fromEntries(formData));
+  if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
+  const d = dados.data;
+  if (d.consumoMedioKwh == null && d.valorFaturaMedio == null) {
+    return { ok: false, mensagem: "Informe o consumo médio ou o valor médio da fatura." };
+  }
+  if (!d.tipoLigacao || d.tarifaKwh == null || !d.dimensionamento_modulo_id || !d.dimensionamento_inversor_id || !d.dimensionamento_quantidade_modulos) {
+    return {
+      ok: false,
+      mensagem: "Confirme a rede elétrica, a tarifa e escolha um módulo/inversor do catálogo ativo pra calcular o sistema.",
+    };
+  }
+
+  const supabase = await criarClienteServidor();
+  const { data: negocio } = await supabase.from("negocios").select("valor").eq("id", d.negocioId).maybeSingle();
+  if (!negocio) return { ok: false, mensagem: "Negócio não encontrado." };
+
+  const resultado = await salvarDimensionamento(supabase, atual.empresaId, atual.membroId, {
+    negocioId: d.negocioId,
+    moduloEquipamentoId: d.dimensionamento_modulo_id,
+    inversorEquipamentoId: d.dimensionamento_inversor_id,
+    quantidadeModulos: d.dimensionamento_quantidade_modulos,
+    tipoLigacao: d.tipoLigacao,
+    consumoMedioKwh: d.consumoMedioKwh,
+    valorFaturaMedio: d.valorFaturaMedio,
+    tarifaKwh: d.tarifaKwh,
+    origemTarifa: d.origemTarifa,
+    produtividadeKwhKwpMes: d.dimensionamento_produtividade_kwh_kwp_mes,
+    origemProdutividade: d.dimensionamento_origem_produtividade,
+    origemEscolha: d.dimensionamento_origem_escolha,
+    precoNegocio: negocio.valor ?? 0,
+  });
+  if (!resultado.ok) return resultado;
+
+  await supabase.from("negocios").update({ estrutura_telhado: d.estruturaTelhado || null }).eq("id", d.negocioId);
+
+  if (d.observacoes !== undefined) {
+    await supabase.from("calculos_solares").update({ observacoes: d.observacoes || null }).eq("negocio_id", d.negocioId);
+  }
+
+  // Itens avulsos (bateria, estrutura, acessórios, ou módulo/inversor extra fora do núcleo do
+  // motor) — substitui só `eh_nucleo_motor = false`; o núcleo já foi tratado por
+  // `salvarDimensionamento` acima, que nunca toca nessas linhas.
+  await supabase.from("kit_componentes").delete().eq("negocio_id", d.negocioId).eq("eh_nucleo_motor", false);
+  if (d.componentes.length) {
+    const { error: erroComponentes } = await supabase.from("kit_componentes").insert(
+      d.componentes.map((c, i) => ({
+        empresa_id: atual.empresaId,
+        negocio_id: d.negocioId,
+        tipo: c.tipo,
+        descricao: c.descricao,
+        potencia_w: c.potenciaW,
+        quantidade: c.quantidade,
+        ordem: 100 + i,
+        origem: "manual" as const,
+        eh_nucleo_motor: false,
+      })),
+    );
+    if (erroComponentes) {
+      return { ok: false, mensagem: "Sistema salvo, mas não foi possível salvar os itens avulsos do kit." };
+    }
+  }
+
+  revalidatePath(`/negocios/${d.negocioId}`);
+  return { ok: true, mensagem: "Sistema salvo." };
 }
