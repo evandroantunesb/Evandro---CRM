@@ -2,13 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { calcular, componentesJsonSchema, DISPONIBILIDADE_PADRAO, nomeKitPersonalizado, potenciaKitPersonalizadoKwp } from "@/lib/calculadora";
+import { calcular, DISPONIBILIDADE_PADRAO } from "@/lib/calculadora";
 import { mensagemErro } from "@/lib/erros";
 import { exigirPapel } from "@/lib/sessao";
 import type { Database } from "@/lib/supabase/database.types";
 import type { SupabaseServidor } from "@/lib/supabase/server";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { TIPOS_LIGACAO, type TipoLigacao, type ResultadoAcao } from "@/lib/tipos";
+import type { TipoLigacao, ResultadoAcao } from "@/lib/tipos";
 
 const CAMINHO_LISTAS = "/configuracoes/listas";
 
@@ -101,92 +101,11 @@ const numeroBr = (mensagem: string) =>
     .transform((v) => Number(v.includes(",") ? v.replace(/\./g, "").replace(",", ".") : v))
     .pipe(z.number({ message: mensagem }).positive(mensagem));
 
-const numeroBrOpcional = z
-  .string()
-  .optional()
-  .transform((v) => {
-    if (!v || !v.trim()) return null;
-    return Number(v.includes(",") ? v.replace(/\./g, "").replace(",", ".") : v);
-  })
-  .pipe(z.number().positive().nullable());
-
-/**
- * Salva o kit personalizado (módulos, inversor, baterias, outros) e recalcula
- * o cálculo solar do negócio a partir dele. O preço usado no payback é o
- * valor do negócio (o kit personalizado não tem preço por item).
- */
-export async function salvarKitPersonalizado(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  const { atual } = await exigirPapel();
-  const dados = z
-    .object({
-      negocioId: z.string().uuid(),
-      tipoLigacao: z.enum(TIPOS_LIGACAO),
-      consumoMedioKwh: numeroBrOpcional,
-      valorFaturaMedio: numeroBrOpcional,
-      tarifaKwh: numeroBr("Informe a tarifa"),
-      estruturaTelhado: z.string().trim().max(120).optional(),
-      componentes: componentesJsonSchema,
-      observacoes: z.string().trim().max(2000, "Máximo de 2.000 caracteres").optional(),
-    })
-    .refine((d) => d.consumoMedioKwh != null || d.valorFaturaMedio != null, {
-      message: "Informe o consumo médio ou o valor médio da fatura.",
-      path: ["consumoMedioKwh"],
-    })
-    .safeParse(Object.fromEntries(formData));
-  if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
-  const d = dados.data;
-
-  const supabase = await criarClienteServidor();
-  const { data: negocio } = await supabase.from("negocios").select("valor").eq("id", d.negocioId).maybeSingle();
-  if (!negocio) return { ok: false, mensagem: "Negócio não encontrado." };
-
-  const montado = await montarLinhaCalculo(supabase, atual.empresaId, {
-    kitNome: nomeKitPersonalizado(d.componentes),
-    potenciaKwp: potenciaKitPersonalizadoKwp(d.componentes),
-    precoKit: negocio.valor ?? 0,
-    tipoLigacao: d.tipoLigacao,
-    consumoMedioKwh: d.consumoMedioKwh,
-    valorFaturaMedio: d.valorFaturaMedio,
-    tarifaKwh: d.tarifaKwh,
-  });
-  if (!montado.ok) return montado;
-
-  const { error: erroCalculo } = await supabase.from("calculos_solares").upsert(
-    {
-      ...montado.linha,
-      negocio_id: d.negocioId,
-      observacoes: d.observacoes || null,
-      atualizado_por: atual.membroId,
-      criado_por: atual.membroId,
-    },
-    { onConflict: "negocio_id", ignoreDuplicates: false },
-  );
-  if (erroCalculo) return { ok: false, mensagem: mensagemErro(erroCalculo, "Não foi possível salvar o cálculo.") };
-
-  await supabase.from("negocios").update({ estrutura_telhado: d.estruturaTelhado || null }).eq("id", d.negocioId);
-
-  // Substitui a lista de componentes (mais simples que sincronizar item a item).
-  await supabase.from("kit_componentes").delete().eq("negocio_id", d.negocioId);
-  if (d.componentes.length) {
-    const { error: erroComponentes } = await supabase.from("kit_componentes").insert(
-      d.componentes.map((c, i) => ({
-        empresa_id: atual.empresaId,
-        negocio_id: d.negocioId,
-        tipo: c.tipo,
-        descricao: c.descricao,
-        potencia_w: c.potenciaW,
-        quantidade: c.quantidade,
-        ordem: i,
-      })),
-    );
-    if (erroComponentes) {
-      return { ok: false, mensagem: "Cálculo salvo, mas não foi possível salvar os componentes do kit." };
-    }
-  }
-
-  revalidatePath(`/negocios/${d.negocioId}`);
-  return { ok: true, mensagem: "Kit e cálculo salvos." };
-}
+// `salvarKitPersonalizado` (calculava por fora do motor de dimensionamento real) foi removida na
+// Fase 6 da reconciliação do motor de dimensionamento (Evandro, 2026-10-01) — a tela de editar o
+// sistema (`negocios/[id]/kit-personalizado.tsx`) passou a chamar `salvarKitNegocio`
+// (`src/lib/acoes/dimensionamento.ts`), que roda o MESMO motor da Etapa 2 do wizard de criação.
+// Não deixar dois caminhos de cálculo paralelos pro mesmo dado (regra da reconciliação).
 
 export async function apagarCalculo(formData: FormData) {
   await exigirPapel();

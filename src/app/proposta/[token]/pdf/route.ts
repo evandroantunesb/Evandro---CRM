@@ -45,7 +45,12 @@ export async function GET(_: Request, { params }: RouteContext<"/proposta/[token
   // empresa que ainda não montou nenhum modelo): mantém o PDF de sempre.
   if (proposta.modelo_id && proposta.blocos_emitidos && proposta.capa_variante) {
     const [{ data: componentesData }, { data: identidadeData }] = await Promise.all([
-      admin.from("kit_componentes").select("tipo, descricao, potencia_w, quantidade").eq("negocio_id", proposta.negocio_id).order("ordem"),
+      admin
+        .from("kit_componentes")
+        .select("tipo, descricao, potencia_w, quantidade")
+        .eq("negocio_id", proposta.negocio_id)
+        .eq("ativo", true)
+        .order("ordem"),
       admin.from("proposta_identidades").select("*").eq("empresa_id", proposta.empresa_id).maybeSingle(),
     ]);
 

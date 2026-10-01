@@ -2,15 +2,12 @@
 
 import { useActionState, useMemo, useState } from "react";
 import { EditorComponentesKit, linhasParaComponentes, type LinhaComponente } from "@/components/kit-componentes";
+import { PainelDimensionamento } from "@/components/dimensionamento/painel-dimensionamento";
+import type { CamposFormularioDimensionamento } from "@/components/dimensionamento/usar-dimensionamento";
 import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
-import { salvarKitPersonalizado } from "@/lib/acoes/calculadora";
-import {
-  calcular,
-  custosInternosEstimados,
-  DISPONIBILIDADE_PADRAO_CAMEL,
-  potenciaKitPersonalizadoKwp,
-  sugerirQuantidadeModulos,
-} from "@/lib/calculadora";
+import { salvarKitNegocio } from "@/lib/acoes/dimensionamento";
+import { calcular, DISPONIBILIDADE_PADRAO_CAMEL } from "@/lib/calculadora";
+import type { EquipamentoAtivo } from "@/lib/dimensionamento";
 import { formatarMoeda } from "@/lib/formatacao";
 import { ROTULO_TIPO_COMPONENTE_KIT, ROTULO_TIPO_LIGACAO, TIPOS_LIGACAO, type TipoComponenteKit, type TipoLigacao } from "@/lib/tipos";
 
@@ -33,16 +30,27 @@ export type CalculoSalvo = {
   observacoes: string | null;
 };
 
+/** Dimensionamento já salvo (`dimensionamentos_solares`) — pré-carrega o painel de dimensionamento
+ * com a escolha atual do motor em vez de começar do zero, como o wizard de criação faz. */
+export type DimensionamentoSalvo = {
+  moduloId: string;
+  inversorId: string;
+  quantidadeModulos: number;
+  origemEscolha: "automatico" | "manual";
+  produtividadeKwhKwpMes: number | null;
+  origemProdutividade: "pvgis" | "nasa" | "padrao";
+};
+
 type Parametros = {
   produtividadeKwhKwpMes: number;
   percentualFioB: number;
   disponibilidadeMonoKwh: number;
   disponibilidadeBiKwh: number;
   disponibilidadeTriKwh: number;
-  custoInstalacaoPorModulo: number;
-  custoMaterialCaPorKwp: number;
-  custoEngenharia: number;
-  comissaoPercentual: number;
+  margemDimensionamentoPct: number;
+  overloadMaximoPct: number;
+  overloadCriticoPct: number;
+  temperaturaMinimaProjetoC: number;
 };
 
 function numeroBr(v: number) {
@@ -56,6 +64,20 @@ function numero(v: string): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
+/**
+ * Editar o sistema de um negócio já criado — reusa o MESMO motor de dimensionamento
+ * (`useDimensionamento` via `<PainelDimensionamento>`) da Etapa 2 do wizard de criação
+ * (Fase 6 da reconciliação, Evandro, 2026-10-01), em vez do caminho de cálculo próprio que esta
+ * tela tinha antes. O módulo/inversor ficam a cargo do painel; os itens avulsos do kit (bateria,
+ * estrutura, acessórios) continuam editáveis abaixo, com o catálogo da empresa disponível também
+ * aqui (Fase 6, item 1).
+ *
+ * Simplificação assumida nesta fase: ao contrário do wizard (Etapa 1), esta tela não resolve
+ * produtividade regional (PVGIS/NASA) nem tarifa ANEEL automaticamente — usa a produtividade
+ * padrão da empresa e pede a tarifa direto, como a tela já fazia antes da Fase 6. A rede elétrica
+ * (tipo de ligação) também não tem o bloqueio "a confirmar" do wizard: o campo já vem preenchido
+ * e qualquer alteração já conta como "confirmada" pro painel.
+ */
 export function KitPersonalizado({
   negocioId,
   negocioValor,
@@ -63,9 +85,13 @@ export function KitPersonalizado({
   padraoCliente,
   consumoMedioKwhPadrao,
   valorFaturaMedioPadrao,
-  componentesSalvos,
+  componentesNucleoSalvos,
+  componentesManuaisSalvos,
+  dimensionamento,
   calculo,
   parametros,
+  modulosAtivos,
+  inversoresAtivos,
 }: {
   negocioId: string;
   negocioValor: number | null;
@@ -73,11 +99,15 @@ export function KitPersonalizado({
   padraoCliente: string | null;
   consumoMedioKwhPadrao: number | null;
   valorFaturaMedioPadrao: number | null;
-  componentesSalvos: ComponenteSalvo[];
+  componentesNucleoSalvos: ComponenteSalvo[];
+  componentesManuaisSalvos: ComponenteSalvo[];
+  dimensionamento: DimensionamentoSalvo | null;
   calculo: CalculoSalvo | null;
   parametros: Parametros | null;
+  modulosAtivos: EquipamentoAtivo[];
+  inversoresAtivos: EquipamentoAtivo[];
 }) {
-  const [resultado, acao, pendente] = useActionState(salvarKitPersonalizado, null);
+  const [resultado, acao, pendente] = useActionState(salvarKitNegocio, null);
   const [editando, setEditando] = useState(!calculo);
   // Fecha o formulário assim que salva (sem useEffect, ajustando durante a renderização).
   const [ultimoResultado, setUltimoResultado] = useState(resultado);
@@ -86,8 +116,10 @@ export function KitPersonalizado({
     if (resultado?.ok) setEditando(false);
   }
 
+  // Itens avulsos do kit (bateria, estrutura, acessórios ou módulo/inversor fora do núcleo do
+  // motor) — o módulo/inversor do núcleo é editado só pelo painel de dimensionamento abaixo.
   const [linhas, setLinhas] = useState<LinhaComponente[]>(() =>
-    componentesSalvos.map((c) => ({
+    componentesManuaisSalvos.map((c) => ({
       tipo: c.tipo,
       descricao: c.descricao,
       potenciaW: c.potenciaW != null ? numeroBr(c.potenciaW) : "",
@@ -105,10 +137,8 @@ export function KitPersonalizado({
   );
   const [tarifaKwh, setTarifaKwh] = useState(calculo ? numeroBr(calculo.tarifaKwh) : "");
 
-  const componentes = useMemo(() => linhasParaComponentes(linhas), [linhas]);
-  const potenciaKwp = potenciaKitPersonalizadoKwp(componentes);
+  const componentesManuais = useMemo(() => linhasParaComponentes(linhas), [linhas]);
 
-  // Consumo médio em kWh, vindo do campo direto ou calculado a partir da fatura + tarifa.
   const consumoMedioEstimado = useMemo(() => {
     const tarifa = numero(tarifaKwh);
     const consumo = numero(consumoMedioKwh);
@@ -118,50 +148,43 @@ export function KitPersonalizado({
     return null;
   }, [consumoMedioKwh, valorFaturaMedio, tarifaKwh]);
 
-  // Sugere a quantidade de módulos pro consumo já informado, assim que o
-  // vendedor escolhe (ou digita) a potência de um módulo.
-  const sugerirQuantidadeModulo = useMemo(() => {
-    if (!parametros || !consumoMedioEstimado) return undefined;
-    return (potenciaW: number) =>
-      sugerirQuantidadeModulos(consumoMedioEstimado, parametros.produtividadeKwhKwpMes, potenciaW);
-  }, [parametros, consumoMedioEstimado]);
+  // Rede elétrica: esta tela não tem o bloqueio "a confirmar" do wizard — o tipo de ligação já
+  // vem preenchido e é tratado como confirmado assim que válido (ver nota no topo do arquivo).
+  const redeEletrica = useMemo(() => ({ tipoLigacao, tensaoRedeV: null }), [tipoLigacao]);
 
-  // Preço de referência (teste) do catálogo + custos internos configurados —
-  // só informativo aqui, já que o valor do negócio é editado em "Dados do negócio".
-  const precoSugerido = useMemo(() => {
-    if (!parametros) return null;
-    const somaComponentes = linhas.reduce((acc, l) => {
-      const precoUnitario = l.precoEstimadoUnitario ? Number(l.precoEstimadoUnitario) : NaN;
-      const quantidade = Number(l.quantidade) || 0;
-      return Number.isFinite(precoUnitario) ? acc + precoUnitario * quantidade : acc;
-    }, 0);
-    if (somaComponentes <= 0) return null;
-    const quantidadeModulos = componentes.filter((c) => c.tipo === "modulo").reduce((acc, c) => acc + c.quantidade, 0);
-    return custosInternosEstimados(somaComponentes, quantidadeModulos, potenciaKwp, parametros).total;
-  }, [linhas, componentes, potenciaKwp, parametros]);
-
-  const previa = useMemo(() => {
-    if (!parametros) return null;
+  // Escolha atual do motor (módulo/inversor/quantidade), repassada pelo painel via onAlteracao —
+  // só pra prévia de geração/economia/payback abaixo (mesmo padrão do wizard, formulario.tsx).
+  const [camposDimensionamento, setCamposDimensionamento] = useState<CamposFormularioDimensionamento | null>(null);
+  const moduloEscolhidoMotor = useMemo(
+    () => modulosAtivos.find((m) => m.id === camposDimensionamento?.moduloId) ?? null,
+    [modulosAtivos, camposDimensionamento],
+  );
+  const potenciaDcKwpMotor =
+    camposDimensionamento && moduloEscolhidoMotor
+      ? Number(((camposDimensionamento.quantidadeModulos * moduloEscolhidoMotor.potenciaW) / 1000).toFixed(2))
+      : null;
+  const previaMotor = useMemo(() => {
+    if (!parametros || !potenciaDcKwpMotor || potenciaDcKwpMotor <= 0) return null;
     const tarifa = numero(tarifaKwh);
-    const consumo = numero(consumoMedioKwh);
-    const fatura = numero(valorFaturaMedio);
-    if (potenciaKwp <= 0 || !tarifa || (!consumo && !fatura)) return null;
-    const consumoMedioFinal = consumo ?? fatura! / tarifa;
+    if (!tarifa || !consumoMedioEstimado) return null;
     return calcular({
-      potenciaKwp,
+      potenciaKwp: potenciaDcKwpMotor,
       precoKit: negocioValor ?? 0,
       tipoLigacao,
-      consumoMedioKwh: consumoMedioFinal,
+      consumoMedioKwh: consumoMedioEstimado,
       tarifaKwh: tarifa,
       produtividadeKwhKwpMes: parametros.produtividadeKwhKwpMes,
       percentualFioB: parametros.percentualFioB,
       disponibilidadeKwh: parametros[DISPONIBILIDADE_PADRAO_CAMEL[tipoLigacao]],
     });
-  }, [parametros, tarifaKwh, consumoMedioKwh, valorFaturaMedio, potenciaKwp, negocioValor, tipoLigacao]);
+  }, [potenciaDcKwpMotor, tarifaKwh, consumoMedioEstimado, negocioValor, tipoLigacao, parametros]);
 
   if (!parametros) {
     return <p className="text-sm text-zinc-600">Parâmetros da calculadora não configurados para a empresa.</p>;
   }
+
+  const semCatalogo = modulosAtivos.length === 0 || inversoresAtivos.length === 0;
+  const componentesParaResumo = [...componentesNucleoSalvos, ...componentesManuaisSalvos];
 
   if (calculo && !editando) {
     return (
@@ -203,9 +226,9 @@ export function KitPersonalizado({
             </div>
           )}
         </dl>
-        {componentesSalvos.length > 0 && (
+        {componentesParaResumo.length > 0 && (
           <ul className="flex flex-col gap-1 rounded-lg bg-zinc-50 p-3 text-sm">
-            {componentesSalvos.map((c, i) => (
+            {componentesParaResumo.map((c, i) => (
               <li key={i}>
                 <span className="text-zinc-500">{ROTULO_TIPO_COMPONENTE_KIT[c.tipo]}:</span> {c.descricao}
                 {c.potenciaW ? ` · ${numeroBr(c.potenciaW)} W` : ""} × {c.quantidade}
@@ -227,30 +250,19 @@ export function KitPersonalizado({
   return (
     <form action={acao} className="flex flex-col gap-3">
       <input type="hidden" name="negocioId" value={negocioId} />
-      <input type="hidden" name="componentes" value={JSON.stringify(componentes)} />
+      <input type="hidden" name="componentes" value={JSON.stringify(componentesManuais)} />
+      <input type="hidden" name="tipoLigacao" value={tipoLigacao} />
+      <input type="hidden" name="consumoMedioKwh" value={consumoMedioKwh} />
+      <input type="hidden" name="valorFaturaMedio" value={valorFaturaMedio} />
+      <input type="hidden" name="tarifaKwh" value={tarifaKwh} />
+      <input type="hidden" name="estruturaTelhado" value={estrutura} />
       {!padraoCliente && (
         <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
           Favor adicionar o padrão atual do cliente (em &quot;Dados do negócio&quot;) para conferir compatibilidade com o kit.
         </p>
       )}
-      <EditorComponentesKit linhas={linhas} onChange={setLinhas} sugerirQuantidadeModulo={sugerirQuantidadeModulo} />
-      {precoSugerido != null && (
-        <p className="-mt-1 text-xs text-zinc-400">
-          Preço sugerido (catálogo + custos internos, estimativa de teste): {formatarMoeda(precoSugerido)} — ajuste em
-          &ldquo;Dados do negócio&rdquo; se quiser usar.
-        </p>
-      )}
-      <Campo
-        rotulo="Estrutura do telhado"
-        name="estruturaTelhado"
-        value={estrutura}
-        onChange={(e) => setEstrutura(e.target.value)}
-        placeholder="Ex.: perfil de alumínio, gancho"
-      />
       <Selecao
         rotulo="Tipo de ligação"
-        name="tipoLigacao"
-        required
         value={tipoLigacao}
         onChange={(e) => setTipoLigacao(e.target.value as TipoLigacao)}
       >
@@ -262,7 +274,6 @@ export function KitPersonalizado({
       </Selecao>
       <Campo
         rotulo="Consumo médio (kWh/mês)"
-        name="consumoMedioKwh"
         inputMode="decimal"
         placeholder="ex.: 450"
         value={consumoMedioKwh}
@@ -271,7 +282,6 @@ export function KitPersonalizado({
       <p className="-mt-2 text-xs text-zinc-400">Sem o consumo em kWh? Preencha o valor médio da fatura abaixo em vez disso.</p>
       <Campo
         rotulo="Valor médio da fatura (R$, opcional)"
-        name="valorFaturaMedio"
         inputMode="decimal"
         placeholder="ex.: 450,00"
         value={valorFaturaMedio}
@@ -279,34 +289,84 @@ export function KitPersonalizado({
       />
       <Campo
         rotulo="Tarifa (R$/kWh)"
-        name="tarifaKwh"
         inputMode="decimal"
-        required
         placeholder="ex.: 0,95"
         value={tarifaKwh}
         onChange={(e) => setTarifaKwh(e.target.value)}
       />
-      {previa && (
-        <dl className="grid grid-cols-2 gap-3 rounded-lg bg-amber-50 px-4 py-3 text-sm md:grid-cols-4">
-          <div>
-            <dt className="text-zinc-500">Potência do kit</dt>
-            <dd className="font-medium text-zinc-900">{numeroBr(potenciaKwp)} kWp</dd>
-          </div>
-          <div>
-            <dt className="text-zinc-500">Geração estimada</dt>
-            <dd className="font-medium text-zinc-900">{previa.geracaoEstimadaKwhMes.toLocaleString("pt-BR")} kWh/mês</dd>
-          </div>
-          <div>
-            <dt className="text-zinc-500">Economia estimada</dt>
-            <dd className="font-medium text-green-700">{formatarMoeda(previa.economiaMensal)}/mês</dd>
-          </div>
-          <div>
-            <dt className="text-zinc-500">Payback estimado</dt>
-            <dd className="font-medium text-zinc-900">
-              {negocioValor ? (previa.paybackMeses != null ? `${previa.paybackMeses.toLocaleString("pt-BR")} meses` : "—") : "defina o valor do negócio"}
-            </dd>
-          </div>
-        </dl>
+
+      {semCatalogo ? (
+        <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          Nenhum módulo/inversor ativo em Configurações → Calculadora — cadastre o catálogo da empresa pra usar o motor
+          de dimensionamento automático nesta tela.
+        </p>
+      ) : (
+        <fieldset className="flex flex-col gap-3">
+          <legend className="mb-1 text-sm font-semibold text-zinc-900">Sistema (módulo + inversor)</legend>
+          <PainelDimensionamento
+            consumoMedioKwh={consumoMedioEstimado}
+            produtividadeKwhKwpMes={parametros.produtividadeKwhKwpMes}
+            origemProdutividade="padrao"
+            margemDimensionamentoPct={parametros.margemDimensionamentoPct}
+            overloadMaximoPct={parametros.overloadMaximoPct}
+            overloadCriticoPct={parametros.overloadCriticoPct}
+            temperaturaMinimaProjetoC={parametros.temperaturaMinimaProjetoC}
+            modulos={modulosAtivos}
+            inversores={inversoresAtivos}
+            redeEletrica={redeEletrica}
+            selecaoInicial={dimensionamento}
+            onAlteracao={setCamposDimensionamento}
+          />
+          {potenciaDcKwpMotor != null && (
+            <dl className="grid grid-cols-2 gap-3 rounded-lg bg-zinc-50 px-4 py-3 text-sm md:grid-cols-3">
+              <div>
+                <dt className="text-zinc-500">Potência do sistema</dt>
+                <dd className="font-medium text-zinc-900">{numeroBr(potenciaDcKwpMotor)} kWp</dd>
+              </div>
+              <div>
+                <dt className="text-zinc-500">Economia estimada</dt>
+                <dd className="font-medium text-zinc-900">
+                  {previaMotor ? `${formatarMoeda(previaMotor.economiaMensal)}/mês` : <span className="text-zinc-400">pendente de tarifa</span>}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-zinc-500">Payback estimado</dt>
+                <dd className="font-medium text-zinc-900">
+                  {previaMotor ? (
+                    previaMotor.paybackMeses != null ? (
+                      `${numeroBr(previaMotor.paybackMeses)} meses`
+                    ) : (
+                      "—"
+                    )
+                  ) : (
+                    <span className="text-zinc-400">pendente de tarifa</span>
+                  )}
+                </dd>
+              </div>
+            </dl>
+          )}
+        </fieldset>
+      )}
+
+      <fieldset className="flex flex-col gap-3">
+        <legend className="mb-2 text-sm font-semibold text-zinc-900">Itens avulsos (bateria, estrutura, acessórios)</legend>
+        <EditorComponentesKit
+          linhas={linhas}
+          onChange={setLinhas}
+          catalogoPorTipo={{ modulo: modulosAtivos, inversor: inversoresAtivos }}
+        />
+      </fieldset>
+
+      <Campo
+        rotulo="Estrutura do telhado"
+        value={estrutura}
+        onChange={(e) => setEstrutura(e.target.value)}
+        placeholder="Ex.: perfil de alumínio, gancho"
+      />
+      {negocioValor != null && (
+        <p className="-mt-1 text-xs text-zinc-400">
+          Payback estimado a partir do valor do negócio ({formatarMoeda(negocioValor)}) — ajuste em &quot;Dados do negócio&quot;.
+        </p>
       )}
       <label className="flex flex-col gap-1 text-sm">
         <span className="font-medium text-zinc-700">Observações (opcional)</span>
@@ -319,7 +379,7 @@ export function KitPersonalizado({
       </label>
       <div className="flex items-center gap-2">
         <Botao type="submit" disabled={pendente}>
-          {pendente ? "Calculando..." : "Salvar kit e calcular"}
+          {pendente ? "Calculando..." : "Salvar sistema"}
         </Botao>
         {calculo && (
           <Botao type="button" variante="secundario" onClick={() => setEditando(false)}>
