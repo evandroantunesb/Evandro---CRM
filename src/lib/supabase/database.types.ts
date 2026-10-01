@@ -1778,6 +1778,7 @@ export type Database = {
           etapa_id: string;
           fechado_em: string | null;
           funil_id: string;
+          handoff_origem_id: string | null;
           id: string;
           motivo_perda_detalhe: string | null;
           motivo_perda_id: string | null;
@@ -1817,6 +1818,7 @@ export type Database = {
           etapa_id: string;
           fechado_em?: string | null;
           funil_id: string;
+          handoff_origem_id?: string | null;
           id?: string;
           motivo_perda_detalhe?: string | null;
           motivo_perda_id?: string | null;
@@ -1856,6 +1858,7 @@ export type Database = {
           etapa_id?: string;
           fechado_em?: string | null;
           funil_id?: string;
+          handoff_origem_id?: string | null;
           id?: string;
           motivo_perda_detalhe?: string | null;
           motivo_perda_id?: string | null;
@@ -1917,6 +1920,13 @@ export type Database = {
             columns: ["funil_id"];
             isOneToOne: false;
             referencedRelation: "funis";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "negocios_handoff_origem_id_fkey";
+            columns: ["handoff_origem_id"];
+            isOneToOne: false;
+            referencedRelation: "handoffs";
             referencedColumns: ["id"];
           },
           {
