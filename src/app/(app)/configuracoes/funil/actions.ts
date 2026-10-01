@@ -171,6 +171,17 @@ export async function definirFechaComoEtapa(formData: FormData) {
   concluir("");
 }
 
+/** Marca a etapa como representando "entrou em negociação" pra gamificação (pontua só na primeira entrada de cada negócio). */
+export async function definirMarcaNegociacaoEtapa(formData: FormData) {
+  await exigirPapel("admin");
+  const etapaId = z.string().uuid().safeParse(formData.get("etapaId"));
+  if (!etapaId.success) return;
+
+  const supabase = await criarClienteServidor();
+  await supabase.from("etapas").update({ marca_negociacao: formData.get("marcaNegociacao") === "on" }).eq("id", etapaId.data);
+  concluir("");
+}
+
 export async function definirDiasConsideradoParado(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
   const { atual } = await exigirPapel("admin");
   const dias = z.coerce.number().int().min(1, "Informe pelo menos 1 dia").max(365, "No máximo 365 dias").safeParse(formData.get("dias"));
