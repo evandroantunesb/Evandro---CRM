@@ -352,13 +352,17 @@ export function statusTecnicoResultante(desejado: StatusTecnico, dadosCompletos:
 /**
  * Se o equipamento pode ser escolhido automaticamente pelo motor de dimensionamento (Evandro,
  * 2026-10-01: "incompleto pode existir no catálogo mas não deve participar automaticamente do
- * motor"). Descontinuado também fica de fora. `null`/`undefined` (banco ainda sem a coluna
+ * motor"). Descontinuado também fica de fora — confirmado por Evandro em 2026-10-01 ao aprovar a
+ * reorganização. "Em revisão" também fica de fora (ajuste do mesmo pedido): é revisão
+ * administrativa em andamento, não validação concluída — completude técnica (os campos que o
+ * motor usa) e aptidão pra entrar na recomendação automática são coisas distintas; só
+ * "completo" e "verificado" participam. `null`/`undefined` (banco ainda sem a coluna
  * `status_tecnico`, ex.: preview apontando pra produção antes da migration) mantém o
  * comportamento anterior — participa —, pra não esvaziar o catálogo por falta de schema.
  */
 export function participaDoMotor(status: StatusTecnico | null | undefined): boolean {
   if (status == null) return true;
-  return status === "completo" || status === "verificado" || status === "em_revisao";
+  return status === "completo" || status === "verificado";
 }
 
 /** Status pra exibir: o gravado no banco ou, se a coluna ainda não existir, o calculado dos dados. */

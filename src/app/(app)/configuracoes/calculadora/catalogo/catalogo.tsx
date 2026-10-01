@@ -75,7 +75,7 @@ export function Catalogo({ itens }: { itens: EquipamentoCatalogo[] }) {
         <h2 className="text-base font-semibold text-zinc-900">Catálogo de equipamentos</h2>
         <p className="text-sm text-zinc-600">
           Módulos e inversores que o sistema combina sozinho a partir do consumo em &quot;Adicionar negócio&quot;. Só
-          entram no dimensionamento automático os ativos com status Completo, Verificado ou Em revisão.
+          entram no dimensionamento automático os ativos com status Completo ou Verificado.
         </p>
       </div>
 

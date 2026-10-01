@@ -164,8 +164,8 @@ export function FormularioEquipamento({
         </label>
         <p className="text-xs text-zinc-500">
           Prioridade maior aparece primeiro entre as opções tecnicamente válidas. Só equipamentos ativos e com status
-          Completo, Verificado ou Em revisão entram no dimensionamento automático; Verificado e Em revisão exigem os
-          dados técnicos completos.
+          Completo ou Verificado entram no dimensionamento automático; Verificado exige os dados técnicos completos
+          (Em revisão fica de fora até ser validado, mesmo com os dados completos).
         </p>
       </section>
 

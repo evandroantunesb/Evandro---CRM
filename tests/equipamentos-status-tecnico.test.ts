@@ -57,15 +57,15 @@ describe("statusTecnicoResultante", () => {
 });
 
 describe("participaDoMotor", () => {
-  it("incompleto e descontinuado ficam fora do motor automático", () => {
+  it("incompleto, em revisão e descontinuado ficam fora do motor automático", () => {
     expect(participaDoMotor("incompleto")).toBe(false);
+    expect(participaDoMotor("em_revisao")).toBe(false);
     expect(participaDoMotor("descontinuado")).toBe(false);
   });
 
-  it("completo, verificado e em revisão participam", () => {
+  it("completo e verificado participam", () => {
     expect(participaDoMotor("completo")).toBe(true);
     expect(participaDoMotor("verificado")).toBe(true);
-    expect(participaDoMotor("em_revisao")).toBe(true);
   });
 
   it("banco sem a coluna (undefined) mantém o comportamento anterior", () => {

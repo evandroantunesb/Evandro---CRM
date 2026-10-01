@@ -19,11 +19,12 @@
 --   * Quando os dados ficam completos, "incompleto" vira "completo" sozinho.
 --
 -- Participação no motor automático (filtro aplicado no carregamento do catálogo em
--- "Adicionar negócio" — `participaDoMotor` em `src/lib/equipamentos.ts`): entram
--- completo, verificado e em_revisao (este último sempre com dados completos, pela regra
--- acima — "em revisão" é só o admin conferindo metadado/datasheet). Ficam de fora
--- incompleto (falta dado técnico) e descontinuado (não deve mais ser vendido). O
--- equipamento continua existindo no catálogo em todos os casos.
+-- "Adicionar negócio" — `participaDoMotor` em `src/lib/equipamentos.ts`, confirmado por
+-- Evandro em 2026-10-01): só completo e verificado entram. Completude técnica (os dados que
+-- o motor usa) e aptidão pra recomendação automática são coisas distintas — em_revisao fica de
+-- fora até a revisão administrativa terminar e virar "verificado", mesmo com os dados técnicos
+-- completos; descontinuado também fica de fora (não deve mais ser vendido); incompleto fica de
+-- fora por falta de dado técnico. O equipamento continua existindo no catálogo em todos os casos.
 
 create type public.status_tecnico_equipamento as enum (
   'completo',
@@ -37,7 +38,7 @@ alter table public.equipamentos_empresa
   add column status_tecnico public.status_tecnico_equipamento not null default 'incompleto';
 
 comment on column public.equipamentos_empresa.status_tecnico is
-  'completo/incompleto: derivados dos dados técnicos (gatilho equipamentos_empresa_status_tecnico). em_revisao/verificado/descontinuado: escolha manual do admin. Só completo/verificado/em_revisao entram no motor automático.';
+  'completo/incompleto: derivados dos dados técnicos (gatilho equipamentos_empresa_status_tecnico). em_revisao/verificado/descontinuado: escolha manual do admin. Só completo/verificado entram no motor automático.';
 
 create or replace function public.ajustar_status_tecnico_equipamento()
 returns trigger

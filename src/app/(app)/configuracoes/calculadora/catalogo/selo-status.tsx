@@ -12,7 +12,7 @@ const ESTILO: Record<StatusTecnico, string> = {
 const DICA: Record<StatusTecnico, string> = {
   completo: "Dados técnicos completos — entra no dimensionamento automático.",
   verificado: "Conferido pelo admin — entra no dimensionamento automático.",
-  em_revisao: "Em revisão pelo admin — continua no dimensionamento automático.",
+  em_revisao: "Em revisão pelo admin — não entra no dimensionamento automático até ser validado.",
   incompleto: "Faltam dados técnicos — não entra no dimensionamento automático.",
   descontinuado: "Fora de linha — não entra no dimensionamento automático.",
 };
