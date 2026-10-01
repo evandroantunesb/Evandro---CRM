@@ -50,6 +50,16 @@ beforeAll(async () => {
 
   const { data: c } = await servico.from("contatos").insert({ empresa_id: empresa, nome: "Cliente pagamento" }).select("id").single();
   contato = c!.id;
+
+  // `gestor` só enxerga negócio de responsável fora da própria empresa/equipe via `pode_ver_responsavel`
+  // (admin vê tudo; gestor só vê quem está na equipe dele). Sem isso, `confirmar_pagamento` falha com
+  // "Você não tem acesso a este negócio." antes mesmo de chegar nas regras de pagamento.
+  const { data: equipe } = await servico.from("equipes").insert({ empresa_id: empresa, nome: "Equipe pagamento" }).select("id").single();
+  await servico.from("equipe_membros").insert([
+    { empresa_id: empresa, equipe_id: equipe!.id, membro_id: membro[gestor.id], e_gestor: true },
+    { empresa_id: empresa, equipe_id: equipe!.id, membro_id: membro[closer.id], e_gestor: false },
+    { empresa_id: empresa, equipe_id: equipe!.id, membro_id: membro[closer2.id], e_gestor: false },
+  ]);
 });
 
 async function criarNegocio(titulo: string, responsavelId: string) {
@@ -102,7 +112,7 @@ describe("confirmar_pagamento", () => {
 
     const { error } = await gestorResponsavel.cliente.rpc("confirmar_pagamento", { p_contrato_id: contratoId });
     expect(error).not.toBeNull();
-    expect(error!.message).toContain("sob sua responsabilidade");
+    expect(error!.message).toContain("assinou como responsável");
   });
 
   it("admin responsável pelo próprio negócio não pode autoconfirmar", async () => {
