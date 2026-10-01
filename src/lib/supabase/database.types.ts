@@ -2059,31 +2059,37 @@ export type Database = {
       };
       municipios_distribuidoras: {
         Row: {
+          ativo: boolean;
           codigo_ibge: string;
           created_at: string;
+          data_referencia: string | null;
+          distribuidora_cnpj: string | null;
+          distribuidora_sigla: string;
           fonte: string;
           id: string;
-          nome_distribuidora: string;
-          sigla_distribuidora: string;
-          versao_base: string;
+          imported_at: string;
         };
         Insert: {
+          ativo?: boolean;
           codigo_ibge: string;
           created_at?: string;
+          data_referencia?: string | null;
+          distribuidora_cnpj?: string | null;
+          distribuidora_sigla: string;
           fonte?: string;
           id?: string;
-          nome_distribuidora: string;
-          sigla_distribuidora: string;
-          versao_base: string;
+          imported_at?: string;
         };
         Update: {
+          ativo?: boolean;
           codigo_ibge?: string;
           created_at?: string;
+          data_referencia?: string | null;
+          distribuidora_cnpj?: string | null;
+          distribuidora_sigla?: string;
           fonte?: string;
           id?: string;
-          nome_distribuidora?: string;
-          sigla_distribuidora?: string;
-          versao_base?: string;
+          imported_at?: string;
         };
         Relationships: [
           {
@@ -2098,19 +2104,19 @@ export type Database = {
       municipios_ibge: {
         Row: {
           codigo_ibge: string;
-          nome: string;
+          municipio: string;
           nome_normalizado: string;
           uf: string;
         };
         Insert: {
           codigo_ibge: string;
-          nome: string;
+          municipio: string;
           nome_normalizado: string;
           uf: string;
         };
         Update: {
           codigo_ibge?: string;
-          nome?: string;
+          municipio?: string;
           nome_normalizado?: string;
           uf?: string;
         };
