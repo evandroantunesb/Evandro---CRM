@@ -56,7 +56,9 @@ async function criarNegocioComHandoffPendente(titulo: string) {
     .select("id")
     .single();
   if (error) throw error;
-  const { data: handoff, error: erroHandoff } = await servico
+  // `handoffs` revoga insert/update/delete até de service_role (migration #106) — só o
+  // próprio SDR, via RLS ("criar quem vê o negócio"), pode abrir o handoff pendente.
+  const { data: handoff, error: erroHandoff } = await sdr.cliente
     .from("handoffs")
     .insert({
       empresa_id: empresa,
@@ -212,7 +214,7 @@ describe("dupla resposta concorrente", () => {
 describe("handoff pendente único por negócio", () => {
   it("não permite um segundo handoff pendente pro mesmo negócio", async () => {
     const { negocioId } = await criarNegocioComHandoffPendente("Pendente único");
-    const { error } = await servico.from("handoffs").insert({
+    const { error } = await sdr.cliente.from("handoffs").insert({
       empresa_id: empresa,
       negocio_id: negocioId,
       contato_id: contato,
