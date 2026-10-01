@@ -159,9 +159,10 @@ export type RedeEletricaConfirmada = {
  * Mapeia `tipoLigacao` (como o vendedor confirma, com bifásico como opção própria) pro enum
  * `fases_ca_equipamento` do catálogo (que só tem monofásico/trifásico). Bifásico mapeia pra
  * "monofasico" porque, na prática do setor, o mesmo inversor monofásico atende ligações mono e
- * bifásicas (a diferença de fiação é da concessionária, não do inversor) — **essa equivalência é
- * uma decisão técnica da calculadora solar e deve ser confirmada pelo Evandro antes de virar
- * regra definitiva** (CLAUDE.md: "nunca decida sozinho dado técnico da calculadora solar").
+ * bifásicas (a diferença de fiação é da concessionária, não do inversor) — **confirmado pelo
+ * Evandro em 2026-10-01**: até 10 kW é inversor monofásico, independente da rede (mono ou
+ * bifásica); a partir de 11/12/15 kW já é trifásico, e aí o que varia é só a tensão (220V,
+ * 380V, 600V etc.), não mais o número de fases.
  */
 const FASES_CA_ESPERADA_POR_TIPO_LIGACAO: Record<TipoLigacao, FasesCaInversor> = {
   monofasico: "monofasico",

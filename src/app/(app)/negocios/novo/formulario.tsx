@@ -109,9 +109,9 @@ function CardDocumentoInteligente({
         {!processado && <span className="text-xs text-zinc-500">{legenda}</span>}
       </label>
       {processado && (
-        <div className="flex flex-col gap-1 rounded-md bg-green-50 px-3 py-2">
-          <p className="text-sm font-medium text-green-800">Documento processado</p>
-          <ul className="text-xs text-green-700">
+        <div className="flex flex-col gap-1 rounded-md bg-dourado/10 px-3 py-2">
+          <p className="text-sm font-medium text-carvao">Documento processado</p>
+          <ul className="text-xs text-carvao/80">
             {campos.map((c) => (
               <li key={c}>{c}</li>
             ))}
@@ -618,8 +618,8 @@ export function FormularioNegocio({
           )}
 
           <div className="flex flex-col gap-2">
-            <div className="flex items-start gap-2 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-800">
-              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+            <div className="flex items-start gap-2 rounded-lg bg-dourado/10 px-3 py-2 text-sm text-carvao">
+              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-dourado" />
               <span>Combinação compatível · MPPT validado · Voc validado</span>
             </div>
             {!mostrarAlertasExemplo ? (
@@ -689,7 +689,7 @@ export function FormularioNegocio({
                   </div>
                   <div>
                     <dt className="text-zinc-500">Economia estimada</dt>
-                    <dd className="font-medium text-green-700">{formatarMoeda(previa.economiaMensal)}/mês</dd>
+                    <dd className="font-medium text-dourado">{formatarMoeda(previa.economiaMensal)}/mês</dd>
                   </div>
                   <div>
                     <dt className="text-zinc-500">Payback estimado</dt>
