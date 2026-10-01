@@ -315,7 +315,7 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
                       negocioId={negocio.id}
                       handoffId={ultimoHandoff.id}
                       deNome={ultimoHandoff.de_membro_id ? nomes.membro(ultimoHandoff.de_membro_id) : "SDR"}
-                      souCloser={atual.membroId === ultimoHandoff.para_membro_id}
+                      podeResponder={atual.membroId === ultimoHandoff.para_membro_id || souAdmin || atual.papel === "gestor"}
                     />
                   </Cartao>
                 );

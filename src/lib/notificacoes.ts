@@ -6,7 +6,7 @@ import { criarClienteServidor } from "@/lib/supabase/server";
 
 export type Notificacao = {
   id: string;
-  tipo: "lead_atribuido" | "tarefa_atribuida" | "handoff_recebido";
+  tipo: "lead_atribuido" | "tarefa_atribuida" | "handoff_recebido" | "handoff_devolvido";
   mensagem: string;
   link: string | null;
 };
