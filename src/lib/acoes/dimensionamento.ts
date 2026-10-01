@@ -147,6 +147,16 @@ export async function salvarDimensionamento(
     atualizado_por: membroId,
   };
 
+  // Lido ANTES do upsert abaixo (que sobrescreve a linha pelo onConflict): é o estado anterior,
+  // usado só pra saber, componente a componente, se o módulo e/ou o inversor realmente mudaram de
+  // equipamento (não apenas de quantidade) — ver bug corrigido logo abaixo, no bloco de
+  // `kit_componentes`.
+  const { data: dimensionamentoAnterior } = await supabase
+    .from("dimensionamentos_solares")
+    .select("modulo_equipamento_id, inversor_equipamento_id")
+    .eq("negocio_id", entrada.negocioId)
+    .maybeSingle();
+
   const { error } = await supabase.from("dimensionamentos_solares").upsert(linha, { onConflict: "negocio_id" });
   if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível salvar o dimensionamento.") };
 
@@ -194,14 +204,27 @@ export async function salvarDimensionamento(
   // 2026-10-01 (ver migration 20261001040000_kit_componentes_nucleo_motor.sql). A troca em si fica
   // auditada na linha do tempo do negócio pelo trigger `registrar_override_manual_componente`
   // (dispara no UPDATE de `dimensionamentos_solares` feito acima, antes desta troca de kit).
-  await supabase
-    .from("kit_componentes")
-    .update({ ativo: false })
-    .eq("negocio_id", entrada.negocioId)
-    .eq("eh_nucleo_motor", true)
-    .eq("ativo", true);
-  await supabase.from("kit_componentes").insert([
-    {
+  // Bug corrigido 2026-10-01 (achado pela suíte de testes real-Postgres do CI, não pelo Evandro):
+  // antes, QUALQUER save reaplicava `origemEscolha` nos dois componentes (módulo e inversor) e
+  // desativava as duas linhas ativas juntas, mesmo quando só um dos dois componentes realmente
+  // mudou de equipamento — então trocar manualmente só o inversor também marcava o módulo
+  // (intocado) como "manual". Agora cada slot é avaliado contra o equipamento que estava
+  // ativo antes deste save (via `dimensionamentoAnterior`, lido acima): só desativa a linha
+  // anterior e insere uma nova (com a `origemEscolha` deste save) quando o `equipamento_id`
+  // daquele slot realmente mudou; quando não mudou, só atualiza quantidade/descrição/potência na
+  // própria linha ativa, preservando a `origem` que ela já tinha.
+  const moduloMudou = dimensionamentoAnterior?.modulo_equipamento_id !== moduloRow.id;
+  const inversorMudou = dimensionamentoAnterior?.inversor_equipamento_id !== inversorRow.id;
+
+  if (moduloMudou) {
+    await supabase
+      .from("kit_componentes")
+      .update({ ativo: false })
+      .eq("negocio_id", entrada.negocioId)
+      .eq("eh_nucleo_motor", true)
+      .eq("ativo", true)
+      .eq("tipo", "modulo");
+    await supabase.from("kit_componentes").insert({
       empresa_id: empresaId,
       negocio_id: entrada.negocioId,
       tipo: "modulo" as const,
@@ -212,8 +235,30 @@ export async function salvarDimensionamento(
       origem: origemEscolha,
       eh_nucleo_motor: true,
       ativo: true,
-    },
-    {
+    });
+  } else {
+    await supabase
+      .from("kit_componentes")
+      .update({
+        descricao: `${moduloRow.fabricante} ${moduloRow.modelo}`,
+        potencia_w: moduloRow.potencia_w,
+        quantidade: opcao.quantidadeModulos,
+      })
+      .eq("negocio_id", entrada.negocioId)
+      .eq("eh_nucleo_motor", true)
+      .eq("ativo", true)
+      .eq("tipo", "modulo");
+  }
+
+  if (inversorMudou) {
+    await supabase
+      .from("kit_componentes")
+      .update({ ativo: false })
+      .eq("negocio_id", entrada.negocioId)
+      .eq("eh_nucleo_motor", true)
+      .eq("ativo", true)
+      .eq("tipo", "inversor");
+    await supabase.from("kit_componentes").insert({
       empresa_id: empresaId,
       negocio_id: entrada.negocioId,
       tipo: "inversor" as const,
@@ -224,8 +269,19 @@ export async function salvarDimensionamento(
       origem: origemEscolha,
       eh_nucleo_motor: true,
       ativo: true,
-    },
-  ]);
+    });
+  } else {
+    await supabase
+      .from("kit_componentes")
+      .update({
+        descricao: `${inversorRow.fabricante} ${inversorRow.modelo}`,
+        potencia_w: inversorRow.potencia_w,
+      })
+      .eq("negocio_id", entrada.negocioId)
+      .eq("eh_nucleo_motor", true)
+      .eq("ativo", true)
+      .eq("tipo", "inversor");
+  }
 
   return { ok: true };
 }
