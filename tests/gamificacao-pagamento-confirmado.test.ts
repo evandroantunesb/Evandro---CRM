@@ -229,7 +229,13 @@ describe("estornar_confirmacao_pagamento", () => {
   it("estorna com motivo: ledger marcado, atividade registrada, linha preservada com estornado_*", async () => {
     const negocioId = await criarNegocio("Estorno completo", membro[closer.id]);
     const contratoId = await criarEAssinarContrato(negocioId, closer.cliente);
-    await admin.cliente.from("gamification_rules").insert({ empresa_id: empresa, nome: "Pagamento 2", evento_tipo: "pagamento.confirmado", pontos: 25 });
+    // Outras regras com o mesmo evento_tipo (de testes anteriores no mesmo `empresa`) continuam ativas
+    // e também pontuam — filtra pelo regra_id desta regra pra não pegar o ledger de outra regra.
+    const { data: regraEstorno } = await admin.cliente
+      .from("gamification_rules")
+      .insert({ empresa_id: empresa, nome: "Pagamento 2", evento_tipo: "pagamento.confirmado", pontos: 25 })
+      .select("id")
+      .single();
     const { data: conf } = await gestor.cliente.rpc("confirmar_pagamento", { p_contrato_id: contratoId });
 
     const { data: estorno, error } = await gestor.cliente.rpc("estornar_confirmacao_pagamento", {
@@ -241,7 +247,12 @@ describe("estornar_confirmacao_pagamento", () => {
     expect(estorno!.motivo_estorno).toBe("Pagamento não caiu na conta");
     expect(estorno!.estornado_por_user_id).toBe(gestor.id);
 
-    const { data: ledger } = await servico.from("point_ledger").select("estornado, estornado_por").eq("evento_id", conf!.evento_confirmacao_id).single();
+    const { data: ledger } = await servico
+      .from("point_ledger")
+      .select("estornado, estornado_por")
+      .eq("evento_id", conf!.evento_confirmacao_id)
+      .eq("regra_id", regraEstorno!.id)
+      .single();
     expect(ledger!.estornado).toBe(true);
     expect(ledger!.estornado_por).toBe(membro[gestor.id]);
 
