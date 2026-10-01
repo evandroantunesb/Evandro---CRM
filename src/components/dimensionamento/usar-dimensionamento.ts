@@ -7,6 +7,8 @@ import {
   type EquipamentoAtivo,
   type OpcaoSistemaAutomatico,
   type RedeEletricaConfirmada,
+  type RejeicaoAgrupada,
+  type ResultadoDimensionamentoAutomatico,
 } from "@/lib/dimensionamento";
 
 export type OrigemEscolhaDimensionamento = "automatico" | "manual";
@@ -62,6 +64,19 @@ export type UsarDimensionamentoResultado = {
   /** Até 3 opções sugeridas automaticamente (nunca inclui overload acima do limite nem
    * combinação eletricamente/rede incompatível CONFIRMADA — ver `dimensionarSistemaAutomatico`). */
   opcoesAutomaticas: OpcaoSistemaAutomatico[];
+  /** Potência-alvo do dimensionamento (consumo/produtividade × margem) — existe mesmo quando
+   * `opcoesAutomaticas` vem vazio, pra UI nunca mostrar só "—" (Evandro, 2026-10-01, ponto 1 das
+   * correções pós-diagnóstico). NUNCA é a potência instalada — essa só existe dentro de uma opção
+   * (módulo + quantidade definidos). */
+  potenciaBaseKwp: number;
+  potenciaAlvoKwp: number;
+  totalCandidatos: number;
+  totalValidos: number;
+  /** Diagnóstico agrupado de por que candidatos não entraram (ou entraram com ressalva) nas
+   * opções sugeridas — ver `RejeicaoAgrupada`. */
+  rejeicoes: RejeicaoAgrupada[];
+  semModuloDisponivel: boolean;
+  semInversorDisponivel: boolean;
   /** `null` até o vendedor escolher uma opção automática ou abrir a seleção manual. */
   origem: OrigemEscolhaDimensionamento | null;
   /** Módulo+inversor correntes (da opção automática escolhida ou da seleção manual). */
@@ -108,10 +123,25 @@ export function useDimensionamento(params: UsarDimensionamentoParams): UsarDimen
     selecaoInicial,
   } = params;
 
-  const prontoPraCalcular = !!consumoMedioKwh && !!produtividadeKwhKwpMes && modulos.length > 0 && inversores.length > 0;
+  // Antes exigia catálogo não-vazio também — mudou (Evandro, 2026-10-01, ponto 1 das correções):
+  // catálogo insuficiente agora é um diagnóstico a MOSTRAR (`semModuloDisponivel`/
+  // `semInversorDisponivel`), não um motivo pra esconder o painel inteiro.
+  const prontoPraCalcular = !!consumoMedioKwh && !!produtividadeKwhKwpMes;
 
-  const opcoesAutomaticas = useMemo((): OpcaoSistemaAutomatico[] => {
-    if (!prontoPraCalcular) return [];
+  const resultadoMotor = useMemo((): ResultadoDimensionamentoAutomatico => {
+    if (!prontoPraCalcular) {
+      return {
+        potenciaBaseKwp: 0,
+        margemPct: margemDimensionamentoPct,
+        potenciaAlvoKwp: 0,
+        totalCandidatos: 0,
+        totalValidos: 0,
+        opcoes: [],
+        rejeicoes: [],
+        semModuloDisponivel: modulos.length === 0,
+        semInversorDisponivel: inversores.length === 0,
+      };
+    }
     return dimensionarSistemaAutomatico({
       consumoMedioKwh: consumoMedioKwh!,
       margemPct: margemDimensionamentoPct,
@@ -135,6 +165,8 @@ export function useDimensionamento(params: UsarDimensionamentoParams): UsarDimen
     inversores,
     redeEletrica,
   ]);
+
+  const opcoesAutomaticas = resultadoMotor.opcoes;
 
   const [origem, setOrigem] = useState<OrigemEscolhaDimensionamento | null>(() => selecaoInicial?.origemEscolha ?? null);
   const [selecionadaId, setSelecionadaId] = useState<string | null>(() =>
@@ -234,6 +266,13 @@ export function useDimensionamento(params: UsarDimensionamentoParams): UsarDimen
   return {
     prontoPraCalcular,
     opcoesAutomaticas,
+    potenciaBaseKwp: resultadoMotor.potenciaBaseKwp,
+    potenciaAlvoKwp: resultadoMotor.potenciaAlvoKwp,
+    totalCandidatos: resultadoMotor.totalCandidatos,
+    totalValidos: resultadoMotor.totalValidos,
+    rejeicoes: resultadoMotor.rejeicoes,
+    semModuloDisponivel: resultadoMotor.semModuloDisponivel,
+    semInversorDisponivel: resultadoMotor.semInversorDisponivel,
     origem,
     par,
     quantidade,

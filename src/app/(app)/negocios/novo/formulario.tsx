@@ -99,44 +99,43 @@ function IndicadorEtapas({ atual }: { atual: 1 | 2 | 3 }) {
   );
 }
 
-/** Card de documento com "leitura automática" simulada: não há OCR real, só a estrutura visual. */
+/** Card de anexo de documento (CNH, conta de energia) — SEM OCR real (Evandro, 2026-10-01, ponto
+ * 4 das correções: removido o mock de "Documento processado / Nome encontrado / CPF encontrado /
+ * Data de nascimento encontrada" que aparecia pra qualquer arquivo selecionado, sem olhar o
+ * conteúdo. Enquanto a extração automática não existir, o card só confirma o anexo — nunca
+ * comunica um dado que não foi extraído de verdade. */
 function CardDocumentoInteligente({
   titulo,
   legenda,
-  campos,
   name,
   accept,
 }: {
   titulo: string;
   legenda: string;
-  campos: string[];
   name: string;
   accept?: string;
 }) {
   const id = useId();
-  const [processado, setProcessado] = useState(false);
   const [nomeArquivo, setNomeArquivo] = useState("");
 
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-dashed border-zinc-300 p-3">
       <label htmlFor={id} className="flex cursor-pointer flex-col gap-1">
         <span className="text-sm font-medium text-zinc-800">{titulo}</span>
-        {!processado && <span className="text-xs text-zinc-500">{legenda}</span>}
+        {!nomeArquivo && <span className="text-xs text-zinc-500">{legenda}</span>}
       </label>
-      {processado && (
-        <div className="flex flex-col gap-1 rounded-md bg-dourado/10 px-3 py-2">
-          <p className="text-sm font-medium text-carvao">Documento processado</p>
-          <ul className="text-xs text-zinc-600">
-            {campos.map((c) => (
-              <li key={c}>{c}</li>
-            ))}
-          </ul>
-          <div className="flex items-center gap-2 pt-1">
-            <button type="button" className="text-xs font-medium text-amber-700 hover:underline" onClick={() => setProcessado(false)}>
-              Revisar dados
-            </button>
-            <span className="truncate text-xs text-zinc-400">· {nomeArquivo}</span>
-          </div>
+      {nomeArquivo && (
+        <div className="flex flex-col gap-1 rounded-md bg-zinc-50 px-3 py-2">
+          <p className="text-sm font-medium text-zinc-800">Arquivo anexado</p>
+          <p className="truncate text-xs text-zinc-600">{nomeArquivo}</p>
+          <p className="text-xs text-zinc-400">Extração automática ainda não executada</p>
+          <button
+            type="button"
+            className="self-start text-xs font-medium text-amber-700 hover:underline"
+            onClick={() => setNomeArquivo("")}
+          >
+            Trocar arquivo
+          </button>
         </div>
       )}
       <input
@@ -145,12 +144,7 @@ function CardDocumentoInteligente({
         name={name}
         accept={accept}
         className="hidden"
-        onChange={(e) => {
-          const arquivo = e.target.files?.[0];
-          if (!arquivo) return;
-          setNomeArquivo(arquivo.name);
-          setProcessado(true);
-        }}
+        onChange={(e) => setNomeArquivo(e.target.files?.[0]?.name ?? "")}
       />
     </div>
   );
@@ -195,6 +189,20 @@ export function FormularioNegocio({
   const [contatoTelefone, setContatoTelefone] = useState("");
   const [contatoEmail, setContatoEmail] = useState("");
   const emailValido = contatoEmail === "" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contatoEmail);
+
+  // Nome do negócio (Etapa 1) — gerado a partir do nome do cliente (novo ou existente), com
+  // edição manual sempre possível. Mesmo padrão "tocado" já usado pro valor sugerido do kit
+  // (`valorTocado`, abaixo): uma vez editado à mão, nunca mais sobrescrito por mudança no nome do
+  // cliente (Evandro, 2026-10-01, ponto 5 das correções — "não precisamos criar nomes
+  // sofisticados agora", só evitar que o vendedor tenha que digitar isso manualmente sempre).
+  const nomeClienteAtual = modo === "existente" ? (contato?.nome ?? "") : contatoNome;
+  const [tituloNegocio, setTituloNegocio] = useState("");
+  const [tituloTocado, setTituloTocado] = useState(false);
+  const [ultimoNomeClienteAplicado, setUltimoNomeClienteAplicado] = useState("");
+  if (nomeClienteAtual !== ultimoNomeClienteAplicado) {
+    setUltimoNomeClienteAplicado(nomeClienteAtual);
+    if (nomeClienteAtual && !tituloTocado) setTituloNegocio(nomeClienteAtual);
+  }
 
   // Localização (Etapa 1) — campos estruturados; concatenados no envio pro campo único que o backend já salva.
   // Cidade/UF também disparam, em segundo plano, a resolução Cidade/UF → município/IBGE →
@@ -480,7 +488,17 @@ export function FormularioNegocio({
       <div className={etapaAtual === 1 ? "flex flex-col gap-5" : "hidden"}>
         <fieldset className="grid gap-3 md:grid-cols-2">
           <legend className="mb-2 text-sm font-semibold text-zinc-900">Negócio</legend>
-          <Campo rotulo="Nome do negócio" name="titulo" placeholder="Ex.: Residência 5 kWp" required />
+          <Campo
+            rotulo="Nome do negócio"
+            name="titulo"
+            placeholder="Ex.: Residência 5 kWp"
+            value={tituloNegocio}
+            onChange={(e) => {
+              setTituloNegocio(e.target.value);
+              setTituloTocado(true);
+            }}
+            required
+          />
           <Selecao rotulo="Origem" name="origem_id" required defaultValue="">
             <option value="" disabled>
               Selecione
@@ -666,19 +684,12 @@ export function FormularioNegocio({
         <fieldset className="flex flex-col gap-3">
           <legend className="mb-2 text-sm font-semibold text-zinc-900">Documentos inteligentes (opcional)</legend>
           <div className="grid gap-3 md:grid-cols-2">
-            <CardDocumentoInteligente
-              titulo="📄 Anexar CNH"
-              legenda="Preencher cadastro automaticamente"
-              name="anexo_cnh_contato"
-              accept="image/*,.pdf"
-              campos={["Nome encontrado", "CPF encontrado", "Data de nascimento encontrada"]}
-            />
+            <CardDocumentoInteligente titulo="📄 Anexar CNH" legenda="Anexo do cliente" name="anexo_cnh_contato" accept="image/*,.pdf" />
             <CardDocumentoInteligente
               titulo="⚡ Anexar conta de energia"
-              legenda="Preencher dados automaticamente"
+              legenda="Anexo do cliente"
               name="anexo_fatura_gerador"
               accept="image/*,.pdf"
-              campos={["Distribuidora", "Unidade consumidora", "Endereço", "Consumo médio"]}
             />
           </div>
         </fieldset>

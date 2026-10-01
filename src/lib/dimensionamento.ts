@@ -127,6 +127,9 @@ export type OpcaoSistemaAutomatico = {
   /** Preenchido só quando `validacaoEletrica === "incompativel"`: razão curta e específica
    * (limite de tensão do inversor, faixa de MPPT, corrente de entrada etc.). */
   motivoIncompatibilidade?: string;
+  /** Mesmo caso de `motivoIncompatibilidade`, como código estruturado — pra UI agrupar/contar
+   * sem precisar fazer parsing de texto livre (Evandro, 2026-10-01, ponto 1 das correções). */
+  codigoIncompatibilidade?: CodigoIncompatibilidadeEletrica;
   stringConfig: ConfiguracaoString | null;
   /** Compatibilidade do inversor com a rede do cliente (fases/tensão) — independente da
    * validação de string acima. 'pendente_confirmacao_rede': `tipoLigacao` ainda não foi
@@ -209,10 +212,15 @@ function arredondar(valor: number, casas: number) {
   return Math.round(valor * fator) / fator;
 }
 
+/** Sub-motivo de uma incompatibilidade elétrica de string — subconjunto de `CodigoRejeicaoCandidato`
+ * que `encontrarConfiguracaoString` sabe diagnosticar hoje (Evandro, 2026-10-01, ponto 1 das
+ * correções pós-diagnóstico: motivo estruturado, não só texto livre). */
+export type CodigoIncompatibilidadeEletrica = "VOC_LIMIT" | "MPPT_MIN" | "MPPT_MAX" | "INPUT_CURRENT";
+
 type ResultadoConfiguracaoString =
   | { tipo: "ok"; config: ConfiguracaoString }
   | { tipo: "nao_verificado" }
-  | { tipo: "incompativel"; motivo: string };
+  | { tipo: "incompativel"; motivo: string; codigo: CodigoIncompatibilidadeEletrica };
 
 /**
  * Procura um arranjo de módulos em série (string) compatível com o inversor:
@@ -279,6 +287,7 @@ function encontrarConfiguracaoString(
     return {
       tipo: "incompativel",
       motivo: `Tensão Voc a frio (${vocFrioComUmModulo}V, mesmo com 1 módulo por string) excede o limite de tensão DC do inversor (${tensaoMaxDcV}V).`,
+      codigo: "VOC_LIMIT",
     };
   }
 
@@ -288,23 +297,29 @@ function encontrarConfiguracaoString(
     return {
       tipo: "incompativel",
       motivo: `Tensão da string excede a faixa de MPPT do inversor (${mpptMinV}–${mpptMaxV}V) mesmo com 1 módulo por string.`,
+      codigo: "MPPT_MAX",
     };
   }
   if (vmpNoLimiteDeVoc < mpptMinV) {
     return {
       tipo: "incompativel",
       motivo: `Tensão da string (${vmpNoLimiteDeVoc}V no máximo de módulos permitido pela tensão Voc) fica abaixo da faixa de MPPT do inversor (${mpptMinV}–${mpptMaxV}V).`,
+      codigo: "MPPT_MIN",
     };
   }
   if (correnteExcedida) {
     return {
       tipo: "incompativel",
       motivo: `Corrente de entrada do MPPT excedida (limite de ${inversor.correnteMaxEntradaA}A por MPPT) para o número de strings necessário.`,
+      codigo: "INPUT_CURRENT",
     };
   }
+  // Nenhuma das checagens específicas acima identificou a causa — ainda assim é um problema de
+  // faixa de MPPT (nenhum arranjo cabe nela), então reaproveita o código mais próximo.
   return {
     tipo: "incompativel",
     motivo: "Nenhum arranjo de módulos por string fica dentro da faixa de tensão do MPPT do inversor.",
+    codigo: "MPPT_MIN",
   };
 }
 
@@ -380,6 +395,7 @@ function montarOpcao(
       ...base,
       validacaoEletrica: "incompativel",
       motivoIncompatibilidade: resultado.motivo,
+      codigoIncompatibilidade: resultado.codigo,
       stringConfig: null,
     };
   }
@@ -450,6 +466,67 @@ export function avaliarCombinacaoEscolhida(
  * CONFIRMADA (`validacaoRede === "incompativel"`) é tratada como a incompatibilidade elétrica
  * de string: nunca entra como sugestão automática.
  */
+
+/** Motivo (estruturado) pelo qual uma combinação módulo+inversor específica não entrou nas
+ * `opcoes` sugeridas, ou ficou sinalizada mesmo entrando — Evandro, 2026-10-01 (ponto 1 das
+ * correções pós-diagnóstico do caso Cascavel/PR): a UI nunca deve só mostrar "—" sem dizer por
+ * quê. `EQUIPMENT_DATA_INCOMPLETE` é o único código aqui que NÃO exclui a combinação da lista de
+ * sugestões (ela entra do mesmo jeito, como "não verificada" — regra inalterada desde a Fase 1);
+ * os demais códigos correspondem exatamente aos critérios que já excluíam a combinação antes
+ * desta mudança. `SHORT_CIRCUIT_CURRENT` está reservado pro dia em que o catálogo passar a
+ * cadastrar corrente de curto-circuito máxima por MPPT (Isc) separada da corrente de operação
+ * (Imp, já verificada como `INPUT_CURRENT`) — o motor não faz essa checagem hoje, então esse
+ * código nunca é produzido ainda; não é uma mudança de algoritmo, só do tipo. */
+export type CodigoRejeicaoCandidato = CodigoIncompatibilidadeEletrica | "OVERLOAD_LIMIT" | "SHORT_CIRCUIT_CURRENT" | "GRID_INCOMPATIBLE" | "EQUIPMENT_DATA_INCOMPLETE";
+
+export type RejeicaoAgrupada = { codigo: CodigoRejeicaoCandidato; quantidade: number };
+
+export type ResultadoDimensionamentoAutomatico = {
+  /** `consumoMedioKwh / produtividadeKwhKwpMes` — potência que cobriria o consumo sem margem. */
+  potenciaBaseKwp: number;
+  margemPct: number;
+  /** `potenciaBaseKwp * (1 + margemPct)` — potência-alvo do dimensionamento. NUNCA é a potência
+   * instalada: é só o que o motor está buscando bater com módulos reais. Só vira potência
+   * instalada quando há módulo + quantidade definidos (`OpcaoSistemaAutomatico.potenciaDcKwp`,
+   * dentro de `opcoes`) — Evandro, 2026-10-01: "15,00 kWp é a potência-alvo... a instalada só
+   * deve virar, por exemplo, 15,50 kWp quando o motor efetivamente decidir 25 × 620W". */
+  potenciaAlvoKwp: number;
+  /** `modulos.length * inversores.length` — todas as combinações avaliadas. */
+  totalCandidatos: number;
+  /** Quantas combinações passariam no critério de seleção automática (mesmo critério de sempre:
+   * overload dentro do limite, elétrica e rede não confirmadas como incompatíveis) — pode ser
+   * maior que `opcoes.length`, que fica limitado a 3 (1 por módulo). */
+  totalValidos: number;
+  /** Até 3 opções sugeridas (1 por módulo) — mesmo campo de sempre, cálculo inalterado. */
+  opcoes: OpcaoSistemaAutomatico[];
+  /** Contagem agrupada por código, maior primeiro — cobre TODO candidato com algum problema,
+   * inclusive os que entraram em `opcoes` mesmo assim (ex.: `EQUIPMENT_DATA_INCOMPLETE`). É
+   * diagnóstico, não veredito de seleção — quem decide o que é selecionável continua sendo
+   * `opcoes`/`totalValidos`. */
+  rejeicoes: RejeicaoAgrupada[];
+  /** Nenhum módulo ativo no catálogo da empresa — nada a avaliar. */
+  semModuloDisponivel: boolean;
+  /** Nenhum inversor ativo no catálogo da empresa — nada a avaliar. */
+  semInversorDisponivel: boolean;
+};
+
+/** Classifica o problema mais relevante de uma combinação já avaliada, pra agrupar em
+ * `rejeicoes` — não decide se a combinação é selecionável (isso continua em `opcaoSelecionavel`,
+ * mesmo critério de sempre). `null` = combinação sem nenhum problema a reportar. */
+function classificarDiagnostico(opcao: OpcaoSistemaAutomatico): CodigoRejeicaoCandidato | null {
+  if (opcao.validacao !== "valido") return "OVERLOAD_LIMIT";
+  if (opcao.validacaoRede === "incompativel") return "GRID_INCOMPATIBLE";
+  if (opcao.validacaoEletrica === "incompativel") return opcao.codigoIncompatibilidade ?? "MPPT_MIN";
+  if (opcao.validacaoEletrica === "nao_verificado") return "EQUIPMENT_DATA_INCOMPLETE";
+  return null;
+}
+
+/** Mesmo critério de seleção automática de sempre (Fase 1) — intacto, só extraído em função
+ * própria pra não duplicar entre o cálculo de `opcoes`/`totalValidos` e `classificarDiagnostico`. */
+function opcaoSelecionavel(opcao: OpcaoSistemaAutomatico): boolean {
+  return opcao.validacao === "valido" && opcao.validacaoEletrica !== "incompativel" && opcao.validacaoRede !== "incompativel";
+}
+
 export function dimensionarSistemaAutomatico(params: {
   consumoMedioKwh: number;
   margemPct: number;
@@ -460,7 +537,7 @@ export function dimensionarSistemaAutomatico(params: {
   overloadCriticoPct: number;
   temperaturaMinimaProjetoC: number;
   redeEletrica?: RedeEletricaConfirmada | null;
-}): OpcaoSistemaAutomatico[] {
+}): ResultadoDimensionamentoAutomatico {
   const {
     consumoMedioKwh,
     margemPct,
@@ -472,22 +549,40 @@ export function dimensionarSistemaAutomatico(params: {
     temperaturaMinimaProjetoC,
     redeEletrica,
   } = params;
-  if (consumoMedioKwh <= 0 || produtividadeKwhKwpMes <= 0 || !modulos.length || !inversores.length) return [];
 
-  const potenciaAlvoKwp = (consumoMedioKwh * (1 + margemPct)) / produtividadeKwhKwpMes;
+  const semModuloDisponivel = modulos.length === 0;
+  const semInversorDisponivel = inversores.length === 0;
+  const vazio = { opcoes: [], rejeicoes: [], totalCandidatos: 0, totalValidos: 0, semModuloDisponivel, semInversorDisponivel };
 
-  const opcoes = modulos.flatMap((modulo) =>
-    inversores
-      .map((inversor) =>
-        avaliarCombinacao(modulo, inversor, potenciaAlvoKwp, overloadMaximoPct, overloadCriticoPct, temperaturaMinimaProjetoC, redeEletrica),
-      )
-      .filter(
-        (opcao) =>
-          opcao.validacao === "valido" && opcao.validacaoEletrica !== "incompativel" && opcao.validacaoRede !== "incompativel",
-      ),
+  if (consumoMedioKwh <= 0 || produtividadeKwhKwpMes <= 0) {
+    return { potenciaBaseKwp: 0, margemPct, potenciaAlvoKwp: 0, ...vazio };
+  }
+
+  // Fórmula inalterada (Evandro, 2026-10-01: "não alterar a fórmula atual") — só passa a ser
+  // exposta no retorno em vez de ficar só dentro do cálculo.
+  const potenciaBaseKwp = arredondar(consumoMedioKwh / produtividadeKwhKwpMes, 2);
+  const potenciaAlvoKwpExato = consumoMedioKwh * (1 + margemPct) / produtividadeKwhKwpMes;
+  const potenciaAlvoKwp = arredondar(potenciaAlvoKwpExato, 2);
+
+  if (semModuloDisponivel || semInversorDisponivel) {
+    return { potenciaBaseKwp, margemPct, potenciaAlvoKwp, ...vazio };
+  }
+
+  const todasCombinacoes = modulos.flatMap((modulo) =>
+    inversores.map((inversor) =>
+      avaliarCombinacao(modulo, inversor, potenciaAlvoKwpExato, overloadMaximoPct, overloadCriticoPct, temperaturaMinimaProjetoC, redeEletrica),
+    ),
   );
 
-  opcoes.sort((a, b) => {
+  const contagemRejeicoes = new Map<CodigoRejeicaoCandidato, number>();
+  const validas: OpcaoSistemaAutomatico[] = [];
+  for (const opcao of todasCombinacoes) {
+    const codigo = classificarDiagnostico(opcao);
+    if (codigo) contagemRejeicoes.set(codigo, (contagemRejeicoes.get(codigo) ?? 0) + 1);
+    if (opcaoSelecionavel(opcao)) validas.push(opcao);
+  }
+
+  validas.sort((a, b) => {
     const prioridade = b.modulo.prioridade + b.inversor.prioridade - (a.modulo.prioridade + a.inversor.prioridade);
     if (prioridade !== 0) return prioridade;
     return Math.abs(a.overloadPct - OVERLOAD_ALVO_PCT) - Math.abs(b.overloadPct - OVERLOAD_ALVO_PCT);
@@ -496,10 +591,25 @@ export function dimensionarSistemaAutomatico(params: {
   // No máximo 1 alternativa por módulo (evita 3 opções que só trocam o
   // inversor e parecem redundantes pro vendedor).
   const escolhidas: OpcaoSistemaAutomatico[] = [];
-  for (const opcao of opcoes) {
+  for (const opcao of validas) {
     if (escolhidas.some((e) => e.modulo.id === opcao.modulo.id)) continue;
     escolhidas.push(opcao);
     if (escolhidas.length === 3) break;
   }
-  return escolhidas;
+
+  const rejeicoes: RejeicaoAgrupada[] = [...contagemRejeicoes.entries()]
+    .map(([codigo, quantidade]) => ({ codigo, quantidade }))
+    .sort((a, b) => b.quantidade - a.quantidade);
+
+  return {
+    potenciaBaseKwp,
+    margemPct,
+    potenciaAlvoKwp,
+    totalCandidatos: todasCombinacoes.length,
+    totalValidos: validas.length,
+    opcoes: escolhidas,
+    rejeicoes,
+    semModuloDisponivel: false,
+    semInversorDisponivel: false,
+  };
 }

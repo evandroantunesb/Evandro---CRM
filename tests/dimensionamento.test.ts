@@ -19,7 +19,7 @@ const inversor8: EquipamentoAtivo = { id: "i3", fabricante: "Fab", modelo: "8kW"
 
 describe("dimensionarSistemaAutomatico", () => {
   it("recomenda o exemplo da especificação: 13 módulos de 620W + inversor 6,5kW, ~24% de overload", () => {
-    const [opcao] = dimensionarSistemaAutomatico({
+    const { opcoes: [opcao] } = dimensionarSistemaAutomatico({
       consumoMedioKwh: 780,
       margemPct: 0.2,
       produtividadeKwhKwpMes: 120,
@@ -47,7 +47,7 @@ describe("dimensionarSistemaAutomatico", () => {
 
   it("NUNCA sugere automaticamente combinação acima do limite de overload (Evandro, 2026-09-30: só entra por override manual)", () => {
     // 8,06 kWp / 6 kW = 34,3% de overload, acima do limite de 30% (seção 156 da spec).
-    const opcoes = dimensionarSistemaAutomatico({
+    const { opcoes } = dimensionarSistemaAutomatico({
       consumoMedioKwh: 780,
       margemPct: 0.2,
       produtividadeKwhKwpMes: 120,
@@ -61,7 +61,7 @@ describe("dimensionarSistemaAutomatico", () => {
   });
 
   it("prioriza opções válidas, ignorando por completo as que ficariam acima do limite (não aparecem nem como alternativa)", () => {
-    const opcoes = dimensionarSistemaAutomatico({
+    const { opcoes } = dimensionarSistemaAutomatico({
       consumoMedioKwh: 780,
       margemPct: 0.2,
       produtividadeKwhKwpMes: 120,
@@ -78,7 +78,7 @@ describe("dimensionarSistemaAutomatico", () => {
 
   it("entre válidas, prioriza prioridade comercial do equipamento", () => {
     const inversor65Prioritario: EquipamentoAtivo = { ...inversor65, id: "i1b", prioridade: 10 };
-    const opcoes = dimensionarSistemaAutomatico({
+    const { opcoes } = dimensionarSistemaAutomatico({
       consumoMedioKwh: 780,
       margemPct: 0.2,
       produtividadeKwhKwpMes: 120,
@@ -99,7 +99,7 @@ describe("dimensionarSistemaAutomatico", () => {
       potenciaW: 585,
       prioridade: 0,
     };
-    const opcoes = dimensionarSistemaAutomatico({
+    const { opcoes } = dimensionarSistemaAutomatico({
       consumoMedioKwh: 780,
       margemPct: 0.2,
       produtividadeKwhKwpMes: 120,
@@ -113,23 +113,95 @@ describe("dimensionarSistemaAutomatico", () => {
     expect(new Set(opcoes.map((o) => o.modulo.id)).size).toBe(2);
   });
 
-  it("retorna vazio sem módulos ou inversores ativos", () => {
-    expect(
-      dimensionarSistemaAutomatico({
-        consumoMedioKwh: 780,
-        margemPct: 0.2,
-        produtividadeKwhKwpMes: 120,
-        modulos: [],
-        inversores: [inversor65],
-        overloadMaximoPct: 0.3,
+  it("sem módulos ativos, marca semModuloDisponivel mas ainda calcula a potência-alvo", () => {
+    const resultado = dimensionarSistemaAutomatico({
+      consumoMedioKwh: 780,
+      margemPct: 0.2,
+      produtividadeKwhKwpMes: 120,
+      modulos: [],
+      inversores: [inversor65],
+      overloadMaximoPct: 0.3,
       overloadCriticoPct: 0.5,
-        temperaturaMinimaProjetoC: TEMPERATURA_PADRAO_C,
-      }),
-    ).toEqual([]);
+      temperaturaMinimaProjetoC: TEMPERATURA_PADRAO_C,
+    });
+    expect(resultado.opcoes).toEqual([]);
+    expect(resultado.semModuloDisponivel).toBe(true);
+    expect(resultado.semInversorDisponivel).toBe(false);
+    expect(resultado.potenciaBaseKwp).toBeCloseTo(6.5, 2);
+    expect(resultado.potenciaAlvoKwp).toBeCloseTo(7.8, 2);
+  });
+
+  it("sem inversores ativos, marca semInversorDisponivel", () => {
+    const resultado = dimensionarSistemaAutomatico({
+      consumoMedioKwh: 780,
+      margemPct: 0.2,
+      produtividadeKwhKwpMes: 120,
+      modulos: [modulo620],
+      inversores: [],
+      overloadMaximoPct: 0.3,
+      overloadCriticoPct: 0.5,
+      temperaturaMinimaProjetoC: TEMPERATURA_PADRAO_C,
+    });
+    expect(resultado.opcoes).toEqual([]);
+    expect(resultado.semInversorDisponivel).toBe(true);
+  });
+
+  it("expõe potência base/alvo e a contagem de candidatos/rejeições mesmo quando nenhuma combinação é válida — caso de teste do Evandro (Cascavel/PR, 2026-10-01)", () => {
+    // 1.500 kWh / 120 kWh/kWp/mês = 12,5 kWp base; ×1,20 de margem = 15,0 kWp alvo.
+    const resultado = dimensionarSistemaAutomatico({
+      consumoMedioKwh: 1500,
+      margemPct: 0.2,
+      produtividadeKwhKwpMes: 120,
+      modulos: [modulo620],
+      inversores: [inversor6], // 25 módulos de 620W = 15,5 kWp / 6 kW -> overload acima do limite
+      overloadMaximoPct: 0.3,
+      overloadCriticoPct: 0.5,
+      temperaturaMinimaProjetoC: TEMPERATURA_PADRAO_C,
+    });
+    expect(resultado.potenciaBaseKwp).toBeCloseTo(12.5, 2);
+    expect(resultado.potenciaAlvoKwp).toBeCloseTo(15, 2);
+    expect(resultado.opcoes).toEqual([]);
+    expect(resultado.totalCandidatos).toBe(1);
+    expect(resultado.totalValidos).toBe(0);
+    expect(resultado.rejeicoes).toEqual([{ codigo: "OVERLOAD_LIMIT", quantidade: 1 }]);
+  });
+
+  it("totalValidos conta todas as combinações elegíveis, não só as até 3 exibidas em opcoes", () => {
+    const modulo585: EquipamentoAtivo = { id: "m3", fabricante: "Fab", modelo: "585W", potenciaW: 585, prioridade: 0 };
+    const resultado = dimensionarSistemaAutomatico({
+      consumoMedioKwh: 780,
+      margemPct: 0.2,
+      produtividadeKwhKwpMes: 120,
+      modulos: [modulo620, modulo585],
+      inversores: [inversor6, inversor65, inversor8],
+      overloadMaximoPct: 0.3,
+      overloadCriticoPct: 0.5,
+      temperaturaMinimaProjetoC: TEMPERATURA_PADRAO_C,
+    });
+    expect(resultado.opcoes.length).toBe(2);
+    expect(resultado.totalCandidatos).toBe(6);
+    expect(resultado.totalValidos).toBeGreaterThanOrEqual(resultado.opcoes.length);
+  });
+
+  it("agrupa dados técnicos incompletos em EQUIPMENT_DATA_INCOMPLETE mesmo quando a combinação continua elegível", () => {
+    // Sem campos elétricos cadastrados (módulo620/inversor65 padrão) -> validacaoEletrica
+    // "nao_verificado", mas ainda entra em opcoes (regra inalterada desde a Fase 1).
+    const resultado = dimensionarSistemaAutomatico({
+      consumoMedioKwh: 780,
+      margemPct: 0.2,
+      produtividadeKwhKwpMes: 120,
+      modulos: [modulo620],
+      inversores: [inversor65],
+      overloadMaximoPct: 0.3,
+      overloadCriticoPct: 0.5,
+      temperaturaMinimaProjetoC: TEMPERATURA_PADRAO_C,
+    });
+    expect(resultado.opcoes.length).toBe(1);
+    expect(resultado.rejeicoes).toEqual([{ codigo: "EQUIPMENT_DATA_INCOMPLETE", quantidade: 1 }]);
   });
 
   it("marca como 'não verificado' quando falta dado elétrico no catálogo", () => {
-    const [opcao] = dimensionarSistemaAutomatico({
+    const { opcoes: [opcao] } = dimensionarSistemaAutomatico({
       consumoMedioKwh: 780,
       margemPct: 0.2,
       produtividadeKwhKwpMes: 120,
@@ -161,7 +233,7 @@ describe("dimensionarSistemaAutomatico", () => {
       correnteMaxEntradaA: 40,
       quantidadeMppt: 2,
     };
-    const [opcao] = dimensionarSistemaAutomatico({
+    const { opcoes: [opcao] } = dimensionarSistemaAutomatico({
       consumoMedioKwh: 780,
       margemPct: 0.2,
       produtividadeKwhKwpMes: 120,
@@ -195,7 +267,7 @@ describe("dimensionarSistemaAutomatico", () => {
       mpptMinV: 500,
       mpptMaxV: 550,
     };
-    const opcoes = dimensionarSistemaAutomatico({
+    const { opcoes } = dimensionarSistemaAutomatico({
       consumoMedioKwh: 780,
       margemPct: 0.2,
       produtividadeKwhKwpMes: 120,
@@ -455,7 +527,7 @@ describe("avaliarRedeEletrica (Fase 3, 2026-10-01 — gate de rede elétrica)", 
 
 describe("gate de rede elétrica integrado ao motor (dimensionarSistemaAutomatico/avaliarCombinacaoEscolhida)", () => {
   it("sem tipoLigacao confirmado, calcula DC/quantidade normalmente e marca o inversor como pendente de confirmação de rede", () => {
-    const [opcao] = dimensionarSistemaAutomatico({
+    const { opcoes: [opcao] } = dimensionarSistemaAutomatico({
       consumoMedioKwh: 780,
       margemPct: 0.2,
       produtividadeKwhKwpMes: 120,
@@ -472,7 +544,7 @@ describe("gate de rede elétrica integrado ao motor (dimensionarSistemaAutomatic
   });
 
   it("com tipoLigacao confirmado e compatível, roda a validação elétrica normal e aprova a opção", () => {
-    const [opcao] = dimensionarSistemaAutomatico({
+    const { opcoes: [opcao] } = dimensionarSistemaAutomatico({
       consumoMedioKwh: 780,
       margemPct: 0.2,
       produtividadeKwhKwpMes: 120,
@@ -487,7 +559,7 @@ describe("gate de rede elétrica integrado ao motor (dimensionarSistemaAutomatic
   });
 
   it("com tipoLigacao confirmado mas incompatível com o único inversor do catálogo, a combinação não entra como sugestão automática", () => {
-    const opcoes = dimensionarSistemaAutomatico({
+    const { opcoes } = dimensionarSistemaAutomatico({
       consumoMedioKwh: 780,
       margemPct: 0.2,
       produtividadeKwhKwpMes: 120,

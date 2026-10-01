@@ -9,7 +9,21 @@ import {
   type CamposFormularioDimensionamento,
   type UsarDimensionamentoParams,
 } from "@/components/dimensionamento/usar-dimensionamento";
-import { camposTecnicosFaltantes, type OpcaoSistemaAutomatico } from "@/lib/dimensionamento";
+import { camposTecnicosFaltantes, type CodigoRejeicaoCandidato, type OpcaoSistemaAutomatico, type RejeicaoAgrupada } from "@/lib/dimensionamento";
+
+/** Rótulo curto em português pra cada código de rejeição — usado só pro resumo agrupado
+ * ("4 combinações acima do limite de overload"), nunca pra listar equipamento por equipamento
+ * (Evandro, 2026-10-01, ponto 1 das correções: "não precisa despejar dezenas... a UI agrupar"). */
+const ROTULO_REJEICAO: Record<CodigoRejeicaoCandidato, string> = {
+  OVERLOAD_LIMIT: "acima do limite de overload",
+  VOC_LIMIT: "tensão Voc a frio acima do limite do inversor",
+  MPPT_MIN: "tensão da string abaixo da faixa de MPPT do inversor",
+  MPPT_MAX: "tensão da string acima da faixa de MPPT do inversor",
+  INPUT_CURRENT: "corrente de entrada do MPPT excedida",
+  SHORT_CIRCUIT_CURRENT: "corrente de curto-circuito acima do limite",
+  GRID_INCOMPATIBLE: "incompatível com a rede elétrica informada",
+  EQUIPMENT_DATA_INCOMPLETE: "com dados técnicos incompletos no catálogo",
+};
 
 /**
  * Painel único de dimensionamento — apresentação pura: toda a lógica (motor, seleção
@@ -33,7 +47,20 @@ export function PainelDimensionamento({
   onAlteracao?: (campos: CamposFormularioDimensionamento | null) => void;
 }) {
   const dimensionamento = useDimensionamento(paramsHook);
-  const { prontoPraCalcular, opcoesAutomaticas, origem, par, quantidade, opcaoAtual, camposFormulario } = dimensionamento;
+  const {
+    prontoPraCalcular,
+    opcoesAutomaticas,
+    potenciaBaseKwp,
+    potenciaAlvoKwp,
+    rejeicoes,
+    semModuloDisponivel,
+    semInversorDisponivel,
+    origem,
+    par,
+    quantidade,
+    opcaoAtual,
+    camposFormulario,
+  } = dimensionamento;
 
   useEffect(() => {
     onAlteracao?.(camposFormulario);
@@ -44,6 +71,16 @@ export function PainelDimensionamento({
 
   return (
     <div className="flex flex-col gap-2">
+      {/* Potência necessária/alvo sempre aparece, mesmo sem combinação automática — nunca só "—"
+          (Evandro, 2026-10-01, ponto 1 das correções pós-diagnóstico do caso Cascavel/PR). NUNCA
+          chamar isso de "potência instalada": só vira isso dentro de uma opção com módulo definido. */}
+      <p className="text-sm text-zinc-700">
+        Potência necessária: <span className="font-medium text-zinc-900">{potenciaAlvoKwp.toLocaleString("pt-BR")} kWp</span>{" "}
+        <span className="text-xs text-zinc-400">
+          ({potenciaBaseKwp.toLocaleString("pt-BR")} kWp de base × margem de {Math.round(paramsHook.margemDimensionamentoPct * 100)}%)
+        </span>
+      </p>
+
       {opcoesAutomaticas.length > 0 ? (
         <>
           <p className="text-sm font-medium text-zinc-700">Kit sugerido automaticamente</p>
@@ -61,12 +98,26 @@ export function PainelDimensionamento({
               />
             ))}
           </div>
+          {rejeicoes.length > 0 && <ResumoRejeicoes rejeicoes={rejeicoes} />}
         </>
       ) : (
-        <p className="flex items-start gap-2 rounded-lg bg-cinza-claro/40 px-3 py-2 text-sm text-zinc-700">
-          <Info className="mt-0.5 h-4 w-4 shrink-0 text-cinza" />
-          Não há kit automático dentro do limite de overload pra esse consumo com os equipamentos ativos hoje.
-        </p>
+        <div className="flex flex-col gap-1.5 rounded-lg bg-cinza-claro/40 px-3 py-2 text-sm text-zinc-700">
+          <p className="flex items-start gap-2">
+            <Info className="mt-0.5 h-4 w-4 shrink-0 text-cinza" />
+            Nenhuma combinação automática compatível encontrada no catálogo atual.
+          </p>
+          {semModuloDisponivel ? (
+            <p className="pl-6 text-xs text-zinc-500">Catálogo sem módulo compatível — nenhum módulo ativo em Configurações → Calculadora.</p>
+          ) : semInversorDisponivel ? (
+            <p className="pl-6 text-xs text-zinc-500">Catálogo sem inversor compatível — nenhum inversor ativo em Configurações → Calculadora.</p>
+          ) : (
+            rejeicoes.length > 0 && (
+              <div className="pl-6">
+                <ResumoRejeicoes rejeicoes={rejeicoes} />
+              </div>
+            )
+          )}
+        </div>
       )}
 
       <SeletorManual
@@ -91,6 +142,20 @@ export function PainelDimensionamento({
 
       <CamposOcultosDimensionamento campos={camposFormulario} />
     </div>
+  );
+}
+
+/** Resumo agrupado do diagnóstico ("4 combinações acima do limite de overload") — nunca lista
+ * equipamento por equipamento (Evandro, 2026-10-01, ponto 1 das correções). */
+function ResumoRejeicoes({ rejeicoes }: { rejeicoes: RejeicaoAgrupada[] }) {
+  return (
+    <ul className="flex flex-col gap-0.5 text-xs text-zinc-500">
+      {rejeicoes.map(({ codigo, quantidade }) => (
+        <li key={codigo}>
+          {quantidade} {quantidade === 1 ? "combinação" : "combinações"} {ROTULO_REJEICAO[codigo]}
+        </li>
+      ))}
+    </ul>
   );
 }
 

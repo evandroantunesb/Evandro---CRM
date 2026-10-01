@@ -4,26 +4,39 @@ import {
   arredondarCoordenadas,
   buscarProdutividadeRegional,
   geocodificarEndereco,
-  type ProdutividadeRegional,
+  type DiagnosticoEtapaGeodados,
 } from "@/lib/geodados";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteAdmin } from "@/lib/supabase/admin";
 import { criarClienteServidor } from "@/lib/supabase/server";
 
+export type ProdutividadeRegional = { produtividadeKwhKwpMes: number; fonte: "pvgis" | "nasa" };
+
+/** Loga o motivo estruturado da falha nos logs do servidor (Vercel) sem expor dado de cliente
+ * nem segredo — Evandro, 2026-10-01 (ponto 3 das correções): "permitir ver/registrar
+ * internamente se a falha foi no geocoding, PVGIS ou NASA... não registrar secrets nem dados
+ * desnecessários em logs". A UI continua mostrando só a mensagem genérica de sempre. */
+function registrarDiagnostico(diagnosticos: DiagnosticoEtapaGeodados[]) {
+  console.error("[geodados] produtividade regional não obtida:", JSON.stringify(diagnosticos));
+}
+
 /**
  * Produtividade solar real (PVGIS/NASA) pro endereço informado, com cache em
  * `dados_solares_cache` (compartilhado entre empresas — é dado público de
  * geografia/clima, não de negócio). Retorna `null` quando o endereço não é
- * geocodificável ou nenhuma fonte externa responde; quem chamou usa a
- * produtividade média configurada como alternativa nesses casos.
+ * geocodificável ou nenhuma fonte externa responde (motivo estruturado vai pro log do
+ * servidor); quem chamou usa a produtividade média configurada como alternativa nesses casos.
  */
 export async function buscarProdutividadeRegionalPorEndereco(endereco: string): Promise<ProdutividadeRegional | null> {
   await exigirPapel();
   if (!endereco.trim()) return null;
 
-  const coordenadas = await geocodificarEndereco(endereco);
-  if (!coordenadas) return null;
-  const { lat, lon } = arredondarCoordenadas(coordenadas);
+  const geocodificacao = await geocodificarEndereco(endereco);
+  if (!geocodificacao.ok) {
+    registrarDiagnostico([geocodificacao.diagnostico]);
+    return null;
+  }
+  const { lat, lon } = arredondarCoordenadas(geocodificacao.coordenadas);
 
   const supabase = await criarClienteServidor();
   const { data: emCache } = await supabase
@@ -37,7 +50,10 @@ export async function buscarProdutividadeRegionalPorEndereco(endereco: string): 
   }
 
   const resultado = await buscarProdutividadeRegional({ lat, lon });
-  if (!resultado) return null;
+  if (!resultado.ok) {
+    registrarDiagnostico(resultado.diagnosticos);
+    return null;
+  }
 
   // `dados_solares_cache` é cache global (sem empresa_id) e a RLS restringe insert/update
   // a `e_plataforma_admin()` (revisão de segurança, 2026-10-01 — ver a migration
@@ -55,5 +71,5 @@ export async function buscarProdutividadeRegionalPorEndereco(endereco: string): 
       },
       { onConflict: "lat_arredondado,lon_arredondado" },
     );
-  return resultado;
+  return { produtividadeKwhKwpMes: resultado.produtividadeKwhKwpMes, fonte: resultado.fonte };
 }
