@@ -45,6 +45,8 @@ Todas as PRs de #85 a #94 mescladas em 2026-09-30 (`pode dar merge`). Nenhuma te
 
 ## Em andamento
 
+- **PR #103 — antifraude da gamificação (Fase A):** motor ganha "única por negócio" (regra só credita 1x por negócio) e estorno automático dos pontos de "negócio ganho"/"handoff ganho" quando o negócio deixa de estar ganho. Primeira fase da reformulação pedida pelo Evandro (doc `RAION_GAMIFICACAO_REGRAS_E_DIRECAO_VISUAL.md`, 2026-10-01) — faltam: eventos novos (qualificação, contato efetivo, negociação, reunião, reativação), zerar as 4 regras antigas (ação manual dele em Configurações), separar XP/moedas, redesenho visual com verde contextual (`CLAUDE.md` já atualizado com essa exceção confirmada). Draft, aguardando revisão.
+- **PR #102 — imagem nas recompensas da loja de gamificação:** upload client-side (bucket privado `recompensas`, mesmo padrão de `proposta-marca`) em Configurações > Gamificação; aparece nos cards da Loja e no preview do dashboard. `database.types.ts` editado à mão (sem Docker/Supabase local nesta sessão pra rodar `pnpm db:types`) — conferir que o CI bate byte a byte. Draft, aguardando revisão.
 - **PR #63 — contexto do Claude:** `CLAUDE.md` enxuto (regras permanentes + seleção de modelos), `docs/arquitetura.md`, `docs/regras-negocio.md`, `PROGRESS.md`, `HANDOFF.md` e `.claude/settings.json`. 
 - **PR #62 — backup diário do banco de produção** para o repositório privado `raion-crm-backups`. Aguardando o Evandro criar os secrets `BACKUP_ENCRYPTION_KEY` e `BACKUP_REPO_TOKEN`.
 - **PRs do Dependabot abertas:** #55–#58 (Actions), #60 (TypeScript 6), #61 (`@types/node` 26). Atualizações maiores: revisar com cuidado antes de mesclar.
