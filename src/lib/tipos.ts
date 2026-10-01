@@ -51,6 +51,44 @@ export const ROTULO_TIPO_TAREFA: Record<TipoTarefa, string> = {
   outro: "Outro",
 };
 
+/**
+ * Resultado estruturado ao concluir (Evandro, 2026-10-01): ligação/WhatsApp e reunião/visita
+ * exigem um resultado pra concluir — e-mail/outro continuam concluindo sem exigir nada.
+ * Sem pontuação automática; serve só pra registrar o que realmente aconteceu.
+ */
+export const RESULTADOS_TAREFA = [
+  "contato_realizado",
+  "sem_resposta",
+  "numero_invalido",
+  "retornar_depois",
+  "sem_interesse",
+  "realizada",
+  "no_show",
+  "cancelada",
+] as const;
+export type ResultadoTarefa = (typeof RESULTADOS_TAREFA)[number];
+
+export const ROTULO_RESULTADO_TAREFA: Record<ResultadoTarefa, string> = {
+  contato_realizado: "Contato realizado",
+  sem_resposta: "Sem resposta",
+  numero_invalido: "Número inválido",
+  retornar_depois: "Retornar depois",
+  sem_interesse: "Sem interesse",
+  realizada: "Realizada",
+  no_show: "Não compareceu",
+  cancelada: "Cancelada",
+};
+
+/** Resultados válidos por tipo de tarefa — null = tipo não exige resultado pra concluir. */
+export const RESULTADOS_POR_TIPO_TAREFA: Record<TipoTarefa, readonly ResultadoTarefa[] | null> = {
+  ligacao: ["contato_realizado", "sem_resposta", "numero_invalido", "retornar_depois", "sem_interesse"],
+  whatsapp: ["contato_realizado", "sem_resposta", "numero_invalido", "retornar_depois", "sem_interesse"],
+  reuniao: ["realizada", "no_show", "cancelada"],
+  visita: ["realizada", "no_show", "cancelada"],
+  email: null,
+  outro: null,
+};
+
 /** Campos que o admin pode exigir para um negócio entrar numa etapa (mesma lista do banco). */
 export const CAMPOS_OBRIGATORIOS = [
   "valor",
