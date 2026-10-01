@@ -45,6 +45,7 @@ Todas as PRs de #85 a #94 mescladas em 2026-09-30 (`pode dar merge`). Nenhuma te
 
 ## Em andamento
 
+- **PR #109 — Resultado estruturado em tarefas:** ligação/WhatsApp e reunião/visita exigem um resultado real pra concluir (contato_realizado/sem_resposta/numero_invalido/retornar_depois/sem_interesse; realizada/no_show/cancelada), reunião/visita só aceita realizada/no_show depois do horário previsto. E-mail/outro sem mudança. Timeline e evento `task.completed` registram o resultado — sem pontuação automática nesta PR; prepara terreno pra uma futura regra de "reunião realizada" filtrar por `resultado`. Draft, CI em andamento.
 - **PR #63 — contexto do Claude:** `CLAUDE.md` enxuto (regras permanentes + seleção de modelos), `docs/arquitetura.md`, `docs/regras-negocio.md`, `PROGRESS.md`, `HANDOFF.md` e `.claude/settings.json`. 
 - **PR #62 — backup diário do banco de produção** para o repositório privado `raion-crm-backups`. Aguardando o Evandro criar os secrets `BACKUP_ENCRYPTION_KEY` e `BACKUP_REPO_TOKEN`.
 - **PRs do Dependabot abertas:** #55–#58 (Actions), #60 (TypeScript 6), #61 (`@types/node` 26). Atualizações maiores: revisar com cuidado antes de mesclar.
@@ -65,6 +66,7 @@ Todas as PRs de #85 a #94 mescladas em 2026-09-30 (`pode dar merge`). Nenhuma te
 - Planilha real de kits/preços e validação dos parâmetros da calculadora com o engenheiro.
 - Estilo dos cards do Kanban; tornar campos como "Valor (R$)" obrigatórios.
 - Apagar a variável `NEXT_PUBLIC_SITE_URL` antiga no Vercel (não é mais usada).
+- Ajuste operacional futuro (PR #109): ao escolher resultado "retornar_depois" numa tarefa de ligação/WhatsApp, pedir a próxima data/hora e criar a tarefa seguinte automaticamente — avaliado e deixado fora da #109 pra não ampliar o escopo.
 
 ## Próximos passos
 
