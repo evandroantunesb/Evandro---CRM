@@ -13,8 +13,8 @@
 -- "Contato efetivo" fica de fora desta migration: a spec exige diferenciar
 -- resposta real de tentativa sem resposta (WhatsApp respondido/ligação
 -- atendida vs. mensagem sem resposta/disparo em massa), e isso não existe
--- como sinal hoje em `tarefas` — around pedir pro Evandro confirmar o
--- desenho (ex.: campo explícito "houve resposta?" ao concluir tarefa de
+-- como sinal hoje em `tarefas` — vou pedir pro Evandro confirmar o desenho
+-- (ex.: campo explícito "houve resposta?" ao concluir tarefa de
 -- ligação/whatsapp/visita) antes de criar schema novo, no mesmo espírito
 -- do "não inferir automaticamente" que ele pediu pro aceite do closer.
 --
@@ -25,6 +25,12 @@
 -- qualificação deixa o vendedor/SDR editar). Guarda permanente por negócio
 -- (spec: "Qualificação só pontua uma vez" — desqualificar e requalificar
 -- não pontua de novo).
+--
+-- registrar_negocio() aqui parte do corpo acumulado das Fases A (estorno)
+-- e B (negotiation_started) — PRs #103/#104, empilhadas nesta mesma branch
+-- em 2026-10-01 pra consolidar (branches antes independentes causavam
+-- CI vermelho: cada uma redefinia a função a partir de uma base diferente
+-- e a que mesclasse por último apagaria silenciosamente as outras).
 
 create or replace function public.registrar_negocio()
 returns trigger
@@ -34,6 +40,8 @@ declare
   v_ator uuid := (select auth.uid());
   v_tipo text;
   v_sdr_user_id uuid;
+  v_responsavel_user_id uuid;
+  v_marca_negociacao boolean;
   v_telefone text;
 begin
   if tg_op = 'INSERT' then
@@ -45,6 +53,16 @@ begin
     insert into public.eventos (empresa_id, tipo, ator_id, entidade, entidade_id, payload)
       values (new.empresa_id, 'deal.created', v_ator, 'negocio', new.id,
               jsonb_build_object('origem_id', new.origem_id, 'responsavel_id', new.responsavel_id, 'valor', new.valor));
+
+    select marca_negociacao into v_marca_negociacao from public.etapas where id = new.etapa_id;
+    if v_marca_negociacao and new.responsavel_id is not null then
+      select user_id into v_responsavel_user_id from public.empresa_membros where id = new.responsavel_id;
+      if v_responsavel_user_id is not null then
+        insert into public.eventos (empresa_id, tipo, ator_id, entidade, entidade_id, payload)
+          values (new.empresa_id, 'deal.negotiation_started', v_responsavel_user_id, 'negocio', new.id, '{}'::jsonb);
+      end if;
+    end if;
+
     return null;
   end if;
 
@@ -59,6 +77,18 @@ begin
     insert into public.eventos (empresa_id, tipo, ator_id, entidade, entidade_id, payload)
       values (new.empresa_id, 'deal.stage_changed', v_ator, 'negocio', new.id,
               jsonb_build_object('de', old.etapa_id, 'para', new.etapa_id, 'responsavel_id', new.responsavel_id));
+
+    select marca_negociacao into v_marca_negociacao from public.etapas where id = new.etapa_id;
+    if v_marca_negociacao and new.responsavel_id is not null and not exists (
+      select 1 from public.eventos
+      where empresa_id = new.empresa_id and tipo = 'deal.negotiation_started' and entidade_id = new.id
+    ) then
+      select user_id into v_responsavel_user_id from public.empresa_membros where id = new.responsavel_id;
+      if v_responsavel_user_id is not null then
+        insert into public.eventos (empresa_id, tipo, ator_id, entidade, entidade_id, payload)
+          values (new.empresa_id, 'deal.negotiation_started', v_responsavel_user_id, 'negocio', new.id, '{}'::jsonb);
+      end if;
+    end if;
   end if;
 
   if new.responsavel_id is distinct from old.responsavel_id then
@@ -115,6 +145,10 @@ begin
               case new.status when 'ganho' then 'deal.won' when 'perdido' then 'deal.lost' else 'deal.reopened' end,
               v_ator, 'negocio', new.id,
               jsonb_build_object('valor', new.valor, 'responsavel_id', new.responsavel_id));
+
+    if old.status = 'ganho' then
+      perform public.estornar_lancamentos_evento(new.id, array['deal.won', 'handoff.won']);
+    end if;
 
     if new.status = 'ganho' then
       select p.user_id into v_sdr_user_id
