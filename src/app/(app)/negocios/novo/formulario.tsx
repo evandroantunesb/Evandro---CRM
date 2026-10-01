@@ -362,11 +362,26 @@ export function FormularioNegocio({
     return (potenciaW: number) => sugerirQuantidadeModulos(consumoParaMotor, parametros.produtividadeKwhKwpMes, potenciaW);
   }, [parametros, consumoParaMotor]);
 
-  // Prévia de economia/payback do kit escolhido pelo motor — só calcula quando há tarifa E rede
-  // elétrica confirmadas (a disponibilidade mínima de kWh depende do tipo de ligação); até lá fica
-  // marcada como pendente em vez de inventar um número (Evandro, 2026-10-01: "nunca inventar
-  // valor" pra economia/payback enquanto a tarifa não existe — aqui a rede soma-se ao mesmo
-  // princípio, porque `calcular` precisa da disponibilidade mínima por tipo de ligação).
+  const produtividadeEfetivaKwhKwpMes = produtividadeEngineKwhKwpMes ?? parametros?.produtividadeKwhKwpMes;
+
+  // Geração estimada: depende só do sistema técnico (potência DC) e da rede elétrica confirmada
+  // (o inversor recomendado só fecha depois da rede) — NUNCA da tarifa (Evandro, 2026-10-01:
+  // "geração NÃO deve depender de tarifa"). `potenciaKwp * produtividade` não usa tarifa nem
+  // tipo de ligação, mas só mostramos depois da rede confirmada porque até lá o inversor (e
+  // portanto o sistema) ainda está pendente de confirmação.
+  const geracaoEstimadaMotorKwhMes = useMemo(() => {
+    if (!redeConfirmada || !potenciaDcKwpMotor || potenciaDcKwpMotor <= 0 || !produtividadeEfetivaKwhKwpMes) return null;
+    return Math.round(potenciaDcKwpMotor * produtividadeEfetivaKwhKwpMes * 100) / 100;
+  }, [redeConfirmada, potenciaDcKwpMotor, produtividadeEfetivaKwhKwpMes]);
+
+  const geracaoEstimadaKitManualKwhMes = useMemo(() => {
+    if (!redeConfirmada || potenciaKitManualKwp <= 0 || !produtividadeEfetivaKwhKwpMes) return null;
+    return Math.round(potenciaKitManualKwp * produtividadeEfetivaKwhKwpMes * 100) / 100;
+  }, [redeConfirmada, potenciaKitManualKwp, produtividadeEfetivaKwhKwpMes]);
+
+  // Economia/payback do kit escolhido pelo motor — só calcula quando há tarifa (além da rede, já
+  // exigida pra geração acima); até lá ficam marcados como pendentes em vez de inventar um número
+  // (Evandro, 2026-10-01: "economia e payback ficam pendentes enquanto não houver tarifa válida").
   const previaMotor = useMemo(() => {
     if (!parametros || !potenciaDcKwpMotor || potenciaDcKwpMotor <= 0) return null;
     if (!tarifaNum || !redeConfirmada || !consumoParaMotor) return null;
@@ -376,11 +391,11 @@ export function FormularioNegocio({
       tipoLigacao: redeConfirmada.tipoLigacao,
       consumoMedioKwh: consumoParaMotor,
       tarifaKwh: tarifaNum,
-      produtividadeKwhKwpMes: produtividadeEngineKwhKwpMes ?? parametros.produtividadeKwhKwpMes,
+      produtividadeKwhKwpMes: produtividadeEfetivaKwhKwpMes ?? parametros.produtividadeKwhKwpMes,
       percentualFioB: parametros.percentualFioB,
       disponibilidadeKwh: parametros[DISPONIBILIDADE_PADRAO_CAMEL[redeConfirmada.tipoLigacao]],
     });
-  }, [parametros, potenciaDcKwpMotor, tarifaNum, redeConfirmada, consumoParaMotor, valor, produtividadeEngineKwhKwpMes]);
+  }, [parametros, potenciaDcKwpMotor, tarifaNum, redeConfirmada, consumoParaMotor, valor, produtividadeEfetivaKwhKwpMes]);
 
   // Prévia do kit personalizado (fallback manual) — independente do motor, como já era.
   const previaKitManual = useMemo(() => {
@@ -392,11 +407,11 @@ export function FormularioNegocio({
       tipoLigacao: redeConfirmada.tipoLigacao,
       consumoMedioKwh: consumoParaMotor,
       tarifaKwh: tarifaNum,
-      produtividadeKwhKwpMes: produtividadeEngineKwhKwpMes ?? parametros.produtividadeKwhKwpMes,
+      produtividadeKwhKwpMes: produtividadeEfetivaKwhKwpMes ?? parametros.produtividadeKwhKwpMes,
       percentualFioB: parametros.percentualFioB,
       disponibilidadeKwh: parametros[DISPONIBILIDADE_PADRAO_CAMEL[redeConfirmada.tipoLigacao]],
     });
-  }, [parametros, redeConfirmada, consumoParaMotor, tarifaNum, potenciaKitManualKwp, valor, produtividadeEngineKwhKwpMes]);
+  }, [parametros, redeConfirmada, consumoParaMotor, tarifaNum, potenciaKitManualKwp, valor, produtividadeEfetivaKwhKwpMes]);
 
   function pesquisar(termo: string) {
     setBusca(termo);
@@ -798,7 +813,11 @@ export function FormularioNegocio({
               <div>
                 <dt className="text-zinc-500">Geração estimada</dt>
                 <dd className="font-medium text-zinc-900">
-                  {previaMotor ? `${previaMotor.geracaoEstimadaKwhMes.toLocaleString("pt-BR")} kWh/mês` : "pendente"}
+                  {geracaoEstimadaMotorKwhMes != null ? (
+                    `${geracaoEstimadaMotorKwhMes.toLocaleString("pt-BR")} kWh/mês`
+                  ) : (
+                    <span className="text-zinc-400">pendente — falta confirmar a rede elétrica</span>
+                  )}
                 </dd>
               </div>
               <div>
@@ -807,18 +826,22 @@ export function FormularioNegocio({
                   {previaMotor ? (
                     `${formatarMoeda(previaMotor.economiaMensal)}/mês`
                   ) : (
-                    <span className="text-zinc-400">pendente — falta tarifa</span>
+                    <span className="text-zinc-400">pendente de tarifa</span>
                   )}
                 </dd>
               </div>
               <div>
                 <dt className="text-zinc-500">Payback estimado</dt>
                 <dd className="font-medium text-zinc-900">
-                  {previaMotor
-                    ? previaMotor.paybackMeses != null
-                      ? `${previaMotor.paybackMeses.toLocaleString("pt-BR")} meses`
-                      : "—"
-                    : "pendente"}
+                  {previaMotor ? (
+                    previaMotor.paybackMeses != null ? (
+                      `${previaMotor.paybackMeses.toLocaleString("pt-BR")} meses`
+                    ) : (
+                      "—"
+                    )
+                  ) : (
+                    <span className="text-zinc-400">pendente de tarifa</span>
+                  )}
                 </dd>
               </div>
             </dl>
@@ -852,7 +875,7 @@ export function FormularioNegocio({
           <fieldset className="flex flex-col gap-3">
             <legend className="mb-2 text-sm font-semibold text-zinc-900">Kit personalizado</legend>
             <EditorComponentesKit linhas={linhas} onChange={setLinhas} sugerirQuantidadeModulo={sugerirQuantidadeModulo} />
-            {previaKitManual && (
+            {potenciaKitManualKwp > 0 && (
               <>
                 <dl className="grid grid-cols-2 gap-3 rounded-lg bg-amber-50 px-4 py-3 text-sm md:grid-cols-4">
                   <div>
@@ -861,20 +884,36 @@ export function FormularioNegocio({
                   </div>
                   <div>
                     <dt className="text-zinc-500">Geração estimada</dt>
-                    <dd className="font-medium text-zinc-900">{previaKitManual.geracaoEstimadaKwhMes.toLocaleString("pt-BR")} kWh/mês</dd>
+                    <dd className="font-medium text-zinc-900">
+                      {geracaoEstimadaKitManualKwhMes != null ? (
+                        `${geracaoEstimadaKitManualKwhMes.toLocaleString("pt-BR")} kWh/mês`
+                      ) : (
+                        <span className="text-zinc-400">pendente — falta confirmar a rede elétrica</span>
+                      )}
+                    </dd>
                   </div>
                   <div>
                     <dt className="text-zinc-500">Economia estimada</dt>
-                    <dd className="font-medium text-carvao">{formatarMoeda(previaKitManual.economiaMensal)}/mês</dd>
+                    <dd className="font-medium text-carvao">
+                      {previaKitManual ? `${formatarMoeda(previaKitManual.economiaMensal)}/mês` : <span className="text-zinc-400">pendente de tarifa</span>}
+                    </dd>
                   </div>
                   <div>
                     <dt className="text-zinc-500">Payback estimado</dt>
                     <dd className="font-medium text-zinc-900">
-                      {previaKitManual.paybackMeses != null ? `${previaKitManual.paybackMeses.toLocaleString("pt-BR")} meses` : "—"}
+                      {previaKitManual ? (
+                        previaKitManual.paybackMeses != null ? (
+                          `${previaKitManual.paybackMeses.toLocaleString("pt-BR")} meses`
+                        ) : (
+                          "—"
+                        )
+                      ) : (
+                        <span className="text-zinc-400">pendente de tarifa</span>
+                      )}
                     </dd>
                   </div>
                 </dl>
-                {potenciaKitManualKwp > 0 && parametros && (previaKitManual.geracaoEstimadaKwhMes ?? 0) > 0 ? null : (
+                {geracaoEstimadaKitManualKwhMes != null && geracaoEstimadaKitManualKwhMes <= 0 && (
                   <div className="flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                     <span>Confira a combinação de módulo e inversor — faltam dados pra validar o dimensionamento.</span>
