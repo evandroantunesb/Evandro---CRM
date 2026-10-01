@@ -2,14 +2,21 @@ import { Cartao } from "@/components/ui";
 import { carregarConfiguracao } from "@/lib/crm";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
+import { Equipamentos } from "./equipamentos";
 import { FormularioParametros, LinhaKit, NovoKit } from "./formularios";
 
 export default async function ConfigCalculadora() {
   const { atual } = await exigirPapel("admin");
   const supabase = await criarClienteServidor();
-  const [{ kits }, { data: parametros }] = await Promise.all([
+  const [{ kits }, { data: parametros }, { data: equipamentos }] = await Promise.all([
     carregarConfiguracao(atual.empresaId),
     supabase.from("parametros_calculadora").select("*").eq("empresa_id", atual.empresaId).single(),
+    supabase
+      .from("equipamentos_empresa")
+      .select("*")
+      .eq("empresa_id", atual.empresaId)
+      .order("tipo")
+      .order("prioridade", { ascending: false }),
   ]);
 
   return (
@@ -43,9 +50,49 @@ export default async function ConfigCalculadora() {
               custoMaterialCaPorKwp: parametros.custo_material_ca_por_kwp,
               custoEngenharia: parametros.custo_engenharia,
               comissaoPercentual: parametros.comissao_percentual,
+              margemDimensionamentoPct: parametros.margem_dimensionamento_pct,
+              overloadMaximoPct: parametros.overload_maximo_pct,
+              overloadCriticoPct: parametros.overload_critico_pct,
+              temperaturaMinimaProjetoC: parametros.temperatura_minima_projeto_c,
+              siglaDistribuidoraAneel: parametros.sigla_distribuidora_aneel,
             }}
           />
         )}
+      </Cartao>
+      <Cartao titulo="Equipamentos ativos (kit automático)">
+        <Equipamentos
+          itens={(equipamentos ?? []).map((e) => ({
+            id: e.id,
+            tipo: e.tipo as "modulo" | "inversor",
+            fabricante: e.fabricante,
+            modelo: e.modelo,
+            potenciaW: e.potencia_w,
+            ativo: e.ativo,
+            prioridade: e.prioridade,
+            vocV: e.voc_v,
+            iscA: e.isc_a,
+            vmpV: e.vmp_v,
+            impA: e.imp_a,
+            coefTempVocPctC: e.coef_temp_voc_pct_c,
+            tipoInversor: e.tipo_inversor,
+            tensaoMaxDcV: e.tensao_max_dc_v,
+            tensaoPartidaV: e.tensao_partida_v,
+            mpptMinV: e.mppt_min_v,
+            mpptMaxV: e.mppt_max_v,
+            correnteMaxEntradaA: e.corrente_max_entrada_a,
+            quantidadeMppt: e.quantidade_mppt,
+            entradasPorMppt: e.entradas_por_mppt,
+            precoReferenciaBRL: e.preco_referencia_brl,
+            datasheetNome: e.datasheet_nome,
+            potenciaDcMaximaEntradaW: e.potencia_dc_maxima_entrada_w,
+            iscMaximoEntradaA: e.isc_maximo_entrada_a,
+            tensaoAcV: e.tensao_ac_v,
+            fasesCa: e.fases_ca,
+            correnteMaxAcA: e.corrente_max_ac_a,
+            eficienciaPct: e.eficiencia_pct,
+            tensaoFasesAc: e.tensao_fases_ac,
+          }))}
+        />
       </Cartao>
     </div>
   );

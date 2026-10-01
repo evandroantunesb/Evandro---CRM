@@ -75,6 +75,11 @@ export function FormularioParametros({
     custoMaterialCaPorKwp: number;
     custoEngenharia: number;
     comissaoPercentual: number;
+    margemDimensionamentoPct: number;
+    overloadMaximoPct: number;
+    overloadCriticoPct: number;
+    temperaturaMinimaProjetoC: number;
+    siglaDistribuidoraAneel: string | null;
   };
 }) {
   const [resultado, acao, pendente] = useActionState(editarParametros, null);
@@ -94,6 +99,65 @@ export function FormularioParametros({
         defaultValue={String(parametros.percentualFioB * 100).replace(".", ",")}
         required
       />
+      <Campo
+        rotulo="Sigla da distribuidora na ANEEL (opcional)"
+        name="sigla_distribuidora_aneel"
+        defaultValue={parametros.siglaDistribuidoraAneel ?? ""}
+        placeholder="Ex.: CPFL-PAULISTA"
+      />
+      <p className="-mt-2 text-xs text-zinc-500">
+        Preenchendo, o &quot;Valor da tarifa&quot; em &quot;Adicionar negócio&quot; é sugerido a partir da tarifa
+        homologada real da ANEEL (subgrupo B1, atualizada semanalmente); sem isso, continua só digitado à mão. A
+        sigla é a mesma usada nos processos da ANEEL para a distribuidora (SigAgente) — confira no site da agência.
+      </p>
+      <p className="mt-1 text-sm font-medium text-zinc-700">Dimensionamento automático</p>
+      <p className="-mt-2 text-xs text-zinc-500">
+        Usados pra montar o kit sozinho a partir do consumo, em &quot;Adicionar negócio&quot; — ver &quot;Equipamentos
+        ativos&quot; abaixo pra escolher os módulos/inversores usados.
+      </p>
+      <div className="grid grid-cols-2 gap-2">
+        <Campo
+          rotulo="Margem de dimensionamento (%)"
+          name="margem_dimensionamento_pct"
+          inputMode="decimal"
+          defaultValue={String(parametros.margemDimensionamentoPct * 100).replace(".", ",")}
+          required
+        />
+        <Campo
+          rotulo="Overload automático máximo (%)"
+          name="overload_maximo_pct"
+          inputMode="decimal"
+          defaultValue={String(parametros.overloadMaximoPct * 100).replace(".", ",")}
+          required
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <Campo
+          rotulo="Overload crítico (%)"
+          name="overload_critico_pct"
+          inputMode="decimal"
+          defaultValue={String(parametros.overloadCriticoPct * 100).replace(".", ",")}
+          required
+        />
+      </div>
+      <p className="-mt-2 text-xs text-zinc-500">
+        Até o overload automático máximo, o kit é sugerido direto. Entre esse limite e o
+        crítico, aparece um aviso leve. Acima do crítico, um alerta forte — mas a escolha
+        manual nunca é bloqueada em nenhuma faixa.
+      </p>
+      <div className="w-40">
+        <Campo
+          rotulo="Temperatura mínima de projeto (°C)"
+          name="temperatura_minima_projeto_c"
+          inputMode="decimal"
+          defaultValue={String(parametros.temperaturaMinimaProjetoC).replace(".", ",")}
+          required
+        />
+      </div>
+      <p className="-mt-2 text-xs text-zinc-500">
+        Usada pra calcular o Voc (tensão em circuito aberto) no frio, o pior caso pra não estourar a tensão máxima do
+        inversor. Ajuste pela região/telhado mais frio que a empresa atende.
+      </p>
       <div className="grid grid-cols-3 gap-2">
         <Campo
           rotulo="Disponibilidade monofásico (kWh)"
