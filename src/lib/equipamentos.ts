@@ -285,7 +285,7 @@ export function linhaCsvParaEquipamento(
 }
 
 // ---------------------------------------------------------------------------
-// Status técnico (migration 20261001030000_equipamentos_status_tecnico.sql)
+// Status técnico (migration 20261001050000_equipamentos_status_tecnico.sql)
 // ---------------------------------------------------------------------------
 
 export const ROTULO_STATUS_TECNICO: Record<StatusTecnico, string> = {

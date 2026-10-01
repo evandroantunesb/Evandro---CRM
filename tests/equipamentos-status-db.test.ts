@@ -1,4 +1,4 @@
-/** Gatilho do status técnico do catálogo (migration 20261001030000) e RLS da coluna nova. */
+/** Gatilho do status técnico do catálogo (migration 20261001050000) e RLS da coluna nova. */
 import { beforeAll, describe, expect, it } from "vitest";
 import type { Database } from "@/lib/supabase/database.types";
 import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";

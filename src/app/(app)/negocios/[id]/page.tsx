@@ -8,6 +8,7 @@ import { apagarAnexo } from "@/lib/acoes/anexos";
 import { alternarEtiqueta } from "@/lib/acoes/negocios";
 import { carregarConfiguracao, formatarDataHora, formatarMoeda } from "@/lib/crm";
 import { paraEquipamentoAtivo } from "@/lib/dimensionamento";
+import { participaDoMotor } from "@/lib/equipamentos";
 import { env } from "@/lib/env";
 import { descreverAtividade } from "@/lib/linha-do-tempo";
 import { exigirPapel } from "@/lib/sessao";
@@ -56,6 +57,9 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
     supabase.from("equipamentos_empresa").select("*").eq("empresa_id", atual.empresaId).eq("ativo", true).order("tipo").order("prioridade", { ascending: false }),
   ]);
   if (!negocio) notFound();
+  // Mesmo recorte de "Adicionar negócio": status técnico incompleto/descontinuado não entra no
+  // motor (filtro em JS pra um banco ainda sem a coluna não esvaziar o catálogo — `participaDoMotor`).
+  const catalogoMotor = (equipamentos ?? []).filter((e) => participaDoMotor(e.status_tecnico));
 
   const [{ data: atividades }, { data: notas }, { data: tarefas }, { data: anexos }, { data: marcadas }, { data: calculo }, { data: dimensionamento }] =
     await Promise.all([
@@ -270,8 +274,8 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
                     }
                   : null
               }
-              modulosAtivos={(equipamentos ?? []).filter((e) => e.tipo === "modulo").map(paraEquipamentoAtivo)}
-              inversoresAtivos={(equipamentos ?? []).filter((e) => e.tipo === "inversor").map(paraEquipamentoAtivo)}
+              modulosAtivos={catalogoMotor.filter((e) => e.tipo === "modulo").map(paraEquipamentoAtivo)}
+              inversoresAtivos={catalogoMotor.filter((e) => e.tipo === "inversor").map(paraEquipamentoAtivo)}
               parametros={
                 parametros
                   ? {

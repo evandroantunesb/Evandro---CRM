@@ -219,7 +219,7 @@ function mensagemErroEquipamento(error: { code?: string; message: string; hint?:
  * Cadastro manual de um módulo ou inversor ("+ Novo equipamento" na aba Catálogo). Datasheet e
  * dados técnicos são opcionais; sem os dados técnicos completos o equipamento fica
  * "Incompleto" e não entra no motor automático (Evandro, 2026-10-01) — ver a migration
- * 20261001030000_equipamentos_status_tecnico.sql.
+ * 20261001050000_equipamentos_status_tecnico.sql.
  */
 export async function cadastrarEquipamentoManual(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
   const { atual } = await exigirPapel("admin");
