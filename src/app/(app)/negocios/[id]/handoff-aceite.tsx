@@ -13,18 +13,18 @@ export function HandoffAceite({
   negocioId,
   handoffId,
   deNome,
-  souCloser,
+  podeResponder,
 }: {
   negocioId: string;
   handoffId: string;
   deNome: string;
-  souCloser: boolean;
+  podeResponder: boolean;
 }) {
   const [resultadoAceite, acaoAceitar, pendenteAceitar] = useActionState(aceitarHandoff, null);
   const [resultadoDevolucao, acaoDevolver, pendenteDevolver] = useActionState(devolverHandoff, null);
   const [devolvendo, setDevolvendo] = useState(false);
 
-  if (!souCloser) {
+  if (!podeResponder) {
     return (
       <div className="flex items-center gap-2">
         <Selo tom="atencao">Aguardando aceite</Selo>

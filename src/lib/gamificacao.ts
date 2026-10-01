@@ -15,7 +15,7 @@ export const EVENTOS_GAMIFICACAO = [
   { tipo: "deal.first_contact_done", rotulo: "SDR: primeiro contato realizado", campos: [] },
   { tipo: "deal.energy_bill_received", rotulo: "SDR: conta de energia recebida", campos: [] },
   { tipo: "handoff.created", rotulo: "SDR: lead entregue para vendas", campos: [] },
-  { tipo: "handoff.aceito", rotulo: "Closer aceitou a oportunidade", campos: [] },
+  { tipo: "oportunidade_aceita", rotulo: "SDR: oportunidade aceita pelo closer", campos: [] },
   { tipo: "handoff.devolvido", rotulo: "Closer devolveu a oportunidade", campos: [] },
   { tipo: "handoff.won", rotulo: "SDR: lead entregue que virou venda", campos: ["valor"] },
 ] as const;
