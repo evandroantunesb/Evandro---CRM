@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { Botao, Campo } from "@/components/ui";
-import { buscarComponentesCatalogo } from "@/lib/acoes/opensolar";
 import { ROTULO_TIPO_COMPONENTE_KIT, TIPOS_COMPONENTE_KIT, type TipoComponenteKit } from "@/lib/tipos";
 
 export type LinhaComponente = {
@@ -38,16 +37,15 @@ export function linhasParaComponentes(linhas: LinhaComponente[]) {
 }
 
 /**
- * Campo "Modelo / descrição": pra módulo e inversor, busca no catálogo técnico
- * (OpenSolar) conforme digita e preenche a potência junto ao escolher um resultado.
- * Continua aceitando texto livre (a busca é só um atalho).
+ * Campo "Modelo / descrição": aceita texto livre. A busca no catálogo técnico (antes via
+ * OpenSolar, removida em 2026-09-30) ainda não foi substituída pelo catálogo próprio
+ * (`equipamentos_empresa`) — isso é Fase 6 da reconciliação do motor de dimensionamento
+ * com o wizard novo. Por enquanto `resultados` nunca é preenchido.
  */
 function CampoModeloComBusca({
-  tipo,
   valor,
   placeholder,
   onChangeTexto,
-  onSelecionar,
 }: {
   tipo: TipoComponenteKit;
   valor: string;
@@ -55,17 +53,12 @@ function CampoModeloComBusca({
   onChangeTexto: (v: string) => void;
   onSelecionar: (descricao: string, potenciaW: string, precoEstimadoUnitario: string) => void;
 }) {
-  const [resultados, setResultados] = useState<
+  const [resultados] = useState<
     { id: number; descricao: string; potenciaW: number | null; precoEstimadoBRL: number | null }[]
   >([]);
-  const [, iniciar] = useTransition();
-  const pesquisavel = tipo === "modulo" || tipo === "inversor";
 
   function pesquisar(termo: string) {
     onChangeTexto(termo);
-    if (!pesquisavel) return;
-    if (termo.trim().length < 2) return setResultados([]);
-    iniciar(async () => setResultados(await buscarComponentesCatalogo(tipo, termo)));
   }
 
   return (
