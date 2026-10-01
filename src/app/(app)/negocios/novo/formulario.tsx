@@ -311,6 +311,16 @@ export function FormularioNegocio({
         if (contatoTelefone.replace(/\D/g, "").length < 10) return setErroEtapa("Informe um WhatsApp válido.");
         if (!emailValido) return setErroEtapa("Informe um e-mail válido ou deixe em branco.");
       }
+      const cepDigitos = cep.replace(/\D/g, "");
+      if (cepDigitos.length > 0 && cepDigitos.length !== 8) {
+        return setErroEtapa("CEP inválido — informe os 8 dígitos ou deixe em branco.");
+      }
+      if (!cidade.trim() || !uf.trim()) {
+        return setErroEtapa("Informe a cidade e o estado para identificarmos a distribuidora de energia.");
+      }
+      if (numero(consumoMedioKwh) == null && numero(valorFaturaMedio) == null) {
+        return setErroEtapa("Informe o consumo médio mensal em kWh ou o valor médio da conta.");
+      }
       setErroEtapa(null);
       return setEtapaAtual(2);
     }
@@ -421,13 +431,13 @@ export function FormularioNegocio({
           ) : (
             <>
               <Campo
-                rotulo="Nome / Razão social"
+                rotulo="Nome / Razão social*"
                 value={contatoNome}
                 onChange={(e) => setContatoNome(e.target.value)}
                 required
               />
               <Campo
-                rotulo="WhatsApp"
+                rotulo="WhatsApp*"
                 type="tel"
                 inputMode="numeric"
                 value={contatoTelefone}
@@ -478,38 +488,39 @@ export function FormularioNegocio({
           )}
         </fieldset>
 
-        {modo === "novo" && (
-          <fieldset className="grid gap-3 md:grid-cols-3">
-            <legend className="mb-2 text-sm font-semibold text-zinc-900">Localização</legend>
-            <Campo
-              rotulo="CEP"
-              inputMode="numeric"
-              value={cep}
-              placeholder="00000-000"
-              onChange={(e) => setCep(formatarCep(e.target.value))}
-              onBlur={(e) => buscarEnderecoPorCep(e.target.value)}
-            />
-            {buscandoCep && <p className="self-end text-xs text-zinc-400 md:col-span-2">Buscando endereço…</p>}
-            <div className="md:col-span-2">
-              <Campo rotulo="Rua" value={rua} onChange={(e) => setRua(e.target.value)} />
-            </div>
-            <Campo rotulo="Número" value={numeroEndereco} onChange={(e) => setNumeroEndereco(e.target.value)} />
-            <Campo rotulo="Complemento" value={complemento} onChange={(e) => setComplemento(e.target.value)} />
-            <Campo rotulo="Bairro" value={bairro} onChange={(e) => setBairro(e.target.value)} />
-            <Campo rotulo="Cidade" value={cidade} onChange={(e) => setCidade(e.target.value)} />
-            <Selecao rotulo="Estado" value={uf} onChange={(e) => setUf(e.target.value)}>
-              <option value="">UF</option>
-              {ESTADOS_BR.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </Selecao>
-          </fieldset>
-        )}
+        <fieldset className="grid gap-3 md:grid-cols-3">
+          <legend className="mb-2 text-sm font-semibold text-zinc-900">Localização</legend>
+          <Campo
+            rotulo="CEP"
+            inputMode="numeric"
+            value={cep}
+            placeholder="00000-000"
+            onChange={(e) => setCep(formatarCep(e.target.value))}
+            onBlur={(e) => buscarEnderecoPorCep(e.target.value)}
+          />
+          {buscandoCep && <p className="self-end text-xs text-zinc-400 md:col-span-2">Buscando endereço…</p>}
+          <div className="md:col-span-2">
+            <Campo rotulo="Rua" value={rua} onChange={(e) => setRua(e.target.value)} />
+          </div>
+          <Campo rotulo="Número" value={numeroEndereco} onChange={(e) => setNumeroEndereco(e.target.value)} />
+          <Campo rotulo="Complemento" value={complemento} onChange={(e) => setComplemento(e.target.value)} />
+          <Campo rotulo="Bairro" value={bairro} onChange={(e) => setBairro(e.target.value)} />
+          <Campo rotulo="Cidade*" value={cidade} onChange={(e) => setCidade(e.target.value)} required />
+          <Selecao rotulo="Estado*" value={uf} onChange={(e) => setUf(e.target.value)} required>
+            <option value="">UF</option>
+            {ESTADOS_BR.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </Selecao>
+          <p className="text-xs text-zinc-400 md:col-span-3">
+            Cidade e estado identificam a distribuidora de energia e a tarifa aplicável — preencha pelo CEP ou manualmente.
+          </p>
+        </fieldset>
 
         <fieldset className="flex flex-col gap-3">
-          <legend className="mb-2 text-sm font-semibold text-zinc-900">Consumo</legend>
+          <legend className="mb-2 text-sm font-semibold text-zinc-900">Dados de energia*</legend>
           <div className="grid gap-3 md:grid-cols-2">
             <Campo
               rotulo="Consumo médio mensal (kWh)"
