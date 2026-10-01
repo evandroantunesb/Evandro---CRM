@@ -838,6 +838,7 @@ export type Database = {
           funil_id: string;
           id: string;
           inicial: boolean;
+          marca_negociacao: boolean;
           nome: string;
           ordem: number;
           updated_at: string;
@@ -852,6 +853,7 @@ export type Database = {
           funil_id: string;
           id?: string;
           inicial?: boolean;
+          marca_negociacao?: boolean;
           nome: string;
           ordem?: number;
           updated_at?: string;
@@ -866,6 +868,7 @@ export type Database = {
           funil_id?: string;
           id?: string;
           inicial?: boolean;
+          marca_negociacao?: boolean;
           nome?: string;
           ordem?: number;
           updated_at?: string;

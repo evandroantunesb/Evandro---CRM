@@ -6,6 +6,8 @@ export const EVENTOS_GAMIFICACAO = [
   { tipo: "deal.won", rotulo: "Negócio ganho", campos: ["valor"] },
   { tipo: "deal.lost", rotulo: "Negócio perdido", campos: [] },
   { tipo: "deal.reopened", rotulo: "Negócio reaberto", campos: [] },
+  { tipo: "deal.negotiation_started", rotulo: "Negócio entrou em negociação", campos: [] },
+  { tipo: "contrato.assinado", rotulo: "Contrato assinado", campos: [] },
   { tipo: "task.created", rotulo: "Tarefa criada", campos: ["tipo"] },
   { tipo: "task.completed", rotulo: "Tarefa concluída", campos: ["no_prazo"] },
   { tipo: "note.created", rotulo: "Nota registrada", campos: [] },
