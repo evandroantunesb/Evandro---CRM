@@ -40,6 +40,12 @@ export async function salvarDimensionamento(
     produtividadeKwhKwpMes?: number | null;
     origemProdutividade?: "pvgis" | "nasa";
     precoNegocio: number;
+    // Origem da escolha de módulo/inversor (Fase 5 da reconciliação, Evandro, 2026-10-01):
+    // "automatico" (opção sugerida pelo motor, o padrão) ou "manual" (vendedor trocou pelo
+    // seletor manual do painel, fora da sugestão). Decide a `origem` gravada em `kit_componentes`
+    // e, via o trigger `registrar_override_manual_componente`, se um override fica registrado na
+    // linha do tempo do negócio.
+    origemEscolha?: "automatico" | "manual";
   },
 ): Promise<{ ok: true } | { ok: false; mensagem: string }> {
   if (entrada.consumoMedioKwh == null && entrada.valorFaturaMedio == null) {
@@ -86,6 +92,7 @@ export async function salvarDimensionamento(
     };
   }
 
+  const origemEscolha = entrada.origemEscolha ?? "automatico";
   const consumoMedioKwh = entrada.consumoMedioKwh ?? entrada.valorFaturaMedio! / entrada.tarifaKwh;
   const produtividadeValida = entrada.produtividadeKwhKwpMes != null && entrada.produtividadeKwhKwpMes > 0;
   const produtividadeKwhKwpMes = produtividadeValida ? entrada.produtividadeKwhKwpMes! : parametros.produtividade_kwh_kwp_mes;
@@ -125,6 +132,7 @@ export async function salvarDimensionamento(
     origem_produtividade: origemProdutividade,
     tarifa_kwh: entrada.tarifaKwh,
     origem_tarifa: entrada.origemTarifa,
+    origem_selecao_equipamentos: origemEscolha,
     tipo_ligacao: entrada.tipoLigacao,
     disponibilidade_kwh: disponibilidadeKwh,
     preco_negocio: entrada.precoNegocio,
@@ -170,7 +178,16 @@ export async function salvarDimensionamento(
     },
     { onConflict: "negocio_id" },
   );
-  await supabase.from("kit_componentes").delete().eq("negocio_id", entrada.negocioId);
+  // Substitui só as linhas que esta função mesma gravou como `origem: "automatico"` (o "slot" do
+  // motor) — nunca os itens que o vendedor adicionou/editou manualmente (bateria, estrutura,
+  // outros, ou um módulo/inversor trocado via override manual, gravado com `origem: "manual"`).
+  // Pedido do Evandro, 2026-10-01 (Fase 5): motor automático + kit manual precisam coexistir.
+  await supabase
+    .from("kit_componentes")
+    .delete()
+    .eq("negocio_id", entrada.negocioId)
+    .eq("origem", "automatico")
+    .in("tipo", ["modulo", "inversor"]);
   await supabase.from("kit_componentes").insert([
     {
       empresa_id: empresaId,
@@ -180,6 +197,7 @@ export async function salvarDimensionamento(
       potencia_w: moduloRow.potencia_w,
       quantidade: opcao.quantidadeModulos,
       ordem: 0,
+      origem: origemEscolha,
     },
     {
       empresa_id: empresaId,
@@ -189,6 +207,7 @@ export async function salvarDimensionamento(
       potencia_w: inversorRow.potencia_w,
       quantidade: 1,
       ordem: 1,
+      origem: origemEscolha,
     },
   ]);
 
