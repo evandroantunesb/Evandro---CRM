@@ -1,0 +1,635 @@
+/** Dimensionamento automático do kit (fase 1): escolhe módulo+inversor ativos, calcula overload e valida string. */
+import { describe, expect, it } from "vitest";
+import {
+  avaliarCombinacaoEscolhida,
+  avaliarRedeEletrica,
+  camposTecnicosFaltantes,
+  dimensionarSistemaAutomatico,
+  paraEquipamentoAtivo,
+  type EquipamentoAtivo,
+  type RedeEletricaConfirmada,
+} from "@/lib/dimensionamento";
+
+const TEMPERATURA_PADRAO_C = 5;
+
+const modulo620: EquipamentoAtivo = { id: "m1", fabricante: "Fab", modelo: "620W", potenciaW: 620, prioridade: 0 };
+const inversor65: EquipamentoAtivo = { id: "i1", fabricante: "Fab", modelo: "6,5kW", potenciaW: 6500, prioridade: 0 };
+const inversor6: EquipamentoAtivo = { id: "i2", fabricante: "Fab", modelo: "6kW", potenciaW: 6000, prioridade: 0 };
+const inversor8: EquipamentoAtivo = { id: "i3", fabricante: "Fab", modelo: "8kW", potenciaW: 8000, prioridade: 0 };
+
+describe("dimensionarSistemaAutomatico", () => {
+  it("recomenda o exemplo da especificação: 13 módulos de 620W + inversor 6,5kW, ~24% de overload", () => {
+    const { opcoes: [opcao] } = dimensionarSistemaAutomatico({
+      consumoMedioKwh: 780,
+      margemPct: 0.2,
+      produtividadeKwhKwpMes: 120,
+      modulos: [modulo620],
+      inversores: [inversor65],
+      overloadMaximoPct: 0.3,
+      overloadCriticoPct: 0.5,
+      temperaturaMinimaProjetoC: TEMPERATURA_PADRAO_C,
+    });
+    // potência alvo = 780*1,2/120 = 7,8 kWp -> 13 módulos de 620W = 8,06 kWp
+    expect(opcao.quantidadeModulos).toBe(13);
+    expect(opcao.potenciaDcKwp).toBe(8.06);
+    expect(opcao.overloadPct).toBeCloseTo(0.24, 2);
+    expect(opcao.validacao).toBe("valido");
+  });
+
+  it("separa dcAcRatio (Pdc/Pac) de overloadPct ((Pdc/Pac - 1)) — bug relatado pelo Evandro em 2026-09-30", () => {
+    // 17 módulos de 620W = 10,54 kWp / inversor de 5 kW -> ratio 2,108, overload 110,8% (não 210,8%).
+    const inversor5: EquipamentoAtivo = { id: "i4", fabricante: "Sungrow", modelo: "SG5", potenciaW: 5000, prioridade: 0 };
+    const opcao = avaliarCombinacaoEscolhida(modulo620, inversor5, 17, 0.3, 0.5, TEMPERATURA_PADRAO_C);
+    expect(opcao?.potenciaDcKwp).toBe(10.54);
+    expect(opcao?.dcAcRatio).toBeCloseTo(2.108, 3);
+    expect(opcao?.overloadPct).toBeCloseTo(1.108, 3);
+  });
+
+  it("NUNCA sugere automaticamente combinação acima do limite de overload (Evandro, 2026-09-30: só entra por override manual)", () => {
+    // 8,06 kWp / 6 kW = 34,3% de overload, acima do limite de 30% (seção 156 da spec).
+    const { opcoes } = dimensionarSistemaAutomatico({
+      consumoMedioKwh: 780,
+      margemPct: 0.2,
+      produtividadeKwhKwpMes: 120,
+      modulos: [modulo620],
+      inversores: [inversor6],
+      overloadMaximoPct: 0.3,
+      overloadCriticoPct: 0.5,
+      temperaturaMinimaProjetoC: TEMPERATURA_PADRAO_C,
+    });
+    expect(opcoes).toEqual([]);
+  });
+
+  it("prioriza opções válidas, ignorando por completo as que ficariam acima do limite (não aparecem nem como alternativa)", () => {
+    const { opcoes } = dimensionarSistemaAutomatico({
+      consumoMedioKwh: 780,
+      margemPct: 0.2,
+      produtividadeKwhKwpMes: 120,
+      modulos: [modulo620],
+      inversores: [inversor6, inversor65],
+      overloadMaximoPct: 0.3,
+      overloadCriticoPct: 0.5,
+      temperaturaMinimaProjetoC: TEMPERATURA_PADRAO_C,
+    });
+    expect(opcoes.length).toBe(1);
+    expect(opcoes[0].inversor.id).toBe("i1");
+    expect(opcoes[0].validacao).toBe("valido");
+  });
+
+  it("entre válidas, prioriza prioridade comercial do equipamento", () => {
+    const inversor65Prioritario: EquipamentoAtivo = { ...inversor65, id: "i1b", prioridade: 10 };
+    const { opcoes } = dimensionarSistemaAutomatico({
+      consumoMedioKwh: 780,
+      margemPct: 0.2,
+      produtividadeKwhKwpMes: 120,
+      modulos: [modulo620],
+      inversores: [inversor8, inversor65Prioritario],
+      overloadMaximoPct: 0.3,
+      overloadCriticoPct: 0.5,
+      temperaturaMinimaProjetoC: TEMPERATURA_PADRAO_C,
+    });
+    expect(opcoes[0].inversor.id).toBe("i1b");
+  });
+
+  it("retorna até 3 opções, no máximo 1 por módulo", () => {
+    const modulo585: EquipamentoAtivo = {
+      id: "m2",
+      fabricante: "Fab",
+      modelo: "585W",
+      potenciaW: 585,
+      prioridade: 0,
+    };
+    const { opcoes } = dimensionarSistemaAutomatico({
+      consumoMedioKwh: 780,
+      margemPct: 0.2,
+      produtividadeKwhKwpMes: 120,
+      modulos: [modulo620, modulo585],
+      inversores: [inversor6, inversor65, inversor8],
+      overloadMaximoPct: 0.3,
+      overloadCriticoPct: 0.5,
+      temperaturaMinimaProjetoC: TEMPERATURA_PADRAO_C,
+    });
+    expect(opcoes.length).toBe(2);
+    expect(new Set(opcoes.map((o) => o.modulo.id)).size).toBe(2);
+  });
+
+  it("sem módulos ativos, marca semModuloDisponivel mas ainda calcula a potência-alvo", () => {
+    const resultado = dimensionarSistemaAutomatico({
+      consumoMedioKwh: 780,
+      margemPct: 0.2,
+      produtividadeKwhKwpMes: 120,
+      modulos: [],
+      inversores: [inversor65],
+      overloadMaximoPct: 0.3,
+      overloadCriticoPct: 0.5,
+      temperaturaMinimaProjetoC: TEMPERATURA_PADRAO_C,
+    });
+    expect(resultado.opcoes).toEqual([]);
+    expect(resultado.semModuloDisponivel).toBe(true);
+    expect(resultado.semInversorDisponivel).toBe(false);
+    expect(resultado.potenciaBaseKwp).toBeCloseTo(6.5, 2);
+    expect(resultado.potenciaAlvoKwp).toBeCloseTo(7.8, 2);
+  });
+
+  it("sem inversores ativos, marca semInversorDisponivel", () => {
+    const resultado = dimensionarSistemaAutomatico({
+      consumoMedioKwh: 780,
+      margemPct: 0.2,
+      produtividadeKwhKwpMes: 120,
+      modulos: [modulo620],
+      inversores: [],
+      overloadMaximoPct: 0.3,
+      overloadCriticoPct: 0.5,
+      temperaturaMinimaProjetoC: TEMPERATURA_PADRAO_C,
+    });
+    expect(resultado.opcoes).toEqual([]);
+    expect(resultado.semInversorDisponivel).toBe(true);
+  });
+
+  it("expõe potência base/alvo e a contagem de candidatos/rejeições mesmo quando nenhuma combinação é válida — caso de teste do Evandro (Cascavel/PR, 2026-10-01)", () => {
+    // 1.500 kWh / 120 kWh/kWp/mês = 12,5 kWp base; ×1,20 de margem = 15,0 kWp alvo.
+    const resultado = dimensionarSistemaAutomatico({
+      consumoMedioKwh: 1500,
+      margemPct: 0.2,
+      produtividadeKwhKwpMes: 120,
+      modulos: [modulo620],
+      inversores: [inversor6], // 25 módulos de 620W = 15,5 kWp / 6 kW -> overload acima do limite
+      overloadMaximoPct: 0.3,
+      overloadCriticoPct: 0.5,
+      temperaturaMinimaProjetoC: TEMPERATURA_PADRAO_C,
+    });
+    expect(resultado.potenciaBaseKwp).toBeCloseTo(12.5, 2);
+    expect(resultado.potenciaAlvoKwp).toBeCloseTo(15, 2);
+    expect(resultado.opcoes).toEqual([]);
+    expect(resultado.totalCandidatos).toBe(1);
+    expect(resultado.totalValidos).toBe(0);
+    expect(resultado.rejeicoes).toEqual([{ codigo: "OVERLOAD_LIMIT", quantidade: 1 }]);
+  });
+
+  it("totalValidos conta todas as combinações elegíveis, não só as até 3 exibidas em opcoes", () => {
+    const modulo585: EquipamentoAtivo = { id: "m3", fabricante: "Fab", modelo: "585W", potenciaW: 585, prioridade: 0 };
+    const resultado = dimensionarSistemaAutomatico({
+      consumoMedioKwh: 780,
+      margemPct: 0.2,
+      produtividadeKwhKwpMes: 120,
+      modulos: [modulo620, modulo585],
+      inversores: [inversor6, inversor65, inversor8],
+      overloadMaximoPct: 0.3,
+      overloadCriticoPct: 0.5,
+      temperaturaMinimaProjetoC: TEMPERATURA_PADRAO_C,
+    });
+    expect(resultado.opcoes.length).toBe(2);
+    expect(resultado.totalCandidatos).toBe(6);
+    expect(resultado.totalValidos).toBeGreaterThanOrEqual(resultado.opcoes.length);
+  });
+
+  it("agrupa dados técnicos incompletos em EQUIPMENT_DATA_INCOMPLETE mesmo quando a combinação continua elegível", () => {
+    // Sem campos elétricos cadastrados (módulo620/inversor65 padrão) -> validacaoEletrica
+    // "nao_verificado", mas ainda entra em opcoes (regra inalterada desde a Fase 1).
+    const resultado = dimensionarSistemaAutomatico({
+      consumoMedioKwh: 780,
+      margemPct: 0.2,
+      produtividadeKwhKwpMes: 120,
+      modulos: [modulo620],
+      inversores: [inversor65],
+      overloadMaximoPct: 0.3,
+      overloadCriticoPct: 0.5,
+      temperaturaMinimaProjetoC: TEMPERATURA_PADRAO_C,
+    });
+    expect(resultado.opcoes.length).toBe(1);
+    expect(resultado.rejeicoes).toEqual([{ codigo: "EQUIPMENT_DATA_INCOMPLETE", quantidade: 1 }]);
+  });
+
+  it("marca como 'não verificado' quando falta dado elétrico no catálogo", () => {
+    const { opcoes: [opcao] } = dimensionarSistemaAutomatico({
+      consumoMedioKwh: 780,
+      margemPct: 0.2,
+      produtividadeKwhKwpMes: 120,
+      modulos: [modulo620],
+      inversores: [inversor65],
+      overloadMaximoPct: 0.3,
+      overloadCriticoPct: 0.5,
+      temperaturaMinimaProjetoC: TEMPERATURA_PADRAO_C,
+    });
+    expect(opcao.validacaoEletrica).toBe("nao_verificado");
+    expect(opcao.stringConfig).toBeNull();
+  });
+
+  it("valida a string (Voc frio + faixa de MPPT) quando o catálogo tem os dados elétricos", () => {
+    // Módulo com Voc 41,5V, coef -0,26%/°C, Vmp 34,8V; inversor com DC máx 600V, MPPT 80-550V.
+    const moduloCompleto: EquipamentoAtivo = {
+      ...modulo620,
+      vocV: 41.5,
+      iscA: 18.5,
+      vmpV: 34.8,
+      impA: 17.8,
+      coefTempVocPctC: -0.26,
+    };
+    const inversorCompleto: EquipamentoAtivo = {
+      ...inversor65,
+      tensaoMaxDcV: 600,
+      mpptMinV: 80,
+      mpptMaxV: 550,
+      correnteMaxEntradaA: 40,
+      quantidadeMppt: 2,
+    };
+    const { opcoes: [opcao] } = dimensionarSistemaAutomatico({
+      consumoMedioKwh: 780,
+      margemPct: 0.2,
+      produtividadeKwhKwpMes: 120,
+      modulos: [moduloCompleto],
+      inversores: [inversorCompleto],
+      overloadMaximoPct: 0.3,
+      overloadCriticoPct: 0.5,
+      temperaturaMinimaProjetoC: TEMPERATURA_PADRAO_C,
+    });
+    expect(opcao.validacaoEletrica).toBe("valido");
+    expect(opcao.stringConfig).not.toBeNull();
+    expect(opcao.stringConfig!.vocFrioV).toBeLessThanOrEqual(600);
+    expect(opcao.stringConfig!.vmpStringV).toBeGreaterThanOrEqual(80);
+    expect(opcao.stringConfig!.vmpStringV).toBeLessThanOrEqual(550);
+  });
+
+  it("descarta a combinação quando nenhum arranjo de string cabe na faixa de MPPT do inversor", () => {
+    // Vmp de 34,8V por módulo nunca cai numa faixa de MPPT de 500-550V com poucos módulos,
+    // e o Voc no frio (limite de 250V) estoura antes de a string chegar perto dessa faixa.
+    const moduloCompleto: EquipamentoAtivo = {
+      ...modulo620,
+      vocV: 41.5,
+      iscA: 18.5,
+      vmpV: 34.8,
+      impA: 17.8,
+      coefTempVocPctC: -0.26,
+    };
+    const inversorIncompativel: EquipamentoAtivo = {
+      ...inversor65,
+      tensaoMaxDcV: 250,
+      mpptMinV: 500,
+      mpptMaxV: 550,
+    };
+    const { opcoes } = dimensionarSistemaAutomatico({
+      consumoMedioKwh: 780,
+      margemPct: 0.2,
+      produtividadeKwhKwpMes: 120,
+      modulos: [moduloCompleto],
+      inversores: [inversorIncompativel],
+      overloadMaximoPct: 0.3,
+      overloadCriticoPct: 0.5,
+      temperaturaMinimaProjetoC: TEMPERATURA_PADRAO_C,
+    });
+    expect(opcoes).toEqual([]);
+  });
+});
+
+describe("avaliarCombinacaoEscolhida", () => {
+  it("com a mesma quantidade que o motor automático teria escolhido, dá o mesmo resultado", () => {
+    // Mesmo exemplo da spec: 13 módulos de 620W + inversor 6,5kW -> 8,06 kWp, ~24% de overload.
+    const opcao = avaliarCombinacaoEscolhida(modulo620, inversor65, 13, 0.3, 0.5, TEMPERATURA_PADRAO_C);
+    expect(opcao?.quantidadeModulos).toBe(13);
+    expect(opcao?.potenciaDcKwp).toBe(8.06);
+    expect(opcao?.overloadPct).toBeCloseTo(0.24, 2);
+    expect(opcao?.validacao).toBe("valido");
+  });
+
+  it("valida uma quantidade escolhida manualmente pelo vendedor, diferente da sugestão automática", () => {
+    // 5 módulos de 620W = 3,1 kWp; overload negativo (sistema bem abaixo do inversor), ainda válido.
+    const opcao = avaliarCombinacaoEscolhida(modulo620, inversor65, 5, 0.3, 0.5, TEMPERATURA_PADRAO_C);
+    expect(opcao?.quantidadeModulos).toBe(5);
+    expect(opcao?.potenciaDcKwp).toBe(3.1);
+    expect(opcao?.validacao).toBe("valido");
+  });
+
+  it("marca overload entre o limite automático e o crítico como 'alerta', sem bloquear", () => {
+    // 13 módulos de 620W (8,06 kWp) num inversor de 6 kW -> ~34,3% de overload, entre 30% e 50%.
+    const opcao = avaliarCombinacaoEscolhida(modulo620, inversor6, 13, 0.3, 0.5, TEMPERATURA_PADRAO_C);
+    expect(opcao?.overloadPct).toBeCloseTo(0.343, 2);
+    expect(opcao?.validacao).toBe("alerta");
+  });
+
+  it("marca overload acima do limite crítico como 'critico', sem bloquear (escolha manual sempre permitida)", () => {
+    // 13 módulos de 620W (8,06 kWp) num inversor de 4 kW -> ~101,5% de overload, acima do limite crítico de 50%.
+    const inversor4: EquipamentoAtivo = { id: "i5", fabricante: "Fab", modelo: "4kW", potenciaW: 4000, prioridade: 0 };
+    const opcao = avaliarCombinacaoEscolhida(modulo620, inversor4, 13, 0.3, 0.5, TEMPERATURA_PADRAO_C);
+    expect(opcao?.overloadPct).toBeCloseTo(1.015, 2);
+    expect(opcao?.validacao).toBe("critico");
+  });
+
+  it("rejeita quantidade zero ou negativa", () => {
+    expect(avaliarCombinacaoEscolhida(modulo620, inversor65, 0, 0.3, 0.5, TEMPERATURA_PADRAO_C)).toBeNull();
+    expect(avaliarCombinacaoEscolhida(modulo620, inversor65, -1, 0.3, 0.5, TEMPERATURA_PADRAO_C)).toBeNull();
+  });
+
+  it("marca como 'incompativel' (com motivo) quando a quantidade escolhida não forma nenhuma string eletricamente compatível — Evandro, 2026-10-01: antes retornava null sem dizer por quê", () => {
+    const moduloCompleto: EquipamentoAtivo = {
+      ...modulo620,
+      vocV: 41.5,
+      iscA: 18.5,
+      vmpV: 34.8,
+      impA: 17.8,
+      coefTempVocPctC: -0.26,
+    };
+    const inversorIncompativel: EquipamentoAtivo = { ...inversor65, tensaoMaxDcV: 250, mpptMinV: 500, mpptMaxV: 550 };
+    const opcao = avaliarCombinacaoEscolhida(moduloCompleto, inversorIncompativel, 13, 0.3, 0.5, TEMPERATURA_PADRAO_C);
+    expect(opcao).not.toBeNull();
+    expect(opcao?.validacaoEletrica).toBe("incompativel");
+    expect(opcao?.stringConfig).toBeNull();
+    expect(opcao?.motivoIncompatibilidade).toBeTruthy();
+    expect(opcao?.motivoIncompatibilidade).toMatch(/MPPT/);
+  });
+
+  it("identifica o motivo específico quando é a tensão Voc a frio que excede o limite do inversor", () => {
+    const moduloCompleto: EquipamentoAtivo = {
+      ...modulo620,
+      vocV: 41.5,
+      iscA: 18.5,
+      vmpV: 34.8,
+      impA: 17.8,
+      coefTempVocPctC: -0.26,
+    };
+    // DC máximo de 30V: nem 1 módulo (Voc a frio ~44V) cabe.
+    const inversorTensaoBaixa: EquipamentoAtivo = { ...inversor65, tensaoMaxDcV: 30, mpptMinV: 10, mpptMaxV: 25 };
+    const opcao = avaliarCombinacaoEscolhida(moduloCompleto, inversorTensaoBaixa, 13, 0.3, 0.5, TEMPERATURA_PADRAO_C);
+    expect(opcao?.validacaoEletrica).toBe("incompativel");
+    expect(opcao?.motivoIncompatibilidade).toMatch(/Voc a frio/);
+  });
+
+  it("identifica o motivo específico quando é a corrente do MPPT que é excedida", () => {
+    const moduloCorrenteAlta: EquipamentoAtivo = {
+      ...modulo620,
+      vocV: 41.5,
+      iscA: 18.5,
+      vmpV: 34.8,
+      impA: 17.8,
+      coefTempVocPctC: -0.26,
+    };
+    // Faixa elétrica compatível, mas corrente máxima de entrada bem abaixo da corrente do módulo.
+    const inversorCorrenteBaixa: EquipamentoAtivo = {
+      ...inversor65,
+      tensaoMaxDcV: 600,
+      mpptMinV: 80,
+      mpptMaxV: 550,
+      correnteMaxEntradaA: 5,
+      quantidadeMppt: 1,
+    };
+    const opcao = avaliarCombinacaoEscolhida(moduloCorrenteAlta, inversorCorrenteBaixa, 13, 0.3, 0.5, TEMPERATURA_PADRAO_C);
+    expect(opcao?.validacaoEletrica).toBe("incompativel");
+    expect(opcao?.motivoIncompatibilidade).toMatch(/[Cc]orrente/);
+  });
+
+  it("valida a string (Voc frio + faixa de MPPT) com a quantidade escolhida, quando o catálogo tem dados elétricos", () => {
+    const moduloCompleto: EquipamentoAtivo = {
+      ...modulo620,
+      vocV: 41.5,
+      iscA: 18.5,
+      vmpV: 34.8,
+      impA: 17.8,
+      coefTempVocPctC: -0.26,
+    };
+    const inversorCompleto: EquipamentoAtivo = {
+      ...inversor65,
+      tensaoMaxDcV: 600,
+      mpptMinV: 80,
+      mpptMaxV: 550,
+      correnteMaxEntradaA: 40,
+      quantidadeMppt: 2,
+    };
+    const opcao = avaliarCombinacaoEscolhida(moduloCompleto, inversorCompleto, 13, 0.3, 0.5, TEMPERATURA_PADRAO_C);
+    expect(opcao?.validacaoEletrica).toBe("valido");
+    expect(opcao?.stringConfig).not.toBeNull();
+    expect(opcao?.motivoIncompatibilidade).toBeUndefined();
+  });
+});
+
+describe("paraEquipamentoAtivo", () => {
+  it("converte um registro de equipamentos_empresa (snake_case) para EquipamentoAtivo (camelCase)", () => {
+    const equipamento = paraEquipamentoAtivo({
+      id: "e1",
+      fabricante: "Canadian",
+      modelo: "CS7L-620",
+      potencia_w: 620,
+      prioridade: 5,
+      voc_v: 41.5,
+      isc_a: 18.5,
+      vmp_v: 34.8,
+      imp_a: 17.8,
+      coef_temp_voc_pct_c: -0.26,
+      tensao_max_dc_v: 600,
+      mppt_min_v: 80,
+      mppt_max_v: 550,
+      corrente_max_entrada_a: 40,
+      quantidade_mppt: 2,
+    });
+    expect(equipamento).toEqual({
+      id: "e1",
+      fabricante: "Canadian",
+      modelo: "CS7L-620",
+      potenciaW: 620,
+      prioridade: 5,
+      vocV: 41.5,
+      iscA: 18.5,
+      vmpV: 34.8,
+      impA: 17.8,
+      coefTempVocPctC: -0.26,
+      tensaoMaxDcV: 600,
+      mpptMinV: 80,
+      mpptMaxV: 550,
+      correnteMaxEntradaA: 40,
+      quantidadeMppt: 2,
+    });
+  });
+
+  it("converte fasesCa e tensaoAcV do inversor (Fase 3, 2026-10-01 — gate de rede elétrica)", () => {
+    const equipamento = paraEquipamentoAtivo({
+      id: "i1",
+      fabricante: "Growatt",
+      modelo: "MIN 6000",
+      potencia_w: 6000,
+      prioridade: 0,
+      voc_v: null,
+      isc_a: null,
+      vmp_v: null,
+      imp_a: null,
+      coef_temp_voc_pct_c: null,
+      tensao_max_dc_v: null,
+      mppt_min_v: null,
+      mppt_max_v: null,
+      corrente_max_entrada_a: null,
+      quantidade_mppt: null,
+      fases_ca: "trifasico",
+      tensao_ac_v: 380,
+    });
+    expect(equipamento.fasesCa).toBe("trifasico");
+    expect(equipamento.tensaoAcV).toBe(380);
+  });
+});
+
+describe("avaliarRedeEletrica (Fase 3, 2026-10-01 — gate de rede elétrica)", () => {
+  const inversorTrifasico380: EquipamentoAtivo = {
+    ...inversor65,
+    fasesCa: "trifasico",
+    tensaoAcV: 380,
+  };
+  const inversorMonofasico220: EquipamentoAtivo = {
+    ...inversor65,
+    fasesCa: "monofasico",
+    tensaoAcV: 220,
+  };
+  const inversorSemFasesCadastradas: EquipamentoAtivo = { ...inversor65 };
+
+  it("fica 'pendente_confirmacao_rede' quando o tipo de ligação ainda não foi confirmado (undefined)", () => {
+    expect(avaliarRedeEletrica(inversorTrifasico380, undefined)).toEqual({
+      validacaoRede: "pendente_confirmacao_rede",
+    });
+  });
+
+  it("fica 'pendente_confirmacao_rede' quando null é passado explicitamente", () => {
+    expect(avaliarRedeEletrica(inversorTrifasico380, null)).toEqual({
+      validacaoRede: "pendente_confirmacao_rede",
+    });
+  });
+
+  it("fica 'nao_verificado' quando a rede foi confirmada mas o catálogo não tem fasesCa do inversor", () => {
+    const rede: RedeEletricaConfirmada = { tipoLigacao: "trifasico" };
+    expect(avaliarRedeEletrica(inversorSemFasesCadastradas, rede)).toEqual({
+      validacaoRede: "nao_verificado",
+    });
+  });
+
+  it("é 'valido' quando o tipo de ligação confirmado bate com as fases do inversor", () => {
+    const rede: RedeEletricaConfirmada = { tipoLigacao: "trifasico" };
+    expect(avaliarRedeEletrica(inversorTrifasico380, rede)).toEqual({ validacaoRede: "valido" });
+  });
+
+  it("mapeia ligação bifásica para inversor monofásico (mesmo inversor atende mono e bifásico)", () => {
+    const rede: RedeEletricaConfirmada = { tipoLigacao: "bifasico" };
+    expect(avaliarRedeEletrica(inversorMonofasico220, rede)).toEqual({ validacaoRede: "valido" });
+  });
+
+  it("é 'incompativel' quando a ligação confirmada exige um número de fases diferente do inversor", () => {
+    const rede: RedeEletricaConfirmada = { tipoLigacao: "monofasico" };
+    const resultado = avaliarRedeEletrica(inversorTrifasico380, rede);
+    expect(resultado.validacaoRede).toBe("incompativel");
+    expect(resultado.motivoIncompatibilidadeRede).toMatch(/monofasico|trifasico/);
+  });
+
+  it("é 'incompativel' quando as fases batem mas a tensão da rede informada diverge da tensão CA do inversor", () => {
+    const rede: RedeEletricaConfirmada = { tipoLigacao: "trifasico", tensaoRedeV: 220 };
+    const resultado = avaliarRedeEletrica(inversorTrifasico380, rede);
+    expect(resultado.validacaoRede).toBe("incompativel");
+    expect(resultado.motivoIncompatibilidadeRede).toMatch(/[Tt]ensão/);
+  });
+
+  it("é 'valido' quando a tensão não foi informada pelo vendedor (só confere fases)", () => {
+    const rede: RedeEletricaConfirmada = { tipoLigacao: "trifasico" };
+    expect(avaliarRedeEletrica(inversorTrifasico380, rede)).toEqual({ validacaoRede: "valido" });
+  });
+});
+
+describe("gate de rede elétrica integrado ao motor (dimensionarSistemaAutomatico/avaliarCombinacaoEscolhida)", () => {
+  it("sem tipoLigacao confirmado, calcula DC/quantidade normalmente e marca o inversor como pendente de confirmação de rede", () => {
+    const { opcoes: [opcao] } = dimensionarSistemaAutomatico({
+      consumoMedioKwh: 780,
+      margemPct: 0.2,
+      produtividadeKwhKwpMes: 120,
+      modulos: [modulo620],
+      inversores: [{ ...inversor65, fasesCa: "trifasico", tensaoAcV: 380 }],
+      overloadMaximoPct: 0.3,
+      overloadCriticoPct: 0.5,
+      temperaturaMinimaProjetoC: TEMPERATURA_PADRAO_C,
+      // redeEletrica omitido de propósito — ainda não confirmado pelo vendedor.
+    });
+    expect(opcao.quantidadeModulos).toBe(13);
+    expect(opcao.potenciaDcKwp).toBe(8.06);
+    expect(opcao.validacaoRede).toBe("pendente_confirmacao_rede");
+  });
+
+  it("com tipoLigacao confirmado e compatível, roda a validação elétrica normal e aprova a opção", () => {
+    const { opcoes: [opcao] } = dimensionarSistemaAutomatico({
+      consumoMedioKwh: 780,
+      margemPct: 0.2,
+      produtividadeKwhKwpMes: 120,
+      modulos: [modulo620],
+      inversores: [{ ...inversor65, fasesCa: "trifasico", tensaoAcV: 380 }],
+      overloadMaximoPct: 0.3,
+      overloadCriticoPct: 0.5,
+      temperaturaMinimaProjetoC: TEMPERATURA_PADRAO_C,
+      redeEletrica: { tipoLigacao: "trifasico", tensaoRedeV: 380 },
+    });
+    expect(opcao.validacaoRede).toBe("valido");
+  });
+
+  it("com tipoLigacao confirmado mas incompatível com o único inversor do catálogo, a combinação não entra como sugestão automática", () => {
+    const { opcoes } = dimensionarSistemaAutomatico({
+      consumoMedioKwh: 780,
+      margemPct: 0.2,
+      produtividadeKwhKwpMes: 120,
+      modulos: [modulo620],
+      inversores: [{ ...inversor65, fasesCa: "trifasico", tensaoAcV: 380 }],
+      overloadMaximoPct: 0.3,
+      overloadCriticoPct: 0.5,
+      temperaturaMinimaProjetoC: TEMPERATURA_PADRAO_C,
+      redeEletrica: { tipoLigacao: "monofasico" },
+    });
+    expect(opcoes).toEqual([]);
+  });
+
+  it("avaliarCombinacaoEscolhida (override manual) também fica pendente sem rede confirmada e válida depois de confirmada", () => {
+    const inversorMono: EquipamentoAtivo = { ...inversor65, fasesCa: "monofasico", tensaoAcV: 220 };
+    const semRede = avaliarCombinacaoEscolhida(modulo620, inversorMono, 13, 0.3, 0.5, TEMPERATURA_PADRAO_C);
+    expect(semRede?.validacaoRede).toBe("pendente_confirmacao_rede");
+
+    const comRede = avaliarCombinacaoEscolhida(modulo620, inversorMono, 13, 0.3, 0.5, TEMPERATURA_PADRAO_C, {
+      tipoLigacao: "monofasico",
+    });
+    expect(comRede?.validacaoRede).toBe("valido");
+  });
+});
+
+describe("camposTecnicosFaltantes", () => {
+  it("lista todos os campos quando módulo e inversor não têm nenhum dado elétrico", () => {
+    expect(camposTecnicosFaltantes(modulo620, inversor65)).toEqual([
+      "Voc (V)",
+      "Vmp (V)",
+      "Isc (A)",
+      "Imp (A)",
+      "Coeficiente de temperatura do Voc (%/°C)",
+      "Tensão DC máxima (V)",
+      "MPPT mínimo (V)",
+      "MPPT máximo (V)",
+      "Corrente máxima por MPPT (A)",
+      "Quantidade de MPPTs",
+    ]);
+  });
+
+  it("não lista nada quando todos os campos técnicos estão preenchidos", () => {
+    const moduloCompleto: EquipamentoAtivo = {
+      ...modulo620,
+      vocV: 41.5,
+      iscA: 18.5,
+      vmpV: 34.8,
+      impA: 17.8,
+      coefTempVocPctC: -0.26,
+    };
+    const inversorCompleto: EquipamentoAtivo = {
+      ...inversor65,
+      tensaoMaxDcV: 600,
+      mpptMinV: 80,
+      mpptMaxV: 550,
+      correnteMaxEntradaA: 40,
+      quantidadeMppt: 2,
+    };
+    expect(camposTecnicosFaltantes(moduloCompleto, inversorCompleto)).toEqual([]);
+  });
+
+  it("lista só os campos específicos que faltam quando o catálogo está parcialmente preenchido", () => {
+    const moduloParcial: EquipamentoAtivo = { ...modulo620, vocV: 41.5, vmpV: 34.8 };
+    const inversorParcial: EquipamentoAtivo = { ...inversor65, tensaoMaxDcV: 600, mpptMinV: 80, mpptMaxV: 550 };
+    expect(camposTecnicosFaltantes(moduloParcial, inversorParcial)).toEqual([
+      "Isc (A)",
+      "Imp (A)",
+      "Coeficiente de temperatura do Voc (%/°C)",
+      "Corrente máxima por MPPT (A)",
+      "Quantidade de MPPTs",
+    ]);
+  });
+});

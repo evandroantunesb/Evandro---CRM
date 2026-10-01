@@ -644,6 +644,205 @@ export type Database = {
           },
         ];
       };
+      dados_solares_cache: {
+        Row: {
+          atualizado_em: string;
+          fonte: string;
+          id: string;
+          lat_arredondado: number;
+          lon_arredondado: number;
+          produtividade_kwh_kwp_mes: number;
+        };
+        Insert: {
+          atualizado_em?: string;
+          fonte: string;
+          id?: string;
+          lat_arredondado: number;
+          lon_arredondado: number;
+          produtividade_kwh_kwp_mes: number;
+        };
+        Update: {
+          atualizado_em?: string;
+          fonte?: string;
+          id?: string;
+          lat_arredondado?: number;
+          lon_arredondado?: number;
+          produtividade_kwh_kwp_mes?: number;
+        };
+        Relationships: [];
+      };
+      dimensionamentos_solares: {
+        Row: {
+          atualizado_por: string | null;
+          consumo_medio_kwh: number;
+          created_at: string;
+          criado_por: string | null;
+          dc_ac_ratio: number;
+          disponibilidade_kwh: number;
+          economia_mensal: number;
+          empresa_id: string;
+          geracao_estimada_kwh_mes: number;
+          id: string;
+          inversor_equipamento_id: string;
+          margem_dimensionamento_pct: number;
+          modulo_equipamento_id: string;
+          negocio_id: string;
+          nome_distribuidora: string | null;
+          origem_distribuidora:
+            | Database["public"]["Enums"]["origem_distribuidora_dimensionamento"]
+            | null;
+          origem_produtividade: Database["public"]["Enums"]["origem_produtividade_dimensionamento"];
+          origem_selecao_equipamentos: Database["public"]["Enums"]["origem_componente_kit"];
+          origem_tarifa: Database["public"]["Enums"]["origem_tarifa_dimensionamento"];
+          overload_critico_pct: number;
+          overload_maximo_pct: number;
+          overload_pct: number;
+          payback_meses: number | null;
+          potencia_ac_kw: number;
+          potencia_dc_kwp: number;
+          preco_negocio: number;
+          produtividade_kwh_kwp_mes: number;
+          quantidade_modulos: number;
+          sigla_distribuidora: string | null;
+          tarifa_kwh: number;
+          tarifa_resolucao_homologatoria: string | null;
+          tarifa_vigencia_inicio: string | null;
+          temperatura_minima_projeto_c: number;
+          tipo_ligacao: Database["public"]["Enums"]["tipo_ligacao"];
+          updated_at: string;
+          validacao: Database["public"]["Enums"]["tipo_validacao_dimensionamento"];
+          validacao_eletrica: Database["public"]["Enums"]["tipo_validacao_eletrica_dimensionamento"];
+          valor_fatura_medio: number | null;
+        };
+        Insert: {
+          atualizado_por?: string | null;
+          consumo_medio_kwh: number;
+          created_at?: string;
+          criado_por?: string | null;
+          dc_ac_ratio: number;
+          disponibilidade_kwh: number;
+          economia_mensal: number;
+          empresa_id: string;
+          geracao_estimada_kwh_mes: number;
+          id?: string;
+          inversor_equipamento_id: string;
+          margem_dimensionamento_pct: number;
+          modulo_equipamento_id: string;
+          negocio_id: string;
+          nome_distribuidora?: string | null;
+          origem_distribuidora?:
+            | Database["public"]["Enums"]["origem_distribuidora_dimensionamento"]
+            | null;
+          origem_produtividade?: Database["public"]["Enums"]["origem_produtividade_dimensionamento"];
+          origem_selecao_equipamentos?: Database["public"]["Enums"]["origem_componente_kit"];
+          origem_tarifa?: Database["public"]["Enums"]["origem_tarifa_dimensionamento"];
+          overload_critico_pct: number;
+          overload_maximo_pct: number;
+          overload_pct: number;
+          payback_meses?: number | null;
+          potencia_ac_kw: number;
+          potencia_dc_kwp: number;
+          preco_negocio: number;
+          produtividade_kwh_kwp_mes: number;
+          quantidade_modulos: number;
+          sigla_distribuidora?: string | null;
+          tarifa_kwh: number;
+          tarifa_resolucao_homologatoria?: string | null;
+          tarifa_vigencia_inicio?: string | null;
+          temperatura_minima_projeto_c: number;
+          tipo_ligacao?: Database["public"]["Enums"]["tipo_ligacao"];
+          updated_at?: string;
+          validacao: Database["public"]["Enums"]["tipo_validacao_dimensionamento"];
+          validacao_eletrica: Database["public"]["Enums"]["tipo_validacao_eletrica_dimensionamento"];
+          valor_fatura_medio?: number | null;
+        };
+        Update: {
+          atualizado_por?: string | null;
+          consumo_medio_kwh?: number;
+          created_at?: string;
+          criado_por?: string | null;
+          dc_ac_ratio?: number;
+          disponibilidade_kwh?: number;
+          economia_mensal?: number;
+          empresa_id?: string;
+          geracao_estimada_kwh_mes?: number;
+          id?: string;
+          inversor_equipamento_id?: string;
+          margem_dimensionamento_pct?: number;
+          modulo_equipamento_id?: string;
+          negocio_id?: string;
+          nome_distribuidora?: string | null;
+          origem_distribuidora?:
+            | Database["public"]["Enums"]["origem_distribuidora_dimensionamento"]
+            | null;
+          origem_produtividade?: Database["public"]["Enums"]["origem_produtividade_dimensionamento"];
+          origem_selecao_equipamentos?: Database["public"]["Enums"]["origem_componente_kit"];
+          origem_tarifa?: Database["public"]["Enums"]["origem_tarifa_dimensionamento"];
+          overload_critico_pct?: number;
+          overload_maximo_pct?: number;
+          overload_pct?: number;
+          payback_meses?: number | null;
+          potencia_ac_kw?: number;
+          potencia_dc_kwp?: number;
+          preco_negocio?: number;
+          produtividade_kwh_kwp_mes?: number;
+          quantidade_modulos?: number;
+          sigla_distribuidora?: string | null;
+          tarifa_kwh?: number;
+          tarifa_resolucao_homologatoria?: string | null;
+          tarifa_vigencia_inicio?: string | null;
+          temperatura_minima_projeto_c?: number;
+          tipo_ligacao?: Database["public"]["Enums"]["tipo_ligacao"];
+          updated_at?: string;
+          validacao?: Database["public"]["Enums"]["tipo_validacao_dimensionamento"];
+          validacao_eletrica?: Database["public"]["Enums"]["tipo_validacao_eletrica_dimensionamento"];
+          valor_fatura_medio?: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "dimensionamentos_solares_atualizado_por_fkey";
+            columns: ["atualizado_por"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "dimensionamentos_solares_criado_por_fkey";
+            columns: ["criado_por"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "dimensionamentos_solares_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "dimensionamentos_solares_inversor_equipamento_id_fkey";
+            columns: ["inversor_equipamento_id"];
+            isOneToOne: false;
+            referencedRelation: "equipamentos_empresa";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "dimensionamentos_solares_modulo_equipamento_id_fkey";
+            columns: ["modulo_equipamento_id"];
+            isOneToOne: false;
+            referencedRelation: "equipamentos_empresa";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "dimensionamentos_solares_negocio_id_fkey";
+            columns: ["negocio_id"];
+            isOneToOne: true;
+            referencedRelation: "negocios";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       empresa_membros: {
         Row: {
           ativo: boolean;
@@ -745,6 +944,188 @@ export type Database = {
           updated_at?: string;
         };
         Relationships: [];
+      };
+      equipamentos_empresa: {
+        Row: {
+          ativo: boolean;
+          bifacial: boolean | null;
+          bifacialidade_pct: number | null;
+          categoria: string | null;
+          coef_temp_isc_pct_c: number | null;
+          coef_temp_pmax_pct_c: number | null;
+          coef_temp_voc_pct_c: number | null;
+          comprimento_mm: number | null;
+          corrente_max_ac_a: number | null;
+          corrente_max_entrada_a: number | null;
+          created_at: string;
+          datasheet_caminho: string | null;
+          datasheet_nome: string | null;
+          eficiencia_modulo_pct: number | null;
+          eficiencia_pct: number | null;
+          empresa_id: string;
+          entradas_por_mppt: number | null;
+          espessura_mm: number | null;
+          fabricante: string;
+          fases_ca: Database["public"]["Enums"]["fases_ca_equipamento"] | null;
+          fonte_primaria: string | null;
+          fonte_secundaria: string | null;
+          fusivel_max_serie_a: number | null;
+          grau_protecao: string | null;
+          id: string;
+          imp_a: number | null;
+          isc_a: number | null;
+          isc_maximo_entrada_a: number | null;
+          largura_mm: number | null;
+          modelo: string;
+          mppt_max_v: number | null;
+          mppt_min_v: number | null;
+          nmot_c: number | null;
+          observacoes: string | null;
+          opensolar_id: number | null;
+          peso_kg: number | null;
+          potencia_aparente_max_va: number | null;
+          potencia_dc_maxima_entrada_w: number | null;
+          potencia_w: number;
+          preco_referencia_brl: number | null;
+          prioridade: number;
+          quantidade_mppt: number | null;
+          status_tecnico: Database["public"]["Enums"]["status_tecnico_equipamento"];
+          status_validacao: string | null;
+          tecnologia: string | null;
+          tensao_ac_v: number | null;
+          tensao_fases_ac: string | null;
+          tensao_max_dc_v: number | null;
+          tensao_max_sistema_v: number | null;
+          tensao_partida_v: number | null;
+          tipo: Database["public"]["Enums"]["tipo_componente_kit"];
+          tipo_inversor: Database["public"]["Enums"]["tipo_inversor_equipamento"] | null;
+          updated_at: string;
+          vmp_v: number | null;
+          voc_v: number | null;
+        };
+        Insert: {
+          ativo?: boolean;
+          bifacial?: boolean | null;
+          bifacialidade_pct?: number | null;
+          categoria?: string | null;
+          coef_temp_isc_pct_c?: number | null;
+          coef_temp_pmax_pct_c?: number | null;
+          coef_temp_voc_pct_c?: number | null;
+          comprimento_mm?: number | null;
+          corrente_max_ac_a?: number | null;
+          corrente_max_entrada_a?: number | null;
+          created_at?: string;
+          datasheet_caminho?: string | null;
+          datasheet_nome?: string | null;
+          eficiencia_modulo_pct?: number | null;
+          eficiencia_pct?: number | null;
+          empresa_id: string;
+          entradas_por_mppt?: number | null;
+          espessura_mm?: number | null;
+          fabricante: string;
+          fases_ca?: Database["public"]["Enums"]["fases_ca_equipamento"] | null;
+          fonte_primaria?: string | null;
+          fonte_secundaria?: string | null;
+          fusivel_max_serie_a?: number | null;
+          grau_protecao?: string | null;
+          id?: string;
+          imp_a?: number | null;
+          isc_a?: number | null;
+          isc_maximo_entrada_a?: number | null;
+          largura_mm?: number | null;
+          modelo: string;
+          mppt_max_v?: number | null;
+          mppt_min_v?: number | null;
+          nmot_c?: number | null;
+          observacoes?: string | null;
+          opensolar_id?: number | null;
+          peso_kg?: number | null;
+          potencia_aparente_max_va?: number | null;
+          potencia_dc_maxima_entrada_w?: number | null;
+          potencia_w: number;
+          preco_referencia_brl?: number | null;
+          prioridade?: number;
+          quantidade_mppt?: number | null;
+          status_tecnico?: Database["public"]["Enums"]["status_tecnico_equipamento"];
+          status_validacao?: string | null;
+          tecnologia?: string | null;
+          tensao_ac_v?: number | null;
+          tensao_fases_ac?: string | null;
+          tensao_max_dc_v?: number | null;
+          tensao_max_sistema_v?: number | null;
+          tensao_partida_v?: number | null;
+          tipo: Database["public"]["Enums"]["tipo_componente_kit"];
+          tipo_inversor?: Database["public"]["Enums"]["tipo_inversor_equipamento"] | null;
+          updated_at?: string;
+          vmp_v?: number | null;
+          voc_v?: number | null;
+        };
+        Update: {
+          ativo?: boolean;
+          bifacial?: boolean | null;
+          bifacialidade_pct?: number | null;
+          categoria?: string | null;
+          coef_temp_isc_pct_c?: number | null;
+          coef_temp_pmax_pct_c?: number | null;
+          coef_temp_voc_pct_c?: number | null;
+          comprimento_mm?: number | null;
+          corrente_max_ac_a?: number | null;
+          corrente_max_entrada_a?: number | null;
+          created_at?: string;
+          datasheet_caminho?: string | null;
+          datasheet_nome?: string | null;
+          eficiencia_modulo_pct?: number | null;
+          eficiencia_pct?: number | null;
+          empresa_id?: string;
+          entradas_por_mppt?: number | null;
+          espessura_mm?: number | null;
+          fabricante?: string;
+          fases_ca?: Database["public"]["Enums"]["fases_ca_equipamento"] | null;
+          fonte_primaria?: string | null;
+          fonte_secundaria?: string | null;
+          fusivel_max_serie_a?: number | null;
+          grau_protecao?: string | null;
+          id?: string;
+          imp_a?: number | null;
+          isc_a?: number | null;
+          isc_maximo_entrada_a?: number | null;
+          largura_mm?: number | null;
+          modelo?: string;
+          mppt_max_v?: number | null;
+          mppt_min_v?: number | null;
+          nmot_c?: number | null;
+          observacoes?: string | null;
+          opensolar_id?: number | null;
+          peso_kg?: number | null;
+          potencia_aparente_max_va?: number | null;
+          potencia_dc_maxima_entrada_w?: number | null;
+          potencia_w?: number;
+          preco_referencia_brl?: number | null;
+          prioridade?: number;
+          quantidade_mppt?: number | null;
+          status_tecnico?: Database["public"]["Enums"]["status_tecnico_equipamento"];
+          status_validacao?: string | null;
+          tecnologia?: string | null;
+          tensao_ac_v?: number | null;
+          tensao_fases_ac?: string | null;
+          tensao_max_dc_v?: number | null;
+          tensao_max_sistema_v?: number | null;
+          tensao_partida_v?: number | null;
+          tipo?: Database["public"]["Enums"]["tipo_componente_kit"];
+          tipo_inversor?: Database["public"]["Enums"]["tipo_inversor_equipamento"] | null;
+          updated_at?: string;
+          vmp_v?: number | null;
+          voc_v?: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "equipamentos_empresa_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       equipe_membros: {
         Row: {
@@ -1404,34 +1785,43 @@ export type Database = {
       };
       kit_componentes: {
         Row: {
+          ativo: boolean;
           created_at: string;
           descricao: string;
+          eh_nucleo_motor: boolean;
           empresa_id: string;
           id: string;
           negocio_id: string;
           ordem: number;
+          origem: Database["public"]["Enums"]["origem_componente_kit"];
           potencia_w: number | null;
           quantidade: number;
           tipo: Database["public"]["Enums"]["tipo_componente_kit"];
         };
         Insert: {
+          ativo?: boolean;
           created_at?: string;
           descricao: string;
+          eh_nucleo_motor?: boolean;
           empresa_id: string;
           id?: string;
           negocio_id: string;
           ordem?: number;
+          origem?: Database["public"]["Enums"]["origem_componente_kit"];
           potencia_w?: number | null;
           quantidade?: number;
           tipo: Database["public"]["Enums"]["tipo_componente_kit"];
         };
         Update: {
+          ativo?: boolean;
           created_at?: string;
           descricao?: string;
+          eh_nucleo_motor?: boolean;
           empresa_id?: string;
           id?: string;
           negocio_id?: string;
           ordem?: number;
+          origem?: Database["public"]["Enums"]["origem_componente_kit"];
           potencia_w?: number | null;
           quantidade?: number;
           tipo?: Database["public"]["Enums"]["tipo_componente_kit"];
@@ -1681,6 +2071,71 @@ export type Database = {
             referencedColumns: ["id"];
           },
         ];
+      };
+      municipios_distribuidoras: {
+        Row: {
+          ativo: boolean;
+          codigo_ibge: string;
+          created_at: string;
+          data_referencia: string | null;
+          distribuidora_cnpj: string | null;
+          distribuidora_sigla: string;
+          fonte: string;
+          id: string;
+          imported_at: string;
+        };
+        Insert: {
+          ativo?: boolean;
+          codigo_ibge: string;
+          created_at?: string;
+          data_referencia?: string | null;
+          distribuidora_cnpj?: string | null;
+          distribuidora_sigla: string;
+          fonte?: string;
+          id?: string;
+          imported_at?: string;
+        };
+        Update: {
+          ativo?: boolean;
+          codigo_ibge?: string;
+          created_at?: string;
+          data_referencia?: string | null;
+          distribuidora_cnpj?: string | null;
+          distribuidora_sigla?: string;
+          fonte?: string;
+          id?: string;
+          imported_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "municipios_distribuidoras_codigo_ibge_fkey";
+            columns: ["codigo_ibge"];
+            isOneToOne: false;
+            referencedRelation: "municipios_ibge";
+            referencedColumns: ["codigo_ibge"];
+          },
+        ];
+      };
+      municipios_ibge: {
+        Row: {
+          codigo_ibge: string;
+          municipio: string;
+          nome_normalizado: string;
+          uf: string;
+        };
+        Insert: {
+          codigo_ibge: string;
+          municipio: string;
+          nome_normalizado: string;
+          uf: string;
+        };
+        Update: {
+          codigo_ibge?: string;
+          municipio?: string;
+          nome_normalizado?: string;
+          uf?: string;
+        };
+        Relationships: [];
       };
       negocio_etiquetas: {
         Row: {
@@ -2082,8 +2537,13 @@ export type Database = {
           disponibilidade_mono_kwh: number;
           disponibilidade_tri_kwh: number;
           empresa_id: string;
+          margem_dimensionamento_pct: number;
+          overload_critico_pct: number;
+          overload_maximo_pct: number;
           percentual_fio_b: number;
           produtividade_kwh_kwp_mes: number;
+          sigla_distribuidora_aneel: string | null;
+          temperatura_minima_projeto_c: number;
           updated_at: string;
         };
         Insert: {
@@ -2095,8 +2555,13 @@ export type Database = {
           disponibilidade_mono_kwh?: number;
           disponibilidade_tri_kwh?: number;
           empresa_id: string;
+          margem_dimensionamento_pct?: number;
+          overload_critico_pct?: number;
+          overload_maximo_pct?: number;
           percentual_fio_b?: number;
           produtividade_kwh_kwp_mes?: number;
+          sigla_distribuidora_aneel?: string | null;
+          temperatura_minima_projeto_c?: number;
           updated_at?: string;
         };
         Update: {
@@ -2108,8 +2573,13 @@ export type Database = {
           disponibilidade_mono_kwh?: number;
           disponibilidade_tri_kwh?: number;
           empresa_id?: string;
+          margem_dimensionamento_pct?: number;
+          overload_critico_pct?: number;
+          overload_maximo_pct?: number;
           percentual_fio_b?: number;
           produtividade_kwh_kwp_mes?: number;
+          sigla_distribuidora_aneel?: string | null;
+          temperatura_minima_projeto_c?: number;
           updated_at?: string;
         };
         Relationships: [
@@ -2848,6 +3318,51 @@ export type Database = {
           },
         ];
       };
+      tarifas_aneel_cache: {
+        Row: {
+          atualizado_em: string;
+          id: string;
+          modalidade_tarifaria: string | null;
+          resolucao_homologatoria: string | null;
+          sigla_distribuidora: string;
+          sub_grupo: string;
+          tarifa_final_kwh: number;
+          unidade_terciaria: string | null;
+          vigencia_fim: string | null;
+          vigencia_inicio: string | null;
+          vlr_te: number;
+          vlr_tusd: number;
+        };
+        Insert: {
+          atualizado_em?: string;
+          id?: string;
+          modalidade_tarifaria?: string | null;
+          resolucao_homologatoria?: string | null;
+          sigla_distribuidora: string;
+          sub_grupo?: string;
+          tarifa_final_kwh: number;
+          unidade_terciaria?: string | null;
+          vigencia_fim?: string | null;
+          vigencia_inicio?: string | null;
+          vlr_te: number;
+          vlr_tusd: number;
+        };
+        Update: {
+          atualizado_em?: string;
+          id?: string;
+          modalidade_tarifaria?: string | null;
+          resolucao_homologatoria?: string | null;
+          sigla_distribuidora?: string;
+          sub_grupo?: string;
+          tarifa_final_kwh?: number;
+          unidade_terciaria?: string | null;
+          vigencia_fim?: string | null;
+          vigencia_inicio?: string | null;
+          vlr_te?: number;
+          vlr_tusd?: number;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -2908,6 +3423,7 @@ export type Database = {
       };
       pode_ver_negocio: { Args: { p_negocio_id: string }; Returns: boolean };
       pode_ver_pasta_anexo: { Args: { p_caminho: string }; Returns: boolean };
+      pode_ver_pasta_datasheet: { Args: { p_caminho: string }; Returns: boolean };
       pode_ver_responsavel: {
         Args: { p_empresa_id: string; p_responsavel_id: string };
         Returns: boolean;
@@ -2944,10 +3460,15 @@ export type Database = {
       };
     };
     Enums: {
+      fases_ca_equipamento: "monofasico" | "trifasico";
       metrica_meta: "receita" | "negocios_ganhos" | "reunioes" | "conversao" | "tarefas_concluidas";
       modelo_cobranca: "por_usuario" | "fixo" | "fixo_mais_usuario";
       modo_distribuicao_leads: "somente_vendedores" | "somente_sdr" | "parcial" | "aleatorio";
       modo_preco_proposta: "sem_preco" | "parcelado" | "avista" | "completo";
+      origem_componente_kit: "automatico" | "manual";
+      origem_distribuidora_dimensionamento: "municipio" | "manual";
+      origem_produtividade_dimensionamento: "padrao" | "pvgis" | "nasa";
+      origem_tarifa_dimensionamento: "manual" | "aneel";
       papel_membro: "admin" | "gestor" | "vendedor" | "sdr";
       periodo_limite_regra: "dia" | "mes";
       proposta_bloco_quebra: "auto" | "nova_pagina" | "pagina_exclusiva";
@@ -2959,12 +3480,21 @@ export type Database = {
       status_membro: "ativo" | "inativo" | "desligado";
       status_negocio: "aberto" | "ganho" | "perdido";
       status_resgate: "solicitado" | "aprovado" | "entregue" | "cancelado";
+      status_tecnico_equipamento:
+        | "completo"
+        | "incompleto"
+        | "em_revisao"
+        | "verificado"
+        | "descontinuado";
       tipo_calculo_comissao: "percentual" | "multiplicador";
       tipo_componente_kit: "modulo" | "inversor" | "bateria" | "outro";
+      tipo_inversor_equipamento: "on_grid" | "hibrido";
       tipo_ligacao: "monofasico" | "bifasico" | "trifasico";
       tipo_pessoa: "pf" | "pj";
       tipo_plano: "gratuito" | "pago";
       tipo_tarefa: "ligacao" | "whatsapp" | "visita" | "reuniao" | "email" | "outro";
+      tipo_validacao_dimensionamento: "valido" | "alerta" | "critico";
+      tipo_validacao_eletrica_dimensionamento: "valido" | "nao_verificado";
       tipo_vendedor: "interno" | "representante";
     };
     CompositeTypes: {
@@ -3084,10 +3614,15 @@ export const Constants = {
   },
   public: {
     Enums: {
+      fases_ca_equipamento: ["monofasico", "trifasico"],
       metrica_meta: ["receita", "negocios_ganhos", "reunioes", "conversao", "tarefas_concluidas"],
       modelo_cobranca: ["por_usuario", "fixo", "fixo_mais_usuario"],
       modo_distribuicao_leads: ["somente_vendedores", "somente_sdr", "parcial", "aleatorio"],
       modo_preco_proposta: ["sem_preco", "parcelado", "avista", "completo"],
+      origem_componente_kit: ["automatico", "manual"],
+      origem_distribuidora_dimensionamento: ["municipio", "manual"],
+      origem_produtividade_dimensionamento: ["padrao", "pvgis", "nasa"],
+      origem_tarifa_dimensionamento: ["manual", "aneel"],
       papel_membro: ["admin", "gestor", "vendedor", "sdr"],
       periodo_limite_regra: ["dia", "mes"],
       proposta_bloco_quebra: ["auto", "nova_pagina", "pagina_exclusiva"],
@@ -3099,12 +3634,22 @@ export const Constants = {
       status_membro: ["ativo", "inativo", "desligado"],
       status_negocio: ["aberto", "ganho", "perdido"],
       status_resgate: ["solicitado", "aprovado", "entregue", "cancelado"],
+      status_tecnico_equipamento: [
+        "completo",
+        "incompleto",
+        "em_revisao",
+        "verificado",
+        "descontinuado",
+      ],
       tipo_calculo_comissao: ["percentual", "multiplicador"],
       tipo_componente_kit: ["modulo", "inversor", "bateria", "outro"],
+      tipo_inversor_equipamento: ["on_grid", "hibrido"],
       tipo_ligacao: ["monofasico", "bifasico", "trifasico"],
       tipo_pessoa: ["pf", "pj"],
       tipo_plano: ["gratuito", "pago"],
       tipo_tarefa: ["ligacao", "whatsapp", "visita", "reuniao", "email", "outro"],
+      tipo_validacao_dimensionamento: ["valido", "alerta", "critico"],
+      tipo_validacao_eletrica_dimensionamento: ["valido", "nao_verificado"],
       tipo_vendedor: ["interno", "representante"],
     },
   },

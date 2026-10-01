@@ -2,15 +2,17 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { calcular, componentesJsonSchema, DISPONIBILIDADE_PADRAO, nomeKitPersonalizado, potenciaKitPersonalizadoKwp } from "@/lib/calculadora";
+import { calcular, DISPONIBILIDADE_PADRAO } from "@/lib/calculadora";
 import { mensagemErro } from "@/lib/erros";
 import { exigirPapel } from "@/lib/sessao";
 import type { Database } from "@/lib/supabase/database.types";
 import type { SupabaseServidor } from "@/lib/supabase/server";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { TIPOS_LIGACAO, type TipoLigacao, type ResultadoAcao } from "@/lib/tipos";
+import type { TipoLigacao, ResultadoAcao } from "@/lib/tipos";
 
 const CAMINHO_LISTAS = "/configuracoes/listas";
+/** Abas de "Kits e calculadora" (Kits, Parâmetros, Calculadora...) — ver `configuracoes/calculadora/layout.tsx`. */
+const CAMINHO_CALCULADORA = "/configuracoes/calculadora";
 
 type LinhaCalculo = Omit<
   Database["public"]["Tables"]["calculos_solares"]["Insert"],
@@ -101,104 +103,11 @@ const numeroBr = (mensagem: string) =>
     .transform((v) => Number(v.includes(",") ? v.replace(/\./g, "").replace(",", ".") : v))
     .pipe(z.number({ message: mensagem }).positive(mensagem));
 
-const numeroBrOpcional = z
-  .string()
-  .optional()
-  .transform((v) => {
-    if (!v || !v.trim()) return null;
-    return Number(v.includes(",") ? v.replace(/\./g, "").replace(",", ".") : v);
-  })
-  .pipe(z.number().positive().nullable());
-
-/**
- * Salva o kit personalizado (módulos, inversor, baterias, outros) e recalcula
- * o cálculo solar do negócio a partir dele. O preço usado no payback é o
- * valor do negócio (o kit personalizado não tem preço por item).
- */
-export async function salvarKitPersonalizado(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  const { atual } = await exigirPapel();
-  const dados = z
-    .object({
-      negocioId: z.string().uuid(),
-      tipoLigacao: z.enum(TIPOS_LIGACAO),
-      consumoMedioKwh: numeroBrOpcional,
-      valorFaturaMedio: numeroBrOpcional,
-      tarifaKwh: numeroBr("Informe a tarifa"),
-      estruturaTelhado: z.string().trim().max(120).optional(),
-      componentes: componentesJsonSchema,
-      observacoes: z.string().trim().max(2000, "Máximo de 2.000 caracteres").optional(),
-    })
-    .refine((d) => d.consumoMedioKwh != null || d.valorFaturaMedio != null, {
-      message: "Informe o consumo médio ou o valor médio da fatura.",
-      path: ["consumoMedioKwh"],
-    })
-    .safeParse(Object.fromEntries(formData));
-  if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
-  const d = dados.data;
-
-  const supabase = await criarClienteServidor();
-  const { data: negocio } = await supabase.from("negocios").select("valor").eq("id", d.negocioId).maybeSingle();
-  if (!negocio) return { ok: false, mensagem: "Negócio não encontrado." };
-
-  const montado = await montarLinhaCalculo(supabase, atual.empresaId, {
-    kitNome: nomeKitPersonalizado(d.componentes),
-    potenciaKwp: potenciaKitPersonalizadoKwp(d.componentes),
-    precoKit: negocio.valor ?? 0,
-    tipoLigacao: d.tipoLigacao,
-    consumoMedioKwh: d.consumoMedioKwh,
-    valorFaturaMedio: d.valorFaturaMedio,
-    tarifaKwh: d.tarifaKwh,
-  });
-  if (!montado.ok) return montado;
-
-  const { error: erroCalculo } = await supabase.from("calculos_solares").upsert(
-    {
-      ...montado.linha,
-      negocio_id: d.negocioId,
-      observacoes: d.observacoes || null,
-      atualizado_por: atual.membroId,
-      criado_por: atual.membroId,
-    },
-    { onConflict: "negocio_id", ignoreDuplicates: false },
-  );
-  if (erroCalculo) return { ok: false, mensagem: mensagemErro(erroCalculo, "Não foi possível salvar o cálculo.") };
-
-  await supabase.from("negocios").update({ estrutura_telhado: d.estruturaTelhado || null }).eq("id", d.negocioId);
-
-  // Substitui a lista de componentes (mais simples que sincronizar item a item).
-  await supabase.from("kit_componentes").delete().eq("negocio_id", d.negocioId);
-  if (d.componentes.length) {
-    const { error: erroComponentes } = await supabase.from("kit_componentes").insert(
-      d.componentes.map((c, i) => ({
-        empresa_id: atual.empresaId,
-        negocio_id: d.negocioId,
-        tipo: c.tipo,
-        descricao: c.descricao,
-        potencia_w: c.potenciaW,
-        quantidade: c.quantidade,
-        ordem: i,
-      })),
-    );
-    if (erroComponentes) {
-      return { ok: false, mensagem: "Cálculo salvo, mas não foi possível salvar os componentes do kit." };
-    }
-  }
-
-  revalidatePath(`/negocios/${d.negocioId}`);
-  return { ok: true, mensagem: "Kit e cálculo salvos." };
-}
-
-export async function apagarCalculo(formData: FormData) {
-  await exigirPapel();
-  const id = z.string().uuid().safeParse(formData.get("calculoId"));
-  if (!id.success) return;
-  const supabase = await criarClienteServidor();
-  const { data } = await supabase.from("calculos_solares").delete().eq("id", id.data).select("negocio_id");
-  if (data?.[0]) {
-    await supabase.from("kit_componentes").delete().eq("negocio_id", data[0].negocio_id);
-    revalidatePath(`/negocios/${data[0].negocio_id}`);
-  }
-}
+// `salvarKitPersonalizado` (calculava por fora do motor de dimensionamento real) foi removida na
+// Fase 6 da reconciliação do motor de dimensionamento (Evandro, 2026-10-01) — a tela de editar o
+// sistema (`negocios/[id]/kit-personalizado.tsx`) passou a chamar `salvarKitNegocio`
+// (`src/lib/acoes/dimensionamento.ts`), que roda o MESMO motor da Etapa 2 do wizard de criação.
+// Não deixar dois caminhos de cálculo paralelos pro mesmo dado (regra da reconciliação).
 
 const nomeKit = z.string().trim().min(2, "Nome muito curto").max(80, "Nome muito longo");
 const potenciaKwp = numeroBr("Informe a potência do kit");
@@ -225,6 +134,7 @@ export async function criarKit(_: ResultadoAcao, formData: FormData): Promise<Re
   });
   if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível criar o kit.") };
   revalidatePath(CAMINHO_LISTAS);
+  revalidatePath(CAMINHO_CALCULADORA, "layout");
   return { ok: true, mensagem: "Kit criado." };
 }
 
@@ -253,6 +163,7 @@ export async function editarKit(_: ResultadoAcao, formData: FormData): Promise<R
     .eq("id", dados.data.id);
   if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível salvar o kit.") };
   revalidatePath(CAMINHO_LISTAS);
+  revalidatePath(CAMINHO_CALCULADORA, "layout");
   return { ok: true, mensagem: "Salvo." };
 }
 
@@ -263,6 +174,13 @@ export async function editarParametros(_: ResultadoAcao, formData: FormData): Pr
     .trim()
     .transform((v) => Number(v.replace(",", ".")) / 100)
     .pipe(z.number().min(0, "Percentual inválido").max(1, "Percentual inválido"));
+  // Overload pode passar de 100% (ex.: 210%), então o limiar crítico aceita uma faixa maior
+  // que os outros percentuais (que nunca passam de 100%).
+  const percentualOverloadCritico = z
+    .string()
+    .trim()
+    .transform((v) => Number(v.replace(",", ".")) / 100)
+    .pipe(z.number().min(0, "Percentual inválido").max(2, "Percentual inválido"));
   const custoOpcional = z
     .string()
     .optional()
@@ -271,6 +189,17 @@ export async function editarParametros(_: ResultadoAcao, formData: FormData): Pr
       return Number(v.includes(",") ? v.replace(/\./g, "").replace(",", ".") : v);
     })
     .pipe(z.number({ message: "Custo inválido" }).nonnegative("Custo inválido"));
+  const temperaturaProjeto = z
+    .string()
+    .trim()
+    .transform((v) => Number(v.replace(",", ".")))
+    .pipe(z.number({ message: "Temperatura inválida" }).min(-30, "Temperatura inválida").max(30, "Temperatura inválida"));
+  const siglaDistribuidoraOpcional = z
+    .string()
+    .trim()
+    .max(40)
+    .optional()
+    .transform((v) => (v && v.length ? v.toUpperCase() : null));
   const dados = z
     .object({
       produtividade_kwh_kwp_mes: numeroBr("Informe a produtividade"),
@@ -282,12 +211,21 @@ export async function editarParametros(_: ResultadoAcao, formData: FormData): Pr
       custo_material_ca_por_kwp: custoOpcional,
       custo_engenharia: custoOpcional,
       comissao_percentual: percentual,
+      margem_dimensionamento_pct: percentual,
+      overload_maximo_pct: percentual,
+      overload_critico_pct: percentualOverloadCritico,
+      temperatura_minima_projeto_c: temperaturaProjeto,
+      sigla_distribuidora_aneel: siglaDistribuidoraOpcional,
     })
     .safeParse(Object.fromEntries(formData));
   if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
+  if (dados.data.overload_critico_pct < dados.data.overload_maximo_pct) {
+    return { ok: false, mensagem: "O overload crítico não pode ser menor que o overload automático máximo." };
+  }
   const supabase = await criarClienteServidor();
   const { error } = await supabase.from("parametros_calculadora").update(dados.data).eq("empresa_id", atual.empresaId);
   if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível salvar os parâmetros.") };
   revalidatePath(CAMINHO_LISTAS);
+  revalidatePath(CAMINHO_CALCULADORA, "layout");
   return { ok: true, mensagem: "Parâmetros salvos." };
 }

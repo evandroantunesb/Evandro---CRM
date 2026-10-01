@@ -7,6 +7,8 @@ import { Cartao, Selo } from "@/components/ui";
 import { apagarAnexo } from "@/lib/acoes/anexos";
 import { alternarEtiqueta } from "@/lib/acoes/negocios";
 import { carregarConfiguracao, formatarDataHora, formatarMoeda } from "@/lib/crm";
+import { paraEquipamentoAtivo } from "@/lib/dimensionamento";
+import { participaDoMotor } from "@/lib/equipamentos";
 import { env } from "@/lib/env";
 import { descreverAtividade } from "@/lib/linha-do-tempo";
 import { exigirPapel } from "@/lib/sessao";
@@ -40,7 +42,7 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
   const { id } = await params;
   const supabase = await criarClienteServidor();
 
-  const [{ data: negocio }, config, { data: parametros }] = await Promise.all([
+  const [{ data: negocio }, config, { data: parametros }, { data: equipamentos }] = await Promise.all([
     supabase
       .from("negocios")
       .select(
@@ -50,10 +52,16 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
       .maybeSingle(),
     carregarConfiguracao(atual.empresaId),
     supabase.from("parametros_calculadora").select("*").eq("empresa_id", atual.empresaId).maybeSingle(),
+    // Catálogo ativo pro motor de dimensionamento (Fase 6 da reconciliação): a tela de editar o
+    // sistema reusa o mesmo motor/hook/componente da Etapa 2 do wizard de criação (negocios/novo).
+    supabase.from("equipamentos_empresa").select("*").eq("empresa_id", atual.empresaId).eq("ativo", true).order("tipo").order("prioridade", { ascending: false }),
   ]);
   if (!negocio) notFound();
+  // Mesmo recorte de "Adicionar negócio": status técnico incompleto/descontinuado não entra no
+  // motor (filtro em JS pra um banco ainda sem a coluna não esvaziar o catálogo — `participaDoMotor`).
+  const catalogoMotor = (equipamentos ?? []).filter((e) => participaDoMotor(e.status_tecnico));
 
-  const [{ data: atividades }, { data: notas }, { data: tarefas }, { data: anexos }, { data: marcadas }, { data: calculo }] =
+  const [{ data: atividades }, { data: notas }, { data: tarefas }, { data: anexos }, { data: marcadas }, { data: calculo }, { data: dimensionamento }] =
     await Promise.all([
       supabase
         .from("atividades")
@@ -85,12 +93,18 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
         )
         .eq("negocio_id", id)
         .maybeSingle(),
+      supabase
+        .from("dimensionamentos_solares")
+        .select("modulo_equipamento_id, inversor_equipamento_id, quantidade_modulos, origem_selecao_equipamentos, produtividade_kwh_kwp_mes, origem_produtividade")
+        .eq("negocio_id", id)
+        .maybeSingle(),
     ]);
 
   const { data: componentes } = await supabase
     .from("kit_componentes")
-    .select("tipo, descricao, potencia_w, quantidade")
+    .select("tipo, descricao, potencia_w, quantidade, eh_nucleo_motor")
     .eq("negocio_id", id)
+    .eq("ativo", true)
     .order("ordem");
 
   const { data: proposta } = await supabase
@@ -242,12 +256,26 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
               padraoCliente={negocio.padrao_cliente}
               consumoMedioKwhPadrao={negocio.consumo_medio_kwh}
               valorFaturaMedioPadrao={negocio.valor_conta_energia}
-              componentesSalvos={(componentes ?? []).map((c) => ({
-                tipo: c.tipo as TipoComponenteKit,
-                descricao: c.descricao,
-                potenciaW: c.potencia_w,
-                quantidade: c.quantidade,
-              }))}
+              componentesNucleoSalvos={(componentes ?? [])
+                .filter((c) => c.eh_nucleo_motor)
+                .map((c) => ({ tipo: c.tipo as TipoComponenteKit, descricao: c.descricao, potenciaW: c.potencia_w, quantidade: c.quantidade }))}
+              componentesManuaisSalvos={(componentes ?? [])
+                .filter((c) => !c.eh_nucleo_motor)
+                .map((c) => ({ tipo: c.tipo as TipoComponenteKit, descricao: c.descricao, potenciaW: c.potencia_w, quantidade: c.quantidade }))}
+              dimensionamento={
+                dimensionamento
+                  ? {
+                      moduloId: dimensionamento.modulo_equipamento_id,
+                      inversorId: dimensionamento.inversor_equipamento_id,
+                      quantidadeModulos: dimensionamento.quantidade_modulos,
+                      origemEscolha: dimensionamento.origem_selecao_equipamentos,
+                      produtividadeKwhKwpMes: dimensionamento.produtividade_kwh_kwp_mes,
+                      origemProdutividade: dimensionamento.origem_produtividade,
+                    }
+                  : null
+              }
+              modulosAtivos={catalogoMotor.filter((e) => e.tipo === "modulo").map(paraEquipamentoAtivo)}
+              inversoresAtivos={catalogoMotor.filter((e) => e.tipo === "inversor").map(paraEquipamentoAtivo)}
               parametros={
                 parametros
                   ? {
@@ -256,10 +284,10 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
                       disponibilidadeMonoKwh: parametros.disponibilidade_mono_kwh,
                       disponibilidadeBiKwh: parametros.disponibilidade_bi_kwh,
                       disponibilidadeTriKwh: parametros.disponibilidade_tri_kwh,
-                      custoInstalacaoPorModulo: parametros.custo_instalacao_por_modulo,
-                      custoMaterialCaPorKwp: parametros.custo_material_ca_por_kwp,
-                      custoEngenharia: parametros.custo_engenharia,
-                      comissaoPercentual: parametros.comissao_percentual,
+                      margemDimensionamentoPct: parametros.margem_dimensionamento_pct,
+                      overloadMaximoPct: parametros.overload_maximo_pct,
+                      overloadCriticoPct: parametros.overload_critico_pct,
+                      temperaturaMinimaProjetoC: parametros.temperatura_minima_projeto_c,
                     }
                   : null
               }

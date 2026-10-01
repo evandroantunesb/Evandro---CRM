@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { Botao, Campo } from "@/components/ui";
-import { buscarComponentesCatalogo } from "@/lib/acoes/opensolar";
+import { useState } from "react";
+import { Botao, Campo, Selecao } from "@/components/ui";
+import type { EquipamentoAtivo } from "@/lib/dimensionamento";
 import { ROTULO_TIPO_COMPONENTE_KIT, TIPOS_COMPONENTE_KIT, type TipoComponenteKit } from "@/lib/tipos";
 
 export type LinhaComponente = {
@@ -37,67 +37,75 @@ export function linhasParaComponentes(linhas: LinhaComponente[]) {
     }));
 }
 
+const SENTINELA_TEXTO_LIVRE = "__texto_livre__";
+
+/** Monta o rótulo "Fabricante Modelo (potência)" usado tanto na opção do catálogo quanto, depois
+ * de selecionada, como descrição salva no componente — igual ao resto do catálogo (Fase 4). */
+function rotuloEquipamento(e: EquipamentoAtivo) {
+  return `${e.fabricante} ${e.modelo}`;
+}
+
 /**
- * Campo "Modelo / descrição": pra módulo e inversor, busca no catálogo técnico
- * (OpenSolar) conforme digita e preenche a potência junto ao escolher um resultado.
- * Continua aceitando texto livre (a busca é só um atalho).
+ * Campo "Modelo / descrição": quando `catalogo` tem equipamentos (módulo/inversor ativos da
+ * empresa em `equipamentos_empresa`), mostra uma seleção a partir dele; "Outro (digitar
+ * manualmente)" volta pro texto livre, pra equipamento fora do catálogo ou tipo sem catálogo
+ * (bateria, estrutura, outro). Catálogo próprio da empresa substituindo a busca livre/OpenSolar
+ * (removida em 2026-09-30) — Fase 6 da reconciliação do motor de dimensionamento com o wizard novo.
  */
 function CampoModeloComBusca({
-  tipo,
   valor,
   placeholder,
+  catalogo,
   onChangeTexto,
-  onSelecionar,
+  onSelecionarEquipamento,
 }: {
   tipo: TipoComponenteKit;
   valor: string;
   placeholder: string;
+  catalogo?: EquipamentoAtivo[];
   onChangeTexto: (v: string) => void;
-  onSelecionar: (descricao: string, potenciaW: string, precoEstimadoUnitario: string) => void;
+  onSelecionarEquipamento: (equipamento: EquipamentoAtivo) => void;
 }) {
-  const [resultados, setResultados] = useState<
-    { id: number; descricao: string; potenciaW: number | null; precoEstimadoBRL: number | null }[]
-  >([]);
-  const [, iniciar] = useTransition();
-  const pesquisavel = tipo === "modulo" || tipo === "inversor";
+  const catalogoDisponivel = !!catalogo && catalogo.length > 0;
+  // Começa em modo texto livre se o valor atual não bate com nenhum item do catálogo (ex.:
+  // equipamento ainda não cadastrado, ou editor aberto com uma descrição já salva manualmente).
+  const [modoTextoLivre, setModoTextoLivre] = useState(
+    () => !catalogoDisponivel || !catalogo!.some((e) => rotuloEquipamento(e) === valor),
+  );
 
-  function pesquisar(termo: string) {
-    onChangeTexto(termo);
-    if (!pesquisavel) return;
-    if (termo.trim().length < 2) return setResultados([]);
-    iniciar(async () => setResultados(await buscarComponentesCatalogo(tipo, termo)));
+  if (!catalogoDisponivel || modoTextoLivre) {
+    return (
+      <div className="flex flex-col gap-1">
+        <Campo rotulo="Modelo / descrição" value={valor} onChange={(e) => onChangeTexto(e.target.value)} placeholder={placeholder} />
+        {catalogoDisponivel && (
+          <button type="button" className="self-start text-xs text-amber-700 hover:underline" onClick={() => setModoTextoLivre(false)}>
+            Escolher do catálogo da empresa
+          </button>
+        )}
+      </div>
+    );
   }
 
+  const selecionadoId = catalogo!.find((e) => rotuloEquipamento(e) === valor)?.id ?? "";
+
   return (
-    <div className="relative">
-      <Campo rotulo="Modelo / descrição" value={valor} onChange={(e) => pesquisar(e.target.value)} placeholder={placeholder} />
-      {resultados.length > 0 && (
-        <ul className="absolute z-10 mt-1 w-full rounded-md border border-zinc-200 bg-white text-sm shadow-md">
-          {resultados.map((r) => (
-            <li key={r.id}>
-              <button
-                type="button"
-                onClick={() => {
-                  onSelecionar(
-                    r.descricao,
-                    r.potenciaW != null ? String(r.potenciaW) : "",
-                    r.precoEstimadoBRL != null ? String(r.precoEstimadoBRL) : "",
-                  );
-                  setResultados([]);
-                }}
-                className="block w-full px-3 py-2 text-left hover:bg-zinc-50"
-              >
-                {r.descricao}
-                {r.potenciaW != null && <span className="text-zinc-400"> · {r.potenciaW} W</span>}
-                {r.precoEstimadoBRL != null && (
-                  <span className="text-zinc-400"> · ~R$ {r.precoEstimadoBRL.toLocaleString("pt-BR")} (estimado)</span>
-                )}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+    <Selecao
+      rotulo="Modelo / descrição"
+      value={selecionadoId || (valor ? SENTINELA_TEXTO_LIVRE : "")}
+      onChange={(e) => {
+        if (e.target.value === SENTINELA_TEXTO_LIVRE) return setModoTextoLivre(true);
+        const equipamento = catalogo!.find((eq) => eq.id === e.target.value);
+        if (equipamento) onSelecionarEquipamento(equipamento);
+      }}
+    >
+      <option value="">Selecione</option>
+      {catalogo!.map((e) => (
+        <option key={e.id} value={e.id}>
+          {rotuloEquipamento(e)} ({e.potenciaW.toLocaleString("pt-BR")} W)
+        </option>
+      ))}
+      <option value={SENTINELA_TEXTO_LIVRE}>Outro (digitar manualmente)</option>
+    </Selecao>
   );
 }
 
@@ -106,11 +114,16 @@ export function EditorComponentesKit({
   linhas,
   onChange,
   sugerirQuantidadeModulo,
+  catalogoPorTipo,
 }: {
   linhas: LinhaComponente[];
   onChange: (linhas: LinhaComponente[]) => void;
   /** Dado o consumo já informado no formulário, sugere quantos módulos de uma potência cobririam ele. */
   sugerirQuantidadeModulo?: (potenciaW: number) => number | null;
+  /** Catálogo ativo da empresa (`equipamentos_empresa`), por tipo — quando presente, troca o campo
+   * "Modelo / descrição" de módulo/inversor por uma seleção a partir dele (com texto livre como
+   * alternativa). Tipos sem catálogo aqui (bateria, outro) continuam só com texto livre. */
+  catalogoPorTipo?: Partial<Record<TipoComponenteKit, EquipamentoAtivo[]>>;
 }) {
   function adicionar(tipo: TipoComponenteKit) {
     onChange([...linhas, novaLinhaComponente(tipo)]);
@@ -166,9 +179,13 @@ export function EditorComponentesKit({
                   tipo={tipo}
                   valor={l.descricao}
                   placeholder={tipo === "modulo" ? "Ex.: Canadian 550 W" : "Ex.: Growatt 5 kW"}
+                  catalogo={catalogoPorTipo?.[tipo]}
                   onChangeTexto={(v) => atualizar(i, { descricao: v })}
-                  onSelecionar={(descricao, potenciaW, precoEstimadoUnitario) =>
-                    atualizar(i, { descricao, potenciaW, precoEstimadoUnitario })
+                  onSelecionarEquipamento={(equipamento) =>
+                    atualizar(i, {
+                      descricao: rotuloEquipamento(equipamento),
+                      potenciaW: String(equipamento.potenciaW),
+                    })
                   }
                 />
                 <Campo

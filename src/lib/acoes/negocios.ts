@@ -4,7 +4,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { montarLinhaCalculo } from "@/lib/acoes/calculadora";
+import { salvarDimensionamento } from "@/lib/acoes/dimensionamento";
 import { enviarAnexoNoServidor } from "@/lib/acoes/anexos";
+import { CAMPOS_DIMENSIONAMENTO } from "@/lib/dimensionamento-campos";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { mensagemErro } from "@/lib/erros";
@@ -35,6 +37,20 @@ const numeroBrOpcional = z
     return Number(v.includes(",") ? v.replace(/\./g, "").replace(",", ".") : v);
   })
   .pipe(z.number().positive().nullable());
+
+// Campos do painel de dimensionamento (hidden inputs simples, sem formatação BR) —
+// ver src/components/dimensionamento/painel-dimensionamento.tsx.
+const numeroOpcional = z
+  .string()
+  .optional()
+  .transform((v) => (v && v.trim() ? Number(v) : null))
+  .pipe(z.number().positive().nullable());
+
+const inteiroOpcional = z
+  .string()
+  .optional()
+  .transform((v) => (v && v.trim() ? Number(v) : null))
+  .pipe(z.number().int().positive().nullable());
 
 /** Selects "sim"/"nao"/"" (não informado) viram boolean | null. */
 const boolOpcional = z
@@ -69,7 +85,18 @@ const esquemaNovo = z.object({
   consumo_medio_kwh: numeroBrOpcional,
   valor_fatura_medio: numeroBrOpcional,
   tarifa_kwh: numeroBrOpcional,
+  origem_tarifa: z.enum(["manual", "aneel"]).optional().default("manual"),
   componentes: componentesJsonSchema,
+  // Escolha do painel de dimensionamento único (src/lib/dimensionamento.ts) — quando presente,
+  // tem prioridade sobre o kit manual (ver Etapa A da unificação do motor de cálculo). Nomes
+  // centralizados em CAMPOS_DIMENSIONAMENTO (src/lib/dimensionamento-campos.ts) — o componente
+  // de campos ocultos usa a mesma constante, pra nunca divergir do schema aqui.
+  [CAMPOS_DIMENSIONAMENTO.moduloId]: uuidOpcional,
+  [CAMPOS_DIMENSIONAMENTO.inversorId]: uuidOpcional,
+  [CAMPOS_DIMENSIONAMENTO.quantidadeModulos]: inteiroOpcional,
+  [CAMPOS_DIMENSIONAMENTO.produtividadeKwhKwpMes]: numeroOpcional,
+  [CAMPOS_DIMENSIONAMENTO.origemProdutividade]: z.enum(["pvgis", "nasa"]).optional(),
+  [CAMPOS_DIMENSIONAMENTO.origemEscolha]: z.enum(["automatico", "manual"]).optional(),
 });
 
 export async function criarNegocio(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
@@ -146,10 +173,55 @@ export async function criarNegocio(_: ResultadoAcao, formData: FormData): Promis
     return { ok: false, mensagem: mensagemErro(error, "Não foi possível criar o negócio. Confira o responsável escolhido.") };
   }
 
-  // Kit personalizado montado junto com o negócio: já deixa o cálculo
-  // pronto, sem o vendedor precisar abrir a calculadora à parte (fluxo de
-  // "nova proposta"). O cálculo roda no backend — não é um passo visível.
-  if (d.tipo_ligacao && d.tarifa_kwh != null && d.componentes.length) {
+  // Dimensionamento do sistema, montado junto com o negócio: já deixa o
+  // cálculo pronto, sem o vendedor precisar abrir a calculadora à parte
+  // (fluxo de "nova proposta"). Motor único (src/lib/dimensionamento.ts,
+  // via `salvarDimensionamento`) quando o vendedor escolheu uma opção do
+  // catálogo no painel; kit manual (fallback pra empresas ainda sem
+  // equipamento cadastrado) quando não. Um kit mal preenchido não deve
+  // impedir a criação do negócio — o vendedor ainda pode calcular depois,
+  // direto na página do negócio.
+  //
+  // Fase 5 da reconciliação (Evandro, 2026-10-01): motor automático e kit manual
+  // coexistem — não é mais "ou um ou outro". Quando o motor roda, `d.componentes`
+  // (preenchido via "Montar kit manualmente", `EditorComponentesKit`) entra como
+  // itens adicionais do kit (bateria, estrutura, acessórios, ou um módulo/inversor
+  // extra do próprio vendedor), sempre com `origem: "manual"` — `salvarDimensionamento`
+  // nunca apaga essas linhas.
+  const usaMotor =
+    d.tipo_ligacao && d.tarifa_kwh != null && d.dimensionamento_modulo_id && d.dimensionamento_inversor_id && d.dimensionamento_quantidade_modulos;
+
+  if (usaMotor) {
+    await salvarDimensionamento(supabase, atual.empresaId, atual.membroId, {
+      negocioId: negocio.id,
+      moduloEquipamentoId: d.dimensionamento_modulo_id!,
+      inversorEquipamentoId: d.dimensionamento_inversor_id!,
+      quantidadeModulos: d.dimensionamento_quantidade_modulos!,
+      tipoLigacao: d.tipo_ligacao!,
+      consumoMedioKwh: d.consumo_medio_kwh,
+      valorFaturaMedio: d.valor_fatura_medio,
+      tarifaKwh: d.tarifa_kwh!,
+      origemTarifa: d.origem_tarifa,
+      produtividadeKwhKwpMes: d.dimensionamento_produtividade_kwh_kwp_mes,
+      origemProdutividade: d.dimensionamento_origem_produtividade,
+      origemEscolha: d.dimensionamento_origem_escolha,
+      precoNegocio: d.valor,
+    });
+    if (d.componentes.length) {
+      await supabase.from("kit_componentes").insert(
+        d.componentes.map((c, i) => ({
+          empresa_id: atual.empresaId,
+          negocio_id: negocio.id,
+          tipo: c.tipo,
+          descricao: c.descricao,
+          potencia_w: c.potenciaW,
+          quantidade: c.quantidade,
+          ordem: 100 + i, // depois do módulo/inversor do motor (ordem 0/1)
+          origem: "manual" as const,
+        })),
+      );
+    }
+  } else if (d.tipo_ligacao && d.tarifa_kwh != null && d.componentes.length) {
     const montado = await montarLinhaCalculo(supabase, atual.empresaId, {
       kitNome: nomeKitPersonalizado(d.componentes),
       potenciaKwp: potenciaKitPersonalizadoKwp(d.componentes),
@@ -175,11 +247,10 @@ export async function criarNegocio(_: ResultadoAcao, formData: FormData): Promis
           potencia_w: c.potenciaW,
           quantidade: c.quantidade,
           ordem: i,
+          origem: "manual" as const,
         })),
       );
     }
-    // Um kit mal preenchido não deve impedir a criação do negócio — o
-    // vendedor ainda pode calcular depois, direto na página do negócio.
   }
 
   // Anexos escolhidos ainda na criação (CNH, faturas): só dá para subir

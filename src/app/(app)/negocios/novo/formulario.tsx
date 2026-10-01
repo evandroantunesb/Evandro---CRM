@@ -1,9 +1,15 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, XCircle } from "lucide-react";
-import { useActionState, useId, useMemo, useState, useTransition } from "react";
+import { AlertTriangle, ChevronLeft, ChevronRight, Info } from "lucide-react";
+import { useId, useMemo, useState, useTransition } from "react";
+import { useActionState } from "react";
 import { CampoArquivo } from "@/components/campo-arquivo";
 import { EditorComponentesKit, linhasParaComponentes, type LinhaComponente } from "@/components/kit-componentes";
+import { PainelDimensionamento } from "@/components/dimensionamento/painel-dimensionamento";
+import { useResolucaoDistribuidora } from "@/components/dimensionamento/usar-resolucao-distribuidora";
+import { useTarifaAneel } from "@/components/dimensionamento/usar-tarifa-aneel";
+import { useProdutividadeRegional } from "@/components/dimensionamento/usar-produtividade-regional";
+import type { CamposFormularioDimensionamento } from "@/components/dimensionamento/usar-dimensionamento";
 import { Botao, Campo, Mensagem, Selecao, Selo } from "@/components/ui";
 import { buscarContatos, criarNegocio, verificarDuplicado, type Duplicado } from "@/lib/acoes/negocios";
 import {
@@ -13,6 +19,7 @@ import {
   potenciaKitPersonalizadoKwp,
   sugerirQuantidadeModulos,
 } from "@/lib/calculadora";
+import type { EquipamentoAtivo, RedeEletricaConfirmada } from "@/lib/dimensionamento";
 import { formatarCep, formatarMascaraMoeda, formatarMoeda, formatarTelefoneBr } from "@/lib/formatacao";
 import { ROTULO_TIPO_LIGACAO, TIPOS_LIGACAO, type TipoLigacao } from "@/lib/tipos";
 
@@ -28,12 +35,24 @@ type Parametros = {
   custoMaterialCaPorKwp: number;
   custoEngenharia: number;
   comissaoPercentual: number;
+  margemDimensionamentoPct: number;
+  overloadMaximoPct: number;
+  overloadCriticoPct: number;
+  temperaturaMinimaProjetoC: number;
+  /** Sigla configurada em Configurações → Calculadora, usada só como sugestão pra preencher a
+   * busca manual de distribuidora quando a resolução por município não encontra nada — nunca
+   * aplicada sozinha sem confirmação do vendedor. */
+  siglaDistribuidoraAneelFallback: string | null;
 };
 
 const ESTADOS_BR = [
   "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG",
   "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO",
 ];
+
+/** Opções comuns de tensão da rede — cobre a maioria dos casos; "outra" libera um campo numérico
+ * livre pra tensões fora dessa lista (ex.: redes rurais, 440V trifásico). */
+const TENSOES_REDE_COMUNS = ["127", "220", "380", "440"] as const;
 
 const ETAPAS_WIZARD = [
   { numero: 1, titulo: "Cliente e consumo" },
@@ -48,11 +67,7 @@ function numero(v: string): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-/** Estimativa ilustrativa (não é o motor de cálculo) só pra prévia mockada da Etapa 2. */
-function estimarSistemaMockKwp(consumoMedioKwh: number | null, produtividadeKwhKwpMes: number) {
-  if (!consumoMedioKwh || !produtividadeKwhKwpMes) return null;
-  return Number(((consumoMedioKwh / produtividadeKwhKwpMes) * 1.24).toFixed(2));
-}
+const MENSAGEM_CONSUMO_OBRIGATORIO = "Informe o consumo médio mensal em kWh para continuar.";
 
 function IndicadorEtapas({ atual }: { atual: 1 | 2 | 3 }) {
   return (
@@ -84,44 +99,43 @@ function IndicadorEtapas({ atual }: { atual: 1 | 2 | 3 }) {
   );
 }
 
-/** Card de documento com "leitura automática" simulada: não há OCR real, só a estrutura visual. */
+/** Card de anexo de documento (CNH, conta de energia) — SEM OCR real (Evandro, 2026-10-01, ponto
+ * 4 das correções: removido o mock de "Documento processado / Nome encontrado / CPF encontrado /
+ * Data de nascimento encontrada" que aparecia pra qualquer arquivo selecionado, sem olhar o
+ * conteúdo. Enquanto a extração automática não existir, o card só confirma o anexo — nunca
+ * comunica um dado que não foi extraído de verdade. */
 function CardDocumentoInteligente({
   titulo,
   legenda,
-  campos,
   name,
   accept,
 }: {
   titulo: string;
   legenda: string;
-  campos: string[];
   name: string;
   accept?: string;
 }) {
   const id = useId();
-  const [processado, setProcessado] = useState(false);
   const [nomeArquivo, setNomeArquivo] = useState("");
 
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-dashed border-zinc-300 p-3">
       <label htmlFor={id} className="flex cursor-pointer flex-col gap-1">
         <span className="text-sm font-medium text-zinc-800">{titulo}</span>
-        {!processado && <span className="text-xs text-zinc-500">{legenda}</span>}
+        {!nomeArquivo && <span className="text-xs text-zinc-500">{legenda}</span>}
       </label>
-      {processado && (
-        <div className="flex flex-col gap-1 rounded-md bg-green-50 px-3 py-2">
-          <p className="text-sm font-medium text-green-800">Documento processado</p>
-          <ul className="text-xs text-green-700">
-            {campos.map((c) => (
-              <li key={c}>{c}</li>
-            ))}
-          </ul>
-          <div className="flex items-center gap-2 pt-1">
-            <button type="button" className="text-xs font-medium text-amber-700 hover:underline" onClick={() => setProcessado(false)}>
-              Revisar dados
-            </button>
-            <span className="truncate text-xs text-zinc-400">· {nomeArquivo}</span>
-          </div>
+      {nomeArquivo && (
+        <div className="flex flex-col gap-1 rounded-md bg-zinc-50 px-3 py-2">
+          <p className="text-sm font-medium text-zinc-800">Arquivo anexado</p>
+          <p className="truncate text-xs text-zinc-600">{nomeArquivo}</p>
+          <p className="text-xs text-zinc-400">Extração automática ainda não executada</p>
+          <button
+            type="button"
+            className="self-start text-xs font-medium text-amber-700 hover:underline"
+            onClick={() => setNomeArquivo("")}
+          >
+            Trocar arquivo
+          </button>
         </div>
       )}
       <input
@@ -130,12 +144,7 @@ function CardDocumentoInteligente({
         name={name}
         accept={accept}
         className="hidden"
-        onChange={(e) => {
-          const arquivo = e.target.files?.[0];
-          if (!arquivo) return;
-          setNomeArquivo(arquivo.name);
-          setProcessado(true);
-        }}
+        onChange={(e) => setNomeArquivo(e.target.files?.[0]?.name ?? "")}
       />
     </div>
   );
@@ -148,6 +157,8 @@ export function FormularioNegocio({
   responsaveis,
   meuMembroId,
   parametros,
+  modulosAtivos,
+  inversoresAtivos,
 }: {
   funilId: string;
   /** Etapa pré-selecionada (ex.: "Adicionar negócio" numa coluna do Kanban); senão usa a etapa inicial do funil. */
@@ -157,6 +168,10 @@ export function FormularioNegocio({
   responsaveis: Opcao[];
   meuMembroId: string;
   parametros: Parametros | null;
+  /** Catálogo ativo da empresa (Configurações → Calculadora), já convertido pro formato do motor
+   * de dimensionamento — ver `src/lib/dimensionamento.ts`. */
+  modulosAtivos: EquipamentoAtivo[];
+  inversoresAtivos: EquipamentoAtivo[];
 }) {
   const [resultado, acao, pendente] = useActionState(criarNegocio, null);
   const [etapaAtual, setEtapaAtual] = useState<1 | 2 | 3>(1);
@@ -175,7 +190,24 @@ export function FormularioNegocio({
   const [contatoEmail, setContatoEmail] = useState("");
   const emailValido = contatoEmail === "" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contatoEmail);
 
+  // Nome do negócio (Etapa 1) — gerado a partir do nome do cliente (novo ou existente), com
+  // edição manual sempre possível. Mesmo padrão "tocado" já usado pro valor sugerido do kit
+  // (`valorTocado`, abaixo): uma vez editado à mão, nunca mais sobrescrito por mudança no nome do
+  // cliente (Evandro, 2026-10-01, ponto 5 das correções — "não precisamos criar nomes
+  // sofisticados agora", só evitar que o vendedor tenha que digitar isso manualmente sempre).
+  const nomeClienteAtual = modo === "existente" ? (contato?.nome ?? "") : contatoNome;
+  const [tituloNegocio, setTituloNegocio] = useState("");
+  const [tituloTocado, setTituloTocado] = useState(false);
+  const [ultimoNomeClienteAplicado, setUltimoNomeClienteAplicado] = useState("");
+  if (nomeClienteAtual !== ultimoNomeClienteAplicado) {
+    setUltimoNomeClienteAplicado(nomeClienteAtual);
+    if (nomeClienteAtual && !tituloTocado) setTituloNegocio(nomeClienteAtual);
+  }
+
   // Localização (Etapa 1) — campos estruturados; concatenados no envio pro campo único que o backend já salva.
+  // Cidade/UF também disparam, em segundo plano, a resolução Cidade/UF → município/IBGE →
+  // distribuidora → tarifa ANEEL (useResolucaoDistribuidora/useTarifaAneel, abaixo) — a conferência
+  // aparece só na Etapa 3, sem travar quem ainda está na Etapa 1 (pedido do Evandro, 2026-10-01).
   const [cep, setCep] = useState("");
   const [rua, setRua] = useState("");
   const [numeroEndereco, setNumeroEndereco] = useState("");
@@ -216,23 +248,90 @@ export function FormularioNegocio({
     return partes.join(", ");
   }, [rua, numeroEndereco, complemento, bairro, cidade, uf, cep]);
 
+  // Resolução de distribuidora por município (Fase 2/4): dispara assim que cidade/UF estão
+  // preenchidas, independente da etapa atual — a conferência/ajuste mora na Etapa 3.
+  const resolucaoDistribuidora = useResolucaoDistribuidora(cidade, uf);
+  const siglaDistribuidora = resolucaoDistribuidora.camposDistribuidora.siglaDistribuidora;
+  const [siglaManualRascunho, setSiglaManualRascunho] = useState("");
+
+  // Tarifa ANEEL pra sigla já resolvida (automática ou escolhida manualmente na Etapa 3).
+  const tarifaAneel = useTarifaAneel(siglaDistribuidora ?? undefined);
+
+  // Produtividade solar real (PVGIS/NASA) pro endereço completo — sem fallback silencioso: quando
+  // não há resultado, quem usa decide mostrar a produtividade padrão da empresa (ver abaixo).
+  const produtividadeRegional = useProdutividadeRegional(enderecoCompleto);
+  const produtividadeEngineKwhKwpMes = produtividadeRegional.produtividade ?? parametros?.produtividadeKwhKwpMes ?? null;
+  const origemProdutividadeEngine: "padrao" | "pvgis" | "nasa" =
+    produtividadeRegional.produtividade != null && produtividadeRegional.fonte ? produtividadeRegional.fonte : "padrao";
+
   // Consumo (Etapa 1): kWh direto ou valor da conta (com máscara), nunca os dois exigidos.
   const [consumoMedioKwh, setConsumoMedioKwh] = useState("");
   const [valorFaturaMedio, setValorFaturaMedio] = useState("");
+
+  // Tarifa (conferida/ajustada na Etapa 3) — pré-preenchida pela ANEEL assim que a distribuidora é
+  // resolvida; editar manualmente marca a origem como "ajustada manualmente" e o hook para de
+  // sobrescrever até a sigla mudar de novo.
   const [tarifaKwh, setTarifaKwh] = useState("");
+  const [tarifaTocada, setTarifaTocada] = useState(false);
+  const [ultimaTarifaAuto, setUltimaTarifaAuto] = useState<number | null>(null);
+  if (tarifaAneel.tarifa !== ultimaTarifaAuto) {
+    setUltimaTarifaAuto(tarifaAneel.tarifa);
+    if (tarifaAneel.tarifa != null && !tarifaTocada) setTarifaKwh(String(tarifaAneel.tarifa));
+  }
+  const tarifaNum = numero(tarifaKwh);
+  const origemTarifaEfetiva: "manual" | "aneel" = tarifaTocada || tarifaAneel.origem !== "aneel" ? "manual" : "aneel";
 
-  // Dados técnicos (Etapa 3, movidos pra fora do primeiro contato).
-  const [tipoLigacao, setTipoLigacao] = useState<TipoLigacao>("trifasico");
+  // Rede elétrica (entrada da Etapa 2): bloco obrigatório só até o vendedor confirmar o tipo de
+  // ligação e a tensão — depois disso vira um campo normal preenchido (Evandro, 2026-10-01).
+  const [redeConfirmada, setRedeConfirmada] = useState<RedeEletricaConfirmada | null>(null);
+  const [tipoLigacaoRascunho, setTipoLigacaoRascunho] = useState<TipoLigacao>("trifasico");
+  const [tensaoRascunho, setTensaoRascunho] = useState<string>("");
+  const [tensaoOutraValor, setTensaoOutraValor] = useState("");
+  const tensaoRascunhoValida = tensaoRascunho === "outra" ? numero(tensaoOutraValor) != null : tensaoRascunho !== "";
 
-  // Kit personalizado (dentro da Etapa 2, escondido até o vendedor pedir).
+  function confirmarRedeEletrica() {
+    const tensaoRedeV = tensaoRascunho === "outra" ? numero(tensaoOutraValor) : Number(tensaoRascunho);
+    setRedeConfirmada({ tipoLigacao: tipoLigacaoRascunho, tensaoRedeV });
+  }
+
+  function alterarRedeEletrica() {
+    if (redeConfirmada) {
+      setTipoLigacaoRascunho(redeConfirmada.tipoLigacao);
+      setTensaoRascunho(
+        redeConfirmada.tensaoRedeV != null && (TENSOES_REDE_COMUNS as readonly string[]).includes(String(redeConfirmada.tensaoRedeV))
+          ? String(redeConfirmada.tensaoRedeV)
+          : "outra",
+      );
+      setTensaoOutraValor(redeConfirmada.tensaoRedeV != null ? String(redeConfirmada.tensaoRedeV) : "");
+    }
+    setRedeConfirmada(null);
+  }
+
+  // Kit personalizado (dentro da Etapa 2, escondido até o vendedor pedir) — fallback pra empresas
+  // ainda sem equipamento cadastrado, ou pra overrides que o motor não cobre (Fase 5 decide a
+  // coexistência com o motor; por enquanto os dois caminhos continuam separados, como já eram).
   const [mostrarKit, setMostrarKit] = useState(false);
-  const [mostrarAlertasExemplo, setMostrarAlertasExemplo] = useState(false);
   const [linhas, setLinhas] = useState<LinhaComponente[]>([]);
   const [estruturaTelhado, setEstruturaTelhado] = useState("");
 
-  const componentes = useMemo(() => linhasParaComponentes(linhas), [linhas]);
-  const potenciaKwp = potenciaKitPersonalizadoKwp(componentes);
+  const componentesKitManual = useMemo(() => linhasParaComponentes(linhas), [linhas]);
+  const potenciaKitManualKwp = potenciaKitPersonalizadoKwp(componentesKitManual);
 
+  // Escolha atual do motor de dimensionamento (módulo/inversor/quantidade), repassada pelo
+  // <PainelDimensionamento> via onAlteracao — os campos ocultos reais já são renderizados dentro
+  // dele (ver CamposOcultosDimensionamento); isso aqui é só leitura, pra prévia de economia/payback.
+  const [camposDimensionamento, setCamposDimensionamento] = useState<CamposFormularioDimensionamento | null>(null);
+  const moduloEscolhidoMotor = useMemo(
+    () => modulosAtivos.find((m) => m.id === camposDimensionamento?.moduloId) ?? null,
+    [modulosAtivos, camposDimensionamento],
+  );
+  const potenciaDcKwpMotor =
+    camposDimensionamento && moduloEscolhidoMotor
+      ? Number(((camposDimensionamento.quantidadeModulos * moduloEscolhidoMotor.potenciaW) / 1000).toFixed(2))
+      : null;
+
+  // Componentes efetivos pro preço sugerido: o kit manual continua alimentando a sugestão de
+  // preço como antes (o motor não tem preço de referência por equipamento nesta fase).
   const precoSugerido = useMemo(() => {
     const somaComponentes = linhas.reduce((acc, l) => {
       const precoUnitario = l.precoEstimadoUnitario ? Number(l.precoEstimadoUnitario) : NaN;
@@ -241,10 +340,10 @@ export function FormularioNegocio({
     }, 0);
     if (somaComponentes <= 0) return null;
     if (!parametros) return Math.round(somaComponentes);
-    const quantidadeModulos = componentes.filter((c) => c.tipo === "modulo").reduce((acc, c) => acc + c.quantidade, 0);
-    const custos = custosInternosEstimados(somaComponentes, quantidadeModulos, potenciaKwp, parametros);
+    const quantidadeModulos = componentesKitManual.filter((c) => c.tipo === "modulo").reduce((acc, c) => acc + c.quantidade, 0);
+    const custos = custosInternosEstimados(somaComponentes, quantidadeModulos, potenciaKitManualKwp, parametros);
     return Math.round(custos.total);
-  }, [linhas, componentes, potenciaKwp, parametros]);
+  }, [linhas, componentesKitManual, potenciaKitManualKwp, parametros]);
 
   const [valor, setValor] = useState("");
   const [valorTocado, setValorTocado] = useState(false);
@@ -254,44 +353,73 @@ export function FormularioNegocio({
     if (precoSugerido != null && !valorTocado) setValor(String(precoSugerido));
   }
 
-  const consumoMedioEstimado = useMemo(() => {
-    const tarifa = numero(tarifaKwh);
-    const consumo = numero(consumoMedioKwh);
-    const fatura = numero(valorFaturaMedio);
-    if (consumo) return consumo;
-    if (fatura && tarifa) return fatura / tarifa;
+  // Consumo médio efetivo pro motor de dimensionamento: kWh direto tem prioridade; sem ele, só dá
+  // pra estimar a partir do valor da conta quando a tarifa já foi resolvida (automática ou manual)
+  // — nunca com uma tarifa fictícia (Evandro, 2026-10-01).
+  const consumoDiretoNum = numero(consumoMedioKwh);
+  const faturaNum = numero(valorFaturaMedio);
+  const consumoParaMotor = useMemo(() => {
+    if (consumoDiretoNum) return consumoDiretoNum;
+    if (faturaNum && tarifaNum) return faturaNum / tarifaNum;
     return null;
-  }, [consumoMedioKwh, valorFaturaMedio, tarifaKwh]);
-
-  const sistemaMockKwp = useMemo(
-    () => estimarSistemaMockKwp(consumoMedioEstimado, parametros?.produtividadeKwhKwpMes ?? 120),
-    [consumoMedioEstimado, parametros],
-  );
+  }, [consumoDiretoNum, faturaNum, tarifaNum]);
+  const faltaConsumoParaMotor = !consumoDiretoNum && faturaNum != null && tarifaNum == null;
 
   const sugerirQuantidadeModulo = useMemo(() => {
-    if (!parametros || !consumoMedioEstimado) return undefined;
-    return (potenciaW: number) =>
-      sugerirQuantidadeModulos(consumoMedioEstimado, parametros.produtividadeKwhKwpMes, potenciaW);
-  }, [parametros, consumoMedioEstimado]);
+    if (!parametros || !consumoParaMotor) return undefined;
+    return (potenciaW: number) => sugerirQuantidadeModulos(consumoParaMotor, parametros.produtividadeKwhKwpMes, potenciaW);
+  }, [parametros, consumoParaMotor]);
 
-  const previa = useMemo(() => {
-    const tarifa = numero(tarifaKwh);
-    const consumo = numero(consumoMedioKwh);
-    const fatura = numero(valorFaturaMedio);
-    const precoKit = numero(valor);
-    if (!parametros || potenciaKwp <= 0 || !tarifa || (!consumo && !fatura)) return null;
-    const consumoMedioFinal = consumo ?? fatura! / tarifa;
+  const produtividadeEfetivaKwhKwpMes = produtividadeEngineKwhKwpMes ?? parametros?.produtividadeKwhKwpMes;
+
+  // Geração estimada: depende só do sistema técnico (potência DC) e da rede elétrica confirmada
+  // (o inversor recomendado só fecha depois da rede) — NUNCA da tarifa (Evandro, 2026-10-01:
+  // "geração NÃO deve depender de tarifa"). `potenciaKwp * produtividade` não usa tarifa nem
+  // tipo de ligação, mas só mostramos depois da rede confirmada porque até lá o inversor (e
+  // portanto o sistema) ainda está pendente de confirmação.
+  const geracaoEstimadaMotorKwhMes = useMemo(() => {
+    if (!redeConfirmada || !potenciaDcKwpMotor || potenciaDcKwpMotor <= 0 || !produtividadeEfetivaKwhKwpMes) return null;
+    return Math.round(potenciaDcKwpMotor * produtividadeEfetivaKwhKwpMes * 100) / 100;
+  }, [redeConfirmada, potenciaDcKwpMotor, produtividadeEfetivaKwhKwpMes]);
+
+  const geracaoEstimadaKitManualKwhMes = useMemo(() => {
+    if (!redeConfirmada || potenciaKitManualKwp <= 0 || !produtividadeEfetivaKwhKwpMes) return null;
+    return Math.round(potenciaKitManualKwp * produtividadeEfetivaKwhKwpMes * 100) / 100;
+  }, [redeConfirmada, potenciaKitManualKwp, produtividadeEfetivaKwhKwpMes]);
+
+  // Economia/payback do kit escolhido pelo motor — só calcula quando há tarifa (além da rede, já
+  // exigida pra geração acima); até lá ficam marcados como pendentes em vez de inventar um número
+  // (Evandro, 2026-10-01: "economia e payback ficam pendentes enquanto não houver tarifa válida").
+  const previaMotor = useMemo(() => {
+    if (!parametros || !potenciaDcKwpMotor || potenciaDcKwpMotor <= 0) return null;
+    if (!tarifaNum || !redeConfirmada || !consumoParaMotor) return null;
     return calcular({
-      potenciaKwp,
-      precoKit: precoKit ?? 0,
-      tipoLigacao,
-      consumoMedioKwh: consumoMedioFinal,
-      tarifaKwh: tarifa,
-      produtividadeKwhKwpMes: parametros.produtividadeKwhKwpMes,
+      potenciaKwp: potenciaDcKwpMotor,
+      precoKit: numero(valor) ?? 0,
+      tipoLigacao: redeConfirmada.tipoLigacao,
+      consumoMedioKwh: consumoParaMotor,
+      tarifaKwh: tarifaNum,
+      produtividadeKwhKwpMes: produtividadeEfetivaKwhKwpMes ?? parametros.produtividadeKwhKwpMes,
       percentualFioB: parametros.percentualFioB,
-      disponibilidadeKwh: parametros[DISPONIBILIDADE_PADRAO_CAMEL[tipoLigacao]],
+      disponibilidadeKwh: parametros[DISPONIBILIDADE_PADRAO_CAMEL[redeConfirmada.tipoLigacao]],
     });
-  }, [parametros, tipoLigacao, consumoMedioKwh, valorFaturaMedio, tarifaKwh, potenciaKwp, valor]);
+  }, [parametros, potenciaDcKwpMotor, tarifaNum, redeConfirmada, consumoParaMotor, valor, produtividadeEfetivaKwhKwpMes]);
+
+  // Prévia do kit personalizado (fallback manual) — independente do motor, como já era.
+  const previaKitManual = useMemo(() => {
+    const precoKit = numero(valor);
+    if (!parametros || potenciaKitManualKwp <= 0 || !tarifaNum || !consumoParaMotor || !redeConfirmada) return null;
+    return calcular({
+      potenciaKwp: potenciaKitManualKwp,
+      precoKit: precoKit ?? 0,
+      tipoLigacao: redeConfirmada.tipoLigacao,
+      consumoMedioKwh: consumoParaMotor,
+      tarifaKwh: tarifaNum,
+      produtividadeKwhKwpMes: produtividadeEfetivaKwhKwpMes ?? parametros.produtividadeKwhKwpMes,
+      percentualFioB: parametros.percentualFioB,
+      disponibilidadeKwh: parametros[DISPONIBILIDADE_PADRAO_CAMEL[redeConfirmada.tipoLigacao]],
+    });
+  }, [parametros, redeConfirmada, consumoParaMotor, tarifaNum, potenciaKitManualKwp, valor, produtividadeEfetivaKwhKwpMes]);
 
   function pesquisar(termo: string) {
     setBusca(termo);
@@ -325,6 +453,7 @@ export function FormularioNegocio({
       return setEtapaAtual(2);
     }
     if (etapaAtual === 2) {
+      if (!redeConfirmada) return setErroEtapa("Confirme o tipo de ligação e a tensão da rede elétrica pra continuar.");
       setErroEtapa(null);
       return setEtapaAtual(3);
     }
@@ -339,8 +468,8 @@ export function FormularioNegocio({
     <form action={acao} className="flex flex-col gap-5">
       <input type="hidden" name="funil_id" value={funilId} />
       {etapaId && <input type="hidden" name="etapa_id" value={etapaId} />}
-      <input type="hidden" name="tipo_ligacao" value={tipoLigacao} />
-      <input type="hidden" name="componentes" value={JSON.stringify(componentes)} />
+      {redeConfirmada && <input type="hidden" name="tipo_ligacao" value={redeConfirmada.tipoLigacao} />}
+      <input type="hidden" name="componentes" value={JSON.stringify(componentesKitManual)} />
       <input type="hidden" name="contato_endereco" value={enderecoCompleto} />
       <input type="hidden" name="contato_nome" value={contatoNome} />
       <input type="hidden" name="contato_telefone" value={contatoTelefone} />
@@ -349,6 +478,7 @@ export function FormularioNegocio({
       <input type="hidden" name="consumo_medio_kwh" value={consumoMedioKwh} />
       <input type="hidden" name="valor_fatura_medio" value={valorFaturaMedio} />
       <input type="hidden" name="tarifa_kwh" value={tarifaKwh} />
+      <input type="hidden" name="origem_tarifa" value={origemTarifaEfetiva} />
       <input type="hidden" name="estrutura_telhado" value={estruturaTelhado} />
       {contato && <input type="hidden" name="contato_id" value={contato.id} />}
 
@@ -358,7 +488,17 @@ export function FormularioNegocio({
       <div className={etapaAtual === 1 ? "flex flex-col gap-5" : "hidden"}>
         <fieldset className="grid gap-3 md:grid-cols-2">
           <legend className="mb-2 text-sm font-semibold text-zinc-900">Negócio</legend>
-          <Campo rotulo="Nome do negócio" name="titulo" placeholder="Ex.: Residência 5 kWp" required />
+          <Campo
+            rotulo="Nome do negócio"
+            name="titulo"
+            placeholder="Ex.: Residência 5 kWp"
+            value={tituloNegocio}
+            onChange={(e) => {
+              setTituloNegocio(e.target.value);
+              setTituloTocado(true);
+            }}
+            required
+          />
           <Selecao rotulo="Origem" name="origem_id" required defaultValue="">
             <option value="" disabled>
               Selecione
@@ -515,7 +655,8 @@ export function FormularioNegocio({
             ))}
           </Selecao>
           <p className="text-xs text-zinc-400 md:col-span-3">
-            Cidade e estado identificam a distribuidora de energia e a tarifa aplicável — preencha pelo CEP ou manualmente.
+            Cidade e estado identificam a distribuidora de energia e a tarifa aplicável — a conferência aparece na Etapa
+            3. Preencha pelo CEP ou manualmente.
           </p>
         </fieldset>
 
@@ -543,19 +684,12 @@ export function FormularioNegocio({
         <fieldset className="flex flex-col gap-3">
           <legend className="mb-2 text-sm font-semibold text-zinc-900">Documentos inteligentes (opcional)</legend>
           <div className="grid gap-3 md:grid-cols-2">
-            <CardDocumentoInteligente
-              titulo="📄 Anexar CNH"
-              legenda="Preencher cadastro automaticamente"
-              name="anexo_cnh_contato"
-              accept="image/*,.pdf"
-              campos={["Nome encontrado", "CPF encontrado", "Data de nascimento encontrada"]}
-            />
+            <CardDocumentoInteligente titulo="📄 Anexar CNH" legenda="Anexo do cliente" name="anexo_cnh_contato" accept="image/*,.pdf" />
             <CardDocumentoInteligente
               titulo="⚡ Anexar conta de energia"
-              legenda="Preencher dados automaticamente"
+              legenda="Anexo do cliente"
               name="anexo_fatura_gerador"
               accept="image/*,.pdf"
-              campos={["Distribuidora", "Unidade consumidora", "Endereço", "Consumo médio"]}
             />
           </div>
         </fieldset>
@@ -570,83 +704,159 @@ export function FormularioNegocio({
 
       {/* Etapa 2 — Sistema recomendado */}
       <div className={etapaAtual === 2 ? "flex flex-col gap-5" : "hidden"}>
+        {/* Rede elétrica — bloco obrigatório na entrada da Etapa 2 (movido da Etapa 3, Fase 4): o
+            motor já calcula potência DC e quantidade de módulos sem isso, mas a escolha do
+            inversor fica "a confirmar" até esse bloco ser preenchido. */}
+        {!redeConfirmada ? (
+          <fieldset className="flex flex-col gap-3 rounded-lg border border-amber-200 bg-amber-50/60 p-4">
+            <legend className="mb-1 text-sm font-semibold text-zinc-900">Rede elétrica</legend>
+            <p className="-mt-2 text-xs text-zinc-500">
+              Necessário pra confirmar o inversor certo pra esse cliente — até confirmar, o motor já calcula a potência
+              e a quantidade de módulos, mas a escolha do inversor fica pendente.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Selecao
+                rotulo="Tipo de ligação*"
+                value={tipoLigacaoRascunho}
+                onChange={(e) => setTipoLigacaoRascunho(e.target.value as TipoLigacao)}
+              >
+                {TIPOS_LIGACAO.map((t) => (
+                  <option key={t} value={t}>
+                    {ROTULO_TIPO_LIGACAO[t]}
+                  </option>
+                ))}
+              </Selecao>
+              <div className="flex flex-col gap-1">
+                <Selecao rotulo="Tensão*" value={tensaoRascunho} onChange={(e) => setTensaoRascunho(e.target.value)}>
+                  <option value="">Selecione</option>
+                  {TENSOES_REDE_COMUNS.map((t) => (
+                    <option key={t} value={t}>
+                      {t}V
+                    </option>
+                  ))}
+                  <option value="outra">Outra</option>
+                </Selecao>
+                {tensaoRascunho === "outra" && (
+                  <Campo
+                    rotulo="Tensão informada (V)"
+                    inputMode="decimal"
+                    placeholder="ex.: 600"
+                    value={tensaoOutraValor}
+                    onChange={(e) => setTensaoOutraValor(e.target.value)}
+                  />
+                )}
+              </div>
+            </div>
+            <Botao type="button" onClick={confirmarRedeEletrica} disabled={!tensaoRascunhoValida} className="self-start">
+              Confirmar rede elétrica
+            </Botao>
+          </fieldset>
+        ) : (
+          <div className="flex items-center justify-between rounded-lg bg-zinc-50 px-3 py-2 text-sm">
+            <span className="text-zinc-700">
+              Rede elétrica: <strong className="text-zinc-900">{ROTULO_TIPO_LIGACAO[redeConfirmada.tipoLigacao]}</strong>
+              {redeConfirmada.tensaoRedeV != null && ` · ${redeConfirmada.tensaoRedeV}V`}
+            </span>
+            <button type="button" className="text-xs font-medium text-amber-700 hover:underline" onClick={alterarRedeEletrica}>
+              Alterar
+            </button>
+          </div>
+        )}
+
         <fieldset className="flex flex-col gap-3">
           <legend className="mb-2 text-sm font-semibold text-zinc-900">Resumo do sistema</legend>
           <dl className="grid grid-cols-2 gap-3 rounded-lg bg-zinc-50 px-4 py-3 text-sm md:grid-cols-3">
             <div>
               <dt className="text-zinc-500">Consumo mensal</dt>
               <dd className="font-medium text-zinc-900">
-                {consumoMedioEstimado ? `${consumoMedioEstimado.toLocaleString("pt-BR")} kWh` : "—"}
+                {consumoParaMotor ? `${consumoParaMotor.toLocaleString("pt-BR")} kWh` : "—"}
               </dd>
             </div>
             <div>
               <dt className="text-zinc-500">Produtividade</dt>
-              <dd className="font-medium text-zinc-900">{parametros?.produtividadeKwhKwpMes ?? 120} kWh/kWp/mês</dd>
+              <dd className="font-medium text-zinc-900">
+                {produtividadeEngineKwhKwpMes ? `${produtividadeEngineKwhKwpMes.toLocaleString("pt-BR")} kWh/kWp/mês` : "—"}{" "}
+                <span className="font-normal text-zinc-400">
+                  {produtividadeRegional.carregando
+                    ? "(buscando…)"
+                    : origemProdutividadeEngine === "padrao"
+                      ? "(padrão da empresa)"
+                      : `(${origemProdutividadeEngine.toUpperCase()})`}
+                </span>
+              </dd>
             </div>
             <div>
               <dt className="text-zinc-500">Sistema recomendado</dt>
-              <dd className="font-medium text-zinc-900">{sistemaMockKwp ? `${sistemaMockKwp.toLocaleString("pt-BR")} kWp` : "—"}</dd>
+              <dd className="font-medium text-zinc-900">{potenciaDcKwpMotor ? `${potenciaDcKwpMotor.toLocaleString("pt-BR")} kWp` : "—"}</dd>
             </div>
           </dl>
-
-          {sistemaMockKwp && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4">
-              <p className="mb-2 text-sm font-semibold text-zinc-900">Kit recomendado (estimativa)</p>
-              <dl className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
-                <div>
-                  <dt className="text-zinc-500">Potência</dt>
-                  <dd className="font-medium text-zinc-900">{sistemaMockKwp.toLocaleString("pt-BR")} kWp</dd>
-                </div>
-                <div>
-                  <dt className="text-zinc-500">Módulos</dt>
-                  <dd className="font-medium text-zinc-900">{Math.max(1, Math.round((sistemaMockKwp * 1000) / 620))} × 620 W</dd>
-                </div>
-                <div>
-                  <dt className="text-zinc-500">Inversor</dt>
-                  <dd className="font-medium text-zinc-900">exemplo de catálogo</dd>
-                </div>
-                <div>
-                  <dt className="text-zinc-500">Geração / economia / payback</dt>
-                  <dd className="font-medium text-zinc-900">a calcular</dd>
-                </div>
-              </dl>
-              <p className="mt-2 text-xs text-zinc-500">
-                Estimativa ilustrativa — os números reais aparecem ao montar o kit manualmente ou depois de informar a
-                tarifa, na Etapa 3.
-              </p>
-            </div>
+          {produtividadeRegional.erro && (
+            <p className="flex items-start gap-2 rounded-lg bg-cinza-claro/40 px-3 py-2 text-xs text-zinc-600">
+              <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-cinza" />
+              {produtividadeRegional.erro} Usando a produtividade padrão configurada da empresa.
+            </p>
           )}
 
-          <div className="flex flex-col gap-2">
-            <div className="flex items-start gap-2 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-800">
-              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>Combinação compatível · MPPT validado · Voc validado</span>
-            </div>
-            {!mostrarAlertasExemplo ? (
-              <button
-                type="button"
-                className="self-start text-xs font-medium text-amber-700 hover:underline"
-                onClick={() => setMostrarAlertasExemplo(true)}
-              >
-                Ver outros exemplos de alerta técnico
-              </button>
-            ) : (
-              <>
-                <div className="flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                  <span>
-                    Overload acima do recomendado (110%) — limite automático: 30% <em className="text-amber-600">(exemplo)</em>
-                  </span>
-                </div>
-                <div className="flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
-                  <XCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                  <span>
-                    Combinação incompatível — motivo: faixa MPPT inválida <em className="text-red-600">(exemplo)</em>
-                  </span>
-                </div>
-              </>
-            )}
-          </div>
+          {faltaConsumoParaMotor ? (
+            <p className="flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              {MENSAGEM_CONSUMO_OBRIGATORIO} Enquanto a tarifa da distribuidora não é resolvida (Etapa 3), não dá pra
+              estimar o consumo a partir só do valor da conta.
+            </p>
+          ) : (
+            <PainelDimensionamento
+              consumoMedioKwh={consumoParaMotor}
+              produtividadeKwhKwpMes={produtividadeEngineKwhKwpMes}
+              origemProdutividade={origemProdutividadeEngine}
+              margemDimensionamentoPct={parametros?.margemDimensionamentoPct ?? 0.2}
+              overloadMaximoPct={parametros?.overloadMaximoPct ?? 0.3}
+              overloadCriticoPct={parametros?.overloadCriticoPct ?? 0.5}
+              temperaturaMinimaProjetoC={parametros?.temperaturaMinimaProjetoC ?? 0}
+              modulos={modulosAtivos}
+              inversores={inversoresAtivos}
+              redeEletrica={redeConfirmada}
+              onAlteracao={setCamposDimensionamento}
+            />
+          )}
+
+          {potenciaDcKwpMotor != null && (
+            <dl className="grid grid-cols-2 gap-3 rounded-lg bg-zinc-50 px-4 py-3 text-sm md:grid-cols-3">
+              <div>
+                <dt className="text-zinc-500">Geração estimada</dt>
+                <dd className="font-medium text-zinc-900">
+                  {geracaoEstimadaMotorKwhMes != null ? (
+                    `${geracaoEstimadaMotorKwhMes.toLocaleString("pt-BR")} kWh/mês`
+                  ) : (
+                    <span className="text-zinc-400">pendente — falta confirmar a rede elétrica</span>
+                  )}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-zinc-500">Economia estimada</dt>
+                <dd className="font-medium text-zinc-900">
+                  {previaMotor ? (
+                    `${formatarMoeda(previaMotor.economiaMensal)}/mês`
+                  ) : (
+                    <span className="text-zinc-400">pendente de tarifa</span>
+                  )}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-zinc-500">Payback estimado</dt>
+                <dd className="font-medium text-zinc-900">
+                  {previaMotor ? (
+                    previaMotor.paybackMeses != null ? (
+                      `${previaMotor.paybackMeses.toLocaleString("pt-BR")} meses`
+                    ) : (
+                      "—"
+                    )
+                  ) : (
+                    <span className="text-zinc-400">pendente de tarifa</span>
+                  )}
+                </dd>
+              </div>
+            </dl>
+          )}
         </fieldset>
 
         <div className="flex flex-col gap-1">
@@ -675,30 +885,51 @@ export function FormularioNegocio({
         ) : (
           <fieldset className="flex flex-col gap-3">
             <legend className="mb-2 text-sm font-semibold text-zinc-900">Kit personalizado</legend>
-            <EditorComponentesKit linhas={linhas} onChange={setLinhas} sugerirQuantidadeModulo={sugerirQuantidadeModulo} />
-            {previa && (
+            <EditorComponentesKit
+              linhas={linhas}
+              onChange={setLinhas}
+              sugerirQuantidadeModulo={sugerirQuantidadeModulo}
+              catalogoPorTipo={{ modulo: modulosAtivos, inversor: inversoresAtivos }}
+            />
+            {potenciaKitManualKwp > 0 && (
               <>
                 <dl className="grid grid-cols-2 gap-3 rounded-lg bg-amber-50 px-4 py-3 text-sm md:grid-cols-4">
                   <div>
                     <dt className="text-zinc-500">Potência do kit</dt>
-                    <dd className="font-medium text-zinc-900">{potenciaKwp.toLocaleString("pt-BR")} kWp</dd>
+                    <dd className="font-medium text-zinc-900">{potenciaKitManualKwp.toLocaleString("pt-BR")} kWp</dd>
                   </div>
                   <div>
                     <dt className="text-zinc-500">Geração estimada</dt>
-                    <dd className="font-medium text-zinc-900">{previa.geracaoEstimadaKwhMes.toLocaleString("pt-BR")} kWh/mês</dd>
+                    <dd className="font-medium text-zinc-900">
+                      {geracaoEstimadaKitManualKwhMes != null ? (
+                        `${geracaoEstimadaKitManualKwhMes.toLocaleString("pt-BR")} kWh/mês`
+                      ) : (
+                        <span className="text-zinc-400">pendente — falta confirmar a rede elétrica</span>
+                      )}
+                    </dd>
                   </div>
                   <div>
                     <dt className="text-zinc-500">Economia estimada</dt>
-                    <dd className="font-medium text-green-700">{formatarMoeda(previa.economiaMensal)}/mês</dd>
+                    <dd className="font-medium text-carvao">
+                      {previaKitManual ? `${formatarMoeda(previaKitManual.economiaMensal)}/mês` : <span className="text-zinc-400">pendente de tarifa</span>}
+                    </dd>
                   </div>
                   <div>
                     <dt className="text-zinc-500">Payback estimado</dt>
                     <dd className="font-medium text-zinc-900">
-                      {previa.paybackMeses != null ? `${previa.paybackMeses.toLocaleString("pt-BR")} meses` : "—"}
+                      {previaKitManual ? (
+                        previaKitManual.paybackMeses != null ? (
+                          `${previaKitManual.paybackMeses.toLocaleString("pt-BR")} meses`
+                        ) : (
+                          "—"
+                        )
+                      ) : (
+                        <span className="text-zinc-400">pendente de tarifa</span>
+                      )}
                     </dd>
                   </div>
                 </dl>
-                {potenciaKwp > 0 && parametros && (previa.geracaoEstimadaKwhMes ?? 0) > 0 ? null : (
+                {geracaoEstimadaKitManualKwhMes != null && geracaoEstimadaKitManualKwhMes <= 0 && (
                   <div className="flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                     <span>Confira a combinação de módulo e inversor — faltam dados pra validar o dimensionamento.</span>
@@ -725,21 +956,84 @@ export function FormularioNegocio({
         <fieldset className="grid gap-3 md:grid-cols-2">
           <legend className="mb-2 text-sm font-semibold text-zinc-900">Dados da unidade consumidora</legend>
           <Campo rotulo="Unidade consumidora" name="unidade_consumidora" placeholder="Opcional" />
-          <Campo rotulo="Distribuidora" placeholder="Preenchida automaticamente em breve" disabled />
-          <Campo
-            rotulo="Tarifa ANEEL (R$/kWh)"
-            inputMode="decimal"
-            placeholder="ex.: 0,95"
-            value={tarifaKwh}
-            onChange={(e) => setTarifaKwh(e.target.value)}
-          />
-          <Selecao rotulo="Tipo de ligação" value={tipoLigacao} onChange={(e) => setTipoLigacao(e.target.value as TipoLigacao)}>
-            {TIPOS_LIGACAO.map((t) => (
-              <option key={t} value={t}>
-                {ROTULO_TIPO_LIGACAO[t]}
-              </option>
-            ))}
-          </Selecao>
+
+          <div className="flex flex-col gap-1">
+            {resolucaoDistribuidora.carregando ? (
+              <Campo rotulo="Distribuidora" value="Buscando distribuidora…" disabled />
+            ) : resolucaoDistribuidora.resolucao?.tipo === "unica" ? (
+              <Campo rotulo="Distribuidora" value={resolucaoDistribuidora.resolucao.distribuidora.siglaDistribuidora} disabled />
+            ) : resolucaoDistribuidora.resolucao?.tipo === "ambigua" ? (
+              <Selecao
+                rotulo="Distribuidora*"
+                value={siglaDistribuidora ?? ""}
+                onChange={(e) => resolucaoDistribuidora.registrarEscolha({ siglaDistribuidora: e.target.value })}
+              >
+                <option value="" disabled>
+                  Selecione — o município tem mais de uma distribuidora
+                </option>
+                {resolucaoDistribuidora.resolucao.distribuidoras.map((d) => (
+                  <option key={d.siglaDistribuidora} value={d.siglaDistribuidora}>
+                    {d.siglaDistribuidora}
+                  </option>
+                ))}
+              </Selecao>
+            ) : (
+              <div className="flex flex-col gap-1">
+                <Campo
+                  rotulo="Distribuidora (sigla)*"
+                  value={siglaManualRascunho}
+                  placeholder="Ex.: CPFL-PAULISTA"
+                  onChange={(e) => setSiglaManualRascunho(e.target.value.toUpperCase())}
+                />
+                <button
+                  type="button"
+                  className="self-start text-xs font-medium text-amber-700 hover:underline disabled:cursor-not-allowed disabled:text-zinc-300"
+                  disabled={!siglaManualRascunho.trim()}
+                  onClick={() => resolucaoDistribuidora.registrarEscolha({ siglaDistribuidora: siglaManualRascunho.trim() })}
+                >
+                  Confirmar distribuidora
+                </button>
+                <p className="text-xs text-zinc-400">
+                  Não encontramos a distribuidora pelo município — selecione manualmente.
+                  {parametros?.siglaDistribuidoraAneelFallback &&
+                    ` Sugestão da empresa: ${parametros.siglaDistribuidoraAneelFallback}.`}
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <Campo
+              rotulo="Tarifa ANEEL (R$/kWh)"
+              inputMode="decimal"
+              placeholder="ex.: 0,95"
+              value={tarifaKwh}
+              onChange={(e) => {
+                setTarifaKwh(e.target.value);
+                setTarifaTocada(true);
+              }}
+            />
+            {tarifaAneel.carregando ? (
+              <p className="text-xs text-zinc-400">Buscando tarifa homologada da ANEEL…</p>
+            ) : tarifaKwh ? (
+              <p className="text-xs text-zinc-400">
+                Origem: {origemTarifaEfetiva === "aneel" ? "ANEEL" : "ajustada manualmente"}
+                {origemTarifaEfetiva === "aneel" && tarifaAneel.resolucaoHomologatoria && ` (${tarifaAneel.resolucaoHomologatoria})`}
+              </p>
+            ) : tarifaAneel.erro ? (
+              <p className="text-xs text-zinc-400">{tarifaAneel.erro} Informe a tarifa manualmente.</p>
+            ) : (
+              <p className="text-xs text-zinc-400">Resolvida automaticamente assim que a distribuidora for confirmada.</p>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 md:col-span-2">
+            <span className="text-sm text-zinc-700">
+              Rede elétrica: <strong>{ROTULO_TIPO_LIGACAO[redeConfirmada?.tipoLigacao ?? "trifasico"]}</strong>
+              {redeConfirmada?.tensaoRedeV != null && ` · ${redeConfirmada.tensaoRedeV}V`}
+            </span>
+            <Selo tom="neutro">confirmada na Etapa 2</Selo>
+          </div>
         </fieldset>
 
         <fieldset className="grid gap-3 md:grid-cols-2">

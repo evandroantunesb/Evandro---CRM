@@ -1,52 +1,56 @@
 import { Cartao } from "@/components/ui";
-import { carregarConfiguracao } from "@/lib/crm";
+import { PADROES_DIMENSIONAMENTO } from "@/lib/calculadora";
+import { paraEquipamentoAtivo } from "@/lib/dimensionamento";
+import { participaDoMotor } from "@/lib/equipamentos";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { FormularioParametros, LinhaKit, NovoKit } from "./formularios";
+import { SimuladorDimensionamento } from "./simulador";
 
-export default async function ConfigCalculadora() {
+/** Número vindo do banco, ou o padrão quando a coluna ainda não existe/está vazia. */
+function numeroOu(valor: unknown, padrao: number) {
+  return typeof valor === "number" && Number.isFinite(valor) ? valor : padrao;
+}
+
+/** Aba "Calculadora": simulação administrativa do motor de dimensionamento (não grava nada). */
+export default async function SimulacaoCalculadora() {
   const { atual } = await exigirPapel("admin");
   const supabase = await criarClienteServidor();
-  const [{ kits }, { data: parametros }] = await Promise.all([
-    carregarConfiguracao(atual.empresaId),
-    supabase.from("parametros_calculadora").select("*").eq("empresa_id", atual.empresaId).single(),
+  const [{ data: parametros }, { data: equipamentos }] = await Promise.all([
+    supabase.from("parametros_calculadora").select("*").eq("empresa_id", atual.empresaId).maybeSingle(),
+    // Mesmo recorte de "Adicionar negócio": ativos e com status técnico que participa do motor.
+    supabase
+      .from("equipamentos_empresa")
+      .select("*")
+      .eq("empresa_id", atual.empresaId)
+      .eq("ativo", true)
+      .order("tipo")
+      .order("prioridade", { ascending: false }),
   ]);
+  const catalogoMotor = (equipamentos ?? []).filter((e) => participaDoMotor(e.status_tecnico));
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-4">
-      <h1 className="text-2xl font-semibold text-zinc-900">Kits e calculadora</h1>
-      <Cartao titulo={`Kits (${kits.length})`}>
-        <p className="mb-3 text-sm text-zinc-600">
-          Kits prontos do catálogo, com potência e preço. O vendedor escolhe um deles na calculadora do negócio.
-        </p>
-        {kits.map((k) => (
-          <LinhaKit key={k.id} item={k} />
-        ))}
-        <div className="mt-3">
-          <NovoKit />
-        </div>
-      </Cartao>
-      <Cartao titulo="Parâmetros da calculadora">
-        <p className="mb-3 text-sm text-zinc-600">
-          Usados na estimativa de economia (modo comercial, sem simulação de engenharia). Valide estes números com o
-          engenheiro responsável antes de usar com clientes.
-        </p>
-        {parametros && (
-          <FormularioParametros
-            parametros={{
-              produtividadeKwhKwpMes: parametros.produtividade_kwh_kwp_mes,
-              percentualFioB: parametros.percentual_fio_b,
-              disponibilidadeMonoKwh: parametros.disponibilidade_mono_kwh,
-              disponibilidadeBiKwh: parametros.disponibilidade_bi_kwh,
-              disponibilidadeTriKwh: parametros.disponibilidade_tri_kwh,
-              custoInstalacaoPorModulo: parametros.custo_instalacao_por_modulo,
-              custoMaterialCaPorKwp: parametros.custo_material_ca_por_kwp,
-              custoEngenharia: parametros.custo_engenharia,
-              comissaoPercentual: parametros.comissao_percentual,
-            }}
-          />
-        )}
-      </Cartao>
-    </div>
+    <Cartao titulo="Simular dimensionamento">
+      <p className="mb-3 text-sm text-zinc-600">
+        Teste o motor com um consumo hipotético e veja o kit que ele recomendaria com o Catálogo e os Parâmetros de
+        hoje. Nada é salvo e nenhum negócio é criado.
+      </p>
+      <SimuladorDimensionamento
+        parametros={{
+          produtividadeKwhKwpMes: parametros ? numeroOu(parametros.produtividade_kwh_kwp_mes, 0) || null : null,
+          margemDimensionamentoPct: numeroOu(
+            parametros?.margem_dimensionamento_pct,
+            PADROES_DIMENSIONAMENTO.margemDimensionamentoPct,
+          ),
+          overloadMaximoPct: numeroOu(parametros?.overload_maximo_pct, PADROES_DIMENSIONAMENTO.overloadMaximoPct),
+          overloadCriticoPct: numeroOu(parametros?.overload_critico_pct, PADROES_DIMENSIONAMENTO.overloadCriticoPct),
+          temperaturaMinimaProjetoC: numeroOu(
+            parametros?.temperatura_minima_projeto_c,
+            PADROES_DIMENSIONAMENTO.temperaturaMinimaProjetoC,
+          ),
+        }}
+        modulos={catalogoMotor.filter((e) => e.tipo === "modulo").map(paraEquipamentoAtivo)}
+        inversores={catalogoMotor.filter((e) => e.tipo === "inversor").map(paraEquipamentoAtivo)}
+      />
+    </Cartao>
   );
 }

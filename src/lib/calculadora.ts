@@ -73,6 +73,19 @@ export const DISPONIBILIDADE_PADRAO: Record<TipoLigacao, "disponibilidade_mono_k
   trifasico: "disponibilidade_tri_kwh",
 };
 
+/**
+ * Defaults do banco (migrations 20260930150000_equipamentos_empresa.sql e
+ * 20260930160000_equipamentos_campos_eletricos.sql) pros parâmetros do dimensionamento
+ * automático — usados só quando o valor não veio (registro antigo, ou banco ainda sem a
+ * coluna), pra tela nunca mostrar "NaN"/"undefined".
+ */
+export const PADROES_DIMENSIONAMENTO = {
+  margemDimensionamentoPct: 0.2,
+  overloadMaximoPct: 0.3,
+  overloadCriticoPct: 0.5,
+  temperaturaMinimaProjetoC: 0,
+} as const;
+
 /** Mesma coisa que DISPONIBILIDADE_PADRAO, para os parâmetros já carregados em camelCase no cliente. */
 export const DISPONIBILIDADE_PADRAO_CAMEL: Record<
   TipoLigacao,
