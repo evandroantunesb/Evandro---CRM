@@ -693,6 +693,7 @@ export type Database = {
             | null;
           origem_produtividade: Database["public"]["Enums"]["origem_produtividade_dimensionamento"];
           origem_tarifa: Database["public"]["Enums"]["origem_tarifa_dimensionamento"];
+          overload_critico_pct: number;
           overload_maximo_pct: number;
           overload_pct: number;
           payback_meses: number | null;
@@ -733,6 +734,7 @@ export type Database = {
             | null;
           origem_produtividade?: Database["public"]["Enums"]["origem_produtividade_dimensionamento"];
           origem_tarifa?: Database["public"]["Enums"]["origem_tarifa_dimensionamento"];
+          overload_critico_pct: number;
           overload_maximo_pct: number;
           overload_pct: number;
           payback_meses?: number | null;
@@ -773,6 +775,7 @@ export type Database = {
             | null;
           origem_produtividade?: Database["public"]["Enums"]["origem_produtividade_dimensionamento"];
           origem_tarifa?: Database["public"]["Enums"]["origem_tarifa_dimensionamento"];
+          overload_critico_pct?: number;
           overload_maximo_pct?: number;
           overload_pct?: number;
           payback_meses?: number | null;
@@ -2454,6 +2457,7 @@ export type Database = {
           disponibilidade_tri_kwh: number;
           empresa_id: string;
           margem_dimensionamento_pct: number;
+          overload_critico_pct: number;
           overload_maximo_pct: number;
           percentual_fio_b: number;
           produtividade_kwh_kwp_mes: number;
@@ -2471,6 +2475,7 @@ export type Database = {
           disponibilidade_tri_kwh?: number;
           empresa_id: string;
           margem_dimensionamento_pct?: number;
+          overload_critico_pct?: number;
           overload_maximo_pct?: number;
           percentual_fio_b?: number;
           produtividade_kwh_kwp_mes?: number;
@@ -2488,6 +2493,7 @@ export type Database = {
           disponibilidade_tri_kwh?: number;
           empresa_id?: string;
           margem_dimensionamento_pct?: number;
+          overload_critico_pct?: number;
           overload_maximo_pct?: number;
           percentual_fio_b?: number;
           produtividade_kwh_kwp_mes?: number;
@@ -3399,7 +3405,7 @@ export type Database = {
       tipo_pessoa: "pf" | "pj";
       tipo_plano: "gratuito" | "pago";
       tipo_tarefa: "ligacao" | "whatsapp" | "visita" | "reuniao" | "email" | "outro";
-      tipo_validacao_dimensionamento: "valido" | "valido_com_alerta";
+      tipo_validacao_dimensionamento: "valido" | "alerta" | "critico";
       tipo_validacao_eletrica_dimensionamento: "valido" | "nao_verificado";
       tipo_vendedor: "interno" | "representante";
     };
@@ -3546,7 +3552,7 @@ export const Constants = {
       tipo_pessoa: ["pf", "pj"],
       tipo_plano: ["gratuito", "pago"],
       tipo_tarefa: ["ligacao", "whatsapp", "visita", "reuniao", "email", "outro"],
-      tipo_validacao_dimensionamento: ["valido", "valido_com_alerta"],
+      tipo_validacao_dimensionamento: ["valido", "alerta", "critico"],
       tipo_validacao_eletrica_dimensionamento: ["valido", "nao_verificado"],
       tipo_vendedor: ["interno", "representante"],
     },

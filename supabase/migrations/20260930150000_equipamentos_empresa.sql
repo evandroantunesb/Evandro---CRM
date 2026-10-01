@@ -47,4 +47,11 @@ alter table public.parametros_calculadora
   add column margem_dimensionamento_pct numeric(4, 3) not null default 0.20
     check (margem_dimensionamento_pct >= 0 and margem_dimensionamento_pct <= 1),
   add column overload_maximo_pct numeric(4, 3) not null default 0.30
-    check (overload_maximo_pct >= 0 and overload_maximo_pct <= 1);
+    check (overload_maximo_pct >= 0 and overload_maximo_pct <= 1),
+  -- Segundo limiar de overload (Evandro, 2026-10-01): até `overload_maximo_pct` passa
+  -- direto (sugerido automaticamente); entre esse limite e `overload_critico_pct` o
+  -- vendedor vê um aviso leve; acima de `overload_critico_pct`, um alerta forte. Em
+  -- nenhuma faixa a escolha manual é bloqueada — só muda a sinalização visual.
+  add column overload_critico_pct numeric(4, 3) not null default 0.50
+    check (overload_critico_pct >= 0 and overload_critico_pct <= 2
+      and overload_critico_pct >= overload_maximo_pct);

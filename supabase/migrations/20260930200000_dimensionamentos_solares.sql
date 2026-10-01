@@ -11,7 +11,10 @@
 -- (`kit_componentes`, que só guarda texto solto). `kit_componentes` continua
 -- existindo para os itens que não entram na fórmula elétrica (bateria,
 -- estrutura, outros).
-create type public.tipo_validacao_dimensionamento as enum ('valido', 'valido_com_alerta');
+-- 3 faixas de overload (Evandro, 2026-10-01): 'valido' (dentro do limite automático),
+-- 'alerta' (acima do limite, até o limite crítico — aviso leve) e 'critico' (acima do
+-- limite crítico — alerta forte). Nenhuma das três bloqueia a escolha manual.
+create type public.tipo_validacao_dimensionamento as enum ('valido', 'alerta', 'critico');
 create type public.tipo_validacao_eletrica_dimensionamento as enum ('valido', 'nao_verificado');
 create type public.origem_produtividade_dimensionamento as enum ('padrao', 'pvgis', 'nasa');
 create type public.origem_tarifa_dimensionamento as enum ('manual', 'aneel');
@@ -39,6 +42,7 @@ create table public.dimensionamentos_solares (
   -- edição/proposta nunca precisar adivinhar o que gerou este snapshot.
   margem_dimensionamento_pct numeric(4, 3) not null check (margem_dimensionamento_pct >= 0 and margem_dimensionamento_pct <= 1),
   overload_maximo_pct numeric(4, 3) not null check (overload_maximo_pct >= 0 and overload_maximo_pct <= 1),
+  overload_critico_pct numeric(4, 3) not null check (overload_critico_pct >= 0 and overload_critico_pct <= 2),
   temperatura_minima_projeto_c numeric(4, 1) not null,
   consumo_medio_kwh numeric(10, 2) not null check (consumo_medio_kwh > 0),
   valor_fatura_medio numeric(12, 2),
@@ -93,10 +97,11 @@ create policy "apagar dimensionamento" on public.dimensionamentos_solares for de
     and (criado_por = public.meu_membro_id(empresa_id) or public.tem_papel(empresa_id, '{admin}'))
   );
 
--- Auditoria de override manual (pedido do Evandro, 2026-09-30): overload acima do limite
--- automático (`overload_maximo_pct`) nunca é sugerido pelo motor (ver `dimensionamento.ts`),
--- só existe quando o vendedor escolhe/ajusta manualmente uma combinação que ultrapassa o
--- limite — isso precisa ficar registrado na linha do tempo do negócio, não só na tabela.
+-- Auditoria de override manual (pedido do Evandro, 2026-09-30; 3 faixas desde 2026-10-01):
+-- overload acima do limite automático (`overload_maximo_pct`) nunca é sugerido pelo motor
+-- (ver `dimensionamento.ts`), só existe quando o vendedor escolhe/ajusta manualmente uma
+-- combinação que ultrapassa o limite ('alerta' ou 'critico') — isso precisa ficar registrado
+-- na linha do tempo do negócio, não só na tabela.
 create or replace function public.registrar_overload_manual_dimensionamento()
 returns trigger
 language plpgsql security definer set search_path = ''
@@ -104,7 +109,7 @@ as $$
 declare
   v_ator uuid := (select auth.uid());
 begin
-  if new.validacao = 'valido_com_alerta' and (
+  if new.validacao in ('alerta', 'critico') and (
     tg_op = 'INSERT'
     or old.overload_pct is distinct from new.overload_pct
     or old.modulo_equipamento_id is distinct from new.modulo_equipamento_id
@@ -115,8 +120,10 @@ begin
       values (
         new.empresa_id, new.negocio_id, 'dimensionamento_overload_manual', v_ator,
         jsonb_build_object(
+          'validacao', new.validacao,
           'overload_pct', new.overload_pct,
           'overload_maximo_pct', new.overload_maximo_pct,
+          'overload_critico_pct', new.overload_critico_pct,
           'potencia_dc_kwp', new.potencia_dc_kwp,
           'potencia_ac_kw', new.potencia_ac_kw,
           'quantidade_modulos', new.quantidade_modulos,

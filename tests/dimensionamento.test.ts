@@ -24,6 +24,7 @@ describe("dimensionarSistemaAutomatico", () => {
       modulos: [modulo620],
       inversores: [inversor65],
       overloadMaximoPct: 0.3,
+      overloadCriticoPct: 0.5,
       temperaturaMinimaProjetoC: TEMPERATURA_PADRAO_C,
     });
     // potência alvo = 780*1,2/120 = 7,8 kWp -> 13 módulos de 620W = 8,06 kWp
@@ -36,7 +37,7 @@ describe("dimensionarSistemaAutomatico", () => {
   it("separa dcAcRatio (Pdc/Pac) de overloadPct ((Pdc/Pac - 1)) — bug relatado pelo Evandro em 2026-09-30", () => {
     // 17 módulos de 620W = 10,54 kWp / inversor de 5 kW -> ratio 2,108, overload 110,8% (não 210,8%).
     const inversor5: EquipamentoAtivo = { id: "i4", fabricante: "Sungrow", modelo: "SG5", potenciaW: 5000, prioridade: 0 };
-    const opcao = avaliarCombinacaoEscolhida(modulo620, inversor5, 17, 0.3, TEMPERATURA_PADRAO_C);
+    const opcao = avaliarCombinacaoEscolhida(modulo620, inversor5, 17, 0.3, 0.5, TEMPERATURA_PADRAO_C);
     expect(opcao?.potenciaDcKwp).toBe(10.54);
     expect(opcao?.dcAcRatio).toBeCloseTo(2.108, 3);
     expect(opcao?.overloadPct).toBeCloseTo(1.108, 3);
@@ -51,6 +52,7 @@ describe("dimensionarSistemaAutomatico", () => {
       modulos: [modulo620],
       inversores: [inversor6],
       overloadMaximoPct: 0.3,
+      overloadCriticoPct: 0.5,
       temperaturaMinimaProjetoC: TEMPERATURA_PADRAO_C,
     });
     expect(opcoes).toEqual([]);
@@ -64,6 +66,7 @@ describe("dimensionarSistemaAutomatico", () => {
       modulos: [modulo620],
       inversores: [inversor6, inversor65],
       overloadMaximoPct: 0.3,
+      overloadCriticoPct: 0.5,
       temperaturaMinimaProjetoC: TEMPERATURA_PADRAO_C,
     });
     expect(opcoes.length).toBe(1);
@@ -80,6 +83,7 @@ describe("dimensionarSistemaAutomatico", () => {
       modulos: [modulo620],
       inversores: [inversor8, inversor65Prioritario],
       overloadMaximoPct: 0.3,
+      overloadCriticoPct: 0.5,
       temperaturaMinimaProjetoC: TEMPERATURA_PADRAO_C,
     });
     expect(opcoes[0].inversor.id).toBe("i1b");
@@ -100,6 +104,7 @@ describe("dimensionarSistemaAutomatico", () => {
       modulos: [modulo620, modulo585],
       inversores: [inversor6, inversor65, inversor8],
       overloadMaximoPct: 0.3,
+      overloadCriticoPct: 0.5,
       temperaturaMinimaProjetoC: TEMPERATURA_PADRAO_C,
     });
     expect(opcoes.length).toBe(2);
@@ -115,6 +120,7 @@ describe("dimensionarSistemaAutomatico", () => {
         modulos: [],
         inversores: [inversor65],
         overloadMaximoPct: 0.3,
+      overloadCriticoPct: 0.5,
         temperaturaMinimaProjetoC: TEMPERATURA_PADRAO_C,
       }),
     ).toEqual([]);
@@ -128,6 +134,7 @@ describe("dimensionarSistemaAutomatico", () => {
       modulos: [modulo620],
       inversores: [inversor65],
       overloadMaximoPct: 0.3,
+      overloadCriticoPct: 0.5,
       temperaturaMinimaProjetoC: TEMPERATURA_PADRAO_C,
     });
     expect(opcao.validacaoEletrica).toBe("nao_verificado");
@@ -159,6 +166,7 @@ describe("dimensionarSistemaAutomatico", () => {
       modulos: [moduloCompleto],
       inversores: [inversorCompleto],
       overloadMaximoPct: 0.3,
+      overloadCriticoPct: 0.5,
       temperaturaMinimaProjetoC: TEMPERATURA_PADRAO_C,
     });
     expect(opcao.validacaoEletrica).toBe("valido");
@@ -192,6 +200,7 @@ describe("dimensionarSistemaAutomatico", () => {
       modulos: [moduloCompleto],
       inversores: [inversorIncompativel],
       overloadMaximoPct: 0.3,
+      overloadCriticoPct: 0.5,
       temperaturaMinimaProjetoC: TEMPERATURA_PADRAO_C,
     });
     expect(opcoes).toEqual([]);
@@ -201,7 +210,7 @@ describe("dimensionarSistemaAutomatico", () => {
 describe("avaliarCombinacaoEscolhida", () => {
   it("com a mesma quantidade que o motor automático teria escolhido, dá o mesmo resultado", () => {
     // Mesmo exemplo da spec: 13 módulos de 620W + inversor 6,5kW -> 8,06 kWp, ~24% de overload.
-    const opcao = avaliarCombinacaoEscolhida(modulo620, inversor65, 13, 0.3, TEMPERATURA_PADRAO_C);
+    const opcao = avaliarCombinacaoEscolhida(modulo620, inversor65, 13, 0.3, 0.5, TEMPERATURA_PADRAO_C);
     expect(opcao?.quantidadeModulos).toBe(13);
     expect(opcao?.potenciaDcKwp).toBe(8.06);
     expect(opcao?.overloadPct).toBeCloseTo(0.24, 2);
@@ -210,22 +219,30 @@ describe("avaliarCombinacaoEscolhida", () => {
 
   it("valida uma quantidade escolhida manualmente pelo vendedor, diferente da sugestão automática", () => {
     // 5 módulos de 620W = 3,1 kWp; overload negativo (sistema bem abaixo do inversor), ainda válido.
-    const opcao = avaliarCombinacaoEscolhida(modulo620, inversor65, 5, 0.3, TEMPERATURA_PADRAO_C);
+    const opcao = avaliarCombinacaoEscolhida(modulo620, inversor65, 5, 0.3, 0.5, TEMPERATURA_PADRAO_C);
     expect(opcao?.quantidadeModulos).toBe(5);
     expect(opcao?.potenciaDcKwp).toBe(3.1);
     expect(opcao?.validacao).toBe("valido");
   });
 
-  it("marca overload acima do limite como 'valido_com_alerta', sem bloquear", () => {
-    // 13 módulos de 620W (8,06 kWp) num inversor de 6 kW -> ~34,3% de overload, acima do limite de 30%.
-    const opcao = avaliarCombinacaoEscolhida(modulo620, inversor6, 13, 0.3, TEMPERATURA_PADRAO_C);
+  it("marca overload entre o limite automático e o crítico como 'alerta', sem bloquear", () => {
+    // 13 módulos de 620W (8,06 kWp) num inversor de 6 kW -> ~34,3% de overload, entre 30% e 50%.
+    const opcao = avaliarCombinacaoEscolhida(modulo620, inversor6, 13, 0.3, 0.5, TEMPERATURA_PADRAO_C);
     expect(opcao?.overloadPct).toBeCloseTo(0.343, 2);
-    expect(opcao?.validacao).toBe("valido_com_alerta");
+    expect(opcao?.validacao).toBe("alerta");
+  });
+
+  it("marca overload acima do limite crítico como 'critico', sem bloquear (escolha manual sempre permitida)", () => {
+    // 13 módulos de 620W (8,06 kWp) num inversor de 4 kW -> ~101,5% de overload, acima do limite crítico de 50%.
+    const inversor4: EquipamentoAtivo = { id: "i5", fabricante: "Fab", modelo: "4kW", potenciaW: 4000, prioridade: 0 };
+    const opcao = avaliarCombinacaoEscolhida(modulo620, inversor4, 13, 0.3, 0.5, TEMPERATURA_PADRAO_C);
+    expect(opcao?.overloadPct).toBeCloseTo(1.015, 2);
+    expect(opcao?.validacao).toBe("critico");
   });
 
   it("rejeita quantidade zero ou negativa", () => {
-    expect(avaliarCombinacaoEscolhida(modulo620, inversor65, 0, 0.3, TEMPERATURA_PADRAO_C)).toBeNull();
-    expect(avaliarCombinacaoEscolhida(modulo620, inversor65, -1, 0.3, TEMPERATURA_PADRAO_C)).toBeNull();
+    expect(avaliarCombinacaoEscolhida(modulo620, inversor65, 0, 0.3, 0.5, TEMPERATURA_PADRAO_C)).toBeNull();
+    expect(avaliarCombinacaoEscolhida(modulo620, inversor65, -1, 0.3, 0.5, TEMPERATURA_PADRAO_C)).toBeNull();
   });
 
   it("rejeita a combinação quando a quantidade escolhida não forma nenhuma string eletricamente compatível", () => {
@@ -238,7 +255,7 @@ describe("avaliarCombinacaoEscolhida", () => {
       coefTempVocPctC: -0.26,
     };
     const inversorIncompativel: EquipamentoAtivo = { ...inversor65, tensaoMaxDcV: 250, mpptMinV: 500, mpptMaxV: 550 };
-    expect(avaliarCombinacaoEscolhida(moduloCompleto, inversorIncompativel, 13, 0.3, TEMPERATURA_PADRAO_C)).toBeNull();
+    expect(avaliarCombinacaoEscolhida(moduloCompleto, inversorIncompativel, 13, 0.3, 0.5, TEMPERATURA_PADRAO_C)).toBeNull();
   });
 
   it("valida a string (Voc frio + faixa de MPPT) com a quantidade escolhida, quando o catálogo tem dados elétricos", () => {
@@ -258,7 +275,7 @@ describe("avaliarCombinacaoEscolhida", () => {
       correnteMaxEntradaA: 40,
       quantidadeMppt: 2,
     };
-    const opcao = avaliarCombinacaoEscolhida(moduloCompleto, inversorCompleto, 13, 0.3, TEMPERATURA_PADRAO_C);
+    const opcao = avaliarCombinacaoEscolhida(moduloCompleto, inversorCompleto, 13, 0.3, 0.5, TEMPERATURA_PADRAO_C);
     expect(opcao?.validacaoEletrica).toBe("valido");
     expect(opcao?.stringConfig).not.toBeNull();
   });

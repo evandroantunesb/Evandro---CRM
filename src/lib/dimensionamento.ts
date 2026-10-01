@@ -92,7 +92,10 @@ export type OpcaoSistemaAutomatico = {
   /** `dcAcRatio - 1` (ex.: 1,108 = 110,8% de overload) — Evandro achou (2026-09-30) a UI mostrando
    * `dcAcRatio` sob o rótulo "overload"; os dois ficam separados aqui pra não repetir a confusão. */
   overloadPct: number;
-  validacao: "valido" | "valido_com_alerta";
+  /** 'valido' (≤ `overloadMaximoPct`), 'alerta' (entre os dois limites) ou 'critico' (acima
+   * de `overloadCriticoPct`) — nenhuma das três bloqueia a escolha manual, só muda a
+   * sinalização visual (Evandro, 2026-10-01). */
+  validacao: "valido" | "alerta" | "critico";
   validacaoEletrica: "valido" | "nao_verificado";
   stringConfig: ConfiguracaoString | null;
 };
@@ -196,6 +199,7 @@ function montarOpcao(
   inversor: EquipamentoAtivo,
   quantidadeModulos: number,
   overloadMaximoPct: number,
+  overloadCriticoPct: number,
   temperaturaMinimaProjetoC: number,
 ): OpcaoSistemaAutomatico | null {
   const potenciaDcKwp = arredondar((quantidadeModulos * modulo.potenciaW) / 1000, 2);
@@ -206,6 +210,9 @@ function montarOpcao(
   const configuracaoString = encontrarConfiguracaoString(modulo, inversor, quantidadeModulos, temperaturaMinimaProjetoC);
   if (configuracaoString === null) return null; // dados elétricos existem, mas nenhum arranjo é seguro — descarta a combinação.
 
+  const validacao: OpcaoSistemaAutomatico["validacao"] =
+    overloadPct <= overloadMaximoPct ? "valido" : overloadPct <= overloadCriticoPct ? "alerta" : "critico";
+
   return {
     modulo,
     inversor,
@@ -214,7 +221,7 @@ function montarOpcao(
     potenciaAcKw,
     dcAcRatio,
     overloadPct,
-    validacao: overloadPct <= overloadMaximoPct ? "valido" : "valido_com_alerta",
+    validacao,
     validacaoEletrica: configuracaoString === undefined ? "nao_verificado" : "valido",
     stringConfig: configuracaoString ?? null,
   };
@@ -225,10 +232,11 @@ function avaliarCombinacao(
   inversor: EquipamentoAtivo,
   potenciaAlvoKwp: number,
   overloadMaximoPct: number,
+  overloadCriticoPct: number,
   temperaturaMinimaProjetoC: number,
 ): OpcaoSistemaAutomatico | null {
   const quantidadeModulos = Math.max(1, Math.ceil((potenciaAlvoKwp * 1000) / modulo.potenciaW));
-  return montarOpcao(modulo, inversor, quantidadeModulos, overloadMaximoPct, temperaturaMinimaProjetoC);
+  return montarOpcao(modulo, inversor, quantidadeModulos, overloadMaximoPct, overloadCriticoPct, temperaturaMinimaProjetoC);
 }
 
 /**
@@ -245,10 +253,11 @@ export function avaliarCombinacaoEscolhida(
   inversor: EquipamentoAtivo,
   quantidadeModulos: number,
   overloadMaximoPct: number,
+  overloadCriticoPct: number,
   temperaturaMinimaProjetoC: number,
 ): OpcaoSistemaAutomatico | null {
   if (!Number.isInteger(quantidadeModulos) || quantidadeModulos <= 0) return null;
-  return montarOpcao(modulo, inversor, quantidadeModulos, overloadMaximoPct, temperaturaMinimaProjetoC);
+  return montarOpcao(modulo, inversor, quantidadeModulos, overloadMaximoPct, overloadCriticoPct, temperaturaMinimaProjetoC);
 }
 
 /**
@@ -269,6 +278,7 @@ export function dimensionarSistemaAutomatico(params: {
   modulos: EquipamentoAtivo[];
   inversores: EquipamentoAtivo[];
   overloadMaximoPct: number;
+  overloadCriticoPct: number;
   temperaturaMinimaProjetoC: number;
 }): OpcaoSistemaAutomatico[] {
   const {
@@ -278,6 +288,7 @@ export function dimensionarSistemaAutomatico(params: {
     modulos,
     inversores,
     overloadMaximoPct,
+    overloadCriticoPct,
     temperaturaMinimaProjetoC,
   } = params;
   if (consumoMedioKwh <= 0 || produtividadeKwhKwpMes <= 0 || !modulos.length || !inversores.length) return [];
@@ -287,7 +298,7 @@ export function dimensionarSistemaAutomatico(params: {
   const opcoes = modulos.flatMap((modulo) =>
     inversores
       .map((inversor) =>
-        avaliarCombinacao(modulo, inversor, potenciaAlvoKwp, overloadMaximoPct, temperaturaMinimaProjetoC),
+        avaliarCombinacao(modulo, inversor, potenciaAlvoKwp, overloadMaximoPct, overloadCriticoPct, temperaturaMinimaProjetoC),
       )
       .filter((opcao): opcao is OpcaoSistemaAutomatico => opcao !== null && opcao.validacao === "valido"),
   );

@@ -70,6 +70,7 @@ export async function salvarDimensionamento(
     paraEquipamentoAtivo(inversorRow),
     entrada.quantidadeModulos,
     parametros.overload_maximo_pct,
+    parametros.overload_critico_pct,
     parametros.temperatura_minima_projeto_c,
   );
   if (!opcao) {
@@ -107,6 +108,7 @@ export async function salvarDimensionamento(
     validacao_eletrica: opcao.validacaoEletrica,
     margem_dimensionamento_pct: parametros.margem_dimensionamento_pct,
     overload_maximo_pct: parametros.overload_maximo_pct,
+    overload_critico_pct: parametros.overload_critico_pct,
     temperatura_minima_projeto_c: parametros.temperatura_minima_projeto_c,
     consumo_medio_kwh: consumoMedioKwh,
     valor_fatura_medio: entrada.valorFaturaMedio,

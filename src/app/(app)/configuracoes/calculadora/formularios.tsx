@@ -77,6 +77,7 @@ export function FormularioParametros({
     comissaoPercentual: number;
     margemDimensionamentoPct: number;
     overloadMaximoPct: number;
+    overloadCriticoPct: number;
     temperaturaMinimaProjetoC: number;
     siglaDistribuidoraAneel: string | null;
   };
@@ -130,6 +131,20 @@ export function FormularioParametros({
           required
         />
       </div>
+      <div className="grid grid-cols-2 gap-2">
+        <Campo
+          rotulo="Overload crítico (%)"
+          name="overload_critico_pct"
+          inputMode="decimal"
+          defaultValue={String(parametros.overloadCriticoPct * 100).replace(".", ",")}
+          required
+        />
+      </div>
+      <p className="-mt-2 text-xs text-zinc-500">
+        Até o overload automático máximo, o kit é sugerido direto. Entre esse limite e o
+        crítico, aparece um aviso leve. Acima do crítico, um alerta forte — mas a escolha
+        manual nunca é bloqueada em nenhuma faixa.
+      </p>
       <div className="w-40">
         <Campo
           rotulo="Temperatura mínima de projeto (°C)"

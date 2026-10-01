@@ -46,6 +46,7 @@ export default async function NovoNegocio({ searchParams }: PageProps<"/negocios
                   comissaoPercentual: parametros.comissao_percentual,
                   margemDimensionamentoPct: parametros.margem_dimensionamento_pct,
                   overloadMaximoPct: parametros.overload_maximo_pct,
+                  overloadCriticoPct: parametros.overload_critico_pct,
                   temperaturaMinimaProjetoC: parametros.temperatura_minima_projeto_c,
                 }
               : null

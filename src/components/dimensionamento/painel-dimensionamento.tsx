@@ -34,6 +34,7 @@ export function PainelDimensionamento({
   origemProdutividade,
   margemDimensionamentoPct,
   overloadMaximoPct,
+  overloadCriticoPct,
   temperaturaMinimaProjetoC,
   modulos,
   inversores,
@@ -44,6 +45,7 @@ export function PainelDimensionamento({
   origemProdutividade: "padrao" | "pvgis" | "nasa";
   margemDimensionamentoPct: number;
   overloadMaximoPct: number;
+  overloadCriticoPct: number;
   temperaturaMinimaProjetoC: number;
   modulos: EquipamentoAtivo[];
   inversores: EquipamentoAtivo[];
@@ -60,9 +62,10 @@ export function PainelDimensionamento({
       modulos,
       inversores,
       overloadMaximoPct,
+      overloadCriticoPct,
       temperaturaMinimaProjetoC,
     });
-  }, [prontoPraCalcular, consumoMedioKwh, produtividadeKwhKwpMes, margemDimensionamentoPct, overloadMaximoPct, temperaturaMinimaProjetoC, modulos, inversores]);
+  }, [prontoPraCalcular, consumoMedioKwh, produtividadeKwhKwpMes, margemDimensionamentoPct, overloadMaximoPct, overloadCriticoPct, temperaturaMinimaProjetoC, modulos, inversores]);
 
   const [selecionadaId, setSelecionadaId] = useState<string | null>(null);
   const [quantidade, setQuantidade] = useState("");
@@ -89,9 +92,9 @@ export function PainelDimensionamento({
     if (!par) return null;
     const qtd = Number(quantidade);
     if (!Number.isFinite(qtd) || qtd <= 0) return null;
-    return avaliarCombinacaoEscolhida(par.modulo, par.inversor, qtd, overloadMaximoPct, temperaturaMinimaProjetoC);
+    return avaliarCombinacaoEscolhida(par.modulo, par.inversor, qtd, overloadMaximoPct, overloadCriticoPct, temperaturaMinimaProjetoC);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [par?.modulo.id, par?.inversor.id, quantidade, overloadMaximoPct, temperaturaMinimaProjetoC]);
+  }, [par?.modulo.id, par?.inversor.id, quantidade, overloadMaximoPct, overloadCriticoPct, temperaturaMinimaProjetoC]);
 
   useEffect(() => {
     if (par && opcaoAtual) {
@@ -254,9 +257,14 @@ function PainelResultado({
         <p className="text-sm text-zinc-700">
           {opcaoAtual.potenciaDcKwp.toLocaleString("pt-BR")} kWp ·{" "}
           overload {(opcaoAtual.overloadPct * 100).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}%
-          {opcaoAtual.validacao === "valido_com_alerta" && (
+          {opcaoAtual.validacao === "alerta" && (
             <span className="ml-1 font-medium text-amber-700">
-              — acima do limite automático, será registrado como override manual
+              ⚠ acima do limite automático — override manual, registrado na linha do tempo
+            </span>
+          )}
+          {opcaoAtual.validacao === "critico" && (
+            <span className="ml-1 font-medium text-red-700">
+              ⚠ overload muito acima do recomendado — não deveria ser usado, mas a escolha fica registrada como override manual
             </span>
           )}
           {opcaoAtual.validacaoEletrica === "nao_verificado" && (

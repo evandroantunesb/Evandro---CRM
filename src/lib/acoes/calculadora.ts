@@ -263,6 +263,13 @@ export async function editarParametros(_: ResultadoAcao, formData: FormData): Pr
     .trim()
     .transform((v) => Number(v.replace(",", ".")) / 100)
     .pipe(z.number().min(0, "Percentual inválido").max(1, "Percentual inválido"));
+  // Overload pode passar de 100% (ex.: 210%), então o limiar crítico aceita uma faixa maior
+  // que os outros percentuais (que nunca passam de 100%).
+  const percentualOverloadCritico = z
+    .string()
+    .trim()
+    .transform((v) => Number(v.replace(",", ".")) / 100)
+    .pipe(z.number().min(0, "Percentual inválido").max(2, "Percentual inválido"));
   const custoOpcional = z
     .string()
     .optional()
@@ -295,11 +302,15 @@ export async function editarParametros(_: ResultadoAcao, formData: FormData): Pr
       comissao_percentual: percentual,
       margem_dimensionamento_pct: percentual,
       overload_maximo_pct: percentual,
+      overload_critico_pct: percentualOverloadCritico,
       temperatura_minima_projeto_c: temperaturaProjeto,
       sigla_distribuidora_aneel: siglaDistribuidoraOpcional,
     })
     .safeParse(Object.fromEntries(formData));
   if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
+  if (dados.data.overload_critico_pct < dados.data.overload_maximo_pct) {
+    return { ok: false, mensagem: "O overload crítico não pode ser menor que o overload automático máximo." };
+  }
   const supabase = await criarClienteServidor();
   const { error } = await supabase.from("parametros_calculadora").update(dados.data).eq("empresa_id", atual.empresaId);
   if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível salvar os parâmetros.") };

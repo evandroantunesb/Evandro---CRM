@@ -33,6 +33,7 @@ type Parametros = {
   comissaoPercentual: number;
   margemDimensionamentoPct: number;
   overloadMaximoPct: number;
+  overloadCriticoPct: number;
   temperaturaMinimaProjetoC: number;
 };
 
@@ -492,6 +493,7 @@ export function FormularioNegocio({
             origemProdutividade={origemProdutividade}
             margemDimensionamentoPct={parametros?.margemDimensionamentoPct ?? 0}
             overloadMaximoPct={parametros?.overloadMaximoPct ?? 0}
+            overloadCriticoPct={parametros?.overloadCriticoPct ?? 0}
             temperaturaMinimaProjetoC={parametros?.temperaturaMinimaProjetoC ?? 0}
             modulos={modulosAtivos}
             inversores={inversoresAtivos}
