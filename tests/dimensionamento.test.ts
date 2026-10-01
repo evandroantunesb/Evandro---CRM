@@ -2,10 +2,12 @@
 import { describe, expect, it } from "vitest";
 import {
   avaliarCombinacaoEscolhida,
+  avaliarRedeEletrica,
   camposTecnicosFaltantes,
   dimensionarSistemaAutomatico,
   paraEquipamentoAtivo,
   type EquipamentoAtivo,
+  type RedeEletricaConfirmada,
 } from "@/lib/dimensionamento";
 
 const TEMPERATURA_PADRAO_C = 5;
@@ -362,6 +364,152 @@ describe("paraEquipamentoAtivo", () => {
       correnteMaxEntradaA: 40,
       quantidadeMppt: 2,
     });
+  });
+
+  it("converte fasesCa e tensaoAcV do inversor (Fase 3, 2026-10-01 — gate de rede elétrica)", () => {
+    const equipamento = paraEquipamentoAtivo({
+      id: "i1",
+      fabricante: "Growatt",
+      modelo: "MIN 6000",
+      potencia_w: 6000,
+      prioridade: 0,
+      voc_v: null,
+      isc_a: null,
+      vmp_v: null,
+      imp_a: null,
+      coef_temp_voc_pct_c: null,
+      tensao_max_dc_v: null,
+      mppt_min_v: null,
+      mppt_max_v: null,
+      corrente_max_entrada_a: null,
+      quantidade_mppt: null,
+      fases_ca: "trifasico",
+      tensao_ac_v: 380,
+    });
+    expect(equipamento.fasesCa).toBe("trifasico");
+    expect(equipamento.tensaoAcV).toBe(380);
+  });
+});
+
+describe("avaliarRedeEletrica (Fase 3, 2026-10-01 — gate de rede elétrica)", () => {
+  const inversorTrifasico380: EquipamentoAtivo = {
+    ...inversor65,
+    fasesCa: "trifasico",
+    tensaoAcV: 380,
+  };
+  const inversorMonofasico220: EquipamentoAtivo = {
+    ...inversor65,
+    fasesCa: "monofasico",
+    tensaoAcV: 220,
+  };
+  const inversorSemFasesCadastradas: EquipamentoAtivo = { ...inversor65 };
+
+  it("fica 'pendente_confirmacao_rede' quando o tipo de ligação ainda não foi confirmado (undefined)", () => {
+    expect(avaliarRedeEletrica(inversorTrifasico380, undefined)).toEqual({
+      validacaoRede: "pendente_confirmacao_rede",
+    });
+  });
+
+  it("fica 'pendente_confirmacao_rede' quando null é passado explicitamente", () => {
+    expect(avaliarRedeEletrica(inversorTrifasico380, null)).toEqual({
+      validacaoRede: "pendente_confirmacao_rede",
+    });
+  });
+
+  it("fica 'nao_verificado' quando a rede foi confirmada mas o catálogo não tem fasesCa do inversor", () => {
+    const rede: RedeEletricaConfirmada = { tipoLigacao: "trifasico" };
+    expect(avaliarRedeEletrica(inversorSemFasesCadastradas, rede)).toEqual({
+      validacaoRede: "nao_verificado",
+    });
+  });
+
+  it("é 'valido' quando o tipo de ligação confirmado bate com as fases do inversor", () => {
+    const rede: RedeEletricaConfirmada = { tipoLigacao: "trifasico" };
+    expect(avaliarRedeEletrica(inversorTrifasico380, rede)).toEqual({ validacaoRede: "valido" });
+  });
+
+  it("mapeia ligação bifásica para inversor monofásico (mesmo inversor atende mono e bifásico)", () => {
+    const rede: RedeEletricaConfirmada = { tipoLigacao: "bifasico" };
+    expect(avaliarRedeEletrica(inversorMonofasico220, rede)).toEqual({ validacaoRede: "valido" });
+  });
+
+  it("é 'incompativel' quando a ligação confirmada exige um número de fases diferente do inversor", () => {
+    const rede: RedeEletricaConfirmada = { tipoLigacao: "monofasico" };
+    const resultado = avaliarRedeEletrica(inversorTrifasico380, rede);
+    expect(resultado.validacaoRede).toBe("incompativel");
+    expect(resultado.motivoIncompatibilidadeRede).toMatch(/monofasico|trifasico/);
+  });
+
+  it("é 'incompativel' quando as fases batem mas a tensão da rede informada diverge da tensão CA do inversor", () => {
+    const rede: RedeEletricaConfirmada = { tipoLigacao: "trifasico", tensaoRedeV: 220 };
+    const resultado = avaliarRedeEletrica(inversorTrifasico380, rede);
+    expect(resultado.validacaoRede).toBe("incompativel");
+    expect(resultado.motivoIncompatibilidadeRede).toMatch(/[Tt]ensão/);
+  });
+
+  it("é 'valido' quando a tensão não foi informada pelo vendedor (só confere fases)", () => {
+    const rede: RedeEletricaConfirmada = { tipoLigacao: "trifasico" };
+    expect(avaliarRedeEletrica(inversorTrifasico380, rede)).toEqual({ validacaoRede: "valido" });
+  });
+});
+
+describe("gate de rede elétrica integrado ao motor (dimensionarSistemaAutomatico/avaliarCombinacaoEscolhida)", () => {
+  it("sem tipoLigacao confirmado, calcula DC/quantidade normalmente e marca o inversor como pendente de confirmação de rede", () => {
+    const [opcao] = dimensionarSistemaAutomatico({
+      consumoMedioKwh: 780,
+      margemPct: 0.2,
+      produtividadeKwhKwpMes: 120,
+      modulos: [modulo620],
+      inversores: [{ ...inversor65, fasesCa: "trifasico", tensaoAcV: 380 }],
+      overloadMaximoPct: 0.3,
+      overloadCriticoPct: 0.5,
+      temperaturaMinimaProjetoC: TEMPERATURA_PADRAO_C,
+      // redeEletrica omitido de propósito — ainda não confirmado pelo vendedor.
+    });
+    expect(opcao.quantidadeModulos).toBe(13);
+    expect(opcao.potenciaDcKwp).toBe(8.06);
+    expect(opcao.validacaoRede).toBe("pendente_confirmacao_rede");
+  });
+
+  it("com tipoLigacao confirmado e compatível, roda a validação elétrica normal e aprova a opção", () => {
+    const [opcao] = dimensionarSistemaAutomatico({
+      consumoMedioKwh: 780,
+      margemPct: 0.2,
+      produtividadeKwhKwpMes: 120,
+      modulos: [modulo620],
+      inversores: [{ ...inversor65, fasesCa: "trifasico", tensaoAcV: 380 }],
+      overloadMaximoPct: 0.3,
+      overloadCriticoPct: 0.5,
+      temperaturaMinimaProjetoC: TEMPERATURA_PADRAO_C,
+      redeEletrica: { tipoLigacao: "trifasico", tensaoRedeV: 380 },
+    });
+    expect(opcao.validacaoRede).toBe("valido");
+  });
+
+  it("com tipoLigacao confirmado mas incompatível com o único inversor do catálogo, a combinação não entra como sugestão automática", () => {
+    const opcoes = dimensionarSistemaAutomatico({
+      consumoMedioKwh: 780,
+      margemPct: 0.2,
+      produtividadeKwhKwpMes: 120,
+      modulos: [modulo620],
+      inversores: [{ ...inversor65, fasesCa: "trifasico", tensaoAcV: 380 }],
+      overloadMaximoPct: 0.3,
+      overloadCriticoPct: 0.5,
+      temperaturaMinimaProjetoC: TEMPERATURA_PADRAO_C,
+      redeEletrica: { tipoLigacao: "monofasico" },
+    });
+    expect(opcoes).toEqual([]);
+  });
+
+  it("avaliarCombinacaoEscolhida (override manual) também fica pendente sem rede confirmada e válida depois de confirmada", () => {
+    const inversorMono: EquipamentoAtivo = { ...inversor65, fasesCa: "monofasico", tensaoAcV: 220 };
+    const semRede = avaliarCombinacaoEscolhida(modulo620, inversorMono, 13, 0.3, 0.5, TEMPERATURA_PADRAO_C);
+    expect(semRede?.validacaoRede).toBe("pendente_confirmacao_rede");
+
+    const comRede = avaliarCombinacaoEscolhida(modulo620, inversorMono, 13, 0.3, 0.5, TEMPERATURA_PADRAO_C, {
+      tipoLigacao: "monofasico",
+    });
+    expect(comRede?.validacaoRede).toBe("valido");
   });
 });
 

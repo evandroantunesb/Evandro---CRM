@@ -12,7 +12,14 @@
  * eletricamente incompatível bloqueia (é risco de queimar equipamento).
  * Sem os campos elétricos, a opção fica marcada como "não verificada" e
  * segue disponível — não trava quem ainda não cadastrou datasheet completo.
+ *
+ * Fase 3 da reconciliação (Evandro, 2026-10-01) acrescenta o gate de rede elétrica: o motor
+ * nunca assume monofásico/bifásico/trifásico nem a tensão da rede por conta própria — ver
+ * `RedeEletricaConfirmada` e `avaliarRedeEletrica` mais abaixo.
  */
+
+import type { TipoLigacao } from "./tipos";
+import { ROTULO_TIPO_LIGACAO } from "./tipos";
 
 export type EquipamentoAtivo = {
   id: string;
@@ -32,7 +39,17 @@ export type EquipamentoAtivo = {
   mpptMaxV?: number | null;
   correnteMaxEntradaA?: number | null;
   quantidadeMppt?: number | null;
+  /** Fases do lado CA do inversor, como cadastrado no catálogo. O enum do banco só tem
+   * "monofasico"/"trifasico" — ligação bifásica do cliente usa o mesmo inversor monofásico
+   * (prática do setor: o inversor só "vê" 2 fios na saída CA independente de a concessionária
+   * chamar a ligação de mono ou bifásica). Ver `avaliarRedeEletrica`. */
+  fasesCa?: FasesCaInversor | null;
+  /** Tensão CA nominal do inversor (V), quando cadastrada. */
+  tensaoAcV?: number | null;
 };
+
+/** Fases do lado CA de um inversor — mesmo enum de `fases_ca_equipamento` no banco. */
+export type FasesCaInversor = "monofasico" | "trifasico";
 
 /** Formato de `equipamentos_empresa` como vem do Supabase (snake_case). */
 export type EquipamentoEmpresaRegistro = {
@@ -51,6 +68,10 @@ export type EquipamentoEmpresaRegistro = {
   mppt_max_v: number | null;
   corrente_max_entrada_a: number | null;
   quantidade_mppt: number | null;
+  /** Opcionais (ausentes em `EquipamentoEmpresaRegistro` de módulo e em dados antigos de teste)
+   * pra não quebrar quem já monta esse registro sem esses dois campos. */
+  fases_ca?: FasesCaInversor | null;
+  tensao_ac_v?: number | null;
 };
 
 /** Converte um registro de `equipamentos_empresa` pro formato que o motor de dimensionamento espera. */
@@ -71,6 +92,8 @@ export function paraEquipamentoAtivo(e: EquipamentoEmpresaRegistro): Equipamento
     mpptMaxV: e.mppt_max_v,
     correnteMaxEntradaA: e.corrente_max_entrada_a,
     quantidadeMppt: e.quantidade_mppt,
+    fasesCa: e.fases_ca,
+    tensaoAcV: e.tensao_ac_v,
   };
 }
 
@@ -105,7 +128,77 @@ export type OpcaoSistemaAutomatico = {
    * (limite de tensão do inversor, faixa de MPPT, corrente de entrada etc.). */
   motivoIncompatibilidade?: string;
   stringConfig: ConfiguracaoString | null;
+  /** Compatibilidade do inversor com a rede do cliente (fases/tensão) — independente da
+   * validação de string acima. 'pendente_confirmacao_rede': `tipoLigacao` ainda não foi
+   * confirmado pelo vendedor, então o motor não arrisca aprovar nem reprovar o inversor nesse
+   * quesito. 'nao_verificado': rede confirmada, mas o catálogo não tem `fasesCa` cadastrado pro
+   * inversor. 'incompativel': rede confirmada e incompatível — ver `motivoIncompatibilidadeRede`.
+   * 'valido': rede confirmada e compatível (Evandro, 2026-10-01). */
+  validacaoRede: "pendente_confirmacao_rede" | "valido" | "nao_verificado" | "incompativel";
+  /** Preenchido só quando `validacaoRede === "incompativel"`. */
+  motivoIncompatibilidadeRede?: string;
 };
+
+/**
+ * Tipo de ligação (e, opcionalmente, tensão nominal) da rede do cliente, já confirmados pelo
+ * vendedor — nunca um valor assumido pelo sistema. Passar `undefined` (ou omitir) pra
+ * `dimensionarSistemaAutomatico`/`avaliarCombinacaoEscolhida` sinaliza "ainda não confirmado":
+ * o motor calcula potência DC e quantidade de módulos normalmente (não dependem da rede), mas
+ * marca `validacaoRede: "pendente_confirmacao_rede"` em vez de validar o inversor contra uma
+ * suposição (Evandro, 2026-10-01 — pedido explícito pra nunca assumir mono/bi/trifásico
+ * silenciosamente).
+ */
+export type RedeEletricaConfirmada = {
+  tipoLigacao: TipoLigacao;
+  /** Tensão nominal informada pelo vendedor (ex.: 127, 220, 380), quando já souber. Quando
+   * ausente, só o número de fases é conferido contra o inversor. */
+  tensaoRedeV?: number | null;
+};
+
+/**
+ * Mapeia `tipoLigacao` (como o vendedor confirma, com bifásico como opção própria) pro enum
+ * `fases_ca_equipamento` do catálogo (que só tem monofásico/trifásico). Bifásico mapeia pra
+ * "monofasico" porque, na prática do setor, o mesmo inversor monofásico atende ligações mono e
+ * bifásicas (a diferença de fiação é da concessionária, não do inversor) — **essa equivalência é
+ * uma decisão técnica da calculadora solar e deve ser confirmada pelo Evandro antes de virar
+ * regra definitiva** (CLAUDE.md: "nunca decida sozinho dado técnico da calculadora solar").
+ */
+const FASES_CA_ESPERADA_POR_TIPO_LIGACAO: Record<TipoLigacao, FasesCaInversor> = {
+  monofasico: "monofasico",
+  bifasico: "monofasico",
+  trifasico: "trifasico",
+};
+
+/**
+ * Confere se o inversor é compatível com a rede do cliente. Roda independente da validação de
+ * string (DC): um inversor pode ter string eletricamente válida e mesmo assim ser o tipo errado
+ * de fase pra rede do cliente, ou vice-versa.
+ */
+export function avaliarRedeEletrica(
+  inversor: EquipamentoAtivo,
+  redeEletrica: RedeEletricaConfirmada | null | undefined,
+): { validacaoRede: OpcaoSistemaAutomatico["validacaoRede"]; motivoIncompatibilidadeRede?: string } {
+  if (!redeEletrica) return { validacaoRede: "pendente_confirmacao_rede" };
+
+  if (inversor.fasesCa == null) return { validacaoRede: "nao_verificado" };
+
+  const fasesEsperadas = FASES_CA_ESPERADA_POR_TIPO_LIGACAO[redeEletrica.tipoLigacao];
+  if (inversor.fasesCa !== fasesEsperadas) {
+    return {
+      validacaoRede: "incompativel",
+      motivoIncompatibilidadeRede: `Ligação ${ROTULO_TIPO_LIGACAO[redeEletrica.tipoLigacao]} precisa de um inversor ${fasesEsperadas}, mas o inversor cadastrado é ${inversor.fasesCa}.`,
+    };
+  }
+
+  if (redeEletrica.tensaoRedeV != null && inversor.tensaoAcV != null && redeEletrica.tensaoRedeV !== inversor.tensaoAcV) {
+    return {
+      validacaoRede: "incompativel",
+      motivoIncompatibilidadeRede: `Tensão da rede informada (${redeEletrica.tensaoRedeV}V) não bate com a tensão CA cadastrada no inversor (${inversor.tensaoAcV}V).`,
+    };
+  }
+
+  return { validacaoRede: "valido" };
+}
 
 const OVERLOAD_ALVO_PCT = 0.15;
 const TEMPERATURA_REFERENCIA_STC_C = 25;
@@ -255,6 +348,7 @@ function montarOpcao(
   overloadMaximoPct: number,
   overloadCriticoPct: number,
   temperaturaMinimaProjetoC: number,
+  redeEletrica: RedeEletricaConfirmada | null | undefined,
 ): OpcaoSistemaAutomatico {
   const potenciaDcKwp = arredondar((quantidadeModulos * modulo.potenciaW) / 1000, 2);
   const potenciaAcKw = arredondar(inversor.potenciaW / 1000, 2);
@@ -262,6 +356,7 @@ function montarOpcao(
   const overloadPct = arredondar(dcAcRatio - 1, 4);
 
   const resultado = encontrarConfiguracaoString(modulo, inversor, quantidadeModulos, temperaturaMinimaProjetoC);
+  const { validacaoRede, motivoIncompatibilidadeRede } = avaliarRedeEletrica(inversor, redeEletrica);
 
   const validacao: OpcaoSistemaAutomatico["validacao"] =
     overloadPct <= overloadMaximoPct ? "valido" : overloadPct <= overloadCriticoPct ? "alerta" : "critico";
@@ -275,6 +370,8 @@ function montarOpcao(
     dcAcRatio,
     overloadPct,
     validacao,
+    validacaoRede,
+    motivoIncompatibilidadeRede,
   };
 
   if (resultado.tipo === "incompativel") {
@@ -300,9 +397,10 @@ function avaliarCombinacao(
   overloadMaximoPct: number,
   overloadCriticoPct: number,
   temperaturaMinimaProjetoC: number,
+  redeEletrica: RedeEletricaConfirmada | null | undefined,
 ): OpcaoSistemaAutomatico {
   const quantidadeModulos = Math.max(1, Math.ceil((potenciaAlvoKwp * 1000) / modulo.potenciaW));
-  return montarOpcao(modulo, inversor, quantidadeModulos, overloadMaximoPct, overloadCriticoPct, temperaturaMinimaProjetoC);
+  return montarOpcao(modulo, inversor, quantidadeModulos, overloadMaximoPct, overloadCriticoPct, temperaturaMinimaProjetoC, redeEletrica);
 }
 
 /**
@@ -315,6 +413,10 @@ function avaliarCombinacao(
  * arranjo elétrico não é seguro, retorna a opção mesmo assim, com `validacaoEletrica:
  * "incompativel"` e `motivoIncompatibilidade` preenchido, pra quem chama decidir o que
  * mostrar (Evandro, 2026-10-01 — antes isso só retornava `null`, sem dizer o motivo).
+ *
+ * `redeEletrica` é opcional e, quando omitido/`undefined`, deixa `validacaoRede` como
+ * `"pendente_confirmacao_rede"` — ver `RedeEletricaConfirmada` (Fase 3, 2026-10-01: o motor
+ * nunca assume o tipo de ligação do cliente).
  */
 export function avaliarCombinacaoEscolhida(
   modulo: EquipamentoAtivo,
@@ -323,9 +425,10 @@ export function avaliarCombinacaoEscolhida(
   overloadMaximoPct: number,
   overloadCriticoPct: number,
   temperaturaMinimaProjetoC: number,
+  redeEletrica?: RedeEletricaConfirmada | null,
 ): OpcaoSistemaAutomatico | null {
   if (!Number.isInteger(quantidadeModulos) || quantidadeModulos <= 0) return null;
-  return montarOpcao(modulo, inversor, quantidadeModulos, overloadMaximoPct, overloadCriticoPct, temperaturaMinimaProjetoC);
+  return montarOpcao(modulo, inversor, quantidadeModulos, overloadMaximoPct, overloadCriticoPct, temperaturaMinimaProjetoC, redeEletrica);
 }
 
 /**
@@ -338,6 +441,13 @@ export function avaliarCombinacaoEscolhida(
  * como override manual explícito, nunca como sugestão automática). Quando
  * nenhuma combinação passa no limite, retorna `[]`; quem chama mostra que não
  * há kit automático pra esse consumo com o catálogo atual.
+ *
+ * `redeEletrica`, quando omitido (rede ainda não confirmada pelo vendedor), não é motivo pra
+ * reprovar combinação nenhuma: potência DC e quantidade de módulos não dependem da rede, então
+ * o cálculo segue normal, só sem aprovar o inversor pelo critério de rede (`validacaoRede:
+ * "pendente_confirmacao_rede"`, ver `avaliarRedeEletrica`). Só uma incompatibilidade de rede
+ * CONFIRMADA (`validacaoRede === "incompativel"`) é tratada como a incompatibilidade elétrica
+ * de string: nunca entra como sugestão automática.
  */
 export function dimensionarSistemaAutomatico(params: {
   consumoMedioKwh: number;
@@ -348,6 +458,7 @@ export function dimensionarSistemaAutomatico(params: {
   overloadMaximoPct: number;
   overloadCriticoPct: number;
   temperaturaMinimaProjetoC: number;
+  redeEletrica?: RedeEletricaConfirmada | null;
 }): OpcaoSistemaAutomatico[] {
   const {
     consumoMedioKwh,
@@ -358,6 +469,7 @@ export function dimensionarSistemaAutomatico(params: {
     overloadMaximoPct,
     overloadCriticoPct,
     temperaturaMinimaProjetoC,
+    redeEletrica,
   } = params;
   if (consumoMedioKwh <= 0 || produtividadeKwhKwpMes <= 0 || !modulos.length || !inversores.length) return [];
 
@@ -366,9 +478,12 @@ export function dimensionarSistemaAutomatico(params: {
   const opcoes = modulos.flatMap((modulo) =>
     inversores
       .map((inversor) =>
-        avaliarCombinacao(modulo, inversor, potenciaAlvoKwp, overloadMaximoPct, overloadCriticoPct, temperaturaMinimaProjetoC),
+        avaliarCombinacao(modulo, inversor, potenciaAlvoKwp, overloadMaximoPct, overloadCriticoPct, temperaturaMinimaProjetoC, redeEletrica),
       )
-      .filter((opcao) => opcao.validacao === "valido" && opcao.validacaoEletrica !== "incompativel"),
+      .filter(
+        (opcao) =>
+          opcao.validacao === "valido" && opcao.validacaoEletrica !== "incompativel" && opcao.validacaoRede !== "incompativel",
+      ),
   );
 
   opcoes.sort((a, b) => {
