@@ -2893,7 +2893,7 @@ export type Database = {
           negocio_id: string;
           observacoes: string | null;
           para_membro_id: string;
-          qualificacao_snapshot: Json;
+          qualificacao_snapshot: NonNullable<Json>;
           respondido_em: string | null;
           respondido_por: string | null;
           status: string;
@@ -2959,7 +2959,7 @@ export type Database = {
           negocio_id: string;
           observacoes: string | null;
           para_membro_id: string;
-          qualificacao_snapshot: Json;
+          qualificacao_snapshot: NonNullable<Json>;
           respondido_em: string | null;
           respondido_por: string | null;
           status: string;
