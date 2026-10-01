@@ -874,7 +874,12 @@ export function FormularioNegocio({
         ) : (
           <fieldset className="flex flex-col gap-3">
             <legend className="mb-2 text-sm font-semibold text-zinc-900">Kit personalizado</legend>
-            <EditorComponentesKit linhas={linhas} onChange={setLinhas} sugerirQuantidadeModulo={sugerirQuantidadeModulo} />
+            <EditorComponentesKit
+              linhas={linhas}
+              onChange={setLinhas}
+              sugerirQuantidadeModulo={sugerirQuantidadeModulo}
+              catalogoPorTipo={{ modulo: modulosAtivos, inversor: inversoresAtivos }}
+            />
             {potenciaKitManualKwp > 0 && (
               <>
                 <dl className="grid grid-cols-2 gap-3 rounded-lg bg-amber-50 px-4 py-3 text-sm md:grid-cols-4">

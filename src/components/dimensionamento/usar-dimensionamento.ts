@@ -43,6 +43,17 @@ export type UsarDimensionamentoParams = {
    * compatível" (`validacaoRede: "pendente_confirmacao_rede"`) até isso ser confirmado (Evandro,
    * 2026-10-01). Ver `src/lib/dimensionamento.ts`. */
   redeEletrica?: RedeEletricaConfirmada | null;
+  /** Pré-carrega o painel com uma escolha já existente (módulo/inversor/quantidade/origem) — usado
+   * pela tela de editar o sistema de um negócio já criado (Fase 6 da reconciliação, Evandro,
+   * 2026-10-01), que reabre com o dimensionamento salvo em vez de começar do zero como o wizard de
+   * criação. Ignorado depois da primeira renderização (não resseta a escolha do vendedor se os
+   * parâmetros do hook mudarem). */
+  selecaoInicial?: {
+    moduloId: string;
+    inversorId: string;
+    quantidadeModulos: number;
+    origemEscolha: OrigemEscolhaDimensionamento;
+  } | null;
 };
 
 export type UsarDimensionamentoResultado = {
@@ -94,6 +105,7 @@ export function useDimensionamento(params: UsarDimensionamentoParams): UsarDimen
     modulos,
     inversores,
     redeEletrica,
+    selecaoInicial,
   } = params;
 
   const prontoPraCalcular = !!consumoMedioKwh && !!produtividadeKwhKwpMes && modulos.length > 0 && inversores.length > 0;
@@ -124,21 +136,37 @@ export function useDimensionamento(params: UsarDimensionamentoParams): UsarDimen
     redeEletrica,
   ]);
 
-  const [origem, setOrigem] = useState<OrigemEscolhaDimensionamento | null>(null);
-  const [selecionadaId, setSelecionadaId] = useState<string | null>(null);
-  const [manualModuloId, setManualModuloId] = useState("");
-  const [manualInversorId, setManualInversorId] = useState("");
-  const [quantidade, setQuantidade] = useState("");
+  const [origem, setOrigem] = useState<OrigemEscolhaDimensionamento | null>(() => selecaoInicial?.origemEscolha ?? null);
+  const [selecionadaId, setSelecionadaId] = useState<string | null>(() =>
+    selecaoInicial?.origemEscolha === "automatico" ? `${selecaoInicial.moduloId}-${selecaoInicial.inversorId}` : null,
+  );
+  const [manualModuloId, setManualModuloId] = useState(() => (selecaoInicial?.origemEscolha === "manual" ? selecaoInicial.moduloId : ""));
+  const [manualInversorId, setManualInversorId] = useState(() => (selecaoInicial?.origemEscolha === "manual" ? selecaoInicial.inversorId : ""));
+  const [quantidade, setQuantidade] = useState(() => (selecaoInicial ? String(selecaoInicial.quantidadeModulos) : ""));
 
   const selecionadaAuto = origem === "automatico" ? (opcoesAutomaticas.find((o) => `${o.modulo.id}-${o.inversor.id}` === selecionadaId) ?? null) : null;
   const moduloManual = origem === "manual" ? (modulos.find((m) => m.id === manualModuloId) ?? null) : null;
   const inversorManual = origem === "manual" ? (inversores.find((i) => i.id === manualInversorId) ?? null) : null;
 
+  // Fallback só pra escolha automática inicial (`selecaoInicial`, tela de editar o sistema): se o
+  // par salvo não aparecer entre as `opcoesAutomaticas` recém-calculadas (ex.: não está mais entre
+  // as top-3 sugestões pro consumo atual), ainda mostra o módulo/inversor salvos — não desaparece o
+  // que o vendedor já tinha escolhido só porque a sugestão automática mudou de ordem/conteúdo.
+  const parInicialAutomaticoFallback =
+    !selecionadaAuto && origem === "automatico" && selecaoInicial && selecionadaId === `${selecaoInicial.moduloId}-${selecaoInicial.inversorId}`
+      ? {
+          modulo: modulos.find((m) => m.id === selecaoInicial.moduloId) ?? null,
+          inversor: inversores.find((i) => i.id === selecaoInicial.inversorId) ?? null,
+        }
+      : null;
+
   const par = selecionadaAuto
     ? { modulo: selecionadaAuto.modulo, inversor: selecionadaAuto.inversor }
     : moduloManual && inversorManual
       ? { modulo: moduloManual, inversor: inversorManual }
-      : null;
+      : parInicialAutomaticoFallback?.modulo && parInicialAutomaticoFallback?.inversor
+        ? { modulo: parInicialAutomaticoFallback.modulo, inversor: parInicialAutomaticoFallback.inversor }
+        : null;
 
   // Recalcula a opção escolhida com a quantidade (possivelmente ajustada), sempre pelo motor —
   // nunca por uma conta própria do hook. O gate de rede elétrica roda aqui também: sem
