@@ -692,6 +692,7 @@ export type Database = {
             | Database["public"]["Enums"]["origem_distribuidora_dimensionamento"]
             | null;
           origem_produtividade: Database["public"]["Enums"]["origem_produtividade_dimensionamento"];
+          origem_selecao_equipamentos: Database["public"]["Enums"]["origem_componente_kit"];
           origem_tarifa: Database["public"]["Enums"]["origem_tarifa_dimensionamento"];
           overload_critico_pct: number;
           overload_maximo_pct: number;
@@ -733,6 +734,7 @@ export type Database = {
             | Database["public"]["Enums"]["origem_distribuidora_dimensionamento"]
             | null;
           origem_produtividade?: Database["public"]["Enums"]["origem_produtividade_dimensionamento"];
+          origem_selecao_equipamentos?: Database["public"]["Enums"]["origem_componente_kit"];
           origem_tarifa?: Database["public"]["Enums"]["origem_tarifa_dimensionamento"];
           overload_critico_pct: number;
           overload_maximo_pct: number;
@@ -774,6 +776,7 @@ export type Database = {
             | Database["public"]["Enums"]["origem_distribuidora_dimensionamento"]
             | null;
           origem_produtividade?: Database["public"]["Enums"]["origem_produtividade_dimensionamento"];
+          origem_selecao_equipamentos?: Database["public"]["Enums"]["origem_componente_kit"];
           origem_tarifa?: Database["public"]["Enums"]["origem_tarifa_dimensionamento"];
           overload_critico_pct?: number;
           overload_maximo_pct?: number;
@@ -1785,6 +1788,7 @@ export type Database = {
           id: string;
           negocio_id: string;
           ordem: number;
+          origem: Database["public"]["Enums"]["origem_componente_kit"];
           potencia_w: number | null;
           quantidade: number;
           tipo: Database["public"]["Enums"]["tipo_componente_kit"];
@@ -1796,6 +1800,7 @@ export type Database = {
           id?: string;
           negocio_id: string;
           ordem?: number;
+          origem?: Database["public"]["Enums"]["origem_componente_kit"];
           potencia_w?: number | null;
           quantidade?: number;
           tipo: Database["public"]["Enums"]["tipo_componente_kit"];
@@ -1807,6 +1812,7 @@ export type Database = {
           id?: string;
           negocio_id?: string;
           ordem?: number;
+          origem?: Database["public"]["Enums"]["origem_componente_kit"];
           potencia_w?: number | null;
           quantidade?: number;
           tipo?: Database["public"]["Enums"]["tipo_componente_kit"];
@@ -3449,6 +3455,7 @@ export type Database = {
       modelo_cobranca: "por_usuario" | "fixo" | "fixo_mais_usuario";
       modo_distribuicao_leads: "somente_vendedores" | "somente_sdr" | "parcial" | "aleatorio";
       modo_preco_proposta: "sem_preco" | "parcelado" | "avista" | "completo";
+      origem_componente_kit: "automatico" | "manual";
       origem_distribuidora_dimensionamento: "municipio" | "manual";
       origem_produtividade_dimensionamento: "padrao" | "pvgis" | "nasa";
       origem_tarifa_dimensionamento: "manual" | "aneel";
@@ -3596,6 +3603,7 @@ export const Constants = {
       modelo_cobranca: ["por_usuario", "fixo", "fixo_mais_usuario"],
       modo_distribuicao_leads: ["somente_vendedores", "somente_sdr", "parcial", "aleatorio"],
       modo_preco_proposta: ["sem_preco", "parcelado", "avista", "completo"],
+      origem_componente_kit: ["automatico", "manual"],
       origem_distribuidora_dimensionamento: ["municipio", "manual"],
       origem_produtividade_dimensionamento: ["padrao", "pvgis", "nasa"],
       origem_tarifa_dimensionamento: ["manual", "aneel"],
