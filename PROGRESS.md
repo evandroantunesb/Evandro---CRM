@@ -55,6 +55,58 @@ Todas as PRs de #85 a #94 mescladas em 2026-09-30 (`pode dar merge`). Nenhuma te
 - **PR #62 — backup diário do banco de produção** para o repositório privado `raion-crm-backups`. Aguardando o Evandro criar os secrets `BACKUP_ENCRYPTION_KEY` e `BACKUP_REPO_TOKEN`.
 - **PRs do Dependabot abertas:** #55–#58 (Actions), #60 (TypeScript 6), #61 (`@types/node` 26). Atualizações maiores: revisar com cuidado antes de mesclar.
 
+## Migrations aplicadas em produção (registro 2026-10-01, pré-aplicação da PR #101)
+
+Confirmado via o último run bem-sucedido de `banco-producao.yml` (run #40, `push`, commit `5765f6e` — "Notificação e feedback do vendedor no handoff SDR (#94)", 2026-09-30T14:21 UTC). 41 arquivos, da fundação até o handoff SDR; nenhum migration da PR #101 (todas com prefixo `202609301{5-9}*`/`20261001*`) está nesta lista ainda — `equipamentos_empresa` não existe em produção, o que bate com "Módulos ativos (0) / Inversores ativos (0)" visto pelo Evandro no preview.
+
+```
+20260925000100_fundacao.sql
+20260925000200_crm_base.sql
+20260925000300_operacao.sql
+20260926000100_calculadora.sql
+20260926020000_endereco_contato.sql
+20260926030000_proposta.sql
+20260926040000_kit_personalizado.sql
+20260926050000_proposta_secoes.sql
+20260926051000_custos_internos.sql
+20260926060000_negocio_fatura_consumo.sql
+20260926070000_captura_leads.sql
+20260926080000_planos_cobranca.sql
+20260926090000_contrato.sql
+20260926100000_gamificacao_pontos.sql
+20260926110000_gamificacao_niveis_conquistas.sql
+20260926120000_gamificacao_ranking.sql
+20260926130000_gamificacao_loja.sql
+20260926140000_gamificacao_metas.sql
+20260926150000_gamificacao_comissoes.sql
+20260927010000_captura_leads_exclusao.sql
+20260927020000_captura_leads_metricas_e_conta_energia.sql
+20260927030000_proposta_modelos.sql
+20260927040000_propostas_modelo_emitido.sql
+20260927050000_google_agenda.sql
+20260928120000_atribuicao_leads.sql
+20260928130000_status_membro.sql
+20260929160000_dias_considerado_parado.sql
+20260929170000_horas_considerado_sem_contato.sql
+20260930003600_notas_sem_exclusao.sql
+20260930013500_etapa_marca_ganho.sql
+20260930094500_contatos_visibilidade_gestor.sql
+20260930095800_papel_sdr.sql
+20260930103000_negocios_qualificacao_sdr.sql
+20260930104500_negocios_handoff_sdr.sql
+20260930130000_tarefa_automatica_sdr.sql
+20260930131500_distribuicao_leads_papel.sql
+20260930134500_notificacoes.sql
+20260930140000_gamificacao_sdr.sql
+20260930141500_handoff_feedback.sql
+```
+
+**13 migrations pendentes (PR #101, nenhuma aplicada ainda):** `20260930150000_equipamentos_empresa` · `20260930160000_equipamentos_campos_eletricos` · `20260930170000_dados_solares_cache` · `20260930180000_equipamentos_manual_datasheet` · `20260930190000_tarifa_aneel_cache` · `20260930200000_dimensionamentos_solares` · `20260930210000_equipamentos_inversor_campos_completos` · `20260930220000_municipios_distribuidoras` · `20261001010000_equipamentos_catalogo_ampliado` · `20261001020000_municipios_distribuidoras_normaliza` · `20261001030000_kit_componentes_origem` · `20261001040000_kit_componentes_nucleo_motor` · `20261001050000_equipamentos_status_tecnico`.
+
+**Risco real achado ao revisar a ordem de deploy (check pré-aplicação pedido pelo Evandro):** `cadastrarEquipamentoManual`/`editarEquipamento` (`src/lib/acoes/equipamentos.ts`) gravam `status_tecnico` explicitamente no insert/update — se o app novo (PR #101) subir no Vercel ANTES da migration `equipamentos_status_tecnico` rodar em produção, cadastrar/editar equipamento no Catálogo quebra (coluna não existe ainda). Leituras (`select("*")`) são seguras nos dois sentidos, graças ao design defensivo já pedido pelo Evandro (`participaDoMotor`/`numeroParaCampo` tratam coluna ausente como `undefined`, nunca quebram). Mitigação: aplicar as 13 migrations via `workflow_dispatch` do `banco-producao.yml` na própria branch `feature/reconciliacao-motor-wizard`, **antes** de mesclar a PR #101 — zera a janela de risco, em vez de depender da ordem entre dois pipelines independentes (Vercel e GitHub Actions) disparados pelo mesmo push.
+
+**Bloqueio encontrado:** não existe backup automático do banco de produção ainda — `.github/workflows/backup-producao.yml` existe só na PR #62 (aberta, não mesclada, aguardando os secrets `BACKUP_ENCRYPTION_KEY`/`BACKUP_REPO_TOKEN` do Evandro). Pedido de "backup/snapshot antes da execução" (Evandro, 2026-10-01) depende de uma decisão dele sobre como fazer esse backup pontual antes de eu aplicar as migrations.
+
 ## Decisões técnicas relevantes
 
 - Migrations aplicadas em produção só via `banco-producao.yml` com `--include-all` (corrige o travamento de 28–29/09).
