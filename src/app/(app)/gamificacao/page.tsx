@@ -106,7 +106,7 @@ export default async function GamificacaoDashboard({ searchParams }: { searchPar
       .limit(3),
     supabase
       .from("recompensas")
-      .select("id, nome, descricao, custo_pontos")
+      .select("id, nome, descricao, custo_pontos, imagem_caminho")
       .eq("empresa_id", atual.empresaId)
       .eq("ativa", true)
       .or(`validade_ate.is.null,validade_ate.gte.${paraDataCurta(new Date())}`)
@@ -121,6 +121,16 @@ export default async function GamificacaoDashboard({ searchParams }: { searchPar
       .gte("periodo_fim", paraDataCurta(atualMes.inicio)),
     carregarConfiguracao(atual.empresaId),
   ]);
+
+  const imagensRecompensas = Object.fromEntries(
+    await Promise.all(
+      (recompensas ?? []).map(async (r) => {
+        if (!r.imagem_caminho) return [r.id, null] as const;
+        const { data } = await supabase.storage.from("recompensas").createSignedUrl(r.imagem_caminho, 3600);
+        return [r.id, data?.signedUrl ?? null] as const;
+      }),
+    ),
+  );
 
   const nomeMembro = new Map(config.membros.map((m) => [m.id, m.nome]));
 
@@ -371,6 +381,7 @@ export default async function GamificacaoDashboard({ searchParams }: { searchPar
               <CartaoRecompensa
                 key={r.id}
                 recompensa={{ id: r.id, nome: r.nome, descricao: r.descricao, custoPontos: r.custo_pontos }}
+                imagemUrl={imagensRecompensas[r.id] ?? null}
                 saldo={meuSaldo}
               />
             ))}

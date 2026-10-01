@@ -6,9 +6,11 @@ import { resgatarRecompensa } from "./actions";
 
 export function CartaoRecompensa({
   recompensa,
+  imagemUrl,
   saldo,
 }: {
   recompensa: { id: string; nome: string; descricao: string; custoPontos: number };
+  imagemUrl: string | null;
   saldo: number;
 }) {
   const [resultado, acao, pendente] = useActionState(resgatarRecompensa, null);
@@ -17,6 +19,10 @@ export function CartaoRecompensa({
   return (
     <form action={acao} className="flex flex-col gap-2 rounded-lg border border-zinc-200 p-3">
       <input type="hidden" name="recompensaId" value={recompensa.id} />
+      {imagemUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={imagemUrl} alt="" className="h-28 w-full rounded-md border border-zinc-100 object-cover bg-zinc-50" />
+      ) : null}
       <span className="text-sm font-medium text-zinc-900">{recompensa.nome}</span>
       {recompensa.descricao && <span className="text-xs text-zinc-500">{recompensa.descricao}</span>}
       <span className="text-sm font-semibold text-dourado">{recompensa.custoPontos.toLocaleString("pt-BR")} pts</span>
