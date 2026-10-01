@@ -11,7 +11,7 @@ export default async function ConfigGamificacao() {
   const [{ data: regras }, { data: niveis }, { data: conquistas }, { data: recompensas }] = await Promise.all([
     supabase
       .from("gamification_rules")
-      .select("id, nome, evento_tipo, condicao, pontos, limite_periodo, limite_quantidade, ativa")
+      .select("id, nome, evento_tipo, condicao, pontos, limite_periodo, limite_quantidade, unica_por_negocio, ativa")
       .eq("empresa_id", atual.empresaId)
       .order("created_at"),
     supabase.from("niveis_gamificacao").select("nivel, nome, xp_minimo").eq("empresa_id", atual.empresaId).order("nivel"),
@@ -50,6 +50,7 @@ export default async function ConfigGamificacao() {
               pontos: r.pontos,
               limitePeriodo: r.limite_periodo as PeriodoLimiteRegra | null,
               limiteQuantidade: r.limite_quantidade,
+              unicaPorNegocio: r.unica_por_negocio,
               ativa: r.ativa,
             }}
             eventos={EVENTOS_GAMIFICACAO}

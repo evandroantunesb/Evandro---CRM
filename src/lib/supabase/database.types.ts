@@ -1131,6 +1131,7 @@ export type Database = {
           limite_quantidade: number | null;
           nome: string;
           pontos: number;
+          unica_por_negocio: boolean;
           updated_at: string;
         };
         Insert: {
@@ -1145,6 +1146,7 @@ export type Database = {
           limite_quantidade?: number | null;
           nome: string;
           pontos: number;
+          unica_por_negocio?: boolean;
           updated_at?: string;
         };
         Update: {
@@ -1159,6 +1161,7 @@ export type Database = {
           limite_quantidade?: number | null;
           nome?: string;
           pontos?: number;
+          unica_por_negocio?: boolean;
           updated_at?: string;
         };
         Relationships: [
@@ -2896,6 +2899,10 @@ export type Database = {
       };
       e_plataforma_admin: { Args: Record<PropertyKey, never>; Returns: boolean };
       empresa_da_pasta_marca: { Args: { p_caminho: string }; Returns: string };
+      estornar_lancamentos_evento: {
+        Args: { p_entidade_id: string; p_eventos_tipo: string[] };
+        Returns: undefined;
+      };
       expirar_atribuicoes_leads: { Args: Record<PropertyKey, never>; Returns: undefined };
       incrementar_preenchimento_formulario: { Args: { p_id: string }; Returns: undefined };
       incrementar_visualizacao_formulario: { Args: { p_id: string }; Returns: undefined };

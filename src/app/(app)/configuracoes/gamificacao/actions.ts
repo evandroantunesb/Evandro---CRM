@@ -46,6 +46,7 @@ export async function criarRegra(_: ResultadoAcao, formData: FormData): Promise<
     condicao: montarCondicao(dados.data),
     limite_periodo: dados.data.limitePeriodo ?? null,
     limite_quantidade: dados.data.limiteQuantidade ?? null,
+    unica_por_negocio: formData.get("unicaPorNegocio") === "on",
     criado_por: atual.membroId,
   });
   if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível criar a regra.") };
@@ -72,6 +73,7 @@ export async function editarRegra(_: ResultadoAcao, formData: FormData): Promise
       condicao: montarCondicao(dados.data),
       limite_periodo: dados.data.limitePeriodo ?? null,
       limite_quantidade: dados.data.limiteQuantidade ?? null,
+      unica_por_negocio: formData.get("unicaPorNegocio") === "on",
       ativa: formData.get("ativa") === "on",
     })
     .eq("id", id.data);

@@ -34,6 +34,7 @@ export type RegraSalva = {
   pontos: number;
   limitePeriodo: PeriodoLimiteRegra | null;
   limiteQuantidade: number | null;
+  unicaPorNegocio: boolean;
   ativa: boolean;
 };
 
@@ -56,6 +57,9 @@ export function NovaRegra({ eventos }: { eventos: readonly EventoOpcao[] }) {
       </div>
       <Campo rotulo="Pontos" name="pontos" type="number" step={1} defaultValue={10} required />
       <CondicaoTeto campos={campos} />
+      <label className="flex items-center gap-1 text-sm text-zinc-700">
+        <input type="checkbox" name="unicaPorNegocio" /> Pontua só a primeira vez por negócio (evita pontuar de novo se o card sair e voltar)
+      </label>
       <div className="flex items-center gap-2">
         <Botao type="submit" disabled={pendente} className="self-start">
           Criar regra
@@ -86,6 +90,9 @@ export function LinhaRegra({ regra, eventos }: { regra: RegraSalva; eventos: rea
       </div>
       <Campo rotulo="Pontos" name="pontos" type="number" step={1} defaultValue={regra.pontos} required />
       <CondicaoTeto campos={campos} condicaoInicial={regra.condicao} limitePeriodoInicial={regra.limitePeriodo} limiteQuantidadeInicial={regra.limiteQuantidade} />
+      <label className="flex items-center gap-1 text-sm text-zinc-700">
+        <input type="checkbox" name="unicaPorNegocio" defaultChecked={regra.unicaPorNegocio} /> Pontua só a primeira vez por negócio (evita pontuar de novo se o card sair e voltar)
+      </label>
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-1 text-sm text-zinc-700">
           <input type="checkbox" name="ativa" defaultChecked={regra.ativa} /> Ativa
