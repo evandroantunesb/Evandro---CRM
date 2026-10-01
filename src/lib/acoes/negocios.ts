@@ -96,6 +96,7 @@ const esquemaNovo = z.object({
   [CAMPOS_DIMENSIONAMENTO.quantidadeModulos]: inteiroOpcional,
   [CAMPOS_DIMENSIONAMENTO.produtividadeKwhKwpMes]: numeroOpcional,
   [CAMPOS_DIMENSIONAMENTO.origemProdutividade]: z.enum(["pvgis", "nasa"]).optional(),
+  [CAMPOS_DIMENSIONAMENTO.origemEscolha]: z.enum(["automatico", "manual"]).optional(),
 });
 
 export async function criarNegocio(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
@@ -177,30 +178,49 @@ export async function criarNegocio(_: ResultadoAcao, formData: FormData): Promis
   // (fluxo de "nova proposta"). Motor único (src/lib/dimensionamento.ts,
   // via `salvarDimensionamento`) quando o vendedor escolheu uma opção do
   // catálogo no painel; kit manual (fallback pra empresas ainda sem
-  // equipamento cadastrado) caso contrário. Um kit mal preenchido não deve
+  // equipamento cadastrado) quando não. Um kit mal preenchido não deve
   // impedir a criação do negócio — o vendedor ainda pode calcular depois,
   // direto na página do negócio.
-  if (
-    d.tipo_ligacao &&
-    d.tarifa_kwh != null &&
-    d.dimensionamento_modulo_id &&
-    d.dimensionamento_inversor_id &&
-    d.dimensionamento_quantidade_modulos
-  ) {
+  //
+  // Fase 5 da reconciliação (Evandro, 2026-10-01): motor automático e kit manual
+  // coexistem — não é mais "ou um ou outro". Quando o motor roda, `d.componentes`
+  // (preenchido via "Montar kit manualmente", `EditorComponentesKit`) entra como
+  // itens adicionais do kit (bateria, estrutura, acessórios, ou um módulo/inversor
+  // extra do próprio vendedor), sempre com `origem: "manual"` — `salvarDimensionamento`
+  // nunca apaga essas linhas.
+  const usaMotor =
+    d.tipo_ligacao && d.tarifa_kwh != null && d.dimensionamento_modulo_id && d.dimensionamento_inversor_id && d.dimensionamento_quantidade_modulos;
+
+  if (usaMotor) {
     await salvarDimensionamento(supabase, atual.empresaId, atual.membroId, {
       negocioId: negocio.id,
-      moduloEquipamentoId: d.dimensionamento_modulo_id,
-      inversorEquipamentoId: d.dimensionamento_inversor_id,
-      quantidadeModulos: d.dimensionamento_quantidade_modulos,
-      tipoLigacao: d.tipo_ligacao,
+      moduloEquipamentoId: d.dimensionamento_modulo_id!,
+      inversorEquipamentoId: d.dimensionamento_inversor_id!,
+      quantidadeModulos: d.dimensionamento_quantidade_modulos!,
+      tipoLigacao: d.tipo_ligacao!,
       consumoMedioKwh: d.consumo_medio_kwh,
       valorFaturaMedio: d.valor_fatura_medio,
-      tarifaKwh: d.tarifa_kwh,
+      tarifaKwh: d.tarifa_kwh!,
       origemTarifa: d.origem_tarifa,
       produtividadeKwhKwpMes: d.dimensionamento_produtividade_kwh_kwp_mes,
       origemProdutividade: d.dimensionamento_origem_produtividade,
+      origemEscolha: d.dimensionamento_origem_escolha,
       precoNegocio: d.valor,
     });
+    if (d.componentes.length) {
+      await supabase.from("kit_componentes").insert(
+        d.componentes.map((c, i) => ({
+          empresa_id: atual.empresaId,
+          negocio_id: negocio.id,
+          tipo: c.tipo,
+          descricao: c.descricao,
+          potencia_w: c.potenciaW,
+          quantidade: c.quantidade,
+          ordem: 100 + i, // depois do módulo/inversor do motor (ordem 0/1)
+          origem: "manual" as const,
+        })),
+      );
+    }
   } else if (d.tipo_ligacao && d.tarifa_kwh != null && d.componentes.length) {
     const montado = await montarLinhaCalculo(supabase, atual.empresaId, {
       kitNome: nomeKitPersonalizado(d.componentes),
@@ -227,6 +247,7 @@ export async function criarNegocio(_: ResultadoAcao, formData: FormData): Promis
           potencia_w: c.potenciaW,
           quantidade: c.quantidade,
           ordem: i,
+          origem: "manual" as const,
         })),
       );
     }
