@@ -3231,7 +3231,7 @@ export type Database = {
       };
       status_pagamento_contrato: {
         Args: { p_contrato_id: string };
-        Returns: Database["public"]["Enums"]["status_pagamento_contrato"] | null;
+        Returns: Database["public"]["Enums"]["status_pagamento_contrato"];
       };
       tem_papel: {
         Args: { p_empresa_id: string; p_papeis: Database["public"]["Enums"]["papel_membro"][] };
@@ -3396,6 +3396,7 @@ export const Constants = {
       status_contrato: ["rascunho", "aguardando_assinatura", "assinado"],
       status_membro: ["ativo", "inativo", "desligado"],
       status_negocio: ["aberto", "ganho", "perdido"],
+      status_pagamento_contrato: ["pendente", "confirmado", "estornado"],
       status_resgate: ["solicitado", "aprovado", "entregue", "cancelado"],
       tipo_calculo_comissao: ["percentual", "multiplicador"],
       tipo_componente_kit: ["modulo", "inversor", "bateria", "outro"],
