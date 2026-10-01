@@ -27,11 +27,35 @@ function doCache(linha: {
 }
 
 /**
+ * Tarifa homologada (TUSD + TE, já convertida pra R$/kWh) pra uma sigla de
+ * distribuidora (SigAgente da ANEEL) já conhecida — ex.: a distribuidora
+ * resolvida por município (`resolverDistribuidoraPorIbge`/
+ * `resolverDistribuidoraPorCidadeUf`, em `src/lib/acoes/distribuidoras.ts`,
+ * Fase 2). Mesmo cache de 7 dias em `tarifas_aneel_cache` de
+ * `buscarTarifaDaEmpresa`, só que recebe a sigla diretamente em vez de
+ * depender da configuração da empresa. Retorna `null` quando a sigla é
+ * vazia, a ANEEL não responde e não há cache anterior.
+ */
+export async function buscarTarifaPorSigla(sigla: string): Promise<TarifaEncontrada | null> {
+  await exigirPapel();
+  const siglaLimpa = sigla.trim();
+  if (!siglaLimpa) return null;
+  return buscarTarifaComCache(siglaLimpa);
+}
+
+/**
  * Tarifa homologada (TUSD + TE, já convertida pra R$/kWh) da distribuidora
  * configurada em Parâmetros (Configurações → Kits e calculadora), com cache
  * de 7 dias em `tarifas_aneel_cache`. Retorna `null` quando a empresa não
  * configurou a sigla da distribuidora ou a ANEEL não responde e não há
  * cache anterior — quem chamou usa a tarifa digitada manualmente nesses casos.
+ *
+ * Fallback temporário de desenvolvimento (Fase 2, 2026-10-01): enquanto a
+ * resolução por município (`buscarTarifaPorSigla`, acima) ainda não está
+ * integrada ao wizard, esta função usa a sigla fixa configurada por empresa.
+ * Isso nunca deve se comportar como se fosse o resultado oficial da
+ * resolução por município — é só um valor fixo por empresa até a
+ * integração (Fase 4/5).
  */
 export async function buscarTarifaDaEmpresa(): Promise<TarifaEncontrada | null> {
   const { atual } = await exigirPapel();
@@ -45,6 +69,11 @@ export async function buscarTarifaDaEmpresa(): Promise<TarifaEncontrada | null> 
   const sigla = parametros?.sigla_distribuidora_aneel?.trim();
   if (!sigla) return null;
 
+  return buscarTarifaComCache(sigla);
+}
+
+async function buscarTarifaComCache(sigla: string): Promise<TarifaEncontrada | null> {
+  const supabase = await criarClienteServidor();
   const { data: emCache } = await supabase
     .from("tarifas_aneel_cache")
     .select("tarifa_final_kwh, vigencia_inicio, resolucao_homologatoria, atualizado_em")
