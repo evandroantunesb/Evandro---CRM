@@ -756,9 +756,8 @@ export function FormularioNegocio({
             CNH e conta de energia já enviados na Etapa 1 aparecem aqui como anexos do negócio.{" "}
             <Selo tom="neutro">opcional</Selo>
           </p>
-          <div className="md:col-span-2">
-            <CampoArquivo rotulo="Fotos e outros documentos" name="anexo_fatura_beneficiario" accept="image/*,.pdf" multiple />
-          </div>
+          <CampoArquivo rotulo="Fotos" name="anexo_fatura_beneficiario" accept="image/*" multiple />
+          <CampoArquivo rotulo="Outros documentos" name="anexo_fatura_beneficiario" multiple />
         </fieldset>
 
         <Mensagem resultado={resultado} />
