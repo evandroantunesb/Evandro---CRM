@@ -6,6 +6,7 @@ import { z } from "zod";
 import { montarLinhaCalculo } from "@/lib/acoes/calculadora";
 import { salvarDimensionamento } from "@/lib/acoes/dimensionamento";
 import { enviarAnexoNoServidor } from "@/lib/acoes/anexos";
+import { CAMPOS_DIMENSIONAMENTO } from "@/lib/dimensionamento-campos";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { mensagemErro } from "@/lib/erros";
@@ -87,12 +88,14 @@ const esquemaNovo = z.object({
   origem_tarifa: z.enum(["manual", "aneel"]).optional().default("manual"),
   componentes: componentesJsonSchema,
   // Escolha do painel de dimensionamento único (src/lib/dimensionamento.ts) — quando presente,
-  // tem prioridade sobre o kit manual (ver Etapa A da unificação do motor de cálculo).
-  dimensionamento_modulo_id: uuidOpcional,
-  dimensionamento_inversor_id: uuidOpcional,
-  dimensionamento_quantidade_modulos: inteiroOpcional,
-  dimensionamento_produtividade_kwh_kwp_mes: numeroOpcional,
-  dimensionamento_origem_produtividade: z.enum(["pvgis", "nasa"]).optional(),
+  // tem prioridade sobre o kit manual (ver Etapa A da unificação do motor de cálculo). Nomes
+  // centralizados em CAMPOS_DIMENSIONAMENTO (src/lib/dimensionamento-campos.ts) — o componente
+  // de campos ocultos usa a mesma constante, pra nunca divergir do schema aqui.
+  [CAMPOS_DIMENSIONAMENTO.moduloId]: uuidOpcional,
+  [CAMPOS_DIMENSIONAMENTO.inversorId]: uuidOpcional,
+  [CAMPOS_DIMENSIONAMENTO.quantidadeModulos]: inteiroOpcional,
+  [CAMPOS_DIMENSIONAMENTO.produtividadeKwhKwpMes]: numeroOpcional,
+  [CAMPOS_DIMENSIONAMENTO.origemProdutividade]: z.enum(["pvgis", "nasa"]).optional(),
 });
 
 export async function criarNegocio(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
