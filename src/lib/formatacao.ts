@@ -6,6 +6,21 @@ export function formatarMoeda(valor: number | null | undefined) {
   return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+/**
+ * Número como valor inicial de campo de formulário, em formato BR ("20", "0,5", "-0,26") —
+ * nunca "NaN", "undefined" ou "null" (Evandro, 2026-10-01: a tela de parâmetros mostrava
+ * "NaN" quando a coluna ainda não existia no banco). Valor ausente/inválido usa `padrao`
+ * quando houver, senão devolve "" (campo vazio). `escala` serve pra percentuais guardados de
+ * 0 a 1 e exibidos de 0 a 100; o arredondamento evita lixo de ponto flutuante (0,29 × 100).
+ */
+export function numeroParaCampo(valor: unknown, opcoes: { padrao?: number; escala?: number } = {}): string {
+  const { padrao, escala = 1 } = opcoes;
+  const numero = typeof valor === "number" || (typeof valor === "string" && valor.trim()) ? Number(valor) : NaN;
+  const base = Number.isFinite(numero) ? numero : padrao;
+  if (base == null || !Number.isFinite(base)) return "";
+  return String(Number((base * escala).toFixed(6))).replace(".", ",");
+}
+
 /** Máscara de telefone brasileiro (fixo ou celular) a partir do que o usuário digita. */
 export function formatarTelefoneBr(valor: string) {
   const d = valor.replace(/\D/g, "").slice(0, 11);

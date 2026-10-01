@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Cartao } from "@/components/ui";
 import { carregarConfiguracao } from "@/lib/crm";
 import { paraEquipamentoAtivo } from "@/lib/dimensionamento";
+import { participaDoMotor } from "@/lib/equipamentos";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { FormularioNegocio } from "./formulario";
@@ -14,7 +15,9 @@ export default async function NovoNegocio({ searchParams }: PageProps<"/negocios
     carregarConfiguracao(atual.empresaId),
     supabase.from("parametros_calculadora").select("*").eq("empresa_id", atual.empresaId).maybeSingle(),
     // Catálogo ativo pro motor de dimensionamento automático (Fase 4 da reconciliação) — só os
-    // equipamentos ligados em Configurações → Calculadora entram nas opções sugeridas.
+    // equipamentos ligados em Configurações → Calculadora entram nas opções sugeridas. O status
+    // técnico (incompleto/descontinuado ficam de fora) é filtrado logo abaixo, em JS, pra que um
+    // banco ainda sem a coluna `status_tecnico` não esvazie o catálogo — ver `participaDoMotor`.
     supabase
       .from("equipamentos_empresa")
       .select("*")
@@ -27,8 +30,9 @@ export default async function NovoNegocio({ searchParams }: PageProps<"/negocios
   if (!funilEscolhido) return <p className="text-sm text-zinc-600">Nenhum funil ativo.</p>;
   const etapaEscolhida = config.etapas.find((e) => e.id === etapa && e.funilId === funilEscolhido.id && e.ativa);
 
-  const modulosAtivos = (equipamentos ?? []).filter((e) => e.tipo === "modulo").map(paraEquipamentoAtivo);
-  const inversoresAtivos = (equipamentos ?? []).filter((e) => e.tipo === "inversor").map(paraEquipamentoAtivo);
+  const catalogoMotor = (equipamentos ?? []).filter((e) => participaDoMotor(e.status_tecnico));
+  const modulosAtivos = catalogoMotor.filter((e) => e.tipo === "modulo").map(paraEquipamentoAtivo);
+  const inversoresAtivos = catalogoMotor.filter((e) => e.tipo === "inversor").map(paraEquipamentoAtivo);
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4">

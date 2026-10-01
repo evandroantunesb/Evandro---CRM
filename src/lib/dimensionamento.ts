@@ -323,7 +323,7 @@ function encontrarConfiguracaoString(
   };
 }
 
-const CAMPOS_TECNICOS_MODULO: { chave: keyof EquipamentoAtivo; rotulo: string }[] = [
+export const CAMPOS_TECNICOS_MODULO: { chave: keyof EquipamentoAtivo; rotulo: string }[] = [
   { chave: "vocV", rotulo: "Voc (V)" },
   { chave: "vmpV", rotulo: "Vmp (V)" },
   { chave: "iscA", rotulo: "Isc (A)" },
@@ -331,7 +331,7 @@ const CAMPOS_TECNICOS_MODULO: { chave: keyof EquipamentoAtivo; rotulo: string }[
   { chave: "coefTempVocPctC", rotulo: "Coeficiente de temperatura do Voc (%/°C)" },
 ];
 
-const CAMPOS_TECNICOS_INVERSOR: { chave: keyof EquipamentoAtivo; rotulo: string }[] = [
+export const CAMPOS_TECNICOS_INVERSOR: { chave: keyof EquipamentoAtivo; rotulo: string }[] = [
   { chave: "tensaoMaxDcV", rotulo: "Tensão DC máxima (V)" },
   { chave: "mpptMinV", rotulo: "MPPT mínimo (V)" },
   { chave: "mpptMaxV", rotulo: "MPPT máximo (V)" },

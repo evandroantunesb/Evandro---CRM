@@ -989,6 +989,7 @@ export type Database = {
           preco_referencia_brl: number | null;
           prioridade: number;
           quantidade_mppt: number | null;
+          status_tecnico: Database["public"]["Enums"]["status_tecnico_equipamento"];
           status_validacao: string | null;
           tecnologia: string | null;
           tensao_ac_v: number | null;
@@ -1045,6 +1046,7 @@ export type Database = {
           preco_referencia_brl?: number | null;
           prioridade?: number;
           quantidade_mppt?: number | null;
+          status_tecnico?: Database["public"]["Enums"]["status_tecnico_equipamento"];
           status_validacao?: string | null;
           tecnologia?: string | null;
           tensao_ac_v?: number | null;
@@ -1101,6 +1103,7 @@ export type Database = {
           preco_referencia_brl?: number | null;
           prioridade?: number;
           quantidade_mppt?: number | null;
+          status_tecnico?: Database["public"]["Enums"]["status_tecnico_equipamento"];
           status_validacao?: string | null;
           tecnologia?: string | null;
           tensao_ac_v?: number | null;
@@ -3477,6 +3480,12 @@ export type Database = {
       status_membro: "ativo" | "inativo" | "desligado";
       status_negocio: "aberto" | "ganho" | "perdido";
       status_resgate: "solicitado" | "aprovado" | "entregue" | "cancelado";
+      status_tecnico_equipamento:
+        | "completo"
+        | "incompleto"
+        | "em_revisao"
+        | "verificado"
+        | "descontinuado";
       tipo_calculo_comissao: "percentual" | "multiplicador";
       tipo_componente_kit: "modulo" | "inversor" | "bateria" | "outro";
       tipo_inversor_equipamento: "on_grid" | "hibrido";
@@ -3625,6 +3634,13 @@ export const Constants = {
       status_membro: ["ativo", "inativo", "desligado"],
       status_negocio: ["aberto", "ganho", "perdido"],
       status_resgate: ["solicitado", "aprovado", "entregue", "cancelado"],
+      status_tecnico_equipamento: [
+        "completo",
+        "incompleto",
+        "em_revisao",
+        "verificado",
+        "descontinuado",
+      ],
       tipo_calculo_comissao: ["percentual", "multiplicador"],
       tipo_componente_kit: ["modulo", "inversor", "bateria", "outro"],
       tipo_inversor_equipamento: ["on_grid", "hibrido"],
