@@ -8,6 +8,8 @@ export const EVENTOS_GAMIFICACAO = [
   { tipo: "deal.reopened", rotulo: "Negócio reaberto", campos: [] },
   { tipo: "task.created", rotulo: "Tarefa criada", campos: ["tipo"] },
   { tipo: "task.completed", rotulo: "Tarefa concluída", campos: ["no_prazo", "resultado"] },
+  { tipo: "reuniao.realizada", rotulo: "Reunião realizada", campos: [] },
+  { tipo: "visita.realizada", rotulo: "Visita realizada", campos: [] },
   { tipo: "note.created", rotulo: "Nota registrada", campos: [] },
   { tipo: "deal.first_contact_done", rotulo: "SDR: primeiro contato realizado", campos: [] },
   { tipo: "deal.energy_bill_received", rotulo: "SDR: conta de energia recebida", campos: [] },
