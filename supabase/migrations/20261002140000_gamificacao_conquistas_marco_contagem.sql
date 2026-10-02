@@ -10,9 +10,14 @@
 -- Marcos cobertos nesta PR (catálogo fechado após auditoria de atribuição/perfil):
 -- deal.qualified, deal.negotiation_started (fatos permanentes — contam direto de
 -- `eventos`, guarda de emissão já impede duplicata); contrato.assinado, deal.won,
--- handoff.won, pagamento.confirmado (estados reversíveis — contam o estado AO VIVO da
--- tabela dona, nunca a contagem bruta de linhas em `eventos`, pra não contar dobrado um
--- ciclo reaberto/reassinado). Reunião e visita realizadas ficam de fora até a PR #109
+-- handoff.won, pagamento.confirmado (estados reversíveis — contam o estado AO VIVO,
+-- nunca a contagem bruta de linhas em `eventos`, pra não contar dobrado um ciclo
+-- reaberto/reassinado/reconfirmado). `contrato.assinado` lê `contratos.status` direto
+-- (já committed antes do `eventos` ser inserido, dentro do mesmo AFTER UPDATE trigger);
+-- `deal.won`/`handoff.won`/`pagamento.confirmado` usam o par de eventos mais recente por
+-- entidade (nunca a tabela satélite `confirmacoes_pagamento`, que só é gravada DEPOIS do
+-- insert em `eventos` dentro de `confirmar_pagamento()` — ainda não existiria no instante
+-- em que este gatilho roda). Reunião e visita realizadas ficam de fora até a PR #109
 -- (`tarefas.resultado`) mesclar — não há fonte causal aceitável hoje sem usar
 -- `task.completed` genérico, que o Evandro vetou explicitamente como workaround.
 --
@@ -206,11 +211,28 @@ begin
   end if;
 
   if p_marco = 'pagamento.confirmado' then
-    select count(distinct negocio_id) into v_count
-      from public.confirmacoes_pagamento
-      where empresa_id = p_empresa_id and estornado_em is null
-        and beneficiario_membro_id = p_membro_id
-        and confirmado_em >= p_ativa_desde;
+    -- Não lê `confirmacoes_pagamento` diretamente: a linha dessa tabela só é gravada
+    -- DEPOIS do insert em `eventos` dentro de `confirmar_pagamento()` (mesma transação,
+    -- mas instrução seguinte) — no instante em que este gatilho roda (AFTER INSERT em
+    -- `eventos`), a confirmação ainda não existe. Usa o par
+    -- pagamento.confirmado/pagamento.confirmacao_estornada em `eventos` (mesmo padrão dos
+    -- outros marcos reversíveis) pra saber se o pagamento está confirmado AO VIVO agora.
+    select user_id into v_user_id from public.empresa_membros where id = p_membro_id;
+    if v_user_id is null then
+      return 0;
+    end if;
+    select count(*) into v_count
+      from public.negocios n
+      join lateral (
+        select e.tipo, e.beneficiario_id, e.created_at from public.eventos e
+        where e.empresa_id = p_empresa_id and e.entidade_id = n.id
+          and e.tipo in ('pagamento.confirmado', 'pagamento.confirmacao_estornada')
+        order by e.created_at desc limit 1
+      ) ult on true
+      where n.empresa_id = p_empresa_id
+        and ult.tipo = 'pagamento.confirmado'
+        and ult.beneficiario_id = v_user_id
+        and ult.created_at >= p_ativa_desde;
     return coalesce(v_count, 0);
   end if;
 

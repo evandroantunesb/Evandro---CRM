@@ -191,16 +191,23 @@ describe("marco_contagem: estado ao vivo, não contagem bruta de eventos (reocor
     expect(await desbloqueada(conquistaId, membro[closer.id])).toBe(true); // agora 2 ao vivo
   });
 
-  it("contrato cancelado e reassinado: só conta enquanto está assinado agora", async () => {
-    const conquistaId = await criarConquistaMarco({ nome: "1 contrato assinado", marco: "contrato.assinado", valor: 1 });
-    const negocioId = await criarNegocio("Contrato ciclo", membro[closer2.id]);
-    const contratoId = await criarEAssinarContrato(negocioId, closer2.cliente);
+  it("contrato cancelado não conta pro threshold; só contratos assinados ao vivo contam", async () => {
+    // Threshold 1 desbloquearia já na primeira assinatura (conquista é permanente depois
+    // de desbloqueada) — threshold 2 é necessário pra observar que um contrato cancelado
+    // deixa de contar, sem reabrir uma conquista já concedida.
+    const conquistaId = await criarConquistaMarco({ nome: "2 contratos assinados", marco: "contrato.assinado", valor: 2 });
+    const negocioA = await criarNegocio("Contrato ciclo A", membro[closer2.id]);
+    const contratoA = await criarEAssinarContrato(negocioA, closer2.cliente);
+    expect(await desbloqueada(conquistaId, membro[closer2.id])).toBe(false); // só 1 assinado
 
-    await closer2.cliente.from("contratos").update({ status: "rascunho" }).eq("id", contratoId);
-    expect(await desbloqueada(conquistaId, membro[closer2.id])).toBe(false);
+    await closer2.cliente.from("contratos").update({ status: "rascunho" }).eq("id", contratoA);
 
-    await closer2.cliente.from("contratos").update({ status: "assinado" }).eq("id", contratoId);
-    expect(await desbloqueada(conquistaId, membro[closer2.id])).toBe(true);
+    const negocioB = await criarNegocio("Contrato ciclo B", membro[closer2.id]);
+    await criarEAssinarContrato(negocioB, closer2.cliente);
+    expect(await desbloqueada(conquistaId, membro[closer2.id])).toBe(false); // só B ao vivo (A cancelado)
+
+    await closer2.cliente.from("contratos").update({ status: "assinado" }).eq("id", contratoA); // reassina A
+    expect(await desbloqueada(conquistaId, membro[closer2.id])).toBe(true); // agora 2 ao vivo
   });
 });
 
