@@ -113,7 +113,13 @@ describe("contrato assinado credita o SDR de origem", () => {
     expect(evCloser!.ator_id).toBe(closer.id);
   });
 
-  it("pontua uma vez: sair e voltar a 'assinado' não duplica o evento", async () => {
+  it("sair e voltar a 'assinado' é reocorrência legítima: emite um novo evento (dedup de pontos fica a cargo do motor)", async () => {
+    // Corretiva 2026-10-02: sair de 'assinado' estorna o lançamento (ver
+    // estornar_lancamentos_evento em registrar_contrato), então reassinar depois é uma
+    // nova ocorrência comercial válida, não farm. A guarda "evento já existe" que impedia
+    // esse segundo evento foi removida daqui — quem evita pontuação duplicada ENQUANTO o
+    // crédito segue ativo é unica_por_negocio no motor (coberto com lançamentos reais em
+    // tests/gamificacao-fix-reocorrencia.test.ts), não a emissão do evento em si.
     const negocioId = await criarNegocio("Negócio reversão", membro[sdr1.id]);
     await enviarEAceitar(negocioId, sdr1, closer);
     const contratoId = await assinarContrato(negocioId, closer.cliente);
@@ -128,7 +134,7 @@ describe("contrato assinado credita o SDR de origem", () => {
       .select("id")
       .eq("entidade_id", negocioId)
       .eq("tipo", "handoff.contrato_assinado");
-    expect(eventos).toHaveLength(1);
+    expect(eventos).toHaveLength(2);
   });
 
   it("write-once: um segundo handoff aceito não rouba a origem gravada no primeiro", async () => {
