@@ -3147,6 +3147,27 @@ export type Database = {
         };
         Returns: number;
       };
+      corrigir_valor_negocio: {
+        Args: { p_motivo: string; p_negocio_id: string; p_novo_valor: number };
+        Returns: {
+          ator_id: string | null;
+          beneficiario_id: string | null;
+          created_at: string;
+          empresa_id: string;
+          entidade: string | null;
+          entidade_id: string | null;
+          id: number;
+          payload: NonNullable<Json>;
+          profile_at_event: Database["public"]["Enums"]["perfil_gamificacao"] | null;
+          tipo: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "eventos";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       decidir_atribuicao_lead: {
         Args: { p_automatico: boolean; p_id: string; p_membro_final_id: string };
         Returns: undefined;
