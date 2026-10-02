@@ -36,11 +36,15 @@ export default async function Ranking({ searchParams }: { searchParams: Promise<
   const { atual } = await exigirPapel();
   const { periodo: periodoParam, perfil: perfilParam } = await searchParams;
   const periodo = (PERIODOS.some((p) => p.chave === periodoParam) ? periodoParam : "mes") as Periodo;
-  // Minha aba por padrão (sdr/closer); sem perfil (admin/gestor, que só visualiza, não compete), cai na primeira aba.
+  // Minha aba por padrão (sdr/closer); sem perfil (admin/gestor, que só visualiza, não compete)
+  // ou com perfil sem aba própria ainda (ex.: cs_farmer, sem gente usando hoje), cai na primeira.
+  const meuPerfilTemAba = PERFIS_RANKING.includes(atual.perfilGamificacao as (typeof PERFIS_RANKING)[number]);
   const perfil = (
     PERFIS_RANKING.includes(perfilParam as (typeof PERFIS_RANKING)[number])
       ? perfilParam
-      : (atual.perfilGamificacao ?? PERFIS_RANKING[0])
+      : meuPerfilTemAba
+        ? atual.perfilGamificacao
+        : PERFIS_RANKING[0]
   ) as (typeof PERFIS_RANKING)[number];
   const supabase = await criarClienteServidor();
 
