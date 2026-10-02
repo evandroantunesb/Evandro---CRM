@@ -3149,7 +3149,12 @@ export type Database = {
         Returns: number;
       };
       calcular_receita_causal_comissao: {
-        Args: { p_ate_exclusivo: string; p_desde: string; p_empresa_id: string; p_membro_id: string };
+        Args: {
+          p_ate_exclusivo: string;
+          p_desde: string;
+          p_empresa_id: string;
+          p_membro_id: string;
+        };
         Returns: number;
       };
       compartilha_empresa: { Args: { p_user_id: string }; Returns: boolean };
