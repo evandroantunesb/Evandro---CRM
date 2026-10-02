@@ -153,7 +153,7 @@ async function contarMarco(marco: string, membroId: string, perfilRequerido: "sd
     p_empresa_id: empresa,
     p_membro_id: membroId,
     p_ativa_desde: "1970-01-01T00:00:00Z",
-    p_perfil_requerido: perfilRequerido,
+    p_perfil_requerido: perfilRequerido ?? undefined,
   });
   if (error) throw error;
   return data as number;

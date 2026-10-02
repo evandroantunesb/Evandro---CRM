@@ -3137,7 +3137,7 @@ export type Database = {
           p_empresa_id: string;
           p_marco: string;
           p_membro_id: string;
-          p_perfil_requerido?: Database["public"]["Enums"]["perfil_gamificacao"] | null;
+          p_perfil_requerido?: Database["public"]["Enums"]["perfil_gamificacao"];
         };
         Returns: number;
       };
