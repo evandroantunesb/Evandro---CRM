@@ -41,10 +41,16 @@ beforeAll(async () => {
   contato = c!.id;
 });
 
-/** Membro novo por teste (papel vendedor, mesmo usuário admin por trás) — evita que
- * testes diferentes, no mesmo dia, somem eventos um do outro na métrica "hoje". */
+let contadorMembro = 0;
+
+/** Membro novo por teste (usuário novo + papel vendedor) — evita que testes
+ * diferentes, no mesmo dia, somem eventos um do outro na métrica "hoje".
+ * `empresa_membros` tem unique (empresa_id, user_id), então cada membro precisa
+ * de um usuário próprio, não só uma linha nova apontando pro mesmo user_id. */
 async function novoMembro() {
-  const { data, error } = await servico.from("empresa_membros").insert({ empresa_id: empresa, user_id: admin.id, papel: "vendedor" }).select("id").single();
+  contadorMembro += 1;
+  const usuario = await criarUsuario(`mrc-membro-${contadorMembro}`);
+  const { data, error } = await servico.from("empresa_membros").insert({ empresa_id: empresa, user_id: usuario.id, papel: "vendedor" }).select("id").single();
   if (error) throw error;
   return data!.id;
 }
