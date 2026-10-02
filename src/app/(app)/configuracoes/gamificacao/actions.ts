@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { EVENTOS_GAMIFICACAO, MARCOS_CONQUISTA } from "@/lib/gamificacao";
+import { EVENTOS_GAMIFICACAO, EVENTOS_TETO_OBRIGATORIO, MARCOS_CONQUISTA } from "@/lib/gamificacao";
 import { mensagemErro } from "@/lib/erros";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
@@ -26,6 +26,10 @@ const esquema = z
   })
   .refine((d) => !d.limitePeriodo === !d.limiteQuantidade, {
     message: "Defina o período e a quantidade do teto juntos, ou deixe os dois em branco.",
+    path: ["limiteQuantidade"],
+  })
+  .refine((d) => !(EVENTOS_TETO_OBRIGATORIO as readonly string[]).includes(d.eventoTipo) || (!!d.limitePeriodo && !!d.limiteQuantidade), {
+    message: "Esse evento é uma atividade repetível: defina período e quantidade do teto antes de salvar.",
     path: ["limiteQuantidade"],
   })
   .refine((d) => d.xp !== 0 || d.moedas !== 0, {
