@@ -581,3 +581,111 @@ describe("marco_contagem: sem dependência de gamification_rules/point_ledger", 
     expect(lancamentos![0].xp).toBe(7);
   });
 });
+
+describe("marco_contagem: perfil causal congelado em contratos.perfil_assinatura (rodada 2 da auditoria)", () => {
+  it("closer assina contrato → perfil_assinatura fica congelado como closer", async () => {
+    const vendedor = await criarUsuario("cm-perfil-assin-1");
+    const membroId = await adicionarMembroEquipe(vendedor.id, "vendedor", "closer");
+    const negocioId = await criarNegocio("Assinatura congela perfil", membroId);
+    const contratoId = await criarEAssinarContrato(negocioId, vendedor.cliente);
+
+    const { data: contrato } = await servico.from("contratos").select("perfil_assinatura").eq("id", contratoId).single();
+    expect(contrato!.perfil_assinatura).toBe("closer");
+  });
+
+  it("mudar o perfil do membro depois da assinatura não altera o perfil_assinatura já congelado", async () => {
+    const vendedor = await criarUsuario("cm-perfil-assin-2");
+    const membroId = await adicionarMembroEquipe(vendedor.id, "vendedor", "closer");
+    const negocioId = await criarNegocio("Assinatura imune a troca de perfil", membroId);
+    const contratoId = await criarEAssinarContrato(negocioId, vendedor.cliente);
+
+    await servico.from("empresa_membros").update({ perfil_gamificacao: "sdr" }).eq("id", membroId);
+
+    const { data: contrato } = await servico.from("contratos").select("perfil_assinatura").eq("id", contratoId).single();
+    expect(contrato!.perfil_assinatura).toBe("closer"); // nunca reinterpretado pelo perfil atual (agora sdr)
+  });
+
+  it("reassinar o mesmo contrato não recalcula perfil_assinatura", async () => {
+    const vendedor = await criarUsuario("cm-perfil-assin-3");
+    const membroId = await adicionarMembroEquipe(vendedor.id, "vendedor", "closer");
+    const negocioId = await criarNegocio("Reassinatura mantém perfil", membroId);
+    const contratoId = await criarEAssinarContrato(negocioId, vendedor.cliente);
+
+    await servico.from("empresa_membros").update({ perfil_gamificacao: "sdr" }).eq("id", membroId);
+    await vendedor.cliente.from("contratos").update({ status: "rascunho" }).eq("id", contratoId);
+    await vendedor.cliente.from("contratos").update({ status: "assinado" }).eq("id", contratoId); // reassina
+
+    const { data: contrato } = await servico.from("contratos").select("perfil_assinatura").eq("id", contratoId).single();
+    expect(contrato!.perfil_assinatura).toBe("closer"); // write-once: reassinatura nunca recalcula
+  });
+
+  it("pagamento confirmado depois usa o perfil congelado na assinatura, mesmo com o perfil atual diferente", async () => {
+    const vendedor = await criarUsuario("cm-perfil-assin-4");
+    const membroId = await adicionarMembroEquipe(vendedor.id, "vendedor", "closer");
+    const negocioId = await criarNegocio("Pagamento usa perfil da assinatura", membroId);
+    const contratoId = await criarEAssinarContrato(negocioId, vendedor.cliente);
+
+    await servico.from("empresa_membros").update({ perfil_gamificacao: "sdr" }).eq("id", membroId); // perfil atual agora é sdr
+    await confirmarPagamento(contratoId);
+
+    expect(await contarMarco("pagamento.confirmado", membroId, "closer")).toBe(1); // perfil congelado na assinatura
+    expect(await contarMarco("pagamento.confirmado", membroId, "sdr")).toBe(0); // nunca o perfil atual
+  });
+
+  it("deal.won registra o perfil causal (congelado) da própria ocorrência", async () => {
+    const vendedor = await criarUsuario("cm-perfil-assin-5");
+    const membroId = await adicionarMembroEquipe(vendedor.id, "vendedor", "closer");
+    const negocioId = await criarNegocio("Deal.won registra perfil causal", membroId);
+    await marcarStatus(negocioId, "ganho", vendedor.cliente);
+
+    expect(await contarMarco("deal.won", membroId, "closer")).toBe(1);
+    expect(await contarMarco("deal.won", membroId, "sdr")).toBe(0);
+  });
+
+  it("mudança sdr → closer não mistura ocorrências antigas e novas em deal.qualified", async () => {
+    const vendedor = await criarUsuario("cm-perfil-assin-6");
+    const membroId = await adicionarMembroEquipe(vendedor.id, "sdr", "sdr");
+    membro[vendedor.id] = membroId;
+
+    async function qualificar(titulo: string) {
+      const negocioId = await criarNegocio(titulo, membroId);
+      const { error } = await vendedor.cliente
+        .from("negocios")
+        .update({ qualif_objetivo: "reduzir conta de luz", qualif_e_decisor: true })
+        .eq("id", negocioId);
+      if (error) throw error;
+    }
+
+    await qualificar("Qualificação como sdr 1");
+    await qualificar("Qualificação como sdr 2");
+    expect(await contarMarco("deal.qualified", membroId, "sdr")).toBe(2);
+    expect(await contarMarco("deal.qualified", membroId, "closer")).toBe(0);
+
+    await servico.from("empresa_membros").update({ perfil_gamificacao: "closer" }).eq("id", membroId);
+    await qualificar("Qualificação como closer 1");
+
+    expect(await contarMarco("deal.qualified", membroId, "sdr")).toBe(2); // histórico sdr intacto
+    expect(await contarMarco("deal.qualified", membroId, "closer")).toBe(1); // nunca 3
+  });
+
+  it("ocorrência com perfil causal null só conta pra conquista geral, nunca pra uma de perfil específico", async () => {
+    const vendedor = await criarUsuario("cm-perfil-assin-7");
+    const { data: vinculo } = await servico
+      .from("empresa_membros")
+      .insert({ empresa_id: empresa, user_id: vendedor.id, papel: "vendedor", perfil_gamificacao: null })
+      .select("id")
+      .single();
+    const membroId = vinculo!.id as string;
+    await servico.from("equipe_membros").insert({ empresa_id: empresa, equipe_id: equipeId, membro_id: membroId, e_gestor: false });
+
+    const negocioId = await criarNegocio("Sem perfil causal", membroId);
+    await marcarStatus(negocioId, "ganho", vendedor.cliente);
+
+    // Conquista geral (perfil_aplicavel = null) continua contando normalmente.
+    expect(await contarMarco("deal.won", membroId, null)).toBe(1);
+    // Conquista de perfil específico nunca conta uma ocorrência sem perfil causal —
+    // nunca infere pelo perfil atual do membro (que também é null aqui, de propósito).
+    expect(await contarMarco("deal.won", membroId, "closer")).toBe(0);
+    expect(await contarMarco("deal.won", membroId, "sdr")).toBe(0);
+  });
+});

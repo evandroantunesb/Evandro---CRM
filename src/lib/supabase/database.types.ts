@@ -702,6 +702,7 @@ export type Database = {
           empresa_id: string;
           id: string;
           negocio_id: string;
+          perfil_assinatura: Database["public"]["Enums"]["perfil_gamificacao"] | null;
           responsavel_assinatura_id: string | null;
           status: Database["public"]["Enums"]["status_contrato"];
           token: string;
@@ -715,6 +716,7 @@ export type Database = {
           empresa_id: string;
           id?: string;
           negocio_id: string;
+          perfil_assinatura?: Database["public"]["Enums"]["perfil_gamificacao"] | null;
           responsavel_assinatura_id?: string | null;
           status?: Database["public"]["Enums"]["status_contrato"];
           token?: string;
@@ -728,6 +730,7 @@ export type Database = {
           empresa_id?: string;
           id?: string;
           negocio_id?: string;
+          perfil_assinatura?: Database["public"]["Enums"]["perfil_gamificacao"] | null;
           responsavel_assinatura_id?: string | null;
           status?: Database["public"]["Enums"]["status_contrato"];
           token?: string;
