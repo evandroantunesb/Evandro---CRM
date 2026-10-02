@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { EVENTOS_GAMIFICACAO } from "@/lib/gamificacao";
+import { EVENTOS_GAMIFICACAO, MARCOS_CONQUISTA } from "@/lib/gamificacao";
 import { mensagemErro } from "@/lib/erros";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
@@ -109,7 +109,31 @@ const esquemaNivel = z.object({
   xpMinimo: z.coerce.number().int().min(0),
 });
 
-export async function salvarNivel(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+export async function criarNivel(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  const { atual } = await exigirPapel("admin");
+  const dados = esquemaNivel.safeParse(Object.fromEntries(formData));
+  if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
+
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.from("niveis_gamificacao").insert({
+    empresa_id: atual.empresaId,
+    nivel: dados.data.nivel,
+    nome: dados.data.nome ?? null,
+    xp_minimo: dados.data.xpMinimo,
+  });
+  if (error) {
+    return {
+      ok: false,
+      mensagem:
+        error.code === "23505" ? "Já existe um nível com esse número ou esse XP mínimo." : mensagemErro(error, "Não foi possível criar o nível."),
+    };
+  }
+
+  revalidatePath(CAMINHO);
+  return { ok: true, mensagem: "Nível criado." };
+}
+
+export async function editarNivel(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
   const { atual } = await exigirPapel("admin");
   const dados = esquemaNivel.safeParse(Object.fromEntries(formData));
   if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
@@ -117,10 +141,9 @@ export async function salvarNivel(_: ResultadoAcao, formData: FormData): Promise
   const supabase = await criarClienteServidor();
   const { error } = await supabase
     .from("niveis_gamificacao")
-    .upsert(
-      { empresa_id: atual.empresaId, nivel: dados.data.nivel, nome: dados.data.nome ?? null, xp_minimo: dados.data.xpMinimo },
-      { onConflict: "empresa_id,nivel" },
-    );
+    .update({ nome: dados.data.nome ?? null, xp_minimo: dados.data.xpMinimo, ativa: formData.get("ativa") === "on" })
+    .eq("empresa_id", atual.empresaId)
+    .eq("nivel", dados.data.nivel);
   if (error) {
     return {
       ok: false,
@@ -142,13 +165,27 @@ export async function apagarNivel(formData: FormData) {
   revalidatePath(CAMINHO);
 }
 
-const esquemaConquista = z.object({
-  nome: z.string().trim().min(2, "Nome muito curto").max(80, "Nome muito longo"),
-  descricao: z.string().trim().max(200).optional().or(z.literal("").transform(() => undefined)),
-  icone: z.string().trim().min(1).max(8).optional().or(z.literal("").transform(() => undefined)),
-  valorXp: z.coerce.number().int().positive("Informe quanto XP é necessário."),
-  xpBonus: z.coerce.number().int().min(0).optional().or(z.literal("").transform(() => undefined)),
-});
+const esquemaConquista = z
+  .object({
+    nome: z.string().trim().min(2, "Nome muito curto").max(80, "Nome muito longo"),
+    descricao: z.string().trim().max(200).optional().or(z.literal("").transform(() => undefined)),
+    icone: z.string().trim().min(1).max(8).optional().or(z.literal("").transform(() => undefined)),
+    metrica: z.enum(["xp_acumulado", "marco_contagem"]).default("xp_acumulado"),
+    marco: z.enum(MARCOS_CONQUISTA).optional().or(z.literal("").transform(() => undefined)),
+    valor: z.coerce.number().int().positive("Informe o valor necessário."),
+    xpBonus: z.coerce.number().int().min(0).optional().or(z.literal("").transform(() => undefined)),
+    perfilAplicavel: z.enum(PERFIS_GAMIFICACAO).optional().or(z.literal("").transform(() => undefined)),
+  })
+  .refine((d) => d.metrica !== "marco_contagem" || !!d.marco, {
+    message: "Escolha o marco dessa conquista.",
+    path: ["marco"],
+  });
+
+function montarCriterioConquista(dados: z.infer<typeof esquemaConquista>) {
+  return dados.metrica === "marco_contagem"
+    ? { metrica: "marco_contagem" as const, marco: dados.marco, valor: dados.valor }
+    : { metrica: "xp_acumulado" as const, valor: dados.valor };
+}
 
 export async function criarConquista(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
   const { atual } = await exigirPapel("admin");
@@ -161,8 +198,9 @@ export async function criarConquista(_: ResultadoAcao, formData: FormData): Prom
     nome: dados.data.nome,
     descricao: dados.data.descricao ?? "",
     icone: dados.data.icone ?? "🏆",
-    criterio: { metrica: "xp_acumulado", valor: dados.data.valorXp },
+    criterio: montarCriterioConquista(dados.data),
     xp_bonus: dados.data.xpBonus ?? 0,
+    perfil_aplicavel: dados.data.perfilAplicavel ?? null,
   });
   if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível criar a conquista.") };
 
@@ -185,8 +223,9 @@ export async function editarConquista(_: ResultadoAcao, formData: FormData): Pro
       nome: dados.data.nome,
       descricao: dados.data.descricao ?? "",
       icone: dados.data.icone ?? "🏆",
-      criterio: { metrica: "xp_acumulado", valor: dados.data.valorXp },
+      criterio: montarCriterioConquista(dados.data),
       xp_bonus: dados.data.xpBonus ?? 0,
+      perfil_aplicavel: dados.data.perfilAplicavel ?? null,
       ativa: formData.get("ativa") === "on",
     })
     .eq("id", id.data);

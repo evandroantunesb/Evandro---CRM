@@ -51,7 +51,7 @@ export default async function Ranking({ searchParams }: { searchParams: Promise<
       .select("id, ativo, perfis(nome, email)")
       .eq("empresa_id", atual.empresaId)
       .eq("ativo", true),
-    supabase.from("niveis_gamificacao").select("nivel, nome, xp_minimo").eq("empresa_id", atual.empresaId).order("xp_minimo"),
+    supabase.from("niveis_gamificacao").select("nivel, nome, xp_minimo").eq("empresa_id", atual.empresaId).eq("ativa", true).order("xp_minimo"),
   ]);
 
   const nomes = new Map(

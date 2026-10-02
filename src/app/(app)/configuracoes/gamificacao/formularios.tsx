@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
+import { MARCOS_CONQUISTA, ROTULO_MARCO_CONQUISTA, type MarcoConquista } from "@/lib/gamificacao";
 import {
   OPERADORES_CONDICAO,
   PERFIS_GAMIFICACAO,
@@ -19,12 +20,13 @@ import {
   apagarRecompensa,
   apagarRegra,
   criarConquista,
+  criarNivel,
   criarRecompensa,
   criarRegra,
   editarConquista,
+  editarNivel,
   editarRecompensa,
   editarRegra,
-  salvarNivel,
 } from "./actions";
 
 type EventoOpcao = { tipo: string; rotulo: string; campos: readonly string[] };
@@ -191,10 +193,10 @@ function CondicaoTeto({
   );
 }
 
-export type NivelSalvo = { nivel: number; nome: string | null; xpMinimo: number };
+export type NivelSalvo = { nivel: number; nome: string | null; xpMinimo: number; ativa: boolean };
 
 export function NovoNivel() {
-  const [resultado, acao, pendente] = useActionState(salvarNivel, null);
+  const [resultado, acao, pendente] = useActionState(criarNivel, null);
   return (
     <form action={acao} className="flex flex-wrap items-end gap-2">
       <Campo rotulo="Nível" name="nivel" type="number" min={1} step={1} required />
@@ -209,12 +211,15 @@ export function NovoNivel() {
 }
 
 export function LinhaNivel({ nivel }: { nivel: NivelSalvo }) {
-  const [resultado, acao, pendente] = useActionState(salvarNivel, null);
+  const [resultado, acao, pendente] = useActionState(editarNivel, null);
   return (
     <form action={acao} className="flex flex-wrap items-end gap-2 border-t border-zinc-100 py-2 first:border-t-0">
       <Campo rotulo="Nível" name="nivel" type="number" defaultValue={nivel.nivel} readOnly />
       <Campo rotulo="Nome" name="nome" defaultValue={nivel.nome ?? ""} placeholder="Ex.: Veterano" />
       <Campo rotulo="XP mínimo" name="xpMinimo" type="number" min={0} step={1} defaultValue={nivel.xpMinimo} required />
+      <label className="flex items-center gap-1 text-sm text-zinc-700">
+        <input type="checkbox" name="ativa" defaultChecked={nivel.ativa} /> Ativo
+      </label>
       <Botao type="submit" variante="secundario" disabled={pendente}>
         Salvar
       </Botao>
@@ -231,13 +236,51 @@ export type ConquistaSalva = {
   nome: string;
   descricao: string;
   icone: string;
-  valorXp: number;
+  metrica: "xp_acumulado" | "marco_contagem";
+  marco: MarcoConquista | null;
+  valor: number;
   xpBonus: number;
+  perfilAplicavel: PerfilGamificacao | null;
   ativa: boolean;
 };
 
+function SeletorMetricaConquista({
+  metrica,
+  setMetrica,
+  marco,
+}: {
+  metrica: "xp_acumulado" | "marco_contagem";
+  setMetrica: (m: "xp_acumulado" | "marco_contagem") => void;
+  marco: MarcoConquista | "";
+}) {
+  return (
+    <>
+      <Selecao
+        rotulo="Critério"
+        name="metrica"
+        value={metrica}
+        onChange={(e) => setMetrica(e.target.value as "xp_acumulado" | "marco_contagem")}
+      >
+        <option value="xp_acumulado">XP acumulado</option>
+        <option value="marco_contagem">Quantidade de um marco (independente de XP)</option>
+      </Selecao>
+      {metrica === "marco_contagem" && (
+        <Selecao rotulo="Marco" name="marco" defaultValue={marco}>
+          <option value="">Escolha o marco</option>
+          {MARCOS_CONQUISTA.map((m) => (
+            <option key={m} value={m}>
+              {ROTULO_MARCO_CONQUISTA[m]}
+            </option>
+          ))}
+        </Selecao>
+      )}
+    </>
+  );
+}
+
 export function NovaConquista() {
   const [resultado, acao, pendente] = useActionState(criarConquista, null);
+  const [metrica, setMetrica] = useState<"xp_acumulado" | "marco_contagem">("xp_acumulado");
   return (
     <form action={acao} className="flex flex-col gap-3">
       <div className="grid gap-3 sm:grid-cols-[80px_1fr]">
@@ -246,8 +289,12 @@ export function NovaConquista() {
       </div>
       <Campo rotulo="Descrição (opcional)" name="descricao" placeholder="Ex.: Acumule 5.000 XP" />
       <div className="grid gap-3 sm:grid-cols-2">
-        <Campo rotulo="XP necessário" name="valorXp" type="number" min={1} step={1} required />
+        <SeletorMetricaConquista metrica={metrica} setMetrica={setMetrica} marco="" />
+      </div>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Campo rotulo={metrica === "marco_contagem" ? "Quantidade necessária" : "XP necessário"} name="valor" type="number" min={1} step={1} required />
         <Campo rotulo="XP bônus ao desbloquear" name="xpBonus" type="number" min={0} step={1} defaultValue={0} />
+        <SeletorPerfil defaultValue="" />
       </div>
       <Botao type="submit" disabled={pendente} className="self-start">
         Criar conquista
@@ -259,6 +306,7 @@ export function NovaConquista() {
 
 export function LinhaConquista({ conquista }: { conquista: ConquistaSalva }) {
   const [resultado, acao, pendente] = useActionState(editarConquista, null);
+  const [metrica, setMetrica] = useState<"xp_acumulado" | "marco_contagem">(conquista.metrica);
   return (
     <form action={acao} className="flex flex-col gap-3 border-t border-zinc-100 py-3 first:border-t-0">
       <input type="hidden" name="id" value={conquista.id} />
@@ -268,8 +316,20 @@ export function LinhaConquista({ conquista }: { conquista: ConquistaSalva }) {
       </div>
       <Campo rotulo="Descrição" name="descricao" defaultValue={conquista.descricao} />
       <div className="grid gap-3 sm:grid-cols-2">
-        <Campo rotulo="XP necessário" name="valorXp" type="number" min={1} step={1} defaultValue={conquista.valorXp} required />
+        <SeletorMetricaConquista metrica={metrica} setMetrica={setMetrica} marco={conquista.marco ?? ""} />
+      </div>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Campo
+          rotulo={metrica === "marco_contagem" ? "Quantidade necessária" : "XP necessário"}
+          name="valor"
+          type="number"
+          min={1}
+          step={1}
+          defaultValue={conquista.valor}
+          required
+        />
         <Campo rotulo="XP bônus ao desbloquear" name="xpBonus" type="number" min={0} step={1} defaultValue={conquista.xpBonus} />
+        <SeletorPerfil defaultValue={conquista.perfilAplicavel ?? ""} />
       </div>
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-1 text-sm text-zinc-700">

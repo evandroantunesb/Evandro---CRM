@@ -1,7 +1,16 @@
 import { Cartao } from "@/components/ui";
-import { calcularNivel } from "@/lib/gamificacao";
+import { calcularNivel, ROTULO_MARCO_CONQUISTA, type MarcoConquista } from "@/lib/gamificacao";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
+
+function descreverCriterio(criterio: unknown) {
+  const c = criterio as { metrica: "xp_acumulado" | "marco_contagem"; valor: number; marco?: string };
+  if (c.metrica === "marco_contagem") {
+    const rotulo = ROTULO_MARCO_CONQUISTA[c.marco as MarcoConquista] ?? c.marco;
+    return `${c.valor.toLocaleString("pt-BR")}x ${rotulo}`;
+  }
+  return `Acumule ${c.valor.toLocaleString("pt-BR")} XP`;
+}
 
 export default async function MinhaJornada() {
   const { atual } = await exigirPapel();
@@ -9,15 +18,24 @@ export default async function MinhaJornada() {
 
   const [{ data: lancamentos }, { data: niveis }, { data: conquistas }, { data: desbloqueadas }] = await Promise.all([
     supabase.from("point_ledger").select("xp").eq("membro_id", atual.membroId).eq("estornado", false),
-    supabase.from("niveis_gamificacao").select("nivel, nome, xp_minimo").eq("empresa_id", atual.empresaId).order("xp_minimo"),
+    supabase.from("niveis_gamificacao").select("nivel, nome, xp_minimo").eq("empresa_id", atual.empresaId).eq("ativa", true).order("xp_minimo"),
     supabase
       .from("conquistas")
-      .select("id, nome, descricao, icone, criterio")
+      .select("id, nome, descricao, icone, criterio, ativa")
       .eq("empresa_id", atual.empresaId)
-      .eq("ativa", true)
       .order("created_at"),
     supabase.from("conquistas_desbloqueadas").select("conquista_id").eq("membro_id", atual.membroId),
   ]);
+
+  // Abrir a Jornada é a "visualização" da conquista — mesma infraestrutura do sininho
+  // (lida_em), sem tela ou mecanismo novo.
+  await supabase
+    .from("notificacoes")
+    .update({ lida_em: new Date().toISOString() })
+    .eq("empresa_id", atual.empresaId)
+    .eq("membro_id", atual.membroId)
+    .eq("tipo", "conquista_desbloqueada")
+    .is("lida_em", null);
 
   const totalXp = (lancamentos ?? []).reduce((soma, l) => soma + l.xp, 0);
   const niveisNormalizados = (niveis ?? []).map((n) => ({ nivel: n.nivel, nome: n.nome, xpMinimo: n.xp_minimo }));
@@ -25,6 +43,9 @@ export default async function MinhaJornada() {
   const nivelAtual = { nivel, nome: nomeNivel, xpMinimo: xpBaseNivel };
 
   const idsDesbloqueadas = new Set((desbloqueadas ?? []).map((d) => d.conquista_id));
+  // Conquista desativada some pra quem ainda não desbloqueou, mas continua
+  // visível no histórico de quem já tem (decisão de Evandro, 2026-10-02).
+  const conquistasVisiveis = (conquistas ?? []).filter((c) => c.ativa || idsDesbloqueadas.has(c.id));
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4">
@@ -48,10 +69,10 @@ export default async function MinhaJornada() {
         <p className="mt-1 text-xs text-zinc-500">{totalXp.toLocaleString("pt-BR")} XP acumulado</p>
       </Cartao>
 
-      <Cartao titulo={`Conquistas (${idsDesbloqueadas.size} de ${conquistas?.length ?? 0})`}>
-        {!conquistas?.length && <p className="text-sm text-zinc-600">Nenhuma conquista configurada ainda.</p>}
+      <Cartao titulo={`Conquistas (${idsDesbloqueadas.size} de ${conquistasVisiveis.length})`}>
+        {!conquistasVisiveis.length && <p className="text-sm text-zinc-600">Nenhuma conquista configurada ainda.</p>}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {(conquistas ?? []).map((c) => {
+          {conquistasVisiveis.map((c) => {
             const desbloqueada = idsDesbloqueadas.has(c.id);
             return (
               <div
@@ -61,11 +82,12 @@ export default async function MinhaJornada() {
                 }`}
               >
                 <span className="text-2xl">{desbloqueada ? c.icone : "🔒"}</span>
-                <span className="text-xs font-medium text-zinc-900">{c.nome}</span>
+                <span className="text-xs font-medium text-zinc-900">
+                  {c.nome}
+                  {!c.ativa && <span className="ml-1 text-[10px] text-zinc-400">(desativada)</span>}
+                </span>
                 {!desbloqueada && (
-                  <span className="text-[11px] text-zinc-500">
-                    Acumule {(c.criterio as { metrica: string; valor: number }).valor.toLocaleString("pt-BR")} XP
-                  </span>
+                  <span className="text-[11px] text-zinc-500">{descreverCriterio(c.criterio)}</span>
                 )}
               </div>
             );

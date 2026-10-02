@@ -226,7 +226,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
       .lt("vence_em", new Date(hojeFimExclusivo).toISOString())
       .order("vence_em", { ascending: true })
       .limit(20),
-    supabase.from("niveis_gamificacao").select("nivel, nome, xp_minimo").eq("empresa_id", atual.empresaId).order("xp_minimo"),
+    supabase.from("niveis_gamificacao").select("nivel, nome, xp_minimo").eq("empresa_id", atual.empresaId).eq("ativa", true).order("xp_minimo"),
     supabase.from("point_ledger").select("xp").eq("membro_id", atual.membroId).eq("estornado", false).limit(20000),
     atual.perfilGamificacao
       ? supabase.rpc("ranking_gamificacao", { p_empresa_id: atual.empresaId, p_perfil: atual.perfilGamificacao, p_desde: mesAtual.inicioIso })
