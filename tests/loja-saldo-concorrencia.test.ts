@@ -38,7 +38,8 @@ beforeAll(async () => {
   contato = c!.id;
 
   // Única regra da empresa: deal.won credita sempre 100 moedas (xp=0, isolado de XP).
-  const { error } = await servico.from("gamification_rules").insert({
+  // gamification_rules revoga insert até de service_role — só admin autenticado cria, via RLS.
+  const { error } = await admin.cliente.from("gamification_rules").insert({
     empresa_id: empresa,
     nome: "Negócio ganho (teste)",
     evento_tipo: "deal.won",
