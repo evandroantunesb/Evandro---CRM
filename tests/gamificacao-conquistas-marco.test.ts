@@ -305,37 +305,54 @@ describe("marco_contagem: deduplicação e idempotência", () => {
 });
 
 describe("marco_contagem: pagamento.confirmado — reocorrência e permanência (sem contar dobrado o mesmo contrato)", () => {
+  // Cada teste usa um membro novo: contarMarco() soma TODOS os contratos ao vivo do
+  // membro (é assim que a contagem real pra threshold de conquista funciona), então
+  // reaproveitar `closer` entre os `it`s acumularia os pagamentos confirmados de testes
+  // anteriores e invalidaria o "conta só 1" de cada cenário isolado.
+  let contadorPagamento = 0;
+  async function criarClienteBeneficiario() {
+    contadorPagamento += 1;
+    const usuario = await criarUsuario(`cm-pag-${contadorPagamento}`);
+    const membroId = await adicionarMembroEquipe(usuario.id, "vendedor", "closer");
+    membro[usuario.id] = membroId;
+    return { usuario, membroId };
+  }
+
   it("pagamento confirmado conta 1 pro responsável congelado na assinatura", async () => {
-    const negocioId = await criarNegocio("Pagamento conta 1", membro[closer.id]);
-    const contratoId = await criarEAssinarContrato(negocioId, closer.cliente);
+    const { usuario, membroId } = await criarClienteBeneficiario();
+    const negocioId = await criarNegocio("Pagamento conta 1", membroId);
+    const contratoId = await criarEAssinarContrato(negocioId, usuario.cliente);
     await confirmarPagamento(contratoId);
-    expect(await contarMarco("pagamento.confirmado", membro[closer.id])).toBe(1);
+    expect(await contarMarco("pagamento.confirmado", membroId)).toBe(1);
   });
 
   it("pagamento confirmado → estornado: deixa de contar pra avaliação futura (estado ao vivo)", async () => {
-    const negocioId = await criarNegocio("Pagamento estornado", membro[closer.id]);
-    const contratoId = await criarEAssinarContrato(negocioId, closer.cliente);
+    const { usuario, membroId } = await criarClienteBeneficiario();
+    const negocioId = await criarNegocio("Pagamento estornado", membroId);
+    const contratoId = await criarEAssinarContrato(negocioId, usuario.cliente);
     await confirmarPagamento(contratoId);
-    expect(await contarMarco("pagamento.confirmado", membro[closer.id])).toBe(1);
+    expect(await contarMarco("pagamento.confirmado", membroId)).toBe(1);
 
     await estornarPagamento(contratoId);
-    expect(await contarMarco("pagamento.confirmado", membro[closer.id])).toBe(0);
+    expect(await contarMarco("pagamento.confirmado", membroId)).toBe(0);
   });
 
   it("confirmado → estornado → reconfirmado: o mesmo contrato continua valendo só 1, nunca 2", async () => {
-    const negocioId = await criarNegocio("Pagamento reconfirmado", membro[closer.id]);
-    const contratoId = await criarEAssinarContrato(negocioId, closer.cliente);
+    const { usuario, membroId } = await criarClienteBeneficiario();
+    const negocioId = await criarNegocio("Pagamento reconfirmado", membroId);
+    const contratoId = await criarEAssinarContrato(negocioId, usuario.cliente);
 
     await confirmarPagamento(contratoId);
     await estornarPagamento(contratoId);
     await confirmarPagamento(contratoId);
 
-    expect(await contarMarco("pagamento.confirmado", membro[closer.id])).toBe(1);
+    expect(await contarMarco("pagamento.confirmado", membroId)).toBe(1);
   });
 
   it("múltiplos ciclos de confirma/estorna no mesmo contrato nunca fazem ele valer mais de 1", async () => {
-    const negocioId = await criarNegocio("Pagamento múltiplos ciclos", membro[closer.id]);
-    const contratoId = await criarEAssinarContrato(negocioId, closer.cliente);
+    const { usuario, membroId } = await criarClienteBeneficiario();
+    const negocioId = await criarNegocio("Pagamento múltiplos ciclos", membroId);
+    const contratoId = await criarEAssinarContrato(negocioId, usuario.cliente);
 
     for (let i = 0; i < 3; i++) {
       await confirmarPagamento(contratoId);
@@ -343,19 +360,20 @@ describe("marco_contagem: pagamento.confirmado — reocorrência e permanência 
     }
     await confirmarPagamento(contratoId);
 
-    expect(await contarMarco("pagamento.confirmado", membro[closer.id])).toBe(1);
+    expect(await contarMarco("pagamento.confirmado", membroId)).toBe(1);
   });
 
   it("conquista já desbloqueada permanece desbloqueada mesmo depois do pagamento ser estornado", async () => {
-    const conquistaId = await criarConquistaMarco({ nome: "Permanece após estorno", marco: "pagamento.confirmado", valor: 1 });
-    const negocioId = await criarNegocio("Pagamento permanência", membro[closer.id]);
-    const contratoId = await criarEAssinarContrato(negocioId, closer.cliente);
+    const { usuario, membroId } = await criarClienteBeneficiario();
+    const conquistaId = await criarConquistaMarco({ nome: `Permanece após estorno ${contadorPagamento}`, marco: "pagamento.confirmado", valor: 1 });
+    const negocioId = await criarNegocio("Pagamento permanência", membroId);
+    const contratoId = await criarEAssinarContrato(negocioId, usuario.cliente);
 
     await confirmarPagamento(contratoId);
-    expect(await desbloqueada(conquistaId, membro[closer.id])).toBe(true);
+    expect(await desbloqueada(conquistaId, membroId)).toBe(true);
 
     await estornarPagamento(contratoId);
-    expect(await desbloqueada(conquistaId, membro[closer.id])).toBe(true); // permanece, nunca é revogada
+    expect(await desbloqueada(conquistaId, membroId)).toBe(true); // permanece, nunca é revogada
   });
 });
 
