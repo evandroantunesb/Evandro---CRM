@@ -147,6 +147,81 @@ describe("reversão causal: task.completed", () => {
     const ledger = await ledgerAtivo(regraId, tarefa!.id);
     expect(ledger.filter((l) => l.estornado)).toHaveLength(1);
   });
+
+  it("cada reversão aponta pra sua própria ocorrência, nunca reaproveitando uma já revertida (A→revA→B→revB→C)", async () => {
+    // Sem regra configurada aqui de propósito — identificação do evento ativo precisa vir
+    // da cadeia evento→reversão (payload.evento_original_id), não da existência de
+    // lançamento em point_ledger (ver teste seguinte, que cobre isso explicitamente).
+    const { data: tarefa } = await criarTarefa("ligacao", PASSADO);
+
+    await vendedor.cliente.from("tarefas").update({ concluida_em: new Date().toISOString(), resultado: "contato_realizado" }).eq("id", tarefa!.id); // A
+    await vendedor.cliente.from("tarefas").update({ concluida_em: null }).eq("id", tarefa!.id); // revA
+    await vendedor.cliente.from("tarefas").update({ concluida_em: new Date().toISOString(), resultado: "sem_resposta" }).eq("id", tarefa!.id); // B
+    await vendedor.cliente.from("tarefas").update({ concluida_em: null }).eq("id", tarefa!.id); // revB
+    await vendedor.cliente.from("tarefas").update({ concluida_em: new Date().toISOString(), resultado: "contato_realizado" }).eq("id", tarefa!.id); // C
+
+    const { data: conclusoes } = await servico
+      .from("eventos")
+      .select("id, created_at")
+      .eq("entidade_id", tarefa!.id)
+      .eq("tipo", "task.completed")
+      .order("created_at");
+    expect(conclusoes).toHaveLength(3);
+    const [eventoA, eventoB] = conclusoes!;
+
+    const { data: reversoes } = await servico
+      .from("eventos")
+      .select("payload, created_at")
+      .eq("entidade_id", tarefa!.id)
+      .eq("tipo", "task.completed_revertido")
+      .order("created_at");
+    expect(reversoes).toHaveLength(2);
+    const [revA, revB] = reversoes!;
+    expect((revA.payload as Record<string, unknown>).evento_original_id).toBe(eventoA.id);
+    expect((revB.payload as Record<string, unknown>).evento_original_id).toBe(eventoB.id);
+    // revA nunca aponta pra B, revB nunca aponta pra A (nenhuma reaproveitada).
+    expect((revA.payload as Record<string, unknown>).evento_original_id).not.toBe(eventoB.id);
+  });
+
+  it("ciclo completo sem nenhuma regra de pontos configurada: ocorrência e reversão existem, nada pra estornar, função não falha", async () => {
+    const { data: tarefa } = await criarTarefa("ligacao", PASSADO);
+
+    const { error: erroConcluir } = await vendedor.cliente
+      .from("tarefas")
+      .update({ concluida_em: new Date().toISOString(), resultado: "contato_realizado" })
+      .eq("id", tarefa!.id);
+    expect(erroConcluir).toBeNull();
+
+    const { data: eventoCompleted } = await servico
+      .from("eventos")
+      .select("id")
+      .eq("entidade_id", tarefa!.id)
+      .eq("tipo", "task.completed")
+      .single();
+    expect(eventoCompleted).not.toBeNull();
+    const { data: ledgerSemRegra } = await servico.from("point_ledger").select("id").eq("referencia_id", tarefa!.id);
+    expect(ledgerSemRegra).toHaveLength(0);
+
+    const { error: erroReabrir } = await vendedor.cliente.from("tarefas").update({ concluida_em: null }).eq("id", tarefa!.id);
+    expect(erroReabrir).toBeNull();
+
+    const { data: reversao } = await servico
+      .from("eventos")
+      .select("payload")
+      .eq("entidade_id", tarefa!.id)
+      .eq("tipo", "task.completed_revertido")
+      .single();
+    expect(reversao).not.toBeNull();
+    expect((reversao!.payload as Record<string, unknown>).evento_original_id).toBe(eventoCompleted!.id);
+
+    const { error: erroConcluirDeNovo } = await vendedor.cliente
+      .from("tarefas")
+      .update({ concluida_em: new Date().toISOString(), resultado: "sem_resposta" })
+      .eq("id", tarefa!.id);
+    expect(erroConcluirDeNovo).toBeNull();
+    const { data: conclusoes } = await servico.from("eventos").select("id").eq("entidade_id", tarefa!.id).eq("tipo", "task.completed");
+    expect(conclusoes).toHaveLength(2);
+  });
 });
 
 describe("reversão causal: reuniao.realizada / visita.realizada", () => {

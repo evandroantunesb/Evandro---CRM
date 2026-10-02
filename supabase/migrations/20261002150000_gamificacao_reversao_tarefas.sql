@@ -20,12 +20,19 @@
 -- o projeto), e todas as agregações (ranking, saldo de moedas, XP total, conquistas por
 -- marco) já somam só `where not estornado`, então o reflexo é automático.
 --
--- Identificação do evento ativo: como cada reabertura reverte imediatamente o que estava
--- ativo, em qualquer momento existe no máximo 1 `task.completed` (e no máximo 1
--- `reuniao.realizada`/`visita.realizada`) ainda não revertido por tarefa — o mais recente
--- de cada tipo é sempre o ativo. `reuniao.realizada`/`visita.realizada` só é revertido se
--- a conclusão que está sendo desfeita tinha `resultado = 'realizada'` (ex.: uma reunião
--- concluída como `no_show` nunca teve esse evento, não há o que reverter).
+-- Identificação do evento ativo: NUNCA só "o mais recente daquele tipo" (ordenação não é
+-- verdade causal). O evento ativo é o mais recente `task.completed`/`<tipo>.realizada`
+-- desta tarefa que ainda não tem uma reversão apontando pra ele (`not exists` contra
+-- `payload->>'evento_original_id'` dos próprios eventos de reversão) — a verdade causal
+-- vem da cadeia evento→reversão, não da existência de lançamento em `point_ledger` (um
+-- evento pode legitimamente não ter gerado ponto nenhum, se nenhuma regra estava
+-- configurada pra ele; `estornar_lancamentos_do_evento` é um no-op seguro nesse caso,
+-- não falha). Isso garante, num histórico "conclusão A → reversão A → conclusão B →
+-- reversão B → conclusão C", que reversão A aponte sempre pra A e reversão B sempre pra
+-- B, nunca reaproveitando uma ocorrência já revertida. `reuniao.realizada`/
+-- `visita.realizada` só é revertido se a conclusão que está sendo desfeita tinha
+-- `resultado = 'realizada'` (ex.: uma reunião concluída como `no_show` nunca teve esse
+-- evento, não há o que reverter).
 --
 -- Novos tipos de evento (mesmo padrão de `pagamento.confirmacao_estornada`, não entram no
 -- catálogo `EVENTOS_GAMIFICACAO` da UI — são reversão, não geram pontos novos):
@@ -82,12 +89,17 @@ begin
                 jsonb_build_object('tarefa_id', new.id, 'titulo', new.titulo, 'tipo', new.tipo));
     end if;
 
-    -- Reverte o task.completed ativo (o mais recente desta tarefa) — cada ciclo de
-    -- conclusão/reabertura tem o seu próprio, nunca o mesmo reaproveitado.
-    select id, ator_id into v_evento_completed_id, v_beneficiario_completed
-      from public.eventos
-      where entidade = 'tarefa' and entidade_id = new.id and tipo = 'task.completed'
-      order by created_at desc limit 1;
+    -- Reverte o task.completed ativo: o mais recente desta tarefa que ainda não tem uma
+    -- reversão apontando pra ele (não "o mais recente" por si só — ver comentário acima).
+    select e.id, e.ator_id into v_evento_completed_id, v_beneficiario_completed
+      from public.eventos e
+      where e.entidade = 'tarefa' and e.entidade_id = new.id and e.tipo = 'task.completed'
+        and not exists (
+          select 1 from public.eventos r
+          where r.entidade = 'tarefa' and r.entidade_id = new.id and r.tipo = 'task.completed_revertido'
+            and (r.payload->>'evento_original_id')::bigint = e.id
+        )
+      order by e.created_at desc limit 1;
 
     if v_evento_completed_id is not null then
       v_membro_id := public.meu_membro_id(new.empresa_id);
@@ -103,10 +115,15 @@ begin
     -- no_show/cancelada nunca teve esse evento — nada a reverter.
     if old.tipo in ('reuniao', 'visita') and old.resultado = 'realizada' then
       v_tipo_realizada := old.tipo::text || '.realizada';
-      select id, ator_id into v_evento_realizada_id, v_beneficiario_realizada
-        from public.eventos
-        where entidade = 'tarefa' and entidade_id = new.id and tipo = v_tipo_realizada
-        order by created_at desc limit 1;
+      select e.id, e.ator_id into v_evento_realizada_id, v_beneficiario_realizada
+        from public.eventos e
+        where e.entidade = 'tarefa' and e.entidade_id = new.id and e.tipo = v_tipo_realizada
+          and not exists (
+            select 1 from public.eventos r
+            where r.entidade = 'tarefa' and r.entidade_id = new.id and r.tipo = v_tipo_realizada || '_revertida'
+              and (r.payload->>'evento_original_id')::bigint = e.id
+          )
+        order by e.created_at desc limit 1;
 
       if v_evento_realizada_id is not null then
         v_membro_id := coalesce(v_membro_id, public.meu_membro_id(new.empresa_id));
