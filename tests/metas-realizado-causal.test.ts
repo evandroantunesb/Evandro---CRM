@@ -90,7 +90,7 @@ async function marcarStatus(negocioId: string, status: "ganho" | "perdido" | "ab
 }
 
 function criarTarefa(tipo: "ligacao" | "reuniao", responsavelId: string, venceEmIso: string) {
-  return vendedor.cliente
+  return servico
     .from("tarefas")
     .insert({ empresa_id: empresa, titulo: `Tarefa metas ${sufixo}-${Math.random()}`, tipo, vence_em: venceEmIso, responsavel_id: responsavelId })
     .select("id")
@@ -181,13 +181,13 @@ describe("reuniões realizadas e tarefas concluídas: líquido da reversão sim�
   it("reunião concluída como 'realizada' conta; reaberta deixa de contar; concluída de novo volta a contar (líquido, nunca acumula)", async () => {
     const membro = await novoMembro();
     const { data: tarefa } = await criarTarefa("reuniao", membro, PASSADO);
-    await vendedor.cliente.from("tarefas").update({ concluida_em: new Date().toISOString(), resultado: "realizada" }).eq("id", tarefa!.id);
+    await servico.from("tarefas").update({ concluida_em: new Date().toISOString(), resultado: "realizada" }).eq("id", tarefa!.id);
     expect(await calcularRealizado(admin.cliente, metaHoje("reunioes", membro))).toBe(1);
 
-    await vendedor.cliente.from("tarefas").update({ concluida_em: null }).eq("id", tarefa!.id);
+    await servico.from("tarefas").update({ concluida_em: null }).eq("id", tarefa!.id);
     expect(await calcularRealizado(admin.cliente, metaHoje("reunioes", membro))).toBe(0);
 
-    await vendedor.cliente.from("tarefas").update({ concluida_em: new Date().toISOString(), resultado: "realizada" }).eq("id", tarefa!.id);
+    await servico.from("tarefas").update({ concluida_em: new Date().toISOString(), resultado: "realizada" }).eq("id", tarefa!.id);
     expect(await calcularRealizado(admin.cliente, metaHoje("reunioes", membro))).toBe(1);
   });
 
@@ -195,7 +195,7 @@ describe("reuniões realizadas e tarefas concluídas: líquido da reversão sim�
     const membroA = await novoMembro();
     const membroB = await novoMembro();
     const { data: tarefa } = await criarTarefa("ligacao", membroA, PASSADO);
-    await vendedor.cliente.from("tarefas").update({ concluida_em: new Date().toISOString(), resultado: "contato_realizado" }).eq("id", tarefa!.id);
+    await servico.from("tarefas").update({ concluida_em: new Date().toISOString(), resultado: "contato_realizado" }).eq("id", tarefa!.id);
 
     expect(await calcularRealizado(admin.cliente, metaHoje("tarefas_concluidas", membroA))).toBe(1);
 
