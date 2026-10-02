@@ -46,9 +46,12 @@ beforeAll(async () => {
 
   const { data: f } = await servico.from("funis").select("id").eq("empresa_id", empresa).single();
   funil = f!.id;
-  const { data: etapas } = await servico.from("etapas").select("id, marca_negociacao").eq("funil_id", funil).order("ordem");
-  etapaInicial = etapas!.find((e) => !e.marca_negociacao)!.id;
-  etapaNegociacao = etapas!.find((e) => e.marca_negociacao)!.id;
+  const { data: etapas } = await servico.from("etapas").select("id").eq("funil_id", funil).order("ordem");
+  etapaInicial = etapas![0].id;
+  // Nenhuma etapa do funil padrão nasce com marca_negociacao (default false) — marca a 2ª pra
+  // poder testar o evento deal.negotiation_started.
+  etapaNegociacao = etapas![1].id;
+  await servico.from("etapas").update({ marca_negociacao: true }).eq("id", etapaNegociacao);
 
   const { data: equipe } = await servico.from("equipes").insert({ empresa_id: empresa, nome: "Equipe fix reocorrência" }).select("id").single();
   await servico.from("equipe_membros").insert([
