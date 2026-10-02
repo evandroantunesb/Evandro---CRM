@@ -9,8 +9,10 @@
 -- mundo — não há precedente igual neste repo (as RPCs existentes como confirmar_pagamento
 -- protegem uma tabela inteira, nunca um campo condicional dentro de uma tabela de edição
 -- livre), mas é técnica padrão e segura: a flag é local à transação (set_config(...,true)),
--- reseta sozinha ao fim dela, e o cliente autenticado não tem como chamá-la diretamente (só
--- RPCs do schema public são expostas pelo PostgREST; set_config é pg_catalog).
+-- e a própria RPC a desliga explicitamente logo depois do UPDATE autorizado (não espera o
+-- fim da transação) — qualquer UPDATE comum posterior na mesma transação já volta a ser
+-- bloqueado. O cliente autenticado não tem como setá-la diretamente (só RPCs do schema
+-- public são expostas pelo PostgREST; set_config é pg_catalog).
 --
 -- Permissão: mesmo padrão de confirmar_pagamento — tem_papel('{admin,gestor}') + pode_ver_negocio
 -- (que já restringe gestor à sua equipe). Closer/vendedor nunca passam no primeiro checque,
@@ -217,6 +219,7 @@ begin
 
   perform set_config('raion.permitir_correcao_valor', 'on', true);
   update public.negocios set valor = p_novo_valor where id = p_negocio_id;
+  perform set_config('raion.permitir_correcao_valor', 'off', true);
 
   insert into public.eventos (empresa_id, tipo, ator_id, beneficiario_id, entidade, entidade_id, payload, profile_at_event)
     values (v_negocio.empresa_id, 'deal.value_corrected', v_ator, v_beneficiario, 'negocio', p_negocio_id,

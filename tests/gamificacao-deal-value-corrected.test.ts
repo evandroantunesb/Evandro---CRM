@@ -89,6 +89,19 @@ describe("bloqueio de UPDATE comum em negócio ganho", () => {
     expect(Number(negocio!.valor)).toBe(10000);
   });
 
+  it("depois de uma correção pela RPC, UPDATE comum posterior continua bloqueado (flag não sobrevive)", async () => {
+    const negocioId = await criarNegocioGanho("Negócio flag não reaproveitada", membro[closer.id], 10000);
+    const { error: erroCorrecao } = await corrigirValor(gestor.cliente, negocioId, 15000, "Correção legítima");
+    expect(erroCorrecao).toBeNull();
+
+    const { error } = await servico.from("negocios").update({ valor: 99999 }).eq("id", negocioId);
+    expect(error).not.toBeNull();
+    expect(error!.message).toMatch(/Corrigir valor/);
+
+    const { data: negocio } = await servico.from("negocios").select("valor").eq("id", negocioId).single();
+    expect(Number(negocio!.valor)).toBe(15000);
+  });
+
   it("negócio aberto continua com edição normal de valor", async () => {
     const { data: negocio } = await servico
       .from("negocios")
