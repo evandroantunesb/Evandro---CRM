@@ -35,6 +35,9 @@ export default async function Usuarios() {
         <FormularioConvite />
       </Cartao>
       <Cartao titulo={`Equipe (${membros.length})`}>
+        <p id="perfil-gamificacao" className="scroll-mt-4 text-sm text-zinc-600">
+          O perfil de gamificação (SDR/Closer/CS Farmer) de cada pessoa é definido abaixo, junto com o restante do cadastro.
+        </p>
         {membros.map((m) => (
           <LinhaMembro key={m.id} membro={m} />
         ))}

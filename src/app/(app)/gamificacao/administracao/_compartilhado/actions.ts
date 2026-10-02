@@ -8,7 +8,9 @@ import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { OPERADORES_CONDICAO, PERFIS_GAMIFICACAO, PERIODOS_LIMITE_REGRA, type ResultadoAcao } from "@/lib/tipos";
 
-const CAMINHO = "/configuracoes/gamificacao";
+const CAMINHO_REGRAS = "/gamificacao/administracao/regras";
+const CAMINHO_NIVEIS_CONQUISTAS = "/gamificacao/administracao/niveis-e-conquistas";
+const CAMINHO_RECOMPENSAS = "/gamificacao/administracao/recompensas";
 const TIPOS_EVENTO = EVENTOS_GAMIFICACAO.map((e) => e.tipo);
 
 const esquema = z
@@ -63,7 +65,7 @@ export async function criarRegra(_: ResultadoAcao, formData: FormData): Promise<
   });
   if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível criar a regra.") };
 
-  revalidatePath(CAMINHO);
+  revalidatePath(CAMINHO_REGRAS);
   return { ok: true, mensagem: "Regra criada." };
 }
 
@@ -93,7 +95,7 @@ export async function editarRegra(_: ResultadoAcao, formData: FormData): Promise
     .eq("id", id.data);
   if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível salvar.") };
 
-  revalidatePath(CAMINHO);
+  revalidatePath(CAMINHO_REGRAS);
   return { ok: true, mensagem: "Salvo." };
 }
 
@@ -104,7 +106,7 @@ export async function apagarRegra(formData: FormData) {
 
   const supabase = await criarClienteServidor();
   await supabase.from("gamification_rules").delete().eq("id", id.data);
-  revalidatePath(CAMINHO);
+  revalidatePath(CAMINHO_REGRAS);
 }
 
 const esquemaNivel = z.object({
@@ -133,7 +135,7 @@ export async function criarNivel(_: ResultadoAcao, formData: FormData): Promise<
     };
   }
 
-  revalidatePath(CAMINHO);
+  revalidatePath(CAMINHO_NIVEIS_CONQUISTAS);
   return { ok: true, mensagem: "Nível criado." };
 }
 
@@ -155,7 +157,7 @@ export async function editarNivel(_: ResultadoAcao, formData: FormData): Promise
     };
   }
 
-  revalidatePath(CAMINHO);
+  revalidatePath(CAMINHO_NIVEIS_CONQUISTAS);
   return { ok: true, mensagem: "Nível salvo." };
 }
 
@@ -166,7 +168,7 @@ export async function apagarNivel(formData: FormData) {
 
   const supabase = await criarClienteServidor();
   await supabase.from("niveis_gamificacao").delete().eq("empresa_id", atual.empresaId).eq("nivel", nivel.data);
-  revalidatePath(CAMINHO);
+  revalidatePath(CAMINHO_NIVEIS_CONQUISTAS);
 }
 
 const esquemaConquista = z
@@ -208,7 +210,7 @@ export async function criarConquista(_: ResultadoAcao, formData: FormData): Prom
   });
   if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível criar a conquista.") };
 
-  revalidatePath(CAMINHO);
+  revalidatePath(CAMINHO_NIVEIS_CONQUISTAS);
   return { ok: true, mensagem: "Conquista criada." };
 }
 
@@ -235,7 +237,7 @@ export async function editarConquista(_: ResultadoAcao, formData: FormData): Pro
     .eq("id", id.data);
   if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível salvar.") };
 
-  revalidatePath(CAMINHO);
+  revalidatePath(CAMINHO_NIVEIS_CONQUISTAS);
   return { ok: true, mensagem: "Salvo." };
 }
 
@@ -246,7 +248,7 @@ export async function apagarConquista(formData: FormData) {
 
   const supabase = await criarClienteServidor();
   await supabase.from("conquistas").delete().eq("id", id.data);
-  revalidatePath(CAMINHO);
+  revalidatePath(CAMINHO_NIVEIS_CONQUISTAS);
 }
 
 const esquemaRecompensa = z.object({
@@ -276,7 +278,7 @@ export async function criarRecompensa(_: ResultadoAcao, formData: FormData): Pro
   });
   if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível criar a recompensa.") };
 
-  revalidatePath(CAMINHO);
+  revalidatePath(CAMINHO_RECOMPENSAS);
   revalidatePath("/gamificacao/loja");
   return { ok: true, mensagem: "Recompensa criada." };
 }
@@ -304,7 +306,7 @@ export async function editarRecompensa(_: ResultadoAcao, formData: FormData): Pr
     .eq("id", id.data);
   if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível salvar.") };
 
-  revalidatePath(CAMINHO);
+  revalidatePath(CAMINHO_RECOMPENSAS);
   revalidatePath("/gamificacao/loja");
   return { ok: true, mensagem: "Salvo." };
 }
@@ -316,6 +318,6 @@ export async function apagarRecompensa(formData: FormData) {
 
   const supabase = await criarClienteServidor();
   await supabase.from("recompensas").delete().eq("id", id.data);
-  revalidatePath(CAMINHO);
+  revalidatePath(CAMINHO_RECOMPENSAS);
   revalidatePath("/gamificacao/loja");
 }
