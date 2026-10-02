@@ -118,7 +118,13 @@ describe("handoff.won usa a origem causal (handoff_origem_id), não o mais recen
     expect(ev!.profile_at_event).toBe("sdr");
   });
 
-  it("pontua uma vez: reabrir e ganhar de novo não duplica o evento", async () => {
+  it("reabrir e ganhar de novo é reocorrência legítima: emite um novo evento (dedup de pontos fica a cargo do motor)", async () => {
+    // Corretiva 2026-10-02: reabrir um negócio ganho estorna o lançamento (ver
+    // estornar_lancamentos_evento em registrar_negocio), então ganhar de novo depois é uma
+    // nova ocorrência comercial válida, não farm. A guarda "evento já existe" que impedia
+    // esse segundo evento foi removida daqui — quem evita pontuação duplicada ENQUANTO o
+    // crédito segue ativo é unica_por_negocio no motor (coberto com lançamentos reais em
+    // tests/gamificacao-fix-reocorrencia.test.ts), não a emissão do evento em si.
     const negocioId = await criarNegocio("Negócio reversão ganho", membro[sdr1.id]);
     await enviarEAceitar(negocioId, sdr1, closer);
     await marcarGanho(negocioId, closer.cliente);
@@ -128,7 +134,7 @@ describe("handoff.won usa a origem causal (handoff_origem_id), não o mais recen
     await marcarGanho(negocioId, closer.cliente);
 
     const { data: eventos } = await servico.from("eventos").select("id").eq("entidade_id", negocioId).eq("tipo", "handoff.won");
-    expect(eventos).toHaveLength(1);
+    expect(eventos).toHaveLength(2);
   });
 
   it("negócio sem handoff nunca emite handoff.won", async () => {
