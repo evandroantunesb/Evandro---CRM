@@ -328,3 +328,81 @@ describe("conquistas: desbloqueio único, bônus XP puro, sem cascata, permanent
     await servico.from("gamification_rules").delete().eq("id", regraId);
   });
 });
+
+describe("notificação de conquista: reaproveita `notificacoes`, só no desbloqueio real", () => {
+  let admin: Usuario;
+  let colab: Usuario;
+  let empresa: string;
+  const membro: Record<string, string> = {};
+
+  beforeAll(async () => {
+    [admin, colab] = await Promise.all(["nc-notif-admin", "nc-notif-colab"].map(criarUsuario));
+    const { data: emp } = await servico.from("empresas").insert({ nome: `Conquistas notificação ${sufixo}` }).select("id").single();
+    empresa = emp!.id;
+    const { data: vinculos } = await servico
+      .from("empresa_membros")
+      .insert([
+        { empresa_id: empresa, user_id: admin.id, papel: "admin" },
+        { empresa_id: empresa, user_id: colab.id, papel: "vendedor" },
+      ])
+      .select("id, user_id");
+    for (const v of vinculos!) membro[v.user_id] = v.id;
+  });
+
+  it("desbloquear uma conquista cria notificação persistente apontando para a Jornada; visualizar a Jornada marca como lida", async () => {
+    const { data: conquista } = await admin.cliente
+      .from("conquistas")
+      .insert({ empresa_id: empresa, nome: "Notificável", criterio: { metrica: "xp_acumulado", valor: 10 }, xp_bonus: 0 })
+      .select("id")
+      .single();
+    await admin.cliente.from("gamification_rules").insert({ empresa_id: empresa, nome: "nc.notif", evento_tipo: "nc.notif", xp: 10, moedas: 0 });
+    await servico.from("eventos").insert({ empresa_id: empresa, tipo: "nc.notif", ator_id: colab.id, entidade: "negocio", entidade_id: randomUUID() });
+
+    const { data: notificacao } = await servico
+      .from("notificacoes")
+      .select("id, tipo, mensagem, link, lida_em")
+      .eq("empresa_id", empresa)
+      .eq("membro_id", membro[colab.id])
+      .eq("tipo", "conquista_desbloqueada")
+      .single();
+    expect(notificacao!.link).toBe("/gamificacao/jornada");
+    expect(notificacao!.mensagem).toContain("Notificável");
+    expect(notificacao!.lida_em).toBeNull();
+
+    // Visualizar a Jornada (mesmo cliente autenticado do colaborador, respeitando RLS) marca como lida.
+    await colab.cliente
+      .from("notificacoes")
+      .update({ lida_em: new Date().toISOString() })
+      .eq("empresa_id", empresa)
+      .eq("membro_id", membro[colab.id])
+      .eq("tipo", "conquista_desbloqueada")
+      .is("lida_em", null);
+
+    const { data: depois } = await servico.from("notificacoes").select("lida_em").eq("id", notificacao!.id).single();
+    expect(depois!.lida_em).not.toBeNull();
+
+    expect(conquista).not.toBeNull();
+  });
+
+  it("concorrência: quando o conflito impede o desbloqueio (já existe), não duplica a notificação", async () => {
+    const { data: conquista } = await admin.cliente
+      .from("conquistas")
+      .insert({ empresa_id: empresa, nome: "Notificável única", criterio: { metrica: "xp_acumulado", valor: 10 }, xp_bonus: 0 })
+      .select("id")
+      .single();
+    await admin.cliente.from("gamification_rules").insert({ empresa_id: empresa, nome: "nc.notif-unica", evento_tipo: "nc.notif-unica", xp: 10, moedas: 0 });
+
+    await servico.from("eventos").insert({ empresa_id: empresa, tipo: "nc.notif-unica", ator_id: colab.id, entidade: "negocio", entidade_id: randomUUID() });
+    await servico.from("eventos").insert({ empresa_id: empresa, tipo: "nc.notif-unica", ator_id: colab.id, entidade: "negocio", entidade_id: randomUUID() });
+
+    const { data: notificacoes } = await servico
+      .from("notificacoes")
+      .select("id")
+      .eq("empresa_id", empresa)
+      .eq("membro_id", membro[colab.id])
+      .eq("tipo", "conquista_desbloqueada")
+      .ilike("mensagem", "%Notificável única%");
+    expect(notificacoes).toHaveLength(1);
+    expect(conquista).not.toBeNull();
+  });
+});

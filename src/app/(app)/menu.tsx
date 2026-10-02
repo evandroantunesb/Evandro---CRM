@@ -53,7 +53,7 @@ const ICONES: Record<string, LucideIcon> = {
   "/super-admin": ShieldCheck,
 };
 
-type Item = { href: string; rotulo: string; grupo?: string };
+type Item = { href: string; rotulo: string; grupo?: string; novo?: boolean };
 
 function ItemMenu({ item, ativo }: { item: Item; ativo: boolean }) {
   const Icone = ICONES[item.href] ?? Building2;
@@ -67,6 +67,7 @@ function ItemMenu({ item, ativo }: { item: Item; ativo: boolean }) {
       {ativo && <span className="absolute top-2 bottom-2 left-0 w-0.5 rounded-full bg-dourado" />}
       <Icone size={17} strokeWidth={1.75} className={ativo ? "text-dourado" : ""} />
       {item.rotulo}
+      {item.novo && <span className="h-1.5 w-1.5 rounded-full bg-dourado" title="Novidade" />}
     </Link>
   );
 }

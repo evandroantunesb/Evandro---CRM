@@ -18,6 +18,16 @@ export default async function MinhaJornada() {
     supabase.from("conquistas_desbloqueadas").select("conquista_id").eq("membro_id", atual.membroId),
   ]);
 
+  // Abrir a Jornada é a "visualização" da conquista — mesma infraestrutura do sininho
+  // (lida_em), sem tela ou mecanismo novo.
+  await supabase
+    .from("notificacoes")
+    .update({ lida_em: new Date().toISOString() })
+    .eq("empresa_id", atual.empresaId)
+    .eq("membro_id", atual.membroId)
+    .eq("tipo", "conquista_desbloqueada")
+    .is("lida_em", null);
+
   const totalXp = (lancamentos ?? []).reduce((soma, l) => soma + l.xp, 0);
   const niveisNormalizados = (niveis ?? []).map((n) => ({ nivel: n.nivel, nome: n.nome, xpMinimo: n.xp_minimo }));
   const { nivel, nome: nomeNivel, xpBaseNivel, proximoNivel, progresso } = calcularNivel(niveisNormalizados, totalXp);
