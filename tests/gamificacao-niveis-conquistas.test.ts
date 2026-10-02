@@ -187,6 +187,15 @@ describe("conquistas: desbloqueio único, bônus XP puro, sem cascata, permanent
     if (error) throw error;
   }
 
+  // Mesma definição de total usada dentro de avaliar_conquistas_pontos() (exclui bônus
+  // de conquista do total que decide novos desbloqueios, decisão 8) — um threshold
+  // calculado a partir do total "cru" (com bônus) nunca seria alcançável depois que o
+  // membro já tivesse alguma conquista anterior com xp_bonus > 0.
+  async function totalXpElegivel(membroId: string) {
+    const { data } = await servico.from("point_ledger").select("xp").eq("membro_id", membroId).eq("estornado", false).neq("referencia_tipo", "conquista");
+    return (data ?? []).reduce((s, l) => s + l.xp, 0);
+  }
+
   it("não desbloqueia duas vezes a mesma conquista mesmo cruzando o limiar várias vezes", async () => {
     const { data: conquista } = await admin.cliente
       .from("conquistas")
@@ -210,8 +219,7 @@ describe("conquistas: desbloqueio único, bônus XP puro, sem cascata, permanent
 
   it("bônus de uma conquista não desbloqueia outra conquista por xp_acumulado (sem cascata)", async () => {
     const regraId = await criarRegra("nc.cascata", 20);
-    const { data: base } = await servico.from("point_ledger").select("xp").eq("membro_id", membro[outro.id]).eq("estornado", false);
-    const totalAntes = (base ?? []).reduce((s, l) => s + l.xp, 0);
+    const totalAntes = await totalXpElegivel(membro[outro.id]);
 
     const { data: cA } = await admin.cliente
       .from("conquistas")
@@ -239,8 +247,7 @@ describe("conquistas: desbloqueio único, bônus XP puro, sem cascata, permanent
 
   it("conquista e bônus permanecem mesmo se o XP de origem for estornado depois", async () => {
     const entidadeId = randomUUID();
-    const { data: base } = await servico.from("point_ledger").select("xp").eq("membro_id", membro[colab.id]).eq("estornado", false);
-    const totalAntes = (base ?? []).reduce((s, l) => s + l.xp, 0);
+    const totalAntes = await totalXpElegivel(membro[colab.id]);
 
     const { data: conquista } = await admin.cliente
       .from("conquistas")
@@ -271,8 +278,7 @@ describe("conquistas: desbloqueio único, bônus XP puro, sem cascata, permanent
   });
 
   it("desativar uma conquista impede novo desbloqueio, mas não apaga quem já tinha", async () => {
-    const { data: base } = await servico.from("point_ledger").select("xp").eq("membro_id", membro[colab.id]).eq("estornado", false);
-    const totalColab = (base ?? []).reduce((s, l) => s + l.xp, 0);
+    const totalColab = await totalXpElegivel(membro[colab.id]);
 
     const { data: conquista } = await admin.cliente
       .from("conquistas")
@@ -289,8 +295,7 @@ describe("conquistas: desbloqueio único, bônus XP puro, sem cascata, permanent
     await admin.cliente.from("conquistas").update({ ativa: false }).eq("id", conquista!.id);
 
     // outro membro, que não tinha a conquista, agora cruza o mesmo limiar — não pode desbloquear.
-    const { data: baseOutro } = await servico.from("point_ledger").select("xp").eq("membro_id", membro[outro.id]).eq("estornado", false);
-    const totalOutro = (baseOutro ?? []).reduce((s, l) => s + l.xp, 0);
+    const totalOutro = await totalXpElegivel(membro[outro.id]);
     if (totalOutro < totalColab) {
       await criarRegra("nc.desativavel-outro", totalColab - totalOutro + 5);
       await emitir("nc.desativavel-outro", outro.id);
@@ -306,8 +311,7 @@ describe("conquistas: desbloqueio único, bônus XP puro, sem cascata, permanent
   });
 
   it("concorrência: dois lançamentos cruzando o limiar quase ao mesmo tempo não duplicam o bônus nem abortam o evento comercial", async () => {
-    const { data: base } = await servico.from("point_ledger").select("xp").eq("membro_id", membro[outro.id]).eq("estornado", false);
-    const totalAntes = (base ?? []).reduce((s, l) => s + l.xp, 0);
+    const totalAntes = await totalXpElegivel(membro[outro.id]);
 
     const { data: conquista } = await admin.cliente
       .from("conquistas")
