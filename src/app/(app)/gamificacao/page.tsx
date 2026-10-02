@@ -145,6 +145,7 @@ export default async function GamificacaoDashboard({ searchParams }: { searchPar
     id: m.id,
     titulo: m.titulo,
     metrica: m.metrica as MetricaMeta,
+    empresaId: atual.empresaId,
     membroId: m.membro_id,
     periodoInicio: m.periodo_inicio,
     periodoFim: m.periodo_fim,

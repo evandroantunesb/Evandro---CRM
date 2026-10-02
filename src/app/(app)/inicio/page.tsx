@@ -254,6 +254,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
     id: m.id,
     titulo: m.titulo,
     metrica: "receita",
+    empresaId: atual.empresaId,
     membroId: m.membro_id,
     periodoInicio: m.periodo_inicio,
     periodoFim: m.periodo_fim,
