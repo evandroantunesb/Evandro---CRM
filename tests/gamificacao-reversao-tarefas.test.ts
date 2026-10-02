@@ -184,7 +184,23 @@ describe("reversão causal: task.completed", () => {
   });
 
   it("ciclo completo sem nenhuma regra de pontos configurada: ocorrência e reversão existem, nada pra estornar, função não falha", async () => {
-    const { data: tarefa } = await criarTarefa("ligacao", PASSADO);
+    // Empresa própria e isolada: a `empresa` compartilhada do describe já acumula regras
+    // `task.completed` de outros testes (criarRegra), então "nenhuma regra configurada" só
+    // é garantido numa empresa nova, sem nenhum insert em gamification_rules.
+    const { data: emp } = await servico.from("empresas").insert({ nome: `Sem regra ${sufixo}-${Math.random()}` }).select("id").single();
+    const empresaIsolada = emp!.id;
+    const { data: vinculo } = await servico
+      .from("empresa_membros")
+      .insert({ empresa_id: empresaIsolada, user_id: vendedor.id, papel: "vendedor" })
+      .select("id")
+      .single();
+    const membroIsoladoId = vinculo!.id;
+
+    const { data: tarefa } = await vendedor.cliente
+      .from("tarefas")
+      .insert({ empresa_id: empresaIsolada, titulo: `Tarefa sem regra ${sufixo}`, tipo: "ligacao", vence_em: PASSADO, responsavel_id: membroIsoladoId })
+      .select("id")
+      .single();
 
     const { error: erroConcluir } = await vendedor.cliente
       .from("tarefas")
