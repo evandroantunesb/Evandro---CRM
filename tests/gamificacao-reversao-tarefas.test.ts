@@ -34,11 +34,13 @@ beforeAll(async () => {
 });
 
 // `gamification_rules` só aceita insert de quem tem papel admin. xp=moedas=4 (exemplo do
-// Evandro: +4 ao concluir, -4 ao reabrir).
+// Evandro: +4 ao concluir, -4 ao reabrir). task.completed/reuniao.realizada/visita.realizada
+// são atividades repetíveis — desde o fechamento de antifraude, o motor só credita com teto
+// configurado (limite_periodo + limite_quantidade); 1000/dia nunca é atingido nestes testes.
 async function criarRegra(evento_tipo: string, valor = 4) {
   const { data, error } = await admin.cliente
     .from("gamification_rules")
-    .insert({ empresa_id: empresa, nome: evento_tipo, evento_tipo, xp: valor, moedas: valor })
+    .insert({ empresa_id: empresa, nome: evento_tipo, evento_tipo, xp: valor, moedas: valor, limite_periodo: "dia", limite_quantidade: 1000 })
     .select("id")
     .single();
   if (error) throw error;

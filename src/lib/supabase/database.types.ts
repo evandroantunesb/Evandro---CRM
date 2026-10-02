@@ -2463,6 +2463,7 @@ export type Database = {
       };
       point_ledger: {
         Row: {
+          condicao_avaliada: Json | null;
           created_at: string;
           descricao: string;
           empresa_id: string;
@@ -2480,6 +2481,7 @@ export type Database = {
           xp: number;
         };
         Insert: {
+          condicao_avaliada?: Json | null;
           created_at?: string;
           descricao?: string;
           empresa_id: string;
@@ -2497,6 +2499,7 @@ export type Database = {
           xp?: number;
         };
         Update: {
+          condicao_avaliada?: Json | null;
           created_at?: string;
           descricao?: string;
           empresa_id?: string;

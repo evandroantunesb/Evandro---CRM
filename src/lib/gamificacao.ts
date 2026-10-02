@@ -1,18 +1,34 @@
+/**
+ * Eventos "atividade" (operacionais, repetíveis sem limite natural) que o fechamento de
+ * antifraude de 2026-10-02 tornou estruturalmente inelegíveis para XP/moedas — ver
+ * `20261002180000_gamificacao_antifraude_fechamento.sql`. O evento continua existindo e
+ * nenhum histórico é apagado; só não é mais oferecido pra regra nova e o motor ignora
+ * qualquer regra antiga desses tipos, mesmo que ainda esteja `ativa`.
+ */
+export const EVENTOS_NAO_PONTUAVEIS = ["deal.created", "deal.stage_changed", "deal.owner_changed", "task.created", "note.created"] as const;
+
+/**
+ * Eventos "atividade repetível" que continuam pontuáveis, mas só com teto configurado
+ * (`limite_periodo` + `limite_quantidade`) — sem teto, o motor ignora a regra. Reunião/
+ * visita não usam `unica_por_negocio` (um negócio pode legitimamente ter várias).
+ */
+export const EVENTOS_TETO_OBRIGATORIO = ["task.completed", "reuniao.realizada", "visita.realizada"] as const;
+
 /** Tipos de evento que o CRM já publica em `eventos` e que podem virar regra de pontos. */
 export const EVENTOS_GAMIFICACAO = [
-  { tipo: "deal.created", rotulo: "Negócio criado", campos: [] },
-  { tipo: "deal.stage_changed", rotulo: "Negócio mudou de etapa", campos: [] },
-  { tipo: "deal.owner_changed", rotulo: "Negócio trocou de responsável", campos: [] },
+  { tipo: "deal.created", rotulo: "Negócio criado", campos: [], naoPontuavel: true },
+  { tipo: "deal.stage_changed", rotulo: "Negócio mudou de etapa", campos: [], naoPontuavel: true },
+  { tipo: "deal.owner_changed", rotulo: "Negócio trocou de responsável", campos: [], naoPontuavel: true },
   { tipo: "deal.won", rotulo: "Negócio ganho", campos: ["valor"] },
   { tipo: "deal.lost", rotulo: "Negócio perdido", campos: [] },
   { tipo: "deal.reopened", rotulo: "Negócio reaberto", campos: [] },
   { tipo: "deal.negotiation_started", rotulo: "Negócio entrou em negociação", campos: [] },
   { tipo: "contrato.assinado", rotulo: "Contrato assinado", campos: [] },
-  { tipo: "task.created", rotulo: "Tarefa criada", campos: ["tipo"] },
+  { tipo: "task.created", rotulo: "Tarefa criada", campos: ["tipo"], naoPontuavel: true },
   { tipo: "task.completed", rotulo: "Tarefa concluída", campos: ["tipo", "no_prazo", "resultado"] },
   { tipo: "reuniao.realizada", rotulo: "Reunião realizada", campos: [] },
   { tipo: "visita.realizada", rotulo: "Visita realizada", campos: [] },
-  { tipo: "note.created", rotulo: "Nota registrada", campos: [] },
+  { tipo: "note.created", rotulo: "Nota registrada", campos: [], naoPontuavel: true },
   { tipo: "deal.qualified", rotulo: "Negócio qualificado", campos: [] },
   // Legado (fase 8, 2026-09-30): conclusão automática da tarefa "Realizar primeiro
   // contato", mesmo tipo de sinal autoatribuído e sem validação que o Evandro rejeitou
@@ -29,8 +45,10 @@ export const EVENTOS_GAMIFICACAO = [
   { tipo: "pagamento.confirmado", rotulo: "Pagamento confirmado", campos: [] },
 ] as const;
 
-/** Eventos oferecidos para criar regra nova — exclui os marcados `legado`. */
-export const EVENTOS_GAMIFICACAO_SELECIONAVEIS = EVENTOS_GAMIFICACAO.filter((e) => !("legado" in e && e.legado));
+/** Eventos oferecidos para criar regra nova — exclui os marcados `legado` ou `naoPontuavel`. */
+export const EVENTOS_GAMIFICACAO_SELECIONAVEIS = EVENTOS_GAMIFICACAO.filter(
+  (e) => !("legado" in e && e.legado) && !("naoPontuavel" in e && e.naoPontuavel),
+);
 
 export type TipoEventoGamificacao = (typeof EVENTOS_GAMIFICACAO)[number]["tipo"];
 

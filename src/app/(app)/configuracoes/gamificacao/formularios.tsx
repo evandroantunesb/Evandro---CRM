@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
-import { MARCOS_CONQUISTA, ROTULO_MARCO_CONQUISTA, type MarcoConquista } from "@/lib/gamificacao";
+import { EVENTOS_TETO_OBRIGATORIO, MARCOS_CONQUISTA, ROTULO_MARCO_CONQUISTA, type MarcoConquista } from "@/lib/gamificacao";
 import {
   OPERADORES_CONDICAO,
   PERFIS_GAMIFICACAO,
@@ -80,7 +80,7 @@ export function NovaRegra({ eventos }: { eventos: readonly EventoOpcao[] }) {
         <Campo rotulo="Moedas" name="moedas" type="number" step={1} defaultValue={10} required />
         <SeletorPerfil defaultValue="" />
       </div>
-      <CondicaoTeto campos={campos} />
+      <CondicaoTeto campos={campos} tetoObrigatorio={(EVENTOS_TETO_OBRIGATORIO as readonly string[]).includes(eventoTipo)} />
       <label className="flex items-center gap-1 text-sm text-zinc-700">
         <input type="checkbox" name="unicaPorNegocio" /> Pontua só a primeira vez por negócio (evita pontuar de novo se o card sair e voltar)
       </label>
@@ -117,7 +117,13 @@ export function LinhaRegra({ regra, eventos }: { regra: RegraSalva; eventos: rea
         <Campo rotulo="Moedas" name="moedas" type="number" step={1} defaultValue={regra.moedas} required />
         <SeletorPerfil defaultValue={regra.perfilAplicavel ?? ""} />
       </div>
-      <CondicaoTeto campos={campos} condicaoInicial={regra.condicao} limitePeriodoInicial={regra.limitePeriodo} limiteQuantidadeInicial={regra.limiteQuantidade} />
+      <CondicaoTeto
+        campos={campos}
+        condicaoInicial={regra.condicao}
+        limitePeriodoInicial={regra.limitePeriodo}
+        limiteQuantidadeInicial={regra.limiteQuantidade}
+        tetoObrigatorio={(EVENTOS_TETO_OBRIGATORIO as readonly string[]).includes(eventoTipo)}
+      />
       <label className="flex items-center gap-1 text-sm text-zinc-700">
         <input type="checkbox" name="unicaPorNegocio" defaultChecked={regra.unicaPorNegocio} /> Pontua só a primeira vez por negócio (evita pontuar de novo se o card sair e voltar)
       </label>
@@ -142,11 +148,13 @@ function CondicaoTeto({
   condicaoInicial,
   limitePeriodoInicial,
   limiteQuantidadeInicial,
+  tetoObrigatorio,
 }: {
   campos: readonly string[];
   condicaoInicial?: { campo: string; operador: OperadorCondicao; valor: string } | null;
   limitePeriodoInicial?: PeriodoLimiteRegra | null;
   limiteQuantidadeInicial?: number | null;
+  tetoObrigatorio: boolean;
 }) {
   return (
     <div className="grid gap-3 sm:grid-cols-2">
@@ -171,9 +179,16 @@ function CondicaoTeto({
         <Campo rotulo="Valor" name="condicaoValor" placeholder="Ex.: 5000" defaultValue={condicaoInicial?.valor ?? ""} />
       </fieldset>
       <fieldset className="flex flex-col gap-2 rounded-lg border border-zinc-200 p-3">
-        <legend className="px-1 text-xs font-medium text-zinc-500">Teto (opcional)</legend>
-        <Selecao rotulo="Período" name="limitePeriodo" defaultValue={limitePeriodoInicial ?? ""}>
-          <option value="">Sem teto</option>
+        <legend className="px-1 text-xs font-medium text-zinc-500">{tetoObrigatorio ? "Teto (obrigatório)" : "Teto (opcional)"}</legend>
+        {tetoObrigatorio && (
+          <p className="text-xs text-zinc-500">
+            Essa é uma atividade repetível — sem período e quantidade definidos, a regra não pontua.
+          </p>
+        )}
+        <Selecao rotulo="Período" name="limitePeriodo" defaultValue={limitePeriodoInicial ?? ""} required={tetoObrigatorio}>
+          <option value="" disabled={tetoObrigatorio}>
+            Sem teto
+          </option>
           {PERIODOS_LIMITE_REGRA.map((p) => (
             <option key={p} value={p}>
               {ROTULO_PERIODO_LIMITE_REGRA[p]}
@@ -187,6 +202,7 @@ function CondicaoTeto({
           min={1}
           step={1}
           defaultValue={limiteQuantidadeInicial ?? undefined}
+          required={tetoObrigatorio}
         />
       </fieldset>
     </div>
