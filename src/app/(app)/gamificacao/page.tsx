@@ -259,7 +259,7 @@ export default async function GamificacaoDashboard({ searchParams }: { searchPar
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Cartao titulo="Evolução de XP">
+        <Cartao titulo="Evolução de XP" acao={<Link href="/gamificacao/extrato" className="text-sm text-dourado hover:underline">Ver extrato →</Link>}>
           {serieAcumulada.length < 2 ? (
             <p className="text-sm text-zinc-500">Sem dados suficientes neste período.</p>
           ) : (

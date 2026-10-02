@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Cartao, Selo } from "@/components/ui";
 import { formatarDataHora } from "@/lib/formatacao";
 import { exigirPapel } from "@/lib/sessao";
@@ -46,7 +47,7 @@ export default async function LojaDeRecompensas() {
     <div className="mx-auto flex max-w-2xl flex-col gap-4">
       <h1 className="text-2xl font-semibold text-zinc-900">Loja de recompensas</h1>
 
-      <Cartao titulo="Seu saldo">
+      <Cartao titulo="Seu saldo" acao={<Link href="/gamificacao/extrato" className="text-sm text-dourado hover:underline">Ver extrato →</Link>}>
         <p className="text-3xl font-semibold text-zinc-900">{saldoExibido.toLocaleString("pt-BR")} moedas</p>
         {ajusteNegativo > 0 && (
           <p className="text-sm text-zinc-500">{ajusteNegativo.toLocaleString("pt-BR")} moedas em ajuste</p>
