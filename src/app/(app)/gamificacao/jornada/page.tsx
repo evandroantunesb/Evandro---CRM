@@ -1,7 +1,16 @@
 import { Cartao } from "@/components/ui";
-import { calcularNivel } from "@/lib/gamificacao";
+import { calcularNivel, ROTULO_MARCO_CONQUISTA, type MarcoConquista } from "@/lib/gamificacao";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
+
+function descreverCriterio(criterio: unknown) {
+  const c = criterio as { metrica: "xp_acumulado" | "marco_contagem"; valor: number; marco?: string };
+  if (c.metrica === "marco_contagem") {
+    const rotulo = ROTULO_MARCO_CONQUISTA[c.marco as MarcoConquista] ?? c.marco;
+    return `${c.valor.toLocaleString("pt-BR")}x ${rotulo}`;
+  }
+  return `Acumule ${c.valor.toLocaleString("pt-BR")} XP`;
+}
 
 export default async function MinhaJornada() {
   const { atual } = await exigirPapel();
@@ -78,9 +87,7 @@ export default async function MinhaJornada() {
                   {!c.ativa && <span className="ml-1 text-[10px] text-zinc-400">(desativada)</span>}
                 </span>
                 {!desbloqueada && (
-                  <span className="text-[11px] text-zinc-500">
-                    Acumule {(c.criterio as { metrica: string; valor: number }).valor.toLocaleString("pt-BR")} XP
-                  </span>
+                  <span className="text-[11px] text-zinc-500">{descreverCriterio(c.criterio)}</span>
                 )}
               </div>
             );

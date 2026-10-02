@@ -32,6 +32,32 @@ export function camposEvento(tipo: string): readonly string[] {
   return EVENTOS_GAMIFICACAO.find((e) => e.tipo === tipo)?.campos ?? [];
 }
 
+/**
+ * Marcos suportados por conquista do tipo `marco_contagem` (critério "N ocorrências de
+ * um evento", independente de XP/moedas — ver `avaliar_conquistas_marco()`). Reunião e
+ * visita realizadas ficam de fora até a PR #109 (`tarefas.resultado`) mesclar: não há
+ * fonte causal aceitável hoje sem usar `task.completed` genérico.
+ */
+export const MARCOS_CONQUISTA = [
+  "deal.qualified",
+  "deal.negotiation_started",
+  "contrato.assinado",
+  "deal.won",
+  "handoff.won",
+  "pagamento.confirmado",
+] as const;
+
+export type MarcoConquista = (typeof MARCOS_CONQUISTA)[number];
+
+export const ROTULO_MARCO_CONQUISTA: Record<MarcoConquista, string> = {
+  "deal.qualified": "Negócio qualificado",
+  "deal.negotiation_started": "Negócio entrou em negociação",
+  "contrato.assinado": "Contrato assinado",
+  "deal.won": "Negócio ganho",
+  "handoff.won": "Oportunidade originada que virou venda (SDR)",
+  "pagamento.confirmado": "Pagamento confirmado",
+};
+
 export type NivelGamificacao = { nivel: number; nome: string | null; xpMinimo: number };
 
 /**

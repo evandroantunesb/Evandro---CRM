@@ -528,6 +528,7 @@ export type Database = {
       conquistas: {
         Row: {
           ativa: boolean;
+          ativa_desde: string;
           created_at: string;
           criterio: NonNullable<Json>;
           descricao: string;
@@ -535,11 +536,13 @@ export type Database = {
           icone: string;
           id: string;
           nome: string;
+          perfil_aplicavel: Database["public"]["Enums"]["perfil_gamificacao"] | null;
           updated_at: string;
           xp_bonus: number;
         };
         Insert: {
           ativa?: boolean;
+          ativa_desde?: string;
           created_at?: string;
           criterio: NonNullable<Json>;
           descricao?: string;
@@ -547,11 +550,13 @@ export type Database = {
           icone?: string;
           id?: string;
           nome: string;
+          perfil_aplicavel?: Database["public"]["Enums"]["perfil_gamificacao"] | null;
           updated_at?: string;
           xp_bonus?: number;
         };
         Update: {
           ativa?: boolean;
+          ativa_desde?: string;
           created_at?: string;
           criterio?: NonNullable<Json>;
           descricao?: string;
@@ -559,6 +564,7 @@ export type Database = {
           icone?: string;
           id?: string;
           nome?: string;
+          perfil_aplicavel?: Database["public"]["Enums"]["perfil_gamificacao"] | null;
           updated_at?: string;
           xp_bonus?: number;
         };
@@ -3124,6 +3130,10 @@ export type Database = {
           isOneToOne: true;
           isSetofReturn: false;
         };
+      };
+      contar_marco_membro: {
+        Args: { p_ativa_desde: string; p_empresa_id: string; p_marco: string; p_membro_id: string };
+        Returns: number;
       };
       decidir_atribuicao_lead: {
         Args: { p_automatico: boolean; p_id: string; p_membro_final_id: string };

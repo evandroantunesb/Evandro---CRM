@@ -1,5 +1,5 @@
 import { Cartao } from "@/components/ui";
-import { EVENTOS_GAMIFICACAO } from "@/lib/gamificacao";
+import { EVENTOS_GAMIFICACAO, type MarcoConquista } from "@/lib/gamificacao";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import type { OperadorCondicao, PerfilGamificacao, PeriodoLimiteRegra } from "@/lib/tipos";
@@ -17,7 +17,7 @@ export default async function ConfigGamificacao() {
     supabase.from("niveis_gamificacao").select("nivel, nome, xp_minimo, ativa").eq("empresa_id", atual.empresaId).order("nivel"),
     supabase
       .from("conquistas")
-      .select("id, nome, descricao, icone, criterio, xp_bonus, ativa")
+      .select("id, nome, descricao, icone, criterio, xp_bonus, perfil_aplicavel, ativa")
       .eq("empresa_id", atual.empresaId)
       .order("created_at"),
     supabase
@@ -83,20 +83,26 @@ export default async function ConfigGamificacao() {
         <NovaConquista />
       </Cartao>
       <Cartao titulo={`Conquistas (${conquistas?.length ?? 0})`}>
-        {(conquistas ?? []).map((c) => (
-          <LinhaConquista
-            key={c.id}
-            conquista={{
-              id: c.id,
-              nome: c.nome,
-              descricao: c.descricao,
-              icone: c.icone,
-              valorXp: (c.criterio as { metrica: string; valor: number }).valor,
-              xpBonus: c.xp_bonus,
-              ativa: c.ativa,
-            }}
-          />
-        ))}
+        {(conquistas ?? []).map((c) => {
+          const criterio = c.criterio as { metrica: "xp_acumulado" | "marco_contagem"; valor: number; marco?: string };
+          return (
+            <LinhaConquista
+              key={c.id}
+              conquista={{
+                id: c.id,
+                nome: c.nome,
+                descricao: c.descricao,
+                icone: c.icone,
+                metrica: criterio.metrica,
+                marco: (criterio.marco as MarcoConquista) ?? null,
+                valor: criterio.valor,
+                xpBonus: c.xp_bonus,
+                perfilAplicavel: c.perfil_aplicavel as PerfilGamificacao | null,
+                ativa: c.ativa,
+              }}
+            />
+          );
+        })}
       </Cartao>
 
       <p className="mt-4 text-sm text-zinc-600">
