@@ -192,7 +192,7 @@ describe("snapshot da condição no point_ledger", () => {
     expect(antes).toHaveLength(1);
     const snapshot = antes[0].condicao_avaliada as Record<string, unknown>;
     expect(snapshot.resultado).toBe(true);
-    expect(snapshot.valor_payload).toBe("60000");
+    expect(snapshot.valor_payload).toBe("60000.00");
     expect((snapshot.condicao as Record<string, unknown>).valor).toBe("50000");
 
     // Edita a regra depois do crédito (condição e xp mudam) — o lançamento antigo não pode mudar.
