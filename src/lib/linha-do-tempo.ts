@@ -43,6 +43,16 @@ export function descreverAtividade(tipo: string, dadosJson: Json, nomes: Nomes):
       return `Arquivo anexado: ${d.nome}`;
     case "anexo_removido":
       return `Arquivo removido: ${d.nome}`;
+    case "handoff_enviado":
+      return `Enviado para vendas: ${nomeOu(nomes.membro, d.para_membro_id, "?")} (aguardando aceite)`;
+    case "handoff_aceito":
+      return "Oportunidade aceita pelo vendedor";
+    case "handoff_devolvido":
+      return `Oportunidade devolvida${d.motivo ? `: ${d.motivo}` : ""}`;
+    case "pagamento_confirmado":
+      return "Pagamento confirmado";
+    case "pagamento_estornado":
+      return `Confirmação de pagamento estornada${d.motivo ? `: ${d.motivo}` : ""}`;
     default:
       return tipo;
   }

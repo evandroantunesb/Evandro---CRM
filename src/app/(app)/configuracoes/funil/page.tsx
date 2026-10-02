@@ -9,6 +9,7 @@ import {
   DiasConsideradoParado,
   FechaComoEtapa,
   HorasConsideradoSemContato,
+  MarcaNegociacaoEtapa,
   NovaEtapa,
   NovoFunil,
   Renomear,
@@ -76,6 +77,7 @@ export default async function ConfigFunil() {
                   ))}
                   <AlternarEtapa etapaId={etapa.id} ativa={etapa.ativa} />
                   <FechaComoEtapa etapaId={etapa.id} fechaComo={etapa.fechaComo} />
+                  <MarcaNegociacaoEtapa etapaId={etapa.id} marcaNegociacao={etapa.marcaNegociacao} />
                   <CamposObrigatorios etapaId={etapa.id} campos={etapa.camposObrigatorios} />
                 </li>
               ))}

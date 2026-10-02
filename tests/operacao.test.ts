@@ -164,7 +164,10 @@ describe("tarefas", () => {
   });
 
   it("concluir registra quem concluiu, a linha do tempo e o evento", async () => {
-    const { error } = await vendedor1.cliente.from("tarefas").update({ concluida_em: new Date().toISOString() }).eq("id", tarefa);
+    const { error } = await vendedor1.cliente
+      .from("tarefas")
+      .update({ concluida_em: new Date().toISOString(), resultado: "contato_realizado" })
+      .eq("id", tarefa);
     expect(error).toBeNull();
     const { data } = await servico.from("tarefas").select("concluida_por").eq("id", tarefa).single();
     expect(data!.concluida_por).toBe(membro[vendedor1.id]);

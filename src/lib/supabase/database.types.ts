@@ -414,9 +414,121 @@ export type Database = {
           },
         ];
       };
+      confirmacoes_pagamento: {
+        Row: {
+          beneficiario_membro_id: string;
+          beneficiario_user_id: string;
+          confirmado_em: string;
+          confirmado_por_membro_id: string;
+          confirmado_por_user_id: string;
+          contrato_id: string;
+          empresa_id: string;
+          estornado_em: string | null;
+          estornado_por_membro_id: string | null;
+          estornado_por_user_id: string | null;
+          evento_confirmacao_id: number;
+          evento_estorno_id: number | null;
+          id: string;
+          motivo_estorno: string | null;
+          negocio_id: string;
+        };
+        Insert: {
+          beneficiario_membro_id: string;
+          beneficiario_user_id: string;
+          confirmado_em?: string;
+          confirmado_por_membro_id: string;
+          confirmado_por_user_id: string;
+          contrato_id: string;
+          empresa_id: string;
+          estornado_em?: string | null;
+          estornado_por_membro_id?: string | null;
+          estornado_por_user_id?: string | null;
+          evento_confirmacao_id: number;
+          evento_estorno_id?: number | null;
+          id?: string;
+          motivo_estorno?: string | null;
+          negocio_id: string;
+        };
+        Update: {
+          beneficiario_membro_id?: string;
+          beneficiario_user_id?: string;
+          confirmado_em?: string;
+          confirmado_por_membro_id?: string;
+          confirmado_por_user_id?: string;
+          contrato_id?: string;
+          empresa_id?: string;
+          estornado_em?: string | null;
+          estornado_por_membro_id?: string | null;
+          estornado_por_user_id?: string | null;
+          evento_confirmacao_id?: number;
+          evento_estorno_id?: number | null;
+          id?: string;
+          motivo_estorno?: string | null;
+          negocio_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "confirmacoes_pagamento_beneficiario_membro_id_fkey";
+            columns: ["beneficiario_membro_id"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "confirmacoes_pagamento_confirmado_por_membro_id_fkey";
+            columns: ["confirmado_por_membro_id"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "confirmacoes_pagamento_contrato_id_fkey";
+            columns: ["contrato_id"];
+            isOneToOne: false;
+            referencedRelation: "contratos";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "confirmacoes_pagamento_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "confirmacoes_pagamento_estornado_por_membro_id_fkey";
+            columns: ["estornado_por_membro_id"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "confirmacoes_pagamento_evento_confirmacao_id_fkey";
+            columns: ["evento_confirmacao_id"];
+            isOneToOne: false;
+            referencedRelation: "eventos";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "confirmacoes_pagamento_evento_estorno_id_fkey";
+            columns: ["evento_estorno_id"];
+            isOneToOne: false;
+            referencedRelation: "eventos";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "confirmacoes_pagamento_negocio_id_fkey";
+            columns: ["negocio_id"];
+            isOneToOne: false;
+            referencedRelation: "negocios";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       conquistas: {
         Row: {
           ativa: boolean;
+          ativa_desde: string;
           created_at: string;
           criterio: NonNullable<Json>;
           descricao: string;
@@ -424,11 +536,13 @@ export type Database = {
           icone: string;
           id: string;
           nome: string;
+          perfil_aplicavel: Database["public"]["Enums"]["perfil_gamificacao"] | null;
           updated_at: string;
           xp_bonus: number;
         };
         Insert: {
           ativa?: boolean;
+          ativa_desde?: string;
           created_at?: string;
           criterio: NonNullable<Json>;
           descricao?: string;
@@ -436,11 +550,13 @@ export type Database = {
           icone?: string;
           id?: string;
           nome: string;
+          perfil_aplicavel?: Database["public"]["Enums"]["perfil_gamificacao"] | null;
           updated_at?: string;
           xp_bonus?: number;
         };
         Update: {
           ativa?: boolean;
+          ativa_desde?: string;
           created_at?: string;
           criterio?: NonNullable<Json>;
           descricao?: string;
@@ -448,6 +564,7 @@ export type Database = {
           icone?: string;
           id?: string;
           nome?: string;
+          perfil_aplicavel?: Database["public"]["Enums"]["perfil_gamificacao"] | null;
           updated_at?: string;
           xp_bonus?: number;
         };
@@ -585,6 +702,8 @@ export type Database = {
           empresa_id: string;
           id: string;
           negocio_id: string;
+          perfil_assinatura: Database["public"]["Enums"]["perfil_gamificacao"] | null;
+          responsavel_assinatura_id: string | null;
           status: Database["public"]["Enums"]["status_contrato"];
           token: string;
           updated_at: string;
@@ -597,6 +716,8 @@ export type Database = {
           empresa_id: string;
           id?: string;
           negocio_id: string;
+          perfil_assinatura?: Database["public"]["Enums"]["perfil_gamificacao"] | null;
+          responsavel_assinatura_id?: string | null;
           status?: Database["public"]["Enums"]["status_contrato"];
           token?: string;
           updated_at?: string;
@@ -609,6 +730,8 @@ export type Database = {
           empresa_id?: string;
           id?: string;
           negocio_id?: string;
+          perfil_assinatura?: Database["public"]["Enums"]["perfil_gamificacao"] | null;
+          responsavel_assinatura_id?: string | null;
           status?: Database["public"]["Enums"]["status_contrato"];
           token?: string;
           updated_at?: string;
@@ -642,6 +765,13 @@ export type Database = {
             referencedRelation: "negocios";
             referencedColumns: ["id"];
           },
+          {
+            foreignKeyName: "contratos_responsavel_assinatura_id_fkey";
+            columns: ["responsavel_assinatura_id"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
         ];
       };
       empresa_membros: {
@@ -651,6 +781,7 @@ export type Database = {
           empresa_id: string;
           id: string;
           papel: Database["public"]["Enums"]["papel_membro"];
+          perfil_gamificacao: Database["public"]["Enums"]["perfil_gamificacao"] | null;
           recebe_leads: boolean;
           recebeu_lead_em: string | null;
           status: Database["public"]["Enums"]["status_membro"];
@@ -664,6 +795,7 @@ export type Database = {
           empresa_id: string;
           id?: string;
           papel?: Database["public"]["Enums"]["papel_membro"];
+          perfil_gamificacao?: Database["public"]["Enums"]["perfil_gamificacao"] | null;
           recebe_leads?: boolean;
           recebeu_lead_em?: string | null;
           status?: Database["public"]["Enums"]["status_membro"];
@@ -677,6 +809,7 @@ export type Database = {
           empresa_id?: string;
           id?: string;
           papel?: Database["public"]["Enums"]["papel_membro"];
+          perfil_gamificacao?: Database["public"]["Enums"]["perfil_gamificacao"] | null;
           recebe_leads?: boolean;
           recebeu_lead_em?: string | null;
           status?: Database["public"]["Enums"]["status_membro"];
@@ -838,6 +971,7 @@ export type Database = {
           funil_id: string;
           id: string;
           inicial: boolean;
+          marca_negociacao: boolean;
           nome: string;
           ordem: number;
           updated_at: string;
@@ -852,6 +986,7 @@ export type Database = {
           funil_id: string;
           id?: string;
           inicial?: boolean;
+          marca_negociacao?: boolean;
           nome: string;
           ordem?: number;
           updated_at?: string;
@@ -866,6 +1001,7 @@ export type Database = {
           funil_id?: string;
           id?: string;
           inicial?: boolean;
+          marca_negociacao?: boolean;
           nome?: string;
           ordem?: number;
           updated_at?: string;
@@ -928,32 +1064,38 @@ export type Database = {
       eventos: {
         Row: {
           ator_id: string | null;
+          beneficiario_id: string | null;
           created_at: string;
           empresa_id: string;
           entidade: string | null;
           entidade_id: string | null;
           id: number;
           payload: NonNullable<Json>;
+          profile_at_event: Database["public"]["Enums"]["perfil_gamificacao"] | null;
           tipo: string;
         };
         Insert: {
           ator_id?: string | null;
+          beneficiario_id?: string | null;
           created_at?: string;
           empresa_id: string;
           entidade?: string | null;
           entidade_id?: string | null;
           id?: never;
           payload?: NonNullable<Json>;
+          profile_at_event?: Database["public"]["Enums"]["perfil_gamificacao"] | null;
           tipo: string;
         };
         Update: {
           ator_id?: string | null;
+          beneficiario_id?: string | null;
           created_at?: string;
           empresa_id?: string;
           entidade?: string | null;
           entidade_id?: string | null;
           id?: never;
           payload?: NonNullable<Json>;
+          profile_at_event?: Database["public"]["Enums"]["perfil_gamificacao"] | null;
           tipo?: string;
         };
         Relationships: [
@@ -1129,9 +1271,12 @@ export type Database = {
           id: string;
           limite_periodo: Database["public"]["Enums"]["periodo_limite_regra"] | null;
           limite_quantidade: number | null;
+          moedas: number;
           nome: string;
-          pontos: number;
+          perfil_aplicavel: Database["public"]["Enums"]["perfil_gamificacao"] | null;
+          unica_por_negocio: boolean;
           updated_at: string;
+          xp: number;
         };
         Insert: {
           ativa?: boolean;
@@ -1143,9 +1288,12 @@ export type Database = {
           id?: string;
           limite_periodo?: Database["public"]["Enums"]["periodo_limite_regra"] | null;
           limite_quantidade?: number | null;
+          moedas?: number;
           nome: string;
-          pontos: number;
+          perfil_aplicavel?: Database["public"]["Enums"]["perfil_gamificacao"] | null;
+          unica_por_negocio?: boolean;
           updated_at?: string;
+          xp?: number;
         };
         Update: {
           ativa?: boolean;
@@ -1157,9 +1305,12 @@ export type Database = {
           id?: string;
           limite_periodo?: Database["public"]["Enums"]["periodo_limite_regra"] | null;
           limite_quantidade?: number | null;
+          moedas?: number;
           nome?: string;
-          pontos?: number;
+          perfil_aplicavel?: Database["public"]["Enums"]["perfil_gamificacao"] | null;
+          unica_por_negocio?: boolean;
           updated_at?: string;
+          xp?: number;
         };
         Relationships: [
           {
@@ -1230,10 +1381,15 @@ export type Database = {
           de_membro_id: string | null;
           empresa_id: string;
           id: string;
+          motivo_devolucao: string | null;
           negocio_id: string;
           observacoes: string | null;
           para_membro_id: string;
+          perfil_sdr_credito: Database["public"]["Enums"]["perfil_gamificacao"] | null;
           qualificacao_snapshot: NonNullable<Json>;
+          respondido_em: string | null;
+          respondido_por: string | null;
+          status: string;
           status_qualificacao: string;
         };
         Insert: {
@@ -1242,10 +1398,15 @@ export type Database = {
           de_membro_id?: string | null;
           empresa_id: string;
           id?: string;
+          motivo_devolucao?: string | null;
           negocio_id: string;
           observacoes?: string | null;
           para_membro_id: string;
+          perfil_sdr_credito?: Database["public"]["Enums"]["perfil_gamificacao"] | null;
           qualificacao_snapshot?: NonNullable<Json>;
+          respondido_em?: string | null;
+          respondido_por?: string | null;
+          status?: string;
           status_qualificacao: string;
         };
         Update: {
@@ -1254,10 +1415,15 @@ export type Database = {
           de_membro_id?: string | null;
           empresa_id?: string;
           id?: string;
+          motivo_devolucao?: string | null;
           negocio_id?: string;
           observacoes?: string | null;
           para_membro_id?: string;
+          perfil_sdr_credito?: Database["public"]["Enums"]["perfil_gamificacao"] | null;
           qualificacao_snapshot?: NonNullable<Json>;
+          respondido_em?: string | null;
+          respondido_por?: string | null;
+          status?: string;
           status_qualificacao?: string;
         };
         Relationships: [
@@ -1292,6 +1458,13 @@ export type Database = {
           {
             foreignKeyName: "handoffs_para_membro_id_fkey";
             columns: ["para_membro_id"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "handoffs_respondido_por_fkey";
+            columns: ["respondido_por"];
             isOneToOne: false;
             referencedRelation: "empresa_membros";
             referencedColumns: ["id"];
@@ -1738,6 +1911,7 @@ export type Database = {
           etapa_id: string;
           fechado_em: string | null;
           funil_id: string;
+          handoff_origem_id: string | null;
           id: string;
           motivo_perda_detalhe: string | null;
           motivo_perda_id: string | null;
@@ -1777,6 +1951,7 @@ export type Database = {
           etapa_id: string;
           fechado_em?: string | null;
           funil_id: string;
+          handoff_origem_id?: string | null;
           id?: string;
           motivo_perda_detalhe?: string | null;
           motivo_perda_id?: string | null;
@@ -1816,6 +1991,7 @@ export type Database = {
           etapa_id?: string;
           fechado_em?: string | null;
           funil_id?: string;
+          handoff_origem_id?: string | null;
           id?: string;
           motivo_perda_detalhe?: string | null;
           motivo_perda_id?: string | null;
@@ -1880,6 +2056,13 @@ export type Database = {
             referencedColumns: ["id"];
           },
           {
+            foreignKeyName: "negocios_handoff_origem_id_fkey";
+            columns: ["handoff_origem_id"];
+            isOneToOne: false;
+            referencedRelation: "handoffs";
+            referencedColumns: ["id"];
+          },
+          {
             foreignKeyName: "negocios_motivo_perda_id_fkey";
             columns: ["motivo_perda_id"];
             isOneToOne: false;
@@ -1904,18 +2087,21 @@ export type Database = {
       };
       niveis_gamificacao: {
         Row: {
+          ativa: boolean;
           empresa_id: string;
           nivel: number;
           nome: string | null;
           xp_minimo: number;
         };
         Insert: {
+          ativa?: boolean;
           empresa_id: string;
           nivel: number;
           nome?: string | null;
           xp_minimo: number;
         };
         Update: {
+          ativa?: boolean;
           empresa_id?: string;
           nivel?: number;
           nome?: string | null;
@@ -2286,10 +2472,12 @@ export type Database = {
           evento_id: number | null;
           id: string;
           membro_id: string;
-          pontos: number;
+          moedas: number;
+          profile_at_event: Database["public"]["Enums"]["perfil_gamificacao"] | null;
           referencia_id: string | null;
           referencia_tipo: string | null;
           regra_id: string | null;
+          xp: number;
         };
         Insert: {
           created_at?: string;
@@ -2301,10 +2489,12 @@ export type Database = {
           evento_id?: number | null;
           id?: string;
           membro_id: string;
-          pontos: number;
+          moedas?: number;
+          profile_at_event?: Database["public"]["Enums"]["perfil_gamificacao"] | null;
           referencia_id?: string | null;
           referencia_tipo?: string | null;
           regra_id?: string | null;
+          xp?: number;
         };
         Update: {
           created_at?: string;
@@ -2316,10 +2506,12 @@ export type Database = {
           evento_id?: number | null;
           id?: string;
           membro_id?: string;
-          pontos?: number;
+          moedas?: number;
+          profile_at_event?: Database["public"]["Enums"]["perfil_gamificacao"] | null;
           referencia_id?: string | null;
           referencia_tipo?: string | null;
           regra_id?: string | null;
+          xp?: number;
         };
         Relationships: [
           {
@@ -2654,7 +2846,7 @@ export type Database = {
           ativa: boolean;
           created_at: string;
           criado_por: string | null;
-          custo_pontos: number;
+          custo_moedas: number;
           descricao: string;
           empresa_id: string;
           estoque: number | null;
@@ -2668,7 +2860,7 @@ export type Database = {
           ativa?: boolean;
           created_at?: string;
           criado_por?: string | null;
-          custo_pontos: number;
+          custo_moedas: number;
           descricao?: string;
           empresa_id: string;
           estoque?: number | null;
@@ -2682,7 +2874,7 @@ export type Database = {
           ativa?: boolean;
           created_at?: string;
           criado_por?: string | null;
-          custo_pontos?: number;
+          custo_moedas?: number;
           descricao?: string;
           empresa_id?: string;
           estoque?: number | null;
@@ -2715,7 +2907,7 @@ export type Database = {
           empresa_id: string;
           id: string;
           membro_id: string;
-          pontos_debitados: number;
+          moedas_debitadas: number;
           recompensa_id: string;
           status: Database["public"]["Enums"]["status_resgate"];
           updated_at: string;
@@ -2725,7 +2917,7 @@ export type Database = {
           empresa_id: string;
           id?: string;
           membro_id: string;
-          pontos_debitados: number;
+          moedas_debitadas: number;
           recompensa_id: string;
           status?: Database["public"]["Enums"]["status_resgate"];
           updated_at?: string;
@@ -2735,7 +2927,7 @@ export type Database = {
           empresa_id?: string;
           id?: string;
           membro_id?: string;
-          pontos_debitados?: number;
+          moedas_debitadas?: number;
           recompensa_id?: string;
           status?: Database["public"]["Enums"]["status_resgate"];
           updated_at?: string;
@@ -2775,6 +2967,7 @@ export type Database = {
           id: string;
           negocio_id: string | null;
           responsavel_id: string | null;
+          resultado: Database["public"]["Enums"]["resultado_tarefa"] | null;
           tipo: Database["public"]["Enums"]["tipo_tarefa"];
           titulo: string;
           updated_at: string;
@@ -2790,6 +2983,7 @@ export type Database = {
           id?: string;
           negocio_id?: string | null;
           responsavel_id?: string | null;
+          resultado?: Database["public"]["Enums"]["resultado_tarefa"] | null;
           tipo?: Database["public"]["Enums"]["tipo_tarefa"];
           titulo: string;
           updated_at?: string;
@@ -2805,6 +2999,7 @@ export type Database = {
           id?: string;
           negocio_id?: string | null;
           responsavel_id?: string | null;
+          resultado?: Database["public"]["Enums"]["resultado_tarefa"] | null;
           tipo?: Database["public"]["Enums"]["tipo_tarefa"];
           titulo?: string;
           updated_at?: string;
@@ -2853,6 +3048,32 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      aceitar_handoff: {
+        Args: { p_handoff_id: string };
+        Returns: {
+          contato_id: string;
+          created_at: string;
+          de_membro_id: string | null;
+          empresa_id: string;
+          id: string;
+          motivo_devolucao: string | null;
+          negocio_id: string;
+          observacoes: string | null;
+          para_membro_id: string;
+          perfil_sdr_credito: Database["public"]["Enums"]["perfil_gamificacao"] | null;
+          qualificacao_snapshot: NonNullable<Json>;
+          respondido_em: string | null;
+          respondido_por: string | null;
+          status: string;
+          status_qualificacao: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "handoffs";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       aprovar_atribuicao_lead: {
         Args: { p_id: string; p_membro_final_id?: string };
         Returns: undefined;
@@ -2867,7 +3088,7 @@ export type Database = {
           empresa_id: string;
           id: string;
           membro_id: string;
-          pontos_debitados: number;
+          moedas_debitadas: number;
           recompensa_id: string;
           status: Database["public"]["Enums"]["status_resgate"];
           updated_at: string;
@@ -2890,12 +3111,109 @@ export type Database = {
         }[];
       };
       compartilha_empresa: { Args: { p_user_id: string }; Returns: boolean };
+      confirmar_pagamento: {
+        Args: { p_contrato_id: string };
+        Returns: {
+          beneficiario_membro_id: string;
+          beneficiario_user_id: string;
+          confirmado_em: string;
+          confirmado_por_membro_id: string;
+          confirmado_por_user_id: string;
+          contrato_id: string;
+          empresa_id: string;
+          estornado_em: string | null;
+          estornado_por_membro_id: string | null;
+          estornado_por_user_id: string | null;
+          evento_confirmacao_id: number;
+          evento_estorno_id: number | null;
+          id: string;
+          motivo_estorno: string | null;
+          negocio_id: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "confirmacoes_pagamento";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      contar_marco_membro: {
+        Args: {
+          p_ativa_desde: string;
+          p_empresa_id: string;
+          p_marco: string;
+          p_membro_id: string;
+          p_perfil_requerido?: Database["public"]["Enums"]["perfil_gamificacao"];
+        };
+        Returns: number;
+      };
       decidir_atribuicao_lead: {
         Args: { p_automatico: boolean; p_id: string; p_membro_final_id: string };
         Returns: undefined;
       };
+      devolver_handoff: {
+        Args: { p_handoff_id: string; p_motivo: string };
+        Returns: {
+          contato_id: string;
+          created_at: string;
+          de_membro_id: string | null;
+          empresa_id: string;
+          id: string;
+          motivo_devolucao: string | null;
+          negocio_id: string;
+          observacoes: string | null;
+          para_membro_id: string;
+          perfil_sdr_credito: Database["public"]["Enums"]["perfil_gamificacao"] | null;
+          qualificacao_snapshot: NonNullable<Json>;
+          respondido_em: string | null;
+          respondido_por: string | null;
+          status: string;
+          status_qualificacao: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "handoffs";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      e_closer_de_handoff_pendente: { Args: { p_negocio_id: string }; Returns: boolean };
       e_plataforma_admin: { Args: Record<PropertyKey, never>; Returns: boolean };
       empresa_da_pasta_marca: { Args: { p_caminho: string }; Returns: string };
+      estornar_confirmacao_pagamento: {
+        Args: { p_contrato_id: string; p_motivo: string };
+        Returns: {
+          beneficiario_membro_id: string;
+          beneficiario_user_id: string;
+          confirmado_em: string;
+          confirmado_por_membro_id: string;
+          confirmado_por_user_id: string;
+          contrato_id: string;
+          empresa_id: string;
+          estornado_em: string | null;
+          estornado_por_membro_id: string | null;
+          estornado_por_user_id: string | null;
+          evento_confirmacao_id: number;
+          evento_estorno_id: number | null;
+          id: string;
+          motivo_estorno: string | null;
+          negocio_id: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "confirmacoes_pagamento";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      estornar_lancamentos_do_evento: {
+        Args: { p_estornado_por: string; p_evento_id: number };
+        Returns: undefined;
+      };
+      estornar_lancamentos_evento: {
+        Args: { p_entidade_id: string; p_eventos_tipo: string[] };
+        Returns: undefined;
+      };
       expirar_atribuicoes_leads: { Args: Record<PropertyKey, never>; Returns: undefined };
       incrementar_preenchimento_formulario: { Args: { p_id: string }; Returns: undefined };
       incrementar_visualizacao_formulario: { Args: { p_id: string }; Returns: undefined };
@@ -2913,10 +3231,14 @@ export type Database = {
         Returns: boolean;
       };
       ranking_gamificacao: {
-        Args: { p_desde?: string; p_empresa_id: string };
+        Args: {
+          p_desde?: string;
+          p_empresa_id: string;
+          p_perfil: Database["public"]["Enums"]["perfil_gamificacao"];
+        };
         Returns: {
           membro_id: string;
-          total_pontos: number;
+          total_xp: number;
         }[];
       };
       solicitar_resgate: {
@@ -2926,7 +3248,7 @@ export type Database = {
           empresa_id: string;
           id: string;
           membro_id: string;
-          pontos_debitados: number;
+          moedas_debitadas: number;
           recompensa_id: string;
           status: Database["public"]["Enums"]["status_resgate"];
           updated_at: string;
@@ -2937,6 +3259,10 @@ export type Database = {
           isOneToOne: true;
           isSetofReturn: false;
         };
+      };
+      status_pagamento_contrato: {
+        Args: { p_contrato_id: string };
+        Returns: Database["public"]["Enums"]["status_pagamento_contrato"];
       };
       tem_papel: {
         Args: { p_empresa_id: string; p_papeis: Database["public"]["Enums"]["papel_membro"][] };
@@ -2949,15 +3275,26 @@ export type Database = {
       modo_distribuicao_leads: "somente_vendedores" | "somente_sdr" | "parcial" | "aleatorio";
       modo_preco_proposta: "sem_preco" | "parcelado" | "avista" | "completo";
       papel_membro: "admin" | "gestor" | "vendedor" | "sdr";
+      perfil_gamificacao: "sdr" | "closer" | "cs_farmer";
       periodo_limite_regra: "dia" | "mes";
       proposta_bloco_quebra: "auto" | "nova_pagina" | "pagina_exclusiva";
       proposta_modelo_capa: "foto" | "minimalista" | "tecnica";
       proposta_modelo_status: "rascunho" | "publicado" | "arquivado";
+      resultado_tarefa:
+        | "contato_realizado"
+        | "sem_resposta"
+        | "numero_invalido"
+        | "retornar_depois"
+        | "sem_interesse"
+        | "realizada"
+        | "no_show"
+        | "cancelada";
       situacao_empresa: "ativa" | "suspensa" | "cancelada";
       status_atribuicao_lead: "pendente" | "aprovada" | "reatribuida" | "expirada";
       status_contrato: "rascunho" | "aguardando_assinatura" | "assinado";
       status_membro: "ativo" | "inativo" | "desligado";
       status_negocio: "aberto" | "ganho" | "perdido";
+      status_pagamento_contrato: "pendente" | "confirmado" | "estornado";
       status_resgate: "solicitado" | "aprovado" | "entregue" | "cancelado";
       tipo_calculo_comissao: "percentual" | "multiplicador";
       tipo_componente_kit: "modulo" | "inversor" | "bateria" | "outro";
@@ -3089,15 +3426,27 @@ export const Constants = {
       modo_distribuicao_leads: ["somente_vendedores", "somente_sdr", "parcial", "aleatorio"],
       modo_preco_proposta: ["sem_preco", "parcelado", "avista", "completo"],
       papel_membro: ["admin", "gestor", "vendedor", "sdr"],
+      perfil_gamificacao: ["sdr", "closer", "cs_farmer"],
       periodo_limite_regra: ["dia", "mes"],
       proposta_bloco_quebra: ["auto", "nova_pagina", "pagina_exclusiva"],
       proposta_modelo_capa: ["foto", "minimalista", "tecnica"],
       proposta_modelo_status: ["rascunho", "publicado", "arquivado"],
+      resultado_tarefa: [
+        "contato_realizado",
+        "sem_resposta",
+        "numero_invalido",
+        "retornar_depois",
+        "sem_interesse",
+        "realizada",
+        "no_show",
+        "cancelada",
+      ],
       situacao_empresa: ["ativa", "suspensa", "cancelada"],
       status_atribuicao_lead: ["pendente", "aprovada", "reatribuida", "expirada"],
       status_contrato: ["rascunho", "aguardando_assinatura", "assinado"],
       status_membro: ["ativo", "inativo", "desligado"],
       status_negocio: ["aberto", "ganho", "perdido"],
+      status_pagamento_contrato: ["pendente", "confirmado", "estornado"],
       status_resgate: ["solicitado", "aprovado", "entregue", "cancelado"],
       tipo_calculo_comissao: ["percentual", "multiplicador"],
       tipo_componente_kit: ["modulo", "inversor", "bateria", "outro"],

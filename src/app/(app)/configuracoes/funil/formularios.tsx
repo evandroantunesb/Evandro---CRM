@@ -12,6 +12,7 @@ import {
   definirDiasConsideradoParado,
   definirFechaComoEtapa,
   definirHorasConsideradoSemContato,
+  definirMarcaNegociacaoEtapa,
   renomear,
 } from "./actions";
 
@@ -149,6 +150,24 @@ export function FechaComoEtapa({ etapaId, fechaComo }: { etapaId: string; fechaC
         <option value="ganho">Marca como ganho</option>
         <option value="perdido">Marca como perdido</option>
       </select>
+    </form>
+  );
+}
+
+/** Marca a etapa como "entrou em negociação" pra gamificação (pontua só a primeira vez que o negócio chega aqui). */
+export function MarcaNegociacaoEtapa({ etapaId, marcaNegociacao }: { etapaId: string; marcaNegociacao: boolean }) {
+  return (
+    <form action={definirMarcaNegociacaoEtapa} title="Marca a entrada do negócio nesta etapa como 'entrou em negociação' na gamificação">
+      <input type="hidden" name="etapaId" value={etapaId} />
+      <label className="flex items-center gap-1 text-sm text-zinc-600">
+        <input
+          type="checkbox"
+          name="marcaNegociacao"
+          defaultChecked={marcaNegociacao}
+          onChange={(e) => e.currentTarget.form?.requestSubmit()}
+        />
+        Negociação
+      </label>
     </form>
   );
 }

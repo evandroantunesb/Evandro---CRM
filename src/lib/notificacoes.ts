@@ -6,7 +6,7 @@ import { criarClienteServidor } from "@/lib/supabase/server";
 
 export type Notificacao = {
   id: string;
-  tipo: "lead_atribuido" | "tarefa_atribuida" | "handoff_recebido";
+  tipo: "lead_atribuido" | "tarefa_atribuida" | "handoff_recebido" | "handoff_devolvido" | "conquista_desbloqueada";
   mensagem: string;
   link: string | null;
 };
@@ -23,6 +23,19 @@ export async function carregarNotificacoesNaoLidas(empresaId: string, membroId: 
     .order("created_at", { ascending: false })
     .limit(limite);
   return (data ?? []) as Notificacao[];
+}
+
+/** Indicador de novidade na área de Gamificação: há conquista desbloqueada ainda não vista na Jornada. */
+export async function temConquistaNaoVisualizada(empresaId: string, membroId: string): Promise<boolean> {
+  const supabase = await criarClienteServidor();
+  const { count } = await supabase
+    .from("notificacoes")
+    .select("id", { count: "exact", head: true })
+    .eq("empresa_id", empresaId)
+    .eq("membro_id", membroId)
+    .eq("tipo", "conquista_desbloqueada")
+    .is("lida_em", null);
+  return (count ?? 0) > 0;
 }
 
 /**

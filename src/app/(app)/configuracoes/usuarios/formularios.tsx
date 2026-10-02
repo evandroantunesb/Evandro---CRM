@@ -4,12 +4,15 @@ import { useActionState, useEffect, useState, useTransition } from "react";
 import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
 import {
   PAPEIS,
+  PERFIS_GAMIFICACAO,
   ROTULO_PAPEL,
+  ROTULO_PERFIL_GAMIFICACAO,
   ROTULO_STATUS_MEMBRO,
   ROTULO_TIPO_VENDEDOR,
   STATUS_MEMBRO,
   TIPOS_VENDEDOR,
   type Papel,
+  type PerfilGamificacao,
   type StatusMembro,
   type TipoVendedor,
 } from "@/lib/tipos";
@@ -37,6 +40,14 @@ export function FormularioConvite() {
         ))}
       </Selecao>
       {papel !== "vendedor" && <input type="hidden" name="tipo_vendedor" value="interno" />}
+      <Selecao rotulo="Perfil de gamificação (opcional)" name="perfil_gamificacao" defaultValue="">
+        <option value="">Sem perfil (fora do ranking)</option>
+        {PERFIS_GAMIFICACAO.map((p) => (
+          <option key={p} value={p}>
+            {ROTULO_PERFIL_GAMIFICACAO[p]}
+          </option>
+        ))}
+      </Selecao>
       <Campo
         rotulo="Senha (opcional)"
         name="senha"
@@ -59,6 +70,7 @@ export type MembroLinha = {
   email: string;
   papel: Papel;
   tipoVendedor: TipoVendedor | null;
+  perfilGamificacao: PerfilGamificacao | null;
   recebeLeads: boolean;
   status: StatusMembro;
 };
@@ -121,6 +133,14 @@ export function LinhaMembro({ membro }: { membro: MembroLinha }) {
         ))}
       </Selecao>
       {papel !== "vendedor" && <input type="hidden" name="tipo_vendedor" value="interno" />}
+      <Selecao name="perfil_gamificacao" defaultValue={membro.perfilGamificacao ?? ""} aria-label="Perfil de gamificação">
+        <option value="">Sem perfil (fora do ranking)</option>
+        {PERFIS_GAMIFICACAO.map((p) => (
+          <option key={p} value={p}>
+            {ROTULO_PERFIL_GAMIFICACAO[p]}
+          </option>
+        ))}
+      </Selecao>
       <label className="flex items-center gap-1 text-sm text-zinc-700">
         <input type="checkbox" name="recebe_leads" defaultChecked={membro.recebeLeads} /> Recebe leads
       </label>

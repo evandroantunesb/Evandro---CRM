@@ -4,6 +4,16 @@ export type Papel = (typeof PAPEIS)[number];
 export const TIPOS_VENDEDOR = ["interno", "representante"] as const;
 export type TipoVendedor = (typeof TIPOS_VENDEDOR)[number];
 
+/** Em qual ranking/pontuação a pessoa compete — separado de `papel` (permissão). Gestor/admin não têm perfil (fora do ranking comercial). */
+export const PERFIS_GAMIFICACAO = ["sdr", "closer", "cs_farmer"] as const;
+export type PerfilGamificacao = (typeof PERFIS_GAMIFICACAO)[number];
+
+export const ROTULO_PERFIL_GAMIFICACAO: Record<PerfilGamificacao, string> = {
+  sdr: "SDR",
+  closer: "Closer",
+  cs_farmer: "CS Farmer",
+};
+
 export const ROTULO_PAPEL: Record<Papel, string> = {
   admin: "Admin",
   gestor: "Gestor",
@@ -49,6 +59,44 @@ export const ROTULO_TIPO_TAREFA: Record<TipoTarefa, string> = {
   reuniao: "Reunião",
   email: "E-mail",
   outro: "Outro",
+};
+
+/**
+ * Resultado estruturado ao concluir (Evandro, 2026-10-01): ligação/WhatsApp e reunião/visita
+ * exigem um resultado pra concluir — e-mail/outro continuam concluindo sem exigir nada.
+ * Sem pontuação automática; serve só pra registrar o que realmente aconteceu.
+ */
+export const RESULTADOS_TAREFA = [
+  "contato_realizado",
+  "sem_resposta",
+  "numero_invalido",
+  "retornar_depois",
+  "sem_interesse",
+  "realizada",
+  "no_show",
+  "cancelada",
+] as const;
+export type ResultadoTarefa = (typeof RESULTADOS_TAREFA)[number];
+
+export const ROTULO_RESULTADO_TAREFA: Record<ResultadoTarefa, string> = {
+  contato_realizado: "Contato realizado",
+  sem_resposta: "Sem resposta",
+  numero_invalido: "Número inválido",
+  retornar_depois: "Retornar depois",
+  sem_interesse: "Sem interesse",
+  realizada: "Realizada",
+  no_show: "Não compareceu",
+  cancelada: "Cancelada",
+};
+
+/** Resultados válidos por tipo de tarefa — null = tipo não exige resultado pra concluir. */
+export const RESULTADOS_POR_TIPO_TAREFA: Record<TipoTarefa, readonly ResultadoTarefa[] | null> = {
+  ligacao: ["contato_realizado", "sem_resposta", "numero_invalido", "retornar_depois", "sem_interesse"],
+  whatsapp: ["contato_realizado", "sem_resposta", "numero_invalido", "retornar_depois", "sem_interesse"],
+  reuniao: ["realizada", "no_show", "cancelada"],
+  visita: ["realizada", "no_show", "cancelada"],
+  email: null,
+  outro: null,
 };
 
 /** Campos que o admin pode exigir para um negócio entrar numa etapa (mesma lista do banco). */
@@ -126,6 +174,16 @@ export const ROTULO_STATUS_CONTRATO: Record<StatusContrato, string> = {
   rascunho: "Rascunho",
   aguardando_assinatura: "Aguardando assinatura",
   assinado: "Assinado",
+};
+
+/** Calculado por `status_pagamento_contrato()` — não existe coluna de status, ver migration. */
+export const STATUS_PAGAMENTO_CONTRATO = ["pendente", "confirmado", "estornado"] as const;
+export type StatusPagamentoContrato = (typeof STATUS_PAGAMENTO_CONTRATO)[number];
+
+export const ROTULO_STATUS_PAGAMENTO_CONTRATO: Record<StatusPagamentoContrato, string> = {
+  pendente: "Aguardando confirmação do pagamento",
+  confirmado: "Pagamento confirmado",
+  estornado: "Confirmação de pagamento estornada",
 };
 
 export const MODOS_PRECO = ["sem_preco", "parcelado", "avista", "completo"] as const;

@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { Cartao } from "@/components/ui";
+import { calcularNivel } from "@/lib/gamificacao";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
+import { ROTULO_PERFIL_GAMIFICACAO, type PerfilGamificacao } from "@/lib/tipos";
 
 const PERIODOS = [
   { chave: "semana", rotulo: "Semana" },
@@ -9,6 +11,11 @@ const PERIODOS = [
   { chave: "geral", rotulo: "Geral" },
 ] as const;
 type Periodo = (typeof PERIODOS)[number]["chave"];
+
+// Ranking é sempre separado por perfil (decisão do Evandro, 2026-10-01): sem
+// mistura por padrão. cs_farmer ainda não tem gente nesse perfil — fica de
+// fora das abas até existir uso real.
+const PERFIS_RANKING = ["sdr", "closer"] as const satisfies readonly PerfilGamificacao[];
 
 function calcularDesde(periodo: Periodo): string | null {
   const agora = new Date();
@@ -25,20 +32,30 @@ function calcularDesde(periodo: Periodo): string | null {
 
 const MEDALHAS = ["🥇", "🥈", "🥉"];
 
-export default async function Ranking({ searchParams }: { searchParams: Promise<{ periodo?: string }> }) {
+export default async function Ranking({ searchParams }: { searchParams: Promise<{ periodo?: string; perfil?: string }> }) {
   const { atual } = await exigirPapel();
-  const { periodo: periodoParam } = await searchParams;
+  const { periodo: periodoParam, perfil: perfilParam } = await searchParams;
   const periodo = (PERIODOS.some((p) => p.chave === periodoParam) ? periodoParam : "mes") as Periodo;
+  // Minha aba por padrão (sdr/closer); sem perfil (admin/gestor, que só visualiza, não compete)
+  // ou com perfil sem aba própria ainda (ex.: cs_farmer, sem gente usando hoje), cai na primeira.
+  const meuPerfilTemAba = PERFIS_RANKING.includes(atual.perfilGamificacao as (typeof PERFIS_RANKING)[number]);
+  const perfil = (
+    PERFIS_RANKING.includes(perfilParam as (typeof PERFIS_RANKING)[number])
+      ? perfilParam
+      : meuPerfilTemAba
+        ? atual.perfilGamificacao
+        : PERFIS_RANKING[0]
+  ) as (typeof PERFIS_RANKING)[number];
   const supabase = await criarClienteServidor();
 
   const [{ data: pontos }, { data: membros }, { data: niveis }] = await Promise.all([
-    supabase.rpc("ranking_gamificacao", { p_empresa_id: atual.empresaId, p_desde: calcularDesde(periodo) ?? undefined }),
+    supabase.rpc("ranking_gamificacao", { p_empresa_id: atual.empresaId, p_perfil: perfil, p_desde: calcularDesde(periodo) ?? undefined }),
     supabase
       .from("empresa_membros")
       .select("id, ativo, perfis(nome, email)")
       .eq("empresa_id", atual.empresaId)
       .eq("ativo", true),
-    supabase.from("niveis_gamificacao").select("nivel, nome, xp_minimo").eq("empresa_id", atual.empresaId).order("xp_minimo"),
+    supabase.from("niveis_gamificacao").select("nivel, nome, xp_minimo").eq("empresa_id", atual.empresaId).eq("ativa", true).order("xp_minimo"),
   ]);
 
   const nomes = new Map(
@@ -48,31 +65,54 @@ export default async function Ranking({ searchParams }: { searchParams: Promise<
     }),
   );
 
-  function nivelPara(totalXp: number) {
-    let resultado: { nivel: number; nome: string | null } = { nivel: 1, nome: null };
-    for (const n of niveis ?? []) {
-      if (n.xp_minimo <= totalXp) resultado = { nivel: n.nivel, nome: n.nome };
-      else break;
-    }
-    return resultado;
+  // Nível exibido no ranking é sempre o nível real da pessoa (XP ativo da
+  // vida toda), nunca o total filtrado por perfil/período usado só pra
+  // ordenar o ranking — mesma fonte única (calcularNivel) de jornada/
+  // dashboard/início, pra não voltar a mostrar nível diferente em cada tela.
+  const membroIds = (pontos ?? []).map((l) => l.membro_id);
+  const { data: xpGlobalLinhas } = membroIds.length
+    ? await supabase.from("point_ledger").select("membro_id, xp").eq("empresa_id", atual.empresaId).eq("estornado", false).in("membro_id", membroIds)
+    : { data: [] as { membro_id: string; xp: number }[] };
+  const xpGlobalPorMembro = new Map<string, number>();
+  for (const l of xpGlobalLinhas ?? []) {
+    xpGlobalPorMembro.set(l.membro_id, (xpGlobalPorMembro.get(l.membro_id) ?? 0) + l.xp);
   }
+  const niveisNormalizados = (niveis ?? []).map((n) => ({ nivel: n.nivel, nome: n.nome, xpMinimo: n.xp_minimo }));
 
   const linhas = (pontos ?? [])
     .filter((l) => nomes.has(l.membro_id))
-    .map((l) => ({ membroId: l.membro_id, nome: nomes.get(l.membro_id)!, total: l.total_pontos, nivel: nivelPara(l.total_pontos) }));
+    .map((l) => ({
+      membroId: l.membro_id,
+      nome: nomes.get(l.membro_id)!,
+      total: l.total_xp,
+      nivel: calcularNivel(niveisNormalizados, xpGlobalPorMembro.get(l.membro_id) ?? 0),
+    }));
 
   const maiorTotal = Math.max(1, ...linhas.map((l) => l.total));
   const podio = linhas.slice(0, 3);
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-semibold text-zinc-900">Ranking</h1>
+        <div className="flex gap-1 rounded-lg bg-zinc-100 p-1">
+          {PERFIS_RANKING.map((p) => (
+            <Link
+              key={p}
+              href={`/gamificacao/ranking?periodo=${periodo}&perfil=${p}`}
+              className={`rounded-md px-3 py-1 text-sm transition-colors ${
+                perfil === p ? "bg-white font-medium text-zinc-900 shadow-sm" : "text-zinc-600 hover:text-zinc-900"
+              }`}
+            >
+              {ROTULO_PERFIL_GAMIFICACAO[p]}
+            </Link>
+          ))}
+        </div>
         <div className="flex gap-1 rounded-lg bg-zinc-100 p-1">
           {PERIODOS.map((p) => (
             <Link
               key={p.chave}
-              href={`/gamificacao/ranking?periodo=${p.chave}`}
+              href={`/gamificacao/ranking?periodo=${p.chave}&perfil=${perfil}`}
               className={`rounded-md px-3 py-1 text-sm transition-colors ${
                 periodo === p.chave ? "bg-white font-medium text-zinc-900 shadow-sm" : "text-zinc-600 hover:text-zinc-900"
               }`}
@@ -82,6 +122,9 @@ export default async function Ranking({ searchParams }: { searchParams: Promise<
           ))}
         </div>
       </div>
+      {!atual.perfilGamificacao && (
+        <p className="text-xs text-zinc-500">Você não compete no ranking comercial (sem perfil de gamificação) — só está visualizando.</p>
+      )}
 
       {!linhas.length && (
         <Cartao>
@@ -106,7 +149,7 @@ export default async function Ranking({ searchParams }: { searchParams: Promise<
                   <span className="text-xs text-zinc-500">
                     {linha.nivel.nome ? `${linha.nivel.nome} · ` : ""}nível {linha.nivel.nivel}
                   </span>
-                  <span className="text-sm font-semibold text-dourado">{linha.total.toLocaleString("pt-BR")} pts</span>
+                  <span className="text-sm font-semibold text-dourado">{linha.total.toLocaleString("pt-BR")} XP</span>
                 </div>
               ) : (
                 <div key={i} />
@@ -125,7 +168,7 @@ export default async function Ranking({ searchParams }: { searchParams: Promise<
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <div className="flex items-baseline justify-between gap-2">
                     <span className="truncate text-sm font-medium text-zinc-900">{linha.nome}</span>
-                    <span className="shrink-0 text-sm font-semibold text-zinc-900">{linha.total.toLocaleString("pt-BR")} pts</span>
+                    <span className="shrink-0 text-sm font-semibold text-zinc-900">{linha.total.toLocaleString("pt-BR")} XP</span>
                   </div>
                   <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
                     <div className="h-full rounded-full bg-dourado" style={{ width: `${Math.max(4, (linha.total / maiorTotal) * 100)}%` }} />
