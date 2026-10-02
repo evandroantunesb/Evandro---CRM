@@ -78,7 +78,9 @@ async function reabrirNegocio(negocioId: string) {
 }
 
 async function criarRecompensa(custoMoedas: number, extra: Record<string, unknown> = {}) {
-  const { data, error } = await servico
+  // Insere via admin autenticado (RLS), não service_role — mesmo caminho de escrita que
+  // produção usa (recompensas revoga insert/update/delete de service_role).
+  const { data, error } = await admin.cliente
     .from("recompensas")
     .insert({ empresa_id: empresa, nome: `Recompensa ${sufixo}-${Math.random()}`, custo_moedas: custoMoedas, ...extra })
     .select("id")

@@ -16,7 +16,13 @@ export default async function ExtratoDePontos() {
 
   const ativos = (lancamentos ?? []).filter((l) => !l.estornado);
   const totalXp = ativos.reduce((soma, l) => soma + l.xp, 0);
-  const totalMoedas = ativos.reduce((soma, l) => soma + l.moedas, 0);
+  // Saldo real pode ficar negativo (moedas já gastas cuja origem foi revertida depois —
+  // estado válido, nunca corrigido artificialmente). Mesma semântica de exibição da Loja:
+  // nunca mostrar o número negativo bruto, só "0 disponíveis" + o ajuste separado. O
+  // ledger (e os lançamentos individuais abaixo) continuam mostrando os valores reais.
+  const saldoMoedasReal = ativos.reduce((soma, l) => soma + l.moedas, 0);
+  const totalMoedas = Math.max(saldoMoedasReal, 0);
+  const ajusteNegativo = saldoMoedasReal < 0 ? -saldoMoedasReal : 0;
 
   function valor(n: number, estornado: boolean) {
     if (n === 0) return null;
@@ -37,6 +43,9 @@ export default async function ExtratoDePontos() {
         </Cartao>
         <Cartao titulo="Saldo de moedas">
           <p className="text-3xl font-semibold text-zinc-900">{totalMoedas.toLocaleString("pt-BR")}</p>
+          {ajusteNegativo > 0 && (
+            <p className="text-sm text-zinc-500">{ajusteNegativo.toLocaleString("pt-BR")} moedas em ajuste</p>
+          )}
         </Cartao>
       </div>
       <Cartao titulo={`Lançamentos (${lancamentos?.length ?? 0})`}>
