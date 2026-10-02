@@ -3132,7 +3132,13 @@ export type Database = {
         };
       };
       contar_marco_membro: {
-        Args: { p_ativa_desde: string; p_empresa_id: string; p_marco: string; p_membro_id: string };
+        Args: {
+          p_ativa_desde: string;
+          p_empresa_id: string;
+          p_marco: string;
+          p_membro_id: string;
+          p_perfil_requerido?: Database["public"]["Enums"]["perfil_gamificacao"] | null;
+        };
         Returns: number;
       };
       decidir_atribuicao_lead: {

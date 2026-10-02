@@ -22,6 +22,7 @@ let funil: string;
 let etapaInicial: string;
 let etapaNegociacao: string;
 let contato: string;
+let equipeId: string;
 
 beforeAll(async () => {
   [sdr1, closer, closer2, gestor, admin] = await Promise.all(
@@ -50,11 +51,12 @@ beforeAll(async () => {
   await servico.from("etapas").update({ marca_negociacao: true }).eq("id", etapaNegociacao);
 
   const { data: equipe } = await servico.from("equipes").insert({ empresa_id: empresa, nome: "Equipe conquistas marco" }).select("id").single();
+  equipeId = equipe!.id;
   await servico.from("equipe_membros").insert([
-    { empresa_id: empresa, equipe_id: equipe!.id, membro_id: membro[gestor.id], e_gestor: true },
-    { empresa_id: empresa, equipe_id: equipe!.id, membro_id: membro[closer.id], e_gestor: false },
-    { empresa_id: empresa, equipe_id: equipe!.id, membro_id: membro[closer2.id], e_gestor: false },
-    { empresa_id: empresa, equipe_id: equipe!.id, membro_id: membro[sdr1.id], e_gestor: false },
+    { empresa_id: empresa, equipe_id: equipeId, membro_id: membro[gestor.id], e_gestor: true },
+    { empresa_id: empresa, equipe_id: equipeId, membro_id: membro[closer.id], e_gestor: false },
+    { empresa_id: empresa, equipe_id: equipeId, membro_id: membro[closer2.id], e_gestor: false },
+    { empresa_id: empresa, equipe_id: equipeId, membro_id: membro[sdr1.id], e_gestor: false },
   ]);
 
   const { data: c } = await servico.from("contatos").insert({ empresa_id: empresa, nome: "Cliente conquistas marco", telefone: "45999990000" }).select("id").single();
@@ -133,6 +135,39 @@ async function criarConquistaMarco(opts: {
 async function desbloqueada(conquistaId: string, membroId: string) {
   const { data } = await servico.from("conquistas_desbloqueadas").select("id").eq("conquista_id", conquistaId).eq("membro_id", membroId).maybeSingle();
   return data !== null;
+}
+
+async function confirmarPagamento(contratoId: string) {
+  const { error } = await gestor.cliente.rpc("confirmar_pagamento", { p_contrato_id: contratoId });
+  if (error) throw error;
+}
+
+async function estornarPagamento(contratoId: string, motivo = "estorno de teste") {
+  const { error } = await gestor.cliente.rpc("estornar_confirmacao_pagamento", { p_contrato_id: contratoId, p_motivo: motivo });
+  if (error) throw error;
+}
+
+async function contarMarco(marco: string, membroId: string, perfilRequerido: "sdr" | "closer" | "cs_farmer" | null = null) {
+  const { data, error } = await admin.cliente.rpc("contar_marco_membro", {
+    p_marco: marco,
+    p_empresa_id: empresa,
+    p_membro_id: membroId,
+    p_ativa_desde: "1970-01-01T00:00:00Z",
+    p_perfil_requerido: perfilRequerido,
+  });
+  if (error) throw error;
+  return data as number;
+}
+
+async function adicionarMembroEquipe(userId: string, papel: "admin" | "gestor" | "vendedor" | "sdr", perfilGamificacao: "sdr" | "closer" | "cs_farmer") {
+  const { data, error } = await servico
+    .from("empresa_membros")
+    .insert({ empresa_id: empresa, user_id: userId, papel, perfil_gamificacao: perfilGamificacao })
+    .select("id")
+    .single();
+  if (error) throw error;
+  await servico.from("equipe_membros").insert({ empresa_id: empresa, equipe_id: equipeId, membro_id: data!.id, e_gestor: false });
+  return data!.id as string;
 }
 
 describe("marco_contagem: atribuição causal, nunca o responsável atual", () => {
@@ -266,6 +301,245 @@ describe("marco_contagem: deduplicação e idempotência", () => {
 
     const { data } = await servico.from("conquistas_desbloqueadas").select("id").eq("conquista_id", conquistaId).eq("membro_id", membro[closer.id]);
     expect(data).toHaveLength(1);
+  });
+});
+
+describe("marco_contagem: pagamento.confirmado — reocorrência e permanência (sem contar dobrado o mesmo contrato)", () => {
+  it("pagamento confirmado conta 1 pro responsável congelado na assinatura", async () => {
+    const negocioId = await criarNegocio("Pagamento conta 1", membro[closer.id]);
+    const contratoId = await criarEAssinarContrato(negocioId, closer.cliente);
+    await confirmarPagamento(contratoId);
+    expect(await contarMarco("pagamento.confirmado", membro[closer.id])).toBe(1);
+  });
+
+  it("pagamento confirmado → estornado: deixa de contar pra avaliação futura (estado ao vivo)", async () => {
+    const negocioId = await criarNegocio("Pagamento estornado", membro[closer.id]);
+    const contratoId = await criarEAssinarContrato(negocioId, closer.cliente);
+    await confirmarPagamento(contratoId);
+    expect(await contarMarco("pagamento.confirmado", membro[closer.id])).toBe(1);
+
+    await estornarPagamento(contratoId);
+    expect(await contarMarco("pagamento.confirmado", membro[closer.id])).toBe(0);
+  });
+
+  it("confirmado → estornado → reconfirmado: o mesmo contrato continua valendo só 1, nunca 2", async () => {
+    const negocioId = await criarNegocio("Pagamento reconfirmado", membro[closer.id]);
+    const contratoId = await criarEAssinarContrato(negocioId, closer.cliente);
+
+    await confirmarPagamento(contratoId);
+    await estornarPagamento(contratoId);
+    await confirmarPagamento(contratoId);
+
+    expect(await contarMarco("pagamento.confirmado", membro[closer.id])).toBe(1);
+  });
+
+  it("múltiplos ciclos de confirma/estorna no mesmo contrato nunca fazem ele valer mais de 1", async () => {
+    const negocioId = await criarNegocio("Pagamento múltiplos ciclos", membro[closer.id]);
+    const contratoId = await criarEAssinarContrato(negocioId, closer.cliente);
+
+    for (let i = 0; i < 3; i++) {
+      await confirmarPagamento(contratoId);
+      await estornarPagamento(contratoId);
+    }
+    await confirmarPagamento(contratoId);
+
+    expect(await contarMarco("pagamento.confirmado", membro[closer.id])).toBe(1);
+  });
+
+  it("conquista já desbloqueada permanece desbloqueada mesmo depois do pagamento ser estornado", async () => {
+    const conquistaId = await criarConquistaMarco({ nome: "Permanece após estorno", marco: "pagamento.confirmado", valor: 1 });
+    const negocioId = await criarNegocio("Pagamento permanência", membro[closer.id]);
+    const contratoId = await criarEAssinarContrato(negocioId, closer.cliente);
+
+    await confirmarPagamento(contratoId);
+    expect(await desbloqueada(conquistaId, membro[closer.id])).toBe(true);
+
+    await estornarPagamento(contratoId);
+    expect(await desbloqueada(conquistaId, membro[closer.id])).toBe(true); // permanece, nunca é revogada
+  });
+});
+
+describe("marco_contagem: bônus da conquista é XP-only (sem cascata por xp_acumulado)", () => {
+  it("o bônus de uma conquista marco_contagem não é somado por avaliar_conquistas_pontos() e não desbloqueia conquista xp_acumulado sozinho", async () => {
+    const { data: conquistaXp } = await admin.cliente
+      .from("conquistas")
+      .insert({ empresa_id: empresa, nome: "XP acumulado (sem cascata)", criterio: { metrica: "xp_acumulado", valor: 50 }, xp_bonus: 0 })
+      .select("id")
+      .single();
+
+    const conquistaMarcoId = await criarConquistaMarco({ nome: "Contrato (bônus 50)", marco: "contrato.assinado", valor: 1, xpBonus: 50 });
+    const negocioId = await criarNegocio("Bônus sem cascata", membro[closer2.id]);
+    await criarEAssinarContrato(negocioId, closer2.cliente);
+
+    expect(await desbloqueada(conquistaMarcoId, membro[closer2.id])).toBe(true);
+    // O bônus de 50 XP foi lançado, mas referencia_tipo='conquista' é excluído da soma que
+    // avalia conquistas xp_acumulado (avaliar_conquistas_pontos()) — sem essa exclusão, os
+    // mesmos 50 XP destravariam "XP acumulado (sem cascata)" nesse mesmo instante.
+    expect(await desbloqueada(conquistaXp!.id, membro[closer2.id])).toBe(false);
+  });
+});
+
+describe("marco_contagem: desbloqueio duplicado não duplica conquista nem notificação", () => {
+  it("um 2º ciclo do marco após já desbloqueado não cria 2ª conquista nem 2ª notificação (a 1ª notificação sai no 1º desbloqueio)", async () => {
+    const conquistaId = await criarConquistaMarco({ nome: "Pagamento confirmado (dedup)", marco: "pagamento.confirmado", valor: 1, xpBonus: 5 });
+    const negocioId = await criarNegocio("Pagamento dedup", membro[closer.id]);
+    const contratoId = await criarEAssinarContrato(negocioId, closer.cliente);
+
+    await confirmarPagamento(contratoId);
+    expect(await desbloqueada(conquistaId, membro[closer.id])).toBe(true);
+
+    const { data: notifsAntes } = await servico
+      .from("notificacoes")
+      .select("id")
+      .eq("membro_id", membro[closer.id])
+      .eq("tipo", "conquista_desbloqueada")
+      .eq("mensagem", "Nova conquista desbloqueada: Pagamento confirmado (dedup)");
+    expect(notifsAntes).toHaveLength(1); // criada já no 1º desbloqueio
+
+    // Novo ciclo no mesmo contrato: reavalia a conquista, que já está desbloqueada.
+    await estornarPagamento(contratoId);
+    await confirmarPagamento(contratoId);
+
+    const { data: desbloqueios } = await servico
+      .from("conquistas_desbloqueadas")
+      .select("id")
+      .eq("conquista_id", conquistaId)
+      .eq("membro_id", membro[closer.id]);
+    expect(desbloqueios).toHaveLength(1); // nunca uma 2ª conquista
+
+    const { data: notifsDepois } = await servico
+      .from("notificacoes")
+      .select("id")
+      .eq("membro_id", membro[closer.id])
+      .eq("tipo", "conquista_desbloqueada")
+      .eq("mensagem", "Nova conquista desbloqueada: Pagamento confirmado (dedup)");
+    expect(notifsDepois).toHaveLength(1); // nunca uma 2ª notificação
+  });
+});
+
+describe("marco_contagem: concorrência", () => {
+  it("duas assinaturas concorrentes cruzando o limiar ao mesmo tempo não duplicam desbloqueio/bônus/notificação, e nenhuma emissão aborta", async () => {
+    // Concorrência real (não simulada): dois requests HTTP paralelos ao Postgrest, cada um
+    // sua própria transação no Postgres — mesmo padrão já usado em
+    // gamificacao-niveis-conquistas.test.ts. A proteção é a constraint UNIQUE
+    // (conquista_id, membro_id) + ON CONFLICT DO NOTHING no insert de
+    // conquistas_desbloqueadas, nunca lock aplicacional.
+    const conquistaId = await criarConquistaMarco({ nome: "Concorrência contrato", marco: "contrato.assinado", valor: 1, xpBonus: 3 });
+    const negocioA = await criarNegocio("Concorrência A", membro[closer2.id]);
+    const negocioB = await criarNegocio("Concorrência B", membro[closer2.id]);
+    const { data: contratoA } = await closer2.cliente.from("contratos").insert({ empresa_id: empresa, negocio_id: negocioA, conteudo: "x" }).select("id").single();
+    const { data: contratoB } = await closer2.cliente.from("contratos").insert({ empresa_id: empresa, negocio_id: negocioB, conteudo: "x" }).select("id").single();
+
+    const resultados = await Promise.all([
+      closer2.cliente.from("contratos").update({ status: "assinado" }).eq("id", contratoA!.id),
+      closer2.cliente.from("contratos").update({ status: "assinado" }).eq("id", contratoB!.id),
+    ]);
+    expect(resultados.every((r) => r.error === null)).toBe(true); // nenhuma das duas emissões abortou a transação comercial
+
+    const { data: desbloqueios } = await servico.from("conquistas_desbloqueadas").select("id").eq("conquista_id", conquistaId).eq("membro_id", membro[closer2.id]);
+    expect(desbloqueios).toHaveLength(1);
+
+    const { data: bonus } = await servico
+      .from("point_ledger")
+      .select("id")
+      .eq("referencia_tipo", "conquista")
+      .eq("referencia_id", conquistaId)
+      .eq("membro_id", membro[closer2.id]);
+    expect(bonus).toHaveLength(1);
+
+    const { data: notifs } = await servico
+      .from("notificacoes")
+      .select("id")
+      .eq("membro_id", membro[closer2.id])
+      .eq("tipo", "conquista_desbloqueada")
+      .eq("mensagem", "Nova conquista desbloqueada: Concorrência contrato");
+    expect(notifs).toHaveLength(1);
+  });
+});
+
+describe("marco_contagem: perfil por ocorrência (causal/congelado), nunca o perfil atual do membro", () => {
+  it("mudança de perfil sdr → closer não mistura ocorrências históricas: 8 como sdr, 2 como closer, nunca 10", async () => {
+    const sdrTroca = await criarUsuario("cm-sdr-troca");
+    const membroTroca = await adicionarMembroEquipe(sdrTroca.id, "sdr", "sdr");
+    membro[sdrTroca.id] = membroTroca;
+
+    for (let i = 0; i < 8; i++) {
+      const negocioId = await criarNegocio(`Oportunidade sdr ${i}`, membroTroca);
+      await enviarEAceitar(negocioId, sdrTroca, closer);
+      await marcarStatus(negocioId, "ganho", closer.cliente);
+    }
+    expect(await contarMarco("handoff.won", membroTroca, "sdr")).toBe(8);
+    expect(await contarMarco("handoff.won", membroTroca, "closer")).toBe(0);
+    expect(await contarMarco("handoff.won", membroTroca, null)).toBe(8);
+
+    // Promove o membro a closer — não reinterpreta as 8 ocorrências antigas como closer.
+    await servico.from("empresa_membros").update({ perfil_gamificacao: "closer" }).eq("id", membroTroca);
+
+    for (let i = 0; i < 2; i++) {
+      const negocioId = await criarNegocio(`Oportunidade closer ${i}`, membroTroca);
+      await enviarEAceitar(negocioId, sdrTroca, closer2);
+      await marcarStatus(negocioId, "ganho", closer2.cliente);
+    }
+    expect(await contarMarco("handoff.won", membroTroca, "sdr")).toBe(8); // histórico sdr intacto
+    expect(await contarMarco("handoff.won", membroTroca, "closer")).toBe(2); // nunca 10
+    expect(await contarMarco("handoff.won", membroTroca, null)).toBe(10); // geral soma tudo
+
+    const conquistaAlta = await criarConquistaMarco({
+      nome: "10 handoffs como closer",
+      marco: "handoff.won",
+      valor: 10,
+      perfilAplicavel: "closer",
+      ativaDesde: "1970-01-01T00:00:00Z",
+    });
+    const conquistaBaixa = await criarConquistaMarco({
+      nome: "2 handoffs como closer",
+      marco: "handoff.won",
+      valor: 2,
+      perfilAplicavel: "closer",
+      ativaDesde: "1970-01-01T00:00:00Z",
+    });
+
+    // Gatilho: um novo evento do marco reavalia as conquistas pro membro.
+    const negocioGatilho = await criarNegocio("Gatilho reavaliação closer", membroTroca);
+    await enviarEAceitar(negocioGatilho, sdrTroca, closer2);
+    await marcarStatus(negocioGatilho, "ganho", closer2.cliente);
+
+    expect(await desbloqueada(conquistaAlta, membroTroca)).toBe(false); // 3/10 como closer, nunca 10/10 (nunca soma as 8 sdr)
+    expect(await desbloqueada(conquistaBaixa, membroTroca)).toBe(true); // 3/2 como closer já desbloqueia
+  });
+
+  it("alterar perfil_aplicavel de uma conquista existente não reaproveita ocorrências causais de outro perfil", async () => {
+    const sdrTroca2 = await criarUsuario("cm-sdr-troca2");
+    const membroTroca2 = await adicionarMembroEquipe(sdrTroca2.id, "sdr", "sdr");
+    membro[sdrTroca2.id] = membroTroca2;
+
+    for (let i = 0; i < 3; i++) {
+      const negocioId = await criarNegocio(`Perfil sdr ${i}`, membroTroca2);
+      await enviarEAceitar(negocioId, sdrTroca2, closer);
+      await marcarStatus(negocioId, "ganho", closer.cliente);
+    }
+    await servico.from("empresa_membros").update({ perfil_gamificacao: "closer" }).eq("id", membroTroca2);
+    for (let i = 0; i < 2; i++) {
+      const negocioId = await criarNegocio(`Perfil closer ${i}`, membroTroca2);
+      await enviarEAceitar(negocioId, sdrTroca2, closer2);
+      await marcarStatus(negocioId, "ganho", closer2.cliente);
+    }
+
+    // Conquista nasce sem filtro de perfil (geral): 5 ocorrências (3 sdr + 2 closer).
+    const conquistaId = await criarConquistaMarco({
+      nome: "Perfil trocado depois de criada",
+      marco: "handoff.won",
+      valor: 1000, // nunca alcançável — só pra existir sem desbloquear ainda
+      ativaDesde: "1970-01-01T00:00:00Z",
+    });
+
+    // Edição administrativa: muda perfil_aplicavel pra 'closer' depois dos fatos já existirem.
+    await admin.cliente.from("conquistas").update({ perfil_aplicavel: "closer" }).eq("id", conquistaId);
+
+    // A contagem causal pro perfil 'closer' é recalculada do zero a partir do dado
+    // congelado de cada ocorrência — nunca herda ou soma as 3 ocorrências 'sdr' antigas.
+    expect(await contarMarco("handoff.won", membroTroca2, "closer")).toBe(2);
+    expect(await contarMarco("handoff.won", membroTroca2, "sdr")).toBe(3); // histórico sdr continua intacto e separado
   });
 });
 

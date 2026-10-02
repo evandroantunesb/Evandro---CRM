@@ -15,11 +15,13 @@
 -- reaberto/reassinado/reconfirmado). `contrato.assinado` lê `contratos.status` direto
 -- (já committed antes do `eventos` ser inserido, dentro do mesmo AFTER UPDATE trigger);
 -- `deal.won`/`handoff.won`/`pagamento.confirmado` usam o par de eventos mais recente por
--- entidade (nunca a tabela satélite `confirmacoes_pagamento`, que só é gravada DEPOIS do
--- insert em `eventos` dentro de `confirmar_pagamento()` — ainda não existiria no instante
--- em que este gatilho roda). Reunião e visita realizadas ficam de fora até a PR #109
--- (`tarefas.resultado`) mesclar — não há fonte causal aceitável hoje sem usar
--- `task.completed` genérico, que o Evandro vetou explicitamente como workaround.
+-- entidade — NUNCA a tabela satélite `confirmacoes_pagamento`: ela só é gravada DEPOIS do
+-- insert em `eventos` dentro de `confirmar_pagamento()` (mesma transação, instrução
+-- seguinte), então ainda não existiria no instante em que este gatilho roda (achado da
+-- 1ª rodada de CI desta PR — `pagamento.confirmado` lia essa tabela antes e sempre via 0).
+-- Reunião e visita realizadas ficam de fora até a PR #109 (`tarefas.resultado`) mesclar —
+-- não há fonte causal aceitável hoje sem usar `task.completed` genérico, que o Evandro
+-- vetou explicitamente como workaround.
 --
 -- Atribuição (beneficiário) é sempre a fonte causal/congelada no momento da transição,
 -- nunca o responsável atual do negócio (que pode mudar depois por redistribuição):
@@ -29,8 +31,9 @@
 --   - contrato.assinado: `ator_id` do evento, que já vem do `responsavel_assinatura_id`
 --     congelado na assinatura (ver `20261001250000_gamificacao_pagamento_confirmado.sql`).
 --   - handoff.won: `beneficiario_id` do evento (o SDR de origem), já congelado.
---   - pagamento.confirmado: `confirmacoes_pagamento.beneficiario_membro_id`, já
---     congelado na assinatura do contrato (nunca o responsável atual).
+--   - pagamento.confirmado: `beneficiario_id` do evento mais recente do par
+--     pagamento.confirmado/pagamento.confirmacao_estornada (mesma fonte usada pra contar o
+--     estado ao vivo — ver nota acima; nunca `confirmacoes_pagamento` nem o responsável atual).
 --   - deal.won: EXCEÇÃO. `ator_id` aqui é só quem clicou pra mudar o status (pode ser um
 --     gestor fechando em nome de alguém, ou a etapa fechando automaticamente) — não é
 --     fonte segura de crédito. A fonte causal correta é `payload->>'responsavel_id'`
@@ -38,9 +41,22 @@
 --     `empresa_membros.id`, não um `auth.users.id` como os demais ator_id/beneficiario_id)
 --     — nunca o `negocios.responsavel_id` atual, que pode ter sido reatribuído depois.
 --
--- Perfil aplicável usa o mesmo princípio: `profile_at_event` quando o evento já o grava
--- congelado (só `handoff.won` hoje), senão o perfil atual do membro (igual ao que
--- `aplicar_regras_gamificacao()` já faz pros eventos imediatos).
+-- Perfil aplicável (auditoria 2026-10-02, item 9): cada OCORRÊNCIA contada precisa do seu
+-- próprio perfil causal/congelado — nunca o perfil atual do membro aplicado
+-- retroativamente ao histórico. Exemplo que motivou a correção: membro tem 8 ocorrências
+-- congeladas como sdr, muda de perfil, produz 2 ocorrências como closer; uma conquista
+-- `perfil_aplicavel=closer, quantidade=10` deve marcar 2/10, nunca 10/10. Hoje só
+-- `handoff.won` grava `profile_at_event` por ocorrência (congelado no aceite do handoff) —
+-- pra esse marco, `contar_marco_membro()` filtra cada ocorrência pelo seu próprio
+-- `profile_at_event`. Os outros 5 marcos (deal.qualified, deal.negotiation_started,
+-- contrato.assinado, deal.won, pagamento.confirmado) não têm perfil congelado por
+-- ocorrência hoje: pra eles, quando a conquista tem `perfil_aplicavel` não-nulo,
+-- `contar_marco_membro()` retorna sempre 0 (nunca desbloqueia) em vez de inventar
+-- atribuição usando o perfil atual do membro — comportamento conservador, documentado
+-- aqui porque é a limitação ativa, não um bug. Conquista com `perfil_aplicavel = null`
+-- continua contando geral, sem filtro. Mudar `perfil_aplicavel` de uma conquista depois de
+-- criada também não reinterpreta fatos antigos: a contagem é sempre recalculada do zero a
+-- partir do perfil congelado de cada ocorrência (ou de zero, pros marcos sem esse dado).
 --
 -- `ativa_desde` (retroatividade): sem desbloqueio retroativo automático — só eventos a
 -- partir de quando a conquista foi criada contam, tanto no desbloqueio marginal (gatilho)
@@ -142,7 +158,8 @@ create or replace function public.contar_marco_membro(
   p_marco text,
   p_empresa_id uuid,
   p_membro_id uuid,
-  p_ativa_desde timestamptz
+  p_ativa_desde timestamptz,
+  p_perfil_requerido public.perfil_gamificacao default null
 )
 returns integer
 language plpgsql security definer set search_path = ''
@@ -152,6 +169,16 @@ declare
   v_user_id uuid;
   v_count integer;
 begin
+  -- Perfil por ocorrência (auditoria 2026-10-02, item 9): só `handoff.won` grava
+  -- `profile_at_event` congelado por ocorrência. Pros outros 5 marcos não existe hoje
+  -- fonte causal de perfil por fato histórico — uma conquista com `perfil_aplicavel`
+  -- não-nulo nesses marcos nunca pode avançar, pra não inventar atribuição usando o
+  -- perfil atual do membro sobre fatos antigos (comportamento conservador deliberado,
+  -- ver comentário no topo do arquivo).
+  if p_perfil_requerido is not null and p_marco <> 'handoff.won' then
+    return 0;
+  end if;
+
   if p_marco in ('deal.qualified', 'deal.negotiation_started') then
     select user_id into v_user_id from public.empresa_membros where id = p_membro_id;
     if v_user_id is null then
@@ -197,16 +224,21 @@ begin
     if v_user_id is null then
       return 0;
     end if;
+    -- `profile_at_event` é o único perfil congelado por ocorrência hoje (ver topo do
+    -- arquivo) — filtra cada ocorrência pelo seu próprio perfil, nunca pelo perfil atual
+    -- do membro. Conquista muda `perfil_aplicavel` depois? A recontagem é sempre do zero
+    -- contra esse dado congelado, então nunca reinterpreta fatos de outro perfil.
     select count(*) into v_count
       from public.negocios n
       join lateral (
-        select e.beneficiario_id, e.created_at from public.eventos e
+        select e.beneficiario_id, e.profile_at_event, e.created_at from public.eventos e
         where e.empresa_id = p_empresa_id and e.tipo = 'handoff.won' and e.entidade_id = n.id
         order by e.created_at desc limit 1
       ) ult on true
       where n.empresa_id = p_empresa_id and n.status = 'ganho'
         and ult.beneficiario_id = v_user_id
-        and ult.created_at >= p_ativa_desde;
+        and ult.created_at >= p_ativa_desde
+        and (p_perfil_requerido is null or ult.profile_at_event = p_perfil_requerido);
     return coalesce(v_count, 0);
   end if;
 
@@ -255,7 +287,7 @@ declare
   v_membro_id uuid;
   v_user_id uuid;
   v_perfil_membro public.perfil_gamificacao;
-  v_perfil public.perfil_gamificacao;
+  v_perfil_evento public.perfil_gamificacao;
   v_conquista record;
   v_contagem integer;
   v_desbloqueio_id uuid;
@@ -287,7 +319,11 @@ begin
   end if;
 
   select perfil_gamificacao into v_perfil_membro from public.empresa_membros where id = v_membro_id;
-  v_perfil := coalesce(new.profile_at_event, v_perfil_membro);
+  -- Perfil deste evento específico, só usado pra registrar o bônus da conquista com o
+  -- perfil correto (contexto do fato que desbloqueou) — nunca pra filtrar quais
+  -- conquistas avaliar: isso é responsabilidade de `contar_marco_membro()`, que filtra
+  -- cada ocorrência contada pelo seu próprio perfil congelado (ver topo do arquivo).
+  v_perfil_evento := coalesce(new.profile_at_event, v_perfil_membro);
 
   for v_conquista in
     select * from public.conquistas
@@ -295,13 +331,12 @@ begin
       and ativa
       and criterio->>'metrica' = 'marco_contagem'
       and criterio->>'marco' = new.tipo
-      and (perfil_aplicavel is null or perfil_aplicavel = v_perfil)
       and not exists (
         select 1 from public.conquistas_desbloqueadas cd
         where cd.conquista_id = conquistas.id and cd.membro_id = v_membro_id
       )
   loop
-    v_contagem := public.contar_marco_membro(new.tipo, new.empresa_id, v_membro_id, v_conquista.ativa_desde);
+    v_contagem := public.contar_marco_membro(new.tipo, new.empresa_id, v_membro_id, v_conquista.ativa_desde, v_conquista.perfil_aplicavel);
     if v_contagem < (v_conquista.criterio->>'valor')::numeric then
       continue;
     end if;
@@ -317,7 +352,7 @@ begin
 
     if v_conquista.xp_bonus > 0 then
       insert into public.point_ledger (empresa_id, membro_id, descricao, referencia_tipo, referencia_id, xp, moedas, profile_at_event)
-        values (new.empresa_id, v_membro_id, 'Conquista: ' || v_conquista.nome, 'conquista', v_conquista.id, v_conquista.xp_bonus, 0, v_perfil);
+        values (new.empresa_id, v_membro_id, 'Conquista: ' || v_conquista.nome, 'conquista', v_conquista.id, v_conquista.xp_bonus, 0, v_perfil_evento);
     end if;
 
     insert into public.notificacoes (empresa_id, membro_id, tipo, mensagem, link)
