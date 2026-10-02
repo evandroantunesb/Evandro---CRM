@@ -5,6 +5,7 @@ export type Meta = {
   id: string;
   titulo: string;
   metrica: MetricaMeta;
+  empresaId: string;
   membroId: string;
   periodoInicio: string;
   periodoFim: string;
@@ -66,46 +67,24 @@ export function calcularProgresso(valorAlvo: number, realizado: number, periodoI
   };
 }
 
-/** Realizado de uma meta: consulta negócios/tarefas do colaborador no período, respeitando o RLS de sempre. */
+/**
+ * Realizado de uma meta: fonte 100% causal (`eventos`, insert-only), nunca o estado ao vivo
+ * de `negocios`/`tarefas` — o responsável/beneficiário usado é o CONGELADO no evento no
+ * momento do fato, nunca o responsável atual. Delegado à RPC `calcular_realizado_meta`
+ * (ver migration `20261002200000_metas_realizado_causal.sql` pras regras de cada métrica:
+ * Receita = modelo A (período do deal.won original); Conversão = só fechamento causal
+ * ativo). A RPC replica a mesma checagem de visibilidade da RLS de `metas`
+ * (`pode_ver_responsavel`), já que é `security definer`.
+ */
 export async function calcularRealizado(supabase: SupabaseServidor, meta: Meta) {
   const { inicioIso, fimExclusivoIso } = limitesPeriodo(meta.periodoInicio, meta.periodoFim);
-
-  if (meta.metrica === "receita" || meta.metrica === "negocios_ganhos") {
-    const { data } = await supabase
-      .from("negocios")
-      .select("valor")
-      .eq("responsavel_id", meta.membroId)
-      .eq("status", "ganho")
-      .gte("fechado_em", inicioIso)
-      .lt("fechado_em", fimExclusivoIso)
-      .limit(10000);
-    const linhas = data ?? [];
-    return meta.metrica === "receita" ? linhas.reduce((soma, n) => soma + (n.valor ?? 0), 0) : linhas.length;
-  }
-
-  if (meta.metrica === "conversao") {
-    const { data } = await supabase
-      .from("negocios")
-      .select("status")
-      .eq("responsavel_id", meta.membroId)
-      .in("status", ["ganho", "perdido"])
-      .gte("fechado_em", inicioIso)
-      .lt("fechado_em", fimExclusivoIso)
-      .limit(10000);
-    const linhas = data ?? [];
-    const ganhos = linhas.filter((n) => n.status === "ganho").length;
-    return linhas.length > 0 ? (ganhos / linhas.length) * 100 : 0;
-  }
-
-  // reunioes | tarefas_concluidas
-  let consulta = supabase
-    .from("tarefas")
-    .select("id", { count: "exact", head: true })
-    .eq("responsavel_id", meta.membroId)
-    .not("concluida_em", "is", null)
-    .gte("concluida_em", inicioIso)
-    .lt("concluida_em", fimExclusivoIso);
-  if (meta.metrica === "reunioes") consulta = consulta.eq("tipo", "reuniao");
-  const { count } = await consulta;
-  return count ?? 0;
+  const { data, error } = await supabase.rpc("calcular_realizado_meta", {
+    p_empresa_id: meta.empresaId,
+    p_membro_id: meta.membroId,
+    p_metrica: meta.metrica,
+    p_desde: inicioIso,
+    p_ate_exclusivo: fimExclusivoIso,
+  });
+  if (error) throw error;
+  return data ?? 0;
 }

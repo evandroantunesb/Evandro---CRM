@@ -3113,6 +3113,16 @@ export type Database = {
           visivel: boolean;
         }[];
       };
+      calcular_realizado_meta: {
+        Args: {
+          p_ate_exclusivo: string;
+          p_desde: string;
+          p_empresa_id: string;
+          p_membro_id: string;
+          p_metrica: Database["public"]["Enums"]["metrica_meta"];
+        };
+        Returns: number;
+      };
       compartilha_empresa: { Args: { p_user_id: string }; Returns: boolean };
       confirmar_pagamento: {
         Args: { p_contrato_id: string };
