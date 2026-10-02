@@ -34,14 +34,23 @@ export default async function LojaDeRecompensas() {
       .limit(50),
   ]);
 
-  const saldo = (lancamentos ?? []).reduce((soma, l) => soma + l.moedas, 0);
+  // Saldo real pode ficar negativo (moedas já gastas cuja origem foi revertida depois
+  // — decisão do Evandro: estado válido, nunca corrigido artificialmente). O resgate
+  // continua bloqueado com base no saldo REAL (via RPC); a exibição clampa em 0 e
+  // mostra o ajuste pendente separadamente, pra não parecer uma dívida financeira.
+  const saldoReal = (lancamentos ?? []).reduce((soma, l) => soma + l.moedas, 0);
+  const saldoExibido = Math.max(saldoReal, 0);
+  const ajusteNegativo = saldoReal < 0 ? -saldoReal : 0;
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4">
       <h1 className="text-2xl font-semibold text-zinc-900">Loja de recompensas</h1>
 
       <Cartao titulo="Seu saldo">
-        <p className="text-3xl font-semibold text-zinc-900">{saldo.toLocaleString("pt-BR")} moedas</p>
+        <p className="text-3xl font-semibold text-zinc-900">{saldoExibido.toLocaleString("pt-BR")} moedas</p>
+        {ajusteNegativo > 0 && (
+          <p className="text-sm text-zinc-500">{ajusteNegativo.toLocaleString("pt-BR")} moedas em ajuste</p>
+        )}
       </Cartao>
 
       <Cartao titulo="Recompensas disponíveis">
@@ -51,7 +60,7 @@ export default async function LojaDeRecompensas() {
             <CartaoRecompensa
               key={r.id}
               recompensa={{ id: r.id, nome: r.nome, descricao: r.descricao, custoMoedas: r.custo_moedas }}
-              saldo={saldo}
+              saldo={saldoReal}
             />
           ))}
         </div>
