@@ -20,7 +20,7 @@ import { redirect } from "next/navigation";
 import { ListaTarefas, type TarefaLista } from "@/components/lista-tarefas";
 import { Cartao, Selo } from "@/components/ui";
 import { carregarConfiguracao, formatarMoeda, inicioDoDia, tempoDesde } from "@/lib/crm";
-import { calcularNivel } from "@/lib/gamificacao";
+import { calcularNivel, responsavelCongeladoPorNegocio } from "@/lib/gamificacao";
 import { carregarLeadsParados } from "@/lib/leads-parados";
 import { carregarLeadsSemContato } from "@/lib/leads-sem-contato";
 import { calcularProgresso, calcularRealizado, type Meta } from "@/lib/metas";
@@ -162,9 +162,13 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
   if (pessoal) consultaFunilMes = consultaFunilMes.eq("responsavel_id", atual.membroId);
 
   // Ganhos recentes: só usado na visão de Equipe (gestor), pra saber de quem foi cada negócio fechado.
+  // Lista pelo estado vivo (status='ganho' só pode ser resultado do último fechamento causal
+  // ser deal.won — reabertura sempre passa por 'aberto' antes); a ATRIBUIÇÃO, porém, vem do
+  // responsável congelado no próprio evento deal.won (ver abaixo), nunca de negocios.responsavel_id
+  // ao vivo, que pode ter trocado depois do ganho.
   const consultaGanhosRecentes = supabase
     .from("negocios")
-    .select("id, numero, valor, fechado_em, responsavel_id, contatos(nome)")
+    .select("id, numero, valor, fechado_em, contatos(nome)")
     .eq("empresa_id", atual.empresaId)
     .eq("status", "ganho")
     .order("fechado_em", { ascending: false })
@@ -316,16 +320,35 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
   ];
 
   // Ganhos recentes: quem fechou cada um dos últimos negócios ganhos (visão de Equipe/gestor) -------------------
+  // Atribuição causal: o responsável congelado no próprio evento deal.won que tornou o
+  // negócio 'ganho' agora (nunca negocios.responsavel_id ao vivo, que pode ter trocado
+  // depois do ganho). Como o negócio só está com status='ganho' porque seu fechamento
+  // causal mais recente foi deal.won (reabertura sempre passa por 'aberto' antes de
+  // qualquer novo ganho), o deal.won mais recente desse negócio É o fechamento ativo —
+  // sem precisar da CTE completa de fechamentos usada em Metas/Comissões.
+  const idsGanhosRecentes = (ganhosRecentes ?? []).map((n) => n.id);
+  const { data: eventosGanhoRecente } = idsGanhosRecentes.length
+    ? await supabase
+        .from("eventos")
+        .select("entidade_id, payload, created_at")
+        .eq("empresa_id", atual.empresaId)
+        .eq("tipo", "deal.won")
+        .in("entidade_id", idsGanhosRecentes)
+        .order("created_at", { ascending: false })
+    : { data: [] as { entidade_id: string; payload: unknown; created_at: string }[] };
+  const mapaResponsavelCongelado = responsavelCongeladoPorNegocio(eventosGanhoRecente ?? []);
+
   const nomeMembro = new Map(config.membros.map((m) => [m.id, m.nome]));
   const listaGanhosRecentes = (ganhosRecentes ?? []).map((n) => {
     const contato = n.contatos as unknown as { nome: string } | null;
+    const responsavelId = mapaResponsavelCongelado.get(n.id) ?? null;
     return {
       id: n.id,
       numero: n.numero,
       contato: contato?.nome ?? "Sem contato",
       valor: n.valor,
       fechadoEm: n.fechado_em,
-      vendedor: n.responsavel_id ? (nomeMembro.get(n.responsavel_id) ?? "Ninguém") : "Ninguém",
+      vendedor: responsavelId ? (nomeMembro.get(responsavelId) ?? "Ninguém") : "Ninguém",
     };
   });
 

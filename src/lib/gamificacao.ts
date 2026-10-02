@@ -96,6 +96,28 @@ export type NivelGamificacao = { nivel: number; nome: string | null; xpMinimo: n
  * progressão pessoal: XP ativo (não estornado) acumulado da vida toda do
  * membro, nunca filtrado por perfil ou período.
  */
+/**
+ * Atribuição causal congelada dos ganhos (Evandro, 2026-10-02, fechamento da auditoria
+ * integrada): recebe eventos `deal.won` de um lote de negócios, já ordenados por
+ * `created_at` desc, e devolve o `responsavel_id` congelado no evento mais recente de
+ * cada negócio — nunca `negocios.responsavel_id` ao vivo, que pode ter trocado depois do
+ * ganho (`deal.owner_changed` não gera novo `deal.won`). Reabertura seguida de novo ganho
+ * é uma nova ocorrência de `deal.won`; como só entram aqui negócios com `status='ganho'`
+ * (cujo último fechamento causal só pode ter sido `deal.won`), o evento mais recente de
+ * cada negócio já É o fechamento ativo.
+ */
+export function responsavelCongeladoPorNegocio(
+  eventosDealWonDescPorData: readonly { entidade_id: string | null; payload: unknown; created_at: string }[],
+): Map<string, string | null> {
+  const porNegocio = new Map<string, string | null>();
+  for (const e of eventosDealWonDescPorData) {
+    if (!e.entidade_id || porNegocio.has(e.entidade_id)) continue;
+    const payload = e.payload as { responsavel_id?: string | null } | null;
+    porNegocio.set(e.entidade_id, payload?.responsavel_id ?? null);
+  }
+  return porNegocio;
+}
+
 export function calcularNivel(niveis: readonly NivelGamificacao[], xpAtivo: number) {
   let atual: { nivel: number; nome: string | null } = { nivel: 1, nome: null };
   let proximo: NivelGamificacao | null = null;
