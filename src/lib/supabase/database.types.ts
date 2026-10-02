@@ -3265,6 +3265,10 @@ export type Database = {
           total_xp: number;
         }[];
       };
+      reavaliar_credito_condicionado_valor: {
+        Args: { p_estornado_por: string; p_evento_won_id: number; p_novo_valor: number };
+        Returns: undefined;
+      };
       solicitar_resgate: {
         Args: { p_recompensa_id: string };
         Returns: {
