@@ -22,6 +22,7 @@ import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
 let sdr1: Usuario;
 let closer: Usuario;
 let gestor: Usuario;
+let admin: Usuario;
 let empresa: string;
 const membro: Record<string, string> = {};
 let funil: string;
@@ -30,7 +31,7 @@ let etapaNegociacao: string;
 let contato: string;
 
 beforeAll(async () => {
-  [sdr1, closer, gestor] = await Promise.all(["fr-sdr1", "fr-closer", "fr-gestor"].map(criarUsuario));
+  [sdr1, closer, gestor, admin] = await Promise.all(["fr-sdr1", "fr-closer", "fr-gestor", "fr-admin"].map(criarUsuario));
   const { data: emp } = await servico.from("empresas").insert({ nome: `Fix reocorrência ${sufixo}` }).select("id").single();
   empresa = emp!.id;
 
@@ -40,6 +41,7 @@ beforeAll(async () => {
       { empresa_id: empresa, user_id: sdr1.id, papel: "sdr", perfil_gamificacao: "sdr" },
       { empresa_id: empresa, user_id: closer.id, papel: "vendedor", perfil_gamificacao: "closer" },
       { empresa_id: empresa, user_id: gestor.id, papel: "gestor" },
+      { empresa_id: empresa, user_id: admin.id, papel: "admin" },
     ])
     .select("id, user_id");
   for (const v of vinculos!) membro[v.user_id] = v.id;
@@ -109,8 +111,9 @@ async function criarEAssinarContrato(negocioId: string, cliente: Usuario["client
 }
 
 async function criarRegra(evento_tipo: string, pontos: number, nome = evento_tipo) {
-  // `gamification_rules` revoga insert de service_role — só admin autenticado cria, via RLS.
-  const { data, error } = await gestor.cliente
+  // `gamification_rules` só aceita insert de quem tem papel admin (RLS "admin cria regra de
+  // gamificacao") — nem gestor, nem service_role.
+  const { data, error } = await admin.cliente
     .from("gamification_rules")
     .insert({ empresa_id: empresa, nome, evento_tipo, pontos, unica_por_negocio: true })
     .select("id")
