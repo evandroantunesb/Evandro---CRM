@@ -39,6 +39,8 @@ export function descreverAtividade(tipo: string, dadosJson: Json, nomes: Nomes):
       return `Tarefa criada: ${ROTULO_TIPO_TAREFA[d.tipo as TipoTarefa] ?? "Tarefa"}, ${d.titulo}`;
     case "tarefa_concluida":
       return `Tarefa concluída${d.atrasada ? " com atraso" : ""}: ${d.titulo}`;
+    case "tarefa_reaberta":
+      return `Tarefa reaberta: ${d.titulo}`;
     case "anexo_adicionado":
       return `Arquivo anexado: ${d.nome}`;
     case "anexo_removido":
