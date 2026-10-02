@@ -34,7 +34,8 @@ export type RegraSalva = {
   nome: string;
   eventoTipo: string;
   condicao: { campo: string; operador: OperadorCondicao; valor: string } | null;
-  pontos: number;
+  xp: number;
+  moedas: number;
   perfilAplicavel: PerfilGamificacao | null;
   limitePeriodo: PeriodoLimiteRegra | null;
   limiteQuantidade: number | null;
@@ -72,8 +73,9 @@ export function NovaRegra({ eventos }: { eventos: readonly EventoOpcao[] }) {
           ))}
         </Selecao>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Campo rotulo="Pontos" name="pontos" type="number" step={1} defaultValue={10} required />
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Campo rotulo="XP" name="xp" type="number" step={1} defaultValue={10} required />
+        <Campo rotulo="Moedas" name="moedas" type="number" step={1} defaultValue={10} required />
         <SeletorPerfil defaultValue="" />
       </div>
       <CondicaoTeto campos={campos} />
@@ -108,8 +110,9 @@ export function LinhaRegra({ regra, eventos }: { regra: RegraSalva; eventos: rea
           ))}
         </Selecao>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Campo rotulo="Pontos" name="pontos" type="number" step={1} defaultValue={regra.pontos} required />
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Campo rotulo="XP" name="xp" type="number" step={1} defaultValue={regra.xp} required />
+        <Campo rotulo="Moedas" name="moedas" type="number" step={1} defaultValue={regra.moedas} required />
         <SeletorPerfil defaultValue={regra.perfilAplicavel ?? ""} />
       </div>
       <CondicaoTeto campos={campos} condicaoInicial={regra.condicao} limitePeriodoInicial={regra.limitePeriodo} limiteQuantidadeInicial={regra.limiteQuantidade} />
@@ -228,7 +231,7 @@ export type ConquistaSalva = {
   nome: string;
   descricao: string;
   icone: string;
-  valorPontos: number;
+  valorXp: number;
   xpBonus: number;
   ativa: boolean;
 };
@@ -241,9 +244,9 @@ export function NovaConquista() {
         <Campo rotulo="Ícone" name="icone" defaultValue="🏆" maxLength={8} />
         <Campo rotulo="Nome" name="nome" placeholder="Ex.: Veterano" required />
       </div>
-      <Campo rotulo="Descrição (opcional)" name="descricao" placeholder="Ex.: Acumule 5.000 pontos" />
+      <Campo rotulo="Descrição (opcional)" name="descricao" placeholder="Ex.: Acumule 5.000 XP" />
       <div className="grid gap-3 sm:grid-cols-2">
-        <Campo rotulo="Pontos necessários" name="valorPontos" type="number" min={1} step={1} required />
+        <Campo rotulo="XP necessário" name="valorXp" type="number" min={1} step={1} required />
         <Campo rotulo="XP bônus ao desbloquear" name="xpBonus" type="number" min={0} step={1} defaultValue={0} />
       </div>
       <Botao type="submit" disabled={pendente} className="self-start">
@@ -265,7 +268,7 @@ export function LinhaConquista({ conquista }: { conquista: ConquistaSalva }) {
       </div>
       <Campo rotulo="Descrição" name="descricao" defaultValue={conquista.descricao} />
       <div className="grid gap-3 sm:grid-cols-2">
-        <Campo rotulo="Pontos necessários" name="valorPontos" type="number" min={1} step={1} defaultValue={conquista.valorPontos} required />
+        <Campo rotulo="XP necessário" name="valorXp" type="number" min={1} step={1} defaultValue={conquista.valorXp} required />
         <Campo rotulo="XP bônus ao desbloquear" name="xpBonus" type="number" min={0} step={1} defaultValue={conquista.xpBonus} />
       </div>
       <div className="flex flex-wrap items-center gap-3">
@@ -288,7 +291,7 @@ export type RecompensaSalva = {
   id: string;
   nome: string;
   descricao: string;
-  custoPontos: number;
+  custoMoedas: number;
   estoque: number | null;
   limitePorMembro: number | null;
   validadeAte: string | null;
@@ -302,7 +305,7 @@ export function NovaRecompensa() {
       <Campo rotulo="Nome" name="nome" placeholder="Ex.: Vale-presente R$ 100" required />
       <Campo rotulo="Descrição (opcional)" name="descricao" />
       <div className="grid gap-3 sm:grid-cols-3">
-        <Campo rotulo="Custo em pontos" name="custoPontos" type="number" min={1} step={1} required />
+        <Campo rotulo="Custo em moedas" name="custoMoedas" type="number" min={1} step={1} required />
         <Campo rotulo="Estoque (opcional)" name="estoque" type="number" min={0} step={1} placeholder="Ilimitado" />
         <Campo rotulo="Limite por colaborador (opcional)" name="limitePorMembro" type="number" min={1} step={1} placeholder="Sem limite" />
       </div>
@@ -323,7 +326,7 @@ export function LinhaRecompensa({ recompensa }: { recompensa: RecompensaSalva })
       <Campo rotulo="Nome" name="nome" defaultValue={recompensa.nome} required />
       <Campo rotulo="Descrição" name="descricao" defaultValue={recompensa.descricao} />
       <div className="grid gap-3 sm:grid-cols-3">
-        <Campo rotulo="Custo em pontos" name="custoPontos" type="number" min={1} step={1} defaultValue={recompensa.custoPontos} required />
+        <Campo rotulo="Custo em moedas" name="custoMoedas" type="number" min={1} step={1} defaultValue={recompensa.custoMoedas} required />
         <Campo rotulo="Estoque" name="estoque" type="number" min={0} step={1} defaultValue={recompensa.estoque ?? undefined} placeholder="Ilimitado" />
         <Campo
           rotulo="Limite por colaborador"

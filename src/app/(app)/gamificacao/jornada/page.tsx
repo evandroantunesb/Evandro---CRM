@@ -1,4 +1,5 @@
 import { Cartao } from "@/components/ui";
+import { calcularNivel } from "@/lib/gamificacao";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 
@@ -7,7 +8,7 @@ export default async function MinhaJornada() {
   const supabase = await criarClienteServidor();
 
   const [{ data: lancamentos }, { data: niveis }, { data: conquistas }, { data: desbloqueadas }] = await Promise.all([
-    supabase.from("point_ledger").select("pontos").eq("membro_id", atual.membroId).eq("estornado", false),
+    supabase.from("point_ledger").select("xp").eq("membro_id", atual.membroId).eq("estornado", false),
     supabase.from("niveis_gamificacao").select("nivel, nome, xp_minimo").eq("empresa_id", atual.empresaId).order("xp_minimo"),
     supabase
       .from("conquistas")
@@ -18,20 +19,10 @@ export default async function MinhaJornada() {
     supabase.from("conquistas_desbloqueadas").select("conquista_id").eq("membro_id", atual.membroId),
   ]);
 
-  const totalXp = (lancamentos ?? []).reduce((soma, l) => soma + l.pontos, 0);
-
-  let nivelAtual = { nivel: 1, nome: null as string | null, xpMinimo: 0 };
-  let proximoNivel: { nivel: number; nome: string | null; xpMinimo: number } | null = null;
-  for (const n of niveis ?? []) {
-    if (n.xp_minimo <= totalXp) nivelAtual = { nivel: n.nivel, nome: n.nome, xpMinimo: n.xp_minimo };
-    else {
-      proximoNivel = { nivel: n.nivel, nome: n.nome, xpMinimo: n.xp_minimo };
-      break;
-    }
-  }
-  const progresso = proximoNivel
-    ? Math.min(100, Math.round(((totalXp - nivelAtual.xpMinimo) / (proximoNivel.xpMinimo - nivelAtual.xpMinimo)) * 100))
-    : 100;
+  const totalXp = (lancamentos ?? []).reduce((soma, l) => soma + l.xp, 0);
+  const niveisNormalizados = (niveis ?? []).map((n) => ({ nivel: n.nivel, nome: n.nome, xpMinimo: n.xp_minimo }));
+  const { nivel, nome: nomeNivel, xpBaseNivel, proximoNivel, progresso } = calcularNivel(niveisNormalizados, totalXp);
+  const nivelAtual = { nivel, nome: nomeNivel, xpMinimo: xpBaseNivel };
 
   const idsDesbloqueadas = new Set((desbloqueadas ?? []).map((d) => d.conquista_id));
 
@@ -73,7 +64,7 @@ export default async function MinhaJornada() {
                 <span className="text-xs font-medium text-zinc-900">{c.nome}</span>
                 {!desbloqueada && (
                   <span className="text-[11px] text-zinc-500">
-                    Acumule {(c.criterio as { metrica: string; valor: number }).valor.toLocaleString("pt-BR")} pontos
+                    Acumule {(c.criterio as { metrica: string; valor: number }).valor.toLocaleString("pt-BR")} XP
                   </span>
                 )}
               </div>

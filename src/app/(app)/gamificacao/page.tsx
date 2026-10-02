@@ -4,6 +4,7 @@ import type { ComponentType } from "react";
 import { Cartao } from "@/components/ui";
 import { carregarConfiguracao } from "@/lib/crm";
 import { formatarMoeda, tempoDesde } from "@/lib/formatacao";
+import { calcularNivel } from "@/lib/gamificacao";
 import { calcularProgresso, calcularRealizado, type Meta } from "@/lib/metas";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
@@ -54,7 +55,8 @@ export default async function GamificacaoDashboard({ searchParams }: { searchPar
     { data: negociosAnterior },
     { data: rankingBruto },
     { data: niveis },
-    { data: pontosTotais },
+    { data: xpTotais },
+    { data: moedasTotais },
     { data: conquistas },
     { data: desbloqueadas },
     { data: recompensas },
@@ -63,7 +65,7 @@ export default async function GamificacaoDashboard({ searchParams }: { searchPar
   ] = await Promise.all([
     supabase
       .from("point_ledger")
-      .select("id, pontos, descricao, membro_id, created_at")
+      .select("id, xp, moedas, descricao, membro_id, created_at")
       .eq("empresa_id", atual.empresaId)
       .eq("estornado", false)
       .gte("created_at", atualMes.inicioIso)
@@ -72,7 +74,7 @@ export default async function GamificacaoDashboard({ searchParams }: { searchPar
       .limit(5000),
     supabase
       .from("point_ledger")
-      .select("pontos")
+      .select("xp")
       .eq("empresa_id", atual.empresaId)
       .eq("estornado", false)
       .gte("created_at", anteriorMes.inicioIso)
@@ -100,7 +102,8 @@ export default async function GamificacaoDashboard({ searchParams }: { searchPar
       p_desde: atualMes.inicioIso,
     }),
     supabase.from("niveis_gamificacao").select("nivel, nome, xp_minimo").eq("empresa_id", atual.empresaId).order("xp_minimo"),
-    supabase.from("point_ledger").select("pontos").eq("membro_id", atual.membroId).eq("estornado", false).limit(20000),
+    supabase.from("point_ledger").select("xp").eq("membro_id", atual.membroId).eq("estornado", false).limit(20000),
+    supabase.from("point_ledger").select("moedas").eq("membro_id", atual.membroId).eq("estornado", false).limit(20000),
     supabase.from("conquistas").select("id, nome, icone").eq("empresa_id", atual.empresaId).eq("ativa", true),
     supabase
       .from("conquistas_desbloqueadas")
@@ -110,11 +113,11 @@ export default async function GamificacaoDashboard({ searchParams }: { searchPar
       .limit(3),
     supabase
       .from("recompensas")
-      .select("id, nome, descricao, custo_pontos")
+      .select("id, nome, descricao, custo_moedas")
       .eq("empresa_id", atual.empresaId)
       .eq("ativa", true)
       .or(`validade_ate.is.null,validade_ate.gte.${paraDataCurta(new Date())}`)
-      .order("custo_pontos")
+      .order("custo_moedas")
       .limit(3),
     supabase
       .from("metas")
@@ -129,8 +132,8 @@ export default async function GamificacaoDashboard({ searchParams }: { searchPar
   const nomeMembro = new Map(config.membros.map((m) => [m.id, m.nome]));
 
   // KPIs -----------------------------------------------------------------
-  const totalPontosPeriodo = (pontosPeriodo ?? []).reduce((s, l) => s + l.pontos, 0);
-  const totalPontosAnterior = (pontosAnteriorAgg ?? []).reduce((s, l) => s + l.pontos, 0);
+  const totalXpPeriodo = (pontosPeriodo ?? []).reduce((s, l) => s + l.xp, 0);
+  const totalXpAnterior = (pontosAnteriorAgg ?? []).reduce((s, l) => s + l.xp, 0);
   const contratosPeriodo = (negociosPeriodo ?? []).length;
   const contratosAnterior = (negociosAnterior ?? []).length;
   const receitaPeriodo = (negociosPeriodo ?? []).reduce((s, n) => s + (n.valor ?? 0), 0);
@@ -153,12 +156,12 @@ export default async function GamificacaoDashboard({ searchParams }: { searchPar
     ? progressosMetas.reduce((s, p) => s + Math.min(p.percentual, 100), 0) / progressosMetas.length
     : null;
 
-  // Evolução de pontos (acumulado por dia no período) ---------------------
+  // Evolução de XP (acumulado por dia no período) --------------------------
   const diasNoPeriodo = Math.round((atualMes.fimExclusivo.getTime() - atualMes.inicio.getTime()) / 86_400_000);
   const porDia = new Array(diasNoPeriodo).fill(0) as number[];
   for (const l of pontosPeriodo ?? []) {
     const dia = Math.floor((new Date(l.created_at).getTime() - atualMes.inicio.getTime()) / 86_400_000);
-    if (dia >= 0 && dia < diasNoPeriodo) porDia[dia] += l.pontos;
+    if (dia >= 0 && dia < diasNoPeriodo) porDia[dia] += l.xp;
   }
   const hoje = new Date();
   const diasComDados = periodo === "mes" ? Math.floor((hoje.getTime() - atualMes.inicio.getTime()) / 86_400_000) + 1 : diasNoPeriodo;
@@ -167,46 +170,32 @@ export default async function GamificacaoDashboard({ searchParams }: { searchPar
     return acc;
   }, []);
 
-  // Ações que mais geram pontos --------------------------------------------
+  // Ações que mais geram XP -------------------------------------------------
   const porAcao = new Map<string, number>();
   for (const l of pontosPeriodo ?? []) {
-    if (!l.descricao) continue;
-    porAcao.set(l.descricao, (porAcao.get(l.descricao) ?? 0) + l.pontos);
+    if (!l.descricao || l.xp === 0) continue;
+    porAcao.set(l.descricao, (porAcao.get(l.descricao) ?? 0) + l.xp);
   }
   const topAcoes = [...porAcao.entries()]
     .map(([rotulo, total]) => ({ rotulo, total }))
     .sort((a, b) => b.total - a.total)
     .slice(0, 5);
 
-  // Ranking ------------------------------------------------------------
-  function nivelPara(totalXp: number) {
-    let resultado = { nivel: 1, nome: null as string | null };
-    for (const n of niveis ?? []) {
-      if (n.xp_minimo <= totalXp) resultado = { nivel: n.nivel, nome: n.nome };
-      else break;
-    }
-    return resultado;
-  }
+  // Ranking (XP ativo, por perfil/período) ---------------------------------
+  const niveisNormalizados = (niveis ?? []).map((n) => ({ nivel: n.nivel, nome: n.nome, xpMinimo: n.xp_minimo }));
   const ranking = (rankingBruto ?? [])
     .filter((l) => nomeMembro.has(l.membro_id))
-    .sort((a, b) => b.total_pontos - a.total_pontos)
+    .sort((a, b) => b.total_xp - a.total_xp)
     .slice(0, 5)
-    .map((l, i) => ({ posicao: i + 1, membroId: l.membro_id, nome: nomeMembro.get(l.membro_id)!, total: l.total_pontos }));
+    .map((l, i) => ({ posicao: i + 1, membroId: l.membro_id, nome: nomeMembro.get(l.membro_id)!, total: l.total_xp }));
 
-  // Meu nível ------------------------------------------------------------
-  const meuTotalXp = (pontosTotais ?? []).reduce((s, l) => s + l.pontos, 0);
-  const meuNivel = nivelPara(meuTotalXp);
-  let proximoNivel: { nivel: number; nome: string | null; xpMinimo: number } | null = null;
-  for (const n of niveis ?? []) {
-    if (n.xp_minimo > meuTotalXp) {
-      proximoNivel = { nivel: n.nivel, nome: n.nome, xpMinimo: n.xp_minimo };
-      break;
-    }
-  }
-  const xpBaseNivel = niveis?.find((n) => n.nivel === meuNivel.nivel)?.xp_minimo ?? 0;
-  const progressoNivel = proximoNivel
-    ? Math.min(100, Math.round(((meuTotalXp - xpBaseNivel) / (proximoNivel.xpMinimo - xpBaseNivel)) * 100))
-    : 100;
+  // Meu nível: sempre XP ativo da vida toda, nunca o total filtrado do
+  // ranking (era a origem de dois níveis diferentes pra mesma pessoa —
+  // corrigido via fonte única em calcularNivel).
+  const meuTotalXp = (xpTotais ?? []).reduce((s, l) => s + l.xp, 0);
+  const meuSaldoMoedas = (moedasTotais ?? []).reduce((s, l) => s + l.moedas, 0);
+  const { nivel: meuNivelNumero, nome: meuNivelNome, proximoNivel, progresso: progressoNivel } = calcularNivel(niveisNormalizados, meuTotalXp);
+  const meuNivel = { nivel: meuNivelNumero, nome: meuNivelNome };
 
   // Minhas conquistas + atividade recente ---------------------------------
   const nomeConquista = new Map((conquistas ?? []).map((c) => [c.id, c]));
@@ -216,7 +205,6 @@ export default async function GamificacaoDashboard({ searchParams }: { searchPar
     ...nomeConquista.get(d.conquista_id),
   }));
 
-  const meuSaldo = meuTotalXp;
   const atividadeRecente = (pontosPeriodo ?? []).slice(0, 8);
 
   return (
@@ -224,7 +212,7 @@ export default async function GamificacaoDashboard({ searchParams }: { searchPar
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-zinc-900">Gamificação</h1>
-          <p className="text-sm text-zinc-500">Acompanhe metas, pontos, ranking e desempenho da equipe.</p>
+          <p className="text-sm text-zinc-500">Acompanhe metas, XP, ranking e desempenho da equipe.</p>
         </div>
         <div className="flex gap-1 rounded-lg bg-zinc-100 p-1">
           {PERIODOS.map((p) => (
@@ -244,9 +232,9 @@ export default async function GamificacaoDashboard({ searchParams }: { searchPar
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi
           Icone={Zap}
-          valor={`${totalPontosPeriodo.toLocaleString("pt-BR")} pts`}
-          legenda="Pontos acumulados"
-          variacaoPct={variacao(totalPontosPeriodo, totalPontosAnterior)}
+          valor={`${totalXpPeriodo.toLocaleString("pt-BR")} XP`}
+          legenda="XP acumulado"
+          variacaoPct={variacao(totalXpPeriodo, totalXpAnterior)}
         />
         <Kpi
           Icone={Target}
@@ -268,20 +256,20 @@ export default async function GamificacaoDashboard({ searchParams }: { searchPar
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Cartao titulo="Evolução de pontos">
+        <Cartao titulo="Evolução de XP">
           {serieAcumulada.length < 2 ? (
             <p className="text-sm text-zinc-500">Sem dados suficientes neste período.</p>
           ) : (
             <>
               <p className="text-sm text-zinc-600">
-                <span className="text-lg font-semibold text-zinc-900">{totalPontosPeriodo.toLocaleString("pt-BR")}</span> pontos no período
+                <span className="text-lg font-semibold text-zinc-900">{totalXpPeriodo.toLocaleString("pt-BR")}</span> XP no período
               </p>
               <GraficoLinha serie={serieAcumulada} />
             </>
           )}
         </Cartao>
 
-        <Cartao titulo="Ações que mais geram pontos">
+        <Cartao titulo="Ações que mais geram XP">
           {!topAcoes.length ? (
             <p className="text-sm text-zinc-500">Nenhum ponto lançado neste período.</p>
           ) : (
@@ -300,7 +288,7 @@ export default async function GamificacaoDashboard({ searchParams }: { searchPar
                 <li key={r.membroId} className={`flex items-center gap-3 text-sm ${r.membroId === atual.membroId ? "rounded-lg bg-dourado/5 p-1.5" : ""}`}>
                   <span className="w-5 shrink-0 text-center">{MEDALHAS[r.posicao - 1] ?? `${r.posicao}º`}</span>
                   <span className="flex-1 truncate text-zinc-900">{r.nome}</span>
-                  <span className="font-medium text-zinc-900">{r.total.toLocaleString("pt-BR")} pts</span>
+                  <span className="font-medium text-zinc-900">{r.total.toLocaleString("pt-BR")} XP</span>
                 </li>
               ))}
             </ul>
@@ -358,7 +346,10 @@ export default async function GamificacaoDashboard({ searchParams }: { searchPar
                     </span>
                     <span className="text-xs text-zinc-500">{tempoDesde(l.created_at)}</span>
                   </div>
-                  <span className="font-medium text-green-700">+{l.pontos}</span>
+                  <span className="flex items-baseline gap-2">
+                    {l.xp !== 0 && <span className="font-medium text-green-700">+{l.xp} XP</span>}
+                    {l.moedas !== 0 && <span className={`font-medium ${l.moedas > 0 ? "text-green-700" : "text-red-700"}`}>{l.moedas > 0 ? "+" : ""}{l.moedas} moedas</span>}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -374,8 +365,8 @@ export default async function GamificacaoDashboard({ searchParams }: { searchPar
             {recompensas.map((r) => (
               <CartaoRecompensa
                 key={r.id}
-                recompensa={{ id: r.id, nome: r.nome, descricao: r.descricao, custoPontos: r.custo_pontos }}
-                saldo={meuSaldo}
+                recompensa={{ id: r.id, nome: r.nome, descricao: r.descricao, custoMoedas: r.custo_moedas }}
+                saldo={meuSaldoMoedas}
               />
             ))}
           </div>

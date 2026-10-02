@@ -38,7 +38,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
           { href: "/gamificacao/jornada", rotulo: "Minha jornada", grupo: "Gamificação" },
           { href: "/gamificacao/ranking", rotulo: "Ranking", grupo: "Gamificação" },
           { href: "/gamificacao/loja", rotulo: "Loja de recompensas", grupo: "Gamificação" },
-          { href: "/gamificacao/extrato", rotulo: "Extrato de pontos", grupo: "Gamificação" },
+          { href: "/gamificacao/extrato", rotulo: "Extrato", grupo: "Gamificação" },
           { href: "/gamificacao/metas", rotulo: "Metas", grupo: "Gamificação" },
           { href: "/gamificacao/comissoes", rotulo: "Comissões", grupo: "Gamificação" },
         ]

@@ -31,3 +31,28 @@ export function rotuloEvento(tipo: string) {
 export function camposEvento(tipo: string): readonly string[] {
   return EVENTOS_GAMIFICACAO.find((e) => e.tipo === tipo)?.campos ?? [];
 }
+
+export type NivelGamificacao = { nivel: number; nome: string | null; xpMinimo: number };
+
+/**
+ * Fonte única do cálculo de nível (Evandro, 2026-10-02): antes, jornada/
+ * ranking/dashboard calculavam nível cada um do seu jeito (um usava XP ativo
+ * global, outro usava o total filtrado por perfil/período do ranking),
+ * resultando em números diferentes pra mesma pessoa. Nível é sempre
+ * progressão pessoal: XP ativo (não estornado) acumulado da vida toda do
+ * membro, nunca filtrado por perfil ou período.
+ */
+export function calcularNivel(niveis: readonly NivelGamificacao[], xpAtivo: number) {
+  let atual: { nivel: number; nome: string | null } = { nivel: 1, nome: null };
+  let proximo: NivelGamificacao | null = null;
+  for (const n of niveis) {
+    if (n.xpMinimo <= xpAtivo) atual = { nivel: n.nivel, nome: n.nome };
+    else {
+      proximo = n;
+      break;
+    }
+  }
+  const xpBaseNivel = niveis.find((n) => n.nivel === atual.nivel)?.xpMinimo ?? 0;
+  const progresso = proximo ? Math.min(100, Math.round(((xpAtivo - xpBaseNivel) / (proximo.xpMinimo - xpBaseNivel)) * 100)) : 100;
+  return { ...atual, xpBaseNivel, proximoNivel: proximo, progresso };
+}

@@ -9,7 +9,7 @@ import { mudarStatusResgate } from "./actions";
 export type ResgateLinha = {
   id: string;
   status: StatusResgate;
-  pontosDebitados: number;
+  moedasDebitadas: number;
   createdAt: string;
   recompensaNome: string;
   membroNome: string;
@@ -33,7 +33,7 @@ export function LinhaResgate({ resgate }: { resgate: ResgateLinha }) {
           {resgate.membroNome} · {resgate.recompensaNome}
         </span>
         <span className="text-xs text-zinc-500">
-          {resgate.pontosDebitados.toLocaleString("pt-BR")} pts · {formatarDataHora(resgate.createdAt)}
+          {resgate.moedasDebitadas.toLocaleString("pt-BR")} moedas · {formatarDataHora(resgate.createdAt)}
         </span>
       </div>
       <div className="flex items-center gap-2">

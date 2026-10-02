@@ -8,20 +8,37 @@ export default async function ExtratoDePontos() {
   const supabase = await criarClienteServidor();
   const { data: lancamentos } = await supabase
     .from("point_ledger")
-    .select("id, pontos, descricao, estornado, created_at")
+    .select("id, xp, moedas, descricao, estornado, created_at")
     .eq("empresa_id", atual.empresaId)
     .eq("membro_id", atual.membroId)
     .order("created_at", { ascending: false })
     .limit(200);
 
-  const total = (lancamentos ?? []).filter((l) => !l.estornado).reduce((soma, l) => soma + l.pontos, 0);
+  const ativos = (lancamentos ?? []).filter((l) => !l.estornado);
+  const totalXp = ativos.reduce((soma, l) => soma + l.xp, 0);
+  const totalMoedas = ativos.reduce((soma, l) => soma + l.moedas, 0);
+
+  function valor(n: number, estornado: boolean) {
+    if (n === 0) return null;
+    return (
+      <span className={`font-medium ${estornado ? "text-zinc-400 line-through" : n >= 0 ? "text-green-700" : "text-red-700"}`}>
+        {n >= 0 ? "+" : ""}
+        {n}
+      </span>
+    );
+  }
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4">
-      <h1 className="text-2xl font-semibold text-zinc-900">Extrato de pontos</h1>
-      <Cartao titulo="Saldo atual">
-        <p className="text-3xl font-semibold text-zinc-900">{total.toLocaleString("pt-BR")} pts</p>
-      </Cartao>
+      <h1 className="text-2xl font-semibold text-zinc-900">Extrato</h1>
+      <div className="grid grid-cols-2 gap-3">
+        <Cartao titulo="XP acumulado">
+          <p className="text-3xl font-semibold text-zinc-900">{totalXp.toLocaleString("pt-BR")}</p>
+        </Cartao>
+        <Cartao titulo="Saldo de moedas">
+          <p className="text-3xl font-semibold text-zinc-900">{totalMoedas.toLocaleString("pt-BR")}</p>
+        </Cartao>
+      </div>
       <Cartao titulo={`Lançamentos (${lancamentos?.length ?? 0})`}>
         {!lancamentos?.length && <p className="text-sm text-zinc-600">Nenhum lançamento ainda.</p>}
         <ul className="flex flex-col">
@@ -36,10 +53,18 @@ export default async function ExtratoDePontos() {
               </div>
               <div className="flex items-center gap-2">
                 {l.estornado && <Selo tom="negativo">Estornado</Selo>}
-                <span className={`font-medium ${l.estornado ? "text-zinc-400 line-through" : l.pontos >= 0 ? "text-green-700" : "text-red-700"}`}>
-                  {l.pontos >= 0 ? "+" : ""}
-                  {l.pontos}
-                </span>
+                {l.xp !== 0 && (
+                  <span className="flex items-baseline gap-1">
+                    {valor(l.xp, l.estornado)}
+                    <span className="text-xs text-zinc-400">XP</span>
+                  </span>
+                )}
+                {l.moedas !== 0 && (
+                  <span className="flex items-baseline gap-1">
+                    {valor(l.moedas, l.estornado)}
+                    <span className="text-xs text-zinc-400">moedas</span>
+                  </span>
+                )}
               </div>
             </li>
           ))}

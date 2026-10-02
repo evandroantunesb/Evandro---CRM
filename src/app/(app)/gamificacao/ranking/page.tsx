@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Cartao } from "@/components/ui";
+import { calcularNivel } from "@/lib/gamificacao";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { ROTULO_PERFIL_GAMIFICACAO, type PerfilGamificacao } from "@/lib/tipos";
@@ -60,18 +61,28 @@ export default async function Ranking({ searchParams }: { searchParams: Promise<
     }),
   );
 
-  function nivelPara(totalXp: number) {
-    let resultado: { nivel: number; nome: string | null } = { nivel: 1, nome: null };
-    for (const n of niveis ?? []) {
-      if (n.xp_minimo <= totalXp) resultado = { nivel: n.nivel, nome: n.nome };
-      else break;
-    }
-    return resultado;
+  // Nível exibido no ranking é sempre o nível real da pessoa (XP ativo da
+  // vida toda), nunca o total filtrado por perfil/período usado só pra
+  // ordenar o ranking — mesma fonte única (calcularNivel) de jornada/
+  // dashboard/início, pra não voltar a mostrar nível diferente em cada tela.
+  const membroIds = (pontos ?? []).map((l) => l.membro_id);
+  const { data: xpGlobalLinhas } = membroIds.length
+    ? await supabase.from("point_ledger").select("membro_id, xp").eq("empresa_id", atual.empresaId).eq("estornado", false).in("membro_id", membroIds)
+    : { data: [] as { membro_id: string; xp: number }[] };
+  const xpGlobalPorMembro = new Map<string, number>();
+  for (const l of xpGlobalLinhas ?? []) {
+    xpGlobalPorMembro.set(l.membro_id, (xpGlobalPorMembro.get(l.membro_id) ?? 0) + l.xp);
   }
+  const niveisNormalizados = (niveis ?? []).map((n) => ({ nivel: n.nivel, nome: n.nome, xpMinimo: n.xp_minimo }));
 
   const linhas = (pontos ?? [])
     .filter((l) => nomes.has(l.membro_id))
-    .map((l) => ({ membroId: l.membro_id, nome: nomes.get(l.membro_id)!, total: l.total_pontos, nivel: nivelPara(l.total_pontos) }));
+    .map((l) => ({
+      membroId: l.membro_id,
+      nome: nomes.get(l.membro_id)!,
+      total: l.total_xp,
+      nivel: calcularNivel(niveisNormalizados, xpGlobalPorMembro.get(l.membro_id) ?? 0),
+    }));
 
   const maiorTotal = Math.max(1, ...linhas.map((l) => l.total));
   const podio = linhas.slice(0, 3);
@@ -134,7 +145,7 @@ export default async function Ranking({ searchParams }: { searchParams: Promise<
                   <span className="text-xs text-zinc-500">
                     {linha.nivel.nome ? `${linha.nivel.nome} · ` : ""}nível {linha.nivel.nivel}
                   </span>
-                  <span className="text-sm font-semibold text-dourado">{linha.total.toLocaleString("pt-BR")} pts</span>
+                  <span className="text-sm font-semibold text-dourado">{linha.total.toLocaleString("pt-BR")} XP</span>
                 </div>
               ) : (
                 <div key={i} />
@@ -153,7 +164,7 @@ export default async function Ranking({ searchParams }: { searchParams: Promise<
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <div className="flex items-baseline justify-between gap-2">
                     <span className="truncate text-sm font-medium text-zinc-900">{linha.nome}</span>
-                    <span className="shrink-0 text-sm font-semibold text-zinc-900">{linha.total.toLocaleString("pt-BR")} pts</span>
+                    <span className="shrink-0 text-sm font-semibold text-zinc-900">{linha.total.toLocaleString("pt-BR")} XP</span>
                   </div>
                   <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
                     <div className="h-full rounded-full bg-dourado" style={{ width: `${Math.max(4, (linha.total / maiorTotal) * 100)}%` }} />

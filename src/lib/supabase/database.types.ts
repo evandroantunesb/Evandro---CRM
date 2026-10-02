@@ -1262,11 +1262,12 @@ export type Database = {
           id: string;
           limite_periodo: Database["public"]["Enums"]["periodo_limite_regra"] | null;
           limite_quantidade: number | null;
+          moedas: number;
           nome: string;
           perfil_aplicavel: Database["public"]["Enums"]["perfil_gamificacao"] | null;
-          pontos: number;
           unica_por_negocio: boolean;
           updated_at: string;
+          xp: number;
         };
         Insert: {
           ativa?: boolean;
@@ -1278,11 +1279,12 @@ export type Database = {
           id?: string;
           limite_periodo?: Database["public"]["Enums"]["periodo_limite_regra"] | null;
           limite_quantidade?: number | null;
+          moedas?: number;
           nome: string;
           perfil_aplicavel?: Database["public"]["Enums"]["perfil_gamificacao"] | null;
-          pontos: number;
           unica_por_negocio?: boolean;
           updated_at?: string;
+          xp?: number;
         };
         Update: {
           ativa?: boolean;
@@ -1294,11 +1296,12 @@ export type Database = {
           id?: string;
           limite_periodo?: Database["public"]["Enums"]["periodo_limite_regra"] | null;
           limite_quantidade?: number | null;
+          moedas?: number;
           nome?: string;
           perfil_aplicavel?: Database["public"]["Enums"]["perfil_gamificacao"] | null;
-          pontos?: number;
           unica_por_negocio?: boolean;
           updated_at?: string;
+          xp?: number;
         };
         Relationships: [
           {
@@ -2457,11 +2460,12 @@ export type Database = {
           evento_id: number | null;
           id: string;
           membro_id: string;
-          pontos: number;
+          moedas: number;
           profile_at_event: Database["public"]["Enums"]["perfil_gamificacao"] | null;
           referencia_id: string | null;
           referencia_tipo: string | null;
           regra_id: string | null;
+          xp: number;
         };
         Insert: {
           created_at?: string;
@@ -2473,11 +2477,12 @@ export type Database = {
           evento_id?: number | null;
           id?: string;
           membro_id: string;
-          pontos: number;
+          moedas?: number;
           profile_at_event?: Database["public"]["Enums"]["perfil_gamificacao"] | null;
           referencia_id?: string | null;
           referencia_tipo?: string | null;
           regra_id?: string | null;
+          xp?: number;
         };
         Update: {
           created_at?: string;
@@ -2489,11 +2494,12 @@ export type Database = {
           evento_id?: number | null;
           id?: string;
           membro_id?: string;
-          pontos?: number;
+          moedas?: number;
           profile_at_event?: Database["public"]["Enums"]["perfil_gamificacao"] | null;
           referencia_id?: string | null;
           referencia_tipo?: string | null;
           regra_id?: string | null;
+          xp?: number;
         };
         Relationships: [
           {
@@ -2828,7 +2834,7 @@ export type Database = {
           ativa: boolean;
           created_at: string;
           criado_por: string | null;
-          custo_pontos: number;
+          custo_moedas: number;
           descricao: string;
           empresa_id: string;
           estoque: number | null;
@@ -2842,7 +2848,7 @@ export type Database = {
           ativa?: boolean;
           created_at?: string;
           criado_por?: string | null;
-          custo_pontos: number;
+          custo_moedas: number;
           descricao?: string;
           empresa_id: string;
           estoque?: number | null;
@@ -2856,7 +2862,7 @@ export type Database = {
           ativa?: boolean;
           created_at?: string;
           criado_por?: string | null;
-          custo_pontos?: number;
+          custo_moedas?: number;
           descricao?: string;
           empresa_id?: string;
           estoque?: number | null;
@@ -2889,7 +2895,7 @@ export type Database = {
           empresa_id: string;
           id: string;
           membro_id: string;
-          pontos_debitados: number;
+          moedas_debitadas: number;
           recompensa_id: string;
           status: Database["public"]["Enums"]["status_resgate"];
           updated_at: string;
@@ -2899,7 +2905,7 @@ export type Database = {
           empresa_id: string;
           id?: string;
           membro_id: string;
-          pontos_debitados: number;
+          moedas_debitadas: number;
           recompensa_id: string;
           status?: Database["public"]["Enums"]["status_resgate"];
           updated_at?: string;
@@ -2909,7 +2915,7 @@ export type Database = {
           empresa_id?: string;
           id?: string;
           membro_id?: string;
-          pontos_debitados?: number;
+          moedas_debitadas?: number;
           recompensa_id?: string;
           status?: Database["public"]["Enums"]["status_resgate"];
           updated_at?: string;
@@ -3067,7 +3073,7 @@ export type Database = {
           empresa_id: string;
           id: string;
           membro_id: string;
-          pontos_debitados: number;
+          moedas_debitadas: number;
           recompensa_id: string;
           status: Database["public"]["Enums"]["status_resgate"];
           updated_at: string;
@@ -3207,7 +3213,7 @@ export type Database = {
         };
         Returns: {
           membro_id: string;
-          total_pontos: number;
+          total_xp: number;
         }[];
       };
       solicitar_resgate: {
@@ -3217,7 +3223,7 @@ export type Database = {
           empresa_id: string;
           id: string;
           membro_id: string;
-          pontos_debitados: number;
+          moedas_debitadas: number;
           recompensa_id: string;
           status: Database["public"]["Enums"]["status_resgate"];
           updated_at: string;

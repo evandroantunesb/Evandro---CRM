@@ -11,7 +11,7 @@ export default async function ConfigGamificacao() {
   const [{ data: regras }, { data: niveis }, { data: conquistas }, { data: recompensas }] = await Promise.all([
     supabase
       .from("gamification_rules")
-      .select("id, nome, evento_tipo, condicao, pontos, perfil_aplicavel, limite_periodo, limite_quantidade, unica_por_negocio, ativa")
+      .select("id, nome, evento_tipo, condicao, xp, moedas, perfil_aplicavel, limite_periodo, limite_quantidade, unica_por_negocio, ativa")
       .eq("empresa_id", atual.empresaId)
       .order("created_at"),
     supabase.from("niveis_gamificacao").select("nivel, nome, xp_minimo").eq("empresa_id", atual.empresaId).order("nivel"),
@@ -22,7 +22,7 @@ export default async function ConfigGamificacao() {
       .order("created_at"),
     supabase
       .from("recompensas")
-      .select("id, nome, descricao, custo_pontos, estoque, limite_por_membro, validade_ate, ativa")
+      .select("id, nome, descricao, custo_moedas, estoque, limite_por_membro, validade_ate, ativa")
       .eq("empresa_id", atual.empresaId)
       .order("created_at"),
   ]);
@@ -32,13 +32,14 @@ export default async function ConfigGamificacao() {
       <h1 className="text-2xl font-semibold text-zinc-900">Gamificação</h1>
 
       <p className="text-sm text-zinc-600">
-        Cada regra associa um evento do CRM a uma pontuação. Sempre que o evento acontecer (e a condição, se houver,
-        for satisfeita), o ponto entra automaticamente no extrato do responsável.
+        Cada regra associa um evento do CRM a XP (progressão: ranking, nível, conquistas) e/ou moedas (saldo gastável
+        na loja). Sempre que o evento acontecer (e a condição, se houver, for satisfeita), o lançamento entra
+        automaticamente no extrato do responsável.
       </p>
-      <Cartao titulo="Nova regra de pontos">
+      <Cartao titulo="Nova regra">
         <NovaRegra eventos={EVENTOS_GAMIFICACAO} />
       </Cartao>
-      <Cartao titulo={`Regras de pontos (${regras?.length ?? 0})`}>
+      <Cartao titulo={`Regras (${regras?.length ?? 0})`}>
         {(regras ?? []).map((r) => (
           <LinhaRegra
             key={r.id}
@@ -47,7 +48,8 @@ export default async function ConfigGamificacao() {
               nome: r.nome,
               eventoTipo: r.evento_tipo,
               condicao: r.condicao as { campo: string; operador: OperadorCondicao; valor: string } | null,
-              pontos: r.pontos,
+              xp: r.xp,
+              moedas: r.moedas,
               perfilAplicavel: r.perfil_aplicavel as PerfilGamificacao | null,
               limitePeriodo: r.limite_periodo as PeriodoLimiteRegra | null,
               limiteQuantidade: r.limite_quantidade,
@@ -60,8 +62,8 @@ export default async function ConfigGamificacao() {
       </Cartao>
 
       <p className="mt-4 text-sm text-zinc-600">
-        Níveis definem quanto XP (o mesmo saldo de pontos) é preciso acumular para subir. Sem níveis cadastrados, todo
-        mundo fica no nível 1.
+        Níveis definem quanto XP é preciso acumular para subir (XP nunca é gasto na loja). Sem níveis cadastrados,
+        todo mundo fica no nível 1.
       </p>
       <Cartao titulo="Novo nível">
         <NovoNivel />
@@ -73,7 +75,8 @@ export default async function ConfigGamificacao() {
       </Cartao>
 
       <p className="mt-4 text-sm text-zinc-600">
-        Conquistas desbloqueiam sozinhas quando o colaborador acumula os pontos exigidos, e podem dar um XP bônus.
+        Conquistas desbloqueiam sozinhas quando o colaborador acumula o XP exigido, e podem dar um XP bônus (nunca
+        moedas — uma conquista que premie em moedas precisa de configuração própria, fora desta tela).
       </p>
       <Cartao titulo="Nova conquista">
         <NovaConquista />
@@ -87,7 +90,7 @@ export default async function ConfigGamificacao() {
               nome: c.nome,
               descricao: c.descricao,
               icone: c.icone,
-              valorPontos: (c.criterio as { metrica: string; valor: number }).valor,
+              valorXp: (c.criterio as { metrica: string; valor: number }).valor,
               xpBonus: c.xp_bonus,
               ativa: c.ativa,
             }}
@@ -96,8 +99,8 @@ export default async function ConfigGamificacao() {
       </Cartao>
 
       <p className="mt-4 text-sm text-zinc-600">
-        A loja de recompensas deixa o colaborador trocar pontos por prêmios. O saldo é debitado assim que ele resgata;
-        cancelar um resgate devolve os pontos.
+        A loja de recompensas deixa o colaborador trocar moedas por prêmios. O saldo é debitado assim que ele resgata;
+        cancelar um resgate devolve as moedas.
       </p>
       <Cartao titulo="Nova recompensa">
         <NovaRecompensa />
@@ -110,7 +113,7 @@ export default async function ConfigGamificacao() {
               id: r.id,
               nome: r.nome,
               descricao: r.descricao,
-              custoPontos: r.custo_pontos,
+              custoMoedas: r.custo_moedas,
               estoque: r.estoque,
               limitePorMembro: r.limite_por_membro,
               validadeAte: r.validade_ate,

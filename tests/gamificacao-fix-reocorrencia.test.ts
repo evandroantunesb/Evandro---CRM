@@ -110,12 +110,14 @@ async function criarEAssinarContrato(negocioId: string, cliente: Usuario["client
   return contrato!.id;
 }
 
-async function criarRegra(evento_tipo: string, pontos: number, nome = evento_tipo) {
+async function criarRegra(evento_tipo: string, valor: number, nome = evento_tipo) {
   // `gamification_rules` só aceita insert de quem tem papel admin (RLS "admin cria regra de
-  // gamificacao") — nem gestor, nem service_role.
+  // gamificacao") — nem gestor, nem service_role. xp=moedas=valor preserva o comportamento
+  // pré-split destes testes (interessados na mecânica de reocorrência/estorno, não na
+  // separação XP x moedas em si, coberta em gamificacao-xp-moedas.test.ts).
   const { data, error } = await admin.cliente
     .from("gamification_rules")
-    .insert({ empresa_id: empresa, nome, evento_tipo, pontos, unica_por_negocio: true })
+    .insert({ empresa_id: empresa, nome, evento_tipo, xp: valor, moedas: valor, unica_por_negocio: true })
     .select("id")
     .single();
   if (error) throw error;
@@ -139,14 +141,14 @@ describe("motor: unica_por_negocio (teste direto, sem depender de um evento de n
 
     // 1. primeira ocorrência pontua.
     await emitirEvento();
-    let { data: ledger } = await servico.from("point_ledger").select("id, estornado, pontos").eq("regra_id", regraId).order("created_at");
+    let { data: ledger } = await servico.from("point_ledger").select("id, estornado, xp").eq("regra_id", regraId).order("created_at");
     expect(ledger).toHaveLength(1);
     expect(ledger![0].estornado).toBe(false);
     const primeiraLinhaId = ledger![0].id;
 
     // 2. repetição sem reversão não pontua (unica_por_negocio bloqueia o farm).
     await emitirEvento();
-    ({ data: ledger } = await servico.from("point_ledger").select("id, estornado, pontos").eq("regra_id", regraId).order("created_at"));
+    ({ data: ledger } = await servico.from("point_ledger").select("id, estornado, xp").eq("regra_id", regraId).order("created_at"));
     expect(ledger).toHaveLength(1);
 
     // 3. ocorrência → estorno → nova ocorrência válida pontua novamente. Usa o mecanismo real
@@ -158,7 +160,7 @@ describe("motor: unica_por_negocio (teste direto, sem depender de um evento de n
     });
     expect(erroEstorno).toBeNull();
     await emitirEvento();
-    ({ data: ledger } = await servico.from("point_ledger").select("id, estornado, pontos").eq("regra_id", regraId).order("created_at"));
+    ({ data: ledger } = await servico.from("point_ledger").select("id, estornado, xp").eq("regra_id", regraId).order("created_at"));
     expect(ledger).toHaveLength(2);
     expect(ledger![0].id).toBe(primeiraLinhaId);
     expect(ledger![0].estornado).toBe(true);
@@ -167,7 +169,7 @@ describe("motor: unica_por_negocio (teste direto, sem depender de um evento de n
 
     // 4. repetição da segunda ocorrência (ainda ativa) de novo não pontua.
     await emitirEvento();
-    ({ data: ledger } = await servico.from("point_ledger").select("id, estornado, pontos").eq("regra_id", regraId).order("created_at"));
+    ({ data: ledger } = await servico.from("point_ledger").select("id, estornado, xp").eq("regra_id", regraId).order("created_at"));
     expect(ledger).toHaveLength(2);
 
     // 5. múltiplos ciclos preservam histórico: um segundo estorno+reocorrência soma uma 3ª linha,
@@ -177,13 +179,13 @@ describe("motor: unica_por_negocio (teste direto, sem depender de um evento de n
       p_eventos_tipo: ["teste.reocorrencia.motor"],
     });
     await emitirEvento();
-    ({ data: ledger } = await servico.from("point_ledger").select("id, estornado, pontos").eq("regra_id", regraId).order("created_at"));
+    ({ data: ledger } = await servico.from("point_ledger").select("id, estornado, xp").eq("regra_id", regraId).order("created_at"));
     expect(ledger).toHaveLength(3);
     expect(ledger!.map((l) => l.id)).toEqual([primeiraLinhaId, segundaLinhaId, ledger![2].id]);
     expect(ledger![0].estornado).toBe(true);
     expect(ledger![1].estornado).toBe(true);
     expect(ledger![2].estornado).toBe(false);
-    expect(ledger!.every((l) => l.pontos === 10)).toBe(true);
+    expect(ledger!.every((l) => l.xp === 10)).toBe(true);
   });
 });
 
@@ -198,13 +200,13 @@ describe("handoff.won: estorno automático (negócio reaberto) libera reocorrên
     expect(eventosGanho1).toHaveLength(1);
     expect(eventosGanho1![0].beneficiario_id).toBe(sdr1.id);
 
-    let { data: ledger } = await servico.from("point_ledger").select("id, estornado, pontos").eq("regra_id", regraId).order("created_at");
+    let { data: ledger } = await servico.from("point_ledger").select("id, estornado, xp").eq("regra_id", regraId).order("created_at");
     expect(ledger).toHaveLength(1);
     expect(ledger![0].estornado).toBe(false);
 
     // Reabrir estorna o par deal.won/handoff.won (ver estornar_lancamentos_evento em registrar_negocio).
     await marcarStatus(negocioId, "aberto", closer.cliente);
-    ({ data: ledger } = await servico.from("point_ledger").select("id, estornado, pontos").eq("regra_id", regraId).order("created_at"));
+    ({ data: ledger } = await servico.from("point_ledger").select("id, estornado, xp").eq("regra_id", regraId).order("created_at"));
     expect(ledger).toHaveLength(1);
     expect(ledger![0].estornado).toBe(true);
 
@@ -214,7 +216,7 @@ describe("handoff.won: estorno automático (negócio reaberto) libera reocorrên
     expect(eventosGanho2).toHaveLength(2);
     expect(eventosGanho2!.every((e) => e.beneficiario_id === sdr1.id)).toBe(true);
 
-    ({ data: ledger } = await servico.from("point_ledger").select("id, estornado, pontos").eq("regra_id", regraId).order("created_at"));
+    ({ data: ledger } = await servico.from("point_ledger").select("id, estornado, xp").eq("regra_id", regraId).order("created_at"));
     expect(ledger).toHaveLength(2);
     expect(ledger![0].estornado).toBe(true);
     expect(ledger![1].estornado).toBe(false);
@@ -236,7 +238,7 @@ describe("handoff.contrato_assinado: estorno automático (contrato sai de assina
     expect(eventos1).toHaveLength(1);
     expect(eventos1![0].beneficiario_id).toBe(sdr1.id);
 
-    let { data: ledger } = await servico.from("point_ledger").select("id, estornado, pontos").eq("regra_id", regraId).order("created_at");
+    let { data: ledger } = await servico.from("point_ledger").select("id, estornado, xp").eq("regra_id", regraId).order("created_at");
     expect(ledger).toHaveLength(1);
     expect(ledger![0].estornado).toBe(false);
     const primeiraLinhaId = ledger![0].id;
@@ -244,7 +246,7 @@ describe("handoff.contrato_assinado: estorno automático (contrato sai de assina
     // Sai de 'assinado': estorna o par contrato.assinado/handoff.contrato_assinado.
     const { error: erroVoltar } = await closer.cliente.from("contratos").update({ status: "rascunho" }).eq("id", contratoId);
     expect(erroVoltar).toBeNull();
-    ({ data: ledger } = await servico.from("point_ledger").select("id, estornado, pontos").eq("regra_id", regraId).order("created_at"));
+    ({ data: ledger } = await servico.from("point_ledger").select("id, estornado, xp").eq("regra_id", regraId).order("created_at"));
     expect(ledger).toHaveLength(1);
     expect(ledger![0].estornado).toBe(true);
     expect(ledger![0].id).toBe(primeiraLinhaId);
@@ -261,11 +263,11 @@ describe("handoff.contrato_assinado: estorno automático (contrato sai de assina
     expect(eventos2).toHaveLength(2);
     expect(eventos2!.every((e) => e.beneficiario_id === sdr1.id)).toBe(true);
 
-    ({ data: ledger } = await servico.from("point_ledger").select("id, estornado, pontos").eq("regra_id", regraId).order("created_at"));
+    ({ data: ledger } = await servico.from("point_ledger").select("id, estornado, xp").eq("regra_id", regraId).order("created_at"));
     expect(ledger).toHaveLength(2);
     expect(ledger![0].id).toBe(primeiraLinhaId);
     expect(ledger![0].estornado).toBe(true);
-    expect(ledger![0].pontos).toBe(15);
+    expect(ledger![0].xp).toBe(15);
     expect(ledger![1].estornado).toBe(false);
   });
 });
@@ -279,7 +281,7 @@ describe("pagamento.confirmado com unica_por_negocio: ciclo confirmar → estorn
     const { data: conf1, error: erro1 } = await gestor.cliente.rpc("confirmar_pagamento", { p_contrato_id: contratoId });
     expect(erro1).toBeNull();
 
-    let { data: ledger } = await servico.from("point_ledger").select("id, estornado, pontos").eq("regra_id", regraId).order("created_at");
+    let { data: ledger } = await servico.from("point_ledger").select("id, estornado, xp").eq("regra_id", regraId).order("created_at");
     expect(ledger).toHaveLength(1);
     expect(ledger![0].estornado).toBe(false);
 
@@ -288,7 +290,7 @@ describe("pagamento.confirmado com unica_por_negocio: ciclo confirmar → estorn
       p_motivo: "Reconciliação de teste",
     });
     expect(erroEstorno).toBeNull();
-    ({ data: ledger } = await servico.from("point_ledger").select("id, estornado, pontos").eq("regra_id", regraId).order("created_at"));
+    ({ data: ledger } = await servico.from("point_ledger").select("id, estornado, xp").eq("regra_id", regraId).order("created_at"));
     expect(ledger).toHaveLength(1);
     expect(ledger![0].estornado).toBe(true);
 
@@ -297,7 +299,7 @@ describe("pagamento.confirmado com unica_por_negocio: ciclo confirmar → estorn
     expect(conf2!.beneficiario_user_id).toBe(closer.id);
     expect(conf1!.id).not.toBe(conf2!.id);
 
-    ({ data: ledger } = await servico.from("point_ledger").select("id, estornado, pontos").eq("regra_id", regraId).order("created_at"));
+    ({ data: ledger } = await servico.from("point_ledger").select("id, estornado, xp").eq("regra_id", regraId).order("created_at"));
     expect(ledger).toHaveLength(2);
     expect(ledger![0].estornado).toBe(true);
     expect(ledger![1].estornado).toBe(false);
@@ -341,17 +343,17 @@ describe("ranking considera corretamente lançamentos e estornos", () => {
 
     const { data: ledgerAtivo } = await servico
       .from("point_ledger")
-      .select("pontos")
+      .select("xp")
       .eq("membro_id", membro[sdr1.id])
       .eq("profile_at_event", "sdr")
       .eq("estornado", false);
-    const somaEsperada = ledgerAtivo!.reduce((soma, l) => soma + l.pontos, 0);
+    const somaEsperada = ledgerAtivo!.reduce((soma, l) => soma + l.xp, 0);
 
     const { data: ranking, error } = await closer.cliente.rpc("ranking_gamificacao", { p_empresa_id: empresa, p_perfil: "sdr" });
     expect(error).toBeNull();
     const linhaSdr = ranking!.find((r) => r.membro_id === membro[sdr1.id]);
     // Só os lançamentos ativos entram na soma — o(s) estornado(s) do ciclo acima ficam de fora.
-    expect(linhaSdr!.total_pontos).toBe(somaEsperada);
+    expect(linhaSdr!.total_xp).toBe(somaEsperada);
     expect(somaEsperada).toBeGreaterThan(0);
   });
 });

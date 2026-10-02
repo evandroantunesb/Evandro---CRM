@@ -15,7 +15,8 @@ const esquema = z
   .object({
     nome: z.string().trim().min(2, "Nome muito curto").max(80, "Nome muito longo"),
     eventoTipo: z.enum(TIPOS_EVENTO as [string, ...string[]], { message: "Escolha um evento." }),
-    pontos: z.coerce.number().int().refine((v) => v !== 0, "Pontos não pode ser zero."),
+    xp: z.coerce.number().int(),
+    moedas: z.coerce.number().int(),
     perfilAplicavel: z.enum(PERFIS_GAMIFICACAO).optional().or(z.literal("").transform(() => undefined)),
     condicaoCampo: z.string().trim().optional().or(z.literal("").transform(() => undefined)),
     condicaoOperador: z.enum(OPERADORES_CONDICAO).optional().or(z.literal("").transform(() => undefined)),
@@ -26,6 +27,10 @@ const esquema = z
   .refine((d) => !d.limitePeriodo === !d.limiteQuantidade, {
     message: "Defina o período e a quantidade do teto juntos, ou deixe os dois em branco.",
     path: ["limiteQuantidade"],
+  })
+  .refine((d) => d.xp !== 0 || d.moedas !== 0, {
+    message: "Informe XP, moedas, ou os dois — não podem ser zero ao mesmo tempo.",
+    path: ["xp"],
   });
 
 function montarCondicao(dados: z.infer<typeof esquema>) {
@@ -43,7 +48,8 @@ export async function criarRegra(_: ResultadoAcao, formData: FormData): Promise<
     empresa_id: atual.empresaId,
     nome: dados.data.nome,
     evento_tipo: dados.data.eventoTipo,
-    pontos: dados.data.pontos,
+    xp: dados.data.xp,
+    moedas: dados.data.moedas,
     perfil_aplicavel: dados.data.perfilAplicavel ?? null,
     condicao: montarCondicao(dados.data),
     limite_periodo: dados.data.limitePeriodo ?? null,
@@ -71,7 +77,8 @@ export async function editarRegra(_: ResultadoAcao, formData: FormData): Promise
     .update({
       nome: dados.data.nome,
       evento_tipo: dados.data.eventoTipo,
-      pontos: dados.data.pontos,
+      xp: dados.data.xp,
+      moedas: dados.data.moedas,
       perfil_aplicavel: dados.data.perfilAplicavel ?? null,
       condicao: montarCondicao(dados.data),
       limite_periodo: dados.data.limitePeriodo ?? null,
@@ -139,7 +146,7 @@ const esquemaConquista = z.object({
   nome: z.string().trim().min(2, "Nome muito curto").max(80, "Nome muito longo"),
   descricao: z.string().trim().max(200).optional().or(z.literal("").transform(() => undefined)),
   icone: z.string().trim().min(1).max(8).optional().or(z.literal("").transform(() => undefined)),
-  valorPontos: z.coerce.number().int().positive("Informe quantos pontos são necessários."),
+  valorXp: z.coerce.number().int().positive("Informe quanto XP é necessário."),
   xpBonus: z.coerce.number().int().min(0).optional().or(z.literal("").transform(() => undefined)),
 });
 
@@ -154,7 +161,7 @@ export async function criarConquista(_: ResultadoAcao, formData: FormData): Prom
     nome: dados.data.nome,
     descricao: dados.data.descricao ?? "",
     icone: dados.data.icone ?? "🏆",
-    criterio: { metrica: "pontos_acumulados", valor: dados.data.valorPontos },
+    criterio: { metrica: "xp_acumulado", valor: dados.data.valorXp },
     xp_bonus: dados.data.xpBonus ?? 0,
   });
   if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível criar a conquista.") };
@@ -178,7 +185,7 @@ export async function editarConquista(_: ResultadoAcao, formData: FormData): Pro
       nome: dados.data.nome,
       descricao: dados.data.descricao ?? "",
       icone: dados.data.icone ?? "🏆",
-      criterio: { metrica: "pontos_acumulados", valor: dados.data.valorPontos },
+      criterio: { metrica: "xp_acumulado", valor: dados.data.valorXp },
       xp_bonus: dados.data.xpBonus ?? 0,
       ativa: formData.get("ativa") === "on",
     })
@@ -202,7 +209,7 @@ export async function apagarConquista(formData: FormData) {
 const esquemaRecompensa = z.object({
   nome: z.string().trim().min(2, "Nome muito curto").max(80, "Nome muito longo"),
   descricao: z.string().trim().max(200).optional().or(z.literal("").transform(() => undefined)),
-  custoPontos: z.coerce.number().int().positive("Informe o custo em pontos."),
+  custoMoedas: z.coerce.number().int().positive("Informe o custo em moedas."),
   estoque: z.coerce.number().int().min(0).optional().or(z.literal("").transform(() => undefined)),
   limitePorMembro: z.coerce.number().int().positive().optional().or(z.literal("").transform(() => undefined)),
   validadeAte: z.string().trim().optional().or(z.literal("").transform(() => undefined)),
@@ -218,7 +225,7 @@ export async function criarRecompensa(_: ResultadoAcao, formData: FormData): Pro
     empresa_id: atual.empresaId,
     nome: dados.data.nome,
     descricao: dados.data.descricao ?? "",
-    custo_pontos: dados.data.custoPontos,
+    custo_moedas: dados.data.custoMoedas,
     estoque: dados.data.estoque ?? null,
     limite_por_membro: dados.data.limitePorMembro ?? null,
     validade_ate: dados.data.validadeAte ?? null,
@@ -245,7 +252,7 @@ export async function editarRecompensa(_: ResultadoAcao, formData: FormData): Pr
     .update({
       nome: dados.data.nome,
       descricao: dados.data.descricao ?? "",
-      custo_pontos: dados.data.custoPontos,
+      custo_moedas: dados.data.custoMoedas,
       estoque: dados.data.estoque ?? null,
       limite_por_membro: dados.data.limitePorMembro ?? null,
       validade_ate: dados.data.validadeAte ?? null,

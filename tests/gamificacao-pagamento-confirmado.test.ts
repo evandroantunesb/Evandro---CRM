@@ -131,7 +131,7 @@ describe("confirmar_pagamento", () => {
     // tem que ser `admin.cliente`, não `servico`.
     const { data: regra } = await admin.cliente
       .from("gamification_rules")
-      .insert({ empresa_id: empresa, nome: "Pagamento confirmado", evento_tipo: "pagamento.confirmado", pontos: 25 })
+      .insert({ empresa_id: empresa, nome: "Pagamento confirmado", evento_tipo: "pagamento.confirmado", xp: 25, moedas: 25 })
       .select("id")
       .single();
 
@@ -148,7 +148,7 @@ describe("confirmar_pagamento", () => {
     expect(ev!.ator_id).toBe(gestor.id);
     expect(ev!.beneficiario_id).toBe(closer.id);
 
-    const { data: ledger } = await servico.from("point_ledger").select("membro_id, pontos").eq("regra_id", regra!.id);
+    const { data: ledger } = await servico.from("point_ledger").select("membro_id, xp").eq("regra_id", regra!.id);
     expect(ledger).toHaveLength(1);
     expect(ledger![0].membro_id).toBe(membro[closer.id]);
   });
@@ -233,7 +233,7 @@ describe("estornar_confirmacao_pagamento", () => {
     // e também pontuam — filtra pelo regra_id desta regra pra não pegar o ledger de outra regra.
     const { data: regraEstorno } = await admin.cliente
       .from("gamification_rules")
-      .insert({ empresa_id: empresa, nome: "Pagamento 2", evento_tipo: "pagamento.confirmado", pontos: 25 })
+      .insert({ empresa_id: empresa, nome: "Pagamento 2", evento_tipo: "pagamento.confirmado", xp: 25, moedas: 25 })
       .select("id")
       .single();
     const { data: conf } = await gestor.cliente.rpc("confirmar_pagamento", { p_contrato_id: contratoId });
@@ -279,7 +279,7 @@ describe("estornar_confirmacao_pagamento", () => {
     const contratoId = await criarEAssinarContrato(negocioId, closer.cliente);
     const { data: regra } = await admin.cliente
       .from("gamification_rules")
-      .insert({ empresa_id: empresa, nome: "Pagamento ciclo", evento_tipo: "pagamento.confirmado", pontos: 25 })
+      .insert({ empresa_id: empresa, nome: "Pagamento ciclo", evento_tipo: "pagamento.confirmado", xp: 25, moedas: 25 })
       .select("id")
       .single();
 
