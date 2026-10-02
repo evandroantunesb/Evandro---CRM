@@ -2078,18 +2078,21 @@ export type Database = {
       };
       niveis_gamificacao: {
         Row: {
+          ativa: boolean;
           empresa_id: string;
           nivel: number;
           nome: string | null;
           xp_minimo: number;
         };
         Insert: {
+          ativa?: boolean;
           empresa_id: string;
           nivel: number;
           nome?: string | null;
           xp_minimo: number;
         };
         Update: {
+          ativa?: boolean;
           empresa_id?: string;
           nivel?: number;
           nome?: string | null;

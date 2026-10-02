@@ -19,12 +19,13 @@ import {
   apagarRecompensa,
   apagarRegra,
   criarConquista,
+  criarNivel,
   criarRecompensa,
   criarRegra,
   editarConquista,
+  editarNivel,
   editarRecompensa,
   editarRegra,
-  salvarNivel,
 } from "./actions";
 
 type EventoOpcao = { tipo: string; rotulo: string; campos: readonly string[] };
@@ -191,10 +192,10 @@ function CondicaoTeto({
   );
 }
 
-export type NivelSalvo = { nivel: number; nome: string | null; xpMinimo: number };
+export type NivelSalvo = { nivel: number; nome: string | null; xpMinimo: number; ativa: boolean };
 
 export function NovoNivel() {
-  const [resultado, acao, pendente] = useActionState(salvarNivel, null);
+  const [resultado, acao, pendente] = useActionState(criarNivel, null);
   return (
     <form action={acao} className="flex flex-wrap items-end gap-2">
       <Campo rotulo="Nível" name="nivel" type="number" min={1} step={1} required />
@@ -209,12 +210,15 @@ export function NovoNivel() {
 }
 
 export function LinhaNivel({ nivel }: { nivel: NivelSalvo }) {
-  const [resultado, acao, pendente] = useActionState(salvarNivel, null);
+  const [resultado, acao, pendente] = useActionState(editarNivel, null);
   return (
     <form action={acao} className="flex flex-wrap items-end gap-2 border-t border-zinc-100 py-2 first:border-t-0">
       <Campo rotulo="Nível" name="nivel" type="number" defaultValue={nivel.nivel} readOnly />
       <Campo rotulo="Nome" name="nome" defaultValue={nivel.nome ?? ""} placeholder="Ex.: Veterano" />
       <Campo rotulo="XP mínimo" name="xpMinimo" type="number" min={0} step={1} defaultValue={nivel.xpMinimo} required />
+      <label className="flex items-center gap-1 text-sm text-zinc-700">
+        <input type="checkbox" name="ativa" defaultChecked={nivel.ativa} /> Ativo
+      </label>
       <Botao type="submit" variante="secundario" disabled={pendente}>
         Salvar
       </Botao>

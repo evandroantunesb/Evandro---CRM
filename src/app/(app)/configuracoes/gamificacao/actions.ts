@@ -109,7 +109,31 @@ const esquemaNivel = z.object({
   xpMinimo: z.coerce.number().int().min(0),
 });
 
-export async function salvarNivel(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+export async function criarNivel(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  const { atual } = await exigirPapel("admin");
+  const dados = esquemaNivel.safeParse(Object.fromEntries(formData));
+  if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
+
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.from("niveis_gamificacao").insert({
+    empresa_id: atual.empresaId,
+    nivel: dados.data.nivel,
+    nome: dados.data.nome ?? null,
+    xp_minimo: dados.data.xpMinimo,
+  });
+  if (error) {
+    return {
+      ok: false,
+      mensagem:
+        error.code === "23505" ? "Já existe um nível com esse número ou esse XP mínimo." : mensagemErro(error, "Não foi possível criar o nível."),
+    };
+  }
+
+  revalidatePath(CAMINHO);
+  return { ok: true, mensagem: "Nível criado." };
+}
+
+export async function editarNivel(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
   const { atual } = await exigirPapel("admin");
   const dados = esquemaNivel.safeParse(Object.fromEntries(formData));
   if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
@@ -117,10 +141,9 @@ export async function salvarNivel(_: ResultadoAcao, formData: FormData): Promise
   const supabase = await criarClienteServidor();
   const { error } = await supabase
     .from("niveis_gamificacao")
-    .upsert(
-      { empresa_id: atual.empresaId, nivel: dados.data.nivel, nome: dados.data.nome ?? null, xp_minimo: dados.data.xpMinimo },
-      { onConflict: "empresa_id,nivel" },
-    );
+    .update({ nome: dados.data.nome ?? null, xp_minimo: dados.data.xpMinimo, ativa: formData.get("ativa") === "on" })
+    .eq("empresa_id", atual.empresaId)
+    .eq("nivel", dados.data.nivel);
   if (error) {
     return {
       ok: false,

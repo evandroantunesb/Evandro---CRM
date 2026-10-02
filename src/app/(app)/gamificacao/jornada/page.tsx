@@ -9,12 +9,11 @@ export default async function MinhaJornada() {
 
   const [{ data: lancamentos }, { data: niveis }, { data: conquistas }, { data: desbloqueadas }] = await Promise.all([
     supabase.from("point_ledger").select("xp").eq("membro_id", atual.membroId).eq("estornado", false),
-    supabase.from("niveis_gamificacao").select("nivel, nome, xp_minimo").eq("empresa_id", atual.empresaId).order("xp_minimo"),
+    supabase.from("niveis_gamificacao").select("nivel, nome, xp_minimo").eq("empresa_id", atual.empresaId).eq("ativa", true).order("xp_minimo"),
     supabase
       .from("conquistas")
-      .select("id, nome, descricao, icone, criterio")
+      .select("id, nome, descricao, icone, criterio, ativa")
       .eq("empresa_id", atual.empresaId)
-      .eq("ativa", true)
       .order("created_at"),
     supabase.from("conquistas_desbloqueadas").select("conquista_id").eq("membro_id", atual.membroId),
   ]);
@@ -25,6 +24,9 @@ export default async function MinhaJornada() {
   const nivelAtual = { nivel, nome: nomeNivel, xpMinimo: xpBaseNivel };
 
   const idsDesbloqueadas = new Set((desbloqueadas ?? []).map((d) => d.conquista_id));
+  // Conquista desativada some pra quem ainda não desbloqueou, mas continua
+  // visível no histórico de quem já tem (decisão de Evandro, 2026-10-02).
+  const conquistasVisiveis = (conquistas ?? []).filter((c) => c.ativa || idsDesbloqueadas.has(c.id));
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4">
@@ -48,10 +50,10 @@ export default async function MinhaJornada() {
         <p className="mt-1 text-xs text-zinc-500">{totalXp.toLocaleString("pt-BR")} XP acumulado</p>
       </Cartao>
 
-      <Cartao titulo={`Conquistas (${idsDesbloqueadas.size} de ${conquistas?.length ?? 0})`}>
-        {!conquistas?.length && <p className="text-sm text-zinc-600">Nenhuma conquista configurada ainda.</p>}
+      <Cartao titulo={`Conquistas (${idsDesbloqueadas.size} de ${conquistasVisiveis.length})`}>
+        {!conquistasVisiveis.length && <p className="text-sm text-zinc-600">Nenhuma conquista configurada ainda.</p>}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {(conquistas ?? []).map((c) => {
+          {conquistasVisiveis.map((c) => {
             const desbloqueada = idsDesbloqueadas.has(c.id);
             return (
               <div
@@ -61,7 +63,10 @@ export default async function MinhaJornada() {
                 }`}
               >
                 <span className="text-2xl">{desbloqueada ? c.icone : "🔒"}</span>
-                <span className="text-xs font-medium text-zinc-900">{c.nome}</span>
+                <span className="text-xs font-medium text-zinc-900">
+                  {c.nome}
+                  {!c.ativa && <span className="ml-1 text-[10px] text-zinc-400">(desativada)</span>}
+                </span>
                 {!desbloqueada && (
                   <span className="text-[11px] text-zinc-500">
                     Acumule {(c.criterio as { metrica: string; valor: number }).valor.toLocaleString("pt-BR")} XP

@@ -101,10 +101,12 @@ export default async function GamificacaoDashboard({ searchParams }: { searchPar
       p_perfil: atual.perfilGamificacao ?? "closer",
       p_desde: atualMes.inicioIso,
     }),
-    supabase.from("niveis_gamificacao").select("nivel, nome, xp_minimo").eq("empresa_id", atual.empresaId).order("xp_minimo"),
+    supabase.from("niveis_gamificacao").select("nivel, nome, xp_minimo").eq("empresa_id", atual.empresaId).eq("ativa", true).order("xp_minimo"),
     supabase.from("point_ledger").select("xp").eq("membro_id", atual.membroId).eq("estornado", false).limit(20000),
     supabase.from("point_ledger").select("moedas").eq("membro_id", atual.membroId).eq("estornado", false).limit(20000),
-    supabase.from("conquistas").select("id, nome, icone").eq("empresa_id", atual.empresaId).eq("ativa", true),
+    // Sem filtro de ativa: isto só identifica conquistas já desbloqueadas (ver minhasConquistas
+    // abaixo), que continuam visíveis mesmo se a conquista for desativada depois.
+    supabase.from("conquistas").select("id, nome, icone").eq("empresa_id", atual.empresaId),
     supabase
       .from("conquistas_desbloqueadas")
       .select("conquista_id, desbloqueada_em")
