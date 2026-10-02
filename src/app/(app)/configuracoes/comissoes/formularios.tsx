@@ -1,14 +1,16 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
+import { Botao, Campo, Mensagem, Selecao, Selo } from "@/components/ui";
 import type { FaixaComissao } from "@/lib/comissoes";
+import { formatarMoeda } from "@/lib/formatacao";
 import type { MembroResumo } from "@/lib/crm";
 import { ROTULO_TIPO_CALCULO_COMISSAO, TIPOS_CALCULO_COMISSAO, type TipoCalculoComissao } from "@/lib/tipos";
-import { apagarPlano, calcularComissao, salvarPlano } from "./actions";
+import { apagarVersaoPlano, calcularComissao, fecharComissao, salvarPlano } from "./actions";
 
-export type PlanoSalvo = {
-  planoId: string | null;
+export type VersaoPlano = {
+  id: string;
+  vigenciaInicio: string;
   salarioBase: number | null;
   metaOte: number | null;
   tipoCalculo: TipoCalculoComissao;
@@ -24,6 +26,19 @@ function paraLinhas(faixas: FaixaComissao[]): LinhaFaixa[] {
     max: f.resultado_maximo === null ? "" : String(f.resultado_maximo),
     valor: String(f.valor),
   }));
+}
+
+function formatarMesReferencia(dataIso: string) {
+  return new Date(`${dataIso}T00:00:00Z`).toLocaleDateString("pt-BR", { month: "long", year: "numeric", timeZone: "UTC" });
+}
+
+/** Mês seguinte ao de `referencia` (ou o mês atual, se não houver nenhuma versão ainda), em "AAAA-MM". */
+function proximoMes(referencia: string | undefined) {
+  const base = referencia ? new Date(`${referencia}T00:00:00Z`) : new Date();
+  const ano = referencia ? base.getUTCFullYear() : base.getFullYear();
+  const mes = referencia ? base.getUTCMonth() : base.getMonth();
+  const proximo = new Date(Date.UTC(ano, mes + (referencia ? 1 : 0), 1));
+  return `${proximo.getUTCFullYear()}-${String(proximo.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
 function FaixasEditor({ faixasIniciais }: { faixasIniciais: FaixaComissao[] }) {
@@ -93,23 +108,28 @@ function FaixasEditor({ faixasIniciais }: { faixasIniciais: FaixaComissao[] }) {
   );
 }
 
-export function PlanoComissaoForm({ membro, plano }: { membro: MembroResumo; plano: PlanoSalvo }) {
+/**
+ * Sempre cria uma NOVA versão do plano (vigência mensal) — nunca edita uma versão existente em
+ * lugar. Pré-preenche com os valores da versão mais recente só como ponto de partida; salvar
+ * nunca sobrescreve essa versão.
+ */
+export function PlanoComissaoForm({ membro, versaoAtual }: { membro: MembroResumo; versaoAtual: VersaoPlano | null }) {
   const [resultado, acao, pendente] = useActionState(salvarPlano, null);
-  const [tipoCalculo, setTipoCalculo] = useState<TipoCalculoComissao>(plano.tipoCalculo);
+  const [tipoCalculo, setTipoCalculo] = useState<TipoCalculoComissao>(versaoAtual?.tipoCalculo ?? "percentual");
 
   return (
     <form action={acao} className="flex flex-col gap-3 border-t border-zinc-100 py-4 first:border-t-0">
       <input type="hidden" name="membroId" value={membro.id} />
-      {plano.planoId && <input type="hidden" name="id" value={plano.planoId} />}
       <p className="text-sm font-medium text-zinc-900">{membro.nome}</p>
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-4">
+        <Campo rotulo="Vigência a partir de" name="vigenciaMes" type="month" defaultValue={proximoMes(versaoAtual?.vigenciaInicio)} required />
         <Campo
           rotulo="Salário-base (R$, opcional)"
           name="salarioBase"
           type="number"
           min={0}
           step="0.01"
-          defaultValue={plano.salarioBase ?? undefined}
+          defaultValue={versaoAtual?.salarioBase ?? undefined}
         />
         <Campo
           rotulo="Meta (OTE, R$, opcional)"
@@ -117,7 +137,7 @@ export function PlanoComissaoForm({ membro, plano }: { membro: MembroResumo; pla
           type="number"
           min={0}
           step="0.01"
-          defaultValue={plano.metaOte ?? undefined}
+          defaultValue={versaoAtual?.metaOte ?? undefined}
         />
         <Selecao
           rotulo="Tipo de cálculo"
@@ -132,19 +152,61 @@ export function PlanoComissaoForm({ membro, plano }: { membro: MembroResumo; pla
           ))}
         </Selecao>
       </div>
-      <FaixasEditor faixasIniciais={plano.faixas} />
+      <FaixasEditor faixasIniciais={versaoAtual?.faixas ?? []} />
       <div className="flex flex-wrap items-center gap-3">
         <Botao type="submit" variante="secundario" disabled={pendente}>
-          Salvar plano
+          Salvar nova versão
         </Botao>
-        {plano.planoId && (
-          <button type="submit" formAction={apagarPlano} className="text-xs text-zinc-400 hover:text-red-700">
-            Apagar plano
-          </button>
-        )}
         <Mensagem resultado={resultado} />
       </div>
     </form>
+  );
+}
+
+/** Histórico de versões do plano de um colaborador. Só a(s) ainda não vigente(s) pode(m) ser apagada(s). */
+export function HistoricoVersoesPlano({
+  versoes,
+  versaoVigenteId,
+  mesAtual,
+}: {
+  versoes: VersaoPlano[];
+  versaoVigenteId: string | null;
+  mesAtual: string;
+}) {
+  if (!versoes.length) return null;
+  return (
+    <details className="text-xs text-zinc-500">
+      <summary className="cursor-pointer select-none">Ver versões anteriores ({versoes.length})</summary>
+      <ul className="mt-2 flex flex-col gap-1.5">
+        {versoes.map((v) => {
+          const futura = v.vigenciaInicio > mesAtual;
+          const vigente = v.id === versaoVigenteId;
+          return (
+            <li key={v.id} className="flex items-center justify-between gap-3 rounded border border-zinc-100 px-2 py-1">
+              <span>
+                Desde {formatarMesReferencia(v.vigenciaInicio)} ·{" "}
+                {v.salarioBase !== null ? `${formatarMoeda(v.salarioBase)} + ` : ""}
+                {ROTULO_TIPO_CALCULO_COMISSAO[v.tipoCalculo]}
+                {vigente && (
+                  <>
+                    {" "}
+                    <Selo tom="positivo">Vigente</Selo>
+                  </>
+                )}
+              </span>
+              {futura && (
+                <form action={apagarVersaoPlano}>
+                  <input type="hidden" name="id" value={v.id} />
+                  <button type="submit" className="text-zinc-400 hover:text-red-700">
+                    Apagar
+                  </button>
+                </form>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </details>
   );
 }
 
@@ -166,6 +228,21 @@ export function CalcularComissaoForm({ membros }: { membros: MembroResumo[] }) {
       <Campo rotulo="Mês" name="mes" type="month" required />
       <Botao type="submit" disabled={pendente}>
         Calcular
+      </Botao>
+      <Mensagem resultado={resultado} />
+    </form>
+  );
+}
+
+/** Fecha uma comissão `aberta`: congela o snapshot e bloqueia recálculo/edição. */
+export function FecharComissaoForm({ comissaoId }: { comissaoId: string }) {
+  const [resultado, acao, pendente] = useActionState(fecharComissao, null);
+
+  return (
+    <form action={acao} className="flex items-center gap-2">
+      <input type="hidden" name="id" value={comissaoId} />
+      <Botao type="submit" variante="secundario" disabled={pendente}>
+        Fechar
       </Botao>
       <Mensagem resultado={resultado} />
     </form>
