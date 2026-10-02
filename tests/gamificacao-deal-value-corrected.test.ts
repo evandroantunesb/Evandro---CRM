@@ -292,11 +292,15 @@ describe("concorrência", () => {
       .select("payload")
       .eq("entidade_id", negocioId)
       .eq("tipo", "deal.value_corrected")
-      .order("created_at");
+      .order("id");
     expect(correcoes).toHaveLength(2);
 
-    // O lock garante ordem serial real: o "de" da segunda correção a commitar é exatamente
-    // o "para" da primeira — nenhuma correção perdeu a atualização da outra.
+    // Ordena por id (sequencial no INSERT real), não por created_at: created_at usa now(),
+    // que congela no início da transação — com 2 transações disputando o lock (for update),
+    // a que começa primeiro pode comitar depois, invertendo a ordem aparente por created_at
+    // mesmo com a serialização correta. O lock garante ordem serial real: o "de" da segunda
+    // correção a commitar é exatamente o "para" da primeira — nenhuma correção perdeu a
+    // atualização da outra.
     const p1 = correcoes![0].payload as Record<string, unknown>;
     const p2 = correcoes![1].payload as Record<string, unknown>;
     expect(p1.de).toBe(10000);
