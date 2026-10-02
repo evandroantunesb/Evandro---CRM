@@ -2967,6 +2967,7 @@ export type Database = {
           id: string;
           negocio_id: string | null;
           responsavel_id: string | null;
+          resultado: Database["public"]["Enums"]["resultado_tarefa"] | null;
           tipo: Database["public"]["Enums"]["tipo_tarefa"];
           titulo: string;
           updated_at: string;
@@ -2982,6 +2983,7 @@ export type Database = {
           id?: string;
           negocio_id?: string | null;
           responsavel_id?: string | null;
+          resultado?: Database["public"]["Enums"]["resultado_tarefa"] | null;
           tipo?: Database["public"]["Enums"]["tipo_tarefa"];
           titulo: string;
           updated_at?: string;
@@ -2997,6 +2999,7 @@ export type Database = {
           id?: string;
           negocio_id?: string | null;
           responsavel_id?: string | null;
+          resultado?: Database["public"]["Enums"]["resultado_tarefa"] | null;
           tipo?: Database["public"]["Enums"]["tipo_tarefa"];
           titulo?: string;
           updated_at?: string;
@@ -3277,6 +3280,15 @@ export type Database = {
       proposta_bloco_quebra: "auto" | "nova_pagina" | "pagina_exclusiva";
       proposta_modelo_capa: "foto" | "minimalista" | "tecnica";
       proposta_modelo_status: "rascunho" | "publicado" | "arquivado";
+      resultado_tarefa:
+        | "contato_realizado"
+        | "sem_resposta"
+        | "numero_invalido"
+        | "retornar_depois"
+        | "sem_interesse"
+        | "realizada"
+        | "no_show"
+        | "cancelada";
       situacao_empresa: "ativa" | "suspensa" | "cancelada";
       status_atribuicao_lead: "pendente" | "aprovada" | "reatribuida" | "expirada";
       status_contrato: "rascunho" | "aguardando_assinatura" | "assinado";
@@ -3419,6 +3431,16 @@ export const Constants = {
       proposta_bloco_quebra: ["auto", "nova_pagina", "pagina_exclusiva"],
       proposta_modelo_capa: ["foto", "minimalista", "tecnica"],
       proposta_modelo_status: ["rascunho", "publicado", "arquivado"],
+      resultado_tarefa: [
+        "contato_realizado",
+        "sem_resposta",
+        "numero_invalido",
+        "retornar_depois",
+        "sem_interesse",
+        "realizada",
+        "no_show",
+        "cancelada",
+      ],
       situacao_empresa: ["ativa", "suspensa", "cancelada"],
       status_atribuicao_lead: ["pendente", "aprovada", "reatribuida", "expirada"],
       status_contrato: ["rascunho", "aguardando_assinatura", "assinado"],

@@ -1,5 +1,5 @@
 import { Cartao } from "@/components/ui";
-import { EVENTOS_GAMIFICACAO, type MarcoConquista } from "@/lib/gamificacao";
+import { EVENTOS_GAMIFICACAO, EVENTOS_GAMIFICACAO_SELECIONAVEIS, type MarcoConquista } from "@/lib/gamificacao";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import type { OperadorCondicao, PerfilGamificacao, PeriodoLimiteRegra } from "@/lib/tipos";
@@ -37,7 +37,7 @@ export default async function ConfigGamificacao() {
         automaticamente no extrato do responsável.
       </p>
       <Cartao titulo="Nova regra">
-        <NovaRegra eventos={EVENTOS_GAMIFICACAO} />
+        <NovaRegra eventos={EVENTOS_GAMIFICACAO_SELECIONAVEIS} />
       </Cartao>
       <Cartao titulo={`Regras (${regras?.length ?? 0})`}>
         {(regras ?? []).map((r) => (

@@ -1,6 +1,7 @@
 import Link from "next/link";
+import { ConcluirTarefa } from "@/components/concluir-tarefa";
 import { formatarPrazo, situacaoPrazo } from "@/lib/crm";
-import { alternarConclusao, apagarTarefa } from "@/lib/acoes/tarefas";
+import { apagarTarefa } from "@/lib/acoes/tarefas";
 import { ROTULO_TIPO_TAREFA, type TipoTarefa } from "@/lib/tipos";
 
 export type TarefaLista = {
@@ -35,20 +36,7 @@ export function ListaTarefas({ tarefas, vazio }: { tarefas: TarefaLista[]; vazio
         const situacao = t.situacao;
         return (
           <li key={t.id} className="flex items-start gap-3 border-t border-zinc-100 py-2 text-sm first:border-t-0">
-            <form action={alternarConclusao}>
-              <input type="hidden" name="tarefaId" value={t.id} />
-              <input type="hidden" name="concluir" value={String(!concluida)} />
-              <button
-                aria-label={concluida ? "Marcar como pendente" : "Concluir tarefa"}
-                className={`mt-0.5 flex h-5 w-5 items-center justify-center rounded border text-xs ${
-                  concluida
-                    ? "border-green-600 bg-green-600 text-white"
-                    : "border-zinc-400 bg-white hover:border-green-600"
-                }`}
-              >
-                {concluida ? "✓" : ""}
-              </button>
-            </form>
+            <ConcluirTarefa tarefaId={t.id} tipo={t.tipo} concluida={concluida} />
             <div className="min-w-0 flex-1">
               <p className={concluida ? "text-zinc-400 line-through" : "text-zinc-900"}>
                 <span className="font-medium">{ROTULO_TIPO_TAREFA[t.tipo]}:</span> {t.titulo}
