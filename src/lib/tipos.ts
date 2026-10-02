@@ -244,6 +244,14 @@ export const ROTULO_TIPO_CALCULO_COMISSAO: Record<TipoCalculoComissao, string> =
   multiplicador: "Multiplicador sobre o resultado",
 };
 
+export const STATUS_COMISSAO = ["aberta", "fechada"] as const;
+export type StatusComissao = (typeof STATUS_COMISSAO)[number];
+
+export const ROTULO_STATUS_COMISSAO: Record<StatusComissao, string> = {
+  aberta: "Aberta",
+  fechada: "Fechada",
+};
+
 export const TIPOS_CLIENTE_QUALIF = ["residencial", "comercial", "industrial", "rural", "outro"] as const;
 export type TipoClienteQualif = (typeof TIPOS_CLIENTE_QUALIF)[number];
 

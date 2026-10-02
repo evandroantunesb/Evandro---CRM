@@ -346,12 +346,18 @@ export type Database = {
           created_at: string;
           empresa_id: string;
           faixa_aplicada: Json | null;
+          faixas_congeladas: Json | null;
+          fechada_em: string | null;
+          fechado_por: string | null;
           id: string;
           membro_id: string;
+          meta_ote_congelada: number | null;
           plano_id: string | null;
           referencia: string;
           resultado_apurado: number;
           salario_base: number;
+          status: Database["public"]["Enums"]["status_comissao"];
+          tipo_calculo_congelado: Database["public"]["Enums"]["tipo_calculo_comissao"] | null;
           valor_comissao: number;
           valor_total: number;
         };
@@ -360,12 +366,18 @@ export type Database = {
           created_at?: string;
           empresa_id: string;
           faixa_aplicada?: Json | null;
+          faixas_congeladas?: Json | null;
+          fechada_em?: string | null;
+          fechado_por?: string | null;
           id?: string;
           membro_id: string;
+          meta_ote_congelada?: number | null;
           plano_id?: string | null;
           referencia: string;
           resultado_apurado?: number;
           salario_base?: number;
+          status?: Database["public"]["Enums"]["status_comissao"];
+          tipo_calculo_congelado?: Database["public"]["Enums"]["tipo_calculo_comissao"] | null;
           valor_comissao?: number;
           valor_total?: number;
         };
@@ -374,12 +386,18 @@ export type Database = {
           created_at?: string;
           empresa_id?: string;
           faixa_aplicada?: Json | null;
+          faixas_congeladas?: Json | null;
+          fechada_em?: string | null;
+          fechado_por?: string | null;
           id?: string;
           membro_id?: string;
+          meta_ote_congelada?: number | null;
           plano_id?: string | null;
           referencia?: string;
           resultado_apurado?: number;
           salario_base?: number;
+          status?: Database["public"]["Enums"]["status_comissao"];
+          tipo_calculo_congelado?: Database["public"]["Enums"]["tipo_calculo_comissao"] | null;
           valor_comissao?: number;
           valor_total?: number;
         };
@@ -396,6 +414,13 @@ export type Database = {
             columns: ["empresa_id"];
             isOneToOne: false;
             referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "comissoes_calculadas_fechado_por_fkey";
+            columns: ["fechado_por"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
             referencedColumns: ["id"];
           },
           {
@@ -2337,7 +2362,6 @@ export type Database = {
       };
       planos_comissao: {
         Row: {
-          ativo: boolean;
           created_at: string;
           criado_por: string | null;
           empresa_id: string;
@@ -2348,9 +2372,9 @@ export type Database = {
           salario_base: number | null;
           tipo_calculo: Database["public"]["Enums"]["tipo_calculo_comissao"];
           updated_at: string;
+          vigencia_inicio: string;
         };
         Insert: {
-          ativo?: boolean;
           created_at?: string;
           criado_por?: string | null;
           empresa_id: string;
@@ -2361,9 +2385,9 @@ export type Database = {
           salario_base?: number | null;
           tipo_calculo?: Database["public"]["Enums"]["tipo_calculo_comissao"];
           updated_at?: string;
+          vigencia_inicio: string;
         };
         Update: {
-          ativo?: boolean;
           created_at?: string;
           criado_por?: string | null;
           empresa_id?: string;
@@ -2374,6 +2398,7 @@ export type Database = {
           salario_base?: number | null;
           tipo_calculo?: Database["public"]["Enums"]["tipo_calculo_comissao"];
           updated_at?: string;
+          vigencia_inicio?: string;
         };
         Relationships: [
           {
@@ -3123,6 +3148,15 @@ export type Database = {
         };
         Returns: number;
       };
+      calcular_receita_causal_comissao: {
+        Args: {
+          p_ate_exclusivo: string;
+          p_desde: string;
+          p_empresa_id: string;
+          p_membro_id: string;
+        };
+        Returns: number;
+      };
       compartilha_empresa: { Args: { p_user_id: string }; Returns: boolean };
       confirmar_pagamento: {
         Args: { p_contrato_id: string };
@@ -3249,6 +3283,7 @@ export type Database = {
         Returns: undefined;
       };
       expirar_atribuicoes_leads: { Args: Record<PropertyKey, never>; Returns: undefined };
+      fechar_comissao: { Args: { p_comissao_id: string }; Returns: undefined };
       incrementar_preenchimento_formulario: { Args: { p_id: string }; Returns: undefined };
       incrementar_visualizacao_formulario: { Args: { p_id: string }; Returns: undefined };
       membro_ativo: { Args: { p_empresa_id: string }; Returns: boolean };
@@ -3329,6 +3364,7 @@ export type Database = {
         | "cancelada";
       situacao_empresa: "ativa" | "suspensa" | "cancelada";
       status_atribuicao_lead: "pendente" | "aprovada" | "reatribuida" | "expirada";
+      status_comissao: "aberta" | "fechada";
       status_contrato: "rascunho" | "aguardando_assinatura" | "assinado";
       status_membro: "ativo" | "inativo" | "desligado";
       status_negocio: "aberto" | "ganho" | "perdido";
@@ -3481,6 +3517,7 @@ export const Constants = {
       ],
       situacao_empresa: ["ativa", "suspensa", "cancelada"],
       status_atribuicao_lead: ["pendente", "aprovada", "reatribuida", "expirada"],
+      status_comissao: ["aberta", "fechada"],
       status_contrato: ["rascunho", "aguardando_assinatura", "assinado"],
       status_membro: ["ativo", "inativo", "desligado"],
       status_negocio: ["aberto", "ganho", "perdido"],
