@@ -64,9 +64,11 @@ function inicioMes(offset = 0) {
 const FAIXA_UNICA: FaixaComissao[] = [{ resultado_minimo: 0, resultado_maximo: null, valor: 10 }];
 
 async function criarVersaoPlano(membroId: string, vigenciaInicio: string, faixas: FaixaComissao[] = FAIXA_UNICA) {
-  const { data, error } = await servico
+  // Insere via admin autenticado (RLS), não service_role — mesmo caminho de escrita que
+  // produção usa (planos_comissao revoga insert/update/delete de service_role).
+  const { data, error } = await admin.cliente
     .from("planos_comissao")
-    .insert({ empresa_id: empresa, membro_id: membroId, vigencia_inicio: vigenciaInicio, tipo_calculo: "percentual", faixas, criado_por: null })
+    .insert({ empresa_id: empresa, membro_id: membroId, vigencia_inicio: vigenciaInicio, tipo_calculo: "percentual", faixas, criado_por: adminMembroId })
     .select("id")
     .single();
   if (error) throw error;

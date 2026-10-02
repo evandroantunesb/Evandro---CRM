@@ -147,16 +147,23 @@ async function estornarPagamento(contratoId: string, motivo = "estorno de teste"
   if (error) throw error;
 }
 
-async function contarMarco(marco: string, membroId: string, perfilRequerido: "sdr" | "closer" | "cs_farmer" | null = null) {
-  const { data, error } = await admin.cliente.rpc("contar_marco_membro", {
-    p_marco: marco,
-    p_empresa_id: empresa,
-    p_membro_id: membroId,
-    p_ativa_desde: "1970-01-01T00:00:00Z",
-    p_perfil_requerido: perfilRequerido ?? undefined,
-  });
-  if (error) throw error;
-  return data as number;
+// contar_marco_membro é helper interno (revoke de public/anon/authenticated — ver
+// `20261002230000_gamificacao_fechamento_auditoria.sql`), nunca mais chamável via RPC
+// direta. Pra validar contagem exata só pelo fluxo interno legítimo, cria-se um par de
+// conquistas "pino" (valorExato e valorExato+1) com `ativaDesde` bem no passado — qualquer
+// evento do marco (passado ou futuro) reavalia as duas, e o par localiza a contagem real
+// sem nunca chamar a RPC: valorExato desbloqueada + valorExato+1 ainda bloqueada == contagem
+// é exatamente valorExato.
+async function criarPinoDeContagem(nomeBase: string, marco: string, valorExato: number, perfilRequerido: "sdr" | "closer" | "cs_farmer" | null = null) {
+  const baixo = await criarConquistaMarco({ nome: `${nomeBase} (pino=${valorExato})`, marco, valor: valorExato, perfilAplicavel: perfilRequerido, ativaDesde: "1970-01-01T00:00:00Z" });
+  const alto = await criarConquistaMarco({ nome: `${nomeBase} (pino=${valorExato + 1})`, marco, valor: valorExato + 1, perfilAplicavel: perfilRequerido, ativaDesde: "1970-01-01T00:00:00Z" });
+  return { baixo, alto };
+}
+
+/** Confirma, via desbloqueio real (nunca via RPC), que a contagem atual é exatamente `pinos.baixo`. */
+async function confirmarContagemExata(membroId: string, pinos: { baixo: string; alto: string }) {
+  expect(await desbloqueada(pinos.baixo, membroId)).toBe(true);
+  expect(await desbloqueada(pinos.alto, membroId)).toBe(false);
 }
 
 async function adicionarMembroEquipe(userId: string, papel: "admin" | "gestor" | "vendedor" | "sdr", perfilGamificacao: "sdr" | "closer" | "cs_farmer") {
@@ -305,10 +312,10 @@ describe("marco_contagem: deduplicação e idempotência", () => {
 });
 
 describe("marco_contagem: pagamento.confirmado — reocorrência e permanência (sem contar dobrado o mesmo contrato)", () => {
-  // Cada teste usa um membro novo: contarMarco() soma TODOS os contratos ao vivo do
-  // membro (é assim que a contagem real pra threshold de conquista funciona), então
-  // reaproveitar `closer` entre os `it`s acumularia os pagamentos confirmados de testes
-  // anteriores e invalidaria o "conta só 1" de cada cenário isolado.
+  // Cada teste usa um membro novo: a contagem real soma TODOS os contratos ao vivo do
+  // membro (é assim que o threshold de conquista funciona), então reaproveitar `closer`
+  // entre os `it`s acumularia os pagamentos confirmados de testes anteriores e
+  // invalidaria o "conta só 1" de cada cenário isolado.
   let contadorPagamento = 0;
   async function criarClienteBeneficiario() {
     contadorPagamento += 1;
@@ -322,8 +329,11 @@ describe("marco_contagem: pagamento.confirmado — reocorrência e permanência 
     const { usuario, membroId } = await criarClienteBeneficiario();
     const negocioId = await criarNegocio("Pagamento conta 1", membroId);
     const contratoId = await criarEAssinarContrato(negocioId, usuario.cliente);
+    const pinos = await criarPinoDeContagem("Pagamento conta 1", "pagamento.confirmado", 1);
+
     await confirmarPagamento(contratoId);
-    expect(await contarMarco("pagamento.confirmado", membroId)).toBe(1);
+
+    await confirmarContagemExata(membroId, pinos);
   });
 
   it("pagamento confirmado → estornado: deixa de contar pra avaliação futura (estado ao vivo)", async () => {
@@ -331,28 +341,38 @@ describe("marco_contagem: pagamento.confirmado — reocorrência e permanência 
     const negocioId = await criarNegocio("Pagamento estornado", membroId);
     const contratoId = await criarEAssinarContrato(negocioId, usuario.cliente);
     await confirmarPagamento(contratoId);
-    expect(await contarMarco("pagamento.confirmado", membroId)).toBe(1);
-
     await estornarPagamento(contratoId);
-    expect(await contarMarco("pagamento.confirmado", membroId)).toBe(0);
+
+    // Estorno não reavalia sozinho (pagamento.confirmacao_estornada não está na lista de
+    // tipos que disparam avaliar_conquistas_marco) — os pinos são criados DEPOIS do estorno
+    // e só são medidos no próximo evento qualificador (contrato B), que revela se a
+    // contagem ao vivo já excluiu o contrato A estornado.
+    const pinos = await criarPinoDeContagem("Pagamento estornado", "pagamento.confirmado", 1);
+    const negocioB = await criarNegocio("Pagamento estornado - gatilho", membroId);
+    const contratoB = await criarEAssinarContrato(negocioB, usuario.cliente);
+    await confirmarPagamento(contratoB);
+
+    await confirmarContagemExata(membroId, pinos); // só 1 ao vivo (B); A estornado não conta
   });
 
   it("confirmado → estornado → reconfirmado: o mesmo contrato continua valendo só 1, nunca 2", async () => {
     const { usuario, membroId } = await criarClienteBeneficiario();
     const negocioId = await criarNegocio("Pagamento reconfirmado", membroId);
     const contratoId = await criarEAssinarContrato(negocioId, usuario.cliente);
+    const pinos = await criarPinoDeContagem("Pagamento reconfirmado", "pagamento.confirmado", 1);
 
     await confirmarPagamento(contratoId);
     await estornarPagamento(contratoId);
     await confirmarPagamento(contratoId);
 
-    expect(await contarMarco("pagamento.confirmado", membroId)).toBe(1);
+    await confirmarContagemExata(membroId, pinos);
   });
 
   it("múltiplos ciclos de confirma/estorna no mesmo contrato nunca fazem ele valer mais de 1", async () => {
     const { usuario, membroId } = await criarClienteBeneficiario();
     const negocioId = await criarNegocio("Pagamento múltiplos ciclos", membroId);
     const contratoId = await criarEAssinarContrato(negocioId, usuario.cliente);
+    const pinos = await criarPinoDeContagem("Pagamento múltiplos ciclos", "pagamento.confirmado", 1);
 
     for (let i = 0; i < 3; i++) {
       await confirmarPagamento(contratoId);
@@ -360,7 +380,7 @@ describe("marco_contagem: pagamento.confirmado — reocorrência e permanência 
     }
     await confirmarPagamento(contratoId);
 
-    expect(await contarMarco("pagamento.confirmado", membroId)).toBe(1);
+    await confirmarContagemExata(membroId, pinos);
   });
 
   it("conquista já desbloqueada permanece desbloqueada mesmo depois do pagamento ser estornado", async () => {
@@ -481,26 +501,40 @@ describe("marco_contagem: perfil por ocorrência (causal/congelado), nunca o per
     const membroTroca = await adicionarMembroEquipe(sdrTroca.id, "sdr", "sdr");
     membro[sdrTroca.id] = membroTroca;
 
+    const pinosSdr8 = await criarPinoDeContagem("Handoff sdr", "handoff.won", 8, "sdr");
+    const pinosNull8 = await criarPinoDeContagem("Handoff geral", "handoff.won", 8, null);
+    const pinoCloserZero = await criarConquistaMarco({
+      nome: "Handoff closer (checagem zero)",
+      marco: "handoff.won",
+      valor: 1,
+      perfilAplicavel: "closer",
+      ativaDesde: "1970-01-01T00:00:00Z",
+    });
+
     for (let i = 0; i < 8; i++) {
       const negocioId = await criarNegocio(`Oportunidade sdr ${i}`, membroTroca);
       await enviarEAceitar(negocioId, sdrTroca, closer);
       await marcarStatus(negocioId, "ganho", closer.cliente);
     }
-    expect(await contarMarco("handoff.won", membroTroca, "sdr")).toBe(8);
-    expect(await contarMarco("handoff.won", membroTroca, "closer")).toBe(0);
-    expect(await contarMarco("handoff.won", membroTroca, null)).toBe(8);
+    await confirmarContagemExata(membroTroca, pinosSdr8); // exatamente 8 como sdr
+    expect(await desbloqueada(pinoCloserZero, membroTroca)).toBe(false); // 0 como closer
+    await confirmarContagemExata(membroTroca, pinosNull8); // geral também 8 (nenhum closer ainda)
 
     // Promove o membro a closer — não reinterpreta as 8 ocorrências antigas como closer.
     await servico.from("empresa_membros").update({ perfil_gamificacao: "closer" }).eq("id", membroTroca);
+
+    const pinosSdr9 = await criarPinoDeContagem("Handoff sdr (pós-promoção)", "handoff.won", 9, "sdr"); // nunca deve desbloquear
+    const pinosCloser2 = await criarPinoDeContagem("Handoff closer", "handoff.won", 2, "closer");
+    const pinosNull10 = await criarPinoDeContagem("Handoff geral (pós-promoção)", "handoff.won", 10, null);
 
     for (let i = 0; i < 2; i++) {
       const negocioId = await criarNegocio(`Oportunidade closer ${i}`, membroTroca);
       await enviarEAceitar(negocioId, sdrTroca, closer2);
       await marcarStatus(negocioId, "ganho", closer2.cliente);
     }
-    expect(await contarMarco("handoff.won", membroTroca, "sdr")).toBe(8); // histórico sdr intacto
-    expect(await contarMarco("handoff.won", membroTroca, "closer")).toBe(2); // nunca 10
-    expect(await contarMarco("handoff.won", membroTroca, null)).toBe(10); // geral soma tudo
+    expect(await desbloqueada(pinosSdr9.baixo, membroTroca)).toBe(false); // histórico sdr nunca passa de 8
+    await confirmarContagemExata(membroTroca, pinosCloser2); // exatamente 2 como closer, nunca 10
+    await confirmarContagemExata(membroTroca, pinosNull10); // geral soma tudo: 10
 
     const conquistaAlta = await criarConquistaMarco({
       nome: "10 handoffs como closer",
@@ -554,10 +588,21 @@ describe("marco_contagem: perfil por ocorrência (causal/congelado), nunca o per
     // Edição administrativa: muda perfil_aplicavel pra 'closer' depois dos fatos já existirem.
     await admin.cliente.from("conquistas").update({ perfil_aplicavel: "closer" }).eq("id", conquistaId);
 
+    // Pinos só são avaliados num evento FUTURO (o trigger reavalia só em INSERT novo em
+    // `eventos`) — por isso o gatilho abaixo (perfil causal "closer", já que o membro foi
+    // promovido) soma +1 ao total closer: 2 ocorrências antigas + esta = 3. O total sdr não
+    // ganha gatilho equivalente e permanece exatamente 3, nunca contaminado pelo closer.
+    const pinosSdr = await criarPinoDeContagem("Perfil trocado (sdr)", "handoff.won", 3, "sdr");
+    const pinosCloser = await criarPinoDeContagem("Perfil trocado (closer)", "handoff.won", 3, "closer");
+
+    const negocioGatilho = await criarNegocio("Gatilho pino perfil trocado", membroTroca2);
+    await enviarEAceitar(negocioGatilho, sdrTroca2, closer2);
+    await marcarStatus(negocioGatilho, "ganho", closer2.cliente);
+
     // A contagem causal pro perfil 'closer' é recalculada do zero a partir do dado
     // congelado de cada ocorrência — nunca herda ou soma as 3 ocorrências 'sdr' antigas.
-    expect(await contarMarco("handoff.won", membroTroca2, "closer")).toBe(2);
-    expect(await contarMarco("handoff.won", membroTroca2, "sdr")).toBe(3); // histórico sdr continua intacto e separado
+    await confirmarContagemExata(membroTroca2, pinosCloser); // 2 antigas + 1 do gatilho: exatamente 3
+    await confirmarContagemExata(membroTroca2, pinosSdr); // histórico sdr continua intacto e separado: exatamente 3
   });
 });
 
@@ -626,20 +671,36 @@ describe("marco_contagem: perfil causal congelado em contratos.perfil_assinatura
     const contratoId = await criarEAssinarContrato(negocioId, vendedor.cliente);
 
     await servico.from("empresa_membros").update({ perfil_gamificacao: "sdr" }).eq("id", membroId); // perfil atual agora é sdr
+    const pinosCloser = await criarPinoDeContagem("Pagamento perfil congelado (closer)", "pagamento.confirmado", 1, "closer");
+    const pinoSdrZero = await criarConquistaMarco({
+      nome: "Pagamento perfil congelado (sdr=0)",
+      marco: "pagamento.confirmado",
+      valor: 1,
+      perfilAplicavel: "sdr",
+      ativaDesde: "1970-01-01T00:00:00Z",
+    });
     await confirmarPagamento(contratoId);
 
-    expect(await contarMarco("pagamento.confirmado", membroId, "closer")).toBe(1); // perfil congelado na assinatura
-    expect(await contarMarco("pagamento.confirmado", membroId, "sdr")).toBe(0); // nunca o perfil atual
+    await confirmarContagemExata(membroId, pinosCloser); // perfil congelado na assinatura: 1 como closer
+    expect(await desbloqueada(pinoSdrZero, membroId)).toBe(false); // nunca o perfil atual
   });
 
   it("deal.won registra o perfil causal (congelado) da própria ocorrência", async () => {
     const vendedor = await criarUsuario("cm-perfil-assin-5");
     const membroId = await adicionarMembroEquipe(vendedor.id, "vendedor", "closer");
     const negocioId = await criarNegocio("Deal.won registra perfil causal", membroId);
+    const pinosCloser = await criarPinoDeContagem("Deal.won perfil causal (closer)", "deal.won", 1, "closer");
+    const pinoSdrZero = await criarConquistaMarco({
+      nome: "Deal.won perfil causal (sdr=0)",
+      marco: "deal.won",
+      valor: 1,
+      perfilAplicavel: "sdr",
+      ativaDesde: "1970-01-01T00:00:00Z",
+    });
     await marcarStatus(negocioId, "ganho", vendedor.cliente);
 
-    expect(await contarMarco("deal.won", membroId, "closer")).toBe(1);
-    expect(await contarMarco("deal.won", membroId, "sdr")).toBe(0);
+    await confirmarContagemExata(membroId, pinosCloser);
+    expect(await desbloqueada(pinoSdrZero, membroId)).toBe(false);
   });
 
   it("mudança sdr → closer não mistura ocorrências antigas e novas em deal.qualified", async () => {
@@ -656,16 +717,26 @@ describe("marco_contagem: perfil causal congelado em contratos.perfil_assinatura
       if (error) throw error;
     }
 
+    const pinosSdr = await criarPinoDeContagem("Qualificado sdr", "deal.qualified", 2, "sdr");
+    const pinoCloserZero = await criarConquistaMarco({
+      nome: "Qualificado closer (checagem zero)",
+      marco: "deal.qualified",
+      valor: 1,
+      perfilAplicavel: "closer",
+      ativaDesde: "1970-01-01T00:00:00Z",
+    });
+
     await qualificar("Qualificação como sdr 1");
     await qualificar("Qualificação como sdr 2");
-    expect(await contarMarco("deal.qualified", membroId, "sdr")).toBe(2);
-    expect(await contarMarco("deal.qualified", membroId, "closer")).toBe(0);
+    await confirmarContagemExata(membroId, pinosSdr); // exatamente 2 como sdr
+    expect(await desbloqueada(pinoCloserZero, membroId)).toBe(false); // 0 como closer
 
     await servico.from("empresa_membros").update({ perfil_gamificacao: "closer" }).eq("id", membroId);
+    const pinosCloser = await criarPinoDeContagem("Qualificado closer", "deal.qualified", 1, "closer");
     await qualificar("Qualificação como closer 1");
 
-    expect(await contarMarco("deal.qualified", membroId, "sdr")).toBe(2); // histórico sdr intacto
-    expect(await contarMarco("deal.qualified", membroId, "closer")).toBe(1); // nunca 3
+    expect(await desbloqueada(pinosSdr.alto, membroId)).toBe(false); // histórico sdr intacto, nunca passa de 2
+    await confirmarContagemExata(membroId, pinosCloser); // exatamente 1 como closer, nunca 3
   });
 
   it("ocorrência com perfil causal null só conta pra conquista geral, nunca pra uma de perfil específico", async () => {
@@ -679,13 +750,28 @@ describe("marco_contagem: perfil causal congelado em contratos.perfil_assinatura
     await servico.from("equipe_membros").insert({ empresa_id: empresa, equipe_id: equipeId, membro_id: membroId, e_gestor: false });
 
     const negocioId = await criarNegocio("Sem perfil causal", membroId);
+    const pinosGeral = await criarPinoDeContagem("Deal.won perfil null (geral)", "deal.won", 1, null);
+    const pinoCloserZero = await criarConquistaMarco({
+      nome: "Deal.won perfil null (closer=0)",
+      marco: "deal.won",
+      valor: 1,
+      perfilAplicavel: "closer",
+      ativaDesde: "1970-01-01T00:00:00Z",
+    });
+    const pinoSdrZero = await criarConquistaMarco({
+      nome: "Deal.won perfil null (sdr=0)",
+      marco: "deal.won",
+      valor: 1,
+      perfilAplicavel: "sdr",
+      ativaDesde: "1970-01-01T00:00:00Z",
+    });
     await marcarStatus(negocioId, "ganho", vendedor.cliente);
 
     // Conquista geral (perfil_aplicavel = null) continua contando normalmente.
-    expect(await contarMarco("deal.won", membroId, null)).toBe(1);
+    await confirmarContagemExata(membroId, pinosGeral);
     // Conquista de perfil específico nunca conta uma ocorrência sem perfil causal —
     // nunca infere pelo perfil atual do membro (que também é null aqui, de propósito).
-    expect(await contarMarco("deal.won", membroId, "closer")).toBe(0);
-    expect(await contarMarco("deal.won", membroId, "sdr")).toBe(0);
+    expect(await desbloqueada(pinoCloserZero, membroId)).toBe(false);
+    expect(await desbloqueada(pinoSdrZero, membroId)).toBe(false);
   });
 });

@@ -146,12 +146,85 @@ describe("estornar_lancamentos_evento: só caminho interno, nunca RPC pública",
   }
 });
 
-// Ponto 2 (contar_marco_membro: eliminar leitura cross-tenant) NÃO foi aplicado nesta PR —
-// conflito estrutural com tests/gamificacao-conquistas-marco.test.ts (chama a função
-// diretamente via RPC autenticada pra testar a contagem isolada) e com o próprio desenho
-// do crédito interno (beneficiário pode ser estruturalmente diferente de quem agiu — ver
-// comentário na migration e relato ao Evandro). Sem teste aqui porque nenhum código foi
-// alterado.
+describe("contar_marco_membro: helper interno, nunca RPC pública (Evandro, opção b)", () => {
+  let admin2: Usuario;
+  let vendedor2: Usuario;
+  let empresa2: string;
+  let membroVendedor2: string;
+  let funil2: string;
+  let etapaInicial2: string;
+  let contato2: string;
+
+  beforeAll(async () => {
+    [admin2, vendedor2] = await Promise.all(["cmm-admin", "cmm-vendedor"].map(criarUsuario));
+    const { data: emp } = await servico.from("empresas").insert({ nome: `contar_marco_membro ${sufixo}` }).select("id").single();
+    empresa2 = emp!.id;
+    const { data: vinculos } = await servico
+      .from("empresa_membros")
+      .insert([
+        { empresa_id: empresa2, user_id: admin2.id, papel: "admin" },
+        { empresa_id: empresa2, user_id: vendedor2.id, papel: "vendedor" },
+      ])
+      .select("id, user_id");
+    membroVendedor2 = vinculos!.find((v) => v.user_id === vendedor2.id)!.id;
+
+    const { data: f } = await servico.from("funis").select("id").eq("empresa_id", empresa2).single();
+    funil2 = f!.id;
+    const { data: etapas } = await servico.from("etapas").select("id").eq("funil_id", funil2).order("ordem");
+    etapaInicial2 = etapas![0].id;
+    const { data: c } = await servico.from("contatos").insert({ empresa_id: empresa2, nome: "Cliente contar_marco_membro" }).select("id").single();
+    contato2 = c!.id;
+  });
+
+  it("usuário autenticado não consegue chamar a RPC diretamente (revoke de authenticated)", async () => {
+    const { error } = await vendedor2.cliente.rpc("contar_marco_membro", {
+      p_marco: "deal.won",
+      p_empresa_id: empresa2,
+      p_membro_id: membroVendedor2,
+      p_ativa_desde: "1970-01-01T00:00:00Z",
+    });
+    expect(error).not.toBeNull();
+    expect(error!.message.toLowerCase()).toContain("permission denied");
+  });
+
+  it("admin também não consegue chamar a RPC diretamente — revoke vale pra qualquer authenticated, não é controle de papel", async () => {
+    const { error } = await admin2.cliente.rpc("contar_marco_membro", {
+      p_marco: "deal.won",
+      p_empresa_id: empresa2,
+      p_membro_id: membroVendedor2,
+      p_ativa_desde: "1970-01-01T00:00:00Z",
+    });
+    expect(error).not.toBeNull();
+    expect(error!.message.toLowerCase()).toContain("permission denied");
+  });
+
+  it("caminho interno continua funcionando: deal.won desbloqueia uma conquista marco_contagem normalmente", async () => {
+    const { data: conquista, error: erroConquista } = await admin2.cliente
+      .from("conquistas")
+      .insert({ empresa_id: empresa2, nome: "cmm-marco", criterio: { metrica: "marco_contagem", marco: "deal.won", valor: 1 } })
+      .select("id")
+      .single();
+    if (erroConquista) throw erroConquista;
+
+    const { data: negocio, error: erroNegocio } = await servico
+      .from("negocios")
+      .insert({ empresa_id: empresa2, titulo: `Negócio cmm ${sufixo}`, contato_id: contato2, funil_id: funil2, etapa_id: etapaInicial2, responsavel_id: membroVendedor2, valor: 1000 })
+      .select("id")
+      .single();
+    if (erroNegocio) throw erroNegocio;
+
+    const { error: erroGanho } = await servico.from("negocios").update({ status: "ganho" }).eq("id", negocio!.id);
+    if (erroGanho) throw erroGanho;
+
+    const { data: desbloqueio } = await servico
+      .from("conquistas_desbloqueadas")
+      .select("id")
+      .eq("conquista_id", conquista!.id)
+      .eq("membro_id", membroVendedor2)
+      .maybeSingle();
+    expect(desbloqueio).not.toBeNull();
+  });
+});
 
 describe("ranking_gamificacao: admin/gestor ficam fora da competição por construção", () => {
   let colab: Usuario;
@@ -209,7 +282,27 @@ describe("ranking_gamificacao: admin/gestor ficam fora da competição por const
   });
 });
 
-// Ponto 6 (grants de defesa em profundidade em metas/planos_comissao/comissoes_calculadas/
-// recompensas) NÃO foi aplicado nesta PR — conflito estrutural com a suíte de testes
-// existente (ver comentário na migration e relato ao Evandro). Sem teste aqui porque
-// nenhum código foi alterado.
+describe("grants das 4 tabelas: service_role sem insert/update/delete, RLS normal intacto (Evandro, opção b)", () => {
+  let admin3: Usuario;
+  let empresa3: string;
+
+  beforeAll(async () => {
+    admin3 = await criarUsuario("grants-admin");
+    const { data: emp } = await servico.from("empresas").insert({ nome: `Grants defesa em profundidade ${sufixo}` }).select("id").single();
+    empresa3 = emp!.id;
+    await servico.from("empresa_membros").insert({ empresa_id: empresa3, user_id: admin3.id, papel: "admin" });
+  });
+
+  it("admin autenticado continua inserindo em recompensas normalmente (RLS, não service_role)", async () => {
+    const { error } = await admin3.cliente
+      .from("recompensas")
+      .insert({ empresa_id: empresa3, nome: `Recompensa grants ${sufixo}`, custo_moedas: 10 });
+    expect(error).toBeNull();
+  });
+
+  it("service_role não consegue mais inserir diretamente em recompensas (revoke de insert/update/delete)", async () => {
+    const { error } = await servico.from("recompensas").insert({ empresa_id: empresa3, nome: `Recompensa service_role ${sufixo}`, custo_moedas: 10 });
+    expect(error).not.toBeNull();
+    expect(error!.message.toLowerCase()).toContain("permission denied");
+  });
+});

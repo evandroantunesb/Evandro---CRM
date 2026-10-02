@@ -17,28 +17,27 @@
 revoke all on function public.estornar_lancamentos_evento(uuid, text[]) from public, anon, authenticated;
 
 -- ---------------------------------------------------------------------------
--- 2. contar_marco_membro: NÃO alterado nesta migration. Conflito estrutural
---    encontrado e reportado ao Evandro em vez de corrigido silenciosamente
---    (mesma instrução do ponto 6: parar antes de ampliar escopo).
+-- 2. contar_marco_membro: revoke total (public/anon/authenticated). Nunca
+--    teve grant/revoke, ficando exposta como RPC pública. Tratada como helper
+--    interno — só é chamada de dentro de avaliar_conquistas_marco() (gatilho
+--    AFTER INSERT em `eventos`). NÃO recebeu checagem via auth.uid()/
+--    pode_ver_responsavel (ao contrário de calcular_realizado_meta): o
+--    beneficiário de um marco pode ser estruturalmente diferente de quem
+--    executou a ação que gerou o evento (ex.: handoff.won credita o SDR de
+--    origem quando é o CLOSER que fecha a venda) — uma checagem desse tipo
+--    rejeitaria esse crédito interno legítimo. Owner da função (avaliar_
+--    conquistas_marco, também security definer) continua executando-a sem
+--    qualquer problema de permissão.
 --
---    O revoke total (mesmo padrão do ponto 1, e a correção arquiteturalmente
---    certa — confirmado: esta função só é chamada internamente, por
---    avaliar_conquistas_marco()) quebra tests/gamificacao-conquistas-marco.
---    test.ts, que chama contar_marco_membro(...) diretamente via RPC
---    autenticada (helper `contarMarco`, usado em ~10 casos) pra testar a
---    lógica de contagem isolada da engrenagem do gatilho — padrão
---    pré-existente, em arquivo fora do escopo desta PR.
---
---    Uma correção alternativa (manter EXECUTE pra authenticated + checagem
---    de autorização via pode_ver_responsavel, como calcular_realizado_meta)
---    foi tentada e também não funciona por desenho: o beneficiário de um
---    marco pode ser estruturalmente diferente de quem executou a ação que
---    gerou o evento (ex.: handoff.won credita o SDR de origem quando é o
---    CLOSER que fecha a venda) — confirmado na prática, quebrando o teste
---    "handoff.won credita o SDR de origem, não quem fechou a venda". Uma
---    checagem baseada em auth.uid()/pode_ver_responsavel rejeitaria esse
---    crédito interno legítimo.
+--    Conflito resolvido (Evandro, 2026-10-02): tests/gamificacao-conquistas-
+--    marco.test.ts chamava a função direto via RPC autenticada (`contarMarco`)
+--    pra testar a contagem isolada — migrado nesta PR pra validar a mesma
+--    contagem só pelo fluxo interno legítimo (conquistas marco_contagem
+--    "pino", desbloqueio observado via `conquistas_desbloqueadas`), nunca
+--    mais chamando a RPC diretamente.
 -- ---------------------------------------------------------------------------
+
+revoke all on function public.contar_marco_membro(text, uuid, uuid, timestamptz, public.perfil_gamificacao) from public, anon, authenticated;
 
 -- ---------------------------------------------------------------------------
 -- 5. Ranking: admin/gestor ficam fora da competição por construção, mesmo que
@@ -72,21 +71,23 @@ revoke all on function public.ranking_gamificacao(uuid, public.perfil_gamificaca
 grant execute on function public.ranking_gamificacao(uuid, public.perfil_gamificacao, timestamptz) to authenticated;
 
 -- ---------------------------------------------------------------------------
--- 6. Grants de defesa em profundidade (metas, planos_comissao,
---    comissoes_calculadas, recompensas): NÃO alterado nesta migration.
---    Conflito estrutural encontrado e reportado ao Evandro em vez de corrigido
---    silenciosamente (instrução explícita: só revogar se nenhum fluxo legítimo
---    depender do acesso de service_role; parar e reportar se houver risco de
---    quebra). Embora nenhuma rota de produção em src/ use a service-role key
---    nessas 4 tabelas, a própria suíte de testes do projeto usa — de forma
---    estabelecida e espalhada por múltiplos arquivos pré-existentes (não
---    criados por esta PR) — o cliente de serviço (`servico`, em tests/ajuda.ts)
---    pra inserir fixtures direto em `planos_comissao`/`comissoes_calculadas`
---    (tests/comissoes-causal.test.ts) e `recompensas`
---    (tests/loja-saldo-concorrencia.test.ts), contornando de propósito a
---    fricção de RLS/admin só pra montar cenário de teste. Revogar quebraria
---    esse padrão de teste já consolidado em vários arquivos fora do escopo
---    desta PR. Ver relato ao Evandro para decidir o próximo passo (migrar os
---    fixtures pra inserir via cliente admin, ou aceitar o risco de defesa em
---    profundidade documentado na auditoria).
+-- 6. Grants de defesa em profundidade: metas, planos_comissao,
+--    comissoes_calculadas e recompensas nunca tiveram revoke de service_role
+--    (diferente do resto do módulo — point_ledger, conquistas_desbloqueadas,
+--    resgates, confirmacoes_pagamento, handoffs já revogam). service_role tem
+--    BYPASSRLS por padrão no Supabase, então qualquer código futuro que use a
+--    chave de serviço nessas tabelas ignoraria silenciosamente a checagem
+--    tem_papel(admin). Reconfirmado antes desta migration: nenhuma rota/código
+--    em src/ usa a service-role key pra escrever nessas 4 tabelas — o único
+--    uso era em fixtures de teste (tests/comissoes-causal.test.ts,
+--    tests/loja-saldo-concorrencia.test.ts), migradas nesta PR pro cliente
+--    admin autenticado (RLS normal), que já era o caminho de escrita legítimo
+--    em produção. Revoga só insert/update/delete — select de serviço
+--    (backups, scripts administrativos read-only) não é afetado. Nenhuma
+--    regra funcional de Comissões ou Loja foi alterada.
 -- ---------------------------------------------------------------------------
+
+revoke insert, update, delete on public.metas from service_role;
+revoke insert, update, delete on public.planos_comissao from service_role;
+revoke insert, update, delete on public.comissoes_calculadas from service_role;
+revoke insert, update, delete on public.recompensas from service_role;
