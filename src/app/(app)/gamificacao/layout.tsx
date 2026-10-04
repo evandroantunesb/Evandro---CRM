@@ -1,12 +1,9 @@
 import type { ReactNode } from "react";
 
-// Tema escuro escopado à árvore /gamificacao (ver globals.css, .tema-gamificacao).
-// As margens negativas cobrem o padding do <main> do layout pai pra que o fundo
-// escuro vá até a borda, em vez de aparecer como um cartão inset sobre o offwhite.
+// Escopa as variáveis do tema escuro (.tema-gamificacao, ver globals.css) a toda a
+// árvore /gamificacao, sem aplicar fundo ou cor de texto por padrão. Cada página já
+// redesenhada pinta seu próprio fundo escuro (ver page.tsx e extrato/page.tsx); as
+// telas ainda não redesenhadas continuam herdando a aparência atual até sua vez.
 export default function LayoutGamificacao({ children }: { children: ReactNode }) {
-  return (
-    <div className="tema-gamificacao -m-4 min-h-screen bg-[var(--gf-bg)] p-4 text-[var(--gf-texto)] md:-m-10 md:p-10">
-      {children}
-    </div>
-  );
+  return <div className="tema-gamificacao">{children}</div>;
 }

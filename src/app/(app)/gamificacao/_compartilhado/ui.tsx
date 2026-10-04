@@ -1,21 +1,30 @@
 import type { ComponentType, ReactNode } from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
 
-/** Cartão-base do tema escuro da Gamificação — mesma API do `Cartao` global (src/components/ui.tsx). */
+/**
+ * Cartão-base do tema escuro da Gamificação — mesma API do `Cartao` global
+ * (src/components/ui.tsx). `destaque` eleva a superfície (--gf-surface-alta) e
+ * aumenta levemente o respiro, pra separar informação principal de secundária
+ * sem glow/neon — só os tokens de superfície/borda já existentes.
+ */
 export function CartaoGf({
   titulo,
   children,
   acao,
   className = "",
+  destaque = false,
 }: {
   titulo?: string;
   children: ReactNode;
   acao?: ReactNode;
   className?: string;
+  destaque?: boolean;
 }) {
   return (
     <section
-      className={`rounded-xl border border-[var(--gf-borda)] bg-[var(--gf-surface)] p-5 shadow-[0_1px_2px_rgba(0,0,0,0.4)] ${className}`}
+      className={`rounded-xl border border-[var(--gf-borda)] shadow-[0_1px_2px_rgba(0,0,0,0.4)] ${
+        destaque ? "bg-[var(--gf-surface-alta)] p-6" : "bg-[var(--gf-surface)] p-5"
+      } ${className}`}
     >
       {(titulo || acao) && (
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -36,11 +45,27 @@ const TOM_BADGE_GF = {
 } as const;
 
 /** Badge do tema escuro — mesmos 4 tons do `Selo` global, remapeados pra verde/dourado/vermelho. */
-export function BadgeGf({ children, tom = "neutro" }: { children: ReactNode; tom?: keyof typeof TOM_BADGE_GF }) {
-  return <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${TOM_BADGE_GF[tom]}`}>{children}</span>;
+export function BadgeGf({
+  children,
+  tom = "neutro",
+}: {
+  children: ReactNode;
+  tom?: keyof typeof TOM_BADGE_GF;
+}) {
+  return (
+    <span
+      className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${TOM_BADGE_GF[tom]}`}
+    >
+      {children}
+    </span>
+  );
 }
 
-/** KPI numérico com ícone, valor e variação — usado na Visão geral e no Extrato. */
+/**
+ * KPI numérico com ícone, valor e variação — usado na Visão geral e no Extrato.
+ * Compacto de propósito: a variação (sobretudo em queda) é só um ícone colorido
+ * + texto neutro pequeno, pra não competir visualmente com o valor principal.
+ */
 export function KpiGf({
   Icone,
   valor,
@@ -53,23 +78,23 @@ export function KpiGf({
   variacaoPct?: number | null;
 }) {
   return (
-    <div className="flex flex-col gap-2 rounded-xl border border-[var(--gf-borda)] bg-[var(--gf-surface)] p-4">
+    <div className="flex flex-col gap-1.5 rounded-xl border border-[var(--gf-borda)] bg-[var(--gf-surface)] p-3.5">
       <div className="flex items-center justify-between">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--gf-verde-10)] text-[var(--gf-verde)]">
-          <Icone size={16} />
+        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--gf-verde-10)] text-[var(--gf-verde)]">
+          <Icone size={14} />
         </span>
         {variacaoPct != null && (
-          <span
-            className={`flex items-center gap-0.5 text-xs font-medium ${
-              variacaoPct >= 0 ? "text-[var(--gf-verde)]" : "text-[var(--gf-vermelho)]"
-            }`}
-          >
-            {variacaoPct >= 0 ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
+          <span className="flex items-center gap-0.5 text-[11px] text-[var(--gf-texto-sec)]">
+            {variacaoPct >= 0 ? (
+              <ArrowUp size={11} className="text-[var(--gf-verde)]" />
+            ) : (
+              <ArrowDown size={11} className="text-[var(--gf-vermelho)]" />
+            )}
             {Math.abs(variacaoPct).toFixed(0)}%
           </span>
         )}
       </div>
-      <p className="truncate text-xl font-semibold text-[var(--gf-texto)]">{valor}</p>
+      <p className="truncate text-lg font-semibold text-[var(--gf-texto)]">{valor}</p>
       <p className="text-xs text-[var(--gf-texto-sec)]">{legenda}</p>
     </div>
   );
@@ -104,7 +129,13 @@ export function LinhaLancamento({
   return (
     <li className="flex items-center justify-between gap-3 border-t border-[var(--gf-borda)] py-2 text-sm first:border-t-0">
       <div className="flex flex-col">
-        <span className={estornado ? "text-[var(--gf-texto-ter)] line-through" : "text-[var(--gf-texto)]"}>{descricao}</span>
+        <span
+          className={
+            estornado ? "text-[var(--gf-texto-ter)] line-through" : "text-[var(--gf-texto)]"
+          }
+        >
+          {descricao}
+        </span>
         <span className="text-xs text-[var(--gf-texto-sec)]">{tempo}</span>
       </div>
       <div className="flex items-center gap-2">
@@ -126,7 +157,25 @@ export function LinhaLancamento({
   );
 }
 
-/** Estado vazio padrão — substitui os <p> soltos de "nenhum dado ainda" espalhados pelas telas. */
-export function EstadoVazioGf({ children }: { children: ReactNode }) {
-  return <p className="text-sm text-[var(--gf-texto-sec)]">{children}</p>;
+/**
+ * Estado vazio padrão — ícone Lucide discreto (opcional) + texto, centralizado e
+ * com respiro vertical pra não parecer um componente quebrado dentro do cartão.
+ */
+export function EstadoVazioGf({
+  children,
+  Icone,
+}: {
+  children: ReactNode;
+  Icone?: ComponentType<{ size?: number }>;
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-2 py-6 text-center">
+      {Icone && (
+        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--gf-surface-alta)] text-[var(--gf-texto-ter)]">
+          <Icone size={16} />
+        </span>
+      )}
+      <p className="text-sm text-[var(--gf-texto-sec)]">{children}</p>
+    </div>
+  );
 }

@@ -1,4 +1,4 @@
-import { Wallet, Zap } from "lucide-react";
+import { Receipt, Wallet, Zap } from "lucide-react";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { formatarDataHora } from "@/lib/formatacao";
@@ -26,43 +26,47 @@ export default async function ExtratoDePontos() {
   const ajusteNegativo = saldoMoedasReal < 0 ? -saldoMoedasReal : 0;
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-4">
-      <h1 className="text-2xl font-semibold text-[var(--gf-texto)]">Extrato</h1>
-      <div className="grid grid-cols-2 gap-3">
-        <CartaoGf titulo="XP acumulado">
-          <p className="flex items-center gap-2 text-3xl font-semibold text-[var(--gf-texto)]">
-            <Zap size={22} className="text-[var(--gf-verde)]" />
-            {totalXp.toLocaleString("pt-BR")}
-          </p>
-        </CartaoGf>
-        <CartaoGf titulo="Saldo de moedas">
-          <p className="flex items-center gap-2 text-3xl font-semibold text-[var(--gf-texto)]">
-            <Wallet size={22} className="text-[var(--gf-verde)]" />
-            {totalMoedas.toLocaleString("pt-BR")}
-          </p>
-          {ajusteNegativo > 0 && (
-            <p className="mt-1 text-sm text-[var(--gf-texto-sec)]">{ajusteNegativo.toLocaleString("pt-BR")} moedas em ajuste</p>
+    <div className="-m-4 min-h-screen bg-[var(--gf-bg)] p-4 text-[var(--gf-texto)] md:-m-10 md:p-10">
+      <div className="mx-auto flex max-w-2xl flex-col gap-4">
+        <h1 className="text-2xl font-semibold text-[var(--gf-texto)]">Extrato</h1>
+        <div className="grid grid-cols-2 gap-3">
+          <CartaoGf titulo="XP acumulado">
+            <p className="flex items-center gap-2 text-3xl font-semibold text-[var(--gf-texto)]">
+              <Zap size={22} className="text-[var(--gf-verde)]" />
+              {totalXp.toLocaleString("pt-BR")}
+            </p>
+          </CartaoGf>
+          <CartaoGf titulo="Saldo de moedas">
+            <p className="flex items-center gap-2 text-3xl font-semibold text-[var(--gf-texto)]">
+              <Wallet size={22} className="text-[var(--gf-verde)]" />
+              {totalMoedas.toLocaleString("pt-BR")}
+            </p>
+            {ajusteNegativo > 0 && (
+              <p className="mt-1 text-sm text-[var(--gf-texto-sec)]">
+                {ajusteNegativo.toLocaleString("pt-BR")} moedas em ajuste
+              </p>
+            )}
+          </CartaoGf>
+        </div>
+        <CartaoGf titulo={`Lançamentos (${lancamentos?.length ?? 0})`}>
+          {!lancamentos?.length ? (
+            <EstadoVazioGf Icone={Receipt}>Nenhum lançamento ainda.</EstadoVazioGf>
+          ) : (
+            <ul className="flex flex-col">
+              {lancamentos.map((l) => (
+                <LinhaLancamento
+                  key={l.id}
+                  descricao={l.descricao}
+                  tempo={formatarDataHora(l.created_at)}
+                  xp={l.xp}
+                  moedas={l.moedas}
+                  estornado={l.estornado}
+                />
+              ))}
+            </ul>
           )}
         </CartaoGf>
       </div>
-      <CartaoGf titulo={`Lançamentos (${lancamentos?.length ?? 0})`}>
-        {!lancamentos?.length ? (
-          <EstadoVazioGf>Nenhum lançamento ainda.</EstadoVazioGf>
-        ) : (
-          <ul className="flex flex-col">
-            {lancamentos.map((l) => (
-              <LinhaLancamento
-                key={l.id}
-                descricao={l.descricao}
-                tempo={formatarDataHora(l.created_at)}
-                xp={l.xp}
-                moedas={l.moedas}
-                estornado={l.estornado}
-              />
-            ))}
-          </ul>
-        )}
-      </CartaoGf>
     </div>
   );
 }
