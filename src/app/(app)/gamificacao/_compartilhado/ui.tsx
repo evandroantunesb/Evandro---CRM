@@ -62,9 +62,11 @@ export function BadgeGf({
 }
 
 /**
- * KPI numérico com ícone, valor e variação — usado na Visão geral e no Extrato.
- * Compacto de propósito: a variação (sobretudo em queda) é só um ícone colorido
- * + texto neutro pequeno, pra não competir visualmente com o valor principal.
+ * KPI em formato de pílula horizontal — ícone, valor e variação lado a lado.
+ * Mais denso que um cartão de grade: pensado pra ficar junto do cabeçalho,
+ * não ocupar uma linha inteira de altura própria. A variação (sobretudo em
+ * queda) é só um ícone colorido + texto neutro pequeno, pra não competir
+ * visualmente com o valor principal.
  */
 export function KpiGf({
   Icone,
@@ -78,24 +80,26 @@ export function KpiGf({
   variacaoPct?: number | null;
 }) {
   return (
-    <div className="flex flex-col gap-1.5 rounded-xl border border-[var(--gf-borda)] bg-[var(--gf-surface)] p-3.5">
-      <div className="flex items-center justify-between">
-        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--gf-verde-10)] text-[var(--gf-verde)]">
-          <Icone size={14} />
-        </span>
-        {variacaoPct != null && (
-          <span className="flex items-center gap-0.5 text-[11px] text-[var(--gf-texto-sec)]">
-            {variacaoPct >= 0 ? (
-              <ArrowUp size={11} className="text-[var(--gf-verde)]" />
-            ) : (
-              <ArrowDown size={11} className="text-[var(--gf-vermelho)]" />
-            )}
-            {Math.abs(variacaoPct).toFixed(0)}%
-          </span>
-        )}
+    <div className="flex items-center gap-2.5 rounded-full border border-[var(--gf-borda)] bg-[var(--gf-surface)] py-2 pr-4 pl-2.5">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--gf-verde-10)] text-[var(--gf-verde)]">
+        <Icone size={15} />
+      </span>
+      <div className="flex min-w-0 flex-col">
+        <div className="flex items-baseline gap-1.5">
+          <p className="truncate text-sm font-semibold text-[var(--gf-texto)]">{valor}</p>
+          {variacaoPct != null && (
+            <span className="flex items-center gap-0.5 text-[10px] text-[var(--gf-texto-sec)]">
+              {variacaoPct >= 0 ? (
+                <ArrowUp size={10} className="text-[var(--gf-verde)]" />
+              ) : (
+                <ArrowDown size={10} className="text-[var(--gf-vermelho)]" />
+              )}
+              {Math.abs(variacaoPct).toFixed(0)}%
+            </span>
+          )}
+        </div>
+        <p className="truncate text-[11px] text-[var(--gf-texto-sec)]">{legenda}</p>
       </div>
-      <p className="truncate text-lg font-semibold text-[var(--gf-texto)]">{valor}</p>
-      <p className="text-xs text-[var(--gf-texto-sec)]">{legenda}</p>
     </div>
   );
 }

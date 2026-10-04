@@ -6,10 +6,10 @@ import {
   FileCheck2,
   Gift,
   LineChart,
+  Medal,
   Target,
   Trophy,
   Users,
-  Wallet,
   Zap,
 } from "lucide-react";
 import { carregarConfiguracao } from "@/lib/crm";
@@ -18,9 +18,15 @@ import { calcularNivel } from "@/lib/gamificacao";
 import { calcularProgresso, calcularRealizado, type Meta } from "@/lib/metas";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import type { MetricaMeta } from "@/lib/tipos";
-import { CartaoGf, EstadoVazioGf, KpiGf, LinhaLancamento } from "./_compartilhado/ui";
+import { UNIDADE_METRICA_META, type MetricaMeta } from "@/lib/tipos";
+import { CartaoGf, EstadoVazioGf, KpiGf } from "./_compartilhado/ui";
 import { CartaoRecompensaGf } from "./_compartilhado/recompensa-preview";
+
+function formatarValorMeta(unidade: "moeda" | "quantidade" | "percentual", valor: number) {
+  if (unidade === "moeda") return formatarMoeda(valor);
+  if (unidade === "percentual") return `${valor.toFixed(1)}%`;
+  return Math.round(valor).toLocaleString("pt-BR");
+}
 
 const PERIODOS = [
   { chave: "mes", rotulo: "Este mês" },
@@ -173,8 +179,6 @@ export default async function GamificacaoDashboard({
   const totalXpAnterior = (pontosAnteriorAgg ?? []).reduce((s, l) => s + l.xp, 0);
   const contratosPeriodo = (negociosPeriodo ?? []).length;
   const contratosAnterior = (negociosAnterior ?? []).length;
-  const receitaPeriodo = (negociosPeriodo ?? []).reduce((s, n) => s + (n.valor ?? 0), 0);
-  const receitaAnterior = (negociosAnterior ?? []).reduce((s, n) => s + (n.valor ?? 0), 0);
 
   const metas: Meta[] = (metasLinhas ?? []).map((m) => ({
     id: m.id,
@@ -197,9 +201,12 @@ export default async function GamificacaoDashboard({
       ),
     ),
   );
-  const progressoMedioMetas = progressosMetas.length
-    ? progressosMetas.reduce((s, p) => s + Math.min(p.percentual, 100), 0) / progressosMetas.length
-    : null;
+  // Zip pra mostrar a meta principal (maior % concluído) com destaque, igual à
+  // referência — mesmos dados de `metas`/`progressosMetas`, só reorganizados.
+  const metasComProgresso = metas
+    .map((m, i) => ({ meta: m, progresso: progressosMetas[i] }))
+    .sort((a, b) => b.progresso.percentual - a.progresso.percentual);
+  const metaPrincipal = metasComProgresso[0] ?? null;
 
   // Evolução de XP (acumulado por dia no período) --------------------------
   const diasNoPeriodo = Math.round(
@@ -241,16 +248,23 @@ export default async function GamificacaoDashboard({
     nome: n.nome,
     xpMinimo: n.xp_minimo,
   }));
-  const ranking = (rankingBruto ?? [])
+  const rankingCompleto = (rankingBruto ?? [])
     .filter((l) => nomeMembro.has(l.membro_id))
     .sort((a, b) => b.total_xp - a.total_xp)
-    .slice(0, 5)
     .map((l, i) => ({
       posicao: i + 1,
       membroId: l.membro_id,
       nome: nomeMembro.get(l.membro_id)!,
       total: l.total_xp,
     }));
+  const ranking = rankingCompleto.slice(0, 5);
+  // Minha posição no ranking do período + quem está logo acima — reaproveita o
+  // mesmo resultado da RPC já consultada acima, sem truncar em 5, só pra achar
+  // minha colocação mesmo quando fico fora do top 5 exibido.
+  const minhaPosicaoRanking = rankingCompleto.find((r) => r.membroId === atual.membroId) ?? null;
+  const acimaDeMim = minhaPosicaoRanking
+    ? (rankingCompleto.find((r) => r.posicao === minhaPosicaoRanking.posicao - 1) ?? null)
+    : null;
 
   // Meu nível: sempre XP ativo da vida toda, nunca o total filtrado do
   // ranking (era a origem de dois níveis diferentes pra mesma pessoa —
@@ -273,16 +287,20 @@ export default async function GamificacaoDashboard({
     ...nomeConquista.get(d.conquista_id),
   }));
 
-  const atividadeRecente = (pontosPeriodo ?? []).slice(0, 8);
+  const atividadeRecente = (pontosPeriodo ?? []).slice(0, 6);
+  const unidadeMetaPrincipal = metaPrincipal
+    ? UNIDADE_METRICA_META[metaPrincipal.meta.metrica]
+    : null;
 
   return (
     <div className="-m-4 min-h-screen bg-[var(--gf-bg)] p-4 text-[var(--gf-texto)] md:-m-10 md:p-10">
-      <div className="mx-auto flex max-w-5xl flex-col gap-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="mx-auto flex max-w-6xl flex-col gap-3">
+        {/* Cabeçalho + KPIs compactos na mesma faixa, como na referência aprovada. */}
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="text-2xl font-semibold text-[var(--gf-texto)]">Gamificação</h1>
             <p className="text-sm text-[var(--gf-texto-sec)]">
-              Acompanhe metas, XP, ranking e desempenho da equipe.
+              Desempenho, evolução e conquistas em um só lugar.
             </p>
           </div>
           <div className="flex gap-1 rounded-lg bg-[var(--gf-surface-alta)] p-1">
@@ -302,35 +320,91 @@ export default async function GamificacaoDashboard({
           </div>
         </div>
 
-        <CartaoGf destaque>
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-4">
-              <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[var(--gf-verde-10)] text-2xl font-semibold text-[var(--gf-verde)]">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <KpiGf
+            Icone={Zap}
+            valor={`${totalXpPeriodo.toLocaleString("pt-BR")} XP`}
+            legenda="No período"
+            variacaoPct={variacao(totalXpPeriodo, totalXpAnterior)}
+          />
+          <KpiGf
+            Icone={Trophy}
+            valor={minhaPosicaoRanking ? `#${minhaPosicaoRanking.posicao}` : "—"}
+            legenda="Posição no ranking"
+          />
+          <KpiGf
+            Icone={FileCheck2}
+            valor={contratosPeriodo.toLocaleString("pt-BR")}
+            legenda="Contratos assinados"
+            variacaoPct={variacao(contratosPeriodo, contratosAnterior)}
+          />
+          <KpiGf
+            Icone={Award}
+            valor={minhasConquistas.length.toLocaleString("pt-BR")}
+            legenda="Conquistas"
+          />
+        </div>
+
+        {/* Hero: minha posição ganha protagonismo (2/3), meu nível ao lado. */}
+        <div className="grid gap-3 lg:grid-cols-3">
+          <CartaoGf destaque className="lg:col-span-2">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="flex items-center gap-1.5 text-xs tracking-wide text-[var(--gf-texto-sec)] uppercase">
+                  <Trophy size={12} className="text-[var(--gf-dourado)]" />
+                  Minha posição
+                </p>
+                <p className="mt-1 text-3xl font-semibold text-[var(--gf-texto)]">
+                  {minhaPosicaoRanking ? `#${minhaPosicaoRanking.posicao}` : "—"}
+                  <span className="ml-2 text-base font-normal text-[var(--gf-texto-sec)]">
+                    {periodo === "mes" ? "no ranking do mês" : "no ranking do período"}
+                  </span>
+                </p>
+                <p className="mt-0.5 text-sm text-[var(--gf-texto-sec)]">
+                  {minhaPosicaoRanking
+                    ? `${minhaPosicaoRanking.total.toLocaleString("pt-BR")} XP no período`
+                    : "Pontue neste período pra entrar no ranking."}
+                </p>
+              </div>
+              {minhaPosicaoRanking && acimaDeMim && (
+                <div className="shrink-0 rounded-lg bg-[var(--gf-surface-alta)] px-4 py-3 text-sm sm:text-right">
+                  <p className="text-[var(--gf-texto-sec)]">Você está a</p>
+                  <p className="font-semibold text-[var(--gf-verde)]">
+                    {(acimaDeMim.total - minhaPosicaoRanking.total).toLocaleString("pt-BR")} XP
+                  </p>
+                  <p className="text-[var(--gf-texto-sec)]">
+                    do {acimaDeMim.posicao}º lugar ({acimaDeMim.nome})
+                  </p>
+                </div>
+              )}
+            </div>
+          </CartaoGf>
+
+          <CartaoGf destaque>
+            <div className="flex items-center gap-3">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--gf-verde-10)] text-lg font-semibold text-[var(--gf-verde)]">
                 {meuNivel.nivel}
               </span>
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs tracking-wide text-[var(--gf-texto-sec)] uppercase">
-                  Nível atual
+                  Meu nível
                 </p>
-                <p className="text-xl font-semibold text-[var(--gf-texto)]">
+                <p className="truncate text-base font-semibold text-[var(--gf-texto)]">
                   {meuNivel.nome ?? `Nível ${meuNivel.nivel}`}
-                </p>
-                <p className="text-sm text-[var(--gf-texto-sec)]">
-                  {meuTotalXp.toLocaleString("pt-BR")} XP acumulado
                 </p>
               </div>
             </div>
-            <div className="flex-1 sm:max-w-sm">
+            <div className="mt-3">
               <div className="flex items-baseline justify-between text-xs text-[var(--gf-texto-sec)]">
-                <span>Progresso para o próximo nível</span>
+                <span>{meuTotalXp.toLocaleString("pt-BR")} XP</span>
                 {proximoNivel && (
                   <span>
-                    {(proximoNivel.xpMinimo - meuTotalXp).toLocaleString("pt-BR")} XP para{" "}
-                    {proximoNivel.nome ?? `nível ${proximoNivel.nivel}`}
+                    {(proximoNivel.xpMinimo - meuTotalXp).toLocaleString("pt-BR")} p/ nível{" "}
+                    {proximoNivel.nivel}
                   </span>
                 )}
               </div>
-              <div className="mt-1.5 h-3 w-full overflow-hidden rounded-full bg-[var(--gf-surface-alta)]">
+              <div className="mt-1.5 h-2.5 w-full overflow-hidden rounded-full bg-[var(--gf-surface-alta)]">
                 <div
                   className="h-full rounded-full bg-[var(--gf-verde)]"
                   style={{ width: `${progressoNivel}%` }}
@@ -342,44 +416,225 @@ export default async function GamificacaoDashboard({
             </div>
             <Link
               href="/gamificacao/jornada"
-              className="shrink-0 text-sm text-[var(--gf-verde)] hover:underline"
+              className="mt-2 inline-block text-xs text-[var(--gf-verde)] hover:underline"
             >
               Ver jornada completa →
             </Link>
-          </div>
-        </CartaoGf>
-
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <KpiGf
-            Icone={Zap}
-            valor={`${totalXpPeriodo.toLocaleString("pt-BR")} XP`}
-            legenda="XP acumulado"
-            variacaoPct={variacao(totalXpPeriodo, totalXpAnterior)}
-          />
-          <KpiGf
-            Icone={Target}
-            valor={progressoMedioMetas === null ? "—" : `${progressoMedioMetas.toFixed(0)}%`}
-            legenda={
-              metas.length
-                ? `Progresso médio de ${metas.length} meta${metas.length === 1 ? "" : "s"} ativa${metas.length === 1 ? "" : "s"}`
-                : "Nenhuma meta ativa"
-            }
-          />
-          <KpiGf
-            Icone={FileCheck2}
-            valor={contratosPeriodo.toLocaleString("pt-BR")}
-            legenda="Contratos assinados"
-            variacaoPct={variacao(contratosPeriodo, contratosAnterior)}
-          />
-          <KpiGf
-            Icone={Wallet}
-            valor={formatarMoeda(receitaPeriodo)}
-            legenda="Receita gerada"
-            variacaoPct={variacao(receitaPeriodo, receitaAnterior)}
-          />
+          </CartaoGf>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-2">
+        {/* Ranking com mais presença (2/3) + metas e loja compactas ao lado. */}
+        <div className="grid gap-3 lg:grid-cols-3">
+          <CartaoGf
+            titulo="Ranking da equipe"
+            acao={
+              <Link
+                href="/gamificacao/ranking"
+                className="text-sm text-[var(--gf-verde)] hover:underline"
+              >
+                Ver completo →
+              </Link>
+            }
+            className="lg:col-span-2"
+          >
+            {!ranking.length ? (
+              <EstadoVazioGf Icone={Users}>Ninguém pontuou neste período ainda.</EstadoVazioGf>
+            ) : (
+              <ul className="flex flex-col gap-1.5">
+                {ranking.map((r) => (
+                  <li
+                    key={r.membroId}
+                    className={`flex items-center gap-3 rounded-lg px-2 py-2 text-sm ${
+                      r.membroId === atual.membroId
+                        ? "bg-[var(--gf-verde-10)]"
+                        : r.posicao <= 3
+                          ? "bg-[var(--gf-surface-alta)]"
+                          : ""
+                    }`}
+                  >
+                    <span className="flex w-6 shrink-0 items-center justify-center">
+                      {r.posicao === 1 ? (
+                        <Trophy size={16} className="text-[var(--gf-dourado)]" />
+                      ) : r.posicao <= 3 ? (
+                        <Medal size={15} className="text-[var(--gf-texto-sec)]" />
+                      ) : (
+                        <span className="text-[var(--gf-texto-sec)]">{r.posicao}º</span>
+                      )}
+                    </span>
+                    <span
+                      className={`flex-1 truncate ${r.membroId === atual.membroId ? "font-medium text-[var(--gf-verde)]" : "text-[var(--gf-texto)]"}`}
+                    >
+                      {r.nome}
+                    </span>
+                    <span className="font-medium text-[var(--gf-texto)]">
+                      {r.total.toLocaleString("pt-BR")} XP
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CartaoGf>
+
+          <div className="flex flex-col gap-3">
+            <CartaoGf
+              titulo="Metas"
+              acao={
+                <Link
+                  href="/gamificacao/metas"
+                  className="text-sm text-[var(--gf-verde)] hover:underline"
+                >
+                  Ver →
+                </Link>
+              }
+            >
+              {!metaPrincipal || !unidadeMetaPrincipal ? (
+                <EstadoVazioGf Icone={Target}>Nenhuma meta ativa no momento.</EstadoVazioGf>
+              ) : (
+                <div className="flex flex-col gap-1.5">
+                  <p className="truncate text-sm text-[var(--gf-texto-sec)]">
+                    {metaPrincipal.meta.titulo}
+                  </p>
+                  <p className="text-sm font-semibold text-[var(--gf-texto)]">
+                    {formatarValorMeta(unidadeMetaPrincipal, metaPrincipal.progresso.realizado)} /{" "}
+                    {formatarValorMeta(unidadeMetaPrincipal, metaPrincipal.meta.valorAlvo)}
+                  </p>
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--gf-surface-alta)]">
+                    <div
+                      className="h-full rounded-full bg-[var(--gf-verde)]"
+                      style={{
+                        width: `${Math.min(Math.max(metaPrincipal.progresso.percentual, 0), 100)}%`,
+                      }}
+                    />
+                  </div>
+                  <p className="text-xs text-[var(--gf-texto-sec)]">
+                    {metaPrincipal.progresso.percentual.toFixed(0)}% concluído
+                    {metasComProgresso.length > 1 &&
+                      ` · +${metasComProgresso.length - 1} outra${metasComProgresso.length - 1 === 1 ? "" : "s"} meta${metasComProgresso.length - 1 === 1 ? "" : "s"}`}
+                  </p>
+                </div>
+              )}
+            </CartaoGf>
+
+            <CartaoGf
+              titulo="Loja"
+              acao={
+                <Link
+                  href="/gamificacao/loja"
+                  className="text-sm text-[var(--gf-verde)] hover:underline"
+                >
+                  Ver →
+                </Link>
+              }
+            >
+              {!recompensas?.length ? (
+                <EstadoVazioGf Icone={Gift}>Nenhuma recompensa disponível.</EstadoVazioGf>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <p className="text-xs text-[var(--gf-texto-sec)]">
+                    Seu saldo:{" "}
+                    <span className="font-semibold text-[var(--gf-texto)]">
+                      {meuSaldoMoedas.toLocaleString("pt-BR")} moedas
+                    </span>
+                  </p>
+                  {recompensas.slice(0, 2).map((r) => (
+                    <CartaoRecompensaGf
+                      key={r.id}
+                      recompensa={{
+                        id: r.id,
+                        nome: r.nome,
+                        descricao: r.descricao,
+                        custoMoedas: r.custo_moedas,
+                      }}
+                      saldo={meuSaldoMoedas}
+                    />
+                  ))}
+                </div>
+              )}
+            </CartaoGf>
+          </div>
+        </div>
+
+        {/* Atividade recente em feed (2/3) + conquistas compactas (1/3). */}
+        <div className="grid gap-3 lg:grid-cols-3">
+          <CartaoGf titulo="Atividade recente" className="lg:col-span-2">
+            {!atividadeRecente.length ? (
+              <EstadoVazioGf Icone={Activity}>Nenhuma atividade neste período.</EstadoVazioGf>
+            ) : (
+              <ul className="flex flex-col">
+                {atividadeRecente.map((l) => (
+                  <li
+                    key={l.id}
+                    className="flex items-center gap-2.5 border-t border-[var(--gf-borda)] py-2 text-sm first:border-t-0"
+                  >
+                    <span
+                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${l.xp >= 0 ? "bg-[var(--gf-verde-10)] text-[var(--gf-verde)]" : "bg-[var(--gf-vermelho-10)] text-[var(--gf-vermelho)]"}`}
+                    >
+                      <Zap size={13} />
+                    </span>
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      <span className="truncate text-[var(--gf-texto)]">
+                        {nomeMembro.get(l.membro_id) ?? "(removido)"} ·{" "}
+                        {l.descricao || "Ponto lançado"}
+                      </span>
+                      <span className="text-xs text-[var(--gf-texto-sec)]">
+                        {tempoDesde(l.created_at)}
+                      </span>
+                    </div>
+                    {l.xp !== 0 && (
+                      <span
+                        className={`shrink-0 font-medium ${l.xp >= 0 ? "text-[var(--gf-verde)]" : "text-[var(--gf-vermelho)]"}`}
+                      >
+                        {l.xp >= 0 ? "+" : ""}
+                        {l.xp} XP
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CartaoGf>
+
+          <CartaoGf
+            titulo="Conquistas"
+            acao={
+              <Link
+                href="/gamificacao/jornada"
+                className="text-sm text-[var(--gf-verde)] hover:underline"
+              >
+                Ver →
+              </Link>
+            }
+          >
+            {!minhasConquistas.length ? (
+              <EstadoVazioGf Icone={Award}>Nenhuma conquista desbloqueada ainda.</EstadoVazioGf>
+            ) : (
+              <ul className="flex flex-col gap-2">
+                {minhasConquistas.map((c) => (
+                  <li key={c.conquistaId} className="flex items-center gap-2 text-sm">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--gf-dourado-10)] text-[var(--gf-dourado)]">
+                      {c.icone ? (
+                        <span className="text-sm leading-none">{c.icone}</span>
+                      ) : (
+                        <Trophy size={14} />
+                      )}
+                    </span>
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      <span className="truncate text-[var(--gf-texto)]">
+                        {c.nome ?? "(conquista removida)"}
+                      </span>
+                      <span className="text-xs text-[var(--gf-texto-sec)]">
+                        {tempoDesde(c.desbloqueadaEm)}
+                      </span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CartaoGf>
+        </div>
+
+        {/* Camada secundária: gráficos de evolução, mais discretos na hierarquia. */}
+        <div className="grid gap-3 lg:grid-cols-2">
           <CartaoGf
             titulo="Evolução de XP"
             acao={
@@ -414,132 +669,6 @@ export default async function GamificacaoDashboard({
             )}
           </CartaoGf>
         </div>
-
-        <div className="grid gap-4 lg:grid-cols-2">
-          <CartaoGf
-            titulo="Ranking da equipe"
-            acao={
-              <Link
-                href="/gamificacao/ranking"
-                className="text-sm text-[var(--gf-verde)] hover:underline"
-              >
-                Ver ranking completo →
-              </Link>
-            }
-          >
-            {!ranking.length ? (
-              <EstadoVazioGf Icone={Users}>Ninguém pontuou neste período ainda.</EstadoVazioGf>
-            ) : (
-              <ul className="flex flex-col gap-2">
-                {ranking.map((r) => (
-                  <li
-                    key={r.membroId}
-                    className={`flex items-center gap-3 text-sm ${r.membroId === atual.membroId ? "rounded-lg bg-[var(--gf-surface-alta)] p-1.5" : ""}`}
-                  >
-                    <span className="flex w-5 shrink-0 items-center justify-center">
-                      {r.posicao === 1 ? (
-                        <Trophy size={14} className="text-[var(--gf-dourado)]" />
-                      ) : (
-                        <span className="text-[var(--gf-texto-sec)]">{r.posicao}º</span>
-                      )}
-                    </span>
-                    <span className="flex-1 truncate text-[var(--gf-texto)]">{r.nome}</span>
-                    <span className="font-medium text-[var(--gf-texto)]">
-                      {r.total.toLocaleString("pt-BR")} XP
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CartaoGf>
-
-          <CartaoGf
-            titulo="Minhas conquistas"
-            acao={
-              <Link
-                href="/gamificacao/jornada"
-                className="text-sm text-[var(--gf-verde)] hover:underline"
-              >
-                Ver todas →
-              </Link>
-            }
-          >
-            {!minhasConquistas.length ? (
-              <EstadoVazioGf Icone={Award}>Nenhuma conquista desbloqueada ainda.</EstadoVazioGf>
-            ) : (
-              <ul className="flex flex-col gap-2.5">
-                {minhasConquistas.map((c) => (
-                  <li key={c.conquistaId} className="flex items-center gap-2.5 text-sm">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--gf-dourado-10)] text-[var(--gf-dourado)]">
-                      {c.icone ? (
-                        <span className="text-base leading-none">{c.icone}</span>
-                      ) : (
-                        <Trophy size={16} />
-                      )}
-                    </span>
-                    <div className="flex flex-1 flex-col">
-                      <span className="text-[var(--gf-texto)]">
-                        {c.nome ?? "(conquista removida)"}
-                      </span>
-                      <span className="text-xs text-[var(--gf-texto-sec)]">
-                        Desbloqueada {tempoDesde(c.desbloqueadaEm)}
-                      </span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CartaoGf>
-        </div>
-
-        <CartaoGf titulo="Atividade recente">
-          {!atividadeRecente.length ? (
-            <EstadoVazioGf Icone={Activity}>Nenhuma atividade neste período.</EstadoVazioGf>
-          ) : (
-            <ul className="flex flex-col">
-              {atividadeRecente.map((l) => (
-                <LinhaLancamento
-                  key={l.id}
-                  descricao={`${nomeMembro.get(l.membro_id) ?? "(removido)"} · ${l.descricao || "Ponto lançado"}`}
-                  tempo={tempoDesde(l.created_at)}
-                  xp={l.xp}
-                  moedas={l.moedas}
-                />
-              ))}
-            </ul>
-          )}
-        </CartaoGf>
-
-        <CartaoGf
-          titulo="Loja de recompensas"
-          acao={
-            <Link
-              href="/gamificacao/loja"
-              className="text-sm text-[var(--gf-verde)] hover:underline"
-            >
-              Ver catálogo completo →
-            </Link>
-          }
-        >
-          {!recompensas?.length ? (
-            <EstadoVazioGf Icone={Gift}>Nenhuma recompensa disponível no momento.</EstadoVazioGf>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-3">
-              {recompensas.map((r) => (
-                <CartaoRecompensaGf
-                  key={r.id}
-                  recompensa={{
-                    id: r.id,
-                    nome: r.nome,
-                    descricao: r.descricao,
-                    custoMoedas: r.custo_moedas,
-                  }}
-                  saldo={meuSaldoMoedas}
-                />
-              ))}
-            </div>
-          )}
-        </CartaoGf>
       </div>
     </div>
   );
