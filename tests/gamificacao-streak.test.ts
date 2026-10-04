@@ -119,6 +119,17 @@ describe("sequencia_produtiva_membro: crédito real de hoje entra na sequência"
 });
 
 describe("sequencia_produtiva_membro: configuração de dias úteis por empresa", () => {
+  it("bitmask padrão (31, segunda a sexta): sábado e domingo não são dia útil", async () => {
+    await servico.from("empresas").update({ dias_uteis_gamificacao: 31 }).eq("id", empresa); // garante o default, independente da ordem dos outros testes
+    const { usuario } = await criarMembro("sk-default-fds");
+
+    const r = await sequencia(usuario);
+    const sabado = r.semana.find((d) => new Date(`${d.data}T12:00:00Z`).getUTCDay() === 6);
+    const domingo = r.semana.find((d) => new Date(`${d.data}T12:00:00Z`).getUTCDay() === 0);
+    expect(sabado?.dia_util).toBe(false);
+    expect(domingo?.dia_util).toBe(false);
+  });
+
   it("empresa com sábado como dia útil (bitmask inclui bit 6) exige crédito no sábado pra não quebrar", async () => {
     // bit0=segunda..bit6=domingo: segunda a sábado = 0b0111111 = 63.
     await servico.from("empresas").update({ dias_uteis_gamificacao: 63 }).eq("id", empresa);
