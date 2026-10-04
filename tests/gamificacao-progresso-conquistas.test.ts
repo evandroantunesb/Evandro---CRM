@@ -127,13 +127,22 @@ describe("progresso_conquistas_membro: xp_acumulado usa exatamente o mesmo filtr
 
   it("crédito estornado também não entra no 'realizado'", async () => {
     const { usuario, membroId } = await criarMembro("pc-estorno-excl");
-    const conquistaId = await criarConquistaXp("50 XP acumulado (estorno)", 50);
+    // Alvo (100) deliberadamente maior que o crédito (50): o crédito nunca cruza o
+    // limiar, então a conquista nunca desbloqueia de verdade e continua visível no
+    // progresso depois do estorno — só assim dá pra observar realizado 50 → 0. Um
+    // alvo igual ao crédito desbloquearia a conquista de verdade no próprio ganho
+    // (permanência de marco: nunca é revogada depois, mesmo com o XP estornado).
+    const conquistaId = await criarConquistaXp("100 XP acumulado (estorno)", 100);
 
     await criarRegraGenerica("Venda (estorno excl.)", "deal.won", 50);
     const negocioId = await ganharNegocio("Venda estorno excl.", usuario, membroId); // +50 xp comum
+
+    expect(linhaDe(await progresso(usuario), conquistaId)?.realizado).toBe(50); // antes do estorno
+
     await reabrirNegocio(negocioId, usuario); // estorno automático (deal.won) do XP desse negócio
 
     const linha = linhaDe(await progresso(usuario), conquistaId);
+    expect(linha).toBeDefined(); // ainda bloqueada (nunca cruzou o limiar) — continua visível
     expect(linha!.realizado).toBe(0); // único crédito do membro foi estornado
   });
 });

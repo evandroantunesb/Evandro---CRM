@@ -122,17 +122,28 @@ describe("ranking_gamificacao: p_ate — reconstrução causal do ledger num ins
   });
 
   it("XP já estornado antes do corte não conta nem no histórico nem no vivo", async () => {
-    const negocio = await criarEGanharNegocio("Venda estornada antes do corte", membroA);
-    await reabrirNegocio(negocio, membroA); // estorno antes do corte abaixo
+    // Membro novo e isolado: o teste anterior já estorna negócios de A depois do corte
+    // dele, então o `estornado_em` daquele estorno já existe no passado relativo a UM
+    // NOVO corte capturado aqui — reaproveitar A/B mediria também aquele estorno antigo,
+    // não só o lançamento deste teste. Com um membro novo, o único lançamento possível
+    // é o criado e estornado abaixo, ambos antes deste corte.
+    const membroC = await criarUsuario("rh-c");
+    const { data: vinculo } = await servico
+      .from("empresa_membros")
+      .insert({ empresa_id: empresa, user_id: membroC.id, papel: "vendedor", perfil_gamificacao: "closer" })
+      .select("id")
+      .single();
+    membro[membroC.id] = vinculo!.id as string;
+
+    const negocio = await criarEGanharNegocio("Venda estornada antes do corte", membroC);
+    await reabrirNegocio(negocio, membroC); // estorno antes do corte abaixo
 
     const corte = new Date().toISOString();
 
     const historico = await ranking(corte);
     const aoVivo = await ranking();
-    // Nenhum dos dois deve contar este lançamento especificamente — comparado contra o
-    // total já estabelecido no teste anterior (200 histórico / 0 ao vivo para A).
-    expect(totalDe(historico, membro[membroA.id])).toBe(200); // sem mudança: não ganhou os +100
-    expect(totalDe(aoVivo, membro[membroA.id])).toBe(0);
+    expect(totalDe(historico, membro[membroC.id])).toBe(0); // estornado_em < corte: não conta nem no histórico
+    expect(totalDe(aoVivo, membro[membroC.id])).toBe(0);
   });
 
   it("XP criado depois do corte não conta no histórico, mas conta ao vivo", async () => {
