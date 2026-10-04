@@ -429,9 +429,9 @@ export default async function GamificacaoDashboard({
           </CartaoGf>
         </div>
 
-        {/* Ranking com mais presença (2/3) + metas e loja compactas ao lado.
-            items-start evita que o ranking vazio estique pra acompanhar a
-            altura da coluna lateral (Metas + Loja). */}
+        {/* Ranking com mais presença (2/3) + coluna lateral única (Metas → Conquistas →
+            Loja, igual à referência). items-start evita que o ranking vazio estique pra
+            acompanhar a altura da coluna lateral, e vice-versa. */}
         <div className="grid items-start gap-3 lg:grid-cols-3">
           <CartaoGf
             titulo="Ranking da equipe"
@@ -498,7 +498,9 @@ export default async function GamificacaoDashboard({
               }
             >
               {!metaPrincipal || !unidadeMetaPrincipal ? (
-                <EstadoVazioGf Icone={Target}>Nenhuma meta ativa no momento.</EstadoVazioGf>
+                <EstadoVazioGf Icone={Target} compacto>
+                  Nenhuma meta ativa no momento.
+                </EstadoVazioGf>
               ) : (
                 <div className="flex flex-col gap-1.5">
                   <p className="truncate text-sm text-[var(--gf-texto-sec)]">
@@ -526,27 +528,71 @@ export default async function GamificacaoDashboard({
             </CartaoGf>
 
             <CartaoGf
-              titulo="Loja"
+              titulo="Conquistas"
               acao={
                 <Link
-                  href="/gamificacao/loja"
+                  href="/gamificacao/jornada"
                   className="text-sm text-[var(--gf-verde)] hover:underline"
                 >
                   Ver →
                 </Link>
               }
             >
-              {!recompensas?.length ? (
-                <EstadoVazioGf Icone={Gift}>Nenhuma recompensa disponível.</EstadoVazioGf>
+              {!minhasConquistas.length ? (
+                <EstadoVazioGf Icone={Award} compacto>
+                  Nenhuma conquista desbloqueada ainda.
+                </EstadoVazioGf>
               ) : (
-                <div className="flex flex-col gap-2">
+                <ul className="flex flex-col gap-2">
+                  {minhasConquistas.map((c) => (
+                    <li key={c.conquistaId} className="flex items-center gap-2 text-sm">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--gf-dourado-10)] text-[var(--gf-dourado)]">
+                        {c.icone ? (
+                          <span className="text-sm leading-none">{c.icone}</span>
+                        ) : (
+                          <Trophy size={14} />
+                        )}
+                      </span>
+                      <div className="flex min-w-0 flex-1 flex-col">
+                        <span className="truncate text-[var(--gf-texto)]">
+                          {c.nome ?? "(conquista removida)"}
+                        </span>
+                        <span className="text-xs text-[var(--gf-texto-sec)]">
+                          {tempoDesde(c.desbloqueadaEm)}
+                        </span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CartaoGf>
+
+            {/* Fecha a coluna, discreta de propósito: sem mais peso visual que
+                Metas/Conquistas, só saldo + prévia + acesso à loja completa. */}
+            <CartaoGf
+              titulo="Loja"
+              acao={
+                <Link
+                  href="/gamificacao/loja"
+                  className="text-sm text-[var(--gf-verde)] hover:underline"
+                >
+                  Ver loja →
+                </Link>
+              }
+            >
+              {!recompensas?.length ? (
+                <EstadoVazioGf Icone={Gift} compacto>
+                  Nenhuma recompensa disponível.
+                </EstadoVazioGf>
+              ) : (
+                <div className="flex flex-col gap-1.5">
                   <p className="text-xs text-[var(--gf-texto-sec)]">
                     Seu saldo:{" "}
                     <span className="font-semibold text-[var(--gf-texto)]">
                       {meuSaldoMoedas.toLocaleString("pt-BR")} moedas
                     </span>
                   </p>
-                  {recompensas.slice(0, 2).map((r) => (
+                  {recompensas.slice(0, 3).map((r) => (
                     <CartaoRecompensaGf
                       key={r.id}
                       recompensa={{
@@ -564,88 +610,46 @@ export default async function GamificacaoDashboard({
           </div>
         </div>
 
-        {/* Atividade recente em feed (2/3) + conquistas compactas (1/3).
-            items-start evita que uma das duas estique vazia pra acompanhar a
-            altura da outra quando só uma tem dados. */}
-        <div className="grid items-start gap-3 lg:grid-cols-3">
-          <CartaoGf titulo="Atividade recente" className="lg:col-span-2">
-            {!atividadeRecente.length ? (
-              <EstadoVazioGf Icone={Activity} compacto>
-                Nenhuma atividade neste período.
-              </EstadoVazioGf>
-            ) : (
-              <ul className="flex flex-col">
-                {atividadeRecente.map((l) => (
-                  <li
-                    key={l.id}
-                    className="flex items-center gap-2.5 border-t border-[var(--gf-borda)] py-2 text-sm first:border-t-0"
+        {/* Atividade recente em feed, largura toda — Conquistas foi pra coluna lateral. */}
+        <CartaoGf titulo="Atividade recente">
+          {!atividadeRecente.length ? (
+            <EstadoVazioGf Icone={Activity} compacto>
+              Nenhuma atividade neste período.
+            </EstadoVazioGf>
+          ) : (
+            <ul className="flex flex-col">
+              {atividadeRecente.map((l) => (
+                <li
+                  key={l.id}
+                  className="flex items-center gap-2.5 border-t border-[var(--gf-borda)] py-2 text-sm first:border-t-0"
+                >
+                  <span
+                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${l.xp >= 0 ? "bg-[var(--gf-verde-10)] text-[var(--gf-verde)]" : "bg-[var(--gf-vermelho-10)] text-[var(--gf-vermelho)]"}`}
                   >
+                    <Zap size={13} />
+                  </span>
+                  <div className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate text-[var(--gf-texto)]">
+                      {nomeMembro.get(l.membro_id) ?? "(removido)"} ·{" "}
+                      {l.descricao || "Ponto lançado"}
+                    </span>
+                    <span className="text-xs text-[var(--gf-texto-sec)]">
+                      {tempoDesde(l.created_at)}
+                    </span>
+                  </div>
+                  {l.xp !== 0 && (
                     <span
-                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${l.xp >= 0 ? "bg-[var(--gf-verde-10)] text-[var(--gf-verde)]" : "bg-[var(--gf-vermelho-10)] text-[var(--gf-vermelho)]"}`}
+                      className={`shrink-0 font-medium ${l.xp >= 0 ? "text-[var(--gf-verde)]" : "text-[var(--gf-vermelho)]"}`}
                     >
-                      <Zap size={13} />
+                      {l.xp >= 0 ? "+" : ""}
+                      {l.xp} XP
                     </span>
-                    <div className="flex min-w-0 flex-1 flex-col">
-                      <span className="truncate text-[var(--gf-texto)]">
-                        {nomeMembro.get(l.membro_id) ?? "(removido)"} ·{" "}
-                        {l.descricao || "Ponto lançado"}
-                      </span>
-                      <span className="text-xs text-[var(--gf-texto-sec)]">
-                        {tempoDesde(l.created_at)}
-                      </span>
-                    </div>
-                    {l.xp !== 0 && (
-                      <span
-                        className={`shrink-0 font-medium ${l.xp >= 0 ? "text-[var(--gf-verde)]" : "text-[var(--gf-vermelho)]"}`}
-                      >
-                        {l.xp >= 0 ? "+" : ""}
-                        {l.xp} XP
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CartaoGf>
-
-          <CartaoGf
-            titulo="Conquistas"
-            acao={
-              <Link
-                href="/gamificacao/jornada"
-                className="text-sm text-[var(--gf-verde)] hover:underline"
-              >
-                Ver →
-              </Link>
-            }
-          >
-            {!minhasConquistas.length ? (
-              <EstadoVazioGf Icone={Award}>Nenhuma conquista desbloqueada ainda.</EstadoVazioGf>
-            ) : (
-              <ul className="flex flex-col gap-2">
-                {minhasConquistas.map((c) => (
-                  <li key={c.conquistaId} className="flex items-center gap-2 text-sm">
-                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--gf-dourado-10)] text-[var(--gf-dourado)]">
-                      {c.icone ? (
-                        <span className="text-sm leading-none">{c.icone}</span>
-                      ) : (
-                        <Trophy size={14} />
-                      )}
-                    </span>
-                    <div className="flex min-w-0 flex-1 flex-col">
-                      <span className="truncate text-[var(--gf-texto)]">
-                        {c.nome ?? "(conquista removida)"}
-                      </span>
-                      <span className="text-xs text-[var(--gf-texto-sec)]">
-                        {tempoDesde(c.desbloqueadaEm)}
-                      </span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CartaoGf>
-        </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </CartaoGf>
 
         {/* Camada secundária: gráficos de evolução, mais discretos na hierarquia.
             items-start evita que um gráfico vazio estique pra acompanhar a
