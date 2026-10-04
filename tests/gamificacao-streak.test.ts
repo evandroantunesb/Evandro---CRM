@@ -4,95 +4,117 @@
  * nunca recebe `p_membro_id`) — por isso todo teste chama a RPC como o próprio membro,
  * nunca como admin em nome de outro.
  *
- * Lançamentos são inseridos direto no `point_ledger` (via `servico`, sem RLS) com
- * `created_at` controlado, igual ao teste de ranking histórico.
+ * `point_ledger` só pode ser escrito pelas próprias funções do motor (insert/update
+ * revogados até de `service_role` em `20260926100000_gamificacao_pontos.sql`, proteção
+ * antifraude da #128) — por isso todo crédito aqui vem do pipeline real (regra genérica
+ * via `eventos`, ou negócio ganho/reaberto pra exercitar o estorno automático), nunca de
+ * insert direto em `point_ledger`.
+ *
+ * Limitação conhecida, reportada a Evandro: como `point_ledger.created_at` é sempre o
+ * instante real do crédito (nenhum caminho legítimo aceita uma data no passado), um teste
+ * automatizado não consegue reproduzir "sexta produtiva → fim de semana → segunda produtiva"
+ * sem esperar dias de calendário reais. Os testes abaixo cobrem o que É possível provar de
+ * ponta a ponta no mesmo dia real (hoje conta, estorno retroativo remove o dia, bônus de
+ * conquista não conta, self-only) e a marcação correta de `dia_util` pros 7 dias da semana
+ * (bitmask), que juntos validam toda a lógica exceto a travessia de múltiplos dias.
  */
+import { randomUUID } from "node:crypto";
 import { beforeAll, describe, expect, it } from "vitest";
 import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
 
 let admin: Usuario;
-let colab: Usuario;
 let empresa: string;
-let membroColabId: string;
+let funil: string;
+let etapaInicial: string;
+let contato: string;
 
 beforeAll(async () => {
-  [admin, colab] = await Promise.all(["sk-admin", "sk-colab"].map(criarUsuario));
+  admin = await criarUsuario("sk-admin");
   const { data: emp } = await servico.from("empresas").insert({ nome: `Streak ${sufixo}` }).select("id").single();
   empresa = emp!.id;
+  await servico.from("empresa_membros").insert({ empresa_id: empresa, user_id: admin.id, papel: "admin" });
 
-  const { data: vinculos } = await servico
-    .from("empresa_membros")
-    .insert([
-      { empresa_id: empresa, user_id: admin.id, papel: "admin" },
-      { empresa_id: empresa, user_id: colab.id, papel: "vendedor", perfil_gamificacao: "closer" },
-    ])
-    .select("id, user_id");
-  membroColabId = vinculos!.find((v) => v.user_id === colab.id)!.id;
+  const { data: f } = await servico.from("funis").select("id").eq("empresa_id", empresa).single();
+  funil = f!.id;
+  const { data: etapas } = await servico.from("etapas").select("id").eq("funil_id", funil).order("ordem");
+  etapaInicial = etapas![0].id;
+
+  const { data: c } = await servico.from("contatos").insert({ empresa_id: empresa, nome: "Cliente streak", telefone: "45999993333" }).select("id").single();
+  contato = c!.id;
 });
 
-/** Dia produtivo: ao menos 1 crédito ativo (xp > 0, referencia_tipo <> 'conquista'). */
-async function creditarDia(diaISO: string, opts: { estornado?: boolean; referenciaTipo?: string; xp?: number } = {}) {
-  const { error } = await servico.from("point_ledger").insert({
-    empresa_id: empresa,
-    membro_id: membroColabId,
-    xp: opts.xp ?? 10,
-    moedas: 0,
-    referencia_tipo: opts.referenciaTipo ?? "teste",
-    profile_at_event: "closer",
-    created_at: `${diaISO}T12:00:00-03:00`, // meio-dia America/Sao_Paulo, sem ambiguidade de fuso
-    estornado: opts.estornado ?? false,
-  });
+async function criarMembro(nomeBase: string) {
+  const usuario = await criarUsuario(nomeBase);
+  const { data, error } = await servico
+    .from("empresa_membros")
+    .insert({ empresa_id: empresa, user_id: usuario.id, papel: "vendedor", perfil_gamificacao: "closer" })
+    .select("id")
+    .single();
   if (error) throw error;
+  return { usuario, membroId: data!.id as string };
 }
 
 type DiaSemana = { data: string; dia_util: boolean; produtivo: boolean };
 
-async function sequencia() {
-  const { data, error } = await colab.cliente.rpc("sequencia_produtiva_membro", { p_empresa_id: empresa });
+async function sequencia(usuario: Usuario) {
+  const { data, error } = await usuario.cliente.rpc("sequencia_produtiva_membro", { p_empresa_id: empresa });
   if (error) throw error;
   const linha = data![0];
   return { sequencia: linha.sequencia, semana: linha.semana as unknown as DiaSemana[] };
-}
-
-/** "Hoje" em America/Sao_Paulo, como a RPC calcula (Brasil não observa DST desde 2019). */
-function hojeSaoPaulo(): Date {
-  const comOffset = new Date(Date.now() - 3 * 60 * 60 * 1000);
-  return new Date(Date.UTC(comOffset.getUTCFullYear(), comOffset.getUTCMonth(), comOffset.getUTCDate()));
 }
 
 function formatarData(d: Date) {
   return d.toISOString().slice(0, 10);
 }
 
-/** ISO: 1=segunda .. 7=domingo (JS getUTCDay: 0=domingo..6=sábado). */
-function isoDow(d: Date) {
-  return ((d.getUTCDay() + 6) % 7) + 1;
+/** "Hoje" em America/Sao_Paulo, como a RPC calcula (Brasil não observa DST desde 2019). */
+function hojeSaoPaulo(): string {
+  const comOffset = new Date(Date.now() - 3 * 60 * 60 * 1000);
+  return formatarData(new Date(Date.UTC(comOffset.getUTCFullYear(), comOffset.getUTCMonth(), comOffset.getUTCDate())));
 }
 
-/** As `qtd` datas de dia útil (seg–sex) imediatamente anteriores a `aPartirDe`, mais recente primeiro. */
-function diasUteisAnteriores(aPartirDe: Date, qtd: number): string[] {
-  const dias: string[] = [];
-  let cursor = new Date(aPartirDe.getTime() - 24 * 60 * 60 * 1000);
-  while (dias.length < qtd) {
-    if (isoDow(cursor) <= 5) dias.push(formatarData(cursor));
-    cursor = new Date(cursor.getTime() - 24 * 60 * 60 * 1000);
-  }
-  return dias;
+async function criarRegraGenerica(nome: string, tipo: string, xp: number) {
+  const { error } = await admin.cliente.from("gamification_rules").insert({ empresa_id: empresa, nome, evento_tipo: tipo, xp, moedas: 0 });
+  if (error) throw error;
 }
 
-describe("sequencia_produtiva_membro: regra seg–sex padrão (default)", () => {
-  it("3 dias úteis consecutivos com crédito formam sequência 3; fim de semana no meio não quebra; hoje sem crédito ainda não quebra", async () => {
-    const hoje = hojeSaoPaulo();
-    // Os 3 dias úteis imediatamente antes de hoje — naturalmente atravessa um fim de semana
-    // quando hoje cai numa segunda/terça, cobrindo "fim de semana não quebra" sem precisar
-    // fixar o dia de execução do teste. "Hoje" propositalmente não recebe crédito, pra provar
-    // que um dia sem atividade ainda não quebra a sequência antes de ela terminar.
-    const tresDiasUteis = diasUteisAnteriores(hoje, 3);
-    for (const dia of tresDiasUteis) await creditarDia(dia);
+async function emitirEventoGenerico(tipo: string, atorUserId: string) {
+  const { error } = await servico.from("eventos").insert({ empresa_id: empresa, tipo, ator_id: atorUserId, entidade: "teste", entidade_id: randomUUID() });
+  if (error) throw error;
+}
 
-    const r = await sequencia();
-    expect(r.sequencia).toBe(3);
-    expect(r.semana).toHaveLength(7);
+async function criarEGanharNegocio(titulo: string, responsavelUsuario: Usuario, membroId: string) {
+  const { data, error } = await servico
+    .from("negocios")
+    .insert({ empresa_id: empresa, titulo, contato_id: contato, funil_id: funil, etapa_id: etapaInicial, responsavel_id: membroId })
+    .select("id")
+    .single();
+  if (error) throw error;
+  const { error: erroGanho } = await responsavelUsuario.cliente.from("negocios").update({ status: "ganho", valor: 10000 }).eq("id", data!.id);
+  if (erroGanho) throw erroGanho;
+  return data!.id as string;
+}
+
+async function reabrirNegocio(negocioId: string, responsavelUsuario: Usuario) {
+  const { error } = await responsavelUsuario.cliente.from("negocios").update({ status: "aberto" }).eq("id", negocioId);
+  if (error) throw error;
+}
+
+describe("sequencia_produtiva_membro: crédito real de hoje entra na sequência", () => {
+  it("membro novo sem histórico: sem crédito, sequência 0; depois de um crédito real hoje, sequência 1", async () => {
+    // Bitmask 127 (todos os dias) garante que 'hoje' é dia útil nesta empresa,
+    // independente do dia real em que o CI roda — evita um teste não-determinístico.
+    await servico.from("empresas").update({ dias_uteis_gamificacao: 127 }).eq("id", empresa);
+
+    const { usuario } = await criarMembro("sk-credito-hoje");
+    expect((await sequencia(usuario)).sequencia).toBe(0);
+
+    await criarRegraGenerica("Crédito real hoje", "sk.credito-hoje", 10);
+    await emitirEventoGenerico("sk.credito-hoje", usuario.id);
+
+    expect((await sequencia(usuario)).sequencia).toBe(1); // hoje produtivo; ontem sem histórico (membro novo) encerra a sequência
+
+    await servico.from("empresas").update({ dias_uteis_gamificacao: 31 }).eq("id", empresa); // restaura default
   });
 });
 
@@ -100,8 +122,9 @@ describe("sequencia_produtiva_membro: configuração de dias úteis por empresa"
   it("empresa com sábado como dia útil (bitmask inclui bit 6) exige crédito no sábado pra não quebrar", async () => {
     // bit0=segunda..bit6=domingo: segunda a sábado = 0b0111111 = 63.
     await servico.from("empresas").update({ dias_uteis_gamificacao: 63 }).eq("id", empresa);
+    const { usuario } = await criarMembro("sk-sabado-util");
 
-    const r = await sequencia();
+    const r = await sequencia(usuario);
     const sabado = r.semana.find((d) => new Date(`${d.data}T12:00:00Z`).getUTCDay() === 6);
     expect(sabado).toBeDefined();
     expect(sabado!.dia_util).toBe(true); // sábado agora é dia útil nesta empresa
@@ -111,55 +134,63 @@ describe("sequencia_produtiva_membro: configuração de dias úteis por empresa"
 });
 
 describe("sequencia_produtiva_membro: estorno retroativo remove o dia produtivo", () => {
-  it("estornar todos os créditos de um dia faz ele deixar de contar como produtivo", async () => {
-    const hoje = formatarData(hojeSaoPaulo());
-    await creditarDia(hoje, { xp: 20 });
+  it("reabrir o negócio ganho hoje (estorno automático) faz o dia deixar de contar como produtivo", async () => {
+    const { usuario, membroId } = await criarMembro("sk-estorno-hoje");
+    await admin.cliente.from("gamification_rules").insert({ empresa_id: empresa, nome: "Venda (streak estorno)", evento_tipo: "deal.won", xp: 20, moedas: 0 });
+    const negocioId = await criarEGanharNegocio("Venda streak estorno", usuario, membroId);
 
-    const antes = await sequencia();
-    const hojeAntes = antes.semana.find((d) => d.data === hoje);
-    expect(hojeAntes?.produtivo).toBe(true);
+    const hoje = hojeSaoPaulo();
+    const antes = await sequencia(usuario);
+    expect(antes.semana.find((d) => d.data === hoje)?.produtivo).toBe(true);
 
-    await servico.from("point_ledger").update({ estornado: true, estornado_em: new Date().toISOString() }).eq("membro_id", membroColabId).eq("empresa_id", empresa).eq("referencia_tipo", "teste").gte("created_at", `${hoje}T00:00:00-03:00`);
+    await reabrirNegocio(negocioId, usuario); // estorno automático (deal.won) do XP desse negócio
 
-    const depois = await sequencia();
-    const hojeDepois = depois.semana.find((d) => d.data === hoje);
-    expect(hojeDepois?.produtivo).toBe(false); // todos os créditos do dia foram estornados — deixa de contar
+    const depois = await sequencia(usuario);
+    expect(depois.semana.find((d) => d.data === hoje)?.produtivo).toBe(false); // todo o crédito do dia foi estornado — deixa de contar
   });
 });
 
 describe("sequencia_produtiva_membro: bônus de conquista não cria dia produtivo", () => {
-  it("um crédito com referencia_tipo = 'conquista' não torna o dia produtivo por si só", async () => {
-    const outro = await criarUsuario("sk-colab-conquista");
+  it("desbloquear uma conquista (marco_contagem) credita só o bônus (referencia_tipo = 'conquista'), que não torna o dia produtivo", async () => {
+    // Empresa dedicada e isolada: precisa ficar SEM nenhuma gamification_rule pra
+    // 'deal.won' pra garantir que ganhar o negócio não gere XP comum — só o bônus da
+    // conquista (motor de marco é independente de gamification_rules/point_ledger,
+    // confirmado em gamificacao-conquistas-marco.test.ts). Reaproveitar a empresa
+    // compartilhada contaminaria esse isolamento com a regra criada no teste de estorno.
+    const outroAdmin = await criarUsuario("sk-bonus-admin");
+    const { data: outraEmpresa } = await servico.from("empresas").insert({ nome: `Streak bônus conquista ${sufixo}` }).select("id").single();
+    const empresaIsolada = outraEmpresa!.id;
+    await servico.from("empresa_membros").insert({ empresa_id: empresaIsolada, user_id: outroAdmin.id, papel: "admin" });
+    const { data: f } = await servico.from("funis").select("id").eq("empresa_id", empresaIsolada).single();
+    const { data: etapas } = await servico.from("etapas").select("id").eq("funil_id", f!.id).order("ordem");
+    const { data: c } = await servico.from("contatos").insert({ empresa_id: empresaIsolada, nome: "Cliente streak bônus", telefone: "45999994444" }).select("id").single();
+
+    const usuario = await criarUsuario("sk-bonus-conquista");
     const { data: vinculo } = await servico
       .from("empresa_membros")
-      .insert({ empresa_id: empresa, user_id: outro.id, papel: "vendedor", perfil_gamificacao: "closer" })
+      .insert({ empresa_id: empresaIsolada, user_id: usuario.id, papel: "vendedor", perfil_gamificacao: "closer" })
       .select("id")
       .single();
     const membroId = vinculo!.id as string;
 
-    const dia = "2026-08-10"; // segunda, bem no passado — isolado de qualquer outro teste
-    await servico.from("point_ledger").insert({
-      empresa_id: empresa,
-      membro_id: membroId,
-      xp: 50,
-      moedas: 0,
-      referencia_tipo: "conquista",
-      profile_at_event: "closer",
-      created_at: `${dia}T12:00:00-03:00`,
-      estornado: false,
-    });
+    await outroAdmin.cliente
+      .from("conquistas")
+      .insert({ empresa_id: empresaIsolada, nome: "1ª venda (bônus streak)", criterio: { metrica: "marco_contagem", marco: "deal.won", valor: 1 }, xp_bonus: 50, ativa_desde: "1970-01-01T00:00:00Z" });
 
-    const { semana, sequencia: seq } = await (async () => {
-      const { data, error } = await outro.cliente.rpc("sequencia_produtiva_membro", { p_empresa_id: empresa });
-      if (error) throw error;
-      const linha = data![0];
-      return { semana: linha.semana as unknown as DiaSemana[], sequencia: linha.sequencia };
-    })();
-    const diaChecado = semana.find((d) => d.data === dia);
-    // Esse dia não está na semana corrente (está no passado), então a checagem real é via
-    // a sequência: sem nenhum outro crédito, a sequência deve ser 0 (bônus de conquista não conta).
-    expect(diaChecado).toBeUndefined(); // fora da semana corrente, como esperado
-    expect(seq).toBe(0);
+    const { data: negocio, error } = await servico
+      .from("negocios")
+      .insert({ empresa_id: empresaIsolada, titulo: "Venda bônus conquista", contato_id: c!.id, funil_id: f!.id, etapa_id: etapas![0].id, responsavel_id: membroId })
+      .select("id")
+      .single();
+    if (error) throw error;
+    const { error: erroGanho } = await usuario.cliente.from("negocios").update({ status: "ganho", valor: 10000 }).eq("id", negocio!.id);
+    if (erroGanho) throw erroGanho;
+
+    const hoje = hojeSaoPaulo();
+    const { data, error: erroRpc } = await usuario.cliente.rpc("sequencia_produtiva_membro", { p_empresa_id: empresaIsolada });
+    if (erroRpc) throw erroRpc;
+    const semana = data![0].semana as unknown as DiaSemana[];
+    expect(semana.find((d) => d.data === hoje)?.produtivo).toBe(false); // só bônus de conquista — não conta
   });
 });
 
@@ -175,8 +206,9 @@ describe("sequencia_produtiva_membro: self-only", () => {
   it("a função não aceita p_membro_id — não há forma de consultar a sequência de outro membro", async () => {
     // A assinatura da RPC só tem p_empresa_id — tentar passar p_membro_id é rejeitado pelo
     // PostgREST antes mesmo de chegar na função (parâmetro desconhecido não declarado nela).
+    const { usuario } = await criarMembro("sk-self-only");
     const args: Record<string, string> = { p_empresa_id: empresa, p_membro_id: "00000000-0000-0000-0000-000000000000" };
-    const { error } = await colab.cliente.rpc("sequencia_produtiva_membro", args as { p_empresa_id: string });
+    const { error } = await usuario.cliente.rpc("sequencia_produtiva_membro", args as { p_empresa_id: string });
     expect(error).not.toBeNull();
   });
 });

@@ -8,10 +8,12 @@
  * (`p_ate`) deve continuar vendo esse XP, enquanto a consulta ao vivo (`p_ate` null,
  * `not estornado`) já não o vê, revelando a queda real de posição.
  *
- * Lançamentos são inseridos direto no `point_ledger` (via `servico`, sem RLS) para
- * controlar `created_at`/`estornado`/`estornado_em` com precisão — nenhum destes
- * testes depende do pipeline de eventos/regras.
+ * `point_ledger` só pode ser escrito pelas próprias funções do motor (insert/update
+ * revogados até de `service_role` em `20260926100000_gamificacao_pontos.sql`) — por
+ * isso todo XP aqui é gerado pelo pipeline real (`eventos` → `aplicar_regras_gamificacao`,
+ * ou negócio ganho/reaberto → `estornar_lancamentos_evento`), nunca por insert direto.
  */
+import { randomUUID } from "node:crypto";
 import { beforeAll, describe, expect, it } from "vitest";
 import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
 
@@ -19,6 +21,9 @@ let admin: Usuario;
 let membroA: Usuario;
 let membroB: Usuario;
 let empresa: string;
+let funil: string;
+let etapaInicial: string;
+let contato: string;
 const membro: Record<string, string> = {};
 
 beforeAll(async () => {
@@ -29,33 +34,50 @@ beforeAll(async () => {
   const { data: vinculos } = await servico
     .from("empresa_membros")
     .insert([
-      { empresa_id: empresa, user_id: admin.id, papel: "admin" },
+      { empresa_id: empresa, user_id: admin.id, papel: "admin", perfil_gamificacao: "closer" },
       { empresa_id: empresa, user_id: membroA.id, papel: "vendedor", perfil_gamificacao: "closer" },
       { empresa_id: empresa, user_id: membroB.id, papel: "vendedor", perfil_gamificacao: "closer" },
     ])
     .select("id, user_id");
   for (const v of vinculos!) membro[v.user_id] = v.id;
+
+  const { data: f } = await servico.from("funis").select("id").eq("empresa_id", empresa).single();
+  funil = f!.id;
+  const { data: etapas } = await servico.from("etapas").select("id").eq("funil_id", funil).order("ordem");
+  etapaInicial = etapas![0].id;
+
+  const { data: c } = await servico.from("contatos").insert({ empresa_id: empresa, nome: "Cliente ranking histórico", telefone: "45999992222" }).select("id").single();
+  contato = c!.id;
+
+  // Regra padrão de deal.won usada pelos cenários que precisam de estorno real
+  // (reabrir um negócio ganho estorna automaticamente o XP daquele negócio).
+  await admin.cliente.from("gamification_rules").insert({ empresa_id: empresa, nome: "Venda (ranking histórico)", evento_tipo: "deal.won", xp: 100, moedas: 0 });
 });
 
-async function lancar(opts: {
-  membroId: string;
-  xp: number;
-  createdAt: string;
-  estornado?: boolean;
-  estornadoEm?: string;
-  perfil?: "sdr" | "closer" | "cs_farmer";
-}) {
-  const { error } = await servico.from("point_ledger").insert({
-    empresa_id: empresa,
-    membro_id: opts.membroId,
-    xp: opts.xp,
-    moedas: 0,
-    referencia_tipo: "teste",
-    profile_at_event: opts.perfil ?? "closer",
-    created_at: opts.createdAt,
-    estornado: opts.estornado ?? false,
-    estornado_em: opts.estornadoEm ?? null,
-  });
+async function criarEGanharNegocio(titulo: string, responsavelUsuario: Usuario) {
+  const { data, error } = await servico
+    .from("negocios")
+    .insert({ empresa_id: empresa, titulo, contato_id: contato, funil_id: funil, etapa_id: etapaInicial, responsavel_id: membro[responsavelUsuario.id] })
+    .select("id")
+    .single();
+  if (error) throw error;
+  const { error: erroGanho } = await responsavelUsuario.cliente.from("negocios").update({ status: "ganho", valor: 10000 }).eq("id", data!.id);
+  if (erroGanho) throw erroGanho;
+  return data!.id as string;
+}
+
+async function reabrirNegocio(negocioId: string, responsavelUsuario: Usuario) {
+  const { error } = await responsavelUsuario.cliente.from("negocios").update({ status: "aberto" }).eq("id", negocioId);
+  if (error) throw error;
+}
+
+async function criarRegraGenerica(nome: string, tipo: string, xp: number) {
+  const { error } = await admin.cliente.from("gamification_rules").insert({ empresa_id: empresa, nome, evento_tipo: tipo, xp, moedas: 0 });
+  if (error) throw error;
+}
+
+async function emitirEventoGenerico(tipo: string, atorUserId: string) {
+  const { error } = await servico.from("eventos").insert({ empresa_id: empresa, tipo, ator_id: atorUserId, entidade: "teste", entidade_id: randomUUID() });
   if (error) throw error;
 }
 
@@ -75,71 +97,61 @@ function totalDe(linhas: { membro_id: string; total_xp: number }[], membroId: st
 
 describe("ranking_gamificacao: p_ate — reconstrução causal do ledger num instante passado", () => {
   it("cenário obrigatório: XP válido no corte e estornado depois do corte — histórico vê o XP, ao vivo vê o estorno (queda real de posição)", async () => {
-    const inicioSemana = "2026-10-01T00:00:00Z";
-    const duranteASemana = "2026-10-03T00:00:00Z";
+    // A ganha 2 negócios (200 XP) antes do corte — fica acima de B, que ganhou 1 (100 XP).
+    const negocioA1 = await criarEGanharNegocio("Venda A1", membroA);
+    const negocioA2 = await criarEGanharNegocio("Venda A2", membroA);
+    await criarEGanharNegocio("Venda B1", membroB);
 
-    // A ganha 100 XP antes do início da semana — fica acima de B no corte.
-    await lancar({ membroId: membro[membroA.id], xp: 100, createdAt: "2026-09-25T00:00:00Z" });
-    // B ganha 40 XP, também antes do corte.
-    await lancar({ membroId: membro[membroB.id], xp: 40, createdAt: "2026-09-26T00:00:00Z" });
+    const corte = new Date().toISOString();
 
-    // Durante a semana, o XP de A é estornado (estornado_em depois do corte).
-    await servico
-      .from("point_ledger")
-      .update({ estornado: true, estornado_em: duranteASemana })
-      .eq("membro_id", membro[membroA.id])
-      .eq("empresa_id", empresa);
+    // Depois do corte, A reabre os 2 negócios — o estorno automático (deal.won) zera o
+    // XP ao vivo de A, mas created_at (antes do corte) e estornado_em (depois) preservam
+    // a validade histórica no instante do corte.
+    await reabrirNegocio(negocioA1, membroA);
+    await reabrirNegocio(negocioA2, membroA);
 
-    const historico = await ranking(inicioSemana);
-    expect(totalDe(historico, membro[membroA.id])).toBe(100); // válido no corte: created_at < p_ate, estornado_em > p_ate
-    expect(totalDe(historico, membro[membroB.id])).toBe(40);
+    const historico = await ranking(corte);
+    expect(totalDe(historico, membro[membroA.id])).toBe(200); // válido no corte
+    expect(totalDe(historico, membro[membroB.id])).toBe(100);
     expect(totalDe(historico, membro[membroA.id])).toBeGreaterThan(totalDe(historico, membro[membroB.id])); // A acima de B no corte
 
     const aoVivo = await ranking();
     expect(totalDe(aoVivo, membro[membroA.id])).toBe(0); // estornado agora: not estornado é falso
-    expect(totalDe(aoVivo, membro[membroB.id])).toBe(40);
-    expect(totalDe(aoVivo, membro[membroA.id])).toBeLessThan(totalDe(aoVivo, membro[membroB.id])); // A cai abaixo de B — queda real
+    expect(totalDe(aoVivo, membro[membroB.id])).toBe(100);
+    expect(totalDe(aoVivo, membro[membroA.id])).toBeLessThan(totalDe(aoVivo, membro[membroB.id])); // queda real de posição
   });
 
   it("XP já estornado antes do corte não conta nem no histórico nem no vivo", async () => {
-    const corte = "2026-10-01T00:00:00Z";
-    await lancar({
-      membroId: membro[membroA.id],
-      xp: 30,
-      createdAt: "2026-09-20T00:00:00Z",
-      estornado: true,
-      estornadoEm: "2026-09-22T00:00:00Z", // antes do corte
-    });
+    const negocio = await criarEGanharNegocio("Venda estornada antes do corte", membroA);
+    await reabrirNegocio(negocio, membroA); // estorno antes do corte abaixo
+
+    const corte = new Date().toISOString();
 
     const historico = await ranking(corte);
     const aoVivo = await ranking();
-    expect(historico.find((l) => l.membro_id === membro[membroA.id] && l.total_xp === 30)).toBeUndefined();
-    expect(aoVivo.find((l) => l.membro_id === membro[membroA.id] && l.total_xp === 30)).toBeUndefined();
+    // Nenhum dos dois deve contar este lançamento especificamente — comparado contra o
+    // total já estabelecido no teste anterior (200 histórico / 0 ao vivo para A).
+    expect(totalDe(historico, membro[membroA.id])).toBe(200); // sem mudança: não ganhou os +100
+    expect(totalDe(aoVivo, membro[membroA.id])).toBe(0);
   });
 
   it("XP criado depois do corte não conta no histórico, mas conta ao vivo", async () => {
-    const corte = "2026-10-01T00:00:00Z";
-
+    const corte = new Date().toISOString();
     const historicoAntes = totalDe(await ranking(corte), membro[membroB.id]);
     const aoVivoAntes = totalDe(await ranking(), membro[membroB.id]);
 
-    await lancar({ membroId: membro[membroB.id], xp: 15, createdAt: "2026-10-02T00:00:00Z" }); // depois do corte
+    await criarEGanharNegocio("Venda B2 (depois do corte)", membroB); // created_at > corte
 
     const historicoDepois = totalDe(await ranking(corte), membro[membroB.id]);
     const aoVivoDepois = totalDe(await ranking(), membro[membroB.id]);
 
     expect(historicoDepois).toBe(historicoAntes); // created_at >= p_ate: não entra no histórico
-    expect(aoVivoDepois).toBe(aoVivoAntes + 15); // entra normalmente no estado ao vivo
+    expect(aoVivoDepois).toBe(aoVivoAntes + 100); // entra normalmente no estado ao vivo
   });
 
   it("ausência de corte (p_ate null) preserva exatamente o comportamento atual (not estornado)", async () => {
     const semCorte = await ranking();
-    const { data: ativos } = await servico
-      .from("point_ledger")
-      .select("xp")
-      .eq("membro_id", membro[membroA.id])
-      .eq("empresa_id", empresa)
-      .eq("estornado", false);
+    const { data: ativos } = await servico.from("point_ledger").select("xp").eq("membro_id", membro[membroA.id]).eq("empresa_id", empresa).eq("estornado", false);
     const somaAtiva = (ativos ?? []).reduce((acc, l) => acc + l.xp, 0);
     expect(totalDe(semCorte, membro[membroA.id])).toBe(somaAtiva);
   });
@@ -147,35 +159,35 @@ describe("ranking_gamificacao: p_ate — reconstrução causal do ledger num ins
   it("isolamento por empresa: lançamento de outra empresa nunca aparece no histórico desta", async () => {
     const outroAdmin = await criarUsuario("rh-outra-empresa-admin");
     const { data: outraEmpresa } = await servico.from("empresas").insert({ nome: `Ranking histórico outra empresa ${sufixo}` }).select("id").single();
-    await servico.from("empresa_membros").insert({ empresa_id: outraEmpresa!.id, user_id: outroAdmin.id, papel: "admin" });
-    const { data: vinculoOutra } = await servico
-      .from("empresa_membros")
-      .insert({ empresa_id: outraEmpresa!.id, user_id: membroA.id, papel: "vendedor", perfil_gamificacao: "closer" })
-      .select("id")
-      .single();
+    await servico.from("empresa_membros").insert({ empresa_id: outraEmpresa!.id, user_id: outroAdmin.id, papel: "vendedor", perfil_gamificacao: "closer" });
+    await outroAdmin.cliente.from("gamification_rules").insert({ empresa_id: outraEmpresa!.id, nome: "Regra outra empresa", evento_tipo: "rh.outra-empresa", xp: 999, moedas: 0 });
+    await servico.from("eventos").insert({ empresa_id: outraEmpresa!.id, tipo: "rh.outra-empresa", ator_id: outroAdmin.id, entidade: "teste", entidade_id: randomUUID() });
 
-    await lancar({ membroId: vinculoOutra!.id, xp: 999, createdAt: "2026-09-20T00:00:00Z" });
-
-    const { data, error } = await outroAdmin.cliente.rpc("ranking_gamificacao", { p_empresa_id: empresa, p_perfil: "closer", p_ate: "2026-10-01T00:00:00Z" });
+    const corteFuturo = new Date(Date.now() + 86_400_000).toISOString();
+    const { data, error } = await admin.cliente.rpc("ranking_gamificacao", { p_empresa_id: empresa, p_perfil: "closer", p_ate: corteFuturo });
     expect(error).toBeNull();
     expect(data!.find((l) => l.total_xp === 999)).toBeUndefined();
   });
 
   it("isolamento por perfil (SDR/Closer): XP lançado com profile_at_event diferente não entra no histórico do outro perfil", async () => {
-    const corte = "2026-10-01T00:00:00Z";
-    await lancar({ membroId: membro[membroB.id], xp: 777, createdAt: "2026-09-20T00:00:00Z", perfil: "sdr" });
+    await servico.from("empresa_membros").update({ perfil_gamificacao: "sdr" }).eq("id", membro[membroB.id]);
+    await criarRegraGenerica("Regra genérica SDR", "rh.evento-sdr", 777);
+    await emitirEventoGenerico("rh.evento-sdr", membroB.id); // profile_at_event = 'sdr' (perfil atual de B no momento)
+    await servico.from("empresa_membros").update({ perfil_gamificacao: "closer" }).eq("id", membro[membroB.id]); // restaura
 
-    const historicoCloser = await ranking(corte, "closer");
-    const historicoSdr = await ranking(corte, "sdr");
+    const corteFuturo = new Date(Date.now() + 86_400_000).toISOString();
+    const historicoCloser = await ranking(corteFuturo, "closer");
+    const historicoSdr = await ranking(corteFuturo, "sdr");
     expect(historicoCloser.find((l) => l.total_xp === 777)).toBeUndefined();
     expect(historicoSdr.find((l) => l.membro_id === membro[membroB.id] && l.total_xp === 777)).toBeDefined();
   });
 
   it("admin/gestor seguem excluídos do histórico, mesmo com XP lançado no período", async () => {
-    const corte = "2026-10-01T00:00:00Z";
-    await lancar({ membroId: membro[admin.id], xp: 500, createdAt: "2026-09-20T00:00:00Z" });
+    await criarRegraGenerica("Regra genérica admin", "rh.evento-admin", 500);
+    await emitirEventoGenerico("rh.evento-admin", admin.id); // admin tem perfil_gamificacao='closer', papel='admin'
 
-    const historico = await ranking(corte);
+    const corteFuturo = new Date(Date.now() + 86_400_000).toISOString();
+    const historico = await ranking(corteFuturo);
     expect(historico.find((l) => l.membro_id === membro[admin.id])).toBeUndefined();
   });
 });

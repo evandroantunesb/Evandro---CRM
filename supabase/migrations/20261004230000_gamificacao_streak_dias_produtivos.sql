@@ -41,11 +41,15 @@ comment on column public.empresas.dias_uteis_gamificacao is
 -- semana vazia, nunca erro (mesmo padrão de `ranking_gamificacao`/RLS: ausência
 -- de acesso vira resultado vazio, não exceção).
 --
--- Sem limite artificial de dias pra trás: caminha até encontrar o primeiro dia
--- útil sem crédito (ou esgotar o histórico da empresa). Único teto é uma trava
--- de segurança técnica bem acima de qualquer uso real (10 anos de dias úteis),
--- só pra nunca haver loop sem fim num cenário de dado corrompido — não é um
--- limite de produto e nunca aparece pro usuário como "180+" nem similar.
+-- Sem limite artificial de dias pra trás, nem mesmo como trava técnica: a
+-- sequência termina naturalmente ao encontrar o primeiro dia útil sem crédito
+-- (pedido explícito do Evandro — nenhum "180+"/cap no produto nem no algoritmo).
+-- Não há risco real de loop sem fim: cada lançamento de `point_ledger` é um
+-- evento real que levou tempo de parede pra existir, então o número de dias
+-- distintos com crédito pra um membro é sempre finito e, na prática, limitado
+-- pela data de criação da empresa — não existe forma de uma empresa ter dias
+-- produtivos "antes de existir", então o laço sempre encontra um dia útil sem
+-- crédito (ou esgota os dados reais) em tempo finito.
 -- ---------------------------------------------------------------------------
 
 create or replace function public.sequencia_produtiva_membro(p_empresa_id uuid)
@@ -65,8 +69,7 @@ declare
   v_inicio_semana date;
   v_semana jsonb := '[]'::jsonb;
   v_dia date;
-  v_max_iteracoes constant integer := 3650; -- trava técnica (~10 anos), não um limite de produto
-  v_i integer := 0;
+  v_i integer;
 begin
   v_membro_id := public.meu_membro_id(p_empresa_id);
   if v_membro_id is null then
@@ -97,14 +100,11 @@ begin
     );
     v_semana := v_semana || jsonb_build_object('data', v_dia, 'dia_util', v_dia_util, 'produtivo', v_produtivo);
   end loop;
-  v_i := 0;
 
-  -- Caminha pra trás a partir de hoje, contando dias úteis produtivos consecutivos.
+  -- Caminha pra trás a partir de hoje, contando dias úteis produtivos consecutivos,
+  -- até encontrar o primeiro dia útil sem crédito — sem limite de iterações.
   v_cursor := v_hoje;
   loop
-    v_i := v_i + 1;
-    exit when v_i > v_max_iteracoes;
-
     v_dow := extract(isodow from v_cursor)::integer;
     v_bit := 1 << (v_dow - 1);
     v_dia_util := (v_bitmask & v_bit) <> 0;
