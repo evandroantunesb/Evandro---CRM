@@ -58,3 +58,26 @@ h3,
   font-family: var(--font-titulo);
   letter-spacing: -0.01em;
 }
+
+/*
+ * Tema escuro da Gamificação — escopado à classe .tema-gamificacao (aplicada só
+ * pelo layout de src/app/(app)/gamificacao). Não altera --color-* acima nem a
+ * paleta do resto do produto. Verde é a cor contextual (XP/progresso/CTA);
+ * dourado fica reservado a prestígio (1º lugar, conquistas, recompensas
+ * premium); vermelho só para alerta/queda/erro — decisão do Evandro, 2026-10-01.
+ */
+.tema-gamificacao {
+  --gf-bg: var(--color-carvao);
+  --gf-surface: #1a1a1c;
+  --gf-surface-alta: #232326;
+  --gf-borda: #2e2e32;
+  --gf-texto: var(--color-offwhite);
+  --gf-texto-sec: #a3a3aa;
+  --gf-texto-ter: #6b6b72;
+  --gf-verde: #34d399;
+  --gf-verde-10: rgb(52 211 153 / 12%);
+  --gf-dourado: var(--color-dourado);
+  --gf-dourado-10: rgb(212 175 55 / 12%);
+  --gf-vermelho: #f87171;
+  --gf-vermelho-10: rgb(248 113 113 / 12%);
+}
