@@ -345,39 +345,45 @@ export default async function GamificacaoDashboard({
           />
         </div>
 
-        {/* Hero: minha posição ganha protagonismo (2/3), meu nível ao lado. */}
-        <div className="grid gap-3 lg:grid-cols-3">
-          <CartaoGf destaque className="lg:col-span-2">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="flex items-center gap-1.5 text-xs tracking-wide text-[var(--gf-texto-sec)] uppercase">
-                  <Trophy size={12} className="text-[var(--gf-dourado)]" />
-                  Minha posição
-                </p>
-                <p className="mt-1 text-3xl font-semibold text-[var(--gf-texto)]">
-                  {minhaPosicaoRanking ? `#${minhaPosicaoRanking.posicao}` : "—"}
-                  <span className="ml-2 text-base font-normal text-[var(--gf-texto-sec)]">
-                    {periodo === "mes" ? "no ranking do mês" : "no ranking do período"}
-                  </span>
-                </p>
-                <p className="mt-0.5 text-sm text-[var(--gf-texto-sec)]">
-                  {minhaPosicaoRanking
-                    ? `${minhaPosicaoRanking.total.toLocaleString("pt-BR")} XP no período`
-                    : "Pontue neste período pra entrar no ranking."}
-                </p>
-              </div>
-              {minhaPosicaoRanking && acimaDeMim && (
-                <div className="shrink-0 rounded-lg bg-[var(--gf-surface-alta)] px-4 py-3 text-sm sm:text-right">
-                  <p className="text-[var(--gf-texto-sec)]">Você está a</p>
-                  <p className="font-semibold text-[var(--gf-verde)]">
-                    {(acimaDeMim.total - minhaPosicaoRanking.total).toLocaleString("pt-BR")} XP
+        {/* Hero: minha posição ganha protagonismo (2/3), meu nível ao lado. Sem
+            dados no ranking, o card encolhe (items-start evita que ele estique
+            pra acompanhar a altura do card de nível ao lado). */}
+        <div className="grid items-start gap-3 lg:grid-cols-3">
+          <CartaoGf destaque={Boolean(minhaPosicaoRanking)} className="lg:col-span-2">
+            {!minhaPosicaoRanking ? (
+              <EstadoVazioGf Icone={Trophy} compacto>
+                Pontue neste período pra entrar no ranking.
+              </EstadoVazioGf>
+            ) : (
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="flex items-center gap-1.5 text-xs tracking-wide text-[var(--gf-texto-sec)] uppercase">
+                    <Trophy size={12} className="text-[var(--gf-dourado)]" />
+                    Minha posição
                   </p>
-                  <p className="text-[var(--gf-texto-sec)]">
-                    do {acimaDeMim.posicao}º lugar ({acimaDeMim.nome})
+                  <p className="mt-1 text-3xl font-semibold text-[var(--gf-texto)]">
+                    {`#${minhaPosicaoRanking.posicao}`}
+                    <span className="ml-2 text-base font-normal text-[var(--gf-texto-sec)]">
+                      {periodo === "mes" ? "no ranking do mês" : "no ranking do período"}
+                    </span>
+                  </p>
+                  <p className="mt-0.5 text-sm text-[var(--gf-texto-sec)]">
+                    {minhaPosicaoRanking.total.toLocaleString("pt-BR")} XP no período
                   </p>
                 </div>
-              )}
-            </div>
+                {acimaDeMim && (
+                  <div className="shrink-0 rounded-lg bg-[var(--gf-surface-alta)] px-4 py-3 text-sm sm:text-right">
+                    <p className="text-[var(--gf-texto-sec)]">Você está a</p>
+                    <p className="font-semibold text-[var(--gf-verde)]">
+                      {(acimaDeMim.total - minhaPosicaoRanking.total).toLocaleString("pt-BR")} XP
+                    </p>
+                    <p className="text-[var(--gf-texto-sec)]">
+                      do {acimaDeMim.posicao}º lugar ({acimaDeMim.nome})
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </CartaoGf>
 
           <CartaoGf destaque>
@@ -423,8 +429,10 @@ export default async function GamificacaoDashboard({
           </CartaoGf>
         </div>
 
-        {/* Ranking com mais presença (2/3) + metas e loja compactas ao lado. */}
-        <div className="grid gap-3 lg:grid-cols-3">
+        {/* Ranking com mais presença (2/3) + metas e loja compactas ao lado.
+            items-start evita que o ranking vazio estique pra acompanhar a
+            altura da coluna lateral (Metas + Loja). */}
+        <div className="grid items-start gap-3 lg:grid-cols-3">
           <CartaoGf
             titulo="Ranking da equipe"
             acao={
@@ -438,7 +446,9 @@ export default async function GamificacaoDashboard({
             className="lg:col-span-2"
           >
             {!ranking.length ? (
-              <EstadoVazioGf Icone={Users}>Ninguém pontuou neste período ainda.</EstadoVazioGf>
+              <EstadoVazioGf Icone={Users} compacto>
+                Ninguém pontuou neste período ainda.
+              </EstadoVazioGf>
             ) : (
               <ul className="flex flex-col gap-1.5">
                 {ranking.map((r) => (
@@ -554,11 +564,15 @@ export default async function GamificacaoDashboard({
           </div>
         </div>
 
-        {/* Atividade recente em feed (2/3) + conquistas compactas (1/3). */}
-        <div className="grid gap-3 lg:grid-cols-3">
+        {/* Atividade recente em feed (2/3) + conquistas compactas (1/3).
+            items-start evita que uma das duas estique vazia pra acompanhar a
+            altura da outra quando só uma tem dados. */}
+        <div className="grid items-start gap-3 lg:grid-cols-3">
           <CartaoGf titulo="Atividade recente" className="lg:col-span-2">
             {!atividadeRecente.length ? (
-              <EstadoVazioGf Icone={Activity}>Nenhuma atividade neste período.</EstadoVazioGf>
+              <EstadoVazioGf Icone={Activity} compacto>
+                Nenhuma atividade neste período.
+              </EstadoVazioGf>
             ) : (
               <ul className="flex flex-col">
                 {atividadeRecente.map((l) => (
@@ -633,8 +647,10 @@ export default async function GamificacaoDashboard({
           </CartaoGf>
         </div>
 
-        {/* Camada secundária: gráficos de evolução, mais discretos na hierarquia. */}
-        <div className="grid gap-3 lg:grid-cols-2">
+        {/* Camada secundária: gráficos de evolução, mais discretos na hierarquia.
+            items-start evita que um gráfico vazio estique pra acompanhar a
+            altura do gráfico preenchido ao lado. */}
+        <div className="grid items-start gap-3 lg:grid-cols-2">
           <CartaoGf
             titulo="Evolução de XP"
             acao={
@@ -647,7 +663,9 @@ export default async function GamificacaoDashboard({
             }
           >
             {serieAcumulada.length < 2 ? (
-              <EstadoVazioGf Icone={LineChart}>Sem dados suficientes neste período.</EstadoVazioGf>
+              <EstadoVazioGf Icone={LineChart} compacto>
+                Sem dados suficientes neste período.
+              </EstadoVazioGf>
             ) : (
               <>
                 <p className="text-sm text-[var(--gf-texto-sec)]">
@@ -663,7 +681,9 @@ export default async function GamificacaoDashboard({
 
           <CartaoGf titulo="Ações que mais geram XP">
             {!topAcoes.length ? (
-              <EstadoVazioGf Icone={BarChart3}>Nenhum ponto lançado neste período.</EstadoVazioGf>
+              <EstadoVazioGf Icone={BarChart3} compacto>
+                Nenhum ponto lançado neste período.
+              </EstadoVazioGf>
             ) : (
               <GraficoBarras itens={topAcoes} />
             )}

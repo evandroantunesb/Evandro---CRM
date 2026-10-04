@@ -164,22 +164,31 @@ export function LinhaLancamento({
 /**
  * Estado vazio padrão — ícone Lucide discreto (opcional) + texto, centralizado e
  * com respiro vertical pra não parecer um componente quebrado dentro do cartão.
+ * `compacto` reduz ainda mais o respiro — pra cartões que, com dados, viram
+ * listas/gráficos altos (ranking, feed, gráficos) e não devem reservar essa
+ * altura quando vazios. Sem `compacto`, o padrão de sempre (ex.: Extrato) não muda.
  */
 export function EstadoVazioGf({
   children,
   Icone,
+  compacto = false,
 }: {
   children: ReactNode;
   Icone?: ComponentType<{ size?: number }>;
+  compacto?: boolean;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-2 py-6 text-center">
+    <div
+      className={`flex flex-col items-center justify-center gap-1.5 text-center ${compacto ? "py-2.5" : "py-6 gap-2"}`}
+    >
       {Icone && (
-        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--gf-surface-alta)] text-[var(--gf-texto-ter)]">
-          <Icone size={16} />
+        <span
+          className={`flex items-center justify-center rounded-full bg-[var(--gf-surface-alta)] text-[var(--gf-texto-ter)] ${compacto ? "h-7 w-7" : "h-9 w-9"}`}
+        >
+          <Icone size={compacto ? 13 : 16} />
         </span>
       )}
-      <p className="text-sm text-[var(--gf-texto-sec)]">{children}</p>
+      <p className={`text-[var(--gf-texto-sec)] ${compacto ? "text-xs" : "text-sm"}`}>{children}</p>
     </div>
   );
 }
