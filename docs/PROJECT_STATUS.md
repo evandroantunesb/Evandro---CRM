@@ -25,7 +25,7 @@ Percentuais aproximados, definidos pelo Evandro em 2026-10-05.
 | Propostas | 50% | Produção: proposta em PDF, link público, contrato com status |
 | Gamificação | 88% | Produção: motor funcionalmente fechado em 2026-10-02 (XP/moedas, níveis, conquistas, ranking, loja, metas, comissões, pagamento confirmado). Visual novo só em Visão geral e Extrato (PR #130); ~9 telas no visual antigo |
 | Interface/UX geral | 55% | Produção: redesign de Início, Tarefas (#80), Contatos (#82), gamificação parcial (#130). Kanban e demais telas pendentes |
-| Base Demo | 85% | **Branch/PR #132:** script pronto, dry-run feito em produção; falta a execução real |
+| Base Demo | 85% | **Branch/PR #132:** script corrigido (`0a66440`), dry-run feito em produção (4 membros / 10 negócios); faltam resolver os bloqueios técnicos e a execução real |
 | Segurança/Produção | 70% | Produção: RLS multiempresa, CI, deploy, migrations via workflow. Backup automático (#62) parado por falta de secrets |
 | Onboarding | 15% | Roadmap |
 | Tipos de Solução | 10% | Roadmap |
@@ -43,17 +43,27 @@ Nada do papel SDR, Tarefas, Contatos, wizard e Loja tem validação registrada e
 
 Draft, branch `feature/seed-base-demo`, script `scripts/seed-base-demo.mjs`. Substitui os vendedores reais da empresa por uma base fictícia de 90 dias de histórico (energia solar residencial e comercial, tickets de ~R$ 15 mil a R$ 120 mil), gerada por fluxos reais (triggers, RPCs, sessões autenticadas) — nunca por inserção direta de pontos ou eventos.
 
-**Dry-run executado com sucesso contra produção** (nada foi alterado):
+**Dry-run executado com sucesso contra produção** com o commit `0a66440` (nada foi alterado):
 
 - empresa correta localizada;
-- 3 membros atuais seriam removidos — encontrados pelo filtro atual do script, `papel = 'vendedor'` (membros com `papel = 'sdr'` não entram nesse filtro) — e 6 negócios atuais seriam apagados;
-- admin, configurações da empresa e contas Auth antigas preservados.
+- 4 membros atuais seriam removidos pelo filtro `papel IN ('vendedor','sdr')`: 3 com `papel = 'vendedor'` e 1 com `papel = 'sdr'` (Rafael Souza);
+- 10 negócios atuais seriam apagados;
+- preservados: admin, gestores, empresas, funis (as etapas só são substituídas na execução real), origens, motivos de perda, `gamification_rules`, níveis, conquistas, recompensas, logs de auditoria e contas Auth antigas.
+
+O dry-run anterior mostrava 3 membros e 6 negócios porque o filtro antigo (`papel = 'vendedor'`) não incluía o SDR.
 
 **Usuários fictícios:** Lucas Martins (closer, melhor desempenho), Mariana Costa (closer, boa e constante), Rafael Almeida (closer, intermediário), Bruno Ferreira (closer, abaixo da meta), Gabriel Santos (SDR).
 
-**Bloqueio da execução real:** o seed atual cria o Gabriel com `papel = 'vendedor'` + `perfil_gamificacao = 'sdr'`, mas o cenário aprovado exige um SDR real (`papel = 'sdr'`). A limpeza também precisa considerar membros antigos com `papel = 'sdr'`. Corrigir na branch `feature/seed-base-demo` e refazer o dry-run antes de executar.
+Resolvido no commit `0a66440`: Gabriel passa a ser SDR real (`papel = 'sdr'` + `perfil_gamificacao = 'sdr'`), os closers ficam `papel = 'vendedor'` + `perfil_gamificacao = 'closer'`, a limpeza considera `vendedor` e `sdr`, e o Gabriel conclui pela própria sessão a tarefa automática "Realizar primeiro contato" (`contato_realizado`) antes de cada handoff.
 
-**Próximo passo:** execução real (`CONFIRMAR_RESET_DEMO=sim`) — **somente com autorização explícita e específica do Evandro**; aprovação de merge não autoriza a execução. Depois, validar no banco real:
+**Bloqueios técnicos antes da execução real** (revisão estática do script contra as migrations, ainda não confirmada em produção):
+
+- `executarLimpeza()` começa apagando `eventos`, mas `delete` em `eventos` é revogado de `service_role` (`20260925000100_fundacao.sql`). A execução real falharia nesse primeiro passo, antes de apagar qualquer coisa.
+- `recriarFunil()` apaga todas as etapas do funil depois da limpeza, mas `negocios.etapa_id` é `on delete restrict`. Se sobrar algum negócio nesse funil (do admin, de gestor ou sem responsável), a execução para no meio, com a limpeza já feita.
+- `confirmacoes_pagamento` e `handoffs.para_membro_id` referenciam negócios/membros sem cascata: pagamento confirmado ou handoff ligado aos registros removidos também bloqueia a limpeza.
+- A limpeza apaga todos os contatos sem negócio da empresa, não só os dos membros removidos, e o dry-run não mostra essa contagem.
+
+**Próximo passo:** resolver os bloqueios acima; depois, execução real (`CONFIRMAR_RESET_DEMO=sim`) — **somente com autorização explícita e específica do Evandro**; aprovação de merge não autoriza a execução. Depois, validar no banco real:
 
 - 5 usuários fictícios;
 - 35 negócios: 12 ganhos (7 pagos), 5 perdidos, 18 em andamento;
