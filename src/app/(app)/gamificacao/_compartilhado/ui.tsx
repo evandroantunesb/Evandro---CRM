@@ -14,7 +14,7 @@ export function CartaoGf({
   className = "",
   destaque = false,
 }: {
-  titulo?: string;
+  titulo?: ReactNode;
   children: ReactNode;
   acao?: ReactNode;
   className?: string;
