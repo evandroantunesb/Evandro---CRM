@@ -217,11 +217,10 @@ h3,
 }
 
 /*
- * Tablet e notebook: duas colunas reais. O desktop de três colunas não entra
- * precocemente só porque o viewport passou de 1024 px — a sidebar também ocupa
- * espaço horizontal no Raion.
+ * Tablet e notebook: duas colunas reais. O desktop de três colunas entra a
+ * partir de 1280 px (ver bloco abaixo) — 1024 px ainda é região intermediária.
  */
-@media (min-width: 768px) and (max-width: 1399px) {
+@media (min-width: 768px) and (max-width: 1279px) {
   .tema-gamificacao .max-w-\[1500px\] {
     width: 100%;
     max-width: none;
@@ -271,9 +270,11 @@ h3,
 
 /*
  * Desktop largo: wireframe oficial da referência. Aqui sim a geometria de três
- * colunas fica fixa e independente da quantidade de dados cadastrados.
+ * colunas fica fixa e independente da quantidade de dados cadastrados. A
+ * partir de 1280 px já há largura útil suficiente pra manter a composição
+ * desktop (1280/1366 não devem cair no layout intermediário de 2 colunas).
  */
-@media (min-width: 1400px) {
+@media (min-width: 1280px) {
   .tema-gamificacao .max-w-\[1500px\] {
     width: 100%;
     max-width: none;
@@ -352,7 +353,7 @@ h3,
   }
 }
 
-@media (min-width: 768px) and (max-width: 1399px) {
+@media (min-width: 768px) and (max-width: 1279px) {
   .tema-gamificacao .gf-area > section,
   .tema-gamificacao .gf-col {
     min-width: 0;
