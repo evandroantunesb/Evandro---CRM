@@ -3,24 +3,34 @@ import {
   Activity,
   Award,
   BarChart3,
-  FileCheck2,
+  Check,
+  Crown,
+  Flame,
   Gift,
   LineChart,
-  Medal,
   Target,
   Trophy,
   Users,
   Zap,
 } from "lucide-react";
 import { carregarConfiguracao } from "@/lib/crm";
-import { formatarMoeda, tempoDesde } from "@/lib/formatacao";
+import { formatarMoeda, inicioDaSemana, tempoDesde } from "@/lib/formatacao";
 import { calcularNivel } from "@/lib/gamificacao";
 import { calcularProgresso, calcularRealizado, type Meta } from "@/lib/metas";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { UNIDADE_METRICA_META, type MetricaMeta } from "@/lib/tipos";
-import { CartaoGf, EstadoVazioGf, KpiGf } from "./_compartilhado/ui";
+import {
+  CartaoGf,
+  EstadoVazioGf,
+  IndicadorKpiGf,
+  IniciaisAvatarGf,
+  KpiGf,
+} from "./_compartilhado/ui";
 import { CartaoRecompensaGf } from "./_compartilhado/recompensa-preview";
+
+type RankingLinha = { posicao: number; membroId: string; nome: string; total: number };
+type DiaSequencia = { data: string; dia_util: boolean; produtivo: boolean };
 
 function formatarValorMeta(unidade: "moeda" | "quantidade" | "percentual", valor: number) {
   if (unidade === "moeda") return formatarMoeda(valor);
@@ -58,6 +68,23 @@ function variacao(atual: number, anterior: number): number | null {
   return ((atual - anterior) / anterior) * 100;
 }
 
+function construirRanking(
+  bruto: { membro_id: string; total_xp: number }[] | null,
+  nomeMembro: Map<string, string>,
+): RankingLinha[] {
+  return (bruto ?? [])
+    .filter((l) => nomeMembro.has(l.membro_id))
+    .sort((a, b) => b.total_xp - a.total_xp)
+    .map((l, i) => ({
+      posicao: i + 1,
+      membroId: l.membro_id,
+      nome: nomeMembro.get(l.membro_id)!,
+      total: l.total_xp,
+    }));
+}
+
+const ROTULOS_DIA_SEMANA = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
+
 export default async function GamificacaoDashboard({
   searchParams,
 }: {
@@ -69,17 +96,20 @@ export default async function GamificacaoDashboard({
     PERIODOS.some((p) => p.chave === periodoParam) ? periodoParam : "mes"
   ) as PeriodoChave;
   const deslocamento = periodo === "mes-passado" ? 1 : 0;
+  const perfil = atual.perfilGamificacao ?? "closer";
 
   const supabase = await criarClienteServidor();
   const atualMes = limitesMes(deslocamento);
   const anteriorMes = limitesMes(deslocamento + 1);
+  const inicioSemanaIso = new Date(inicioDaSemana()).toISOString();
 
   const [
     { data: pontosPeriodo },
     { data: pontosAnteriorAgg },
-    { data: negociosPeriodo },
-    { data: negociosAnterior },
     { data: rankingBruto },
+    { data: rankingHistoricoSemanaBruto },
+    { data: sequenciaBruta },
+    { data: progressoConquistasBruto },
     { data: niveis },
     { data: xpTotais },
     { data: moedasTotais },
@@ -106,27 +136,24 @@ export default async function GamificacaoDashboard({
       .gte("created_at", anteriorMes.inicioIso)
       .lt("created_at", anteriorMes.fimExclusivoIso)
       .limit(5000),
-    supabase
-      .from("negocios")
-      .select("valor")
-      .eq("empresa_id", atual.empresaId)
-      .eq("status", "ganho")
-      .gte("fechado_em", atualMes.inicioIso)
-      .lt("fechado_em", atualMes.fimExclusivoIso)
-      .limit(10000),
-    supabase
-      .from("negocios")
-      .select("valor")
-      .eq("empresa_id", atual.empresaId)
-      .eq("status", "ganho")
-      .gte("fechado_em", anteriorMes.inicioIso)
-      .lt("fechado_em", anteriorMes.fimExclusivoIso)
-      .limit(10000),
     supabase.rpc("ranking_gamificacao", {
       p_empresa_id: atual.empresaId,
-      p_perfil: atual.perfilGamificacao ?? "closer",
+      p_perfil: perfil,
       p_desde: atualMes.inicioIso,
     }),
+    // Mesma janela do período selecionado, reconstruída no instante do início desta
+    // semana (ver migration `gamificacao_ranking_historico`) — só pra calcular a
+    // variação de posição "esta semana" do KPI/hero. Sem invenção de baseline: se o
+    // intervalo for vazio/inconsistente (ex.: "Mês passado" selecionado), a função
+    // simplesmente não encontra o membro e a variação fica null.
+    supabase.rpc("ranking_gamificacao", {
+      p_empresa_id: atual.empresaId,
+      p_perfil: perfil,
+      p_desde: atualMes.inicioIso,
+      p_ate: inicioSemanaIso,
+    }),
+    supabase.rpc("sequencia_produtiva_membro", { p_empresa_id: atual.empresaId }),
+    supabase.rpc("progresso_conquistas_membro", { p_empresa_id: atual.empresaId }),
     supabase
       .from("niveis_gamificacao")
       .select("nivel, nome, xp_minimo")
@@ -148,12 +175,12 @@ export default async function GamificacaoDashboard({
     // Sem filtro de ativa: isto só identifica conquistas já desbloqueadas (ver minhasConquistas
     // abaixo), que continuam visíveis mesmo se a conquista for desativada depois.
     supabase.from("conquistas").select("id, nome, icone").eq("empresa_id", atual.empresaId),
+    // Sem limite: usado tanto pra "última conquista" quanto pro total/novas-no-período do KPI.
     supabase
       .from("conquistas_desbloqueadas")
       .select("conquista_id, desbloqueada_em")
       .eq("membro_id", atual.membroId)
-      .order("desbloqueada_em", { ascending: false })
-      .limit(3),
+      .order("desbloqueada_em", { ascending: false }),
     supabase
       .from("recompensas")
       .select("id, nome, descricao, custo_moedas")
@@ -177,8 +204,7 @@ export default async function GamificacaoDashboard({
   // KPIs -----------------------------------------------------------------
   const totalXpPeriodo = (pontosPeriodo ?? []).reduce((s, l) => s + l.xp, 0);
   const totalXpAnterior = (pontosAnteriorAgg ?? []).reduce((s, l) => s + l.xp, 0);
-  const contratosPeriodo = (negociosPeriodo ?? []).length;
-  const contratosAnterior = (negociosAnterior ?? []).length;
+  const variacaoXpPct = variacao(totalXpPeriodo, totalXpAnterior);
 
   const metas: Meta[] = (metasLinhas ?? []).map((m) => ({
     id: m.id,
@@ -207,6 +233,8 @@ export default async function GamificacaoDashboard({
     .map((m, i) => ({ meta: m, progresso: progressosMetas[i] }))
     .sort((a, b) => b.progresso.percentual - a.progresso.percentual);
   const metaPrincipal = metasComProgresso[0] ?? null;
+  const metasAtingidas = metasComProgresso.filter((m) => m.progresso.percentual >= 100).length;
+  const metasTotal = metasComProgresso.length;
 
   // Evolução de XP (acumulado por dia no período) --------------------------
   const diasNoPeriodo = Math.round(
@@ -242,21 +270,13 @@ export default async function GamificacaoDashboard({
     .sort((a, b) => b.total - a.total)
     .slice(0, 5);
 
-  // Ranking (XP ativo, por perfil/período) ---------------------------------
+  // Ranking (XP ativo, por perfil/período) + variação de posição esta semana ----
   const niveisNormalizados = (niveis ?? []).map((n) => ({
     nivel: n.nivel,
     nome: n.nome,
     xpMinimo: n.xp_minimo,
   }));
-  const rankingCompleto = (rankingBruto ?? [])
-    .filter((l) => nomeMembro.has(l.membro_id))
-    .sort((a, b) => b.total_xp - a.total_xp)
-    .map((l, i) => ({
-      posicao: i + 1,
-      membroId: l.membro_id,
-      nome: nomeMembro.get(l.membro_id)!,
-      total: l.total_xp,
-    }));
+  const rankingCompleto = construirRanking(rankingBruto, nomeMembro);
   const ranking = rankingCompleto.slice(0, 5);
   // Minha posição no ranking do período + quem está logo acima — reaproveita o
   // mesmo resultado da RPC já consultada acima, sem truncar em 5, só pra achar
@@ -265,6 +285,16 @@ export default async function GamificacaoDashboard({
   const acimaDeMim = minhaPosicaoRanking
     ? (rankingCompleto.find((r) => r.posicao === minhaPosicaoRanking.posicao - 1) ?? null)
     : null;
+
+  const rankingSemanaPassada = construirRanking(rankingHistoricoSemanaBruto, nomeMembro);
+  const minhaPosicaoSemanaPassada =
+    rankingSemanaPassada.find((r) => r.membroId === atual.membroId) ?? null;
+  // Positivo = subiu (número da posição diminuiu). Sem registro histórico (membro
+  // novo, ou período sem sobreposição com "esta semana"), fica null — nunca inventa.
+  const deltaPosicaoSemana =
+    minhaPosicaoSemanaPassada && minhaPosicaoRanking
+      ? minhaPosicaoSemanaPassada.posicao - minhaPosicaoRanking.posicao
+      : null;
 
   // Meu nível: sempre XP ativo da vida toda, nunca o total filtrado do
   // ranking (era a origem de dois níveis diferentes pra mesma pessoa —
@@ -279,13 +309,28 @@ export default async function GamificacaoDashboard({
   } = calcularNivel(niveisNormalizados, meuTotalXp);
   const meuNivel = { nivel: meuNivelNumero, nome: meuNivelNome };
 
-  // Minhas conquistas + atividade recente ---------------------------------
+  // Sequência produtiva -----------------------------------------------------
+  const sequenciaLinha = sequenciaBruta?.[0];
+  const diasSequencia = sequenciaLinha?.sequencia ?? 0;
+  const semanaSequencia = (sequenciaLinha?.semana as unknown as DiaSequencia[] | undefined) ?? [];
+
+  // Conquistas: última + próxima (com progresso) + contagem do período -------
   const nomeConquista = new Map((conquistas ?? []).map((c) => [c.id, c]));
-  const minhasConquistas = (desbloqueadas ?? []).map((d) => ({
-    conquistaId: d.conquista_id,
-    desbloqueadaEm: d.desbloqueada_em,
-    ...nomeConquista.get(d.conquista_id),
-  }));
+  const todasDesbloqueadas = desbloqueadas ?? [];
+  const totalConquistasDesbloqueadas = todasDesbloqueadas.length;
+  const conquistasNovasPeriodo = todasDesbloqueadas.filter(
+    (d) => d.desbloqueada_em >= atualMes.inicioIso && d.desbloqueada_em < atualMes.fimExclusivoIso,
+  ).length;
+  const ultimaDesbloqueada = todasDesbloqueadas[0] ?? null;
+  const ultimaConquista = ultimaDesbloqueada
+    ? { ...nomeConquista.get(ultimaDesbloqueada.conquista_id), desbloqueadaEm: ultimaDesbloqueada.desbloqueada_em }
+    : null;
+  const proximaConquista =
+    (progressoConquistasBruto ?? [])
+      .map((p) => ({ ...p, info: nomeConquista.get(p.conquista_id) }))
+      .filter((p) => p.info)
+      .sort((a, b) => (b.alvo > 0 ? b.realizado / b.alvo : 0) - (a.alvo > 0 ? a.realizado / a.alvo : 0))[0] ??
+    null;
 
   const atividadeRecente = (pontosPeriodo ?? []).slice(0, 6);
   const unidadeMetaPrincipal = metaPrincipal
@@ -294,8 +339,8 @@ export default async function GamificacaoDashboard({
 
   return (
     <div className="-m-4 min-h-screen bg-[var(--gf-bg)] p-4 text-[var(--gf-texto)] md:-m-10 md:p-10">
-      <div className="mx-auto flex max-w-6xl flex-col gap-3">
-        {/* Cabeçalho + KPIs compactos na mesma faixa, como na referência aprovada. */}
+      <div className="mx-auto flex max-w-7xl flex-col gap-3">
+        {/* Cabeçalho + controle de período. */}
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="text-2xl font-semibold text-[var(--gf-texto)]">Gamificação</h1>
@@ -320,48 +365,70 @@ export default async function GamificacaoDashboard({
           </div>
         </div>
 
+        {/* KPIs superiores: XP, Posição, Metas, Conquistas (Contratos removido do
+            conjunto, a pedido do Evandro — fora do escopo de gamificação). */}
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <KpiGf
             Icone={Zap}
             valor={`${totalXpPeriodo.toLocaleString("pt-BR")} XP`}
             legenda="No período"
-            variacaoPct={variacao(totalXpPeriodo, totalXpAnterior)}
+            indicador={
+              variacaoXpPct != null && (
+                <IndicadorKpiGf
+                  direcao={variacaoXpPct >= 0 ? "alta" : "baixa"}
+                  texto={`${Math.abs(variacaoXpPct).toFixed(0)}%`}
+                />
+              )
+            }
           />
           <KpiGf
             Icone={Trophy}
             valor={minhaPosicaoRanking ? `#${minhaPosicaoRanking.posicao}` : "—"}
             legenda="Posição no ranking"
+            indicador={
+              deltaPosicaoSemana != null &&
+              deltaPosicaoSemana !== 0 && (
+                <IndicadorKpiGf
+                  direcao={deltaPosicaoSemana > 0 ? "alta" : "baixa"}
+                  texto={`${Math.abs(deltaPosicaoSemana)} esta semana`}
+                />
+              )
+            }
           />
           <KpiGf
-            Icone={FileCheck2}
-            valor={contratosPeriodo.toLocaleString("pt-BR")}
-            legenda="Contratos assinados"
-            variacaoPct={variacao(contratosPeriodo, contratosAnterior)}
+            Icone={Target}
+            valor={`${metasAtingidas}/${metasTotal}`}
+            legenda="Metas atingidas"
           />
           <KpiGf
             Icone={Award}
-            valor={minhasConquistas.length.toLocaleString("pt-BR")}
+            valor={totalConquistasDesbloqueadas.toLocaleString("pt-BR")}
             legenda="Conquistas"
+            indicador={
+              conquistasNovasPeriodo > 0 && (
+                <span className="text-[10px] font-medium text-[var(--gf-verde)]">
+                  +{conquistasNovasPeriodo}
+                </span>
+              )
+            }
           />
         </div>
 
-        {/* Hero: minha posição ganha protagonismo (2/3), meu nível ao lado. Sem
-            dados no ranking, o card encolhe (items-start evita que ele estique
-            pra acompanhar a altura do card de nível ao lado). */}
-        <div className="grid items-start gap-3 lg:grid-cols-3">
-          <CartaoGf destaque={Boolean(minhaPosicaoRanking)} className="lg:col-span-2">
+        {/* Hero: Minha posição domina (6/12), Meu nível e Sequência ao lado (3/12 cada). */}
+        <div className="grid items-stretch gap-3 lg:grid-cols-12">
+          <CartaoGf destaque className="lg:col-span-6">
             {!minhaPosicaoRanking ? (
               <EstadoVazioGf Icone={Trophy} compacto>
                 Pontue neste período pra entrar no ranking.
               </EstadoVazioGf>
             ) : (
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex h-full flex-col justify-between gap-4 sm:flex-row sm:items-center">
                 <div>
                   <p className="flex items-center gap-1.5 text-xs tracking-wide text-[var(--gf-texto-sec)] uppercase">
                     <Trophy size={12} className="text-[var(--gf-dourado)]" />
                     Minha posição
                   </p>
-                  <p className="mt-1 text-3xl font-semibold text-[var(--gf-texto)]">
+                  <p className="mt-1 text-4xl font-semibold text-[var(--gf-texto)]">
                     {`#${minhaPosicaoRanking.posicao}`}
                     <span className="ml-2 text-base font-normal text-[var(--gf-texto-sec)]">
                       {periodo === "mes" ? "no ranking do mês" : "no ranking do período"}
@@ -370,15 +437,23 @@ export default async function GamificacaoDashboard({
                   <p className="mt-0.5 text-sm text-[var(--gf-texto-sec)]">
                     {minhaPosicaoRanking.total.toLocaleString("pt-BR")} XP no período
                   </p>
+                  {deltaPosicaoSemana != null && deltaPosicaoSemana !== 0 && (
+                    <div className="mt-2">
+                      <IndicadorKpiGf
+                        direcao={deltaPosicaoSemana > 0 ? "alta" : "baixa"}
+                        texto={`${Math.abs(deltaPosicaoSemana)} posiç${Math.abs(deltaPosicaoSemana) === 1 ? "ão" : "ões"} esta semana`}
+                      />
+                    </div>
+                  )}
                 </div>
                 {acimaDeMim && (
-                  <div className="shrink-0 rounded-lg bg-[var(--gf-surface-alta)] px-4 py-3 text-sm sm:text-right">
-                    <p className="text-[var(--gf-texto-sec)]">Você está a</p>
+                  <div className="shrink-0 rounded-lg bg-[var(--gf-surface)] px-4 py-3 text-sm sm:text-right">
+                    <p className="text-[var(--gf-texto-sec)]">Próxima posição</p>
                     <p className="font-semibold text-[var(--gf-verde)]">
                       {(acimaDeMim.total - minhaPosicaoRanking.total).toLocaleString("pt-BR")} XP
                     </p>
                     <p className="text-[var(--gf-texto-sec)]">
-                      do {acimaDeMim.posicao}º lugar ({acimaDeMim.nome})
+                      pra alcançar {acimaDeMim.nome} ({acimaDeMim.posicao}º lugar)
                     </p>
                   </div>
                 )}
@@ -386,7 +461,7 @@ export default async function GamificacaoDashboard({
             )}
           </CartaoGf>
 
-          <CartaoGf destaque>
+          <CartaoGf destaque className="flex flex-col lg:col-span-3">
             <div className="flex items-center gap-3">
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--gf-verde-10)] text-lg font-semibold text-[var(--gf-verde)]">
                 {meuNivel.nivel}
@@ -427,12 +502,46 @@ export default async function GamificacaoDashboard({
               Ver jornada completa →
             </Link>
           </CartaoGf>
+
+          <CartaoGf destaque className="lg:col-span-3">
+            <div className="flex items-center gap-1.5 text-xs tracking-wide text-[var(--gf-texto-sec)] uppercase">
+              <Flame size={13} className="text-[var(--gf-dourado)]" />
+              Sequência
+            </div>
+            <p className="mt-1 text-2xl font-semibold text-[var(--gf-texto)]">
+              {diasSequencia}{" "}
+              <span className="text-sm font-normal text-[var(--gf-texto-sec)]">
+                dia{diasSequencia === 1 ? "" : "s"} produtivo{diasSequencia === 1 ? "" : "s"}{" "}
+                consecutivo{diasSequencia === 1 ? "" : "s"}
+              </span>
+            </p>
+            {semanaSequencia.length > 0 && (
+              <div className="mt-3 flex justify-between gap-1">
+                {semanaSequencia.map((dia, i) => (
+                  <div key={dia.data} className="flex flex-col items-center gap-1">
+                    <span className="text-[10px] text-[var(--gf-texto-ter)]">
+                      {ROTULOS_DIA_SEMANA[i] ?? ""}
+                    </span>
+                    <span
+                      className={`flex h-5 w-5 items-center justify-center rounded-full ${
+                        dia.produtivo
+                          ? "bg-[var(--gf-verde)] text-[var(--gf-surface)]"
+                          : dia.dia_util
+                            ? "border border-[var(--gf-borda)]"
+                            : "bg-[var(--gf-surface-alta)]"
+                      }`}
+                    >
+                      {dia.produtivo && <Check size={12} strokeWidth={3} />}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CartaoGf>
         </div>
 
-        {/* Ranking com mais presença (2/3) + coluna lateral única (Metas → Conquistas →
-            Loja, igual à referência). items-start evita que o ranking vazio estique pra
-            acompanhar a altura da coluna lateral, e vice-versa. */}
-        <div className="grid items-start gap-3 lg:grid-cols-3">
+        {/* Área principal: Ranking (5/12), Centro (4/12), Lateral direita (3/12). */}
+        <div className="grid items-start gap-3 lg:grid-cols-12">
           <CartaoGf
             titulo="Ranking da equipe"
             acao={
@@ -443,51 +552,162 @@ export default async function GamificacaoDashboard({
                 Ver completo →
               </Link>
             }
-            className="lg:col-span-2"
+            className="lg:col-span-5"
           >
             {!ranking.length ? (
               <EstadoVazioGf Icone={Users} compacto>
                 Ninguém pontuou neste período ainda.
               </EstadoVazioGf>
             ) : (
-              <ul className="flex flex-col gap-1.5">
-                {ranking.map((r) => (
-                  <li
-                    key={r.membroId}
-                    className={`flex items-center gap-3 rounded-lg px-2 py-2 text-sm ${
-                      r.membroId === atual.membroId
-                        ? "bg-[var(--gf-verde-10)]"
-                        : r.posicao <= 3
-                          ? "bg-[var(--gf-surface-alta)]"
-                          : ""
-                    }`}
-                  >
-                    <span className="flex w-6 shrink-0 items-center justify-center">
-                      {r.posicao === 1 ? (
-                        <Trophy size={16} className="text-[var(--gf-dourado)]" />
-                      ) : r.posicao <= 3 ? (
-                        <Medal size={15} className="text-[var(--gf-texto-sec)]" />
-                      ) : (
-                        <span className="text-[var(--gf-texto-sec)]">{r.posicao}º</span>
-                      )}
-                    </span>
-                    <span
-                      className={`flex-1 truncate ${r.membroId === atual.membroId ? "font-medium text-[var(--gf-verde)]" : "text-[var(--gf-texto)]"}`}
+              <>
+                {ranking.length >= 2 && (
+                  <div className="mb-4 flex items-end justify-center gap-3">
+                    {[ranking[1], ranking[0], ranking[2]].map(
+                      (r) =>
+                        r && (
+                          <div
+                            key={r.membroId}
+                            className={`flex flex-col items-center gap-1 ${r.posicao === 1 ? "pb-0" : "pb-3"}`}
+                          >
+                            {r.posicao === 1 && (
+                              <Crown size={16} className="text-[var(--gf-dourado)]" />
+                            )}
+                            <IniciaisAvatarGf
+                              nome={r.nome}
+                              tamanho={r.posicao === 1 ? 48 : 40}
+                              tom={r.posicao === 1 ? "dourado" : "neutro"}
+                            />
+                            <span className="max-w-20 truncate text-xs font-medium text-[var(--gf-texto)]">
+                              {r.nome}
+                            </span>
+                            <span className="text-[11px] text-[var(--gf-texto-sec)]">
+                              {r.total.toLocaleString("pt-BR")} XP
+                            </span>
+                          </div>
+                        ),
+                    )}
+                  </div>
+                )}
+                <ul className="flex flex-col gap-1.5">
+                  {ranking.map((r) => (
+                    <li
+                      key={r.membroId}
+                      className={`flex items-center gap-3 rounded-lg px-2 py-2 text-sm ${
+                        r.membroId === atual.membroId ? "bg-[var(--gf-verde-10)]" : ""
+                      }`}
                     >
-                      {r.nome}
-                    </span>
-                    <span className="font-medium text-[var(--gf-texto)]">
-                      {r.total.toLocaleString("pt-BR")} XP
-                    </span>
-                  </li>
-                ))}
-              </ul>
+                      <span className="w-5 shrink-0 text-center text-[var(--gf-texto-sec)]">
+                        {r.posicao}
+                      </span>
+                      <span
+                        className={`flex-1 truncate ${r.membroId === atual.membroId ? "font-medium text-[var(--gf-verde)]" : "text-[var(--gf-texto)]"}`}
+                      >
+                        {r.membroId === atual.membroId ? "Você" : r.nome}
+                      </span>
+                      <span className="font-medium text-[var(--gf-texto)]">
+                        {r.total.toLocaleString("pt-BR")} XP
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </>
             )}
           </CartaoGf>
 
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3 lg:col-span-4">
+            <CartaoGf titulo="Você x próximo colocado">
+              {!acimaDeMim || !minhaPosicaoRanking ? (
+                <EstadoVazioGf Icone={Trophy} compacto>
+                  {minhaPosicaoRanking
+                    ? "Você já está em 1º lugar no período."
+                    : "Pontue neste período pra comparar com o próximo colocado."}
+                </EstadoVazioGf>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  <p className="text-sm text-[var(--gf-texto-sec)]">
+                    Você está a{" "}
+                    <span className="font-semibold text-[var(--gf-verde)]">
+                      {(acimaDeMim.total - minhaPosicaoRanking.total).toLocaleString("pt-BR")} XP
+                    </span>{" "}
+                    do {acimaDeMim.posicao}º lugar
+                  </p>
+                  {[
+                    { linha: minhaPosicaoRanking, rotulo: "Você", destaque: true },
+                    { linha: acimaDeMim, rotulo: acimaDeMim.nome, destaque: false },
+                  ].map(({ linha, rotulo, destaque }) => (
+                    <div key={linha.membroId} className="flex items-center gap-2.5">
+                      <IniciaisAvatarGf nome={linha.nome} tamanho={28} tom={destaque ? "verde" : "neutro"} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-baseline justify-between text-xs">
+                          <span
+                            className={destaque ? "font-medium text-[var(--gf-verde)]" : "text-[var(--gf-texto)]"}
+                          >
+                            {rotulo}
+                          </span>
+                          <span className="text-[var(--gf-texto-sec)]">
+                            {linha.total.toLocaleString("pt-BR")} XP
+                          </span>
+                        </div>
+                        <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[var(--gf-surface-alta)]">
+                          <div
+                            className={`h-full rounded-full ${destaque ? "bg-[var(--gf-verde)]" : "bg-[var(--gf-texto-ter)]"}`}
+                            style={{
+                              width: `${Math.min(100, (linha.total / acimaDeMim.total) * 100)}%`,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CartaoGf>
+
+            <CartaoGf titulo="Atividade recente">
+              {!atividadeRecente.length ? (
+                <EstadoVazioGf Icone={Activity} compacto>
+                  Nenhuma atividade neste período.
+                </EstadoVazioGf>
+              ) : (
+                <ul className="flex flex-col">
+                  {atividadeRecente.map((l) => (
+                    <li
+                      key={l.id}
+                      className="flex items-center gap-2.5 border-t border-[var(--gf-borda)] py-2 text-sm first:border-t-0"
+                    >
+                      <span
+                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${l.xp >= 0 ? "bg-[var(--gf-verde-10)] text-[var(--gf-verde)]" : "bg-[var(--gf-vermelho-10)] text-[var(--gf-vermelho)]"}`}
+                      >
+                        <Zap size={13} />
+                      </span>
+                      <div className="flex min-w-0 flex-1 flex-col">
+                        <span className="truncate text-[var(--gf-texto)]">
+                          {nomeMembro.get(l.membro_id) ?? "(removido)"} ·{" "}
+                          {l.descricao || "Ponto lançado"}
+                        </span>
+                        <span className="text-xs text-[var(--gf-texto-sec)]">
+                          {tempoDesde(l.created_at)}
+                        </span>
+                      </div>
+                      {l.xp !== 0 && (
+                        <span
+                          className={`shrink-0 font-medium ${l.xp >= 0 ? "text-[var(--gf-verde)]" : "text-[var(--gf-vermelho)]"}`}
+                        >
+                          {l.xp >= 0 ? "+" : ""}
+                          {l.xp} XP
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CartaoGf>
+          </div>
+
+          {/* Lateral direita, ordem obrigatória: Meta mensal → Conquistas → Loja. */}
+          <div className="flex flex-col gap-3 lg:col-span-3">
             <CartaoGf
-              titulo="Metas"
+              titulo="Meta mensal"
               acao={
                 <Link
                   href="/gamificacao/metas"
@@ -538,37 +758,59 @@ export default async function GamificacaoDashboard({
                 </Link>
               }
             >
-              {!minhasConquistas.length ? (
+              {!ultimaConquista && !proximaConquista ? (
                 <EstadoVazioGf Icone={Award} compacto>
-                  Nenhuma conquista desbloqueada ainda.
+                  Nenhuma conquista ainda.
                 </EstadoVazioGf>
               ) : (
-                <ul className="flex flex-col gap-2">
-                  {minhasConquistas.map((c) => (
-                    <li key={c.conquistaId} className="flex items-center gap-2 text-sm">
+                <div className="flex flex-col gap-3">
+                  {ultimaConquista && (
+                    <div className="flex items-center gap-2 text-sm">
                       <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--gf-dourado-10)] text-[var(--gf-dourado)]">
-                        {c.icone ? (
-                          <span className="text-sm leading-none">{c.icone}</span>
+                        {ultimaConquista.icone ? (
+                          <span className="text-sm leading-none">{ultimaConquista.icone}</span>
                         ) : (
                           <Trophy size={14} />
                         )}
                       </span>
                       <div className="flex min-w-0 flex-1 flex-col">
-                        <span className="truncate text-[var(--gf-texto)]">
-                          {c.nome ?? "(conquista removida)"}
+                        <span className="text-[11px] text-[var(--gf-texto-sec)]">
+                          Última conquista
                         </span>
-                        <span className="text-xs text-[var(--gf-texto-sec)]">
-                          {tempoDesde(c.desbloqueadaEm)}
+                        <span className="truncate text-[var(--gf-texto)]">
+                          {ultimaConquista.nome ?? "(conquista removida)"} ·{" "}
+                          {tempoDesde(ultimaConquista.desbloqueadaEm)}
                         </span>
                       </div>
-                    </li>
-                  ))}
-                </ul>
+                    </div>
+                  )}
+                  {proximaConquista?.info && (
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[11px] text-[var(--gf-texto-sec)]">
+                        Próxima conquista
+                      </span>
+                      <p className="truncate text-sm text-[var(--gf-texto)]">
+                        {proximaConquista.info.nome}
+                      </p>
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--gf-surface-alta)]">
+                        <div
+                          className="h-full rounded-full bg-[var(--gf-dourado)]"
+                          style={{
+                            width: `${Math.min(100, (proximaConquista.realizado / proximaConquista.alvo) * 100)}%`,
+                          }}
+                        />
+                      </div>
+                      <p className="text-xs text-[var(--gf-texto-sec)]">
+                        Você está em {proximaConquista.realizado} de {proximaConquista.alvo}
+                      </p>
+                    </div>
+                  )}
+                </div>
               )}
             </CartaoGf>
 
             {/* Fecha a coluna, discreta de propósito: sem mais peso visual que
-                Metas/Conquistas, só saldo + prévia + acesso à loja completa. */}
+                Meta/Conquistas, só saldo + prévia + acesso à loja completa. */}
             <CartaoGf
               titulo="Loja"
               acao={
@@ -610,50 +852,7 @@ export default async function GamificacaoDashboard({
           </div>
         </div>
 
-        {/* Atividade recente em feed, largura toda — Conquistas foi pra coluna lateral. */}
-        <CartaoGf titulo="Atividade recente">
-          {!atividadeRecente.length ? (
-            <EstadoVazioGf Icone={Activity} compacto>
-              Nenhuma atividade neste período.
-            </EstadoVazioGf>
-          ) : (
-            <ul className="flex flex-col">
-              {atividadeRecente.map((l) => (
-                <li
-                  key={l.id}
-                  className="flex items-center gap-2.5 border-t border-[var(--gf-borda)] py-2 text-sm first:border-t-0"
-                >
-                  <span
-                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${l.xp >= 0 ? "bg-[var(--gf-verde-10)] text-[var(--gf-verde)]" : "bg-[var(--gf-vermelho-10)] text-[var(--gf-vermelho)]"}`}
-                  >
-                    <Zap size={13} />
-                  </span>
-                  <div className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate text-[var(--gf-texto)]">
-                      {nomeMembro.get(l.membro_id) ?? "(removido)"} ·{" "}
-                      {l.descricao || "Ponto lançado"}
-                    </span>
-                    <span className="text-xs text-[var(--gf-texto-sec)]">
-                      {tempoDesde(l.created_at)}
-                    </span>
-                  </div>
-                  {l.xp !== 0 && (
-                    <span
-                      className={`shrink-0 font-medium ${l.xp >= 0 ? "text-[var(--gf-verde)]" : "text-[var(--gf-vermelho)]"}`}
-                    >
-                      {l.xp >= 0 ? "+" : ""}
-                      {l.xp} XP
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </CartaoGf>
-
-        {/* Camada secundária: gráficos de evolução, mais discretos na hierarquia.
-            items-start evita que um gráfico vazio estique pra acompanhar a
-            altura do gráfico preenchido ao lado. */}
+        {/* Camada secundária: gráficos de evolução, mais discretos na hierarquia. */}
         <div className="grid items-start gap-3 lg:grid-cols-2">
           <CartaoGf
             titulo="Evolução de XP"

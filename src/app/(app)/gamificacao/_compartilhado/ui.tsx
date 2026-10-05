@@ -62,22 +62,40 @@ export function BadgeGf({
 }
 
 /**
- * KPI em formato de pílula horizontal — ícone, valor e variação lado a lado.
- * Mais denso que um cartão de grade: pensado pra ficar junto do cabeçalho,
- * não ocupar uma linha inteira de altura própria. A variação (sobretudo em
- * queda) é só um ícone colorido + texto neutro pequeno, pra não competir
+ * Indicador de variação (seta + texto curto) — usado dentro de `KpiGf` e de
+ * cartões maiores (ex.: "Minha posição") sempre que há uma comparação com um
+ * ponto no passado. Só um ícone colorido + texto pequeno, pra não competir
  * visualmente com o valor principal.
+ */
+export function IndicadorKpiGf({ direcao, texto }: { direcao: "alta" | "baixa"; texto: string }) {
+  return (
+    <span className="flex items-center gap-0.5 text-[10px] text-[var(--gf-texto-sec)]">
+      {direcao === "alta" ? (
+        <ArrowUp size={10} className="text-[var(--gf-verde)]" />
+      ) : (
+        <ArrowDown size={10} className="text-[var(--gf-vermelho)]" />
+      )}
+      {texto}
+    </span>
+  );
+}
+
+/**
+ * KPI em formato de pílula horizontal — ícone, valor e indicador lado a lado.
+ * Mais denso que um cartão de grade: pensado pra ficar junto do cabeçalho,
+ * não ocupar uma linha inteira de altura própria. `indicador` é livre (usar
+ * `IndicadorKpiGf` pra variação com seta, ou qualquer outro texto/badge curto).
  */
 export function KpiGf({
   Icone,
   valor,
   legenda,
-  variacaoPct,
+  indicador,
 }: {
   Icone: ComponentType<{ size?: number }>;
   valor: string;
   legenda: string;
-  variacaoPct?: number | null;
+  indicador?: ReactNode;
 }) {
   return (
     <div className="flex items-center gap-2.5 rounded-full border border-[var(--gf-borda)] bg-[var(--gf-surface)] py-2 pr-4 pl-2.5">
@@ -87,20 +105,42 @@ export function KpiGf({
       <div className="flex min-w-0 flex-col">
         <div className="flex items-baseline gap-1.5">
           <p className="truncate text-sm font-semibold text-[var(--gf-texto)]">{valor}</p>
-          {variacaoPct != null && (
-            <span className="flex items-center gap-0.5 text-[10px] text-[var(--gf-texto-sec)]">
-              {variacaoPct >= 0 ? (
-                <ArrowUp size={10} className="text-[var(--gf-verde)]" />
-              ) : (
-                <ArrowDown size={10} className="text-[var(--gf-vermelho)]" />
-              )}
-              {Math.abs(variacaoPct).toFixed(0)}%
-            </span>
-          )}
+          {indicador}
         </div>
         <p className="truncate text-[11px] text-[var(--gf-texto-sec)]">{legenda}</p>
       </div>
     </div>
+  );
+}
+
+const TOM_INICIAIS_GF = {
+  neutro: "bg-[var(--gf-surface-alta)] text-[var(--gf-texto-sec)]",
+  verde: "bg-[var(--gf-verde-10)] text-[var(--gf-verde)]",
+  dourado: "bg-[var(--gf-dourado-10)] text-[var(--gf-dourado)]",
+} as const;
+
+/**
+ * Avatar-fallback consistente (iniciais sobre círculo colorido) — usado onde a
+ * referência visual tem foto de perfil e o produto não tem upload de foto.
+ * Nunca inventa uma imagem; só a inicial do nome.
+ */
+export function IniciaisAvatarGf({
+  nome,
+  tamanho = 32,
+  tom = "neutro",
+}: {
+  nome: string;
+  tamanho?: number;
+  tom?: keyof typeof TOM_INICIAIS_GF;
+}) {
+  const inicial = nome.trim().charAt(0).toUpperCase() || "?";
+  return (
+    <span
+      className={`flex shrink-0 items-center justify-center rounded-full font-semibold ${TOM_INICIAIS_GF[tom]}`}
+      style={{ width: tamanho, height: tamanho, fontSize: Math.max(10, tamanho * 0.4) }}
+    >
+      {inicial}
+    </span>
   );
 }
 

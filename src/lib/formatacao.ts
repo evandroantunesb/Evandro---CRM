@@ -79,6 +79,20 @@ export function inicioDoDia(agora = Date.now()) {
   return new Date(`${dia}T00:00:00-03:00`).getTime();
 }
 
+/** Início da semana atual (segunda-feira 00:00, fuso de Brasília), como timestamp. */
+export function inicioDaSemana(agora = Date.now()) {
+  const [ano, mes, dia] = new Date(agora)
+    .toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" })
+    .split("-")
+    .map(Number);
+  const base = new Date(Date.UTC(ano, mes - 1, dia));
+  base.setUTCDate(base.getUTCDate() - ((base.getUTCDay() + 6) % 7));
+  const y = base.getUTCFullYear();
+  const m = String(base.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(base.getUTCDate()).padStart(2, "0");
+  return new Date(`${y}-${m}-${d}T00:00:00-03:00`).getTime();
+}
+
 /** Fim da semana atual (domingo 23:59:59, fuso de Brasília), como timestamp. */
 export function fimDaSemana(agora = Date.now()) {
   const [ano, mes, dia] = new Date(agora)
