@@ -556,7 +556,7 @@ export default async function GamificacaoDashboard({
             className="flex min-h-[300px] flex-col overflow-hidden lg:h-full lg:min-h-0"
           >
             <div
-              className={`flex min-h-80 flex-1 flex-col ${!ranking.length ? "items-center justify-center" : ""}`}
+              className={`flex min-h-0 flex-1 flex-col overflow-hidden ${!ranking.length ? "items-center justify-center" : ""}`}
             >
               {!ranking.length ? (
                 <EstadoVazioGf Icone={Users} compacto>
@@ -670,7 +670,7 @@ export default async function GamificacaoDashboard({
 
             <CartaoGf titulo={<span className="flex items-center gap-2"><Zap size={15} className="text-[var(--gf-dourado)]" />Atividade recente</span>} className="flex flex-col">
               <div
-                className={`flex min-h-56 flex-1 flex-col ${!atividadeRecente.length ? "items-center justify-center" : ""}`}
+                className={`flex min-h-0 flex-1 flex-col overflow-hidden ${!atividadeRecente.length ? "items-center justify-center" : ""}`}
               >
                 {!atividadeRecente.length ? (
                   <EstadoVazioGf Icone={Activity} compacto>
