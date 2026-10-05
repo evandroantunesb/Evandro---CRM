@@ -325,7 +325,7 @@ export default async function GamificacaoDashboard({
     <div className="-m-4 min-h-screen bg-[var(--gf-bg)] p-4 text-[var(--gf-texto)] md:-m-10 md:p-10">
       <div className="mx-auto flex max-w-[1500px] flex-col gap-2">
         {/* Cabeçalho e KPIs na mesma faixa no desktop. */}
-        <div className="grid gap-2 lg:grid-cols-[minmax(260px,0.72fr)_minmax(0,1fr)] lg:items-center">
+        <div className="gf-cabecalho grid gap-2 lg:grid-cols-[minmax(260px,0.72fr)_minmax(0,1fr)] lg:items-center">
           <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="text-2xl font-semibold text-[var(--gf-texto)]">Gamificação</h1>
@@ -350,7 +350,7 @@ export default async function GamificacaoDashboard({
           </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="gf-kpis grid grid-cols-2 gap-2 sm:grid-cols-4">
           <KpiGf
             Icone={Zap}
             valor={`${totalXpPeriodo.toLocaleString("pt-BR")} XP`}
@@ -402,10 +402,10 @@ export default async function GamificacaoDashboard({
         </div>
 
         {/* Hero: proporções fixas da referência no desktop. */}
-        <div className="grid items-stretch gap-2 lg:h-[154px] lg:grid-cols-[2.56fr_1.27fr_1fr]">
+        <div className="gf-hero grid items-stretch gap-2 lg:h-[154px] lg:grid-cols-[2.56fr_1.27fr_1fr]">
           <CartaoGf
             destaque
-            className="relative overflow-hidden !p-4 lg:h-full"
+            className="gf-hero-posicao relative overflow-hidden !p-4 lg:h-full"
             style={{
               backgroundImage:
                 "linear-gradient(to right, rgba(15,15,16,0.88), rgba(15,15,16,0.5)), url(/gamificacao/fundo-minha-posicao.svg)",
@@ -457,7 +457,7 @@ export default async function GamificacaoDashboard({
             )}
           </CartaoGf>
 
-          <CartaoGf destaque className="flex flex-col !p-4 lg:h-full">
+          <CartaoGf destaque className="gf-hero-secundario gf-hero-nivel flex flex-col justify-between !p-4 lg:h-full">
             <div className="flex items-center gap-3">
               <span className="flex h-11 w-11 shrink-0 items-center justify-center bg-[var(--gf-verde-10)] text-lg font-semibold text-[var(--gf-verde)] [clip-path:polygon(25%_5%,75%_5%,100%_50%,75%_95%,25%_95%,0_50%)] ring-1 ring-[var(--gf-verde)]/60 drop-shadow-[0_0_8px_rgba(52,211,153,.25)]">
                 {meuNivel.nivel}
@@ -499,7 +499,10 @@ export default async function GamificacaoDashboard({
             </Link>
           </CartaoGf>
 
-          <CartaoGf destaque className="!p-4 lg:h-full">
+          <CartaoGf
+            destaque
+            className="gf-hero-secundario gf-hero-sequencia flex flex-col justify-between !p-4 lg:h-full"
+          >
             <div className="flex items-center gap-1.5 text-xs tracking-wide text-[var(--gf-texto-sec)] uppercase">
               <Flame size={16} className="text-[var(--gf-verde)] drop-shadow-[0_0_6px_rgba(52,211,153,.35)]" />
               Sequência
@@ -537,7 +540,7 @@ export default async function GamificacaoDashboard({
         </div>
 
         {/* Área principal: Ranking (5/12), Centro (4/12), Lateral direita (3/12). */}
-        <div className="grid gap-2 lg:h-[388px] lg:grid-cols-[1.19fr_1fr_1.05fr]">
+        <div className="gf-area grid min-w-0 gap-2 lg:h-[388px] lg:grid-cols-[1.19fr_1fr_1.05fr]">
           <CartaoGf
             titulo={<span className="flex items-center gap-2"><Crown size={15} className="text-[var(--gf-dourado)]" />Ranking</span>}
             acao={
@@ -548,12 +551,12 @@ export default async function GamificacaoDashboard({
                 Ver completo →
               </Link>
             }
-            className="flex min-h-[300px] flex-col overflow-hidden lg:h-full lg:min-h-0"
+            className="gf-cartao-ranking flex min-h-[300px] flex-col overflow-hidden lg:h-full lg:min-h-0"
           >
             <RankingTabsGf listas={rankingPorAba} membroAtualId={atual.membroId} />
           </CartaoGf>
 
-          <div className="grid gap-2 lg:h-full lg:grid-rows-[119px_1fr]">
+          <div className="gf-col gf-col-centro grid min-w-0 gap-2 lg:h-full lg:grid-rows-[119px_1fr]">
             <CartaoGf titulo={<span className="flex items-center gap-2"><BarChart3 size={15} className="text-[var(--gf-verde)]" />Você x próximo colocado</span>}>
               {!acimaDeMim || !minhaPosicaoRanking ? (
                 <EstadoVazioGf Icone={Trophy} compacto>
@@ -648,7 +651,7 @@ export default async function GamificacaoDashboard({
           </div>
 
           {/* Lateral direita, ordem obrigatória: Meta mensal → Conquistas → Loja. */}
-          <div className="grid gap-2 lg:h-full lg:grid-rows-[103px_128px_1fr]">
+          <div className="gf-col gf-col-lateral grid min-w-0 gap-2 lg:h-full lg:grid-rows-[103px_128px_1fr]">
             <CartaoGf
               titulo={<span className="flex items-center gap-2"><Target size={15} className="text-[var(--gf-verde)]" />Meta mensal</span>}
               acao={

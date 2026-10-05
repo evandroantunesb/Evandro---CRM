@@ -30,7 +30,7 @@ export function CartaoGf({
       style={style}
     >
       {(titulo || acao) && (
-        <div className="mb-3 flex min-w-0 items-center justify-between gap-2">
+        <div className="gf-cartao-cabecalho mb-3 flex min-w-0 items-center justify-between gap-2">
           {titulo && (
             <h2 className="min-w-0 truncate text-base font-semibold text-[var(--gf-texto)]">
               {titulo}
