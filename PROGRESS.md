@@ -1,5 +1,7 @@
 # Progresso — Raion CRM
 
+> **Arquivo histórico — não atualizar.** Registro do desenvolvimento até 2026-09-30, com entradas parciais até 2026-10-02. O estado atual está em `docs/PROJECT_STATUS.md` e o planejamento em `docs/ROADMAP.md`. Status de PR e próximos passos abaixo estão desatualizados.
+
 Resumo do estado do desenvolvimento. **Atualize ao concluir cada funcionalidade:** alterações (com número da PR), arquivos modificados, decisões técnicas e próximas tarefas. Última atualização: 2026-09-30.
 
 ## Em produção

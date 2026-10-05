@@ -1,5 +1,7 @@
 # Handoff — Raion CRM (2026-09-29, ~20h UTC)
 
+> **Arquivo histórico — não atualizar.** Handoff de 2026-09-29, já obsoleto. O estado atual está em `docs/PROJECT_STATUS.md`; regras permanentes no `CLAUDE.md`.
+
 Contexto para uma nova sessão continuar sem repetir trabalho. Leia junto com `CLAUDE.md` (regras permanentes) e `PROGRESS.md` (estado atual). Arquitetura e regras de negócio detalhadas estão em `docs/`.
 
 **Legenda:** ✅ **código** = conferido no repositório/GitHub nesta data · 💬 **conversa** = decisão registrada no chat com o Evandro · ❓ **não verificado** = relatado, mas não conferido agora.

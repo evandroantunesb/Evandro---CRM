@@ -21,14 +21,16 @@ src/lib/propostas/      montagem e paginação do PDF de proposta
 src/lib/supabase/       clientes (server, navegador, admin), proxy.ts (middleware), database.types.ts (gerado)
 supabase/migrations/    schema + RLS (fonte da verdade do banco)
 tests/                  Vitest; os testes *-db e rls precisam do Supabase local
-scripts/                criar-super-admin, seed-equipe-cascavel
-.github/workflows/      ci.yml, banco-producao.yml, seed-equipe-cascavel.yml; dependabot.yml
+scripts/                criar-super-admin, seed-equipe-cascavel, seed-metas-vendedores
+                        (seed-base-demo só na branch da PR #132)
+.github/workflows/      ci.yml, banco-producao.yml, seed-equipe-cascavel.yml,
+                        seed-metas-vendedores.yml; dependabot.yml
 ```
 
 ## Segurança e permissões
 
 - Todo dado operacional tem `empresa_id`; políticas de RLS em `supabase/migrations` isolam cada empresa.
-- Perfis: super-admin (tabela `plataforma_admins`) e, por empresa, `admin`, `gestor`, `vendedor` (interno ou representante) em `empresa_membros.papel`.
+- Perfis: super-admin (tabela `plataforma_admins`) e, por empresa, `admin`, `gestor`, `vendedor` (interno ou representante) ou `sdr` em `empresa_membros.papel`. Separados disso: `perfil_gamificacao` (`sdr`, `closer`, `cs_farmer`) e `status` (`ativo`, `inativo`, `desligado`).
 - **Super-admin não fura RLS:** o selo só libera `/super-admin/*`. Para ver negócios de uma empresa é preciso ser admin dela. Um 404 ao abrir negócio costuma ser permissão, não bug de rota.
 - Visibilidade de negócios: `pode_ver_responsavel()` — admin da empresa, o próprio responsável ou o gestor da equipe dele.
 - Rotas públicas: lista `ROTAS_PUBLICAS` em `src/lib/supabase/proxy.ts`. Página pública nova precisa entrar nela.
@@ -41,7 +43,32 @@ scripts/                criar-super-admin, seed-equipe-cascavel
 - Arquivo novo: `supabase/migrations/AAAAMMDDHHMMSS_nome.sql`. **Confira as migrations das PRs abertas antes de escolher o prefixo** — versões iguais quebram o `db push`.
 - Depois de mudar o banco: `pnpm db:types`. Editando `database.types.ts` à mão, siga o gerador (ordem alfabética, unions quebradas em linhas, `SetofOptions` em funções que retornam uma linha de tabela) — o CI compara byte a byte. O arquivo é grande: busque a tabela pelo nome.
 - Produção: `banco-producao.yml` roda `supabase db push --include-all` a cada push na `main` que toque migrations (ou manualmente). O preview do Vercel usa o **mesmo** banco de produção: PR com migration nova dá erro no preview até ser aplicada.
-- Entrega que depende de tabela de PR não mesclada nasce da branch dessa PR (PR empilhada).
+- Entrega que depende de tabela de PR não mesclada nasce da branch dessa PR (PR empilhada). Ao apagar a branch de uma PR mesclada, as PRs filhas abertas têm a `base` trocada para `main` — cuidado.
+
+## Imutabilidade e datas
+
+Limites confirmados no banco; valem para qualquer trabalho com dados retroativos ou de demonstração.
+
+- `eventos` e `point_ledger`: imutáveis até para `service_role`. Só a função motor (`security definer`, trigger `eventos_aplicar_gamificacao`) escreve, sempre com `now()`.
+- `atividades`: imutável para todos, inclusive `service_role`. `logs_auditoria` também é imutável para usuários.
+- `historico_etapas` (`entrou_em`/`saiu_em`), `negocios.created_at` e `negocios.etapa_desde` podem ser retrodatados por `service_role`.
+- `negocios.updated_at` nunca: o trigger `tocar_updated_at()` sobrescreve para `now()` em todo UPDATE.
+- Por isso metas e comissões (que leem `eventos.created_at`) não refletem datas retrodatadas em `negocios`/`historico_etapas`.
+
+## Gamificação (motor)
+
+- Fluxo: ação real → registro em `eventos` → trigger `eventos_aplicar_gamificacao` → crédito em `point_ledger` (XP e moedas separados). Valores vigentes em `gamification_rules` por empresa; níveis em `niveis_gamificacao`.
+- `eventos.ator_id` (quem agiu) é separado de `eventos.beneficiario_id` (quem recebe o crédito); o perfil causal é congelado por ocorrência (`eventos.profile_at_event`, `contratos.perfil_assinatura`).
+- Metas: `calcular_realizado_meta(...)`; comissões: `calcular_receita_causal_comissao`, planos versionados por `vigencia_inicio`, `fechar_comissao()` fecha o período.
+- RPCs com regra de autoria: `aceitar_handoff()` só via sessão autenticada do closer (não `service_role`); `confirmar_pagamento` é insert-only e bloqueia autoconfirmação.
+- Código em `src/lib/gamificacao.ts`, `src/lib/metas.ts`, `src/lib/comissoes.ts`; motor de dimensionamento em `src/lib/calculadora.ts`.
+
+## Scripts de dados
+
+- `seed-equipe-cascavel.mjs` e `seed-metas-vendedores.mjs` rodam pelos workflows manuais de mesmo nome.
+- `seed-base-demo.mjs` (PR #132, não mesclada) é **destrutivo**. Sem `CONFIRMAR_RESET_DEMO` só imprime o plano (dry-run, já executado em produção — resultado em `docs/PROJECT_STATUS.md`); com `CONFIRMAR_RESET_DEMO=sim` apaga e recria dados — só com autorização explícita e separada do Evandro. Credenciais vão por variável de ambiente local, nunca no chat:
+  `SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... ADMIN_EMAIL=... node scripts/seed-base-demo.mjs`
+- A fórmula da calculadora é replicada à mão nos scripts de seed; mudou `src/lib/calculadora.ts`, atualize os scripts.
 
 ## Deploy e CI
 
