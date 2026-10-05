@@ -21,14 +21,15 @@ src/lib/propostas/      montagem e paginação do PDF de proposta
 src/lib/supabase/       clientes (server, navegador, admin), proxy.ts (middleware), database.types.ts (gerado)
 supabase/migrations/    schema + RLS (fonte da verdade do banco)
 tests/                  Vitest; os testes *-db e rls precisam do Supabase local
-scripts/                criar-super-admin, seed-equipe-cascavel
-.github/workflows/      ci.yml, banco-producao.yml, seed-equipe-cascavel.yml; dependabot.yml
+scripts/                criar-super-admin, seed-equipe-cascavel (legado), seed-metas-vendedores;
+                        seed-base-demo.mjs pertence à PR #132 até o merge
+.github/workflows/      ci.yml, banco-producao.yml, seed-equipe-cascavel.yml, seed-metas-vendedores.yml; dependabot.yml
 ```
 
 ## Segurança e permissões
 
 - Todo dado operacional tem `empresa_id`; políticas de RLS em `supabase/migrations` isolam cada empresa.
-- Perfis: super-admin (tabela `plataforma_admins`) e, por empresa, `admin`, `gestor`, `vendedor` (interno ou representante) em `empresa_membros.papel`.
+- Perfis: super-admin (tabela `plataforma_admins`) e, por empresa, `admin`, `gestor`, `vendedor` (interno ou representante) e `sdr` em `empresa_membros.papel`. Perfil de gamificação separado em `perfil_gamificacao` (`sdr`, `closer`, `cs_farmer`).
 - **Super-admin não fura RLS:** o selo só libera `/super-admin/*`. Para ver negócios de uma empresa é preciso ser admin dela. Um 404 ao abrir negócio costuma ser permissão, não bug de rota.
 - Visibilidade de negócios: `pode_ver_responsavel()` — admin da empresa, o próprio responsável ou o gestor da equipe dele.
 - Rotas públicas: lista `ROTAS_PUBLICAS` em `src/lib/supabase/proxy.ts`. Página pública nova precisa entrar nela.
@@ -39,7 +40,7 @@ scripts/                criar-super-admin, seed-equipe-cascavel
 ## Banco e migrations
 
 - Arquivo novo: `supabase/migrations/AAAAMMDDHHMMSS_nome.sql`. **Confira as migrations das PRs abertas antes de escolher o prefixo** — versões iguais quebram o `db push`.
-- Depois de mudar o banco: `pnpm db:types`. Editando `database.types.ts` à mão, siga o gerador (ordem alfabética, unions quebradas em linhas, `SetofOptions` em funções que retornam uma linha de tabela) — o CI compara byte a byte. O arquivo é grande: busque a tabela pelo nome.
+- `src/lib/supabase/database.types.ts` é **gerado** por `pnpm db:types` depois de mudar o banco. Nunca edite à mão — o CI compara byte a byte com a saída do gerador. O arquivo é grande: para consultar, busque a tabela pelo nome.
 - Produção: `banco-producao.yml` roda `supabase db push --include-all` a cada push na `main` que toque migrations (ou manualmente). O preview do Vercel usa o **mesmo** banco de produção: PR com migration nova dá erro no preview até ser aplicada.
 - Entrega que depende de tabela de PR não mesclada nasce da branch dessa PR (PR empilhada).
 
