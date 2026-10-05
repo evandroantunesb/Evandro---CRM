@@ -1,30 +1,31 @@
-// Base fictícia de demonstração: reseta membros comerciais (papel vendedor/sdr) e dados existentes
-// e semeia 4 closers + 1 SDR fictícios, 35 negócios, 90 dias de histórico
-// visual, ganhos/perdas/pagamentos/comissões e gamificação — tudo através dos
-// mecanismos reais do CRM (triggers, RPCs, sessões autenticadas de cada
-// membro). Nunca insere diretamente em `point_ledger` nem em `eventos` com um
-// tipo que o motor credite pontos sem a ação real correspondente ter
-// acontecido.
+// Base fictícia de demonstração: cria uma empresa SEPARADA ("Raion Solar Demo") e semeia
+// 4 closers + 1 SDR fictícios, 35 negócios, 90 dias de histórico visual,
+// ganhos/perdas/pagamentos/comissões e gamificação — tudo através dos mecanismos
+// reais do CRM (triggers, RPCs, sessões autenticadas de cada membro). Nunca insere
+// em `point_ledger`, `eventos` nem `conquistas_desbloqueadas`.
 //
-// Desenho aprovado por Evandro em 2026-10-05 (ver
-// /mnt/project-files/auditorias/{diagnostico,desenho}-base-demo-2026-10-05.md).
+// Desenho aprovado por Evandro em 2026-10-05; estratégia "empresa separada" aprovada
+// no mesmo dia, depois do diagnóstico de dependências da limpeza.
 //
-// DESTRUTIVO: com CONFIRMAR_RESET_DEMO=sim, apaga todo `empresa_membros` com
-// papel='vendedor' ou papel='sdr' da empresa do ADMIN_EMAIL — e, em cascata, todos os
-// negócios/contatos/point_ledger/metas/comissões/conquistas desses membros —
-// antes de semear os 5 fictícios. SEM a flag, só mostra o que seria apagado
-// (dry run) e sai sem mudar nada. Nunca toca em admin nem gestor.
+// NÃO APAGA NADA. Nenhuma linha de nenhuma empresa existente é removida ou alterada:
+// a empresa de origem (onde ADMIN_EMAIL é admin) só é LIDA, para copiar a configuração
+// de gamificação e os parâmetros da calculadora. Tudo o que é escrito nasce dentro da
+// empresa demo nova.
 //
 // Uso:
-//   node scripts/seed-base-demo.mjs                         # dry run
-//   CONFIRMAR_RESET_DEMO=sim SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... \
-//     ADMIN_EMAIL=... node scripts/seed-base-demo.mjs        # reset + seed de verdade
+//   node scripts/seed-base-demo.mjs                        # dry run: valida e mostra o plano
+//   CRIAR_BASE_DEMO=sim node scripts/seed-base-demo.mjs    # cria a empresa demo de verdade
+// Variáveis: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, ADMIN_EMAIL (admin da empresa de
+// origem, vira admin da demo) e, só se esse admin for admin de mais de uma empresa,
+// EMPRESA_ORIGEM_ID.
 import { createClient } from "@supabase/supabase-js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY_PROD;
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? "vando12star@gmail.com";
-const CONFIRMAR_RESET_DEMO = process.env.CONFIRMAR_RESET_DEMO === "sim";
+const EMPRESA_ORIGEM_ID = process.env.EMPRESA_ORIGEM_ID || null;
+const CRIAR_BASE_DEMO = process.env.CRIAR_BASE_DEMO === "sim";
+const NOME_EMPRESA_DEMO = "Raion Solar Demo";
 const SENHA_DEMO = "123456";
 const UM_DIA_MS = 24 * 60 * 60 * 1000;
 
@@ -111,153 +112,309 @@ async function clienteComo(email) {
 }
 
 // ---------------------------------------------------------------------------
-// 1. Empresa / admin
+// 1. Admin, empresa de origem e checagem de duplicidade (só leitura)
 // ---------------------------------------------------------------------------
 
-async function resolverEmpresaEAdmin() {
-  const { data: usuarios, error } = await db.auth.admin.listUsers({ perPage: 200 });
+async function listarUsuariosAuth() {
+  const { data, error } = await db.auth.admin.listUsers({ perPage: 200 });
   if (error) throw error;
-  const admin = usuarios.users.find((u) => u.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase());
+  return data.users;
+}
+
+async function resolverAdminEOrigem(usuariosAuth) {
+  const admin = usuariosAuth.find((u) => u.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase());
   await falhaSe(!admin, `Não achei nenhum usuário com e-mail ${ADMIN_EMAIL}.`);
+
+  const { data: vinculos, error } = await db
+    .from("empresa_membros")
+    .select("empresa_id, empresas(nome)")
+    .eq("user_id", admin.id)
+    .eq("papel", "admin")
+    .eq("ativo", true);
+  if (error) throw error;
+  const candidatas = vinculos.filter((v) => v.empresas?.nome !== NOME_EMPRESA_DEMO);
+
+  let origem;
+  if (EMPRESA_ORIGEM_ID) {
+    origem = candidatas.find((v) => v.empresa_id === EMPRESA_ORIGEM_ID);
+    await falhaSe(!origem, `${ADMIN_EMAIL} não é admin ativo da empresa EMPRESA_ORIGEM_ID=${EMPRESA_ORIGEM_ID}.`);
+  } else {
+    await falhaSe(!candidatas.length, `${ADMIN_EMAIL} não é admin ativo de nenhuma empresa para servir de origem da configuração.`);
+    await falhaSe(
+      candidatas.length > 1,
+      `${ADMIN_EMAIL} é admin de ${candidatas.length} empresas (${candidatas.map((c) => `${c.empresas?.nome} = ${c.empresa_id}`).join("; ")}). ` +
+        "Defina EMPRESA_ORIGEM_ID com a empresa cuja configuração deve ser copiada.",
+    );
+    origem = candidatas[0];
+  }
+  return { adminUserId: admin.id, origemId: origem.empresa_id, origemNome: origem.empresas?.nome ?? "(sem nome)" };
+}
+
+// Não existe slug nem coluna própria para marcar a empresa demo (e não vale criar
+// migration só para isso). Os identificadores estáveis disponíveis são o nome exato da
+// empresa e os e-mails fixos dos 5 fictícios — o script recusa rodar se qualquer um
+// dos dois já estiver em uso, em vez de criar "Raion Solar Demo 2".
+async function encontrarDemoExistente(usuariosAuth) {
+  const { data: porNome, error } = await db.from("empresas").select("id, nome, situacao").eq("nome", NOME_EMPRESA_DEMO);
+  if (error) throw error;
+
+  const emailsDemo = new Set(PESSOAS.map((p) => p.email.toLowerCase()));
+  const usuariosDemo = usuariosAuth.filter((u) => emailsDemo.has(u.email?.toLowerCase()));
+  let vinculosAtivos = [];
+  if (usuariosDemo.length) {
+    const { data, error: eVinc } = await db
+      .from("empresa_membros")
+      .select("empresa_id, user_id, empresas(nome)")
+      .in(
+        "user_id",
+        usuariosDemo.map((u) => u.id),
+      )
+      .eq("ativo", true);
+    if (eVinc) throw eVinc;
+    vinculosAtivos = data ?? [];
+  }
+  return { porNome: porNome ?? [], usuariosDemo, vinculosAtivos };
+}
+
+// ---------------------------------------------------------------------------
+// 2. Configuração copiada da empresa de origem
+//
+// Inventário do que a empresa demo JÁ GANHA dos gatilhos de `empresas` ao nascer
+// (não é copiado, para não duplicar):
+//   - criar_padroes_empresa(): funil "Vendas" + 4 etapas e 9 origens;
+//   - criar_motivos_padrao(): 7 motivos de perda;
+//   - criar_parametros_calculadora_padrao(): 1 linha de parametros_calculadora
+//     (valores padrão — sobrescritos abaixo com os da origem, via UPDATE).
+// Nada de gamificação, modelos, kits ou recompensas nasce com a empresa.
+//
+// Copiado (só o que está ativo na origem), pela sessão do admin — mesmo caminho e
+// mesmas policies das telas de Gamificação > Administração:
+//   gamification_rules, niveis_gamificacao, conquistas, recompensas.
+// Não copiado: modelos de contrato/proposta e identidade da proposta (texto e logos
+// da empresa real), kits, etiquetas, equipes, formulários de captura.
+//
+// Nenhuma linha é copiada por JSON cru: cada registro é remontado campo a campo, e
+// `condicao`/`criterio` só passam se usarem campos conhecidos do catálogo atual
+// (src/lib/gamificacao.ts) e nenhum UUID — um ID de outra empresa nunca é levado
+// para a demo. Hoje nenhum campo de condição do catálogo guarda ID (nem de etapa),
+// então não há o que remapear; se aparecer, o script bloqueia em vez de copiar.
+// ---------------------------------------------------------------------------
+
+// União de EVENTOS_GAMIFICACAO[].campos em src/lib/gamificacao.ts.
+const CAMPOS_CONDICAO_CONHECIDOS = new Set(["valor", "tipo", "no_prazo", "resultado"]);
+// Marcados `naoPontuavel` ou `legado` no mesmo catálogo.
+const EVENTOS_NAO_PONTUAVEIS = new Set(["deal.created", "deal.stage_changed", "deal.owner_changed", "task.created", "note.created", "deal.first_contact_done"]);
+const METRICAS_CONQUISTA = new Set(["xp_acumulado", "marco_contagem"]);
+const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+const PARAMETROS_COPIADOS = [
+  "comissao_percentual",
+  "custo_engenharia",
+  "custo_instalacao_por_modulo",
+  "custo_material_ca_por_kwp",
+  "disponibilidade_bi_kwh",
+  "disponibilidade_mono_kwh",
+  "disponibilidade_tri_kwh",
+  "percentual_fio_b",
+  "produtividade_kwh_kwp_mes",
+];
+
+async function lerAtivos(tabela, origemId, filtrarAtiva = true) {
+  let consulta = db.from(tabela).select("*").eq("empresa_id", origemId);
+  if (filtrarAtiva) consulta = consulta.eq("ativa", true);
+  const { data, error } = await consulta;
+  if (error) throw error;
+  return data ?? [];
+}
+
+async function carregarConfiguracaoOrigem(origemId) {
+  const [regras, niveis, conquistas, recompensas] = await Promise.all([
+    lerAtivos("gamification_rules", origemId),
+    lerAtivos("niveis_gamificacao", origemId),
+    lerAtivos("conquistas", origemId),
+    lerAtivos("recompensas", origemId),
+  ]);
+  const { data: parametros, error: eParam } = await db.from("parametros_calculadora").select(PARAMETROS_COPIADOS.join(", ")).eq("empresa_id", origemId).single();
+  if (eParam) throw eParam;
+
+  const bloqueios = [];
+  const avisos = [];
+
+  const regrasDemo = [];
+  for (const r of regras) {
+    let condicao = null;
+    if (r.condicao !== null && r.condicao !== undefined) {
+      const c = r.condicao;
+      const chaves = c && typeof c === "object" && !Array.isArray(c) ? Object.keys(c).sort().join(",") : "";
+      if (chaves !== "campo,operador,valor") {
+        bloqueios.push(`regra "${r.nome}": condição em formato inesperado (${JSON.stringify(c)}).`);
+        continue;
+      }
+      if (!CAMPOS_CONDICAO_CONHECIDOS.has(c.campo) || UUID_RE.test(String(c.valor))) {
+        bloqueios.push(`regra "${r.nome}": condição ${c.campo} ${c.operador} ${c.valor} usa campo fora do catálogo ou um ID — não é copiada às cegas.`);
+        continue;
+      }
+      condicao = { campo: c.campo, operador: c.operador, valor: c.valor };
+    }
+    if (EVENTOS_NAO_PONTUAVEIS.has(r.evento_tipo)) {
+      avisos.push(`regra "${r.nome}" (${r.evento_tipo}: ${r.xp} XP / ${r.moedas} moedas) é de evento marcado como não pontuável/legado no catálogo atual — será copiada como está ativa na origem.`);
+    }
+    regrasDemo.push({
+      nome: r.nome,
+      evento_tipo: r.evento_tipo,
+      xp: r.xp,
+      moedas: r.moedas,
+      perfil_aplicavel: r.perfil_aplicavel,
+      condicao,
+      limite_periodo: r.limite_periodo,
+      limite_quantidade: r.limite_quantidade,
+      unica_por_negocio: r.unica_por_negocio,
+    });
+  }
+
+  const conquistasDemo = [];
+  for (const c of conquistas) {
+    const k = c.criterio;
+    const valido =
+      k && typeof k === "object" && METRICAS_CONQUISTA.has(k.metrica) && Number.isInteger(k.valor) && (k.metrica !== "marco_contagem" || typeof k.marco === "string");
+    if (!valido || UUID_RE.test(JSON.stringify(k))) {
+      bloqueios.push(`conquista "${c.nome}": critério em formato inesperado ou com ID (${JSON.stringify(k)}).`);
+      continue;
+    }
+    conquistasDemo.push({
+      nome: c.nome,
+      descricao: c.descricao,
+      icone: c.icone,
+      criterio: k.metrica === "marco_contagem" ? { metrica: k.metrica, marco: k.marco, valor: k.valor } : { metrica: k.metrica, valor: k.valor },
+      xp_bonus: c.xp_bonus,
+      perfil_aplicavel: c.perfil_aplicavel,
+    });
+  }
+
+  const niveisDemo = niveis.map((n) => ({ nivel: n.nivel, nome: n.nome, xp_minimo: n.xp_minimo }));
+  const recompensasDemo = recompensas.map((r) => ({
+    nome: r.nome,
+    descricao: r.descricao,
+    custo_moedas: r.custo_moedas,
+    estoque: r.estoque,
+    limite_por_membro: r.limite_por_membro,
+    validade_ate: r.validade_ate,
+  }));
+
+  if (!regrasDemo.length) avisos.push("a origem não tem nenhuma regra de gamificação ativa — a demo não vai gerar XP.");
+  if (!niveisDemo.length) avisos.push("a origem não tem níveis ativos.");
+
+  return { regras: regrasDemo, niveis: niveisDemo, conquistas: conquistasDemo, recompensas: recompensasDemo, parametros, bloqueios, avisos };
+}
+
+function imprimirPlano({ origemId, origemNome, config, demoExistente }) {
+  console.log(`\nEmpresa de origem (só leitura): ${origemNome} (empresa_id=${origemId})`);
+  console.log(`Empresa a criar: "${NOME_EMPRESA_DEMO}" — situação ativa, sem plano de cobrança (aparece na cobrança com R$ 0).`);
+  console.log("\nCriado automaticamente pelos gatilhos de `empresas` (não copiado):");
+  console.log('  funil "Vendas" + 4 etapas (viram as 4 primeiras das 9 do funil demo), 9 origens, 7 motivos de perda, parâmetros da calculadora (valores padrão).');
+  console.log("\nCopiado da origem pela sessão do admin (só registros ativos, remontados campo a campo):");
+  console.log(`  regras de gamificação: ${config.regras.length}`);
+  for (const r of config.regras) {
+    const cond = r.condicao ? ` [se ${r.condicao.campo} ${r.condicao.operador} ${r.condicao.valor}]` : "";
+    console.log(`    - ${r.nome}: ${r.evento_tipo} → ${r.xp} XP / ${r.moedas} moedas${r.perfil_aplicavel ? ` (perfil ${r.perfil_aplicavel})` : ""}${cond}`);
+  }
+  console.log(`  níveis: ${config.niveis.length} · conquistas: ${config.conquistas.length} · recompensas: ${config.recompensas.length}`);
+  console.log(`  parâmetros da calculadora: ${PARAMETROS_COPIADOS.length} campos (UPDATE na linha criada pelo gatilho)`);
+  console.log("Não copiado: modelos de contrato/proposta, identidade da proposta, kits, etiquetas, equipes, formulários de captura.");
+  console.log(`\nUsuários fictícios: ${PESSOAS.length} (${demoExistente.usuariosDemo.length} já existem no Auth e serão reaproveitados, com a senha de demonstração redefinida).`);
+  for (const p of PESSOAS) console.log(`  - ${p.nome} <${p.email}> — papel=${p.papel}, perfil_gamificacao=${p.perfil_gamificacao}`);
+
+  if (config.avisos.length) {
+    console.log("\nAvisos:");
+    for (const a of config.avisos) console.log(`  ⚠ ${a}`);
+  }
+}
+
+async function copiarConfiguracao(clienteAdmin, demoId, demoAdminMembroId, config) {
+  const lotes = [
+    ["gamification_rules", config.regras.map((r) => ({ ...r, empresa_id: demoId, criado_por: demoAdminMembroId }))],
+    ["niveis_gamificacao", config.niveis.map((n) => ({ ...n, empresa_id: demoId }))],
+    ["conquistas", config.conquistas.map((c) => ({ ...c, empresa_id: demoId }))],
+    ["recompensas", config.recompensas.map((r) => ({ ...r, empresa_id: demoId, criado_por: demoAdminMembroId }))],
+  ];
+  for (const [tabela, linhas] of lotes) {
+    if (!linhas.length) continue;
+    const { error } = await clienteAdmin.from(tabela).insert(linhas);
+    if (error) throw new Error(`Falha ao copiar ${tabela}: ${error.message}`);
+    console.log(`  ${tabela}: ${linhas.length}`);
+  }
+  const { error: eParam } = await clienteAdmin.from("parametros_calculadora").update(config.parametros).eq("empresa_id", demoId);
+  if (eParam) throw new Error(`Falha ao copiar parâmetros da calculadora: ${eParam.message}`);
+  console.log("  parametros_calculadora: atualizados");
+}
+
+// ---------------------------------------------------------------------------
+// 3. Empresa demo, vínculo do admin e funil de 9 etapas
+// ---------------------------------------------------------------------------
+
+/** Mesmo caminho de criarEmpresa() em src/app/(app)/super-admin/actions.ts. */
+async function criarEmpresaDemo(adminUserId) {
+  const { data: empresa, error } = await db.from("empresas").insert({ nome: NOME_EMPRESA_DEMO, created_by: adminUserId }).select("id").single();
+  if (error) throw error;
+  console.log(`  empresa criada: empresa_id=${empresa.id}`);
 
   const { data: membro, error: eMembro } = await db
     .from("empresa_membros")
-    .select("id, empresa_id")
-    .eq("user_id", admin.id)
-    .eq("papel", "admin")
-    .limit(1)
-    .maybeSingle();
-  if (eMembro) throw eMembro;
-  await falhaSe(!membro, `${ADMIN_EMAIL} não é admin de nenhuma empresa.`);
-
-  return { empresaId: membro.empresa_id, adminMembroId: membro.id, adminUserId: admin.id };
+    .insert({ empresa_id: empresa.id, user_id: adminUserId, papel: "admin" })
+    .select("id")
+    .single();
+  if (eMembro) throw new Error(`Empresa demo criada (empresa_id=${empresa.id}), mas o admin não foi vinculado: ${eMembro.message}`);
+  console.log(`  ${ADMIN_EMAIL} vinculado como admin (empresa_membros.id=${membro.id})`);
+  return { demoId: empresa.id, demoAdminMembroId: membro.id };
 }
 
-// ---------------------------------------------------------------------------
-// 2. Reset — dry run por padrão, só apaga com CONFIRMAR_RESET_DEMO=sim
-// ---------------------------------------------------------------------------
-
-// Só membros comerciais de linha de frente; admin e gestor nunca entram no reset.
-const PAPEIS_REMOVIDOS_NO_RESET = ["vendedor", "sdr"];
-
-async function planoDeLimpeza(empresaId, adminMembroId) {
-  const { data: membros, error } = await db
-    .from("empresa_membros")
-    .select("id, user_id, papel, perfis(nome, email)")
-    .eq("empresa_id", empresaId)
-    .in("papel", PAPEIS_REMOVIDOS_NO_RESET);
-  if (error) throw error;
-
-  await falhaSe(
-    membros.some((m) => m.id === adminMembroId),
-    "Proteção: o admin apareceu na lista de membros a remover — abortando sem apagar nada.",
-  );
-  await falhaSe(
-    membros.some((m) => !PAPEIS_REMOVIDOS_NO_RESET.includes(m.papel)),
-    "Proteção: apareceu membro fora de papel vendedor/sdr na lista a remover — abortando sem apagar nada.",
-  );
-
-  const membroIds = membros.map((m) => m.id);
-  let negocioIds = [];
-  if (membroIds.length) {
-    const { data: negocios, error: eNeg } = await db
-      .from("negocios")
-      .select("id")
-      .eq("empresa_id", empresaId)
-      .or(`responsavel_id.in.(${membroIds.join(",")}),criado_por.in.(${membroIds.join(",")})`);
-    if (eNeg) throw eNeg;
-    negocioIds = (negocios ?? []).map((n) => n.id);
-  }
-
-  return { membros, membroIds, negocioIds };
-}
-
-async function imprimirPlano({ membros, negocioIds }) {
-  const porPapel = (papel) => membros.filter((m) => m.papel === papel).length;
-  console.log(`\nMembros com papel vendedor ou sdr que seriam removidos (${membros.length}: ${porPapel("vendedor")} vendedor, ${porPapel("sdr")} sdr):`);
-  for (const m of membros) {
-    console.log(`  - ${m.perfis?.nome ?? "(sem nome)"} <${m.perfis?.email ?? "sem e-mail"}> — papel=${m.papel} (empresa_membros.id=${m.id})`);
-  }
-  console.log(`Negócios que seriam apagados (cascata: histórico, atividades, propostas, contratos, tarefas, notas, handoffs): ${negocioIds.length}`);
-  console.log("Isso também apaga em cascata, por membro removido: point_ledger, conquistas_desbloqueadas, resgates, metas, comissoes_calculadas, notificacoes.");
-  console.log("Preservado, sem alteração: admin, gestores, empresas, funis (etapas são substituídas no passo seguinte), origens, motivos_perda, gamification_rules, niveis_gamificacao, conquistas, recompensas, logs_auditoria.");
-}
-
-async function executarLimpeza(empresaId, { membroIds, negocioIds }) {
-  if (negocioIds.length) {
-    console.log(`Apagando eventos de ${negocioIds.length} negócio(s) antigos...`);
-    const { error: eEventos } = await db.from("eventos").delete().eq("empresa_id", empresaId).eq("entidade", "negocio").in("entidade_id", negocioIds);
-    if (eEventos) throw eEventos;
-
-    console.log(`Apagando ${negocioIds.length} negócio(s) antigos (cascata)...`);
-    const { error: eNegocios } = await db.from("negocios").delete().in("id", negocioIds);
-    if (eNegocios) throw eNegocios;
-  }
-
-  console.log("Apagando contatos órfãos...");
-  const { data: contatosOrfaos, error: eBuscaContatos } = await db
-    .from("contatos")
-    .select("id, negocios!left(id)")
-    .eq("empresa_id", empresaId);
-  if (eBuscaContatos) throw eBuscaContatos;
-  const idsOrfaos = (contatosOrfaos ?? []).filter((c) => !c.negocios?.length).map((c) => c.id);
-  if (idsOrfaos.length) {
-    const { error: eDelContatos } = await db.from("contatos").delete().in("id", idsOrfaos);
-    if (eDelContatos) throw eDelContatos;
-  }
-  console.log(`  ${idsOrfaos.length} contato(s) órfão(s) apagado(s).`);
-
-  if (membroIds.length) {
-    console.log(`Apagando ${membroIds.length} empresa_membros antigos com papel vendedor/sdr (cascata: point_ledger, metas, comissões, conquistas, resgates, notificações)...`);
-    const { error: eMembros } = await db.from("empresa_membros").delete().in("id", membroIds);
-    if (eMembros) throw eMembros;
-  }
-
-  console.log("Apagando equipes órfãs...");
-  const { data: equipes, error: eEquipes } = await db.from("equipes").select("id, equipe_membros!left(membro_id)").eq("empresa_id", empresaId);
-  if (eEquipes) throw eEquipes;
-  const equipesOrfas = (equipes ?? []).filter((e) => !e.equipe_membros?.length).map((e) => e.id);
-  if (equipesOrfas.length) {
-    const { error: eDelEquipes } = await db.from("equipes").delete().in("id", equipesOrfas);
-    if (eDelEquipes) throw eDelEquipes;
-  }
-  console.log(`  ${equipesOrfas.length} equipe(s) órfã(s) apagada(s).`);
-}
-
-// ---------------------------------------------------------------------------
-// 3. Funil de 9 etapas — substitui as 4 atuais (instrução explícita do
-//    Evandro: dados atuais não são reais, sem motivo pra manter redundância).
-// ---------------------------------------------------------------------------
+const ETAPAS_PADRAO_EMPRESA = ["Novo lead", "Contato feito", "Visita agendada", "Proposta enviada"];
 
 const ETAPAS_DEMO = [
-  { nome: "Novo Lead", inicial: true, fecha_como: null },
-  { nome: "Qualificação", inicial: false, fecha_como: null },
-  { nome: "Contato Realizado", inicial: false, fecha_como: null },
-  { nome: "Levantamento/Diagnóstico", inicial: false, fecha_como: null },
-  { nome: "Proposta Enviada", inicial: false, fecha_como: null },
-  { nome: "Follow-up", inicial: false, fecha_como: null },
-  { nome: "Negociação", inicial: false, fecha_como: null },
-  { nome: "Assinado", inicial: false, fecha_como: "ganho" },
-  { nome: "Pago", inicial: false, fecha_como: null },
+  { nome: "Novo Lead", fecha_como: null, marca_negociacao: false },
+  { nome: "Qualificação", fecha_como: null, marca_negociacao: false },
+  { nome: "Contato Realizado", fecha_como: null, marca_negociacao: false },
+  { nome: "Levantamento / Diagnóstico", fecha_como: null, marca_negociacao: false },
+  { nome: "Proposta Enviada", fecha_como: null, marca_negociacao: false },
+  { nome: "Follow-up", fecha_como: null, marca_negociacao: false },
+  { nome: "Negociação", fecha_como: null, marca_negociacao: true },
+  { nome: "Assinado", fecha_como: "ganho", marca_negociacao: false },
+  { nome: "Pago", fecha_como: null, marca_negociacao: false },
 ];
 
-async function recriarFunil(empresaId) {
-  const { data: funil, error: eFunil } = await db.from("funis").select("id").eq("empresa_id", empresaId).order("ordem").limit(1).single();
-  if (eFunil) throw eFunil;
+/**
+ * Sem apagar nada: as 4 etapas que o gatilho acabou de criar (empresa nova, sem nenhum
+ * negócio) viram as 4 primeiras do funil demo, e as outras 5 são acrescentadas — pela
+ * sessão do admin, como em Configurações > Funis e etapas.
+ */
+async function montarFunilDemo(clienteAdmin, demoId) {
+  const { data: funis, error: eFunis } = await db.from("funis").select("id").eq("empresa_id", demoId);
+  if (eFunis) throw eFunis;
+  await falhaSe(funis.length !== 1, `Esperava 1 funil criado pelo gatilho na empresa demo, achei ${funis.length}.`);
+  const funilId = funis[0].id;
 
-  console.log(`Removendo as etapas atuais do funil "Vendas" (funil_id=${funil.id})...`);
-  const { error: eDelEtapas } = await db.from("etapas").delete().eq("funil_id", funil.id);
-  if (eDelEtapas) throw eDelEtapas;
+  const { data: padrao, error: ePadrao } = await db.from("etapas").select("id, nome, ordem").eq("funil_id", funilId).order("ordem");
+  if (ePadrao) throw ePadrao;
+  await falhaSe(
+    padrao.map((e) => e.nome).join("|") !== ETAPAS_PADRAO_EMPRESA.join("|"),
+    `Etapas padrão da empresa demo diferentes do esperado (${padrao.map((e) => e.nome).join(", ")}).`,
+  );
 
-  console.log("Criando as 9 etapas do funil de demonstração...");
-  const { data: etapas, error: eInsEtapas } = await db
-    .from("etapas")
-    .insert(ETAPAS_DEMO.map((e, i) => ({ empresa_id: empresaId, funil_id: funil.id, nome: e.nome, ordem: i + 1, inicial: e.inicial, fecha_como: e.fecha_como })))
-    .select("id, nome, ordem")
-    .order("ordem");
-  if (eInsEtapas) throw eInsEtapas;
+  for (let i = 0; i < padrao.length; i++) {
+    const { nome, fecha_como, marca_negociacao } = ETAPAS_DEMO[i];
+    const { error } = await clienteAdmin.from("etapas").update({ nome, fecha_como, marca_negociacao }).eq("id", padrao[i].id);
+    if (error) throw error;
+  }
+  const novas = ETAPAS_DEMO.slice(padrao.length).map((e, i) => ({ empresa_id: demoId, funil_id: funilId, ordem: padrao.length + i + 1, inicial: false, ...e }));
+  const { error: eNovas } = await clienteAdmin.from("etapas").insert(novas);
+  if (eNovas) throw eNovas;
 
-  return { funilId: funil.id, etapas };
+  const { data: etapas, error: eEtapas } = await db.from("etapas").select("id, nome, ordem").eq("funil_id", funilId).order("ordem");
+  if (eEtapas) throw eEtapas;
+  await falhaSe(
+    etapas.map((e) => e.nome).join("|") !== ETAPAS_DEMO.map((e) => e.nome).join("|"),
+    `Funil demo não ficou como planejado (${etapas.map((e) => e.nome).join(", ")}).`,
+  );
+  return { funilId, etapas };
 }
 
 // ---------------------------------------------------------------------------
@@ -643,23 +800,35 @@ function primeiroDiaDoMes(data) {
   return `${data.getUTCFullYear()}-${String(data.getUTCMonth() + 1).padStart(2, "0")}-01`;
 }
 
-async function garantirPlanoComissao(empresaId, membroId) {
+// `planos_comissao` é versionado por `vigencia_inicio` (não tem coluna `ativo`) e a
+// escrita é revogada de service_role — o plano nasce pela sessão do admin, igual a
+// src/app/(app)/configuracoes/comissoes/actions.ts.
+async function garantirPlanoComissao(clienteAdmin, empresaId, membroId, criadoPor) {
   const referencia = primeiroDiaDoMes(AGORA);
-  const { data: existente } = await db.from("planos_comissao").select("id").eq("empresa_id", empresaId).eq("membro_id", membroId).eq("ativo", true).maybeSingle();
-  if (existente) return existente.id;
-  const { data, error } = await db
+  const { data: vigente, error: eVigente } = await db
+    .from("planos_comissao")
+    .select("id")
+    .eq("empresa_id", empresaId)
+    .eq("membro_id", membroId)
+    .lte("vigencia_inicio", referencia)
+    .order("vigencia_inicio", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (eVigente) throw eVigente;
+  if (vigente) return vigente.id;
+  const { data, error } = await clienteAdmin
     .from("planos_comissao")
     .insert({
       empresa_id: empresaId,
       membro_id: membroId,
+      vigencia_inicio: referencia,
       salario_base: 0,
       tipo_calculo: "percentual",
       faixas: [
         { resultado_minimo: 0, resultado_maximo: 50000, valor: 3 },
         { resultado_minimo: 50000, resultado_maximo: null, valor: 4 },
       ],
-      ativo: true,
-      vigencia_inicio: referencia,
+      criado_por: criadoPor,
     })
     .select("id")
     .single();
@@ -676,7 +845,7 @@ async function calcularEFecharComissoes(empresaId, pessoas, fechar) {
   const resultados = [];
   for (const chave of ["lucas", "mariana", "rafael", "bruno"]) {
     const membroId = pessoas[chave].membroId;
-    const planoId = await garantirPlanoComissao(empresaId, membroId);
+    const planoId = await garantirPlanoComissao(clienteAdmin, empresaId, membroId, pessoas.adminMembroId);
     const { data: resultadoApurado, error: eCalc } = await clienteAdmin.rpc("calcular_receita_causal_comissao", {
       p_empresa_id: empresaId,
       p_membro_id: membroId,
@@ -726,7 +895,10 @@ async function calcularEFecharComissoes(empresaId, pessoas, fechar) {
 //    só com alvo calibrado abaixo do resultado esperado de cada closer.
 // ---------------------------------------------------------------------------
 
+// Escrita em `metas` é revogada de service_role: a meta nasce pela sessão do admin,
+// com os mesmos campos de criarMeta() em src/app/(app)/configuracoes/metas/actions.ts.
 async function criarMetas(empresaId, adminMembroId, pessoas, alvosPorChave) {
+  const clienteAdmin = await clienteComo(ADMIN_EMAIL);
   const inicio = primeiroDiaDoMes(AGORA);
   const fim = new Date(Date.UTC(AGORA.getUTCFullYear(), AGORA.getUTCMonth() + 1, 0)).toISOString().slice(0, 10);
   const nomeMes = new Date(inicio).toLocaleDateString("pt-BR", { month: "long", year: "numeric", timeZone: "UTC" });
@@ -735,7 +907,7 @@ async function criarMetas(empresaId, adminMembroId, pessoas, alvosPorChave) {
     const membroId = pessoas[chave].membroId;
     const { data: existente } = await db.from("metas").select("id").eq("empresa_id", empresaId).eq("membro_id", membroId).eq("metrica", "receita").eq("ativa", true).lte("periodo_inicio", fim).gte("periodo_fim", inicio).maybeSingle();
     if (existente) continue;
-    const { error } = await db.from("metas").insert({
+    const { error } = await clienteAdmin.from("metas").insert({
       empresa_id: empresaId,
       titulo: `Meta comercial de ${nomeMes}`,
       metrica: "receita",
@@ -743,7 +915,6 @@ async function criarMetas(empresaId, adminMembroId, pessoas, alvosPorChave) {
       periodo_inicio: inicio,
       periodo_fim: fim,
       valor_alvo: alvosPorChave[chave],
-      ativa: true,
       criado_por: adminMembroId,
     });
     if (error) throw error;
@@ -907,23 +1078,45 @@ async function validarPosSeed(empresaId, pessoas) {
 // ---------------------------------------------------------------------------
 
 async function main() {
-  console.log("Resolvendo empresa do admin...");
-  const { empresaId, adminMembroId } = await resolverEmpresaEAdmin();
-  console.log(`empresa_id = ${empresaId}`);
+  // --- Só leitura: tudo o que pode bloquear é checado antes da primeira escrita. ---
+  const usuariosAuth = await listarUsuariosAuth();
+  const { adminUserId, origemId, origemNome } = await resolverAdminEOrigem(usuariosAuth);
+  const demoExistente = await encontrarDemoExistente(usuariosAuth);
+  const config = await carregarConfiguracaoOrigem(origemId);
+  const plano35 = montarPlano();
 
-  const plano = await planoDeLimpeza(empresaId, adminMembroId);
-  await imprimirPlano(plano);
+  imprimirPlano({ origemId, origemNome, config, demoExistente });
 
-  if (!CONFIRMAR_RESET_DEMO) {
-    console.log("\nCONFIRMAR_RESET_DEMO não está definido como 'sim' — nada foi apagado ou criado. Dry run encerrado.");
+  const bloqueios = [...config.bloqueios];
+  for (const e of demoExistente.porNome) bloqueios.push(`já existe empresa "${e.nome}" (empresa_id=${e.id}, situação ${e.situacao}) — a Base Demo não é recriada nem duplicada.`);
+  for (const v of demoExistente.vinculosAtivos) {
+    const email = demoExistente.usuariosDemo.find((u) => u.id === v.user_id)?.email;
+    bloqueios.push(`${email} já é membro ativo da empresa "${v.empresas?.nome}" (empresa_id=${v.empresa_id}).`);
+  }
+  if (plano35.length !== 35) bloqueios.push(`plano gerou ${plano35.length} negócios, esperava 35.`);
+
+  if (bloqueios.length) {
+    console.log("\nBLOQUEIOS — nada foi criado:");
+    for (const b of bloqueios) console.log(`  ✗ ${b}`);
+    process.exit(1);
+  }
+
+  if (!CRIAR_BASE_DEMO) {
+    console.log("\nCRIAR_BASE_DEMO não está definido como 'sim' — nada foi criado. Dry run encerrado.");
     return;
   }
 
-  console.log("\nCONFIRMAR_RESET_DEMO=sim — prosseguindo com a limpeza real.");
-  await executarLimpeza(empresaId, plano);
+  // --- Escritas: só dentro da empresa demo nova. ---
+  console.log(`\nCRIAR_BASE_DEMO=sim — criando "${NOME_EMPRESA_DEMO}"...`);
+  const { demoId: empresaId, demoAdminMembroId: adminMembroId } = await criarEmpresaDemo(adminUserId);
+  const clienteAdmin = await clienteComo(ADMIN_EMAIL);
 
-  const { funilId, etapas: etapasCriadas } = await recriarFunil(empresaId);
-  const etapas = etapasCriadas.map((e) => ({ ...e, funilId }));
+  console.log("\nMontando o funil de 9 etapas...");
+  const { funilId, etapas: etapasDemo } = await montarFunilDemo(clienteAdmin, empresaId);
+  const etapas = etapasDemo.map((e) => ({ ...e, funilId }));
+
+  console.log("\nCopiando a configuração da origem (sessão do admin)...");
+  await copiarConfiguracao(clienteAdmin, empresaId, adminMembroId, config);
 
   console.log("\nCriando os 5 membros fictícios...");
   const pessoas = { adminMembroId };
@@ -939,12 +1132,12 @@ async function main() {
   const motivosPerdaPorNome = new Map((motivos ?? []).map((m) => [m.nome, m.id]));
   const { data: origens } = await db.from("origens").select("id, nome").eq("empresa_id", empresaId);
   const origensPorNome = new Map((origens ?? []).map((o) => [o.nome, o.id]));
+  const faltando = [...ORIGENS_POOL.filter((o) => !origensPorNome.has(o)), ...MOTIVOS_PERDA.filter((m) => !motivosPerdaPorNome.has(m))];
+  await falhaSe(faltando.length > 0, `Origens/motivos padrão ausentes na empresa demo: ${faltando.join(", ")}.`);
 
   const ctx = { empresaId, etapas, parametros, pessoas, motivosPerdaPorNome, origensPorNome };
 
   console.log("\nCriando os 35 negócios (sessões reais, eventos/gamificação disparados pelos gatilhos)...");
-  const plano35 = montarPlano();
-  await falhaSe(plano35.length !== 35, `Plano gerou ${plano35.length} negócios, esperava 35 — abortando antes de criar qualquer um.`);
   const resultados = [];
   for (const deal of plano35) {
     const r = await executarNegocio(ctx, deal);
@@ -961,7 +1154,7 @@ async function main() {
 
   await validarPosSeed(empresaId, pessoas);
 
-  console.log("\nConcluído.");
+  console.log(`\nConcluído. Empresa "${NOME_EMPRESA_DEMO}" (empresa_id=${empresaId}) — ${ADMIN_EMAIL} acessa pelo seletor de empresa do menu.`);
 }
 
 main().catch((err) => {
