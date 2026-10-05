@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import "./dashboard-fixes.css";
 
 // Escopa as variáveis do tema escuro (.tema-gamificacao, ver globals.css) a toda a
 // árvore /gamificacao, sem aplicar fundo ou cor de texto por padrão. Cada página já
