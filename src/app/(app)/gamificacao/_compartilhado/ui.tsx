@@ -91,23 +91,30 @@ export function KpiGf({
   valor,
   legenda,
   indicador,
+  tom = "verde",
 }: {
-  Icone: ComponentType<{ size?: number }>;
+  Icone: ComponentType<{ size?: number; className?: string }>;
   valor: string;
   legenda: string;
   indicador?: ReactNode;
+  tom?: "verde" | "dourado";
 }) {
+  const icone =
+    tom === "dourado"
+      ? "bg-[var(--gf-dourado-10)] text-[var(--gf-dourado)]"
+      : "bg-[var(--gf-verde-10)] text-[var(--gf-verde)]";
+
   return (
-    <div className="flex items-center gap-2.5 rounded-full border border-[var(--gf-borda)] bg-[var(--gf-surface)] py-2 pr-4 pl-2.5">
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--gf-verde-10)] text-[var(--gf-verde)]">
+    <div className="flex h-11 min-w-0 items-center gap-2 rounded-lg border border-[var(--gf-borda)] bg-[var(--gf-surface)] px-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.35)]">
+      <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${icone}`}>
         <Icone size={15} />
       </span>
-      <div className="flex min-w-0 flex-col">
-        <div className="flex items-baseline gap-1.5">
-          <p className="truncate text-sm font-semibold text-[var(--gf-texto)]">{valor}</p>
+      <div className="flex min-w-0 flex-1 flex-col justify-center">
+        <div className="flex min-w-0 items-baseline gap-1.5">
+          <p className="truncate text-sm font-semibold leading-none text-[var(--gf-texto)]">{valor}</p>
           {indicador}
         </div>
-        <p className="truncate text-[11px] text-[var(--gf-texto-sec)]">{legenda}</p>
+        <p className="mt-1 truncate text-[9px] leading-none text-[var(--gf-texto-sec)]">{legenda}</p>
       </div>
     </div>
   );
