@@ -716,6 +716,142 @@ async function criarMetas(empresaId, adminMembroId, pessoas, alvosPorChave) {
 }
 
 // ---------------------------------------------------------------------------
+// 10. Validação pós-seed — lê o resultado real do banco (point_ledger, não
+//    contagem de eventos) e confere contra os números que o Evandro aprovou.
+//    Roda sempre no final de uma execução real; só reporta, nunca corrige
+//    nada sozinha (um valor fora do esperado é um problema a investigar, não
+//    a "ajustar" escrevendo em point_ledger).
+// ---------------------------------------------------------------------------
+
+async function validarPosSeed(empresaId, pessoas) {
+  console.log("\n=== Validação pós-seed ===");
+  const closers = ["lucas", "mariana", "rafael", "bruno"];
+  const closerIds = closers.map((c) => pessoas[c].membroId);
+
+  console.log("\n-- 1. Membros fictícios --");
+  const { data: membros, error: eMembros } = await db
+    .from("empresa_membros")
+    .select("id, papel, perfil_gamificacao, perfis(nome, email)")
+    .eq("empresa_id", empresaId)
+    .in("id", [...closerIds, pessoas.gabriel.membroId]);
+  if (eMembros) throw eMembros;
+  await falhaSe(membros.length !== 5, `Esperava 5 membros fictícios, achei ${membros.length}.`);
+  for (const m of membros) console.log(`  ${m.perfis?.nome} — papel=${m.papel}, perfil_gamificacao=${m.perfil_gamificacao}`);
+
+  console.log("\n-- 2/3. Negócios: total, status e distribuição por vendedor --");
+  const { data: negocios, error: eNeg } = await db
+    .from("negocios")
+    .select("id, status, responsavel_id, valor")
+    .eq("empresa_id", empresaId)
+    .in("responsavel_id", closerIds);
+  if (eNeg) throw eNeg;
+  await falhaSe(negocios.length !== 35, `Esperava 35 negócios, achei ${negocios.length}.`);
+  const porStatus = { aberto: 0, ganho: 0, perdido: 0 };
+  const porCloser = {};
+  for (const n of negocios) {
+    porStatus[n.status] = (porStatus[n.status] ?? 0) + 1;
+    porCloser[n.responsavel_id] = (porCloser[n.responsavel_id] ?? 0) + 1;
+  }
+  console.log(`  total=${negocios.length}, ganhos=${porStatus.ganho}, perdidos=${porStatus.perdido}, em andamento=${porStatus.aberto}`);
+  for (const c of closers) console.log(`  ${c}: ${porCloser[pessoas[c].membroId] ?? 0} negócio(s)`);
+
+  console.log("\n-- 4. Ganhos pagos (confirmacoes_pagamento ativa) --");
+  const negocioIdsGanhos = negocios.filter((n) => n.status === "ganho").map((n) => n.id);
+  let totalPagos = 0;
+  if (negocioIdsGanhos.length) {
+    const { data: pagos, error: ePagos } = await db
+      .from("confirmacoes_pagamento")
+      .select("negocio_id")
+      .eq("empresa_id", empresaId)
+      .in("negocio_id", negocioIdsGanhos)
+      .is("estornado_em", null);
+    if (ePagos) throw ePagos;
+    totalPagos = pagos.length;
+  }
+  console.log(`  pagos=${totalPagos} (esperado: 7)`);
+
+  console.log("\n-- 5. Handoffs do Gabriel --");
+  const { data: handoffs, error: eHandoffs } = await db.from("handoffs").select("id, para_membro_id").eq("empresa_id", empresaId).eq("de_membro_id", pessoas.gabriel.membroId);
+  if (eHandoffs) throw eHandoffs;
+  console.log(`  total=${handoffs.length} (esperado: 5)`);
+
+  console.log("\n-- 6. XP/pontos reais por membro (point_ledger, só lançamentos não estornados) --");
+  const { data: lancamentos, error: eLedger } = await db
+    .from("point_ledger")
+    .select("membro_id, xp, moedas")
+    .eq("empresa_id", empresaId)
+    .eq("estornado", false)
+    .in("membro_id", [...closerIds, pessoas.gabriel.membroId]);
+  if (eLedger) throw eLedger;
+  const xpPorMembro = {};
+  for (const l of lancamentos) xpPorMembro[l.membro_id] = (xpPorMembro[l.membro_id] ?? 0) + l.xp;
+
+  const { data: niveis } = await db.from("niveis_gamificacao").select("nivel, nome, xp_minimo").eq("empresa_id", empresaId).order("xp_minimo", { ascending: true });
+  function nivelDe(xp) {
+    let atual = null;
+    for (const n of niveis ?? []) {
+      if (xp >= n.xp_minimo) atual = n;
+    }
+    return atual ? `nível ${atual.nivel}${atual.nome ? ` (${atual.nome})` : ""}` : "sem nível configurado";
+  }
+
+  const rankingTodos = [...closers, "gabriel"].map((c) => ({ chave: c, nome: pessoas[c].nome, xp: xpPorMembro[pessoas[c].membroId] ?? 0 }));
+  rankingTodos.sort((a, b) => b.xp - a.xp);
+  for (const r of rankingTodos) console.log(`  ${r.nome}: ${r.xp} XP — ${nivelDe(r.xp)}`);
+
+  const xpClosers = closers.map((c) => xpPorMembro[pessoas[c].membroId] ?? 0);
+  const ordemOk = xpClosers.every((v, i) => i === 0 || v <= xpClosers[i - 1]);
+  console.log(
+    ordemOk
+      ? "  RANKING OK: Lucas > Mariana > Rafael > Bruno, confirmado no point_ledger real."
+      : `  ATENÇÃO — ranking real não ficou Lucas>Mariana>Rafael>Bruno (XP: ${closers.map((c, i) => `${c}=${xpClosers[i]}`).join(", ")}). Não corrigido automaticamente — revisar regras ativas (gamification_rules) antes de prosseguir.`,
+  );
+
+  console.log("\n-- 7. Metas do mês atual --");
+  const clienteAdmin = await clienteComo(ADMIN_EMAIL);
+  const inicioMes = new Date(Date.UTC(AGORA.getUTCFullYear(), AGORA.getUTCMonth(), 1));
+  const fimExclusivo = new Date(Date.UTC(AGORA.getUTCFullYear(), AGORA.getUTCMonth() + 1, 1));
+  const { data: metas, error: eMetas } = await db.from("metas").select("membro_id, valor_alvo").eq("empresa_id", empresaId).in("membro_id", closerIds).eq("ativa", true);
+  if (eMetas) throw eMetas;
+  for (const c of closers) {
+    const meta = metas.find((m) => m.membro_id === pessoas[c].membroId);
+    if (!meta) {
+      console.log(`  ${c}: sem meta ativa encontrada`);
+      continue;
+    }
+    const { data: realizado, error: eReal } = await clienteAdmin.rpc("calcular_realizado_meta", {
+      p_empresa_id: empresaId,
+      p_membro_id: pessoas[c].membroId,
+      p_metrica: "receita",
+      p_desde: inicioMes.toISOString(),
+      p_ate_exclusivo: fimExclusivo.toISOString(),
+    });
+    if (eReal) throw eReal;
+    console.log(`  ${c}: alvo R$ ${meta.valor_alvo} — realizado R$ ${arredondar(realizado ?? 0, 2)}`);
+  }
+
+  console.log("\n-- 8. Comissões calculadas --");
+  const referencia = primeiroDiaDoMes(AGORA);
+  const { data: comissoes, error: eComissoes } = await db
+    .from("comissoes_calculadas")
+    .select("membro_id, resultado_apurado, valor_total, status")
+    .eq("empresa_id", empresaId)
+    .eq("referencia", referencia)
+    .in("membro_id", closerIds);
+  if (eComissoes) throw eComissoes;
+  for (const c of closers) {
+    const com = comissoes.find((x) => x.membro_id === pessoas[c].membroId);
+    if (!com) {
+      console.log(`  ${c}: nenhuma comissão calculada`);
+      continue;
+    }
+    console.log(`  ${c}: resultado apurado R$ ${com.resultado_apurado} — comissão R$ ${com.valor_total} — status=${com.status}`);
+  }
+
+  console.log("\n=== Fim da validação pós-seed ===");
+}
+
+// ---------------------------------------------------------------------------
 // main
 // ---------------------------------------------------------------------------
 
@@ -771,6 +907,8 @@ async function main() {
 
   console.log("\nCriando metas de receita do mês atual...");
   await criarMetas(empresaId, adminMembroId, pessoas, { lucas: 90000, mariana: 70000, rafael: 45000, bruno: 35000 });
+
+  await validarPosSeed(empresaId, pessoas);
 
   console.log("\nConcluído.");
 }
