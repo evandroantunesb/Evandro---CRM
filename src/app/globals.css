@@ -300,3 +300,64 @@ h3,
     grid-template-rows: 32fr 40fr 28fr !important;
   }
 }
+
+/*
+ * Estabilização de alinhamento da Visão Geral.
+ * Evita que títulos/ações quebrem a geometria em larguras intermediárias e
+ * mantém os pares de cartões com a mesma caixa visual.
+ */
+.tema-gamificacao .max-w-\[1500px\] > :nth-child(3) section > div:first-child {
+  flex-wrap: nowrap !important;
+  align-items: center;
+  min-width: 0;
+}
+
+.tema-gamificacao .max-w-\[1500px\] > :nth-child(3) section > div:first-child > h2 {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tema-gamificacao .max-w-\[1500px\] > :nth-child(3) section > div:first-child > a {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+@media (max-width: 767px) {
+  .tema-gamificacao .max-w-\[1500px\] > :first-child > :nth-child(2) > div {
+    height: 56px;
+    min-height: 56px;
+  }
+
+  .tema-gamificacao .max-w-\[1500px\] > :nth-child(2) > section:nth-child(2),
+  .tema-gamificacao .max-w-\[1500px\] > :nth-child(2) > section:nth-child(3) {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-self: stretch;
+  }
+
+  .tema-gamificacao .max-w-\[1500px\] > :nth-child(3) > section,
+  .tema-gamificacao .max-w-\[1500px\] > :nth-child(3) > div > section {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .tema-gamificacao .max-w-\[1500px\] > :nth-child(3) section > div:first-child {
+    min-height: 24px;
+    margin-bottom: 12px;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1399px) {
+  .tema-gamificacao .max-w-\[1500px\] > :nth-child(3) > section,
+  .tema-gamificacao .max-w-\[1500px\] > :nth-child(3) > div {
+    min-width: 0;
+  }
+
+  .tema-gamificacao .max-w-\[1500px\] > :nth-child(3) section > div:first-child {
+    min-height: 24px;
+  }
+}
