@@ -22,14 +22,18 @@ export function CartaoGf({
 }) {
   return (
     <section
-      className={`rounded-xl border border-[var(--gf-borda)] shadow-[0_1px_2px_rgba(0,0,0,0.4)] ${
+      className={`min-w-0 overflow-hidden rounded-xl border border-[var(--gf-borda)] shadow-[0_1px_2px_rgba(0,0,0,0.4)] ${
         destaque ? "bg-[var(--gf-surface-alta)] p-6" : "bg-[var(--gf-surface)] p-5"
       } ${className}`}
     >
       {(titulo || acao) && (
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          {titulo && <h2 className="text-base font-semibold text-[var(--gf-texto)]">{titulo}</h2>}
-          {acao}
+        <div className="mb-3 flex min-w-0 items-center justify-between gap-2">
+          {titulo && (
+            <h2 className="min-w-0 truncate text-base font-semibold text-[var(--gf-texto)]">
+              {titulo}
+            </h2>
+          )}
+          {acao && <div className="shrink-0 whitespace-nowrap">{acao}</div>}
         </div>
       )}
       {children}
@@ -105,14 +109,14 @@ export function KpiGf({
       : "bg-[var(--gf-verde-10)] text-[var(--gf-verde)]";
 
   return (
-    <div className="flex h-11 min-w-0 items-center gap-2 rounded-lg border border-[var(--gf-borda)] bg-[var(--gf-surface)] px-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.35)]">
+    <div className="flex h-11 min-w-0 items-center gap-2 overflow-hidden rounded-lg border border-[var(--gf-borda)] bg-[var(--gf-surface)] px-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.35)]">
       <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${icone}`}>
         <Icone size={15} />
       </span>
       <div className="flex min-w-0 flex-1 flex-col justify-center">
-        <div className="flex min-w-0 items-baseline gap-1.5">
+        <div className="flex min-w-0 items-baseline gap-1.5 overflow-hidden">
           <p className="truncate text-sm font-semibold leading-none text-[var(--gf-texto)]">{valor}</p>
-          {indicador}
+          <span className="shrink-0">{indicador}</span>
         </div>
         <p className="mt-1 truncate text-[9px] leading-none text-[var(--gf-texto-sec)]">{legenda}</p>
       </div>
@@ -179,17 +183,17 @@ export function LinhaLancamento({
 
   return (
     <li className="flex items-center justify-between gap-3 border-t border-[var(--gf-borda)] py-2 text-sm first:border-t-0">
-      <div className="flex flex-col">
+      <div className="flex min-w-0 flex-col">
         <span
-          className={
+          className={`truncate ${
             estornado ? "text-[var(--gf-texto-ter)] line-through" : "text-[var(--gf-texto)]"
-          }
+          }`}
         >
           {descricao}
         </span>
-        <span className="text-xs text-[var(--gf-texto-sec)]">{tempo}</span>
+        <span className="truncate text-xs text-[var(--gf-texto-sec)]">{tempo}</span>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex shrink-0 items-center gap-2">
         {estornado && <BadgeGf tom="negativo">Estornado</BadgeGf>}
         {xp !== undefined && xp !== 0 && (
           <span className="flex items-baseline gap-1">
@@ -226,7 +230,7 @@ export function EstadoVazioGf({
 }) {
   return (
     <div
-      className={`flex flex-col items-center justify-center gap-1.5 text-center ${compacto ? "py-2.5" : "py-6 gap-2"}`}
+      className={`flex min-w-0 flex-col items-center justify-center gap-1.5 text-center ${compacto ? "py-2.5" : "py-6 gap-2"}`}
     >
       {Icone && (
         <span
@@ -235,7 +239,9 @@ export function EstadoVazioGf({
           <Icone size={compacto ? 13 : 16} />
         </span>
       )}
-      <p className={`text-[var(--gf-texto-sec)] ${compacto ? "text-xs" : "text-sm"}`}>{children}</p>
+      <p className={`max-w-full text-[var(--gf-texto-sec)] ${compacto ? "text-xs" : "text-sm"}`}>
+        {children}
+      </p>
     </div>
   );
 }
