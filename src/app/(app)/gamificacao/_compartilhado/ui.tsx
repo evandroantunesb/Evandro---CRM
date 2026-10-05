@@ -1,4 +1,4 @@
-import type { ComponentType, ReactNode } from "react";
+import type { ComponentType, CSSProperties, ReactNode } from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
 
 /**
@@ -13,18 +13,21 @@ export function CartaoGf({
   acao,
   className = "",
   destaque = false,
+  style,
 }: {
   titulo?: ReactNode;
   children: ReactNode;
   acao?: ReactNode;
   className?: string;
   destaque?: boolean;
+  style?: CSSProperties;
 }) {
   return (
     <section
       className={`min-w-0 overflow-hidden rounded-xl border border-[var(--gf-borda)] shadow-[0_1px_2px_rgba(0,0,0,0.4)] ${
         destaque ? "bg-[var(--gf-surface-alta)] p-6" : "bg-[var(--gf-surface)] p-5"
       } ${className}`}
+      style={style}
     >
       {(titulo || acao) && (
         <div className="mb-3 flex min-w-0 items-center justify-between gap-2">

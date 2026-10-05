@@ -6,11 +6,9 @@ import {
   Check,
   Crown,
   Flame,
-  Gift,
-  LineChart,
+  ShoppingCart,
   Target,
   Trophy,
-  Users,
   Zap,
 } from "lucide-react";
 import { carregarConfiguracao } from "@/lib/crm";
@@ -27,7 +25,8 @@ import {
   IniciaisAvatarGf,
   KpiGf,
 } from "./_compartilhado/ui";
-import { CartaoRecompensaGf } from "./_compartilhado/recompensa-preview";
+import { RecompensaChipGf } from "./_compartilhado/recompensa-preview";
+import { RankingTabsGf } from "./_compartilhado/ranking-tabs";
 
 type RankingLinha = { posicao: number; membroId: string; nome: string; total: number };
 type DiaSequencia = { data: string; dia_util: boolean; produtivo: boolean };
@@ -108,6 +107,8 @@ export default async function GamificacaoDashboard({
     { data: pontosAnteriorAgg },
     { data: rankingBruto },
     { data: rankingHistoricoSemanaBruto },
+    { data: rankingSemanaBruto },
+    { data: rankingGeralBruto },
     { data: sequenciaBruta },
     { data: progressoConquistasBruto },
     { data: niveis },
@@ -151,6 +152,17 @@ export default async function GamificacaoDashboard({
       p_perfil: perfil,
       p_desde: atualMes.inicioIso,
       p_ate: inicioSemanaIso,
+    }),
+    // Abas do card de Ranking (Semana/Mês/Geral) — mesma RPC, janelas
+    // diferentes; "Mês" reaproveita o `rankingBruto` já consultado acima.
+    supabase.rpc("ranking_gamificacao", {
+      p_empresa_id: atual.empresaId,
+      p_perfil: perfil,
+      p_desde: inicioSemanaIso,
+    }),
+    supabase.rpc("ranking_gamificacao", {
+      p_empresa_id: atual.empresaId,
+      p_perfil: perfil,
     }),
     supabase.rpc("sequencia_produtiva_membro", { p_empresa_id: atual.empresaId }),
     supabase.rpc("progresso_conquistas_membro", { p_empresa_id: atual.empresaId }),
@@ -236,40 +248,6 @@ export default async function GamificacaoDashboard({
   const metasAtingidas = metasComProgresso.filter((m) => m.progresso.percentual >= 100).length;
   const metasTotal = metasComProgresso.length;
 
-  // Evolução de XP (acumulado por dia no período) --------------------------
-  const diasNoPeriodo = Math.round(
-    (atualMes.fimExclusivo.getTime() - atualMes.inicio.getTime()) / 86_400_000,
-  );
-  const porDia = new Array(diasNoPeriodo).fill(0) as number[];
-  for (const l of pontosPeriodo ?? []) {
-    const dia = Math.floor(
-      (new Date(l.created_at).getTime() - atualMes.inicio.getTime()) / 86_400_000,
-    );
-    if (dia >= 0 && dia < diasNoPeriodo) porDia[dia] += l.xp;
-  }
-  const hoje = new Date();
-  const diasComDados =
-    periodo === "mes"
-      ? Math.floor((hoje.getTime() - atualMes.inicio.getTime()) / 86_400_000) + 1
-      : diasNoPeriodo;
-  const serieAcumulada = porDia
-    .slice(0, Math.max(2, Math.min(diasComDados, diasNoPeriodo)))
-    .reduce<number[]>((acc, v) => {
-      acc.push((acc.at(-1) ?? 0) + v);
-      return acc;
-    }, []);
-
-  // Ações que mais geram XP -------------------------------------------------
-  const porAcao = new Map<string, number>();
-  for (const l of pontosPeriodo ?? []) {
-    if (!l.descricao || l.xp === 0) continue;
-    porAcao.set(l.descricao, (porAcao.get(l.descricao) ?? 0) + l.xp);
-  }
-  const topAcoes = [...porAcao.entries()]
-    .map(([rotulo, total]) => ({ rotulo, total }))
-    .sort((a, b) => b.total - a.total)
-    .slice(0, 5);
-
   // Ranking (XP ativo, por perfil/período) + variação de posição esta semana ----
   const niveisNormalizados = (niveis ?? []).map((n) => ({
     nivel: n.nivel,
@@ -278,6 +256,12 @@ export default async function GamificacaoDashboard({
   }));
   const rankingCompleto = construirRanking(rankingBruto, nomeMembro);
   const ranking = rankingCompleto.slice(0, 5);
+  // Abas do card de Ranking — mesma fonte, três janelas diferentes.
+  const rankingPorAba = {
+    semana: construirRanking(rankingSemanaBruto, nomeMembro).slice(0, 5),
+    mes: ranking,
+    geral: construirRanking(rankingGeralBruto, nomeMembro).slice(0, 5),
+  };
   // Minha posição no ranking do período + quem está logo acima — reaproveita o
   // mesmo resultado da RPC já consultada acima, sem truncar em 5, só pra achar
   // minha colocação mesmo quando fico fora do top 5 exibido.
@@ -384,6 +368,7 @@ export default async function GamificacaoDashboard({
             Icone={Trophy}
             valor={minhaPosicaoRanking ? `#${minhaPosicaoRanking.posicao}` : "—"}
             legenda="Posição no ranking"
+            tom="dourado"
             indicador={
               deltaPosicaoSemana != null &&
               deltaPosicaoSemana !== 0 && (
@@ -403,6 +388,7 @@ export default async function GamificacaoDashboard({
             Icone={Award}
             valor={totalConquistasDesbloqueadas.toLocaleString("pt-BR")}
             legenda="Conquistas"
+            tom="dourado"
             indicador={
               conquistasNovasPeriodo > 0 && (
                 <span className="text-[10px] font-medium text-[var(--gf-verde)]">
@@ -417,13 +403,22 @@ export default async function GamificacaoDashboard({
 
         {/* Hero: proporções fixas da referência no desktop. */}
         <div className="grid items-stretch gap-2 lg:h-[154px] lg:grid-cols-[2.56fr_1.27fr_1fr]">
-          <CartaoGf destaque className="overflow-hidden !p-4 lg:h-full">
+          <CartaoGf
+            destaque
+            className="relative overflow-hidden !p-4 lg:h-full"
+            style={{
+              backgroundImage:
+                "linear-gradient(to right, rgba(15,15,16,0.88), rgba(15,15,16,0.5)), url(/gamificacao/fundo-minha-posicao.svg)",
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+            }}
+          >
             {!minhaPosicaoRanking ? (
               <EstadoVazioGf Icone={Trophy} compacto>
                 Pontue neste período pra entrar no ranking.
               </EstadoVazioGf>
             ) : (
-              <div className="flex h-full flex-col justify-between gap-4 sm:flex-row sm:items-center">
+              <div className="relative flex h-full flex-col justify-between gap-4 sm:flex-row sm:items-center">
                 <div>
                   <p className="flex items-center gap-1.5 text-xs tracking-wide text-[var(--gf-texto-sec)] uppercase">
                     <Trophy size={12} className="text-[var(--gf-dourado)]" />
@@ -555,68 +550,7 @@ export default async function GamificacaoDashboard({
             }
             className="flex min-h-[300px] flex-col overflow-hidden lg:h-full lg:min-h-0"
           >
-            <div
-              className={`flex min-h-0 flex-1 flex-col overflow-hidden ${!ranking.length ? "items-center justify-center" : ""}`}
-            >
-              {!ranking.length ? (
-                <EstadoVazioGf Icone={Users} compacto>
-                  Ninguém pontuou neste período ainda.
-                </EstadoVazioGf>
-              ) : (
-                <>
-                    {ranking.length >= 2 && (
-                      <div className="mb-4 flex items-end justify-center gap-3">
-                        {[ranking[1], ranking[0], ranking[2]].map(
-                          (r) =>
-                            r && (
-                              <div
-                                key={r.membroId}
-                                className={`flex flex-col items-center gap-1 ${r.posicao === 1 ? "pb-0" : "pb-3"}`}
-                              >
-                                {r.posicao === 1 && (
-                                  <Crown size={16} className="text-[var(--gf-dourado)]" />
-                                )}
-                                <IniciaisAvatarGf
-                                  nome={r.nome}
-                                  tamanho={r.posicao === 1 ? 48 : 40}
-                                  tom={r.posicao === 1 ? "dourado" : "neutro"}
-                                />
-                                <span className="max-w-20 truncate text-xs font-medium text-[var(--gf-texto)]">
-                                  {r.nome}
-                                </span>
-                                <span className="text-[11px] text-[var(--gf-texto-sec)]">
-                                  {r.total.toLocaleString("pt-BR")} XP
-                                </span>
-                              </div>
-                            ),
-                        )}
-                      </div>
-                    )}
-                    <ul className="flex flex-col gap-1.5">
-                      {ranking.map((r) => (
-                        <li
-                          key={r.membroId}
-                          className={`flex items-center gap-3 rounded-lg px-2 py-2 text-sm ${
-                            r.membroId === atual.membroId ? "bg-[var(--gf-verde-10)]" : ""
-                          }`}
-                        >
-                          <span className="w-5 shrink-0 text-center text-[var(--gf-texto-sec)]">
-                            {r.posicao}
-                          </span>
-                          <span
-                            className={`flex-1 truncate ${r.membroId === atual.membroId ? "font-medium text-[var(--gf-verde)]" : "text-[var(--gf-texto)]"}`}
-                          >
-                            {r.membroId === atual.membroId ? "Você" : r.nome}
-                          </span>
-                          <span className="font-medium text-[var(--gf-texto)]">
-                            {r.total.toLocaleString("pt-BR")} XP
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                </>
-              )}
-            </div>
+            <RankingTabsGf listas={rankingPorAba} membroAtualId={atual.membroId} />
           </CartaoGf>
 
           <div className="grid gap-2 lg:h-full lg:grid-rows-[119px_1fr]">
@@ -821,7 +755,7 @@ export default async function GamificacaoDashboard({
             {/* Fecha a coluna, discreta de propósito: sem mais peso visual que
                 Meta/Conquistas, só saldo + prévia + acesso à loja completa. */}
             <CartaoGf
-              titulo={<span className="flex items-center gap-2"><Gift size={15} className="text-[var(--gf-dourado)]" />Loja</span>}
+              titulo={<span className="flex items-center gap-2"><ShoppingCart size={15} className="text-[var(--gf-dourado)]" />Loja</span>}
               acao={
                 <Link
                   href="/gamificacao/loja"
@@ -832,29 +766,26 @@ export default async function GamificacaoDashboard({
               }
             >
               {!recompensas?.length ? (
-                <EstadoVazioGf Icone={Gift} compacto>
+                <EstadoVazioGf Icone={ShoppingCart} compacto>
                   Nenhuma recompensa disponível.
                 </EstadoVazioGf>
               ) : (
-                <div className="flex flex-col gap-1.5">
-                  <p className="text-xs text-[var(--gf-texto-sec)]">
-                    Seu saldo:{" "}
-                    <span className="font-semibold text-[var(--gf-texto)]">
+                <div className="flex items-center justify-between gap-2 overflow-hidden">
+                  <p className="shrink-0 text-xs text-[var(--gf-texto-sec)]">
+                    Seu saldo
+                    <br />
+                    <span className="text-sm font-semibold text-[var(--gf-texto)]">
                       {meuSaldoMoedas.toLocaleString("pt-BR")} moedas
                     </span>
                   </p>
-                  {recompensas.slice(0, 3).map((r) => (
-                    <CartaoRecompensaGf
-                      key={r.id}
-                      recompensa={{
-                        id: r.id,
-                        nome: r.nome,
-                        descricao: r.descricao,
-                        custoMoedas: r.custo_moedas,
-                      }}
-                      saldo={meuSaldoMoedas}
-                    />
-                  ))}
+                  <div className="flex min-w-0 items-center gap-1 overflow-hidden">
+                    {recompensas.slice(0, 3).map((r) => (
+                      <RecompensaChipGf
+                        key={r.id}
+                        recompensa={{ id: r.id, nome: r.nome, custoMoedas: r.custo_moedas }}
+                      />
+                    ))}
+                  </div>
                 </div>
               )}
             </CartaoGf>
@@ -866,54 +797,3 @@ export default async function GamificacaoDashboard({
   );
 }
 
-function GraficoLinha({ serie }: { serie: number[] }) {
-  const largura = 100;
-  const altura = 32;
-  const maxValor = Math.max(1, ...serie);
-  const passoX = largura / (serie.length - 1);
-  const pontos = serie
-    .map((v, i) => `${(i * passoX).toFixed(2)},${(altura - (v / maxValor) * altura).toFixed(2)}`)
-    .join(" ");
-  return (
-    <svg
-      viewBox={`0 0 ${largura} ${altura}`}
-      preserveAspectRatio="none"
-      className="mt-2 h-28 w-full"
-    >
-      <polyline
-        points={pontos}
-        fill="none"
-        stroke="var(--gf-verde)"
-        strokeWidth="1.5"
-        vectorEffect="non-scaling-stroke"
-      />
-    </svg>
-  );
-}
-
-function GraficoBarras({ itens }: { itens: { rotulo: string; total: number }[] }) {
-  const maxValor = Math.max(1, ...itens.map((i) => i.total));
-  return (
-    <div className="flex items-end justify-between gap-2" style={{ height: 140 }}>
-      {itens.map((item) => (
-        <div key={item.rotulo} className="flex h-full flex-1 flex-col items-center gap-1.5">
-          <span className="text-xs font-medium text-[var(--gf-texto)]">
-            {item.total.toLocaleString("pt-BR")}
-          </span>
-          <div className="flex w-full flex-1 items-end">
-            <div
-              className="w-full rounded-t bg-[var(--gf-verde)]"
-              style={{ height: `${Math.max(4, (item.total / maxValor) * 100)}%` }}
-            />
-          </div>
-          <span
-            className="w-full truncate text-center text-[11px] text-[var(--gf-texto-sec)]"
-            title={item.rotulo}
-          >
-            {item.rotulo}
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
