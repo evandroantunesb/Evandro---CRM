@@ -1,5 +1,7 @@
 # Handoff — Raion CRM (2026-09-29, ~20h UTC)
 
+> **Obsoleto.** Substituído por `docs/HANDOFF-CLAUDE-2026-10-06.md` e, para o estado atual, por `docs/PROJECT_STATUS.md`. Mantido só como histórico.
+
 Contexto para uma nova sessão continuar sem repetir trabalho. Leia junto com `CLAUDE.md` (regras permanentes) e `PROGRESS.md` (estado atual). Arquitetura e regras de negócio detalhadas estão em `docs/`.
 
 **Legenda:** ✅ **código** = conferido no repositório/GitHub nesta data · 💬 **conversa** = decisão registrada no chat com o Evandro · ❓ **não verificado** = relatado, mas não conferido agora.

@@ -1,5 +1,7 @@
 # Progresso — Raion CRM
 
+> **Histórico (desatualizado desde 2026-09-30).** O estado atual do projeto está em `docs/PROJECT_STATUS.md`; o roadmap, em `docs/ROADMAP.md`.
+
 Resumo do estado do desenvolvimento. **Atualize ao concluir cada funcionalidade:** alterações (com número da PR), arquivos modificados, decisões técnicas e próximas tarefas. Última atualização: 2026-09-30.
 
 ## Em produção
