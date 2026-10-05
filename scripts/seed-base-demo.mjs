@@ -1,4 +1,4 @@
-// Base fictícia de demonstração: reseta vendedores/dados comerciais existentes
+// Base fictícia de demonstração: reseta membros comerciais (papel vendedor/sdr) e dados existentes
 // e semeia 4 closers + 1 SDR fictícios, 35 negócios, 90 dias de histórico
 // visual, ganhos/perdas/pagamentos/comissões e gamificação — tudo através dos
 // mecanismos reais do CRM (triggers, RPCs, sessões autenticadas de cada
@@ -10,10 +10,10 @@
 // /mnt/project-files/auditorias/{diagnostico,desenho}-base-demo-2026-10-05.md).
 //
 // DESTRUTIVO: com CONFIRMAR_RESET_DEMO=sim, apaga todo `empresa_membros` com
-// papel='vendedor' da empresa do ADMIN_EMAIL — e, em cascata, todos os
+// papel='vendedor' ou papel='sdr' da empresa do ADMIN_EMAIL — e, em cascata, todos os
 // negócios/contatos/point_ledger/metas/comissões/conquistas desses membros —
 // antes de semear os 5 fictícios. SEM a flag, só mostra o que seria apagado
-// (dry run) e sai sem mudar nada. Nunca toca na linha do admin.
+// (dry run) e sai sem mudar nada. Nunca toca em admin nem gestor.
 //
 // Uso:
 //   node scripts/seed-base-demo.mjs                         # dry run
@@ -137,20 +137,27 @@ async function resolverEmpresaEAdmin() {
 // 2. Reset — dry run por padrão, só apaga com CONFIRMAR_RESET_DEMO=sim
 // ---------------------------------------------------------------------------
 
+// Só membros comerciais de linha de frente; admin e gestor nunca entram no reset.
+const PAPEIS_REMOVIDOS_NO_RESET = ["vendedor", "sdr"];
+
 async function planoDeLimpeza(empresaId, adminMembroId) {
-  const { data: vendedores, error } = await db
+  const { data: membros, error } = await db
     .from("empresa_membros")
-    .select("id, user_id, perfis(nome, email)")
+    .select("id, user_id, papel, perfis(nome, email)")
     .eq("empresa_id", empresaId)
-    .eq("papel", "vendedor");
+    .in("papel", PAPEIS_REMOVIDOS_NO_RESET);
   if (error) throw error;
 
   await falhaSe(
-    vendedores.some((v) => v.id === adminMembroId),
-    "Proteção: o admin apareceu na lista de vendedores a remover — abortando sem apagar nada.",
+    membros.some((m) => m.id === adminMembroId),
+    "Proteção: o admin apareceu na lista de membros a remover — abortando sem apagar nada.",
+  );
+  await falhaSe(
+    membros.some((m) => !PAPEIS_REMOVIDOS_NO_RESET.includes(m.papel)),
+    "Proteção: apareceu membro fora de papel vendedor/sdr na lista a remover — abortando sem apagar nada.",
   );
 
-  const membroIds = vendedores.map((v) => v.id);
+  const membroIds = membros.map((m) => m.id);
   let negocioIds = [];
   if (membroIds.length) {
     const { data: negocios, error: eNeg } = await db
@@ -162,17 +169,18 @@ async function planoDeLimpeza(empresaId, adminMembroId) {
     negocioIds = (negocios ?? []).map((n) => n.id);
   }
 
-  return { vendedores, membroIds, negocioIds };
+  return { membros, membroIds, negocioIds };
 }
 
-async function imprimirPlano({ vendedores, negocioIds }) {
-  console.log(`\nVendedores/SDR que seriam removidos (${vendedores.length}):`);
-  for (const v of vendedores) {
-    console.log(`  - ${v.perfis?.nome ?? "(sem nome)"} <${v.perfis?.email ?? "sem e-mail"}> (empresa_membros.id=${v.id})`);
+async function imprimirPlano({ membros, negocioIds }) {
+  const porPapel = (papel) => membros.filter((m) => m.papel === papel).length;
+  console.log(`\nMembros com papel vendedor ou sdr que seriam removidos (${membros.length}: ${porPapel("vendedor")} vendedor, ${porPapel("sdr")} sdr):`);
+  for (const m of membros) {
+    console.log(`  - ${m.perfis?.nome ?? "(sem nome)"} <${m.perfis?.email ?? "sem e-mail"}> — papel=${m.papel} (empresa_membros.id=${m.id})`);
   }
   console.log(`Negócios que seriam apagados (cascata: histórico, atividades, propostas, contratos, tarefas, notas, handoffs): ${negocioIds.length}`);
   console.log("Isso também apaga em cascata, por membro removido: point_ledger, conquistas_desbloqueadas, resgates, metas, comissoes_calculadas, notificacoes.");
-  console.log("Preservado, sem alteração: admin, empresas, funis (etapas são substituídas no passo seguinte), origens, motivos_perda, gamification_rules, niveis_gamificacao, conquistas, recompensas, logs_auditoria.");
+  console.log("Preservado, sem alteração: admin, gestores, empresas, funis (etapas são substituídas no passo seguinte), origens, motivos_perda, gamification_rules, niveis_gamificacao, conquistas, recompensas, logs_auditoria.");
 }
 
 async function executarLimpeza(empresaId, { membroIds, negocioIds }) {
@@ -200,7 +208,7 @@ async function executarLimpeza(empresaId, { membroIds, negocioIds }) {
   console.log(`  ${idsOrfaos.length} contato(s) órfão(s) apagado(s).`);
 
   if (membroIds.length) {
-    console.log(`Apagando ${membroIds.length} empresa_membros (vendedores/SDR) antigos (cascata: point_ledger, metas, comissões, conquistas, resgates, notificações)...`);
+    console.log(`Apagando ${membroIds.length} empresa_membros antigos com papel vendedor/sdr (cascata: point_ledger, metas, comissões, conquistas, resgates, notificações)...`);
     const { error: eMembros } = await db.from("empresa_membros").delete().in("id", membroIds);
     if (eMembros) throw eMembros;
   }
@@ -257,14 +265,16 @@ async function recriarFunil(empresaId) {
 // ---------------------------------------------------------------------------
 
 const PESSOAS = [
-  { chave: "lucas", nome: "Lucas Martins", email: "lucas.martins.demo@raioncrm-demo.com.br", perfil_gamificacao: "closer" },
-  { chave: "mariana", nome: "Mariana Costa", email: "mariana.costa.demo@raioncrm-demo.com.br", perfil_gamificacao: "closer" },
-  { chave: "rafael", nome: "Rafael Almeida", email: "rafael.almeida.demo@raioncrm-demo.com.br", perfil_gamificacao: "closer" },
-  { chave: "bruno", nome: "Bruno Ferreira", email: "bruno.ferreira.demo@raioncrm-demo.com.br", perfil_gamificacao: "closer" },
-  { chave: "gabriel", nome: "Gabriel Santos", email: "gabriel.santos.demo@raioncrm-demo.com.br", perfil_gamificacao: "sdr" },
+  { chave: "lucas", nome: "Lucas Martins", email: "lucas.martins.demo@raioncrm-demo.com.br", papel: "vendedor", perfil_gamificacao: "closer" },
+  { chave: "mariana", nome: "Mariana Costa", email: "mariana.costa.demo@raioncrm-demo.com.br", papel: "vendedor", perfil_gamificacao: "closer" },
+  { chave: "rafael", nome: "Rafael Almeida", email: "rafael.almeida.demo@raioncrm-demo.com.br", papel: "vendedor", perfil_gamificacao: "closer" },
+  { chave: "bruno", nome: "Bruno Ferreira", email: "bruno.ferreira.demo@raioncrm-demo.com.br", papel: "vendedor", perfil_gamificacao: "closer" },
+  { chave: "gabriel", nome: "Gabriel Santos", email: "gabriel.santos.demo@raioncrm-demo.com.br", papel: "sdr", perfil_gamificacao: "sdr" },
 ];
 
-async function garantirMembro(empresaId, { nome, email, perfil_gamificacao }) {
+async function garantirMembro(empresaId, { nome, email, papel, perfil_gamificacao }) {
+  // tipo_vendedor só faz sentido pra papel vendedor (validar_membro() preenche 'interno' se faltar).
+  const tipo_vendedor = papel === "vendedor" ? "interno" : null;
   const { data: existentes } = await db.auth.admin.listUsers({ perPage: 200 });
   let usuario = existentes.users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
   if (!usuario) {
@@ -279,13 +289,13 @@ async function garantirMembro(empresaId, { nome, email, perfil_gamificacao }) {
 
   const { data: membroExistente } = await db.from("empresa_membros").select("id").eq("empresa_id", empresaId).eq("user_id", usuario.id).maybeSingle();
   if (membroExistente) {
-    await db.from("empresa_membros").update({ perfil_gamificacao, ativo: true, status: "ativo" }).eq("id", membroExistente.id);
+    await db.from("empresa_membros").update({ papel, perfil_gamificacao, tipo_vendedor, ativo: true, status: "ativo" }).eq("id", membroExistente.id);
     return { membroId: membroExistente.id, userId: usuario.id };
   }
 
   const { data: membro, error: eMembro } = await db
     .from("empresa_membros")
-    .insert({ empresa_id: empresaId, user_id: usuario.id, papel: "vendedor", perfil_gamificacao, tipo_vendedor: "interno", status: "ativo", ativo: true })
+    .insert({ empresa_id: empresaId, user_id: usuario.id, papel, perfil_gamificacao, tipo_vendedor, status: "ativo", ativo: true })
     .select("id")
     .single();
   if (eMembro) throw eMembro;
@@ -522,6 +532,31 @@ async function executarNegocio(ctx, deal) {
   await db.from("kit_componentes").insert(kit.componentes.map((c, i) => ({ empresa_id: empresaId, negocio_id: negocioId, ordem: i, ...c })));
   await db.from("propostas").insert({ empresa_id: empresaId, negocio_id: negocioId });
 
+  // Primeiro contato do SDR: o gatilho criar_tarefa_primeiro_contato_sdr() já criou a
+  // tarefa "Realizar primeiro contato" ao inserir o negócio com Gabriel (papel sdr) como
+  // responsável. Gabriel conclui pela própria sessão, igual a alternarConclusao() em
+  // src/lib/acoes/tarefas.ts (preparar_tarefa() valida o resultado e registrar_tarefa()
+  // emite task.completed) — antes do handoff.
+  if (deal.viaSdr) {
+    const { data: tarefasSdr, error: eTarefasSdr } = await clienteCriador
+      .from("tarefas")
+      .select("id")
+      .eq("negocio_id", negocioId)
+      .eq("responsavel_id", pessoas.gabriel.membroId)
+      .eq("titulo", "Realizar primeiro contato")
+      .is("concluida_em", null);
+    if (eTarefasSdr) throw eTarefasSdr;
+    await falhaSe(
+      tarefasSdr.length !== 1,
+      `Esperava 1 tarefa automática de primeiro contato no negócio ${negocioId}, achei ${tarefasSdr.length} — confira se Gabriel está com papel 'sdr'.`,
+    );
+    const { error: eConcluir } = await clienteCriador
+      .from("tarefas")
+      .update({ concluida_em: new Date().toISOString(), resultado: "contato_realizado" })
+      .eq("id", tarefasSdr[0].id);
+    if (eConcluir) throw eConcluir;
+  }
+
   // Handoff SDR → closer: Gabriel cria, closer aceita (transfere responsavel_id de verdade).
   if (deal.viaSdr) {
     const { data: handoff, error: eHandoff } = await clienteCriador
@@ -737,6 +772,12 @@ async function validarPosSeed(empresaId, pessoas) {
   if (eMembros) throw eMembros;
   await falhaSe(membros.length !== 5, `Esperava 5 membros fictícios, achei ${membros.length}.`);
   for (const m of membros) console.log(`  ${m.perfis?.nome} — papel=${m.papel}, perfil_gamificacao=${m.perfil_gamificacao}`);
+  const esperadoPorMembroId = new Map(PESSOAS.map((p) => [pessoas[p.chave].membroId, p]));
+  const divergentes = membros.filter((m) => {
+    const esperado = esperadoPorMembroId.get(m.id);
+    return m.papel !== esperado.papel || m.perfil_gamificacao !== esperado.perfil_gamificacao;
+  });
+  if (divergentes.length) console.log(`  ⚠ papel/perfil diferente do esperado: ${divergentes.map((m) => m.perfis?.nome).join(", ")}`);
 
   console.log("\n-- 2/3. Negócios: total, status e distribuição por vendedor --");
   const { data: negocios, error: eNeg } = await db
@@ -774,6 +815,16 @@ async function validarPosSeed(empresaId, pessoas) {
   const { data: handoffs, error: eHandoffs } = await db.from("handoffs").select("id, para_membro_id").eq("empresa_id", empresaId).eq("de_membro_id", pessoas.gabriel.membroId);
   if (eHandoffs) throw eHandoffs;
   console.log(`  total=${handoffs.length} (esperado: 5)`);
+  const { data: tarefasSdr, error: eTarefasSdr } = await db
+    .from("tarefas")
+    .select("concluida_em, resultado")
+    .eq("empresa_id", empresaId)
+    .eq("responsavel_id", pessoas.gabriel.membroId)
+    .eq("titulo", "Realizar primeiro contato");
+  if (eTarefasSdr) throw eTarefasSdr;
+  const concluidasSdr = tarefasSdr.filter((t) => t.concluida_em && t.resultado === "contato_realizado").length;
+  console.log(`  tarefas de primeiro contato: ${tarefasSdr.length}, concluídas com contato_realizado: ${concluidasSdr} (esperado: 5 e 5)`);
+  if (concluidasSdr !== tarefasSdr.length) console.log("  ⚠ há tarefa de primeiro contato do Gabriel em aberto (vai aparecer como atrasada).");
 
   console.log("\n-- 6. XP/pontos reais por membro (point_ledger, só lançamentos não estornados) --");
   const { data: lancamentos, error: eLedger } = await db
