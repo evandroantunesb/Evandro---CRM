@@ -865,6 +865,7 @@ export type Database = {
           created_at: string;
           created_by: string | null;
           dias_considerado_parado: number;
+          dias_uteis_gamificacao: number;
           horas_considerado_sem_contato: number;
           id: string;
           modo_distribuicao_leads: Database["public"]["Enums"]["modo_distribuicao_leads"];
@@ -879,6 +880,7 @@ export type Database = {
           created_at?: string;
           created_by?: string | null;
           dias_considerado_parado?: number;
+          dias_uteis_gamificacao?: number;
           horas_considerado_sem_contato?: number;
           id?: string;
           modo_distribuicao_leads?: Database["public"]["Enums"]["modo_distribuicao_leads"];
@@ -893,6 +895,7 @@ export type Database = {
           created_at?: string;
           created_by?: string | null;
           dias_considerado_parado?: number;
+          dias_uteis_gamificacao?: number;
           horas_considerado_sem_contato?: number;
           id?: string;
           modo_distribuicao_leads?: Database["public"]["Enums"]["modo_distribuicao_leads"];
@@ -3299,8 +3302,17 @@ export type Database = {
         Args: { p_empresa_id: string; p_responsavel_id: string };
         Returns: boolean;
       };
+      progresso_conquistas_membro: {
+        Args: { p_empresa_id: string };
+        Returns: {
+          alvo: number;
+          conquista_id: string;
+          realizado: number;
+        }[];
+      };
       ranking_gamificacao: {
         Args: {
+          p_ate?: string;
           p_desde?: string;
           p_empresa_id: string;
           p_perfil: Database["public"]["Enums"]["perfil_gamificacao"];
@@ -3313,6 +3325,13 @@ export type Database = {
       reavaliar_credito_condicionado_valor: {
         Args: { p_estornado_por: string; p_evento_won_id: number; p_novo_valor: number };
         Returns: undefined;
+      };
+      sequencia_produtiva_membro: {
+        Args: { p_empresa_id: string };
+        Returns: {
+          semana: Json;
+          sequencia: number;
+        }[];
       };
       solicitar_resgate: {
         Args: { p_recompensa_id: string };
