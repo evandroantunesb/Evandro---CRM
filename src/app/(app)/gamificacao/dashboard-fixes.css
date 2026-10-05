@@ -1,0 +1,65 @@
+/* Ajustes finos da Visão Geral de Gamificação.
+ * Escopo deliberadamente restrito ao container max-w-[1500px] da overview.
+ */
+
+.tema-gamificacao .max-w-\[1500px\] > :nth-child(2) > section:nth-child(2),
+.tema-gamificacao .max-w-\[1500px\] > :nth-child(2) > section:nth-child(3) {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+}
+
+/* Sequência: evita a legenda longa espremida ao lado do número. */
+.tema-gamificacao .max-w-\[1500px\] > :nth-child(2) > section:nth-child(3) > p {
+  line-height: 1;
+}
+
+.tema-gamificacao .max-w-\[1500px\] > :nth-child(2) > section:nth-child(3) > p > span {
+  display: block;
+  margin-top: 4px;
+  max-width: 100%;
+  line-height: 1.2;
+}
+
+/* A área principal nunca pode escapar da própria coluna. */
+.tema-gamificacao .max-w-\[1500px\] > :nth-child(3),
+.tema-gamificacao .max-w-\[1500px\] > :nth-child(3) > *,
+.tema-gamificacao .max-w-\[1500px\] > :nth-child(3) > div > section {
+  min-width: 0;
+}
+
+.tema-gamificacao .max-w-\[1500px\] > :nth-child(3) > div > section {
+  overflow: hidden;
+}
+
+@media (max-width: 767px) {
+  /* KPIs: mesma caixa e mesma distribuição visual nos quatro cards. */
+  .tema-gamificacao .max-w-\[1500px\] > :first-child > :nth-child(2) > div {
+    height: 58px !important;
+    min-height: 58px !important;
+    align-items: center;
+  }
+
+  /* Nível e sequência precisam respirar igualmente dentro da mesma linha. */
+  .tema-gamificacao .max-w-\[1500px\] > :nth-child(2) > section:nth-child(2),
+  .tema-gamificacao .max-w-\[1500px\] > :nth-child(2) > section:nth-child(3) {
+    height: 148px !important;
+    padding: 14px !important;
+  }
+
+  .tema-gamificacao .max-w-\[1500px\] > :nth-child(2) > section:nth-child(3) > p {
+    margin-top: 6px;
+  }
+
+  .tema-gamificacao .max-w-\[1500px\] > :nth-child(2) > section:nth-child(3) > p > span {
+    font-size: 11px;
+    line-height: 1.2;
+  }
+
+  /* A meta precisa comportar cabeçalho + estado vazio sem encostar no card seguinte. */
+  .tema-gamificacao .max-w-\[1500px\] > :nth-child(3) > :nth-child(3) {
+    grid-template-rows: 118px 145px 150px !important;
+  }
+}
