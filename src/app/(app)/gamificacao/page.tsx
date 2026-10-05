@@ -552,66 +552,70 @@ export default async function GamificacaoDashboard({
                 Ver completo →
               </Link>
             }
-            className="lg:col-span-5"
+            className="flex flex-col lg:col-span-5"
           >
-            {!ranking.length ? (
-              <EstadoVazioGf Icone={Users} compacto>
-                Ninguém pontuou neste período ainda.
-              </EstadoVazioGf>
-            ) : (
-              <>
-                {ranking.length >= 2 && (
-                  <div className="mb-4 flex items-end justify-center gap-3">
-                    {[ranking[1], ranking[0], ranking[2]].map(
-                      (r) =>
-                        r && (
-                          <div
-                            key={r.membroId}
-                            className={`flex flex-col items-center gap-1 ${r.posicao === 1 ? "pb-0" : "pb-3"}`}
-                          >
-                            {r.posicao === 1 && (
-                              <Crown size={16} className="text-[var(--gf-dourado)]" />
-                            )}
-                            <IniciaisAvatarGf
-                              nome={r.nome}
-                              tamanho={r.posicao === 1 ? 48 : 40}
-                              tom={r.posicao === 1 ? "dourado" : "neutro"}
-                            />
-                            <span className="max-w-20 truncate text-xs font-medium text-[var(--gf-texto)]">
-                              {r.nome}
-                            </span>
-                            <span className="text-[11px] text-[var(--gf-texto-sec)]">
-                              {r.total.toLocaleString("pt-BR")} XP
-                            </span>
-                          </div>
-                        ),
+            <div
+              className={`flex min-h-80 flex-1 flex-col ${!ranking.length ? "items-center justify-center" : ""}`}
+            >
+              {!ranking.length ? (
+                <EstadoVazioGf Icone={Users} compacto>
+                  Ninguém pontuou neste período ainda.
+                </EstadoVazioGf>
+              ) : (
+                <>
+                    {ranking.length >= 2 && (
+                      <div className="mb-4 flex items-end justify-center gap-3">
+                        {[ranking[1], ranking[0], ranking[2]].map(
+                          (r) =>
+                            r && (
+                              <div
+                                key={r.membroId}
+                                className={`flex flex-col items-center gap-1 ${r.posicao === 1 ? "pb-0" : "pb-3"}`}
+                              >
+                                {r.posicao === 1 && (
+                                  <Crown size={16} className="text-[var(--gf-dourado)]" />
+                                )}
+                                <IniciaisAvatarGf
+                                  nome={r.nome}
+                                  tamanho={r.posicao === 1 ? 48 : 40}
+                                  tom={r.posicao === 1 ? "dourado" : "neutro"}
+                                />
+                                <span className="max-w-20 truncate text-xs font-medium text-[var(--gf-texto)]">
+                                  {r.nome}
+                                </span>
+                                <span className="text-[11px] text-[var(--gf-texto-sec)]">
+                                  {r.total.toLocaleString("pt-BR")} XP
+                                </span>
+                              </div>
+                            ),
+                        )}
+                      </div>
                     )}
-                  </div>
-                )}
-                <ul className="flex flex-col gap-1.5">
-                  {ranking.map((r) => (
-                    <li
-                      key={r.membroId}
-                      className={`flex items-center gap-3 rounded-lg px-2 py-2 text-sm ${
-                        r.membroId === atual.membroId ? "bg-[var(--gf-verde-10)]" : ""
-                      }`}
-                    >
-                      <span className="w-5 shrink-0 text-center text-[var(--gf-texto-sec)]">
-                        {r.posicao}
-                      </span>
-                      <span
-                        className={`flex-1 truncate ${r.membroId === atual.membroId ? "font-medium text-[var(--gf-verde)]" : "text-[var(--gf-texto)]"}`}
-                      >
-                        {r.membroId === atual.membroId ? "Você" : r.nome}
-                      </span>
-                      <span className="font-medium text-[var(--gf-texto)]">
-                        {r.total.toLocaleString("pt-BR")} XP
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
+                    <ul className="flex flex-col gap-1.5">
+                      {ranking.map((r) => (
+                        <li
+                          key={r.membroId}
+                          className={`flex items-center gap-3 rounded-lg px-2 py-2 text-sm ${
+                            r.membroId === atual.membroId ? "bg-[var(--gf-verde-10)]" : ""
+                          }`}
+                        >
+                          <span className="w-5 shrink-0 text-center text-[var(--gf-texto-sec)]">
+                            {r.posicao}
+                          </span>
+                          <span
+                            className={`flex-1 truncate ${r.membroId === atual.membroId ? "font-medium text-[var(--gf-verde)]" : "text-[var(--gf-texto)]"}`}
+                          >
+                            {r.membroId === atual.membroId ? "Você" : r.nome}
+                          </span>
+                          <span className="font-medium text-[var(--gf-texto)]">
+                            {r.total.toLocaleString("pt-BR")} XP
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                </>
+              )}
+            </div>
           </CartaoGf>
 
           <div className="flex flex-col gap-3 lg:col-span-4">
@@ -663,44 +667,48 @@ export default async function GamificacaoDashboard({
               )}
             </CartaoGf>
 
-            <CartaoGf titulo="Atividade recente">
-              {!atividadeRecente.length ? (
-                <EstadoVazioGf Icone={Activity} compacto>
-                  Nenhuma atividade neste período.
-                </EstadoVazioGf>
-              ) : (
-                <ul className="flex flex-col">
-                  {atividadeRecente.map((l) => (
-                    <li
-                      key={l.id}
-                      className="flex items-center gap-2.5 border-t border-[var(--gf-borda)] py-2 text-sm first:border-t-0"
-                    >
-                      <span
-                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${l.xp >= 0 ? "bg-[var(--gf-verde-10)] text-[var(--gf-verde)]" : "bg-[var(--gf-vermelho-10)] text-[var(--gf-vermelho)]"}`}
+            <CartaoGf titulo="Atividade recente" className="flex flex-col">
+              <div
+                className={`flex min-h-56 flex-1 flex-col ${!atividadeRecente.length ? "items-center justify-center" : ""}`}
+              >
+                {!atividadeRecente.length ? (
+                  <EstadoVazioGf Icone={Activity} compacto>
+                    Nenhuma atividade neste período.
+                  </EstadoVazioGf>
+                ) : (
+                  <ul className="flex flex-col">
+                    {atividadeRecente.map((l) => (
+                      <li
+                        key={l.id}
+                        className="flex items-center gap-2.5 border-t border-[var(--gf-borda)] py-2 text-sm first:border-t-0"
                       >
-                        <Zap size={13} />
-                      </span>
-                      <div className="flex min-w-0 flex-1 flex-col">
-                        <span className="truncate text-[var(--gf-texto)]">
-                          {nomeMembro.get(l.membro_id) ?? "(removido)"} ·{" "}
-                          {l.descricao || "Ponto lançado"}
-                        </span>
-                        <span className="text-xs text-[var(--gf-texto-sec)]">
-                          {tempoDesde(l.created_at)}
-                        </span>
-                      </div>
-                      {l.xp !== 0 && (
                         <span
-                          className={`shrink-0 font-medium ${l.xp >= 0 ? "text-[var(--gf-verde)]" : "text-[var(--gf-vermelho)]"}`}
+                          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${l.xp >= 0 ? "bg-[var(--gf-verde-10)] text-[var(--gf-verde)]" : "bg-[var(--gf-vermelho-10)] text-[var(--gf-vermelho)]"}`}
                         >
-                          {l.xp >= 0 ? "+" : ""}
-                          {l.xp} XP
+                          <Zap size={13} />
                         </span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
+                        <div className="flex min-w-0 flex-1 flex-col">
+                          <span className="truncate text-[var(--gf-texto)]">
+                            {nomeMembro.get(l.membro_id) ?? "(removido)"} ·{" "}
+                            {l.descricao || "Ponto lançado"}
+                          </span>
+                          <span className="text-xs text-[var(--gf-texto-sec)]">
+                            {tempoDesde(l.created_at)}
+                          </span>
+                        </div>
+                        {l.xp !== 0 && (
+                          <span
+                            className={`shrink-0 font-medium ${l.xp >= 0 ? "text-[var(--gf-verde)]" : "text-[var(--gf-vermelho)]"}`}
+                          >
+                            {l.xp >= 0 ? "+" : ""}
+                            {l.xp} XP
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </CartaoGf>
           </div>
 
