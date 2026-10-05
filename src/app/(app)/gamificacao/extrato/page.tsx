@@ -1,7 +1,8 @@
-import { Cartao, Selo } from "@/components/ui";
-import { formatarDataHora } from "@/lib/formatacao";
+import { Receipt, Wallet, Zap } from "lucide-react";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
+import { formatarDataHora } from "@/lib/formatacao";
+import { CartaoGf, EstadoVazioGf, LinhaLancamento } from "../_compartilhado/ui";
 
 export default async function ExtratoDePontos() {
   const { atual } = await exigirPapel();
@@ -24,61 +25,48 @@ export default async function ExtratoDePontos() {
   const totalMoedas = Math.max(saldoMoedasReal, 0);
   const ajusteNegativo = saldoMoedasReal < 0 ? -saldoMoedasReal : 0;
 
-  function valor(n: number, estornado: boolean) {
-    if (n === 0) return null;
-    return (
-      <span className={`font-medium ${estornado ? "text-zinc-400 line-through" : n >= 0 ? "text-green-700" : "text-red-700"}`}>
-        {n >= 0 ? "+" : ""}
-        {n}
-      </span>
-    );
-  }
-
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-4">
-      <h1 className="text-2xl font-semibold text-zinc-900">Extrato</h1>
-      <div className="grid grid-cols-2 gap-3">
-        <Cartao titulo="XP acumulado">
-          <p className="text-3xl font-semibold text-zinc-900">{totalXp.toLocaleString("pt-BR")}</p>
-        </Cartao>
-        <Cartao titulo="Saldo de moedas">
-          <p className="text-3xl font-semibold text-zinc-900">{totalMoedas.toLocaleString("pt-BR")}</p>
-          {ajusteNegativo > 0 && (
-            <p className="text-sm text-zinc-500">{ajusteNegativo.toLocaleString("pt-BR")} moedas em ajuste</p>
+    <div className="-m-4 min-h-screen bg-[var(--gf-bg)] p-4 text-[var(--gf-texto)] md:-m-10 md:p-10">
+      <div className="mx-auto flex max-w-2xl flex-col gap-4">
+        <h1 className="text-2xl font-semibold text-[var(--gf-texto)]">Extrato</h1>
+        <div className="grid grid-cols-2 gap-3">
+          <CartaoGf titulo="XP acumulado">
+            <p className="flex items-center gap-2 text-3xl font-semibold text-[var(--gf-texto)]">
+              <Zap size={22} className="text-[var(--gf-verde)]" />
+              {totalXp.toLocaleString("pt-BR")}
+            </p>
+          </CartaoGf>
+          <CartaoGf titulo="Saldo de moedas">
+            <p className="flex items-center gap-2 text-3xl font-semibold text-[var(--gf-texto)]">
+              <Wallet size={22} className="text-[var(--gf-verde)]" />
+              {totalMoedas.toLocaleString("pt-BR")}
+            </p>
+            {ajusteNegativo > 0 && (
+              <p className="mt-1 text-sm text-[var(--gf-texto-sec)]">
+                {ajusteNegativo.toLocaleString("pt-BR")} moedas em ajuste
+              </p>
+            )}
+          </CartaoGf>
+        </div>
+        <CartaoGf titulo={`Lançamentos (${lancamentos?.length ?? 0})`}>
+          {!lancamentos?.length ? (
+            <EstadoVazioGf Icone={Receipt}>Nenhum lançamento ainda.</EstadoVazioGf>
+          ) : (
+            <ul className="flex flex-col">
+              {lancamentos.map((l) => (
+                <LinhaLancamento
+                  key={l.id}
+                  descricao={l.descricao}
+                  tempo={formatarDataHora(l.created_at)}
+                  xp={l.xp}
+                  moedas={l.moedas}
+                  estornado={l.estornado}
+                />
+              ))}
+            </ul>
           )}
-        </Cartao>
+        </CartaoGf>
       </div>
-      <Cartao titulo={`Lançamentos (${lancamentos?.length ?? 0})`}>
-        {!lancamentos?.length && <p className="text-sm text-zinc-600">Nenhum lançamento ainda.</p>}
-        <ul className="flex flex-col">
-          {(lancamentos ?? []).map((l) => (
-            <li
-              key={l.id}
-              className="flex items-center justify-between gap-3 border-t border-zinc-100 py-2 text-sm first:border-t-0"
-            >
-              <div className="flex flex-col">
-                <span className={l.estornado ? "text-zinc-400 line-through" : "text-zinc-900"}>{l.descricao}</span>
-                <span className="text-xs text-zinc-500">{formatarDataHora(l.created_at)}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                {l.estornado && <Selo tom="negativo">Estornado</Selo>}
-                {l.xp !== 0 && (
-                  <span className="flex items-baseline gap-1">
-                    {valor(l.xp, l.estornado)}
-                    <span className="text-xs text-zinc-400">XP</span>
-                  </span>
-                )}
-                {l.moedas !== 0 && (
-                  <span className="flex items-baseline gap-1">
-                    {valor(l.moedas, l.estornado)}
-                    <span className="text-xs text-zinc-400">moedas</span>
-                  </span>
-                )}
-              </div>
-            </li>
-          ))}
-        </ul>
-      </Cartao>
     </div>
   );
 }

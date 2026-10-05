@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 260" preserveAspectRatio="xMidYMax slice">
+  <defs>
+    <linearGradient id="ceu" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0f2b22" />
+      <stop offset="55%" stop-color="#14201d" />
+      <stop offset="100%" stop-color="#0f0f10" />
+    </linearGradient>
+    <linearGradient id="montanhaLonge" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#16342a" />
+      <stop offset="100%" stop-color="#132420" />
+    </linearGradient>
+    <linearGradient id="montanhaPerto" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#101f1a" />
+      <stop offset="100%" stop-color="#0c1512" />
+    </linearGradient>
+    <radialGradient id="brilho" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#34d399" stop-opacity="0.55" />
+      <stop offset="45%" stop-color="#34d399" stop-opacity="0.16" />
+      <stop offset="100%" stop-color="#34d399" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="ponto" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#eafff5" stop-opacity="1" />
+      <stop offset="40%" stop-color="#34d399" stop-opacity="0.9" />
+      <stop offset="100%" stop-color="#34d399" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+
+  <rect width="900" height="260" fill="url(#ceu)" />
+
+  <circle cx="650" cy="78" r="150" fill="url(#brilho)" />
+
+  <path
+    d="M0,180 L90,110 L180,165 L270,95 L360,150 L470,70 L560,140 L650,55 L720,120 L800,85 L900,150 L900,260 L0,260 Z"
+    fill="url(#montanhaLonge)"
+  />
+
+  <path
+    d="M0,220 L60,165 L130,205 L210,140 L300,195 L390,150 L470,200 L560,120 L650,185 L740,150 L820,200 L900,170 L900,260 L0,260 Z"
+    fill="url(#montanhaPerto)"
+  />
+
+  <circle cx="650" cy="52" r="5" fill="url(#ponto)" />
+  <circle cx="650" cy="52" r="2" fill="#eafff5" />
+</svg>
