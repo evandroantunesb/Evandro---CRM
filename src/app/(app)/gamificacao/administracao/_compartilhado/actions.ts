@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { EVENTOS_GAMIFICACAO, EVENTOS_TETO_OBRIGATORIO, MARCOS_CONQUISTA } from "@/lib/gamificacao";
 import { mensagemErro } from "@/lib/erros";
+import { caminhoImagemRecompensaValido } from "@/lib/imagem-upload";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { OPERADORES_CONDICAO, PERFIS_GAMIFICACAO, PERIODOS_LIMITE_REGRA, type ResultadoAcao } from "@/lib/tipos";
@@ -11,6 +12,7 @@ import { OPERADORES_CONDICAO, PERFIS_GAMIFICACAO, PERIODOS_LIMITE_REGRA, type Re
 const CAMINHO_REGRAS = "/gamificacao/administracao/regras";
 const CAMINHO_NIVEIS_CONQUISTAS = "/gamificacao/administracao/niveis-e-conquistas";
 const CAMINHO_RECOMPENSAS = "/gamificacao/administracao/recompensas";
+const BUCKET_RECOMPENSAS = "recompensas";
 const TIPOS_EVENTO = EVENTOS_GAMIFICACAO.map((e) => e.tipo);
 
 const esquema = z
@@ -312,12 +314,117 @@ export async function editarRecompensa(_: ResultadoAcao, formData: FormData): Pr
 }
 
 export async function apagarRecompensa(formData: FormData) {
-  await exigirPapel("admin");
+  const { atual } = await exigirPapel("admin");
   const id = z.string().uuid().safeParse(formData.get("id"));
   if (!id.success) return;
 
   const supabase = await criarClienteServidor();
-  await supabase.from("recompensas").delete().eq("id", id.data);
+  const { data: apagadas, error } = await supabase.from("recompensas").delete().eq("id", id.data).select("id");
+  // Só limpa o Storage se a recompensa realmente saiu do banco (com resgates, a exclusão é
+  // barrada pela chave estrangeira: aí a imagem continua valendo).
+  if (!error && apagadas?.length) {
+    await removerPastaDaRecompensa(supabase, atual.empresaId, id.data);
+  }
   revalidatePath(CAMINHO_RECOMPENSAS);
   revalidatePath("/gamificacao/loja");
+}
+
+type ClienteServidor = Awaited<ReturnType<typeof criarClienteServidor>>;
+
+/** Remove do bucket todos os arquivos de `<empresa_id>/<recompensa_id>/`. Falhas não derrubam a ação. */
+async function removerPastaDaRecompensa(supabase: ClienteServidor, empresaId: string, recompensaId: string) {
+  try {
+    const pasta = `${empresaId}/${recompensaId}`;
+    const { data: itens } = await supabase.storage.from(BUCKET_RECOMPENSAS).list(pasta, { limit: 1000 });
+    const caminhos = (itens ?? []).filter((i) => i.id).map((i) => `${pasta}/${i.name}`);
+    if (caminhos.length) await supabase.storage.from(BUCKET_RECOMPENSAS).remove(caminhos);
+  } catch {
+    // Arquivo órfão é só desperdício de espaço; não pode desfazer a exclusão já feita.
+  }
+}
+
+async function removerArquivoRecompensa(supabase: ClienteServidor, caminho: string) {
+  try {
+    await supabase.storage.from(BUCKET_RECOMPENSAS).remove([caminho]);
+  } catch {
+    // Idem: não bloqueia a ação principal.
+  }
+}
+
+function revalidarImagemRecompensa() {
+  revalidatePath(CAMINHO_RECOMPENSAS);
+  revalidatePath("/gamificacao/loja");
+  revalidatePath("/gamificacao");
+}
+
+const esquemaIdRecompensa = z.string().uuid();
+
+/**
+ * Grava o caminho da imagem (já enviada pelo navegador ao bucket `recompensas`) na recompensa.
+ * Só depois de gravar remove o arquivo anterior; se não conseguir gravar, remove o recém-enviado.
+ */
+export async function definirImagemRecompensa(recompensaId: string, caminho: string): Promise<NonNullable<ResultadoAcao>> {
+  const { atual } = await exigirPapel("admin");
+  const id = esquemaIdRecompensa.safeParse(recompensaId);
+  if (!id.success || !caminhoImagemRecompensaValido(atual.empresaId, id.data, caminho)) {
+    return { ok: false, mensagem: "Imagem inválida." };
+  }
+
+  const supabase = await criarClienteServidor();
+  const { data: recompensa } = await supabase
+    .from("recompensas")
+    .select("id, imagem_caminho")
+    .eq("id", id.data)
+    .eq("empresa_id", atual.empresaId)
+    .maybeSingle();
+  if (!recompensa) {
+    await removerArquivoRecompensa(supabase, caminho);
+    return { ok: false, mensagem: "Recompensa não encontrada." };
+  }
+
+  const { data: atualizada, error } = await supabase
+    .from("recompensas")
+    .update({ imagem_caminho: caminho })
+    .eq("id", id.data)
+    .eq("empresa_id", atual.empresaId)
+    .select("id");
+  if (error || !atualizada?.length) {
+    await removerArquivoRecompensa(supabase, caminho);
+    return { ok: false, mensagem: mensagemErro(error, "Não foi possível salvar a imagem.") };
+  }
+
+  if (recompensa.imagem_caminho && recompensa.imagem_caminho !== caminho) {
+    await removerArquivoRecompensa(supabase, recompensa.imagem_caminho);
+  }
+  revalidarImagemRecompensa();
+  return { ok: true, mensagem: "Imagem salva." };
+}
+
+/** Tira a imagem da recompensa (volta ao ícone) e apaga o arquivo do bucket. */
+export async function removerImagemRecompensa(recompensaId: string): Promise<NonNullable<ResultadoAcao>> {
+  const { atual } = await exigirPapel("admin");
+  const id = esquemaIdRecompensa.safeParse(recompensaId);
+  if (!id.success) return { ok: false, mensagem: "Dados inválidos." };
+
+  const supabase = await criarClienteServidor();
+  const { data: recompensa } = await supabase
+    .from("recompensas")
+    .select("id, imagem_caminho")
+    .eq("id", id.data)
+    .eq("empresa_id", atual.empresaId)
+    .maybeSingle();
+  if (!recompensa) return { ok: false, mensagem: "Recompensa não encontrada." };
+  if (!recompensa.imagem_caminho) return { ok: true, mensagem: "A recompensa já está sem imagem." };
+
+  const { data: atualizada, error } = await supabase
+    .from("recompensas")
+    .update({ imagem_caminho: null })
+    .eq("id", id.data)
+    .eq("empresa_id", atual.empresaId)
+    .select("id");
+  if (error || !atualizada?.length) return { ok: false, mensagem: mensagemErro(error, "Não foi possível remover a imagem.") };
+
+  await removerArquivoRecompensa(supabase, recompensa.imagem_caminho);
+  revalidarImagemRecompensa();
+  return { ok: true, mensagem: "Imagem removida." };
 }

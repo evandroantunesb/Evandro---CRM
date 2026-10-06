@@ -1,5 +1,6 @@
 import { Gift } from "lucide-react";
 import { exigirPapel } from "@/lib/sessao";
+import { assinarImagensEmLote } from "@/lib/storage-imagens";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { CabecalhoPaginaGf, CartaoGf, EstadoVazioGf, PaginaGf, VoltarGf } from "../../_compartilhado/ui";
 import { LinhaRecompensa, NovaRecompensa } from "../_compartilhado/formularios";
@@ -9,9 +10,14 @@ export default async function Recompensas() {
   const supabase = await criarClienteServidor();
   const { data: recompensas } = await supabase
     .from("recompensas")
-    .select("id, nome, descricao, custo_moedas, estoque, limite_por_membro, validade_ate, ativa")
+    .select("id, nome, descricao, custo_moedas, estoque, limite_por_membro, validade_ate, ativa, imagem_caminho")
     .eq("empresa_id", atual.empresaId)
     .order("created_at");
+  const urlsImagem = await assinarImagensEmLote(
+    supabase,
+    "recompensas",
+    (recompensas ?? []).map((r) => r.imagem_caminho),
+  );
 
   return (
     <PaginaGf largura="formulario">
@@ -33,6 +39,7 @@ export default async function Recompensas() {
             {recompensas.map((r) => (
               <LinhaRecompensa
                 key={r.id}
+                empresaId={atual.empresaId}
                 recompensa={{
                   id: r.id,
                   nome: r.nome,
@@ -42,6 +49,8 @@ export default async function Recompensas() {
                   limitePorMembro: r.limite_por_membro,
                   validadeAte: r.validade_ate,
                   ativa: r.ativa,
+                  imagemCaminho: r.imagem_caminho,
+                  imagemUrl: r.imagem_caminho ? (urlsImagem.get(r.imagem_caminho) ?? null) : null,
                 }}
               />
             ))}

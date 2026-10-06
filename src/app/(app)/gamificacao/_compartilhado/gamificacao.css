@@ -474,3 +474,192 @@
     background-image: radial-gradient(60% 90% at 50% 0%, var(--gf-dourado-10), transparent 70%);
   }
 }
+
+@layer components {
+/* ------------------------------------------------------------------ */
+/* Gerenciar imagem pela miniatura (menu no desktop, painel no celular) */
+/* ------------------------------------------------------------------ */
+.tema-gamificacao .gf-imagem-gatilho {
+  position: relative;
+  display: block;
+  width: 100%;
+  border-radius: 0.5rem;
+  cursor: pointer;
+}
+
+.tema-gamificacao .gf-imagem-gatilho:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.tema-gamificacao .gf-imagem-gatilho:focus-visible {
+  outline: 2px solid var(--gf-verde);
+  outline-offset: 2px;
+}
+
+/* Camada escura com ícone e texto: aparece no hover/foco (desktop) e fica sempre visível só como selo. */
+.tema-gamificacao .gf-imagem-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  border-radius: 0.5rem;
+  background-color: rgb(15 15 16 / 62%);
+  color: var(--gf-texto);
+  font-size: 0.75rem;
+  font-weight: 500;
+  opacity: 0;
+  transition: opacity 0.12s;
+  pointer-events: none;
+}
+
+/* Sem imagem: o texto cobre o ícone do placeholder em vez de se sobrepor a ele. */
+.tema-gamificacao .gf-imagem-overlay-vazio {
+  background-color: var(--gf-surface-alta);
+}
+
+.tema-gamificacao .gf-imagem-gatilho:focus-visible .gf-imagem-overlay,
+.tema-gamificacao .gf-imagem-gatilho[aria-expanded="true"] .gf-imagem-overlay {
+  opacity: 1;
+}
+
+@media (hover: hover) {
+  .tema-gamificacao .gf-imagem-gatilho:hover:not(:disabled) .gf-imagem-overlay {
+    opacity: 1;
+  }
+}
+
+.tema-gamificacao .gf-imagem-selo {
+  position: absolute;
+  right: 0.375rem;
+  bottom: 0.375rem;
+  display: flex;
+  height: 1.75rem;
+  width: 1.75rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background-color: rgb(15 15 16 / 78%);
+  color: var(--gf-texto);
+  pointer-events: none;
+}
+
+@media (hover: hover) {
+  .tema-gamificacao .gf-imagem-gatilho:hover .gf-imagem-selo {
+    opacity: 0;
+  }
+}
+
+/* Camada na top layer (popover): cobre a janela; o menu fica em coordenadas da janela. */
+.tema-gamificacao .gf-menu-camada {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  border: 0;
+  padding: 0;
+  overflow: visible;
+  background: transparent;
+  color: inherit;
+}
+
+/* Fundo clicável que fecha o menu: transparente no desktop, escurecido no celular. */
+.tema-gamificacao .gf-menu-fundo {
+  position: absolute;
+  inset: 0;
+  background: transparent;
+}
+
+.tema-gamificacao .gf-menu-imagem {
+  position: absolute;
+  top: calc(var(--gf-menu-y, 0px) + 0.375rem);
+  left: var(--gf-menu-x, 0px);
+  min-width: 12.5rem;
+  max-width: calc(100vw - 2rem);
+  border: 1px solid var(--gf-borda);
+  border-radius: 0.625rem;
+  background-color: var(--gf-surface-alta);
+  padding: 0.25rem;
+  box-shadow: 0 10px 28px rgb(0 0 0 / 55%);
+}
+
+.tema-gamificacao .gf-menu-item {
+  display: flex;
+  width: 100%;
+  min-height: 2.5rem;
+  align-items: center;
+  gap: 0.625rem;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--gf-texto);
+}
+
+.tema-gamificacao .gf-menu-item:hover,
+.tema-gamificacao .gf-menu-item:focus-visible {
+  background-color: rgb(255 255 255 / 7%);
+  outline: none;
+}
+
+.tema-gamificacao .gf-menu-item:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--gf-verde);
+}
+
+.tema-gamificacao .gf-menu-item-perigo {
+  color: var(--gf-vermelho);
+}
+
+.tema-gamificacao .gf-menu-item-perigo:hover,
+.tema-gamificacao .gf-menu-item-perigo:focus-visible {
+  background-color: var(--gf-vermelho-10);
+}
+
+.tema-gamificacao .gf-menu-item-perigo:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--gf-vermelho);
+}
+
+.tema-gamificacao .gf-menu-titulo {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .tema-gamificacao .gf-menu-fundo {
+    background: rgb(0 0 0 / 60%);
+  }
+
+  .tema-gamificacao .gf-menu-imagem {
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    max-width: none;
+    border-width: 1px 0 0;
+    border-radius: 1rem 1rem 0 0;
+    padding: 0.5rem 0.75rem calc(0.75rem + env(safe-area-inset-bottom));
+  }
+
+  .tema-gamificacao .gf-menu-titulo {
+    display: flex;
+    min-height: 2.75rem;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding-left: 0.75rem;
+    font-size: 0.8125rem;
+    color: var(--gf-texto-sec);
+  }
+
+  .tema-gamificacao .gf-menu-item {
+    min-height: 3rem;
+    font-size: 1rem;
+  }
+}
+}

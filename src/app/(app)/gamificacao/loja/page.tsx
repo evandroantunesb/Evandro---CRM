@@ -2,6 +2,7 @@ import { Coins, Gift, PackageCheck } from "lucide-react";
 import { formatarDataHora } from "@/lib/formatacao";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
+import { assinarImagensEmLote } from "@/lib/storage-imagens";
 import type { StatusResgate } from "@/lib/tipos";
 import { AbasSecao } from "../_compartilhado/abas-secao";
 import { StatusResgateGf } from "../_compartilhado/resgate-ui";
@@ -26,7 +27,7 @@ export default async function LojaDeRecompensas() {
     supabase.from("point_ledger").select("moedas").eq("membro_id", atual.membroId).eq("estornado", false),
     supabase
       .from("recompensas")
-      .select("id, nome, descricao, custo_moedas")
+      .select("id, nome, descricao, custo_moedas, imagem_caminho")
       .eq("empresa_id", atual.empresaId)
       .eq("ativa", true)
       .or(`validade_ate.is.null,validade_ate.gte.${hoje}`)
@@ -38,6 +39,13 @@ export default async function LojaDeRecompensas() {
       .order("created_at", { ascending: false })
       .limit(50),
   ]);
+
+  // Uma única chamada assina as imagens de todas as recompensas exibidas.
+  const urlsImagem = await assinarImagensEmLote(
+    supabase,
+    "recompensas",
+    (recompensas ?? []).map((r) => r.imagem_caminho),
+  );
 
   // Saldo real pode ficar negativo (moedas já gastas cuja origem foi revertida depois
   // — decisão do Evandro: estado válido, nunca corrigido artificialmente). O resgate
@@ -97,7 +105,13 @@ export default async function LojaDeRecompensas() {
             {recompensas.map((r) => (
               <CartaoRecompensa
                 key={r.id}
-                recompensa={{ id: r.id, nome: r.nome, descricao: r.descricao, custoMoedas: r.custo_moedas }}
+                recompensa={{
+                  id: r.id,
+                  nome: r.nome,
+                  descricao: r.descricao,
+                  custoMoedas: r.custo_moedas,
+                  imagemUrl: r.imagem_caminho ? (urlsImagem.get(r.imagem_caminho) ?? null) : null,
+                }}
                 saldo={saldoReal}
               />
             ))}

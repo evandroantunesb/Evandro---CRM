@@ -1,4 +1,5 @@
 import { Check, Gift } from "lucide-react";
+import { ImagemRecompensaGf } from "./imagem-recompensa-gf";
 import { formatarNumeroGf } from "./ui";
 
 /**
@@ -12,15 +13,22 @@ export function RecompensaChipGf({
   recompensa,
   saldo,
 }: {
-  recompensa: { id: string; nome: string; custoMoedas: number };
+  recompensa: { id: string; nome: string; custoMoedas: number; imagemUrl?: string | null };
   saldo?: number;
 }) {
   const faltam = saldo === undefined ? 0 : Math.max(recompensa.custoMoedas - saldo, 0);
   return (
     <div className="flex min-w-0 items-center gap-3 rounded-lg border border-[var(--gf-borda)] bg-[var(--gf-surface-alta)] px-3 py-2.5">
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--gf-dourado-10)] text-[var(--gf-dourado)]">
-        <Gift size={18} aria-hidden />
-      </span>
+      <ImagemRecompensaGf
+        url={recompensa.imagemUrl}
+        alt={recompensa.nome}
+        className="h-9 w-12 rounded-lg"
+        fallback={
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--gf-dourado-10)] text-[var(--gf-dourado)]">
+            <Gift size={18} aria-hidden />
+          </span>
+        }
+      />
       <div className="min-w-0 flex-1">
         <p className="line-clamp-2 text-sm leading-snug font-semibold break-words text-[var(--gf-texto)]">
           {recompensa.nome}
