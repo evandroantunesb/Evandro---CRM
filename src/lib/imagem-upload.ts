@@ -67,6 +67,9 @@ export function caminhoImagemRecompensaValido(empresaId: string, recompensaId: s
   return esperado.test(caminho);
 }
 
+/** Bucket privado das fotos de perfil (migration 20261006200000_avatares.sql). */
+export const BUCKET_AVATARES = "avatares";
+
 /** Foto de perfil: saída exata de 512x512 (quadrada; o recorte pode ampliar uma imagem pequena). */
 export const SAIDA_AVATAR = { largura: 512, altura: 512 } as const;
 

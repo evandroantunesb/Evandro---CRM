@@ -1,10 +1,12 @@
 import { LogOut } from "lucide-react";
 import Link from "next/link";
 import { Avatar } from "@/components/avatar";
+import { assinarAvatares } from "@/lib/avatares";
 import { LogoRaion } from "@/components/marca";
 import { carregarDiasConsideradoParado, carregarHorasConsideradoSemContato } from "@/lib/crm";
 import { carregarNotificacoesNaoLidas, contarPendencias, temConquistaNaoVisualizada } from "@/lib/notificacoes";
 import { obterSessao } from "@/lib/sessao";
+import { criarClienteServidor } from "@/lib/supabase/server";
 import { trocarEmpresa } from "@/lib/acoes/empresa-atual";
 import { ROTULO_PAPEL, type Papel } from "@/lib/tipos";
 import { Menu } from "./menu";
@@ -73,6 +75,11 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
       temConquistaNaoVisualizada(sessao.atual.empresaId, sessao.atual.membroId),
     ]);
   }
+
+  // Foto do próprio usuário (sidebar desktop e bloco mobile): uma assinatura com a sessão dele.
+  const urlAvatar = sessao.avatarCaminho
+    ? ((await assinarAvatares(await criarClienteServidor(), [sessao.avatarCaminho])).get(sessao.avatarCaminho) ?? null)
+    : null;
 
   const itens = [
     ...(sessao.atual
@@ -144,7 +151,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
         )}
         <Menu itens={itens} />
         <div className="hidden items-center gap-3 border-t border-white/10 pt-4 md:mt-auto md:flex">
-          <Avatar nome={sessao.nome} tamanho={36} />
+          <Avatar nome={sessao.nome} tamanho={36} src={urlAvatar} />
           <Link href="/perfil" className="min-w-0 flex-1" title="Meu perfil">
             <span className="block truncate text-sm font-medium text-offwhite hover:underline">{sessao.nome}</span>
             {papel && <span className="block text-xs text-offwhite/50">{ROTULO_PAPEL[papel]}</span>}
@@ -156,8 +163,9 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
           </form>
         </div>
         <div className="flex items-center justify-between text-sm md:hidden">
-          <Link href="/perfil" className="truncate text-offwhite/70">
-            {sessao.nome}
+          <Link href="/perfil" className="flex min-w-0 items-center gap-2 text-offwhite/70">
+            {urlAvatar && <Avatar nome={sessao.nome} tamanho={24} src={urlAvatar} />}
+            <span className="truncate">{sessao.nome}</span>
           </Link>
           <form action="/sair" method="post">
             <button className="text-offwhite/70">Sair</button>

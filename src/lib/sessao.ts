@@ -23,6 +23,8 @@ export type Sessao = {
   userId: string;
   email: string;
   nome: string;
+  /** Caminho da foto no bucket 'avatares' (perfis.avatar_caminho); nulo = sem foto. A URL é assinada por quem exibe. */
+  avatarCaminho: string | null;
   superAdmin: boolean;
   vinculos: Vinculo[];
   /** Empresa em uso. Nulo quando o usuário não participa de nenhuma (ex.: só super-admin). */
@@ -38,7 +40,7 @@ export const obterSessao = cache(async (): Promise<Sessao> => {
   if (!user) redirect("/login");
 
   const [{ data: perfil }, { data: admin }, { data: membros }] = await Promise.all([
-    supabase.from("perfis").select("nome, email").eq("id", user.id).maybeSingle(),
+    supabase.from("perfis").select("nome, email, avatar_caminho").eq("id", user.id).maybeSingle(),
     supabase.from("plataforma_admins").select("user_id").eq("user_id", user.id).maybeSingle(),
     supabase
       .from("empresa_membros")
@@ -65,6 +67,7 @@ export const obterSessao = cache(async (): Promise<Sessao> => {
     userId: user.id,
     email: user.email ?? perfil?.email ?? "",
     nome: perfil?.nome || user.email || "",
+    avatarCaminho: perfil?.avatar_caminho ?? null,
     superAdmin: Boolean(admin),
     vinculos,
     atual,
