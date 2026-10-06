@@ -64,7 +64,7 @@ export default async function MinhaJornada() {
           )}
         </div>
         <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-zinc-100">
-          <div className="h-full rounded-full bg-dourado" style={{ width: `${progresso}%` }} />
+          <div className="h-full rounded-full bg-[var(--gf-verde)]" style={{ width: `${progresso}%` }} />
         </div>
         <p className="mt-1 text-xs text-zinc-500">{totalXp.toLocaleString("pt-BR")} XP acumulado</p>
       </Cartao>

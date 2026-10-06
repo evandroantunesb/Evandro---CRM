@@ -1,10 +1,9 @@
 import type { ReactNode } from "react";
+import { TemaGamificacao } from "./_compartilhado/tema-gamificacao";
 import "./dashboard-fixes.css";
 
-// Escopa as variáveis do tema escuro (.tema-gamificacao, ver globals.css) a toda a
-// árvore /gamificacao, sem aplicar fundo ou cor de texto por padrão. Cada página já
-// redesenhada pinta seu próprio fundo escuro (ver page.tsx e extrato/page.tsx); as
-// telas ainda não redesenhadas continuam herdando a aparência atual até sua vez.
+// Toda a árvore /gamificacao usa o mesmo ambiente escuro (fundo + texto + variáveis --gf-*,
+// ver globals.css). As páginas não pintam fundo próprio: a superfície é contínua.
 export default function LayoutGamificacao({ children }: { children: ReactNode }) {
-  return <div className="tema-gamificacao">{children}</div>;
+  return <TemaGamificacao>{children}</TemaGamificacao>;
 }

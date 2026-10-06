@@ -4,6 +4,7 @@ import { formatarDataHora } from "@/lib/formatacao";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { ROTULO_STATUS_RESGATE, type StatusResgate } from "@/lib/tipos";
+import { AbasSecao } from "../_compartilhado/abas-secao";
 import { CartaoRecompensa } from "./formulario";
 
 const TOM_STATUS: Record<StatusResgate, "neutro" | "positivo" | "negativo" | "atencao"> = {
@@ -45,6 +46,7 @@ export default async function LojaDeRecompensas() {
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4">
+      <AbasSecao secao="recompensas" papel={atual.papel} />
       <h1 className="text-2xl font-semibold text-zinc-900">Loja de recompensas</h1>
 
       <Cartao titulo="Seu saldo" acao={<Link href="/gamificacao/extrato" className="text-sm text-dourado hover:underline">Ver extrato →</Link>}>

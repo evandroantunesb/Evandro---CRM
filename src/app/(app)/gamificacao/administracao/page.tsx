@@ -23,7 +23,7 @@ export default async function AdministracaoGamificacao() {
           <Link
             key={s.href}
             href={s.href}
-            className="rounded-xl border border-zinc-200/80 bg-white p-4 shadow-[0_1px_2px_rgba(15,15,16,0.04)] transition-colors hover:border-dourado"
+            className="rounded-xl border border-[var(--gf-borda)] bg-[var(--gf-surface)] p-4 shadow-[0_1px_2px_rgba(0,0,0,0.4)] transition-colors outline-none hover:border-[var(--gf-verde)] focus-visible:border-[var(--gf-verde)]"
           >
             <p className="text-sm font-semibold text-zinc-900">{s.titulo}</p>
             <p className="mt-1 text-xs text-zinc-600">{s.descricao}</p>

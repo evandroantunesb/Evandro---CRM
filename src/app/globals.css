@@ -83,6 +83,116 @@ h3,
 }
 
 /*
+ * Componentes claros dentro do tema escuro. Telas e formulários ainda escritos com os
+ * componentes de src/components/ui.tsx (Cartao, Botao, Campo, Selecao, Mensagem, Selo) e
+ * com classes zinc/white/green/red/amber ficam legíveis aqui SEM editar esses componentes:
+ * as utilities do Tailwind 4 leem var(--color-*), então redefinir as variáveis só dentro
+ * de .tema-gamificacao remapeia tudo no escopo; o resto do app mantém a aparência clara.
+ * --color-carvao não é remapeado (--gf-bg depende dele): o que usa text-carvao/bg-carvao
+ * recebe regras próprias abaixo. Verde = ação positiva/foco; vermelho = erro/perigo.
+ */
+.tema-gamificacao {
+  color-scheme: dark;
+  --gf-on-verde: #04261a;
+  --color-white: var(--gf-surface);
+  --color-zinc-50: var(--gf-surface-alta);
+  --color-zinc-100: var(--gf-borda);
+  --color-zinc-200: var(--gf-borda);
+  --color-zinc-400: #82828a;
+  --color-zinc-500: #9a9aa2;
+  --color-zinc-600: var(--gf-texto-sec);
+  --color-zinc-700: #c9c9ce;
+  --color-zinc-800: var(--gf-surface-alta);
+  --color-zinc-900: var(--gf-texto);
+  --color-green-50: var(--gf-verde-10);
+  --color-green-100: var(--gf-verde-10);
+  --color-green-500: var(--gf-verde);
+  --color-green-800: var(--gf-verde);
+  --color-red-50: var(--gf-vermelho-10);
+  --color-red-100: var(--gf-vermelho-10);
+  --color-red-200: rgb(248 113 113 / 35%);
+  --color-red-700: var(--gf-vermelho);
+  --color-red-800: var(--gf-vermelho);
+  --color-amber-100: var(--gf-dourado-10);
+  --color-amber-800: var(--gf-dourado);
+}
+
+.tema-gamificacao .text-carvao {
+  color: var(--gf-texto);
+}
+
+.tema-gamificacao .text-carvao.hover\:text-dourado:hover {
+  color: var(--gf-verde);
+}
+
+/* Campos de formulário: superfície elevada sobre o cartão, texto claro, foco verde. */
+.tema-gamificacao :is(input:not([type="checkbox"], [type="radio"]), select, textarea) {
+  border-color: #3f3f46;
+  background-color: var(--gf-surface-alta);
+  color: var(--gf-texto);
+}
+
+/* Celular: opção longa de <select> não pode alargar a grade do formulário além da tela. */
+.tema-gamificacao label {
+  min-width: 0;
+}
+
+.tema-gamificacao :is(input:not([type="checkbox"], [type="radio"]), select, textarea) {
+  max-width: 100%;
+}
+
+.tema-gamificacao :is(input:not([type="checkbox"], [type="radio"]), select, textarea)::placeholder {
+  color: var(--color-zinc-400);
+  opacity: 1;
+}
+
+.tema-gamificacao :is(input:not([type="checkbox"], [type="radio"]), select, textarea):focus {
+  border-color: var(--gf-verde);
+  --tw-ring-color: rgb(52 211 153 / 25%);
+}
+
+.tema-gamificacao :is(input:not([type="checkbox"], [type="radio"]), select, textarea):disabled {
+  background-color: var(--gf-borda);
+  color: var(--color-zinc-500);
+}
+
+.tema-gamificacao option {
+  background-color: var(--gf-surface-alta);
+  color: var(--gf-texto);
+}
+
+.tema-gamificacao :is(input[type="checkbox"], input[type="radio"]) {
+  accent-color: var(--gf-verde);
+}
+
+/* Botões do ui.tsx: primário vira ação verde; secundário e perigo ficam escuros. */
+.tema-gamificacao button.bg-carvao {
+  background-color: var(--gf-verde);
+  color: var(--gf-on-verde);
+}
+
+.tema-gamificacao button.bg-carvao:hover:not(:disabled) {
+  background-color: color-mix(in srgb, var(--gf-verde) 82%, white);
+}
+
+.tema-gamificacao button.bg-white {
+  background-color: var(--gf-surface-alta);
+}
+
+.tema-gamificacao button.bg-white:hover:not(:disabled) {
+  border-color: var(--gf-verde);
+}
+
+.tema-gamificacao button.bg-white.text-red-700:hover:not(:disabled) {
+  border-color: var(--gf-vermelho);
+  background-color: var(--gf-vermelho-10);
+}
+
+.tema-gamificacao :is(button, a):focus-visible {
+  --tw-ring-color: rgb(52 211 153 / 50%);
+}
+
+/*
  * Hero "Minha posição": a paisagem faz parte da linguagem visual em qualquer
  * breakpoint. O estado vazio usa o mesmo container e não altera a geometria.
  * Seletores escopados pelas classes semânticas de src/app/(app)/gamificacao/page.tsx

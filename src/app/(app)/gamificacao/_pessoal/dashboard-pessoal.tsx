@@ -327,480 +327,478 @@ export async function DashboardPessoal({
     : null;
 
   return (
-    <div className="-m-4 min-h-screen bg-[var(--gf-bg)] p-4 text-[var(--gf-texto)] md:-m-10 md:p-10">
-      <div className="mx-auto flex max-w-[1500px] flex-col gap-2">
-        {/* Cabeçalho e KPIs na mesma faixa no desktop. */}
-        <div className="gf-cabecalho grid gap-2 lg:grid-cols-[minmax(260px,0.72fr)_minmax(0,1fr)] lg:items-center">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-semibold text-[var(--gf-texto)]">Gamificação</h1>
-            <p className="text-sm text-[var(--gf-texto-sec)]">
-              Desempenho, evolução e conquistas em um só lugar.
-            </p>
-          </div>
-          <div className="hidden gap-1 rounded-lg bg-[var(--gf-surface-alta)] p-1">
-            {PERIODOS.map((p) => (
-              <Link
-                key={p.chave}
-                href={`/gamificacao?periodo=${p.chave}`}
-                className={`rounded-md px-3 py-1 text-sm transition-colors ${
-                  periodo === p.chave
-                    ? "bg-[var(--gf-surface)] font-medium text-[var(--gf-texto)] shadow-sm"
-                    : "text-[var(--gf-texto-sec)] hover:text-[var(--gf-texto)]"
-                }`}
-              >
-                {p.rotulo}
-              </Link>
-            ))}
-          </div>
-          </div>
-
-          <div className="gf-kpis grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <KpiGf
-            Icone={Zap}
-            valor={`${totalXpPeriodo.toLocaleString("pt-BR")} XP`}
-            legenda="No período"
-            indicador={
-              variacaoXpPct != null && (
-                <IndicadorKpiGf
-                  direcao={variacaoXpPct >= 0 ? "alta" : "baixa"}
-                  texto={`${Math.abs(variacaoXpPct).toFixed(0)}%`}
-                />
-              )
-            }
-          />
-          <KpiGf
-            Icone={Trophy}
-            valor={minhaPosicaoRanking ? `#${minhaPosicaoRanking.posicao}` : "—"}
-            legenda="Posição no ranking"
-            tom="dourado"
-            indicador={
-              deltaPosicaoSemana != null &&
-              deltaPosicaoSemana !== 0 && (
-                <IndicadorKpiGf
-                  direcao={deltaPosicaoSemana > 0 ? "alta" : "baixa"}
-                  texto={`${Math.abs(deltaPosicaoSemana)} esta semana`}
-                />
-              )
-            }
-          />
-          <KpiGf
-            Icone={Target}
-            valor={`${metasAtingidas}/${metasTotal}`}
-            legenda="Metas atingidas"
-          />
-          <KpiGf
-            Icone={Award}
-            valor={totalConquistasDesbloqueadas.toLocaleString("pt-BR")}
-            legenda="Conquistas"
-            tom="dourado"
-            indicador={
-              conquistasNovasPeriodo > 0 && (
-                <span className="text-[10px] font-medium text-[var(--gf-verde)]">
-                  +{conquistasNovasPeriodo}
-                </span>
-              )
-            }
-          />
+    <div className="mx-auto flex max-w-[1500px] flex-col gap-2">
+      {/* Cabeçalho e KPIs na mesma faixa no desktop. */}
+      <div className="gf-cabecalho grid gap-2 lg:grid-cols-[minmax(260px,0.72fr)_minmax(0,1fr)] lg:items-center">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold text-[var(--gf-texto)]">Gamificação</h1>
+          <p className="text-sm text-[var(--gf-texto-sec)]">
+            Desempenho, evolução e conquistas em um só lugar.
+          </p>
+        </div>
+        <div className="hidden gap-1 rounded-lg bg-[var(--gf-surface-alta)] p-1">
+          {PERIODOS.map((p) => (
+            <Link
+              key={p.chave}
+              href={`/gamificacao?periodo=${p.chave}`}
+              className={`rounded-md px-3 py-1 text-sm transition-colors ${
+                periodo === p.chave
+                  ? "bg-[var(--gf-surface)] font-medium text-[var(--gf-texto)] shadow-sm"
+                  : "text-[var(--gf-texto-sec)] hover:text-[var(--gf-texto)]"
+              }`}
+            >
+              {p.rotulo}
+            </Link>
+          ))}
+        </div>
         </div>
 
-        </div>
+        <div className="gf-kpis grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <KpiGf
+          Icone={Zap}
+          valor={`${totalXpPeriodo.toLocaleString("pt-BR")} XP`}
+          legenda="No período"
+          indicador={
+            variacaoXpPct != null && (
+              <IndicadorKpiGf
+                direcao={variacaoXpPct >= 0 ? "alta" : "baixa"}
+                texto={`${Math.abs(variacaoXpPct).toFixed(0)}%`}
+              />
+            )
+          }
+        />
+        <KpiGf
+          Icone={Trophy}
+          valor={minhaPosicaoRanking ? `#${minhaPosicaoRanking.posicao}` : "—"}
+          legenda="Posição no ranking"
+          tom="dourado"
+          indicador={
+            deltaPosicaoSemana != null &&
+            deltaPosicaoSemana !== 0 && (
+              <IndicadorKpiGf
+                direcao={deltaPosicaoSemana > 0 ? "alta" : "baixa"}
+                texto={`${Math.abs(deltaPosicaoSemana)} esta semana`}
+              />
+            )
+          }
+        />
+        <KpiGf
+          Icone={Target}
+          valor={`${metasAtingidas}/${metasTotal}`}
+          legenda="Metas atingidas"
+        />
+        <KpiGf
+          Icone={Award}
+          valor={totalConquistasDesbloqueadas.toLocaleString("pt-BR")}
+          legenda="Conquistas"
+          tom="dourado"
+          indicador={
+            conquistasNovasPeriodo > 0 && (
+              <span className="text-[10px] font-medium text-[var(--gf-verde)]">
+                +{conquistasNovasPeriodo}
+              </span>
+            )
+          }
+        />
+      </div>
 
-        {/* Hero: proporções fixas da referência no desktop. */}
-        <div className="gf-hero grid items-stretch gap-2 lg:h-[154px] lg:grid-cols-[2.56fr_1.27fr_1fr]">
-          <CartaoGf
-            destaque
-            className="gf-hero-posicao relative overflow-hidden !p-4 lg:h-full"
-            style={{
-              backgroundImage:
-                "linear-gradient(to right, rgba(15,15,16,0.88), rgba(15,15,16,0.5)), url(/gamificacao/fundo-minha-posicao.svg)",
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-            }}
-          >
-            {!minhaPosicaoRanking ? (
-              <EstadoVazioGf Icone={Trophy} compacto>
-                Pontue neste período pra entrar no ranking.
-              </EstadoVazioGf>
-            ) : (
-              <div className="relative flex h-full flex-col justify-between gap-4 sm:flex-row sm:items-center">
-                <div>
-                  <p className="flex items-center gap-1.5 text-xs tracking-wide text-[var(--gf-texto-sec)] uppercase">
-                    <Trophy size={12} className="text-[var(--gf-dourado)]" />
-                    Minha posição
-                  </p>
-                  <p className="mt-1 text-4xl font-semibold text-[var(--gf-texto)]">
-                    {`#${minhaPosicaoRanking.posicao}`}
-                    <span className="ml-2 text-base font-normal text-[var(--gf-texto-sec)]">
-                      {periodo === "mes" ? "no ranking do mês" : "no ranking do período"}
-                    </span>
-                  </p>
-                  <p className="mt-0.5 text-sm text-[var(--gf-texto-sec)]">
-                    {minhaPosicaoRanking.total.toLocaleString("pt-BR")} XP no período
-                  </p>
-                  {deltaPosicaoSemana != null && deltaPosicaoSemana !== 0 && (
-                    <div className="mt-2">
-                      <IndicadorKpiGf
-                        direcao={deltaPosicaoSemana > 0 ? "alta" : "baixa"}
-                        texto={`${Math.abs(deltaPosicaoSemana)} posiç${Math.abs(deltaPosicaoSemana) === 1 ? "ão" : "ões"} esta semana`}
-                      />
-                    </div>
-                  )}
-                </div>
-                {acimaDeMim && (
-                  <div className="shrink-0 rounded-lg bg-[var(--gf-surface)] px-4 py-3 text-sm sm:text-right">
-                    <p className="text-[var(--gf-texto-sec)]">Próxima posição</p>
-                    <p className="font-semibold text-[var(--gf-verde)]">
-                      {(acimaDeMim.total - minhaPosicaoRanking.total).toLocaleString("pt-BR")} XP
-                    </p>
-                    <p className="text-[var(--gf-texto-sec)]">
-                      pra alcançar {acimaDeMim.nome} ({acimaDeMim.posicao}º lugar)
-                    </p>
+      </div>
+
+      {/* Hero: proporções fixas da referência no desktop. */}
+      <div className="gf-hero grid items-stretch gap-2 lg:h-[154px] lg:grid-cols-[2.56fr_1.27fr_1fr]">
+        <CartaoGf
+          destaque
+          className="gf-hero-posicao relative overflow-hidden !p-4 lg:h-full"
+          style={{
+            backgroundImage:
+              "linear-gradient(to right, rgba(15,15,16,0.88), rgba(15,15,16,0.5)), url(/gamificacao/fundo-minha-posicao.svg)",
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          }}
+        >
+          {!minhaPosicaoRanking ? (
+            <EstadoVazioGf Icone={Trophy} compacto>
+              Pontue neste período pra entrar no ranking.
+            </EstadoVazioGf>
+          ) : (
+            <div className="relative flex h-full flex-col justify-between gap-4 sm:flex-row sm:items-center">
+              <div>
+                <p className="flex items-center gap-1.5 text-xs tracking-wide text-[var(--gf-texto-sec)] uppercase">
+                  <Trophy size={12} className="text-[var(--gf-dourado)]" />
+                  Minha posição
+                </p>
+                <p className="mt-1 text-4xl font-semibold text-[var(--gf-texto)]">
+                  {`#${minhaPosicaoRanking.posicao}`}
+                  <span className="ml-2 text-base font-normal text-[var(--gf-texto-sec)]">
+                    {periodo === "mes" ? "no ranking do mês" : "no ranking do período"}
+                  </span>
+                </p>
+                <p className="mt-0.5 text-sm text-[var(--gf-texto-sec)]">
+                  {minhaPosicaoRanking.total.toLocaleString("pt-BR")} XP no período
+                </p>
+                {deltaPosicaoSemana != null && deltaPosicaoSemana !== 0 && (
+                  <div className="mt-2">
+                    <IndicadorKpiGf
+                      direcao={deltaPosicaoSemana > 0 ? "alta" : "baixa"}
+                      texto={`${Math.abs(deltaPosicaoSemana)} posiç${Math.abs(deltaPosicaoSemana) === 1 ? "ão" : "ões"} esta semana`}
+                    />
                   </div>
                 )}
               </div>
-            )}
-          </CartaoGf>
-
-          <CartaoGf destaque className="gf-hero-secundario gf-hero-nivel flex flex-col justify-between !p-4 lg:h-full">
-            <div className="flex items-center gap-3">
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center bg-[var(--gf-verde-10)] text-lg font-semibold text-[var(--gf-verde)] [clip-path:polygon(25%_5%,75%_5%,100%_50%,75%_95%,25%_95%,0_50%)] ring-1 ring-[var(--gf-verde)]/60 drop-shadow-[0_0_8px_rgba(52,211,153,.25)]">
-                {meuNivel.nivel}
-              </span>
-              <div className="min-w-0">
-                <p className="text-xs tracking-wide text-[var(--gf-texto-sec)] uppercase">
-                  Meu nível
-                </p>
-                <p className="truncate text-base font-semibold text-[var(--gf-texto)]">
-                  {meuNivel.nome ?? `Nível ${meuNivel.nivel}`}
-                </p>
-              </div>
-            </div>
-            <div className="mt-3">
-              <div className="flex items-baseline justify-between text-xs text-[var(--gf-texto-sec)]">
-                <span>{meuTotalXp.toLocaleString("pt-BR")} XP</span>
-                {proximoNivel && (
-                  <span>
-                    {(proximoNivel.xpMinimo - meuTotalXp).toLocaleString("pt-BR")} p/ nível{" "}
-                    {proximoNivel.nivel}
-                  </span>
-                )}
-              </div>
-              <div className="mt-1.5 h-2.5 w-full overflow-hidden rounded-full bg-[var(--gf-surface-alta)]">
-                <div
-                  className="h-full rounded-full bg-[var(--gf-verde)]"
-                  style={{ width: `${progressoNivel}%` }}
-                />
-              </div>
-              {!proximoNivel && (
-                <p className="mt-1 text-xs text-[var(--gf-texto-sec)]">Nível máximo alcançado.</p>
+              {acimaDeMim && (
+                <div className="shrink-0 rounded-lg bg-[var(--gf-surface)] px-4 py-3 text-sm sm:text-right">
+                  <p className="text-[var(--gf-texto-sec)]">Próxima posição</p>
+                  <p className="font-semibold text-[var(--gf-verde)]">
+                    {(acimaDeMim.total - minhaPosicaoRanking.total).toLocaleString("pt-BR")} XP
+                  </p>
+                  <p className="text-[var(--gf-texto-sec)]">
+                    pra alcançar {acimaDeMim.nome} ({acimaDeMim.posicao}º lugar)
+                  </p>
+                </div>
               )}
             </div>
-            <Link
-              href="/gamificacao/jornada"
-              className="mt-2 inline-block text-xs text-[var(--gf-verde)] hover:underline"
-            >
-              Ver jornada completa →
-            </Link>
-          </CartaoGf>
+          )}
+        </CartaoGf>
 
-          <CartaoGf
-            destaque
-            className="gf-hero-secundario gf-hero-sequencia flex flex-col justify-between !p-4 lg:h-full"
-          >
-            <div className="flex items-center gap-1.5 text-xs tracking-wide text-[var(--gf-texto-sec)] uppercase">
-              <Flame size={16} className="text-[var(--gf-verde)] drop-shadow-[0_0_6px_rgba(52,211,153,.35)]" />
-              Sequência
+        <CartaoGf destaque className="gf-hero-secundario gf-hero-nivel flex flex-col justify-between !p-4 lg:h-full">
+          <div className="flex items-center gap-3">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center bg-[var(--gf-verde-10)] text-lg font-semibold text-[var(--gf-verde)] [clip-path:polygon(25%_5%,75%_5%,100%_50%,75%_95%,25%_95%,0_50%)] ring-1 ring-[var(--gf-verde)]/60 drop-shadow-[0_0_8px_rgba(52,211,153,.25)]">
+              {meuNivel.nivel}
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs tracking-wide text-[var(--gf-texto-sec)] uppercase">
+                Meu nível
+              </p>
+              <p className="truncate text-base font-semibold text-[var(--gf-texto)]">
+                {meuNivel.nome ?? `Nível ${meuNivel.nivel}`}
+              </p>
             </div>
-            <p className="mt-1 text-2xl font-semibold text-[var(--gf-texto)]">
-              {diasSequencia}{" "}
-              <span className="text-sm font-normal text-[var(--gf-texto-sec)]">
-                dia{diasSequencia === 1 ? "" : "s"} produtivo{diasSequencia === 1 ? "" : "s"}{" "}
-                consecutivo{diasSequencia === 1 ? "" : "s"}
-              </span>
-            </p>
-            {semanaSequencia.length > 0 && (
-              <div className="mt-3 flex justify-between gap-1">
-                {semanaSequencia.map((dia, i) => (
-                  <div key={dia.data} className="flex flex-col items-center gap-1">
-                    <span className="text-[10px] text-[var(--gf-texto-ter)]">
-                      {ROTULOS_DIA_SEMANA[i] ?? ""}
-                    </span>
-                    <span
-                      className={`flex h-5 w-5 items-center justify-center rounded-full ${
-                        dia.produtivo
-                          ? "bg-[var(--gf-verde)] text-[var(--gf-surface)]"
-                          : dia.dia_util
-                            ? "border border-[var(--gf-borda)]"
-                            : "bg-[var(--gf-surface-alta)]"
-                      }`}
-                    >
-                      {dia.produtivo && <Check size={12} strokeWidth={3} />}
-                    </span>
+          </div>
+          <div className="mt-3">
+            <div className="flex items-baseline justify-between text-xs text-[var(--gf-texto-sec)]">
+              <span>{meuTotalXp.toLocaleString("pt-BR")} XP</span>
+              {proximoNivel && (
+                <span>
+                  {(proximoNivel.xpMinimo - meuTotalXp).toLocaleString("pt-BR")} p/ nível{" "}
+                  {proximoNivel.nivel}
+                </span>
+              )}
+            </div>
+            <div className="mt-1.5 h-2.5 w-full overflow-hidden rounded-full bg-[var(--gf-surface-alta)]">
+              <div
+                className="h-full rounded-full bg-[var(--gf-verde)]"
+                style={{ width: `${progressoNivel}%` }}
+              />
+            </div>
+            {!proximoNivel && (
+              <p className="mt-1 text-xs text-[var(--gf-texto-sec)]">Nível máximo alcançado.</p>
+            )}
+          </div>
+          <Link
+            href="/gamificacao/jornada"
+            className="mt-2 inline-block text-xs text-[var(--gf-verde)] hover:underline"
+          >
+            Ver jornada completa →
+          </Link>
+        </CartaoGf>
+
+        <CartaoGf
+          destaque
+          className="gf-hero-secundario gf-hero-sequencia flex flex-col justify-between !p-4 lg:h-full"
+        >
+          <div className="flex items-center gap-1.5 text-xs tracking-wide text-[var(--gf-texto-sec)] uppercase">
+            <Flame size={16} className="text-[var(--gf-verde)] drop-shadow-[0_0_6px_rgba(52,211,153,.35)]" />
+            Sequência
+          </div>
+          <p className="mt-1 text-2xl font-semibold text-[var(--gf-texto)]">
+            {diasSequencia}{" "}
+            <span className="text-sm font-normal text-[var(--gf-texto-sec)]">
+              dia{diasSequencia === 1 ? "" : "s"} produtivo{diasSequencia === 1 ? "" : "s"}{" "}
+              consecutivo{diasSequencia === 1 ? "" : "s"}
+            </span>
+          </p>
+          {semanaSequencia.length > 0 && (
+            <div className="mt-3 flex justify-between gap-1">
+              {semanaSequencia.map((dia, i) => (
+                <div key={dia.data} className="flex flex-col items-center gap-1">
+                  <span className="text-[10px] text-[var(--gf-texto-ter)]">
+                    {ROTULOS_DIA_SEMANA[i] ?? ""}
+                  </span>
+                  <span
+                    className={`flex h-5 w-5 items-center justify-center rounded-full ${
+                      dia.produtivo
+                        ? "bg-[var(--gf-verde)] text-[var(--gf-surface)]"
+                        : dia.dia_util
+                          ? "border border-[var(--gf-borda)]"
+                          : "bg-[var(--gf-surface-alta)]"
+                    }`}
+                  >
+                    {dia.produtivo && <Check size={12} strokeWidth={3} />}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </CartaoGf>
+      </div>
+
+      {/* Área principal: Ranking (5/12), Centro (4/12), Lateral direita (3/12). */}
+      <div className="gf-area grid min-w-0 gap-2 lg:h-[388px] lg:grid-cols-[1.19fr_1fr_1.05fr]">
+        <CartaoGf
+          titulo={<span className="flex items-center gap-2"><Crown size={15} className="text-[var(--gf-dourado)]" />Ranking</span>}
+          acao={
+            <Link
+              href="/gamificacao/ranking"
+              className="text-sm text-[var(--gf-verde)] hover:underline"
+            >
+              Ver completo →
+            </Link>
+          }
+          className="gf-cartao-ranking flex min-h-[300px] flex-col overflow-hidden lg:h-full lg:min-h-0"
+        >
+          <RankingTabsGf listas={rankingPorAba} membroAtualId={atual.membroId} />
+        </CartaoGf>
+
+        <div className="gf-col gf-col-centro grid min-w-0 gap-2 lg:h-full lg:grid-rows-[119px_1fr]">
+          <CartaoGf titulo={<span className="flex items-center gap-2"><BarChart3 size={15} className="text-[var(--gf-verde)]" />Você x próximo colocado</span>}>
+            {!acimaDeMim || !minhaPosicaoRanking ? (
+              <EstadoVazioGf Icone={Trophy} compacto>
+                {minhaPosicaoRanking
+                  ? "Você já está em 1º lugar no período."
+                  : "Pontue neste período pra comparar com o próximo colocado."}
+              </EstadoVazioGf>
+            ) : (
+              <div className="flex flex-col gap-3">
+                <p className="text-sm text-[var(--gf-texto-sec)]">
+                  Você está a{" "}
+                  <span className="font-semibold text-[var(--gf-verde)]">
+                    {(acimaDeMim.total - minhaPosicaoRanking.total).toLocaleString("pt-BR")} XP
+                  </span>{" "}
+                  do {acimaDeMim.posicao}º lugar
+                </p>
+                {[
+                  { linha: minhaPosicaoRanking, rotulo: "Você", destaque: true },
+                  { linha: acimaDeMim, rotulo: acimaDeMim.nome, destaque: false },
+                ].map(({ linha, rotulo, destaque }) => (
+                  <div key={linha.membroId} className="flex items-center gap-2.5">
+                    <IniciaisAvatarGf nome={linha.nome} tamanho={28} tom={destaque ? "verde" : "neutro"} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-baseline justify-between text-xs">
+                        <span
+                          className={destaque ? "font-medium text-[var(--gf-verde)]" : "text-[var(--gf-texto)]"}
+                        >
+                          {rotulo}
+                        </span>
+                        <span className="text-[var(--gf-texto-sec)]">
+                          {linha.total.toLocaleString("pt-BR")} XP
+                        </span>
+                      </div>
+                      <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[var(--gf-surface-alta)]">
+                        <div
+                          className={`h-full rounded-full ${destaque ? "bg-[var(--gf-verde)]" : "bg-[var(--gf-texto-ter)]"}`}
+                          style={{
+                            width: `${Math.min(100, (linha.total / acimaDeMim.total) * 100)}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
             )}
           </CartaoGf>
-        </div>
 
-        {/* Área principal: Ranking (5/12), Centro (4/12), Lateral direita (3/12). */}
-        <div className="gf-area grid min-w-0 gap-2 lg:h-[388px] lg:grid-cols-[1.19fr_1fr_1.05fr]">
-          <CartaoGf
-            titulo={<span className="flex items-center gap-2"><Crown size={15} className="text-[var(--gf-dourado)]" />Ranking</span>}
-            acao={
-              <Link
-                href="/gamificacao/ranking"
-                className="text-sm text-[var(--gf-verde)] hover:underline"
-              >
-                Ver completo →
-              </Link>
-            }
-            className="gf-cartao-ranking flex min-h-[300px] flex-col overflow-hidden lg:h-full lg:min-h-0"
-          >
-            <RankingTabsGf listas={rankingPorAba} membroAtualId={atual.membroId} />
-          </CartaoGf>
-
-          <div className="gf-col gf-col-centro grid min-w-0 gap-2 lg:h-full lg:grid-rows-[119px_1fr]">
-            <CartaoGf titulo={<span className="flex items-center gap-2"><BarChart3 size={15} className="text-[var(--gf-verde)]" />Você x próximo colocado</span>}>
-              {!acimaDeMim || !minhaPosicaoRanking ? (
-                <EstadoVazioGf Icone={Trophy} compacto>
-                  {minhaPosicaoRanking
-                    ? "Você já está em 1º lugar no período."
-                    : "Pontue neste período pra comparar com o próximo colocado."}
+          <CartaoGf titulo={<span className="flex items-center gap-2"><Zap size={15} className="text-[var(--gf-dourado)]" />Atividade recente</span>} className="flex flex-col">
+            <div
+              className={`flex min-h-0 flex-1 flex-col overflow-hidden ${!atividadeRecente.length ? "items-center justify-center" : ""}`}
+            >
+              {!atividadeRecente.length ? (
+                <EstadoVazioGf Icone={Activity} compacto>
+                  Nenhuma atividade neste período.
                 </EstadoVazioGf>
               ) : (
-                <div className="flex flex-col gap-3">
-                  <p className="text-sm text-[var(--gf-texto-sec)]">
-                    Você está a{" "}
-                    <span className="font-semibold text-[var(--gf-verde)]">
-                      {(acimaDeMim.total - minhaPosicaoRanking.total).toLocaleString("pt-BR")} XP
-                    </span>{" "}
-                    do {acimaDeMim.posicao}º lugar
-                  </p>
-                  {[
-                    { linha: minhaPosicaoRanking, rotulo: "Você", destaque: true },
-                    { linha: acimaDeMim, rotulo: acimaDeMim.nome, destaque: false },
-                  ].map(({ linha, rotulo, destaque }) => (
-                    <div key={linha.membroId} className="flex items-center gap-2.5">
-                      <IniciaisAvatarGf nome={linha.nome} tamanho={28} tom={destaque ? "verde" : "neutro"} />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-baseline justify-between text-xs">
-                          <span
-                            className={destaque ? "font-medium text-[var(--gf-verde)]" : "text-[var(--gf-texto)]"}
-                          >
-                            {rotulo}
-                          </span>
-                          <span className="text-[var(--gf-texto-sec)]">
-                            {linha.total.toLocaleString("pt-BR")} XP
-                          </span>
-                        </div>
-                        <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[var(--gf-surface-alta)]">
-                          <div
-                            className={`h-full rounded-full ${destaque ? "bg-[var(--gf-verde)]" : "bg-[var(--gf-texto-ter)]"}`}
-                            style={{
-                              width: `${Math.min(100, (linha.total / acimaDeMim.total) * 100)}%`,
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CartaoGf>
-
-            <CartaoGf titulo={<span className="flex items-center gap-2"><Zap size={15} className="text-[var(--gf-dourado)]" />Atividade recente</span>} className="flex flex-col">
-              <div
-                className={`flex min-h-0 flex-1 flex-col overflow-hidden ${!atividadeRecente.length ? "items-center justify-center" : ""}`}
-              >
-                {!atividadeRecente.length ? (
-                  <EstadoVazioGf Icone={Activity} compacto>
-                    Nenhuma atividade neste período.
-                  </EstadoVazioGf>
-                ) : (
-                  <ul className="flex flex-col">
-                    {atividadeRecente.map((l) => (
-                      <li
-                        key={l.id}
-                        className="flex items-center gap-2.5 border-t border-[var(--gf-borda)] py-2 text-sm first:border-t-0"
+                <ul className="flex flex-col">
+                  {atividadeRecente.map((l) => (
+                    <li
+                      key={l.id}
+                      className="flex items-center gap-2.5 border-t border-[var(--gf-borda)] py-2 text-sm first:border-t-0"
+                    >
+                      <span
+                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${l.xp >= 0 ? "bg-[var(--gf-verde-10)] text-[var(--gf-verde)]" : "bg-[var(--gf-vermelho-10)] text-[var(--gf-vermelho)]"}`}
                       >
-                        <span
-                          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${l.xp >= 0 ? "bg-[var(--gf-verde-10)] text-[var(--gf-verde)]" : "bg-[var(--gf-vermelho-10)] text-[var(--gf-vermelho)]"}`}
-                        >
-                          <Zap size={13} />
-                        </span>
-                        <div className="flex min-w-0 flex-1 flex-col">
-                          <span className="truncate text-[var(--gf-texto)]">
-                            {nomeMembro.get(l.membro_id) ?? "(removido)"} ·{" "}
-                            {l.descricao || "Ponto lançado"}
-                          </span>
-                          <span className="text-xs text-[var(--gf-texto-sec)]">
-                            {tempoDesde(l.created_at)}
-                          </span>
-                        </div>
-                        {l.xp !== 0 && (
-                          <span
-                            className={`shrink-0 font-medium ${l.xp >= 0 ? "text-[var(--gf-verde)]" : "text-[var(--gf-vermelho)]"}`}
-                          >
-                            {l.xp >= 0 ? "+" : ""}
-                            {l.xp} XP
-                          </span>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </CartaoGf>
-          </div>
-
-          {/* Lateral direita, ordem obrigatória: Meta mensal → Conquistas → Loja. */}
-          <div className="gf-col gf-col-lateral grid min-w-0 gap-2 lg:h-full lg:grid-rows-[103px_128px_1fr]">
-            <CartaoGf
-              titulo={<span className="flex items-center gap-2"><Target size={15} className="text-[var(--gf-verde)]" />Meta mensal</span>}
-              acao={
-                <Link
-                  href="/gamificacao/metas"
-                  className="text-sm text-[var(--gf-verde)] hover:underline"
-                >
-                  Ver →
-                </Link>
-              }
-            >
-              {!metaPrincipal || !unidadeMetaPrincipal ? (
-                <EstadoVazioGf Icone={Target} compacto>
-                  Nenhuma meta ativa no momento.
-                </EstadoVazioGf>
-              ) : (
-                <div className="flex flex-col gap-1.5">
-                  <p className="truncate text-sm text-[var(--gf-texto-sec)]">
-                    {metaPrincipal.meta.titulo}
-                  </p>
-                  <p className="text-sm font-semibold text-[var(--gf-texto)]">
-                    {formatarValorMeta(unidadeMetaPrincipal, metaPrincipal.progresso.realizado)} /{" "}
-                    {formatarValorMeta(unidadeMetaPrincipal, metaPrincipal.meta.valorAlvo)}
-                  </p>
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--gf-surface-alta)]">
-                    <div
-                      className="h-full rounded-full bg-[var(--gf-verde)]"
-                      style={{
-                        width: `${Math.min(Math.max(metaPrincipal.progresso.percentual, 0), 100)}%`,
-                      }}
-                    />
-                  </div>
-                  <p className="text-xs text-[var(--gf-texto-sec)]">
-                    {metaPrincipal.progresso.percentual.toFixed(0)}% concluído
-                    {metasComProgresso.length > 1 &&
-                      ` · +${metasComProgresso.length - 1} outra${metasComProgresso.length - 1 === 1 ? "" : "s"} meta${metasComProgresso.length - 1 === 1 ? "" : "s"}`}
-                  </p>
-                </div>
-              )}
-            </CartaoGf>
-
-            <CartaoGf
-              titulo={<span className="flex items-center gap-2"><Trophy size={15} className="text-[var(--gf-dourado)]" />Conquistas</span>}
-              acao={
-                <Link
-                  href="/gamificacao/jornada"
-                  className="text-sm text-[var(--gf-verde)] hover:underline"
-                >
-                  Ver →
-                </Link>
-              }
-            >
-              {!ultimaConquista && !proximaConquista ? (
-                <EstadoVazioGf Icone={Award} compacto>
-                  Nenhuma conquista ainda.
-                </EstadoVazioGf>
-              ) : (
-                <div className="flex flex-col gap-3">
-                  {ultimaConquista && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--gf-dourado-10)] text-[var(--gf-dourado)]">
-                        {ultimaConquista.icone ? (
-                          <span className="text-sm leading-none">{ultimaConquista.icone}</span>
-                        ) : (
-                          <Trophy size={14} />
-                        )}
+                        <Zap size={13} />
                       </span>
                       <div className="flex min-w-0 flex-1 flex-col">
-                        <span className="text-[11px] text-[var(--gf-texto-sec)]">
-                          Última conquista
-                        </span>
                         <span className="truncate text-[var(--gf-texto)]">
-                          {ultimaConquista.nome ?? "(conquista removida)"} ·{" "}
-                          {tempoDesde(ultimaConquista.desbloqueadaEm)}
+                          {nomeMembro.get(l.membro_id) ?? "(removido)"} ·{" "}
+                          {l.descricao || "Ponto lançado"}
+                        </span>
+                        <span className="text-xs text-[var(--gf-texto-sec)]">
+                          {tempoDesde(l.created_at)}
                         </span>
                       </div>
-                    </div>
-                  )}
-                  {proximaConquista?.info && (
-                    <div className="flex flex-col gap-1">
-                      <span className="text-[11px] text-[var(--gf-texto-sec)]">
-                        Próxima conquista
-                      </span>
-                      <p className="truncate text-sm text-[var(--gf-texto)]">
-                        {proximaConquista.info.nome}
-                      </p>
-                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--gf-surface-alta)]">
-                        <div
-                          className="h-full rounded-full bg-[var(--gf-dourado)]"
-                          style={{
-                            width: `${Math.min(100, (proximaConquista.realizado / proximaConquista.alvo) * 100)}%`,
-                          }}
-                        />
-                      </div>
-                      <p className="text-xs text-[var(--gf-texto-sec)]">
-                        Você está em {proximaConquista.realizado} de {proximaConquista.alvo}
-                      </p>
-                    </div>
-                  )}
-                </div>
+                      {l.xp !== 0 && (
+                        <span
+                          className={`shrink-0 font-medium ${l.xp >= 0 ? "text-[var(--gf-verde)]" : "text-[var(--gf-vermelho)]"}`}
+                        >
+                          {l.xp >= 0 ? "+" : ""}
+                          {l.xp} XP
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
               )}
-            </CartaoGf>
-
-            {/* Fecha a coluna, discreta de propósito: sem mais peso visual que
-                Meta/Conquistas, só saldo + prévia + acesso à loja completa. */}
-            <CartaoGf
-              titulo={<span className="flex items-center gap-2"><ShoppingCart size={15} className="text-[var(--gf-dourado)]" />Loja</span>}
-              acao={
-                <Link
-                  href="/gamificacao/loja"
-                  className="text-sm text-[var(--gf-verde)] hover:underline"
-                >
-                  Ver loja →
-                </Link>
-              }
-            >
-              {!recompensas?.length ? (
-                <EstadoVazioGf Icone={ShoppingCart} compacto>
-                  Nenhuma recompensa disponível.
-                </EstadoVazioGf>
-              ) : (
-                <div className="flex items-center justify-between gap-2 overflow-hidden">
-                  <p className="shrink-0 text-xs text-[var(--gf-texto-sec)]">
-                    Seu saldo
-                    <br />
-                    <span className="text-sm font-semibold text-[var(--gf-texto)]">
-                      {meuSaldoMoedas.toLocaleString("pt-BR")} moedas
-                    </span>
-                  </p>
-                  <div className="flex min-w-0 items-center gap-1 overflow-hidden">
-                    {recompensas.slice(0, 3).map((r) => (
-                      <RecompensaChipGf
-                        key={r.id}
-                        recompensa={{ id: r.id, nome: r.nome, custoMoedas: r.custo_moedas }}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-            </CartaoGf>
-          </div>
+            </div>
+          </CartaoGf>
         </div>
 
+        {/* Lateral direita, ordem obrigatória: Meta mensal → Conquistas → Loja. */}
+        <div className="gf-col gf-col-lateral grid min-w-0 gap-2 lg:h-full lg:grid-rows-[103px_128px_1fr]">
+          <CartaoGf
+            titulo={<span className="flex items-center gap-2"><Target size={15} className="text-[var(--gf-verde)]" />Meta mensal</span>}
+            acao={
+              <Link
+                href="/gamificacao/metas"
+                className="text-sm text-[var(--gf-verde)] hover:underline"
+              >
+                Ver →
+              </Link>
+            }
+          >
+            {!metaPrincipal || !unidadeMetaPrincipal ? (
+              <EstadoVazioGf Icone={Target} compacto>
+                Nenhuma meta ativa no momento.
+              </EstadoVazioGf>
+            ) : (
+              <div className="flex flex-col gap-1.5">
+                <p className="truncate text-sm text-[var(--gf-texto-sec)]">
+                  {metaPrincipal.meta.titulo}
+                </p>
+                <p className="text-sm font-semibold text-[var(--gf-texto)]">
+                  {formatarValorMeta(unidadeMetaPrincipal, metaPrincipal.progresso.realizado)} /{" "}
+                  {formatarValorMeta(unidadeMetaPrincipal, metaPrincipal.meta.valorAlvo)}
+                </p>
+                <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--gf-surface-alta)]">
+                  <div
+                    className="h-full rounded-full bg-[var(--gf-verde)]"
+                    style={{
+                      width: `${Math.min(Math.max(metaPrincipal.progresso.percentual, 0), 100)}%`,
+                    }}
+                  />
+                </div>
+                <p className="text-xs text-[var(--gf-texto-sec)]">
+                  {metaPrincipal.progresso.percentual.toFixed(0)}% concluído
+                  {metasComProgresso.length > 1 &&
+                    ` · +${metasComProgresso.length - 1} outra${metasComProgresso.length - 1 === 1 ? "" : "s"} meta${metasComProgresso.length - 1 === 1 ? "" : "s"}`}
+                </p>
+              </div>
+            )}
+          </CartaoGf>
+
+          <CartaoGf
+            titulo={<span className="flex items-center gap-2"><Trophy size={15} className="text-[var(--gf-dourado)]" />Conquistas</span>}
+            acao={
+              <Link
+                href="/gamificacao/jornada"
+                className="text-sm text-[var(--gf-verde)] hover:underline"
+              >
+                Ver →
+              </Link>
+            }
+          >
+            {!ultimaConquista && !proximaConquista ? (
+              <EstadoVazioGf Icone={Award} compacto>
+                Nenhuma conquista ainda.
+              </EstadoVazioGf>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {ultimaConquista && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--gf-dourado-10)] text-[var(--gf-dourado)]">
+                      {ultimaConquista.icone ? (
+                        <span className="text-sm leading-none">{ultimaConquista.icone}</span>
+                      ) : (
+                        <Trophy size={14} />
+                      )}
+                    </span>
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      <span className="text-[11px] text-[var(--gf-texto-sec)]">
+                        Última conquista
+                      </span>
+                      <span className="truncate text-[var(--gf-texto)]">
+                        {ultimaConquista.nome ?? "(conquista removida)"} ·{" "}
+                        {tempoDesde(ultimaConquista.desbloqueadaEm)}
+                      </span>
+                    </div>
+                  </div>
+                )}
+                {proximaConquista?.info && (
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[11px] text-[var(--gf-texto-sec)]">
+                      Próxima conquista
+                    </span>
+                    <p className="truncate text-sm text-[var(--gf-texto)]">
+                      {proximaConquista.info.nome}
+                    </p>
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--gf-surface-alta)]">
+                      <div
+                        className="h-full rounded-full bg-[var(--gf-dourado)]"
+                        style={{
+                          width: `${Math.min(100, (proximaConquista.realizado / proximaConquista.alvo) * 100)}%`,
+                        }}
+                      />
+                    </div>
+                    <p className="text-xs text-[var(--gf-texto-sec)]">
+                      Você está em {proximaConquista.realizado} de {proximaConquista.alvo}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </CartaoGf>
+
+          {/* Fecha a coluna, discreta de propósito: sem mais peso visual que
+              Meta/Conquistas, só saldo + prévia + acesso à loja completa. */}
+          <CartaoGf
+            titulo={<span className="flex items-center gap-2"><ShoppingCart size={15} className="text-[var(--gf-dourado)]" />Loja</span>}
+            acao={
+              <Link
+                href="/gamificacao/loja"
+                className="text-sm text-[var(--gf-verde)] hover:underline"
+              >
+                Ver loja →
+              </Link>
+            }
+          >
+            {!recompensas?.length ? (
+              <EstadoVazioGf Icone={ShoppingCart} compacto>
+                Nenhuma recompensa disponível.
+              </EstadoVazioGf>
+            ) : (
+              <div className="flex items-center justify-between gap-2 overflow-hidden">
+                <p className="shrink-0 text-xs text-[var(--gf-texto-sec)]">
+                  Seu saldo
+                  <br />
+                  <span className="text-sm font-semibold text-[var(--gf-texto)]">
+                    {meuSaldoMoedas.toLocaleString("pt-BR")} moedas
+                  </span>
+                </p>
+                <div className="flex min-w-0 items-center gap-1 overflow-hidden">
+                  {recompensas.slice(0, 3).map((r) => (
+                    <RecompensaChipGf
+                      key={r.id}
+                      recompensa={{ id: r.id, nome: r.nome, custoMoedas: r.custo_moedas }}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </CartaoGf>
+        </div>
       </div>
+
     </div>
   );
 }
