@@ -6,7 +6,9 @@ Consulte só a seção necessária para a tarefa. Regras permanentes ficam no `C
 
 ```
 src/app/(app)/          telas logadas: inicio, negocios (Kanban/lista), contatos, tarefas,
-                        painel (gestor), gamificacao (ranking, extrato, jornada, loja, metas, comissoes),
+                        painel (gestor), gamificacao (visão gerencial/pessoal em _gerencial/_pessoal, ranking,
+                        extrato, jornada, loja, metas, comissoes, administracao; tema escuro
+                        e componentes em _compartilhado),
                         configuracoes (funil, origens, usuarios, equipes, calculadora, propostas,
                         contrato, captura, gamificacao, metas, comissoes, resgates, listas),
                         perfil, super-admin (empresas, cobrança); menu.tsx e layout.tsx
@@ -22,7 +24,7 @@ src/lib/supabase/       clientes (server, navegador, admin), proxy.ts (middlewar
 supabase/migrations/    schema + RLS (fonte da verdade do banco)
 tests/                  Vitest; os testes *-db e rls precisam do Supabase local
 scripts/                criar-super-admin, seed-equipe-cascavel (legado), seed-metas-vendedores;
-                        seed-base-demo.mjs pertence à PR #132 até o merge
+                        seed-base-demo.mjs (empresa demo separada) pertence à PR #132 até o merge
 .github/workflows/      ci.yml, banco-producao.yml, seed-equipe-cascavel.yml, seed-metas-vendedores.yml; dependabot.yml
 ```
 
@@ -41,6 +43,7 @@ scripts/                criar-super-admin, seed-equipe-cascavel (legado), seed-m
 
 - Arquivo novo: `supabase/migrations/AAAAMMDDHHMMSS_nome.sql`. **Confira as migrations das PRs abertas antes de escolher o prefixo** — versões iguais quebram o `db push`.
 - `src/lib/supabase/database.types.ts` é **gerado** por `pnpm db:types` depois de mudar o banco. Nunca edite à mão — o CI compara byte a byte com a saída do gerador. O arquivo é grande: para consultar, busque a tabela pelo nome.
+- Produção pode estar à frente da `main` quando uma migration de PR é aplicada antes do merge (ex.: `20261006120000_recompensas_imagem.sql`, PR #139). Confira antes de escolher prefixo ou reaplicar.
 - Produção: `banco-producao.yml` roda `supabase db push --include-all` a cada push na `main` que toque migrations (ou manualmente). O preview do Vercel usa o **mesmo** banco de produção: PR com migration nova dá erro no preview até ser aplicada.
 - Entrega que depende de tabela de PR não mesclada nasce da branch dessa PR (PR empilhada).
 

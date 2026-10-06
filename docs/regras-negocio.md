@@ -4,7 +4,7 @@ Não altere nenhuma destas regras sem pedido explícito do Evandro.
 
 - **Funil padrão (atual na `main`):** 4 etapas criadas para cada empresa nova — Novo lead → Contato feito → Visita agendada → Proposta enviada. Configurável só por admin.
 - **Ganho e Perdido não são etapas do funil:** são valores de `negocios.status` (`aberto`/`ganho`/`perdido`). A perda exige motivo (`motivo_perda_id`). Uma etapa pode ter `fecha_como` (`ganho` ou `perdido`) para fechar o negócio ao receber o card; "perdido" sempre passa pelo motivo.
-- **Funil de 9 etapas (Base Demo, PR #132 — ainda não executada):** Novo Lead → Qualificação → Contato Realizado → Levantamento/Diagnóstico → Proposta Enviada → Follow-up → Negociação → Assinado (`fecha_como='ganho'`) → Pago. Só passa a valer na empresa de demonstração quando o seed for executado com autorização.
+- **Funil de 9 etapas (só na empresa "Raion Solar Demo", PR #132 — não mesclada):** Novo Lead → Qualificação → Contato Realizado → Levantamento/Diagnóstico → Proposta Enviada → Follow-up → Negociação → Assinado (`fecha_como='ganho'`) → Pago. Não altera o funil de nenhuma empresa existente.
 - **Distribuição de leads:** rodízio automático entre vendedores ativos, com fila de aprovação do gestor; prazo de auto-aprovação configurável por origem (padrão 1h). Expiração via `pg_cron` a cada 5 min.
 - **Status do vendedor:** Ativo / Inativo / Desligado; só ativos entram no rodízio.
 - **Leads parados:** negócio aberto sem mudar de etapa nem ganhar nota há mais que `empresas.dias_considerado_parado` (padrão 7).
@@ -15,4 +15,4 @@ Não altere nenhuma destas regras sem pedido explícito do Evandro.
 - **Cobrança:** super-admin define plano/valor por empresa; sem gateway de pagamento.
 - **Proposta e contrato** "fotografam" o modelo na geração; editar o modelo depois não muda o documento já gerado. Contrato só pode ser regerado em rascunho.
 - CNH e documentos pessoais são dado sensível (LGPD): acesso restrito.
-- **Dados de teste (legado):** Equipe Cascavel em produção (Camila, Rafael, Bruno; e-mails `*.teste@raioncrm-demo.com.br`), criada por `scripts/seed-equipe-cascavel.mjs`. Será substituída pela base fictícia de demonstração da PR #132 (`scripts/seed-base-demo.mjs`) quando o seed for executado com autorização. O repositório é público: senhas não ficam aqui.
+- **Dados de teste (legado):** Equipe Cascavel em produção (Camila, Rafael, Bruno; e-mails `*.teste@raioncrm-demo.com.br`), criada por `scripts/seed-equipe-cascavel.mjs`. A base de demonstração da PR #132 (`scripts/seed-base-demo.mjs`) não a substitui nem apaga: cria uma empresa separada, "Raion Solar Demo". O repositório é público: senhas não ficam aqui.

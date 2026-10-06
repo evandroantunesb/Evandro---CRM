@@ -1,6 +1,6 @@
 # Roadmap de produto — Raion CRM
 
-Visão consolidada do produto. **Última atualização: 2026-10-05.** Percentuais são estimativas aproximadas para orientar prioridade, não medições. Estado detalhado e PRs em `docs/PROJECT_STATUS.md`.
+Visão consolidada do produto. **Última atualização: 2026-10-06.** Percentuais são estimativas aproximadas para orientar prioridade, não medições. Estado detalhado e PRs em `docs/PROJECT_STATUS.md`.
 
 Legenda da coluna Situação: **produção** = mesclado na `main` e em produção · **branch** = implementado em PR ainda não mesclada (não está na `main` nem em produção) · **—** = roadmap, não iniciado ou só esboçado.
 
@@ -17,9 +17,9 @@ Legenda da coluna Situação: **produção** = mesclado na `main` e em produçã
 | Calculadora Solar | 72% | produção: calculadora, kit e proposta · **branch (PR #101):** motor de dimensionamento reconciliado no wizard de 3 etapas |
 | Catálogo Técnico | 75% | **branch (PR #101):** parte relevante do avanço — catálogo de equipamentos, dados solares, tarifas ANEEL, municípios/distribuidoras (13 migrations pendentes); não está na `main` nem em produção |
 | Propostas | 50% | produção |
-| Gamificação | 88% | produção |
+| Gamificação | 88% | produção: motor, dashboards gerencial/pessoal, menu e tema escuro (#130, #131, #136–#138) · **branch (PR #139):** imagem nas recompensas (migration já aplicada em produção) |
 | Interface/UX geral | 55% | produção |
-| Base Demo | 85% | **branch (PR #132):** script pronto, dry-run feito; execução real pendente de autorização |
+| Base Demo | 85% | **branch (PR #132):** script cria empresa separada "Raion Solar Demo" sem apagar nada; 1ª execução real parou no 1º negócio (corrigido); retomada pendente de autorização |
 | Segurança/Produção | 70% | produção |
 | Onboarding | 15% | — |
 | Tipos de Solução | 10% | — |

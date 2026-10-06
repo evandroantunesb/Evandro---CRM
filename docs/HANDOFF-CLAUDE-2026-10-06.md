@@ -1,5 +1,7 @@
 # Handoff — Raion CRM (2026-10-06)
 
+> **Retrato de 2026-10-05, já desatualizado** (Base Demo, PRs #114/#136–#139). Estado atual em `docs/PROJECT_STATUS.md`.
+
 Documento gerado para troca de conta/sessão. Complementa (e em caso de conflito, prevalece sobre) o `PROGRESS.md` (datado de 2026-09-30, desatualizado em vários pontos) e o `HANDOFF.md` da raiz (datado de 2026-09-29, obsoleto). Leia primeiro este arquivo, depois `CLAUDE.md`, `docs/arquitetura.md` e `docs/regras-negocio.md` só sob demanda da tarefa.
 
 ## 1. Visão geral

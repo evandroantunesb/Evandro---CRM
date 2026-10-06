@@ -40,7 +40,7 @@ Este arquivo contém só regras duráveis. Estado atual em `docs/PROJECT_STATUS.
 
 - Leitura direcionada: busque antes de abrir e leia só o trecho necessário. Não leia `node_modules/` (exceto `node_modules/next/dist/docs/`), `.next/`, lockfile ou arquivos gerados sem necessidade.
 - Um agente resolve a maioria das tarefas; agentes paralelos só com escopo fechado e sem sobreposição.
-- O modelo é escolhido pelo Evandro. Nunca diga que trocou de modelo sem ter trocado. Recomende um modelo mais forte só com justificativa técnica (arquitetura, regra complexa, bug difícil entre módulos).
+- O modelo é escolhido pelo Evandro; nunca diga que trocou de modelo sem ter trocado. Sonnet é o padrão (tarefas bem definidas, interface, scripts, testes, documentação). Opus só quando risco ou complexidade justificar: arquitetura, migrations delicadas, banco de produção, RLS/permissões, gamificação/metas/comissões, impacto em vários módulos, revisão de PR grande, bug difícil. Recomende Opus dizendo por quê.
 - Mantenha a mesma thread na mesma funcionalidade; não crie thread nova sem autorização. Antes de trocar, atualize `docs/PROJECT_STATUS.md` para que a próxima sessão continue só com o repositório.
 
 ## Documentação
@@ -52,7 +52,7 @@ Este arquivo contém só regras duráveis. Estado atual em `docs/PROJECT_STATUS.
 
 - **Português** é o idioma padrão do produto (interface, rotas, nomes, commits) e da comunicação com o Evandro.
 - Mobile é prioridade; reutilize `src/components/ui.tsx`.
-- **Identidade visual (não alterar):** Carvão `#0F0F10`, Dourado Solar `#D4AF37`, Off-white `#FAF8F3`, Cinza `#6B7280`, Cinza claro `#E5E7EB` (`src/app/globals.css`); Manrope nos títulos, Inter nos textos; logo em `src/components/marca.tsx` + `public/marca/`. Verde só no WhatsApp, vermelho só para perda e erro. **Exceção (só em `/gamificacao`):** verde é a cor contextual principal, dourado reservado a prestígio/conquistas, vermelho limitado a alertas.
+- **Identidade visual (não alterar):** Carvão `#0F0F10`, Dourado Solar `#D4AF37`, Off-white `#FAF8F3`, Cinza `#6B7280`, Cinza claro `#E5E7EB` (`src/app/globals.css`); Manrope nos títulos, Inter nos textos; logo em `src/components/marca.tsx` + `public/marca/`. Verde só no WhatsApp, vermelho só para perda e erro. **Exceção (só no módulo de gamificação — `/gamificacao` e `/configuracoes/{metas,comissoes,resgates}`):** tema escuro, verde como cor contextual principal, dourado reservado a prestígio/conquistas, vermelho limitado a alertas.
 - Respostas objetivas: o que mudou, arquivos, testes feitos e pendências.
 
 ## Segurança
