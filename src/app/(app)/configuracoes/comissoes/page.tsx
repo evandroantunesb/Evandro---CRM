@@ -1,14 +1,12 @@
-import { Cartao, Selo } from "@/components/ui";
+import { Banknote } from "lucide-react";
 import { carregarConfiguracao } from "@/lib/crm";
 import { formatarMoeda } from "@/lib/formatacao";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { ROTULO_STATUS_COMISSAO, type StatusComissao, type TipoCalculoComissao } from "@/lib/tipos";
+import type { StatusComissao, TipoCalculoComissao } from "@/lib/tipos";
+import { formatarReferenciaComissao, StatusComissaoGf } from "../../gamificacao/_compartilhado/comissao-ui";
+import { CabecalhoPaginaGf, CartaoGf, EstadoVazioGf, PaginaGf, VoltarGf } from "../../gamificacao/_compartilhado/ui";
 import { CalcularComissaoForm, FecharComissaoForm, HistoricoVersoesPlano, PlanoComissaoForm, type VersaoPlano } from "./formularios";
-
-function formatarReferencia(referencia: string) {
-  return new Date(`${referencia}T00:00:00Z`).toLocaleDateString("pt-BR", { month: "long", year: "numeric", timeZone: "UTC" });
-}
 
 export default async function ConfigComissoes() {
   const { atual } = await exigirPapel("admin");
@@ -48,52 +46,79 @@ export default async function ConfigComissoes() {
   }
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-4">
-      <h1 className="text-2xl font-semibold text-zinc-900">Comissões</h1>
-      <p className="text-sm text-zinc-600">
-        Cada colaborador tem um plano com salário-base opcional e faixas de resultado (receita de negócios ganhos no
-        mês). É um conceito separado de pontos e de metas — não afeta o extrato nem o ranking da gamificação. Alterar
-        o plano cria uma nova versão com vigência a partir do mês escolhido; versões passadas são preservadas.
-      </p>
+    <PaginaGf largura="formulario">
+      <VoltarGf href="/gamificacao/administracao">Administração</VoltarGf>
+      <CabecalhoPaginaGf
+        titulo="Comissões"
+        descricao="Cada colaborador tem um plano com salário-base opcional e faixas de resultado (receita de negócios ganhos no mês). É um conceito separado de pontos e de metas — não afeta o extrato nem o ranking da gamificação. Alterar o plano cria uma nova versão com vigência a partir do mês escolhido; versões passadas são preservadas."
+      />
 
-      <Cartao titulo="Planos por colaborador">
-        {membros.map((membro) => {
-          const versoes = versoesPorMembro.get(membro.id) ?? [];
-          const versaoAtual = versoes.find((v) => v.vigenciaInicio <= mesAtual) ?? null;
-          return (
-            <div key={membro.id}>
-              <PlanoComissaoForm membro={membro} versaoAtual={versaoAtual} />
-              <HistoricoVersoesPlano versoes={versoes} versaoVigenteId={versaoAtual?.id ?? null} mesAtual={mesAtual} />
-            </div>
-          );
-        })}
-      </Cartao>
+      <CartaoGf titulo="Planos por colaborador">
+        {!membros.length ? (
+          <EstadoVazioGf Icone={Banknote} compacto titulo="Nenhum colaborador ativo">
+            Cadastre colaboradores em Usuários para configurar planos de comissão.
+          </EstadoVazioGf>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {membros.map((membro) => {
+              const versoes = versoesPorMembro.get(membro.id) ?? [];
+              const versaoAtual = versoes.find((v) => v.vigenciaInicio <= mesAtual) ?? null;
+              return (
+                <div key={membro.id} className="gf-item-edicao flex flex-col gap-4">
+                  <PlanoComissaoForm membro={membro} versaoAtual={versaoAtual} />
+                  <HistoricoVersoesPlano versoes={versoes} versaoVigenteId={versaoAtual?.id ?? null} mesAtual={mesAtual} />
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CartaoGf>
 
-      <Cartao titulo="Calcular comissão do mês">
+      <CartaoGf titulo="Calcular comissão do mês">
         <CalcularComissaoForm membros={membros} />
-      </Cartao>
+      </CartaoGf>
 
-      <Cartao titulo={`Histórico de cálculo (${historico?.length ?? 0})`}>
-        {!historico?.length && <p className="text-sm text-zinc-600">Nenhum cálculo feito ainda.</p>}
-        <div className="flex flex-col">
-          {(historico ?? []).map((h) => (
-            <div
-              key={h.id}
-              className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-zinc-100 py-2 text-sm first:border-t-0"
-            >
-              <span className="flex items-center gap-2 text-zinc-900">
-                {nomeMembro.get(h.membro_id) ?? "(removido)"} · {formatarReferencia(h.referencia)}
-                <Selo tom={h.status === "fechada" ? "neutro" : "atencao"}>{ROTULO_STATUS_COMISSAO[h.status as StatusComissao]}</Selo>
-              </span>
-              <span className="flex items-center gap-3 text-zinc-600">
-                Resultado {formatarMoeda(h.resultado_apurado)} · Comissão {formatarMoeda(h.valor_comissao)} · Total{" "}
-                <span className="font-medium text-zinc-900">{formatarMoeda(h.valor_total)}</span>
-                {h.status === "aberta" && <FecharComissaoForm comissaoId={h.id} />}
-              </span>
-            </div>
-          ))}
-        </div>
-      </Cartao>
-    </div>
+      <CartaoGf titulo={`Histórico de cálculo (${historico?.length ?? 0})`}>
+        {!historico?.length ? (
+          <EstadoVazioGf Icone={Banknote} compacto titulo="Nenhum cálculo feito ainda">
+            Use “Calcular comissão do mês” acima para gerar o primeiro.
+          </EstadoVazioGf>
+        ) : (
+          <ul className="flex flex-col">
+            {historico.map((h) => (
+              <li
+                key={h.id}
+                className="flex flex-col gap-3 border-t border-[var(--gf-borda)] py-4 first:border-t-0 first:pt-0 last:pb-0 @min-[680px]:flex-row @min-[680px]:items-center @min-[680px]:justify-between"
+              >
+                <div className="min-w-0">
+                  <p className="gf-t-item break-words">{nomeMembro.get(h.membro_id) ?? "(removido)"}</p>
+                  <p className="gf-t-aux mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <span>{formatarReferenciaComissao(h.referencia)}</span>
+                    <StatusComissaoGf status={h.status as StatusComissao} />
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                  <dl className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+                    <div>
+                      <dt className="gf-t-micro">Resultado</dt>
+                      <dd className="gf-num font-medium">{formatarMoeda(h.resultado_apurado)}</dd>
+                    </div>
+                    <div>
+                      <dt className="gf-t-micro">Comissão</dt>
+                      <dd className="gf-num font-medium">{formatarMoeda(h.valor_comissao)}</dd>
+                    </div>
+                    <div>
+                      <dt className="gf-t-micro">Total</dt>
+                      <dd className="gf-num font-bold">{formatarMoeda(h.valor_total)}</dd>
+                    </div>
+                  </dl>
+                  {h.status === "aberta" && <FecharComissaoForm comissaoId={h.id} />}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CartaoGf>
+    </PaginaGf>
   );
 }

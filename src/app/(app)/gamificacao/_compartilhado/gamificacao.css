@@ -1,0 +1,476 @@
+/*
+ * Estilos compartilhados do módulo Gamificação (escopados em `.tema-gamificacao`).
+ * Importado por `tema-gamificacao.tsx`, então vale para /gamificacao e para as telas
+ * administrativas de /configuracoes (metas, comissões e resgates). Tokens de cor
+ * (`--gf-*`) e o remapeamento dos componentes claros ficam em src/app/globals.css.
+ *
+ * Responsividade por CONTAINER, não por viewport: o menu lateral ocupa 256 px a partir de
+ * 768 px, então a largura útil da página é bem menor que a da janela (1024 px -> ~688 px).
+ * `.tema-gamificacao` é um container (`@container` no TemaGamificacao).
+ */
+
+/* Mesma ordem de camadas do Tailwind: a escala tipográfica fica em `components`, então
+   utilitários (cor, peso) aplicados na mesma tag ainda a sobrescrevem. */
+@layer theme, base, components, utilities;
+
+.tema-gamificacao {
+  --gf-trilha: #38383f;
+  --gf-neutro-barra: #9b9ba3;
+  --gf-dourado-borda: rgb(212 175 55 / 40%);
+  --gf-verde-borda: rgb(52 211 153 / 40%);
+}
+
+@layer components {
+/* ------------------------------------------------------------------ */
+/* Escala tipográfica do módulo                                         */
+/*   página 28 · seção 17 · item 15 · KPI 20/28/40 · texto 14 ·         */
+/*   auxiliar 13 · microtexto 12 (mínimo; nada de 9–11 px no desktop)   */
+/* ------------------------------------------------------------------ */
+.tema-gamificacao .gf-t-pagina {
+  font-family: var(--font-titulo);
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: var(--gf-texto);
+}
+
+.tema-gamificacao .gf-t-secao {
+  font-family: var(--font-titulo);
+  font-size: 1.0625rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--gf-texto);
+}
+
+.tema-gamificacao .gf-t-item {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--gf-texto);
+}
+
+.tema-gamificacao .gf-t-kpi-sm,
+.tema-gamificacao .gf-t-kpi,
+.tema-gamificacao .gf-t-kpi-lg {
+  font-family: var(--font-titulo);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--gf-texto);
+  font-variant-numeric: tabular-nums;
+}
+
+.tema-gamificacao .gf-t-kpi-sm {
+  font-size: 1.25rem;
+  line-height: 1.2;
+}
+
+.tema-gamificacao .gf-t-kpi {
+  font-size: 1.75rem;
+  line-height: 1.1;
+}
+
+.tema-gamificacao .gf-t-kpi-lg {
+  font-size: 2.25rem;
+  line-height: 1.05;
+}
+
+.tema-gamificacao .gf-t-texto {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--gf-texto);
+}
+
+.tema-gamificacao .gf-t-aux {
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--gf-texto-sec);
+}
+
+.tema-gamificacao .gf-t-micro {
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--gf-texto-sec);
+}
+
+.tema-gamificacao .gf-t-rotulo {
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--gf-texto-sec);
+}
+
+.tema-gamificacao .gf-num {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (min-width: 768px) {
+  .tema-gamificacao .gf-t-pagina {
+    font-size: 1.75rem;
+  }
+
+  .tema-gamificacao .gf-t-kpi-lg {
+    font-size: 2.5rem;
+  }
+}
+}
+
+/* ------------------------------------------------------------------ */
+/* Acessibilidade e interação comuns                                    */
+/* ------------------------------------------------------------------ */
+.tema-gamificacao :is(a, button, summary, select, input, textarea):focus-visible {
+  outline: 2px solid var(--gf-verde);
+  outline-offset: 2px;
+}
+
+/* Campos já têm anel de foco próprio (borda + ring): sem contorno duplo. */
+.tema-gamificacao :is(input:not([type="checkbox"], [type="radio"]), select, textarea):focus-visible {
+  outline-offset: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tema-gamificacao * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Formulários das telas administrativas (componentes de ui.tsx)        */
+/* Altura confortável, rótulos legíveis, botões com alvo de toque.      */
+/* ------------------------------------------------------------------ */
+.tema-gamificacao :is(input:not([type="checkbox"], [type="radio"]), select, textarea) {
+  min-height: 2.75rem;
+  font-size: 0.9375rem;
+}
+
+.tema-gamificacao label > span.font-medium {
+  font-size: 0.8125rem;
+  line-height: 1.3;
+  color: var(--gf-texto);
+}
+
+.tema-gamificacao label:has(> input[type="checkbox"], > input[type="radio"]) {
+  min-height: 2.25rem;
+  gap: 0.5rem;
+}
+
+.tema-gamificacao input[type="checkbox"],
+.tema-gamificacao input[type="radio"] {
+  width: 1.125rem;
+  height: 1.125rem;
+  flex-shrink: 0;
+}
+
+.tema-gamificacao fieldset {
+  min-width: 0;
+  border-color: var(--gf-borda);
+  border-radius: 0.75rem;
+  background-color: rgb(255 255 255 / 2%);
+}
+
+.tema-gamificacao fieldset > legend {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--gf-texto-sec);
+}
+
+.tema-gamificacao :is(button.bg-carvao, button.bg-white) {
+  min-height: 2.75rem;
+  padding-inline: 1.25rem;
+}
+
+/* Ações destrutivas em texto (Apagar, Remover): legíveis, com alvo de toque e sem competir com Salvar. */
+.tema-gamificacao .gf-botao-texto {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  border-radius: 0.5rem;
+  padding-inline: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--gf-texto-sec);
+  transition: color 0.15s, background-color 0.15s;
+}
+
+.tema-gamificacao .gf-botao-texto:hover:not(:disabled) {
+  background-color: var(--gf-vermelho-10);
+  color: var(--gf-vermelho);
+}
+
+.tema-gamificacao .gf-botao-texto:disabled {
+  opacity: 0.5;
+}
+
+.tema-gamificacao .gf-botao-texto-neutro:hover:not(:disabled) {
+  background-color: var(--gf-verde-10);
+  color: var(--gf-verde);
+}
+
+@media (max-width: 767px) {
+  /* 16 px evita o zoom automático do iOS ao focar o campo. */
+  .tema-gamificacao :is(input:not([type="checkbox"], [type="radio"]), select, textarea) {
+    font-size: 1rem;
+  }
+}
+
+/* Item de lista editável (regra, nível, conquista, recompensa, meta...). */
+.tema-gamificacao .gf-item-edicao {
+  border: 1px solid var(--gf-borda);
+  border-radius: 0.75rem;
+  background-color: rgb(255 255 255 / 2.5%);
+  padding: 1rem;
+}
+
+@media (min-width: 640px) {
+  .tema-gamificacao .gf-item-edicao {
+    padding: 1.25rem;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Linha de ranking (RankingTabsGf e página /gamificacao/ranking)       */
+/* ------------------------------------------------------------------ */
+.tema-gamificacao .gf-linha-rank {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 0.75rem;
+  row-gap: 0.375rem;
+}
+
+.tema-gamificacao .gf-linha-rank--avatar {
+  grid-template-columns: 2rem 2.25rem minmax(0, 1fr) auto;
+}
+
+.tema-gamificacao .gf-linha-rank-barra {
+  grid-column: 2 / -1;
+}
+
+.tema-gamificacao .gf-linha-rank--avatar .gf-linha-rank-barra {
+  grid-column: 3 / -1;
+}
+
+@container (min-width: 640px) {
+  .tema-gamificacao .gf-linha-rank--larga {
+    grid-template-columns: 2.5rem 2.5rem minmax(0, 1.6fr) minmax(0, 2fr) 7.5rem;
+    column-gap: 1rem;
+  }
+
+  .tema-gamificacao .gf-linha-rank--larga .gf-linha-rank-barra {
+    grid-column: 4;
+    grid-row: 1;
+  }
+
+  .tema-gamificacao .gf-linha-rank--larga .gf-linha-rank-xp {
+    grid-column: 5;
+    grid-row: 1;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Visão geral PESSOAL                                                  */
+/* Sem alturas fixas: cada cartão cresce com o conteúdo e as colunas    */
+/* se igualam por stretch. Breakpoints pelo container (ver topo):       */
+/*   <600 uma coluna · 600-879 duas · >=880 três (1280 px de janela).   */
+/* ------------------------------------------------------------------ */
+.tema-gamificacao .gf-pessoal {
+  display: flex;
+  width: 100%;
+  max-width: 1500px;
+  margin-inline: auto;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.tema-gamificacao .gf-kpis {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+@container (min-width: 720px) {
+  .tema-gamificacao .gf-kpis {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.tema-gamificacao .gf-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.75rem;
+}
+
+.tema-gamificacao .gf-area {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.75rem;
+}
+
+.tema-gamificacao .gf-col {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* Cartões da coluna dividem a altura sobrando (bordas inferiores alinhadas). */
+.tema-gamificacao .gf-col > section {
+  flex: 1 1 auto;
+}
+
+@container (min-width: 600px) {
+  .tema-gamificacao .gf-hero {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tema-gamificacao .gf-hero-posicao {
+    grid-column: 1 / -1;
+  }
+
+  .tema-gamificacao .gf-area {
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  }
+
+  /* Lateral vira uma faixa de três cartões lado a lado abaixo das duas colunas. */
+  .tema-gamificacao .gf-col-lateral {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(13.75rem, 1fr));
+  }
+}
+
+@container (min-width: 880px) {
+  .tema-gamificacao .gf-hero {
+    grid-template-columns: minmax(0, 1.9fr) minmax(0, 1.1fr) minmax(15.5rem, 1fr);
+  }
+
+  .tema-gamificacao .gf-hero-posicao {
+    grid-column: auto;
+  }
+
+  .tema-gamificacao .gf-area {
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .tema-gamificacao .gf-col-lateral {
+    grid-column: auto;
+    display: flex;
+  }
+}
+
+/* Hero "Minha posição": a paisagem faz parte da identidade da Visão geral. */
+.tema-gamificacao .gf-hero-posicao {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 77% 21%, rgb(212 175 55 / 20%) 0 2%, transparent 12%),
+    radial-gradient(circle at 73% 31%, rgb(52 211 153 / 18%), transparent 28%),
+    linear-gradient(115deg, #07110d 0%, #0b1b14 48%, #101614 100%);
+}
+
+.tema-gamificacao .gf-hero-posicao::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  right: -3%;
+  bottom: -20%;
+  width: 72%;
+  height: 92%;
+  clip-path: polygon(0 100%, 13% 73%, 24% 82%, 39% 47%, 48% 61%, 61% 18%, 72% 52%, 82% 39%, 100% 100%);
+  background:
+    linear-gradient(155deg, rgb(52 211 153 / 30%), transparent 48%),
+    linear-gradient(180deg, #163b2b, #08110d 78%);
+  opacity: 0.95;
+}
+
+.tema-gamificacao .gf-hero-posicao::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgb(4 10 7 / 92%) 0%, rgb(4 10 7 / 52%) 48%, transparent 76%),
+    radial-gradient(circle at 73% 23%, rgb(52 211 153 / 12%), transparent 26%);
+  pointer-events: none;
+}
+
+.tema-gamificacao .gf-hero-posicao > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ------------------------------------------------------------------ */
+/* Visão geral GERENCIAL                                                */
+/* ------------------------------------------------------------------ */
+.tema-gamificacao .gf-gerencial {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.tema-gamificacao .gf-gerencial-rankings,
+.tema-gamificacao .gf-gerencial-baixo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.75rem;
+}
+
+.tema-gamificacao .gf-gerencial-ranking {
+  display: flex;
+  min-width: 0;
+  max-height: 34rem;
+  flex-direction: column;
+}
+
+@container (min-width: 700px) {
+  .tema-gamificacao .gf-gerencial-rankings {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+  }
+
+  .tema-gamificacao .gf-gerencial-baixo {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+  }
+
+  .tema-gamificacao .gf-gerencial-baixo > .gf-gerencial-metas {
+    grid-column: 1 / -1;
+  }
+}
+
+@container (min-width: 1000px) {
+  .tema-gamificacao .gf-gerencial-baixo {
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .tema-gamificacao .gf-gerencial-baixo > .gf-gerencial-metas {
+    grid-column: auto;
+  }
+}
+
+/* Listas longas rolam dentro do cartão em vez de esticar a página. */
+.tema-gamificacao .gf-gerencial-lista {
+  display: flex;
+  max-height: 26rem;
+  flex-direction: column;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.tema-gamificacao .gf-gerencial-lista > * {
+  flex-shrink: 0;
+}
+
+/* Pódio do Ranking e saldo da Loja: brilho dourado discreto no topo (prestígio), sem neon. */
+@layer components {
+  .tema-gamificacao .gf-podio-card {
+    background-image: radial-gradient(60% 90% at 50% 0%, var(--gf-dourado-10), transparent 70%);
+  }
+}

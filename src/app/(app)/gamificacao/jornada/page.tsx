@@ -1,7 +1,16 @@
-import { Cartao } from "@/components/ui";
+import { Award, Check, Lock } from "lucide-react";
 import { calcularNivel, ROTULO_MARCO_CONQUISTA, type MarcoConquista } from "@/lib/gamificacao";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
+import {
+  BadgeGf,
+  BarraProgressoGf,
+  CabecalhoPaginaGf,
+  CartaoGf,
+  EstadoVazioGf,
+  formatarNumeroGf,
+  PaginaGf,
+} from "../_compartilhado/ui";
 
 function descreverCriterio(criterio: unknown) {
   const c = criterio as { metrica: "xp_acumulado" | "marco_contagem"; valor: number; marco?: string };
@@ -11,6 +20,8 @@ function descreverCriterio(criterio: unknown) {
   }
   return `Acumule ${c.valor.toLocaleString("pt-BR")} XP`;
 }
+
+const HEXAGONO = "[clip-path:polygon(25%_5%,75%_5%,100%_50%,75%_95%,25%_95%,0_50%)]";
 
 export default async function MinhaJornada() {
   const { atual } = await exigirPapel();
@@ -48,52 +59,178 @@ export default async function MinhaJornada() {
   const conquistasVisiveis = (conquistas ?? []).filter((c) => c.ativa || idsDesbloqueadas.has(c.id));
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-4">
-      <h1 className="text-2xl font-semibold text-zinc-900">Minha jornada</h1>
+    <PaginaGf largura="media">
+      <CabecalhoPaginaGf
+        titulo="Minha jornada"
+        descricao="Seu nível, o caminho até o próximo e as conquistas que você já desbloqueou."
+      />
 
-      <Cartao titulo="Nível atual">
-        <div className="flex items-baseline justify-between">
-          <span className="text-3xl font-semibold text-zinc-900">
-            {nivelAtual.nivel}
-            {nivelAtual.nome && <span className="ml-2 text-base font-normal text-zinc-500">{nivelAtual.nome}</span>}
-          </span>
-          {proximoNivel && (
-            <span className="text-sm text-zinc-600">
-              faltam {(proximoNivel.xpMinimo - totalXp).toLocaleString("pt-BR")} XP para o nível {proximoNivel.nivel}
+      <CartaoGf destaque>
+        <div className="flex flex-col gap-5 @min-[560px]:flex-row @min-[560px]:items-center">
+          <div className="flex min-w-0 items-center gap-4 @min-[560px]:w-72 @min-[560px]:shrink-0">
+            <span
+              aria-hidden
+              className={`flex h-16 w-16 shrink-0 items-center justify-center bg-[var(--gf-verde-10)] font-titulo text-3xl font-bold text-[var(--gf-verde)] ring-1 ring-[var(--gf-verde)]/60 ${HEXAGONO}`}
+            >
+              {nivelAtual.nivel}
             </span>
-          )}
-        </div>
-        <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-zinc-100">
-          <div className="h-full rounded-full bg-[var(--gf-verde)]" style={{ width: `${progresso}%` }} />
-        </div>
-        <p className="mt-1 text-xs text-zinc-500">{totalXp.toLocaleString("pt-BR")} XP acumulado</p>
-      </Cartao>
-
-      <Cartao titulo={`Conquistas (${idsDesbloqueadas.size} de ${conquistasVisiveis.length})`}>
-        {!conquistasVisiveis.length && <p className="text-sm text-zinc-600">Nenhuma conquista configurada ainda.</p>}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {conquistasVisiveis.map((c) => {
-            const desbloqueada = idsDesbloqueadas.has(c.id);
-            return (
-              <div
-                key={c.id}
-                className={`flex flex-col items-center gap-1 rounded-lg border p-3 text-center ${
-                  desbloqueada ? "border-dourado/40 bg-dourado/5" : "border-zinc-200 bg-zinc-50 opacity-60"
-                }`}
-              >
-                <span className="text-2xl">{desbloqueada ? c.icone : "🔒"}</span>
-                <span className="text-xs font-medium text-zinc-900">
-                  {c.nome}
-                  {!c.ativa && <span className="ml-1 text-[10px] text-zinc-400">(desativada)</span>}
+            <div className="min-w-0">
+              <p className="gf-t-rotulo">Nível atual</p>
+              <p className="gf-t-kpi mt-1 break-words">{nivelAtual.nome ?? `Nível ${nivelAtual.nivel}`}</p>
+              <p className="gf-t-aux mt-0.5">
+                <span className="gf-num font-semibold text-[var(--gf-texto)]">{formatarNumeroGf(totalXp)} XP</span>{" "}
+                acumulados
+              </p>
+            </div>
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-sm">
+              <span className="text-[var(--gf-texto-sec)]">
+                {proximoNivel
+                  ? `Rumo ao nível ${proximoNivel.nivel}${proximoNivel.nome ? ` · ${proximoNivel.nome}` : ""}`
+                  : "Nível máximo alcançado"}
+              </span>
+              {proximoNivel && (
+                <span className="gf-num font-semibold text-[var(--gf-texto)]">
+                  Faltam {formatarNumeroGf(proximoNivel.xpMinimo - totalXp)} XP
                 </span>
-                {!desbloqueada && (
-                  <span className="text-[11px] text-zinc-500">{descreverCriterio(c.criterio)}</span>
-                )}
-              </div>
-            );
-          })}
+              )}
+            </div>
+            <BarraProgressoGf
+              valor={progresso}
+              tamanho="lg"
+              rotulo={proximoNivel ? `Progresso até o nível ${proximoNivel.nivel}` : "Nível máximo alcançado"}
+              className="mt-2.5"
+            />
+            <p className="gf-t-micro mt-1.5">{progresso}% do caminho neste nível</p>
+          </div>
         </div>
-      </Cartao>
-    </div>
+      </CartaoGf>
+
+      {niveisNormalizados.length > 0 && (
+        <CartaoGf titulo="Progressão de níveis" descricao="Do primeiro ao último nível configurado.">
+          <ol className="flex flex-col">
+            {niveisNormalizados.map((n, i) => {
+              const atualNivel = n.nivel === nivelAtual.nivel;
+              const concluido = !atualNivel && n.xpMinimo <= totalXp;
+              const proximo = proximoNivel?.nivel === n.nivel;
+              const ultimo = i === niveisNormalizados.length - 1;
+              return (
+                <li key={n.nivel} className="flex gap-4" aria-current={atualNivel ? "step" : undefined}>
+                  <div className="flex flex-col items-center">
+                    <span
+                      aria-hidden
+                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
+                        atualNivel
+                          ? "bg-[var(--gf-verde)] text-[var(--gf-on-verde)]"
+                          : concluido
+                            ? "bg-[var(--gf-verde-10)] text-[var(--gf-verde)] ring-1 ring-[var(--gf-verde-borda)]"
+                            : "border border-dashed border-[var(--gf-neutro-barra)] text-[var(--gf-texto-sec)]"
+                      }`}
+                    >
+                      {concluido ? <Check size={18} strokeWidth={3} /> : n.nivel}
+                    </span>
+                    {!ultimo && (
+                      <span
+                        aria-hidden
+                        className={`my-1 w-0.5 flex-1 ${concluido ? "bg-[var(--gf-verde-borda)]" : "bg-[var(--gf-borda)]"}`}
+                      />
+                    )}
+                  </div>
+                  <div className={`min-w-0 flex-1 ${ultimo ? "" : "pb-6"}`}>
+                    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                      <p className="gf-t-item text-base break-words">
+                        Nível {n.nivel}
+                        {n.nome && <span className="font-normal text-[var(--gf-texto-sec)]"> · {n.nome}</span>}
+                      </p>
+                      {atualNivel ? (
+                        <BadgeGf tom="positivo">Você está aqui</BadgeGf>
+                      ) : concluido ? (
+                        <BadgeGf tom="neutro" Icone={Check}>
+                          Concluído
+                        </BadgeGf>
+                      ) : proximo ? (
+                        <BadgeGf tom="atencao">Próximo nível</BadgeGf>
+                      ) : null}
+                    </div>
+                    <p className="gf-t-aux mt-0.5">
+                      {formatarNumeroGf(n.xpMinimo)} XP necessários
+                      {!atualNivel && !concluido && (
+                        <>
+                          {" · "}
+                          <span className="font-semibold text-[var(--gf-texto)]">
+                            faltam {formatarNumeroGf(n.xpMinimo - totalXp)} XP
+                          </span>
+                        </>
+                      )}
+                    </p>
+                    {proximo && (
+                      <BarraProgressoGf
+                        valor={progresso}
+                        rotulo={`Progresso até o nível ${n.nivel}`}
+                        className="mt-2.5 max-w-md"
+                      />
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        </CartaoGf>
+      )}
+
+      <CartaoGf
+        titulo="Conquistas"
+        Icone={Award}
+        tomIcone="dourado"
+        descricao={`${idsDesbloqueadas.size} de ${conquistasVisiveis.length} desbloqueadas`}
+      >
+        {!conquistasVisiveis.length ? (
+          <EstadoVazioGf Icone={Award} compacto titulo="Nenhuma conquista configurada ainda">
+            Quando a administração criar conquistas, você acompanha o progresso de cada uma aqui.
+          </EstadoVazioGf>
+        ) : (
+          <ul className="grid grid-cols-1 gap-3 @min-[480px]:grid-cols-2 @min-[820px]:grid-cols-3">
+            {conquistasVisiveis.map((c) => {
+              const desbloqueada = idsDesbloqueadas.has(c.id);
+              return (
+                <li
+                  key={c.id}
+                  className={`flex min-w-0 items-start gap-3 rounded-xl border p-4 ${
+                    desbloqueada
+                      ? "border-[var(--gf-dourado-borda)] bg-[var(--gf-dourado-10)]"
+                      : "border-[var(--gf-borda)] bg-[var(--gf-surface-alta)]"
+                  }`}
+                >
+                  <span
+                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-2xl leading-none ${
+                      desbloqueada
+                        ? "bg-[var(--gf-surface)]"
+                        : "bg-[var(--gf-surface)] text-[var(--gf-texto-sec)]"
+                    }`}
+                  >
+                    {desbloqueada ? c.icone : <Lock size={20} aria-hidden />}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="gf-t-item break-words">{c.nome}</p>
+                    {c.descricao && <p className="gf-t-aux mt-0.5 line-clamp-2 break-words">{c.descricao}</p>}
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      {desbloqueada ? (
+                        <BadgeGf tom="atencao" Icone={Check}>
+                          Desbloqueada
+                        </BadgeGf>
+                      ) : (
+                        <span className="gf-t-micro">{descreverCriterio(c.criterio)}</span>
+                      )}
+                      {!c.ativa && <BadgeGf>Desativada</BadgeGf>}
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </CartaoGf>
+    </PaginaGf>
   );
 }

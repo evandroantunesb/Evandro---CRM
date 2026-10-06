@@ -3,7 +3,15 @@ import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { formatarDataHora } from "@/lib/formatacao";
 import { AbasSecao } from "../_compartilhado/abas-secao";
-import { CartaoGf, EstadoVazioGf, LinhaLancamento } from "../_compartilhado/ui";
+import {
+  CabecalhoPaginaGf,
+  CartaoGf,
+  EstadoVazioGf,
+  formatarNumeroGf,
+  LinhaLancamento,
+  LinkAcaoGf,
+  PaginaGf,
+} from "../_compartilhado/ui";
 
 export default async function ExtratoDePontos() {
   const { atual } = await exigirPapel();
@@ -25,33 +33,57 @@ export default async function ExtratoDePontos() {
   const saldoMoedasReal = ativos.reduce((soma, l) => soma + l.moedas, 0);
   const totalMoedas = Math.max(saldoMoedasReal, 0);
   const ajusteNegativo = saldoMoedasReal < 0 ? -saldoMoedasReal : 0;
+  const totalLancamentos = lancamentos?.length ?? 0;
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-4">
+    <PaginaGf largura="media">
       <AbasSecao secao="recompensas" papel={atual.papel} />
-      <h1 className="text-2xl font-semibold text-[var(--gf-texto)]">Extrato</h1>
-      <div className="grid grid-cols-2 gap-3">
-        <CartaoGf titulo="XP acumulado">
-          <p className="flex items-center gap-2 text-3xl font-semibold text-[var(--gf-texto)]">
-            <Zap size={22} className="text-[var(--gf-verde)]" />
-            {totalXp.toLocaleString("pt-BR")}
-          </p>
+      <CabecalhoPaginaGf
+        titulo="Extrato"
+        descricao="Tudo que entrou e saiu do seu XP e das suas moedas."
+        acao={<LinkAcaoGf href="/gamificacao/loja">Ir para a loja</LinkAcaoGf>}
+      />
+
+      <div className="grid gap-3 @min-[520px]:grid-cols-2">
+        <CartaoGf destaque>
+          <div className="flex items-center gap-4">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[var(--gf-verde-10)] text-[var(--gf-verde)]">
+              <Zap size={24} aria-hidden />
+            </span>
+            <div className="min-w-0">
+              <p className="gf-t-rotulo">XP acumulado</p>
+              <p className="gf-t-kpi mt-1">{formatarNumeroGf(totalXp)}</p>
+            </div>
+          </div>
         </CartaoGf>
-        <CartaoGf titulo="Saldo de moedas">
-          <p className="flex items-center gap-2 text-3xl font-semibold text-[var(--gf-texto)]">
-            <Wallet size={22} className="text-[var(--gf-verde)]" />
-            {totalMoedas.toLocaleString("pt-BR")}
-          </p>
-          {ajusteNegativo > 0 && (
-            <p className="mt-1 text-sm text-[var(--gf-texto-sec)]">
-              {ajusteNegativo.toLocaleString("pt-BR")} moedas em ajuste
-            </p>
-          )}
+        <CartaoGf destaque>
+          <div className="flex items-center gap-4">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[var(--gf-dourado-10)] text-[var(--gf-dourado)]">
+              <Wallet size={24} aria-hidden />
+            </span>
+            <div className="min-w-0">
+              <p className="gf-t-rotulo">Saldo de moedas</p>
+              <p className="gf-t-kpi mt-1">{formatarNumeroGf(totalMoedas)}</p>
+              {ajusteNegativo > 0 && (
+                <p className="gf-t-aux mt-0.5">{formatarNumeroGf(ajusteNegativo)} moedas em ajuste</p>
+              )}
+            </div>
+          </div>
         </CartaoGf>
       </div>
-      <CartaoGf titulo={`Lançamentos (${lancamentos?.length ?? 0})`}>
+
+      <CartaoGf
+        titulo="Lançamentos"
+        descricao={
+          totalLancamentos >= 200
+            ? "Exibindo os 200 lançamentos mais recentes."
+            : `${totalLancamentos} ${totalLancamentos === 1 ? "lançamento" : "lançamentos"}`
+        }
+      >
         {!lancamentos?.length ? (
-          <EstadoVazioGf Icone={Receipt}>Nenhum lançamento ainda.</EstadoVazioGf>
+          <EstadoVazioGf Icone={Receipt} titulo="Nenhum lançamento ainda">
+            Seus pontos e moedas aparecem aqui assim que você pontuar.
+          </EstadoVazioGf>
         ) : (
           <ul className="flex flex-col">
             {lancamentos.map((l) => (
@@ -67,6 +99,6 @@ export default async function ExtratoDePontos() {
           </ul>
         )}
       </CartaoGf>
-    </div>
+    </PaginaGf>
   );
 }

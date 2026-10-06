@@ -1,7 +1,6 @@
 import type { ComponentType, ReactNode } from "react";
-import Link from "next/link";
 import { Activity, Award, Crown, Target, Trophy, Users, Zap } from "lucide-react";
-import { formatarMoeda, tempoDesde } from "@/lib/formatacao";
+import { tempoDesde } from "@/lib/formatacao";
 import {
   carregarDadosGerencial,
   type DadosGerencial,
@@ -9,19 +8,22 @@ import {
 } from "@/lib/gamificacao-gerencial";
 import type { Vinculo } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { ROTULO_PERFIL_GAMIFICACAO, UNIDADE_METRICA_META } from "@/lib/tipos";
+import { ROTULO_PERFIL_GAMIFICACAO, ROTULO_METRICA_META, UNIDADE_METRICA_META } from "@/lib/tipos";
+import { formatarValorMeta, ProgressoMetaGf, SituacaoMetaGf } from "../_compartilhado/metas-ui";
 import { RankingTabsGf } from "../_compartilhado/ranking-tabs";
-import { CartaoGf, EstadoVazioGf, IndicadorKpiGf } from "../_compartilhado/ui";
-import "./gerencial.css";
+import {
+  CabecalhoPaginaGf,
+  CartaoGf,
+  EstadoVazioGf,
+  IndicadorKpiGf,
+  IniciaisAvatarGf,
+  LinhaLancamento,
+  LinkAcaoGf,
+  SeletorSegmentadoGf,
+} from "../_compartilhado/ui";
 
 const PERIODOS_VALIDOS = ["mes", "mes-passado"] as const;
 type PeriodoGerencial = (typeof PERIODOS_VALIDOS)[number];
-
-function formatarValorMeta(unidade: "moeda" | "quantidade" | "percentual", valor: number) {
-  if (unidade === "moeda") return formatarMoeda(valor);
-  if (unidade === "percentual") return `${valor.toFixed(1)}%`;
-  return Math.round(valor).toLocaleString("pt-BR");
-}
 
 const TOM_ICONE_KPI = {
   verde: "bg-[var(--gf-verde-10)] text-[var(--gf-verde)]",
@@ -29,7 +31,7 @@ const TOM_ICONE_KPI = {
   dourado: "bg-[var(--gf-dourado-10)] text-[var(--gf-dourado)]",
 } as const;
 
-/** KPI da visão gerencial: maior e mais legível que a pílula da visão pessoal. */
+/** KPI da visão gerencial: rótulo completo (quebra linha), valor grande e contexto abaixo. */
 function KpiGerencial({
   Icone,
   rotulo,
@@ -46,21 +48,19 @@ function KpiGerencial({
   tom: keyof typeof TOM_ICONE_KPI;
 }) {
   return (
-    <div className="flex min-w-0 items-start gap-3 rounded-xl border border-[var(--gf-borda)] bg-[var(--gf-surface)] p-3 shadow-[0_1px_2px_rgba(0,0,0,0.4)] md:p-4">
-      <span
-        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${TOM_ICONE_KPI[tom]}`}
-      >
-        <Icone size={18} />
-      </span>
-      <div className="flex min-w-0 flex-1 flex-col">
-        <p className="line-clamp-2 text-[11px] leading-tight text-[var(--gf-texto-sec)]">{rotulo}</p>
-        <p className="mt-1 truncate text-xl font-semibold leading-none text-[var(--gf-texto)] md:text-2xl">
-          {valor}
-        </p>
+    <div className="flex min-w-0 flex-col gap-3 rounded-xl border border-[var(--gf-borda)] bg-[var(--gf-surface)] p-4 shadow-[0_1px_2px_rgba(0,0,0,0.4)]">
+      <div className="flex items-center gap-2.5">
+        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${TOM_ICONE_KPI[tom]}`}>
+          <Icone size={18} />
+        </span>
+        <p className="gf-t-aux min-w-0 leading-tight">{rotulo}</p>
+      </div>
+      <div>
+        <p className="gf-t-kpi">{valor}</p>
         {(indicador || legenda) && (
-          <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-1.5 text-[10px] text-[var(--gf-texto-sec)]">
+          <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
             {indicador}
-            {legenda && <span className="truncate">{legenda}</span>}
+            {legenda && <span className="gf-t-micro">{legenda}</span>}
           </div>
         )}
       </div>
@@ -73,32 +73,29 @@ function ListaMetas({ metas }: { metas: MetaGerencial[] }) {
     <ul className="gf-gerencial-lista">
       {metas.map((m) => {
         const unidade = UNIDADE_METRICA_META[m.metrica];
-        const pct = m.progresso.percentual;
         return (
           <li
             key={m.id}
-            className="flex flex-col gap-1.5 border-t border-[var(--gf-borda)] py-2.5 text-sm first:border-t-0 first:pt-0"
+            className="flex flex-col gap-3 border-t border-[var(--gf-borda)] py-4 first:border-t-0 first:pt-0 last:pb-0"
           >
-            <div className="flex min-w-0 items-baseline justify-between gap-3">
-              <span className="min-w-0 truncate font-medium text-[var(--gf-texto)]">
-                {m.membroNome}
-              </span>
-              <span
-                className={`shrink-0 text-xs font-semibold ${pct >= 100 ? "text-[var(--gf-verde)]" : "text-[var(--gf-texto)]"}`}
-              >
-                {pct.toFixed(0)}%
-              </span>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <IniciaisAvatarGf nome={m.membroNome} tamanho={36} />
+                <div className="min-w-0">
+                  <p className="gf-t-item break-words">{m.membroNome}</p>
+                  <p className="gf-t-aux break-words">
+                    {m.titulo} · {ROTULO_METRICA_META[m.metrica]}
+                  </p>
+                </div>
+              </div>
+              <SituacaoMetaGf percentual={m.progresso.percentual} diasRestantes={m.progresso.diasRestantes} />
             </div>
-            <p className="truncate text-xs text-[var(--gf-texto-sec)]">
-              {m.titulo} · {formatarValorMeta(unidade, m.progresso.realizado)} de{" "}
-              {formatarValorMeta(unidade, m.valorAlvo)}
-            </p>
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--gf-surface-alta)]">
-              <div
-                className="h-full rounded-full bg-[var(--gf-verde)]"
-                style={{ width: `${Math.min(Math.max(pct, 0), 100)}%` }}
-              />
-            </div>
+            <ProgressoMetaGf
+              rotulo={`${m.membroNome} — ${m.titulo}`}
+              realizado={formatarValorMeta(unidade, m.progresso.realizado)}
+              alvo={formatarValorMeta(unidade, m.valorAlvo)}
+              percentual={m.progresso.percentual}
+            />
           </li>
         );
       })}
@@ -126,34 +123,20 @@ function Conteudo({
 
   return (
     <div className="gf-gerencial">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div className="flex flex-col gap-0.5">
-          <h1 className="text-2xl font-semibold text-[var(--gf-texto)]">Gamificação</h1>
-          <p className="text-sm text-[var(--gf-texto-sec)]">
-            {daEmpresa ? "Visão gerencial da empresa" : "Visão gerencial da sua equipe"} ·{" "}
-            {periodoRotulo.toLowerCase()}
-          </p>
-        </div>
-        <nav
-          aria-label="Período"
-          className="flex w-fit gap-1 rounded-lg bg-[var(--gf-surface-alta)] p-1"
-        >
-          {OPCOES_PERIODO.map((p) => (
-            <Link
-              key={p.chave}
-              href={`/gamificacao?periodo=${p.chave}`}
-              aria-current={periodo === p.chave ? "page" : undefined}
-              className={`rounded-md px-3 py-1 text-sm transition-colors ${
-                periodo === p.chave
-                  ? "bg-[var(--gf-surface)] font-medium text-[var(--gf-texto)] shadow-sm"
-                  : "text-[var(--gf-texto-sec)] hover:text-[var(--gf-texto)]"
-              }`}
-            >
-              {p.rotulo}
-            </Link>
-          ))}
-        </nav>
-      </header>
+      <CabecalhoPaginaGf
+        titulo="Gamificação"
+        descricao={`${daEmpresa ? "Visão gerencial da empresa" : "Visão gerencial da sua equipe"} · ${periodoRotulo.toLowerCase()}`}
+        acao={
+          <SeletorSegmentadoGf
+            rotulo="Período"
+            opcoes={OPCOES_PERIODO.map((p) => ({
+              href: `/gamificacao?periodo=${p.chave}`,
+              rotulo: p.rotulo,
+              ativo: periodo === p.chave,
+            }))}
+          />
+        }
+      />
 
       {dados.gestorSemEquipe && (
         <CartaoGf>
@@ -164,7 +147,7 @@ function Conteudo({
         </CartaoGf>
       )}
 
-      <div className="gf-gerencial-kpis">
+      <div className="gf-kpis">
         <KpiGerencial
           Icone={Zap}
           tom="verde"
@@ -209,8 +192,8 @@ function Conteudo({
               rolagem
               titulo={
                 <>
-                  <Crown size={15} className="shrink-0 text-[var(--gf-dourado)]" />
-                  <span className="truncate">
+                  <Crown size={18} className="shrink-0 text-[var(--gf-dourado)]" aria-hidden />
+                  <span className="min-w-0">
                     Ranking {ROTULO_PERFIL_GAMIFICACAO[r.perfil]} · {rotuloEscopoRanking}
                   </span>
                 </>
@@ -224,17 +207,9 @@ function Conteudo({
       <div className="gf-gerencial-baixo">
         <CartaoGf
           className="gf-gerencial-metas"
-          titulo={
-            <span className="flex items-center gap-2">
-              <Target size={15} className="text-[var(--gf-verde)]" />
-              Metas {rotuloEscopo}
-            </span>
-          }
-          acao={
-            <Link href="/gamificacao/metas" className="text-sm text-[var(--gf-verde)] hover:underline">
-              Ver →
-            </Link>
-          }
+          titulo={`Metas ${rotuloEscopo}`}
+          Icone={Target}
+          acao={<LinkAcaoGf href="/gamificacao/metas">Ver</LinkAcaoGf>}
         >
           {!dados.metas.length ? (
             <EstadoVazioGf Icone={Target} compacto>
@@ -245,14 +220,7 @@ function Conteudo({
           )}
         </CartaoGf>
 
-        <CartaoGf
-          titulo={
-            <span className="flex items-center gap-2">
-              <Zap size={15} className="text-[var(--gf-verde)]" />
-              Atividade recente
-            </span>
-          }
-        >
+        <CartaoGf titulo="Atividade recente" Icone={Zap}>
           {!dados.atividade.length ? (
             <EstadoVazioGf Icone={Activity} compacto>
               Nenhuma atividade neste período.
@@ -260,45 +228,20 @@ function Conteudo({
           ) : (
             <ul className="gf-gerencial-lista">
               {dados.atividade.map((l) => (
-                <li
+                <LinhaLancamento
                   key={l.id}
-                  className="flex items-center gap-2.5 border-t border-[var(--gf-borda)] py-2 text-sm first:border-t-0 first:pt-0"
-                >
-                  <span
-                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${l.xp >= 0 ? "bg-[var(--gf-verde-10)] text-[var(--gf-verde)]" : "bg-[var(--gf-vermelho-10)] text-[var(--gf-vermelho)]"}`}
-                  >
-                    <Zap size={13} />
-                  </span>
-                  <div className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate text-[var(--gf-texto)]">
-                      {l.membroNome} · {l.descricao}
-                    </span>
-                    <span className="text-xs text-[var(--gf-texto-sec)]">
-                      {tempoDesde(l.createdAt)}
-                    </span>
-                  </div>
-                  {l.xp !== 0 && (
-                    <span
-                      className={`shrink-0 font-medium ${l.xp >= 0 ? "text-[var(--gf-verde)]" : "text-[var(--gf-vermelho)]"}`}
-                    >
-                      {l.xp >= 0 ? "+" : ""}
-                      {l.xp} XP
-                    </span>
-                  )}
-                </li>
+                  autor={l.membroNome}
+                  descricao={l.descricao}
+                  tempo={tempoDesde(l.createdAt)}
+                  xp={l.xp}
+                  Icone={Zap}
+                />
               ))}
             </ul>
           )}
         </CartaoGf>
 
-        <CartaoGf
-          titulo={
-            <span className="flex items-center gap-2">
-              <Trophy size={15} className="text-[var(--gf-dourado)]" />
-              Conquistas recentes
-            </span>
-          }
-        >
+        <CartaoGf titulo="Conquistas recentes" Icone={Trophy} tomIcone="dourado">
           {!dados.conquistasRecentes.length ? (
             <EstadoVazioGf Icone={Award} compacto>
               Nenhuma conquista desbloqueada ainda.
@@ -308,20 +251,20 @@ function Conteudo({
               {dados.conquistasRecentes.map((c) => (
                 <li
                   key={c.id}
-                  className="flex items-center gap-2.5 border-t border-[var(--gf-borda)] py-2 text-sm first:border-t-0 first:pt-0"
+                  className="flex items-center gap-3 border-t border-[var(--gf-borda)] py-3 first:border-t-0 first:pt-0 last:pb-0"
                 >
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--gf-dourado-10)] text-[var(--gf-dourado)]">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--gf-dourado-10)] text-[var(--gf-dourado)]">
                     {c.icone ? (
-                      <span className="text-sm leading-none">{c.icone}</span>
+                      <span className="text-lg leading-none">{c.icone}</span>
                     ) : (
-                      <Trophy size={14} />
+                      <Trophy size={18} aria-hidden />
                     )}
                   </span>
-                  <div className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate text-[var(--gf-texto)]">{c.conquistaNome}</span>
-                    <span className="truncate text-xs text-[var(--gf-texto-sec)]">
+                  <div className="min-w-0 flex-1">
+                    <p className="gf-t-item break-words">{c.conquistaNome}</p>
+                    <p className="gf-t-aux break-words">
                       {c.membroNome} · {tempoDesde(c.desbloqueadaEm)}
-                    </span>
+                    </p>
                   </div>
                 </li>
               ))}

@@ -1,10 +1,11 @@
-import Link from "next/link";
-import { Cartao } from "@/components/ui";
+import { Crown, Users } from "lucide-react";
 import { calcularNivel } from "@/lib/gamificacao";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { ROTULO_PERFIL_GAMIFICACAO, type PerfilGamificacao } from "@/lib/tipos";
 import { AbasSecao } from "../_compartilhado/abas-secao";
+import { LinhaRankingGf, PodioGf, type ItemRankingGf } from "../_compartilhado/ranking-ui";
+import { CabecalhoPaginaGf, CartaoGf, EstadoVazioGf, PaginaGf, SeletorSegmentadoGf } from "../_compartilhado/ui";
 
 const PERIODOS = [
   { chave: "semana", rotulo: "Semana" },
@@ -30,8 +31,6 @@ function calcularDesde(periodo: Periodo): string | null {
   }
   return null;
 }
-
-const MEDALHAS = ["🥇", "🥈", "🥉"];
 
 export default async function Ranking({ searchParams }: { searchParams: Promise<{ periodo?: string; perfil?: string }> }) {
   const { atual } = await exigirPapel();
@@ -90,100 +89,82 @@ export default async function Ranking({ searchParams }: { searchParams: Promise<
     }));
 
   const maiorTotal = Math.max(1, ...linhas.map((l) => l.total));
-  const podio = linhas.slice(0, 3);
+  const itens: ItemRankingGf[] = linhas.map((l, i) => ({
+    posicao: i + 1,
+    membroId: l.membroId,
+    nome: l.nome,
+    total: l.total,
+    detalhe: `Nível ${l.nivel.nivel}${l.nivel.nome ? ` · ${l.nivel.nome}` : ""}`,
+  }));
+  const podio = itens.slice(0, 3);
+  const rotuloPeriodo = PERIODOS.find((p) => p.chave === periodo)?.rotulo ?? "Mês";
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-4">
+    <PaginaGf largura="larga">
       <AbasSecao secao="desempenho" papel={atual.papel} />
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-semibold text-zinc-900">Ranking</h1>
-        <div className="flex gap-1 rounded-lg bg-zinc-100 p-1">
-          {PERFIS_RANKING.map((p) => (
-            <Link
-              key={p}
-              href={`/gamificacao/ranking?periodo=${periodo}&perfil=${p}`}
-              className={`rounded-md px-3 py-1 text-sm transition-colors ${
-                perfil === p ? "bg-white font-medium text-zinc-900 shadow-sm" : "text-zinc-600 hover:text-zinc-900"
-              }`}
-            >
-              {ROTULO_PERFIL_GAMIFICACAO[p]}
-            </Link>
-          ))}
-        </div>
-        <div className="flex gap-1 rounded-lg bg-zinc-100 p-1">
-          {PERIODOS.map((p) => (
-            <Link
-              key={p.chave}
-              href={`/gamificacao/ranking?periodo=${p.chave}&perfil=${perfil}`}
-              className={`rounded-md px-3 py-1 text-sm transition-colors ${
-                periodo === p.chave ? "bg-white font-medium text-zinc-900 shadow-sm" : "text-zinc-600 hover:text-zinc-900"
-              }`}
-            >
-              {p.rotulo}
-            </Link>
-          ))}
-        </div>
-      </div>
+      <CabecalhoPaginaGf
+        titulo="Ranking"
+        descricao={`${ROTULO_PERFIL_GAMIFICACAO[perfil]} · ${rotuloPeriodo} · ordenado por XP acumulado no período`}
+        acao={
+          <div className="flex flex-wrap items-center gap-2">
+            <SeletorSegmentadoGf
+              rotulo="Perfil do ranking"
+              opcoes={PERFIS_RANKING.map((p) => ({
+                href: `/gamificacao/ranking?periodo=${periodo}&perfil=${p}`,
+                rotulo: ROTULO_PERFIL_GAMIFICACAO[p],
+                ativo: perfil === p,
+              }))}
+            />
+            <SeletorSegmentadoGf
+              rotulo="Período do ranking"
+              opcoes={PERIODOS.map((p) => ({
+                href: `/gamificacao/ranking?periodo=${p.chave}&perfil=${perfil}`,
+                rotulo: p.rotulo,
+                ativo: periodo === p.chave,
+              }))}
+            />
+          </div>
+        }
+      />
       {!atual.perfilGamificacao && (
-        <p className="text-xs text-zinc-500">Você não compete no ranking comercial (sem perfil de gamificação) — só está visualizando.</p>
+        <p className="gf-t-aux">
+          Você não compete no ranking comercial (sem perfil de gamificação) — só está visualizando.
+        </p>
       )}
 
       {!linhas.length && (
-        <Cartao>
-          <p className="text-sm text-zinc-600">Ninguém pontuou nesse período ainda.</p>
-        </Cartao>
+        <CartaoGf>
+          <EstadoVazioGf Icone={Users} titulo="Ninguém pontuou ainda">
+            Nenhum participante somou XP nesse período. Assim que alguém pontuar, o pódio aparece aqui.
+          </EstadoVazioGf>
+        </CartaoGf>
       )}
 
       {podio.length > 0 && (
-        <Cartao>
-          <div className="flex items-end justify-center gap-3">
-            {[podio[1], podio[0], podio[2]].map((linha, i) =>
-              linha ? (
-                <div
-                  key={linha.membroId}
-                  className={`flex flex-col items-center gap-1 rounded-lg px-3 pt-3 pb-2 text-center ${
-                    i === 1 ? "order-2 bg-dourado/10" : "order-none bg-zinc-50"
-                  }`}
-                  style={{ minWidth: 88 }}
-                >
-                  <span className="text-2xl">{MEDALHAS[i === 1 ? 0 : i === 0 ? 1 : 2]}</span>
-                  <span className="max-w-[80px] truncate text-sm font-medium text-zinc-900">{linha.nome}</span>
-                  <span className="text-xs text-zinc-500">
-                    {linha.nivel.nome ? `${linha.nivel.nome} · ` : ""}nível {linha.nivel.nivel}
-                  </span>
-                  <span className="text-sm font-semibold text-dourado">{linha.total.toLocaleString("pt-BR")} XP</span>
-                </div>
-              ) : (
-                <div key={i} />
-              ),
-            )}
-          </div>
-        </Cartao>
+        <CartaoGf titulo="Pódio" Icone={Crown} tomIcone="dourado" className="gf-podio-card">
+          <PodioGf itens={podio} membroAtualId={atual.membroId} variante="grande" />
+        </CartaoGf>
       )}
 
-      {linhas.length > 0 && (
-        <Cartao titulo="Classificação completa">
-          <ul className="flex flex-col gap-2.5">
-            {linhas.map((linha, i) => (
-              <li key={linha.membroId} className={`flex items-center gap-3 ${linha.membroId === atual.membroId ? "rounded-lg bg-[var(--gf-verde-10)] p-1.5" : ""}`}>
-                <span className="w-5 shrink-0 text-right text-sm text-zinc-500">{i + 1}º</span>
-                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span className="truncate text-sm font-medium text-zinc-900">{linha.nome}</span>
-                    <span className="shrink-0 text-sm font-semibold text-zinc-900">{linha.total.toLocaleString("pt-BR")} XP</span>
-                  </div>
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
-                    <div
-                      className={`h-full rounded-full ${i === 0 ? "bg-dourado" : linha.membroId === atual.membroId ? "bg-[var(--gf-verde)]" : "bg-[var(--gf-texto-ter)]"}`}
-                      style={{ width: `${Math.max(4, (linha.total / maiorTotal) * 100)}%` }}
-                    />
-                  </div>
-                </div>
-              </li>
+      {itens.length > 0 && (
+        <CartaoGf
+          titulo="Classificação completa"
+          descricao={`${itens.length} participante${itens.length === 1 ? "" : "s"}`}
+        >
+          <ul className="flex flex-col gap-1" aria-label="Classificação completa">
+            {itens.map((item) => (
+              <LinhaRankingGf
+                key={item.membroId}
+                item={item}
+                membroAtualId={atual.membroId}
+                maximo={maiorTotal}
+                avatar
+                larga
+              />
             ))}
           </ul>
-        </Cartao>
+        </CartaoGf>
       )}
-    </div>
+    </PaginaGf>
   );
 }

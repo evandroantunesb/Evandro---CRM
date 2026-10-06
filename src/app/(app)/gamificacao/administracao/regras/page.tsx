@@ -1,8 +1,9 @@
-import { Cartao } from "@/components/ui";
+import { ListChecks } from "lucide-react";
 import { EVENTOS_GAMIFICACAO, EVENTOS_GAMIFICACAO_SELECIONAVEIS } from "@/lib/gamificacao";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import type { OperadorCondicao, PerfilGamificacao, PeriodoLimiteRegra } from "@/lib/tipos";
+import { CabecalhoPaginaGf, CartaoGf, EstadoVazioGf, PaginaGf, VoltarGf } from "../../_compartilhado/ui";
 import { LinhaRegra, NovaRegra } from "../_compartilhado/formularios";
 
 export default async function RegrasDePontos() {
@@ -15,38 +16,44 @@ export default async function RegrasDePontos() {
     .order("created_at");
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-4">
-      <h1 className="text-2xl font-semibold text-zinc-900">Regras de pontos</h1>
-
-      <p className="text-sm text-zinc-600">
-        Cada regra associa um evento do CRM a XP (progressão: ranking, nível, conquistas) e/ou moedas (saldo gastável
-        na loja). Sempre que o evento acontecer (e a condição, se houver, for satisfeita), o lançamento entra
-        automaticamente no extrato do responsável.
-      </p>
-      <Cartao titulo="Nova regra">
+    <PaginaGf largura="formulario">
+      <VoltarGf href="/gamificacao/administracao">Administração</VoltarGf>
+      <CabecalhoPaginaGf
+        titulo="Regras de pontos"
+        descricao="Cada regra associa um evento do CRM a XP (progressão: ranking, nível, conquistas) e/ou moedas (saldo gastável na loja). Sempre que o evento acontecer (e a condição, se houver, for satisfeita), o lançamento entra automaticamente no extrato do responsável."
+      />
+      <CartaoGf titulo="Nova regra">
         <NovaRegra eventos={EVENTOS_GAMIFICACAO_SELECIONAVEIS} />
-      </Cartao>
-      <Cartao titulo={`Regras (${regras?.length ?? 0})`}>
-        {(regras ?? []).map((r) => (
-          <LinhaRegra
-            key={r.id}
-            regra={{
-              id: r.id,
-              nome: r.nome,
-              eventoTipo: r.evento_tipo,
-              condicao: r.condicao as { campo: string; operador: OperadorCondicao; valor: string } | null,
-              xp: r.xp,
-              moedas: r.moedas,
-              perfilAplicavel: r.perfil_aplicavel as PerfilGamificacao | null,
-              limitePeriodo: r.limite_periodo as PeriodoLimiteRegra | null,
-              limiteQuantidade: r.limite_quantidade,
-              unicaPorNegocio: r.unica_por_negocio,
-              ativa: r.ativa,
-            }}
-            eventos={EVENTOS_GAMIFICACAO}
-          />
-        ))}
-      </Cartao>
-    </div>
+      </CartaoGf>
+      <CartaoGf titulo={`Regras (${regras?.length ?? 0})`}>
+        {!regras?.length ? (
+          <EstadoVazioGf Icone={ListChecks} compacto titulo="Nenhuma regra cadastrada">
+            Crie a primeira regra acima para começar a gerar XP e moedas automaticamente.
+          </EstadoVazioGf>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {regras.map((r) => (
+              <LinhaRegra
+                key={r.id}
+                regra={{
+                  id: r.id,
+                  nome: r.nome,
+                  eventoTipo: r.evento_tipo,
+                  condicao: r.condicao as { campo: string; operador: OperadorCondicao; valor: string } | null,
+                  xp: r.xp,
+                  moedas: r.moedas,
+                  perfilAplicavel: r.perfil_aplicavel as PerfilGamificacao | null,
+                  limitePeriodo: r.limite_periodo as PeriodoLimiteRegra | null,
+                  limiteQuantidade: r.limite_quantidade,
+                  unicaPorNegocio: r.unica_por_negocio,
+                  ativa: r.ativa,
+                }}
+                eventos={EVENTOS_GAMIFICACAO}
+              />
+            ))}
+          </div>
+        )}
+      </CartaoGf>
+    </PaginaGf>
   );
 }

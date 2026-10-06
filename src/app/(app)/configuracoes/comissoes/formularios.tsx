@@ -1,11 +1,13 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { Botao, Campo, Mensagem, Selecao, Selo } from "@/components/ui";
+import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
 import type { FaixaComissao } from "@/lib/comissoes";
 import { formatarMoeda } from "@/lib/formatacao";
 import type { MembroResumo } from "@/lib/crm";
 import { ROTULO_TIPO_CALCULO_COMISSAO, TIPOS_CALCULO_COMISSAO, type TipoCalculoComissao } from "@/lib/tipos";
+import { CabecalhoItemGf } from "../../gamificacao/_compartilhado/formulario-ui";
+import { BadgeGf } from "../../gamificacao/_compartilhado/ui";
 import { apagarVersaoPlano, calcularComissao, fecharComissao, salvarPlano } from "./actions";
 
 export type VersaoPlano = {
@@ -59,10 +61,10 @@ function FaixasEditor({ faixasIniciais }: { faixasIniciais: FaixaComissao[] }) {
   }
 
   return (
-    <fieldset className="flex flex-col gap-2 rounded-lg border border-zinc-200 p-3">
-      <legend className="px-1 text-xs font-medium text-zinc-500">Faixas de resultado</legend>
+    <fieldset className="flex flex-col gap-3 rounded-lg border border-zinc-200 p-4">
+      <legend className="px-1.5">Faixas de resultado</legend>
       {linhas.map((linha, i) => (
-        <div key={i} className="grid grid-cols-[1fr_1fr_1fr_auto] items-end gap-2">
+        <div key={i} className="grid grid-cols-1 gap-2 @min-[560px]:grid-cols-[1fr_1fr_1fr_auto] @min-[560px]:items-end">
           <Campo
             rotulo="De (R$)"
             type="number"
@@ -90,7 +92,7 @@ function FaixasEditor({ faixasIniciais }: { faixasIniciais: FaixaComissao[] }) {
           <button
             type="button"
             onClick={() => setLinhas((atual) => (atual.length > 1 ? atual.filter((_, idx) => idx !== i) : atual))}
-            className="mb-1.5 text-xs text-zinc-400 hover:text-red-700"
+            className="gf-botao-texto self-start"
           >
             Remover
           </button>
@@ -99,7 +101,7 @@ function FaixasEditor({ faixasIniciais }: { faixasIniciais: FaixaComissao[] }) {
       <button
         type="button"
         onClick={() => setLinhas((atual) => [...atual, { min: "", max: "", valor: "" }])}
-        className="self-start text-xs font-medium text-carvao hover:text-dourado"
+        className="gf-botao-texto gf-botao-texto-neutro self-start"
       >
         + Adicionar faixa
       </button>
@@ -118,10 +120,16 @@ export function PlanoComissaoForm({ membro, versaoAtual }: { membro: MembroResum
   const [tipoCalculo, setTipoCalculo] = useState<TipoCalculoComissao>(versaoAtual?.tipoCalculo ?? "percentual");
 
   return (
-    <form action={acao} className="flex flex-col gap-3 border-t border-zinc-100 py-4 first:border-t-0">
+    <form action={acao} className="flex flex-col gap-4">
       <input type="hidden" name="membroId" value={membro.id} />
-      <p className="text-sm font-medium text-zinc-900">{membro.nome}</p>
-      <div className="grid gap-3 sm:grid-cols-4">
+      <CabecalhoItemGf titulo={membro.nome}>
+        {versaoAtual ? (
+          <BadgeGf tom="positivo">Plano vigente · {ROTULO_TIPO_CALCULO_COMISSAO[versaoAtual.tipoCalculo]}</BadgeGf>
+        ) : (
+          <BadgeGf tom="neutro">Sem plano</BadgeGf>
+        )}
+      </CabecalhoItemGf>
+      <div className="grid gap-3 @min-[560px]:grid-cols-2 @min-[960px]:grid-cols-4">
         <Campo rotulo="Vigência a partir de" name="vigenciaMes" type="month" defaultValue={proximoMes(versaoAtual?.vigenciaInicio)} required />
         <Campo
           rotulo="Salário-base (R$, opcional)"
@@ -153,7 +161,7 @@ export function PlanoComissaoForm({ membro, versaoAtual }: { membro: MembroResum
         </Selecao>
       </div>
       <FaixasEditor faixasIniciais={versaoAtual?.faixas ?? []} />
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3 border-t border-[var(--gf-borda)] pt-4">
         <Botao type="submit" variante="secundario" disabled={pendente}>
           Salvar nova versão
         </Botao>
@@ -175,14 +183,16 @@ export function HistoricoVersoesPlano({
 }) {
   if (!versoes.length) return null;
   return (
-    <details className="text-xs text-zinc-500">
-      <summary className="cursor-pointer select-none">Ver versões anteriores ({versoes.length})</summary>
-      <ul className="mt-2 flex flex-col gap-1.5">
+    <details className="gf-t-aux text-sm">
+      <summary className="inline-flex min-h-9 cursor-pointer items-center rounded-md font-medium text-[var(--gf-texto)] select-none hover:text-[var(--gf-verde)]">
+        Ver versões anteriores ({versoes.length})
+      </summary>
+      <ul className="mt-2 flex flex-col gap-2">
         {versoes.map((v) => {
           const futura = v.vigenciaInicio > mesAtual;
           const vigente = v.id === versaoVigenteId;
           return (
-            <li key={v.id} className="flex items-center justify-between gap-3 rounded border border-zinc-100 px-2 py-1">
+            <li key={v.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-zinc-100 px-3 py-2">
               <span>
                 Desde {formatarMesReferencia(v.vigenciaInicio)} ·{" "}
                 {v.salarioBase !== null ? `${formatarMoeda(v.salarioBase)} + ` : ""}
@@ -190,14 +200,14 @@ export function HistoricoVersoesPlano({
                 {vigente && (
                   <>
                     {" "}
-                    <Selo tom="positivo">Vigente</Selo>
+                    <BadgeGf tom="positivo">Vigente</BadgeGf>
                   </>
                 )}
               </span>
               {futura && (
                 <form action={apagarVersaoPlano}>
                   <input type="hidden" name="id" value={v.id} />
-                  <button type="submit" className="text-zinc-400 hover:text-red-700">
+                  <button type="submit" className="gf-botao-texto">
                     Apagar
                   </button>
                 </form>
@@ -214,7 +224,8 @@ export function CalcularComissaoForm({ membros }: { membros: MembroResumo[] }) {
   const [resultado, acao, pendente] = useActionState(calcularComissao, null);
 
   return (
-    <form action={acao} className="flex flex-wrap items-end gap-3">
+    <form action={acao} className="flex flex-col gap-4">
+      <div className="grid gap-3 @min-[560px]:grid-cols-2">
       <Selecao rotulo="Colaborador" name="membroId" defaultValue="">
         <option value="" disabled>
           Escolha
@@ -226,10 +237,13 @@ export function CalcularComissaoForm({ membros }: { membros: MembroResumo[] }) {
         ))}
       </Selecao>
       <Campo rotulo="Mês" name="mes" type="month" required />
-      <Botao type="submit" disabled={pendente}>
-        Calcular
-      </Botao>
-      <Mensagem resultado={resultado} />
+      </div>
+      <div className="flex flex-wrap items-center gap-3">
+        <Botao type="submit" disabled={pendente} className="self-start">
+          Calcular
+        </Botao>
+        <Mensagem resultado={resultado} />
+      </div>
     </form>
   );
 }

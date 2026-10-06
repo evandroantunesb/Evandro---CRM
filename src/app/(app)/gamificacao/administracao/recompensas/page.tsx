@@ -1,6 +1,7 @@
-import { Cartao } from "@/components/ui";
+import { Gift } from "lucide-react";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
+import { CabecalhoPaginaGf, CartaoGf, EstadoVazioGf, PaginaGf, VoltarGf } from "../../_compartilhado/ui";
 import { LinhaRecompensa, NovaRecompensa } from "../_compartilhado/formularios";
 
 export default async function Recompensas() {
@@ -13,33 +14,40 @@ export default async function Recompensas() {
     .order("created_at");
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-4">
-      <h1 className="text-2xl font-semibold text-zinc-900">Recompensas</h1>
-
-      <p className="text-sm text-zinc-600">
-        A loja de recompensas deixa o colaborador trocar moedas por prêmios. O saldo é debitado assim que ele resgata;
-        cancelar um resgate devolve as moedas.
-      </p>
-      <Cartao titulo="Nova recompensa">
+    <PaginaGf largura="formulario">
+      <VoltarGf href="/gamificacao/administracao">Administração</VoltarGf>
+      <CabecalhoPaginaGf
+        titulo="Recompensas"
+        descricao="A loja de recompensas deixa o colaborador trocar moedas por prêmios. O saldo é debitado assim que ele resgata; cancelar um resgate devolve as moedas."
+      />
+      <CartaoGf titulo="Nova recompensa">
         <NovaRecompensa />
-      </Cartao>
-      <Cartao titulo={`Recompensas (${recompensas?.length ?? 0})`}>
-        {(recompensas ?? []).map((r) => (
-          <LinhaRecompensa
-            key={r.id}
-            recompensa={{
-              id: r.id,
-              nome: r.nome,
-              descricao: r.descricao,
-              custoMoedas: r.custo_moedas,
-              estoque: r.estoque,
-              limitePorMembro: r.limite_por_membro,
-              validadeAte: r.validade_ate,
-              ativa: r.ativa,
-            }}
-          />
-        ))}
-      </Cartao>
-    </div>
+      </CartaoGf>
+      <CartaoGf titulo={`Recompensas (${recompensas?.length ?? 0})`}>
+        {!recompensas?.length ? (
+          <EstadoVazioGf Icone={Gift} compacto titulo="Nenhuma recompensa cadastrada">
+            Crie a primeira recompensa acima para abrir a loja.
+          </EstadoVazioGf>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {recompensas.map((r) => (
+              <LinhaRecompensa
+                key={r.id}
+                recompensa={{
+                  id: r.id,
+                  nome: r.nome,
+                  descricao: r.descricao,
+                  custoMoedas: r.custo_moedas,
+                  estoque: r.estoque,
+                  limitePorMembro: r.limite_por_membro,
+                  validadeAte: r.validade_ate,
+                  ativa: r.ativa,
+                }}
+              />
+            ))}
+          </div>
+        )}
+      </CartaoGf>
+    </PaginaGf>
   );
 }

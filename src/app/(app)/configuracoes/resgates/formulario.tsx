@@ -1,9 +1,11 @@
 "use client";
 
 import { useActionState } from "react";
-import { Botao, Mensagem, Selo } from "@/components/ui";
+import { Botao, Mensagem } from "@/components/ui";
 import { formatarDataHora } from "@/lib/formatacao";
-import { ROTULO_STATUS_RESGATE, type StatusResgate } from "@/lib/tipos";
+import type { StatusResgate } from "@/lib/tipos";
+import { StatusResgateGf } from "../../gamificacao/_compartilhado/resgate-ui";
+import { formatarNumeroGf } from "../../gamificacao/_compartilhado/ui";
 import { mudarStatusResgate } from "./actions";
 
 export type ResgateLinha = {
@@ -15,35 +17,29 @@ export type ResgateLinha = {
   membroNome: string;
 };
 
-const TOM_STATUS: Record<StatusResgate, "neutro" | "positivo" | "negativo" | "atencao"> = {
-  solicitado: "atencao",
-  aprovado: "neutro",
-  entregue: "positivo",
-  cancelado: "negativo",
-};
-
 export function LinhaResgate({ resgate }: { resgate: ResgateLinha }) {
   const [resultado, acao, pendente] = useActionState(mudarStatusResgate, null);
 
   return (
-    <form action={acao} className="flex flex-wrap items-center justify-between gap-3 border-t border-zinc-100 py-3 first:border-t-0">
+    <form
+      action={acao}
+      className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-t border-[var(--gf-borda)] py-4 first:border-t-0 first:pt-0 last:pb-0"
+    >
       <input type="hidden" name="id" value={resgate.id} />
-      <div className="flex flex-col gap-0.5">
-        <span className="text-sm font-medium text-zinc-900">
-          {resgate.membroNome} · {resgate.recompensaNome}
-        </span>
-        <span className="text-xs text-zinc-500">
-          {resgate.moedasDebitadas.toLocaleString("pt-BR")} moedas · {formatarDataHora(resgate.createdAt)}
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <span className="gf-t-item break-words">{resgate.recompensaNome}</span>
+        <span className="gf-t-aux break-words">
+          {resgate.membroNome} · {formatarNumeroGf(resgate.moedasDebitadas)} moedas · {formatarDataHora(resgate.createdAt)}
         </span>
       </div>
-      <div className="flex items-center gap-2">
-        <Selo tom={TOM_STATUS[resgate.status]}>{ROTULO_STATUS_RESGATE[resgate.status]}</Selo>
+      <div className="flex flex-wrap items-center gap-2">
+        <StatusResgateGf status={resgate.status} />
         {resgate.status === "solicitado" && (
           <>
             <Botao type="submit" name="novoStatus" value="aprovado" variante="secundario" disabled={pendente}>
               Aprovar
             </Botao>
-            <button type="submit" name="novoStatus" value="cancelado" disabled={pendente} className="text-xs text-zinc-400 hover:text-red-700">
+            <button type="submit" name="novoStatus" value="cancelado" disabled={pendente} className="gf-botao-texto">
               Cancelar
             </button>
           </>
@@ -53,7 +49,7 @@ export function LinhaResgate({ resgate }: { resgate: ResgateLinha }) {
             <Botao type="submit" name="novoStatus" value="entregue" variante="secundario" disabled={pendente}>
               Marcar entregue
             </Botao>
-            <button type="submit" name="novoStatus" value="cancelado" disabled={pendente} className="text-xs text-zinc-400 hover:text-red-700">
+            <button type="submit" name="novoStatus" value="cancelado" disabled={pendente} className="gf-botao-texto">
               Cancelar
             </button>
           </>
