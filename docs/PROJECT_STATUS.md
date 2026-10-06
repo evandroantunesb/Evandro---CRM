@@ -70,7 +70,7 @@ Membros fictícios: Lucas Martins, Mariana Costa, Rafael Almeida e Bruno Ferreir
 | #118 | aberta, draft, não mesclada | aparentemente substituída pela #119 (já na `main`) — candidata a fechar |
 | #62 Backup do banco | aberta, não mesclada | bloqueada nos secrets `BACKUP_ENCRYPTION_KEY`/`BACKUP_REPO_TOKEN` |
 | #68, #70, #71, #76 | abertas, não mescladas | antigas (29–30/09); #71 conflita; revisar relevância |
-| #135 Dependabot (6 atualizações menores) | não incluída na verificação de 06/10 | revisar com o Evandro |
+| #135 Dependabot (6 atualizações menores) | aberta, não-draft, não mesclada, mergeable | revisar com o Evandro |
 
 ## Outras pendências
 
