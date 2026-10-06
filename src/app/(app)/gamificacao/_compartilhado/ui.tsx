@@ -1,6 +1,7 @@
 import type { ComponentType, CSSProperties, ReactNode } from "react";
 import Link from "next/link";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Minus, Plus, Undo2 } from "lucide-react";
+import { FotoAvatar } from "@/components/foto-avatar";
 
 /** Ícone Lucide (ou compatível) aceito pelos componentes do módulo. */
 export type IconeGf = ComponentType<{ size?: number; className?: string; "aria-hidden"?: boolean | "true" | "false" }>;
@@ -364,21 +365,23 @@ const TOM_INICIAIS_GF = {
 } as const;
 
 /**
- * Avatar-fallback consistente (iniciais sobre círculo colorido) — usado onde a
- * referência visual tem foto de perfil e o produto não tem upload de foto.
- * Nunca inventa uma imagem; só a inicial do nome.
+ * Avatar consistente: a foto do perfil (`src`, URL assinada) quando houver; senão — ou se a
+ * imagem falhar ao carregar — as iniciais sobre círculo colorido. Nunca inventa uma imagem.
+ * A foto é decorativa (o nome já aparece ao lado), por isso `alt` vazio.
  */
 export function IniciaisAvatarGf({
   nome,
   tamanho = 32,
   tom = "neutro",
+  src,
 }: {
   nome: string;
   tamanho?: number;
   tom?: keyof typeof TOM_INICIAIS_GF;
+  src?: string | null;
 }) {
   const inicial = nome.trim().charAt(0).toUpperCase() || "?";
-  return (
+  const iniciais = (
     <span
       aria-hidden
       className={`flex shrink-0 items-center justify-center rounded-full font-semibold ${TOM_INICIAIS_GF[tom]}`}
@@ -390,6 +393,18 @@ export function IniciaisAvatarGf({
       }}
     >
       {inicial}
+    </span>
+  );
+  if (!src) return iniciais;
+  return (
+    <span aria-hidden className="flex shrink-0">
+      <FotoAvatar
+        src={src}
+        alt=""
+        tamanho={tamanho}
+        fallback={iniciais}
+        className={tom === "dourado" ? "ring-[1.5px] ring-[var(--gf-dourado-borda)]" : tom === "verde" ? "ring-1 ring-[var(--gf-verde-borda)]" : ""}
+      />
     </span>
   );
 }
@@ -411,6 +426,7 @@ export function LinhaLancamento({
   moedas,
   estornado = false,
   autor,
+  avatarUrl,
   Icone,
 }: {
   descricao: ReactNode;
@@ -419,6 +435,8 @@ export function LinhaLancamento({
   moedas?: number;
   estornado?: boolean;
   autor?: string;
+  /** Foto pequena ao lado do nome do autor (só aparece quando há foto; sem foto, nada muda). */
+  avatarUrl?: string;
   /** Ícone fixo no lugar do padrão (+/−/estorno), ex.: raio de XP nas Visões gerais. */
   Icone?: IconeGf;
 }) {
@@ -457,7 +475,16 @@ export function LinhaLancamento({
             estornado ? "text-[var(--gf-texto-ter)] line-through" : "text-[var(--gf-texto)]"
           }`}
         >
-          {autor && <span className="font-semibold">{autor} · </span>}
+          {autor && (
+            <span className="font-semibold">
+              {avatarUrl && (
+                <span className="mr-1.5 inline-flex align-text-bottom">
+                  <IniciaisAvatarGf nome={autor} tamanho={16} src={avatarUrl} />
+                </span>
+              )}
+              {autor} ·{" "}
+            </span>
+          )}
           {descricao}
         </p>
         <p className="gf-t-micro">{tempo}</p>

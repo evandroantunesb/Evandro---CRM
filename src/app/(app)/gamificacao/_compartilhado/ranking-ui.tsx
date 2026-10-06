@@ -8,6 +8,8 @@ export type ItemRankingGf = {
   nome: string;
   total: number;
   detalhe?: string;
+  /** URL assinada da foto de perfil; sem ela, aparecem as iniciais. */
+  avatarUrl?: string;
 };
 
 /** Selo textual que identifica o usuário logado (não depende só de cor). */
@@ -59,6 +61,7 @@ export function PodioGf({
               nome={it.nome}
               tamanho={tamanhoAvatar}
               tom={primeiro ? "dourado" : voce ? "verde" : "neutro"}
+              src={it.avatarUrl}
             />
             <p
               className={`mt-2 w-full leading-tight font-semibold break-words text-[var(--gf-texto)] ${
@@ -150,7 +153,12 @@ export function LinhaRankingGf({
         {item.posicao}º
       </span>
       {(avatar || larga) && (
-        <IniciaisAvatarGf nome={item.nome} tamanho={36} tom={primeiro ? "dourado" : voce ? "verde" : "neutro"} />
+        <IniciaisAvatarGf
+          nome={item.nome}
+          tamanho={36}
+          tom={primeiro ? "dourado" : voce ? "verde" : "neutro"}
+          src={item.avatarUrl}
+        />
       )}
       <div className="min-w-0">
         <div className="flex min-w-0 items-center gap-2">

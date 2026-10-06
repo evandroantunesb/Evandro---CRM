@@ -5,7 +5,7 @@ import { Users } from "lucide-react";
 import { LinhaRankingGf, PodioGf } from "./ranking-ui";
 import { EstadoVazioGf } from "./ui";
 
-type RankingLinha = { posicao: number; membroId: string; nome: string; total: number };
+type RankingLinha = { posicao: number; membroId: string; nome: string; total: number; avatarUrl?: string };
 
 const ABAS = [
   { chave: "semana", rotulo: "Semana" },
