@@ -5,6 +5,7 @@ import { calcularProgresso, calcularRealizado, type Meta } from "@/lib/metas";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { ROTULO_METRICA_META, UNIDADE_METRICA_META, type MetricaMeta } from "@/lib/tipos";
+import { AbasSecao } from "../_compartilhado/abas-secao";
 
 function formatarValor(unidade: "moeda" | "quantidade" | "percentual", valor: number) {
   if (unidade === "moeda") return formatarMoeda(valor);
@@ -47,6 +48,7 @@ export default async function MinhasMetas() {
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4">
+      <AbasSecao secao="desempenho" papel={atual.papel} />
       <h1 className="text-2xl font-semibold text-zinc-900">Metas</h1>
 
       {!metas.length && (
@@ -75,7 +77,7 @@ export default async function MinhasMetas() {
 
               <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-100">
                 <div
-                  className={`h-full rounded-full ${percentualBarra >= 100 ? "bg-green-500" : "bg-dourado"}`}
+                  className="h-full rounded-full bg-[var(--gf-verde)]"
                   style={{ width: `${percentualBarra}%` }}
                 />
               </div>

@@ -5,6 +5,7 @@ import { formatarMoeda } from "@/lib/formatacao";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { ROTULO_STATUS_COMISSAO, ROTULO_TIPO_CALCULO_COMISSAO, type StatusComissao, type TipoCalculoComissao } from "@/lib/tipos";
+import { AbasSecao } from "../_compartilhado/abas-secao";
 
 function formatarReferencia(referencia: string) {
   return new Date(`${referencia}T00:00:00Z`).toLocaleDateString("pt-BR", { month: "long", year: "numeric", timeZone: "UTC" });
@@ -35,6 +36,7 @@ export default async function MinhasComissoes() {
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4">
+      <AbasSecao secao="desempenho" papel={atual.papel} />
       <h1 className="text-2xl font-semibold text-zinc-900">Comissões</h1>
 
       {!plano ? (

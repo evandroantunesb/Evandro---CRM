@@ -4,6 +4,7 @@ import { calcularNivel } from "@/lib/gamificacao";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { ROTULO_PERFIL_GAMIFICACAO, type PerfilGamificacao } from "@/lib/tipos";
+import { AbasSecao } from "../_compartilhado/abas-secao";
 
 const PERIODOS = [
   { chave: "semana", rotulo: "Semana" },
@@ -93,6 +94,7 @@ export default async function Ranking({ searchParams }: { searchParams: Promise<
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4">
+      <AbasSecao secao="desempenho" papel={atual.papel} />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-semibold text-zinc-900">Ranking</h1>
         <div className="flex gap-1 rounded-lg bg-zinc-100 p-1">
@@ -163,7 +165,7 @@ export default async function Ranking({ searchParams }: { searchParams: Promise<
         <Cartao titulo="Classificação completa">
           <ul className="flex flex-col gap-2.5">
             {linhas.map((linha, i) => (
-              <li key={linha.membroId} className={`flex items-center gap-3 ${linha.membroId === atual.membroId ? "rounded-lg bg-dourado/5 p-1.5" : ""}`}>
+              <li key={linha.membroId} className={`flex items-center gap-3 ${linha.membroId === atual.membroId ? "rounded-lg bg-[var(--gf-verde-10)] p-1.5" : ""}`}>
                 <span className="w-5 shrink-0 text-right text-sm text-zinc-500">{i + 1}º</span>
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <div className="flex items-baseline justify-between gap-2">
@@ -171,7 +173,10 @@ export default async function Ranking({ searchParams }: { searchParams: Promise<
                     <span className="shrink-0 text-sm font-semibold text-zinc-900">{linha.total.toLocaleString("pt-BR")} XP</span>
                   </div>
                   <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
-                    <div className="h-full rounded-full bg-dourado" style={{ width: `${Math.max(4, (linha.total / maiorTotal) * 100)}%` }} />
+                    <div
+                      className={`h-full rounded-full ${i === 0 ? "bg-dourado" : linha.membroId === atual.membroId ? "bg-[var(--gf-verde)]" : "bg-[var(--gf-texto-ter)]"}`}
+                      style={{ width: `${Math.max(4, (linha.total / maiorTotal) * 100)}%` }}
+                    />
                   </div>
                 </div>
               </li>

@@ -6,9 +6,54 @@ import { carregarDiasConsideradoParado, carregarHorasConsideradoSemContato } fro
 import { carregarNotificacoesNaoLidas, contarPendencias, temConquistaNaoVisualizada } from "@/lib/notificacoes";
 import { obterSessao } from "@/lib/sessao";
 import { trocarEmpresa } from "@/lib/acoes/empresa-atual";
-import { ROTULO_PAPEL } from "@/lib/tipos";
+import { ROTULO_PAPEL, type Papel } from "@/lib/tipos";
 import { Menu } from "./menu";
 import { Sininho } from "./sininho";
+
+const GRUPO_GAMIFICACAO = "Gamificação";
+
+/**
+ * Itens do grupo Gamificação por papel. Ranking/Metas/Comissões e Loja/Extrato não são
+ * itens próprios: viram abas dentro de Desempenho e Recompensas (`ativoEm` mantém o item
+ * ativo nessas rotas). Administração (admin) segue como hub das telas de configuração.
+ */
+function itensGamificacao(papel: Papel | undefined, conquistaNova: boolean) {
+  const visaoGeral = {
+    href: "/gamificacao",
+    rotulo: "Visão geral",
+    grupo: GRUPO_GAMIFICACAO,
+    novo: conquistaNova,
+    // Só a própria rota: as demais telas pertencem a Desempenho/Recompensas/Administração.
+    // A Jornada (aberta a partir do dashboard) é a exceção que mantém Visão geral ativa.
+    exato: true,
+    ativoEm: ["/gamificacao/jornada"],
+  };
+  const desempenho = {
+    href: "/gamificacao/ranking",
+    rotulo: "Desempenho",
+    grupo: GRUPO_GAMIFICACAO,
+    ativoEm: ["/gamificacao/metas", "/gamificacao/comissoes"],
+  };
+  if (papel === "admin") {
+    return [
+      visaoGeral,
+      desempenho,
+      {
+        href: "/gamificacao/administracao",
+        rotulo: "Administração",
+        grupo: GRUPO_GAMIFICACAO,
+        // Telas administrativas da Gamificação que vivem fora da árvore /gamificacao.
+        ativoEm: ["/configuracoes/metas", "/configuracoes/comissoes", "/configuracoes/resgates"],
+      },
+    ];
+  }
+  if (papel === "gestor") return [visaoGeral, desempenho];
+  return [
+    visaoGeral,
+    desempenho,
+    { href: "/gamificacao/loja", rotulo: "Recompensas", grupo: GRUPO_GAMIFICACAO, ativoEm: ["/gamificacao/extrato"] },
+  ];
+}
 
 export default async function LayoutApp({ children }: { children: React.ReactNode }) {
   const sessao = await obterSessao();
@@ -36,12 +81,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
           { href: "/negocios", rotulo: "Negócios" },
           { href: "/tarefas", rotulo: "Tarefas" },
           ...(papel !== "sdr" ? [{ href: "/contatos", rotulo: "Contatos" }] : []),
-          { href: "/gamificacao", rotulo: "Visão geral", grupo: "Gamificação", novo: conquistaNova },
-          { href: "/gamificacao/ranking", rotulo: "Ranking", grupo: "Gamificação" },
-          { href: "/gamificacao/metas", rotulo: "Metas", grupo: "Gamificação" },
-          { href: "/gamificacao/comissoes", rotulo: "Comissões", grupo: "Gamificação" },
-          { href: "/gamificacao/loja", rotulo: "Loja de recompensas", grupo: "Gamificação" },
-          ...(papel === "admin" ? [{ href: "/gamificacao/administracao", rotulo: "Administração", grupo: "Gamificação" }] : []),
+          ...itensGamificacao(papel, conquistaNova),
         ]
       : []),
     ...(papel === "admin" || papel === "gestor" ? [{ href: "/painel", rotulo: "Painel" }] : []),

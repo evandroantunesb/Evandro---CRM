@@ -46,7 +46,16 @@ const ICONES: Record<string, LucideIcon> = {
   "/super-admin": ShieldCheck,
 };
 
-type Item = { href: string; rotulo: string; grupo?: string; novo?: boolean };
+/**
+ * `href` é o destino do link e também a rota que o torna ativo. `ativoEm` lista rotas
+ * (prefixos) adicionais que também marcam o item como ativo — ex.: um item "Desempenho"
+ * que leva a /gamificacao/ranking e fica ativo em /gamificacao/metas. `exato` faz o
+ * próprio `href` só casar com a rota exata (não com subrotas) — usado por "Visão geral",
+ * que não deve ficar ativa dentro das demais telas de /gamificacao.
+ */
+type Item = { href: string; rotulo: string; grupo?: string; novo?: boolean; ativoEm?: string[]; exato?: boolean };
+
+const rotaCorresponde = (caminho: string, rota: string) => caminho === rota || caminho.startsWith(`${rota}/`);
 
 function ItemMenu({ item, ativo }: { item: Item; ativo: boolean }) {
   const Icone = ICONES[item.href] ?? Building2;
@@ -80,10 +89,25 @@ export function Menu({ itens }: { itens: Item[] }) {
     observador.observe(faixa);
     return () => observador.disconnect();
   }, [itens, grupoAberto]);
-  // Prefixo mais específico vence: evita que uma rota "pai" (ex.: /gamificacao)
-  // fique marcada como ativa junto com uma rota "filha" mais específica.
-  const correspondentes = itens.filter((i) => caminho === i.href || caminho.startsWith(`${i.href}/`));
-  const hrefAtivo = correspondentes.sort((a, b) => b.href.length - a.href.length)[0]?.href;
+  // Cada item responde pelo próprio `href` e pelas rotas de `ativoEm`. O prefixo mais
+  // específico (rota mais longa) vence: evita que uma rota "pai" (ex.: /gamificacao)
+  // fique marcada como ativa junto com uma rota "filha" mais específica, mesmo quando
+  // esta pertence a outro item via `ativoEm`.
+  let hrefAtivo: string | undefined;
+  let tamanhoMelhorRota = -1;
+  for (const item of itens) {
+    const rotas = [
+      { rota: item.href, exata: item.exato ?? false },
+      ...(item.ativoEm ?? []).map((rota) => ({ rota, exata: false })),
+    ];
+    for (const { rota, exata } of rotas) {
+      const casa = exata ? caminho === rota : rotaCorresponde(caminho, rota);
+      if (casa && rota.length > tamanhoMelhorRota) {
+        tamanhoMelhorRota = rota.length;
+        hrefAtivo = item.href;
+      }
+    }
+  }
   const ehAtivo = (href: string) => href === hrefAtivo;
 
   // No celular, agrupa os itens que têm "grupo" atrás de um botão expansível,

@@ -349,12 +349,10 @@ export async function DashboardGerencial({
   const dados = await carregarDadosGerencial(supabase, atual, periodo === "mes-passado" ? 1 : 0);
 
   return (
-    <div className="-m-4 min-h-screen bg-[var(--gf-bg)] p-4 text-[var(--gf-texto)] md:-m-10 md:p-10">
-      <Conteudo
-        dados={dados}
-        periodo={periodo}
-        periodoRotulo={periodo === "mes-passado" ? "Mês passado" : "Este mês"}
-      />
-    </div>
+    <Conteudo
+      dados={dados}
+      periodo={periodo}
+      periodoRotulo={periodo === "mes-passado" ? "Mês passado" : "Este mês"}
+    />
   );
 }
