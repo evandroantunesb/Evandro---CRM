@@ -19,43 +19,6 @@ type LinhaNegocio = {
 export type IndicadorOrigem = { nome: string; total: number };
 export type IndicadorEtapa = { funil: string; etapa: string; ordem: number; total: number; valor: number };
 export type IndicadorVendedor = { nome: string; abertos: number; ganhos: number; perdidos: number; valorGanho: number; atrasadas: number };
-export type AtribuicaoPendente = {
-  id: string;
-  negocioId: string;
-  negocioNumero: number;
-  contatoNome: string;
-  membroSugeridoId: string;
-  membroSugeridoNome: string;
-  expiraEm: string;
-};
-
-/** Leads que o rodízio sugeriu e ainda esperam aprovação (ou reatribuição) do gestor. */
-export async function carregarAtribuicoesPendentes(empresaId: string): Promise<AtribuicaoPendente[]> {
-  const supabase = await criarClienteServidor();
-  const { data } = await supabase
-    .from("atribuicoes_leads")
-    .select(
-      "id, expira_em, negocios!inner(id, numero, contatos(nome)), empresa_membros!atribuicoes_leads_membro_sugerido_id_fkey(id, perfis(nome))",
-    )
-    .eq("empresa_id", empresaId)
-    .eq("status", "pendente")
-    .order("expira_em");
-
-  return (data ?? []).map((a) => {
-    const negocio = a.negocios as unknown as { id: string; numero: number; contatos: { nome: string } | null };
-    const membro = a.empresa_membros as unknown as { id: string; perfis: { nome: string } | null };
-    return {
-      id: a.id,
-      negocioId: negocio.id,
-      negocioNumero: negocio.numero,
-      contatoNome: negocio.contatos?.nome ?? "(sem nome)",
-      membroSugeridoId: membro.id,
-      membroSugeridoNome: membro.perfis?.nome ?? "(sem nome)",
-      expiraEm: a.expira_em,
-    };
-  });
-}
-
 export type TarefaAtrasada = {
   id: string;
   titulo: string;

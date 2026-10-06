@@ -4,26 +4,27 @@ import { Bell } from "lucide-react";
 import Link from "next/link";
 import { marcarNotificacaoLida } from "@/lib/acoes/notificacoes";
 import type { Notificacao } from "@/lib/notificacoes";
+import type { LinkPendencias } from "@/lib/pendencias";
 
-/** Bell do menu: se há notificação individual não lida, abre um dropdown com elas; senão cai no link de pendências de sempre. */
-export function Sininho({
-  notificacoes,
-  linkPendencias,
-  textoPendencias,
-}: {
-  notificacoes: Notificacao[];
-  linkPendencias: string;
-  textoPendencias: string;
-}) {
+/**
+ * Bell do menu: se há notificação individual não lida, abre um dropdown com elas; senão mostra
+ * os links de pendências (admin/gestor: leads a distribuir e demais pendências separados).
+ */
+export function Sininho({ notificacoes, pendencias }: { notificacoes: Notificacao[]; pendencias: LinkPendencias[] }) {
   if (notificacoes.length === 0) {
     return (
-      <Link
-        href={linkPendencias}
-        className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-offwhite hover:border-dourado"
-      >
-        <Bell size={16} />
-        {textoPendencias}
-      </Link>
+      <div className="flex flex-col gap-1">
+        {pendencias.map((p) => (
+          <Link
+            key={p.href}
+            href={p.href}
+            className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-offwhite hover:border-dourado"
+          >
+            <Bell size={16} />
+            {p.texto}
+          </Link>
+        ))}
+      </div>
     );
   }
 
@@ -49,9 +50,11 @@ export function Sininho({
             </button>
           </form>
         ))}
-        <Link href={linkPendencias} className="block rounded-md p-2 text-xs text-zinc-500 hover:bg-zinc-50 hover:underline">
-          {textoPendencias}
-        </Link>
+        {pendencias.map((p) => (
+          <Link key={p.href} href={p.href} className="block rounded-md p-2 text-xs text-zinc-500 hover:bg-zinc-50 hover:underline">
+            {p.texto}
+          </Link>
+        ))}
       </div>
     </details>
   );

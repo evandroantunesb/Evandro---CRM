@@ -2,6 +2,7 @@ import {
   BriefcaseBusiness,
   Calendar,
   FileText,
+  Inbox,
   KanbanSquare,
   Mail,
   MapPin,
@@ -20,6 +21,7 @@ import { redirect } from "next/navigation";
 import { ListaTarefas, type TarefaLista } from "@/components/lista-tarefas";
 import { Cartao, Selo } from "@/components/ui";
 import { carregarConfiguracao, formatarMoeda, inicioDoDia, tempoDesde } from "@/lib/crm";
+import { contarAtribuicoesPendentes } from "@/lib/distribuicao-leads";
 import { calcularNivel, responsavelCongeladoPorNegocio } from "@/lib/gamificacao";
 import { carregarLeadsParados } from "@/lib/leads-parados";
 import { carregarLeadsSemContato } from "@/lib/leads-sem-contato";
@@ -243,10 +245,12 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
   ]);
 
   const filtroResponsavel = pessoal ? { responsavelId: atual.membroId } : {};
-  const [leadsSemContato, leadsParados, propostasParadas] = await Promise.all([
+  const [leadsSemContato, leadsParados, propostasParadas, leadsADistribuir] = await Promise.all([
     carregarLeadsSemContato(supabase, atual.empresaId, { ...filtroResponsavel, horasLimite: config.horasConsideradoSemContato }),
     carregarLeadsParados(supabase, atual.empresaId, { ...filtroResponsavel, diasLimite: config.diasConsideradoParado }),
     carregarPropostasParadas(supabase, atual.empresaId, { ...filtroResponsavel, diasLimite: config.diasConsideradoParado }),
+    // Fila de distribuição: só admin/gestor decidem (nas duas visões, é tarefa de quem distribui).
+    podeVerEquipe ? contarAtribuicoesPendentes(supabase, atual.empresaId) : Promise.resolve(0),
   ]);
 
   // KPIs -------------------------------------------------------------------
@@ -383,7 +387,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
     icone: LucideIcon;
     titulo: string;
     subtitulo: string;
-    badge: "atrasado" | "pendente" | "parado" | "proposta_parada";
+    badge: "atrasado" | "pendente" | "parado" | "proposta_parada" | "distribuir";
     tempo: string;
     href: string;
   };
@@ -426,7 +430,25 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
     tempo: tempoDesde(n.ultimaAtividadeEm, agora.getTime()),
     href: `/negocios/${n.id}`,
   }));
-  const prioridades = [...prioridadesAtrasadas, ...prioridadesParadas, ...prioridadesPropostasParadas, ...prioridadesLeads].slice(0, 4);
+  // Leads a distribuir entram à frente, sem tomar o lugar das 4 prioridades de sempre.
+  const prioridadeDistribuir: Prioridade[] =
+    leadsADistribuir > 0
+      ? [
+          {
+            id: "leads-a-distribuir",
+            icone: Inbox,
+            titulo: `${leadsADistribuir} lead${leadsADistribuir === 1 ? "" : "s"} a distribuir`,
+            subtitulo: "Aprove a sugestão do rodízio ou escolha o responsável",
+            badge: "distribuir",
+            tempo: "",
+            href: "/leads-a-distribuir",
+          },
+        ]
+      : [];
+  const prioridades = [
+    ...prioridadeDistribuir,
+    ...[...prioridadesAtrasadas, ...prioridadesParadas, ...prioridadesPropostasParadas, ...prioridadesLeads].slice(0, 4),
+  ];
   const totalPendencias = (tarefasAtrasadasTotal ?? 0) + leadsSemContato.length + leadsParados.length + propostasParadas.length;
 
   // Agenda de hoje -----------------------------------------------------------
@@ -572,7 +594,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
                       <p className="truncate text-xs text-zinc-500">{p.subtitulo}</p>
                     </Link>
                     <Selo tom={p.badge === "atrasado" ? "negativo" : "atencao"}>
-                      {{ atrasado: "Atrasado", pendente: "Pendente", parado: "Parado", proposta_parada: "Proposta parada" }[p.badge]}
+                      {{ atrasado: "Atrasado", pendente: "Pendente", parado: "Parado", proposta_parada: "Proposta parada", distribuir: "Distribuir" }[p.badge]}
                     </Selo>
                     <span className="hidden shrink-0 text-xs text-zinc-500 sm:inline">{p.tempo}</span>
                   </li>
