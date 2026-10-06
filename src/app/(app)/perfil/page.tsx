@@ -1,10 +1,13 @@
 import Link from "next/link";
 import { Botao, Cartao } from "@/components/ui";
+import { assinarAvatares } from "@/lib/avatares";
 import { desconectarGoogleAgenda } from "@/lib/acoes/google-agenda";
 import { integracaoConfigurada } from "@/lib/google-agenda";
 import { obterSessao } from "@/lib/sessao";
 import { criarClienteAdmin } from "@/lib/supabase/admin";
+import { criarClienteServidor } from "@/lib/supabase/server";
 import { FormularioPerfil } from "./formulario";
+import { FotoPerfil } from "./foto-perfil";
 
 const MENSAGENS_GOOGLE: Record<string, { texto: string; erro: boolean }> = {
   conectado: { texto: "Conta do Google conectada.", erro: false },
@@ -16,6 +19,11 @@ export default async function Perfil({ searchParams }: PageProps<"/perfil">) {
   const sessao = await obterSessao();
   const { google } = await searchParams;
   const mensagemGoogle = typeof google === "string" ? MENSAGENS_GOOGLE[google] : undefined;
+
+  // A foto do próprio usuário: assinada com a sessão dele (uma chamada).
+  const urlAvatar = sessao.avatarCaminho
+    ? ((await assinarAvatares(await criarClienteServidor(), [sessao.avatarCaminho])).get(sessao.avatarCaminho) ?? null)
+    : null;
 
   let emailGoogleConectado: string | null = null;
   if (sessao.atual && integracaoConfigurada()) {
@@ -31,6 +39,9 @@ export default async function Perfil({ searchParams }: PageProps<"/perfil">) {
   return (
     <div className="mx-auto flex max-w-xl flex-col gap-4">
       <h1 className="text-2xl font-semibold text-zinc-900">Meu perfil</h1>
+      <Cartao titulo="Foto">
+        <FotoPerfil userId={sessao.userId} nome={sessao.nome} avatarUrl={urlAvatar} temFoto={Boolean(sessao.avatarCaminho)} />
+      </Cartao>
       <Cartao>
         <FormularioPerfil nome={sessao.nome === sessao.email ? "" : sessao.nome} email={sessao.email} />
       </Cartao>
