@@ -106,7 +106,7 @@ describe("recompensas: imagem (constraint do caminho + bucket privado)", () => {
       expect([...(bucket!.allowed_mime_types ?? [])].sort()).toEqual(["image/jpeg", "image/png", "image/webp"]);
     });
 
-    it("admin envia na pasta da própria empresa", async () => {
+    it("admin envia na pasta de recompensa existente da própria empresa", async () => {
       const { error } = await admin.cliente.storage.from(BUCKET).upload(caminho, imagem(), { contentType: "image/png" });
       expect(error).toBeNull();
     });
@@ -123,6 +123,55 @@ describe("recompensas: imagem (constraint do caminho + bucket privado)", () => {
         .from(BUCKET)
         .upload(`${empresa}/${recompensa}/${randomUUID()}.png`, imagem(), { contentType: "image/png" });
       expect(error).not.toBeNull();
+    });
+
+    it("admin não envia para pasta de recompensa inexistente", async () => {
+      const { error } = await admin.cliente.storage
+        .from(BUCKET)
+        .upload(`${empresa}/${randomUUID()}/${randomUUID()}.png`, imagem(), { contentType: "image/png" });
+      expect(error).not.toBeNull();
+    });
+
+    it("admin não envia para pasta cujo 2º segmento é recompensa de OUTRA empresa", async () => {
+      const deOutraEmpresa = randomUUID();
+      const { error: erroCriar } = await adminOutra.cliente
+        .from("recompensas")
+        .insert({ id: deOutraEmpresa, empresa_id: outraEmpresa, nome: "Da outra empresa", custo_moedas: 10 });
+      expect(erroCriar).toBeNull();
+
+      const { error } = await admin.cliente.storage
+        .from(BUCKET)
+        .upload(`${empresa}/${deOutraEmpresa}/${randomUUID()}.png`, imagem(), { contentType: "image/png" });
+      expect(error).not.toBeNull();
+    });
+
+    it("admin envia para outra recompensa existente da própria empresa", async () => {
+      const { error } = await admin.cliente.storage
+        .from(BUCKET)
+        .upload(`${empresa}/${outraRecompensa}/${randomUUID()}.png`, imagem(), { contentType: "image/png" });
+      expect(error).toBeNull();
+    });
+
+    it("depois de apagar a recompensa, o admin ainda remove os arquivos da pasta", async () => {
+      const efemera = randomUUID();
+      const { error: erroCriar } = await admin.cliente
+        .from("recompensas")
+        .insert({ id: efemera, empresa_id: empresa, nome: "Efêmera", custo_moedas: 10 });
+      expect(erroCriar).toBeNull();
+      const arquivo = `${empresa}/${efemera}/${randomUUID()}.png`;
+      const envio = await admin.cliente.storage.from(BUCKET).upload(arquivo, imagem(), { contentType: "image/png" });
+      expect(envio.error).toBeNull();
+
+      const { error: erroApagar } = await admin.cliente.from("recompensas").delete().eq("id", efemera);
+      expect(erroApagar).toBeNull();
+
+      const { data: itens } = await admin.cliente.storage.from(BUCKET).list(`${empresa}/${efemera}`);
+      expect(itens ?? []).toHaveLength(1);
+      const removido = await admin.cliente.storage.from(BUCKET).remove([arquivo]);
+      expect(removido.error).toBeNull();
+      expect(removido.data).toHaveLength(1);
+      const existe = await servico.storage.from(BUCKET).download(arquivo);
+      expect(existe.error).not.toBeNull();
     });
 
     it("caminho que não começa com o uuid da empresa é negado", async () => {
