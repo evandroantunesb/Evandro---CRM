@@ -10,7 +10,7 @@ Não altere nenhuma destas regras sem pedido explícito do Evandro.
 - **Leads parados:** negócio aberto sem mudar de etapa nem ganhar nota há mais que `empresas.dias_considerado_parado` (padrão 7).
 - **Propostas paradas:** proposta gerada sem o cliente abrir de novo nem mudar etapa no mesmo prazo.
 - Parados aparecem no Painel (com botão Reatribuir), na Início e no sininho de notificações.
-- **Gamificação (pontos padrão):** negócio criado 5, etapa avançada 2, negócio ganho 50, tarefa concluída 3, nota 1. Há níveis, conquistas, ranking, loja de recompensas, metas e comissões.
+- **Gamificação (pontuação):** não há tabela fixa de pontos; XP e moedas vêm das regras ativas configuradas por empresa em `gamification_rules`. Eventos elegíveis, como `deal.won`, pontuam conforme a regra ativa. `deal.created`, `deal.stage_changed`, `deal.owner_changed`, `task.created` e `note.created` nunca pontuam. `task.completed`, `reuniao.realizada` e `visita.realizada` só pontuam se a regra tiver teto (`limite_periodo` + `limite_quantidade`). Há níveis, conquistas, ranking, loja de recompensas, metas e comissões.
 - **Imagem da recompensa:** opcional; só admin adiciona, edita, substitui ou remove. Arquivo de até 3 MB, somente JPEG, PNG ou WebP (SVG recusado), sempre recortado em 4:3 antes do envio.
 - **WhatsApp:** só botão `wa.me` + registro manual (sem API oficial).
 - **Cobrança:** super-admin define plano/valor por empresa; sem gateway de pagamento.

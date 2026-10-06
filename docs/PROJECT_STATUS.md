@@ -65,7 +65,7 @@ Membros fictícios: Lucas Martins, Mariana Costa, Rafael Almeida e Bruno Ferreir
 | #139 Imagem nas recompensas | mesclada | merge `3b8de5c` |
 | #102 Imagem nas recompensas (antiga) | fechada, sem merge | superada pela #139 |
 | #133 Handoff técnico | aberta, draft, não mesclada | conteúdo incluído nesta consolidação |
-| #134 Docs (`docs/consolidar-contexto`) | aberta, draft, não mesclada | consolidação documental anterior; fechar depois que esta PR de docs a substituir |
+| #134 Docs (`docs/consolidar-contexto`) | fechada, sem merge | superada pela #140 |
 | #116 | aberta, draft, não mesclada | sem diferença de arquivos em relação à `main` — candidata a fechar |
 | #118 | aberta, draft, não mesclada | aparentemente substituída pela #119 (já na `main`) — candidata a fechar |
 | #62 Backup do banco | aberta, não mesclada | bloqueada nos secrets `BACKUP_ENCRYPTION_KEY`/`BACKUP_REPO_TOKEN` |
@@ -86,7 +86,7 @@ Membros fictícios: Lucas Martins, Mariana Costa, Rafael Almeida e Bruno Ferreir
 
 1. Base Demo (PR #132): revisar e mesclar o script com autorização (a demo já está em produção). Qualquer nova execução exige dry-run antes e autorização específica.
 2. Backup do banco de produção → aplicar as 13 migrations da PR #101 → revisar e mesclar com autorização.
-3. Fechar/decidir as PRs remanescentes (#116, #118, #133, #134, #135, #62, #68, #70, #71, #76).
+3. Fechar/decidir as PRs remanescentes (#116, #118, #133, #135, #62, #68, #70, #71, #76).
 4. Consolidar Calculadora + Propostas (CSV real e teste de referência).
 5. Validação visual em navegador real e melhorias de UX.
 6. Iniciar o roadmap operacional (Pedido → Compras), conforme `docs/ROADMAP.md`, quando o Evandro decidir.
