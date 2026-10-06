@@ -43,10 +43,10 @@ export function AbasSecao({ secao, papel }: { secao: "desempenho" | "recompensas
             key={aba.href}
             href={aba.href}
             aria-current={ativa ? "page" : undefined}
-            className={`shrink-0 border-b-2 px-4 py-2.5 text-sm whitespace-nowrap transition-colors outline-none focus-visible:rounded-md focus-visible:ring-2 focus-visible:ring-[var(--gf-verde)]/50 ${
+            className={`shrink-0 border-b-2 px-4 py-3 text-sm whitespace-nowrap transition-colors ${
               ativa
-                ? "border-[var(--gf-verde)] font-medium text-[var(--gf-verde)]"
-                : "border-transparent text-[var(--gf-texto-sec)] hover:border-[var(--gf-borda)] hover:text-[var(--gf-texto)]"
+                ? "border-[var(--gf-verde)] font-semibold text-[var(--gf-verde)]"
+                : "border-transparent font-medium text-[var(--gf-texto-sec)] hover:border-[var(--gf-borda)] hover:text-[var(--gf-texto)]"
             }`}
           >
             {aba.rotulo}

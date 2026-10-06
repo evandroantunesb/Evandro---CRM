@@ -1,17 +1,19 @@
-import { Cartao, Selo } from "@/components/ui";
+import { CalendarDays, Target } from "lucide-react";
 import { carregarConfiguracao } from "@/lib/crm";
-import { formatarMoeda } from "@/lib/formatacao";
 import { calcularProgresso, calcularRealizado, type Meta } from "@/lib/metas";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { ROTULO_METRICA_META, UNIDADE_METRICA_META, type MetricaMeta } from "@/lib/tipos";
 import { AbasSecao } from "../_compartilhado/abas-secao";
-
-function formatarValor(unidade: "moeda" | "quantidade" | "percentual", valor: number) {
-  if (unidade === "moeda") return formatarMoeda(valor);
-  if (unidade === "percentual") return `${valor.toFixed(1)}%`;
-  return Math.round(valor).toLocaleString("pt-BR");
-}
+import { formatarValorMeta, ProgressoMetaGf, SituacaoMetaGf } from "../_compartilhado/metas-ui";
+import {
+  BadgeGf,
+  CabecalhoPaginaGf,
+  CartaoGf,
+  EstadoVazioGf,
+  IniciaisAvatarGf,
+  PaginaGf,
+} from "../_compartilhado/ui";
 
 function formatarData(isoData: string) {
   return new Date(`${isoData}T00:00:00Z`).toLocaleDateString("pt-BR", { timeZone: "UTC" });
@@ -45,73 +47,114 @@ export default async function MinhasMetas() {
   const progressos = await Promise.all(
     metas.map(async (meta) => calcularProgresso(meta.valorAlvo, await calcularRealizado(supabase, meta), meta.periodoInicio, meta.periodoFim)),
   );
+  const batidas = progressos.filter((p) => p.percentual >= 100).length;
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-4">
+    <PaginaGf largura="larga">
       <AbasSecao secao="desempenho" papel={atual.papel} />
-      <h1 className="text-2xl font-semibold text-zinc-900">Metas</h1>
+      <CabecalhoPaginaGf
+        titulo="Metas"
+        descricao="Realizado, alvo e situação de cada meta ativa."
+        acao={
+          metas.length > 0 && (
+            <BadgeGf tom={batidas > 0 ? "positivo" : "neutro"}>
+              {batidas} de {metas.length} {metas.length === 1 ? "meta batida" : "metas batidas"}
+            </BadgeGf>
+          )
+        }
+      />
 
       {!metas.length && (
-        <Cartao>
-          <p className="text-sm text-zinc-600">Nenhuma meta ativa no momento.</p>
-        </Cartao>
+        <CartaoGf>
+          <EstadoVazioGf Icone={Target} titulo="Nenhuma meta ativa no momento">
+            Quando a administração cadastrar uma meta, ela aparece aqui com o progresso em tempo real.
+          </EstadoVazioGf>
+        </CartaoGf>
       )}
 
-      {metas.map((meta, i) => {
-        const progresso = progressos[i];
-        const unidade = UNIDADE_METRICA_META[meta.metrica];
-        const percentualBarra = Math.min(Math.max(progresso.percentual, 0), 100);
-        const encerrada = progresso.diasRestantes === 0;
+      <div className="grid gap-4 @min-[760px]:grid-cols-2">
+        {metas.map((meta, i) => {
+          const progresso = progressos[i];
+          const unidade = UNIDADE_METRICA_META[meta.metrica];
+          const encerrada = progresso.diasRestantes === 0;
+          const pessoa = nomeMembro.get(meta.membroId) ?? "(removido)";
 
-        return (
-          <Cartao key={meta.id} titulo={meta.titulo}>
-            <div className="flex flex-col gap-2">
-              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-sm text-zinc-600">
-                <span>
-                  {nomeMembro.get(meta.membroId) ?? "(removido)"} · {ROTULO_METRICA_META[meta.metrica]}
-                </span>
-                <span>
-                  {formatarData(meta.periodoInicio)} – {formatarData(meta.periodoFim)}
-                </span>
-              </div>
+          return (
+            <CartaoGf
+              key={meta.id}
+              titulo={meta.titulo}
+              acao={<SituacaoMetaGf percentual={progresso.percentual} diasRestantes={progresso.diasRestantes} />}
+              className="flex flex-col"
+            >
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center gap-3">
+                  <IniciaisAvatarGf nome={pessoa} tamanho={40} />
+                  <div className="min-w-0">
+                    <p className="gf-t-item break-words">{pessoa}</p>
+                    <p className="gf-t-aux break-words">
+                      {ROTULO_METRICA_META[meta.metrica]}
+                      <span className="mx-1.5 text-[var(--gf-texto-ter)]" aria-hidden>
+                        •
+                      </span>
+                      <span className="inline-flex items-center gap-1">
+                        <CalendarDays size={13} aria-hidden />
+                        {formatarData(meta.periodoInicio)} – {formatarData(meta.periodoFim)}
+                      </span>
+                    </p>
+                  </div>
+                </div>
 
-              <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-100">
-                <div
-                  className="h-full rounded-full bg-[var(--gf-verde)]"
-                  style={{ width: `${percentualBarra}%` }}
+                <ProgressoMetaGf
+                  rotulo={`${pessoa} — ${meta.titulo}`}
+                  realizado={formatarValorMeta(unidade, progresso.realizado)}
+                  alvo={formatarValorMeta(unidade, meta.valorAlvo)}
+                  percentual={progresso.percentual}
                 />
-              </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-sm">
-                <span className="font-medium text-zinc-900">
-                  {formatarValor(unidade, progresso.realizado)} de {formatarValor(unidade, meta.valorAlvo)} (
-                  {progresso.percentual.toFixed(0)}%)
-                </span>
-                {encerrada ? (
-                  <Selo tom={progresso.percentual >= 100 ? "positivo" : "negativo"}>
-                    {progresso.percentual >= 100 ? "Meta batida" : "Período encerrado"}
-                  </Selo>
-                ) : (
-                  <span className="text-zinc-600">
-                    Faltam {formatarValor(unidade, progresso.faltante)} · {progresso.diasRestantes}{" "}
-                    {progresso.diasRestantes === 1 ? "dia restante" : "dias restantes"}
-                  </span>
+                {!encerrada && (
+                  <>
+                    <p className="text-sm text-[var(--gf-texto)]">
+                      {progresso.faltante > 0 ? (
+                        <>
+                          Faltam <span className="gf-num font-semibold">{formatarValorMeta(unidade, progresso.faltante)}</span>
+                        </>
+                      ) : (
+                        <span className="font-semibold text-[var(--gf-verde)]">Meta atingida</span>
+                      )}
+                      <span className="mx-1.5 text-[var(--gf-texto-ter)]" aria-hidden>
+                        •
+                      </span>
+                      {progresso.diasRestantes} {progresso.diasRestantes === 1 ? "dia restante" : "dias restantes"}
+                    </p>
+                    <dl className="flex flex-col gap-1.5 border-t border-[var(--gf-borda)] pt-3 text-sm">
+                      <div className="flex items-baseline justify-between gap-3">
+                        <dt className="text-[var(--gf-texto-sec)]">Média diária</dt>
+                        <dd className="gf-num font-medium text-[var(--gf-texto)]">
+                          {formatarValorMeta(unidade, progresso.mediaDiariaRealizada)}
+                        </dd>
+                      </div>
+                      {progresso.necessarioPorDiaRestante !== null && (
+                        <div className="flex items-baseline justify-between gap-3">
+                          <dt className="text-[var(--gf-texto-sec)]">Necessário por dia</dt>
+                          <dd className="gf-num font-medium text-[var(--gf-texto)]">
+                            {formatarValorMeta(unidade, progresso.necessarioPorDiaRestante)}
+                          </dd>
+                        </div>
+                      )}
+                      <div className="flex items-baseline justify-between gap-3">
+                        <dt className="text-[var(--gf-texto-sec)]">Projeção final</dt>
+                        <dd className="gf-num font-medium text-[var(--gf-texto)]">
+                          {formatarValorMeta(unidade, progresso.projecaoFinal)}
+                        </dd>
+                      </div>
+                    </dl>
+                  </>
                 )}
               </div>
-
-              {!encerrada && (
-                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-500">
-                  <span>Média diária: {formatarValor(unidade, progresso.mediaDiariaRealizada)}</span>
-                  {progresso.necessarioPorDiaRestante !== null && (
-                    <span>Necessário/dia: {formatarValor(unidade, progresso.necessarioPorDiaRestante)}</span>
-                  )}
-                  <span>Projeção final: {formatarValor(unidade, progresso.projecaoFinal)}</span>
-                </div>
-              )}
-            </div>
-          </Cartao>
-        );
-      })}
-    </div>
+            </CartaoGf>
+          );
+        })}
+      </div>
+    </PaginaGf>
   );
 }
