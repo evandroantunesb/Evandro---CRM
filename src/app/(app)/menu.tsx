@@ -52,8 +52,34 @@ const ICONES: Record<string, LucideIcon> = {
  * que leva a /gamificacao/ranking e fica ativo em /gamificacao/metas. `exato` faz o
  * próprio `href` só casar com a rota exata (não com subrotas) — usado por "Visão geral",
  * que não deve ficar ativa dentro das demais telas de /gamificacao.
+ *
+ * `grupo` dá título no desktop e, no celular, recolhe o item atrás de um botão expansível.
+ * `secao` só dá título no desktop: no celular o item continua na faixa principal (telas do
+ * dia a dia, a um toque). `subgrupo` dá um subtítulo dentro do `grupo` (ex.: Configurações).
  */
-type Item = { href: string; rotulo: string; grupo?: string; novo?: boolean; ativoEm?: string[]; exato?: boolean };
+type Item = {
+  href: string;
+  rotulo: string;
+  grupo?: string;
+  secao?: string;
+  subgrupo?: string;
+  novo?: boolean;
+  ativoEm?: string[];
+  exato?: boolean;
+};
+
+const tituloDe = (item: Item | undefined) => item?.grupo ?? item?.secao;
+
+/** Subtítulo a exibir antes do item `i`, quando ele abre um novo subgrupo. */
+const subtituloAntes = (lista: Item[], i: number) => {
+  const item = lista[i];
+  const anterior = lista[i - 1];
+  return item.subgrupo && (item.subgrupo !== anterior?.subgrupo || tituloDe(item) !== tituloDe(anterior)) ? item.subgrupo : null;
+};
+
+function Subtitulo({ texto }: { texto: string }) {
+  return <p className="mt-2 mb-0.5 px-3 text-[11px] font-medium text-offwhite/35">{texto}</p>;
+}
 
 const rotaCorresponde = (caminho: string, rota: string) => caminho === rota || caminho.startsWith(`${rota}/`);
 
@@ -154,9 +180,15 @@ export function Menu({ itens }: { itens: Item[] }) {
           grupoAberto === grupo.nome && (
             <div key={grupo.nome} className="max-h-[50vh] overflow-y-auto rounded-lg bg-white/[0.03] p-1 md:hidden">
               <div className="flex flex-col gap-1">
-                {grupo.itens.map((item) => (
-                  <ItemMenu key={item.href} item={item} ativo={ehAtivo(item.href)} />
-                ))}
+                {grupo.itens.map((item, i) => {
+                  const subtitulo = subtituloAntes(grupo.itens, i);
+                  return (
+                    <div key={item.href} className="contents">
+                      {subtitulo && <Subtitulo texto={subtitulo} />}
+                      <ItemMenu item={item} ativo={ehAtivo(item.href)} />
+                    </div>
+                  );
+                })}
               </div>
             </div>
           ),
@@ -164,12 +196,14 @@ export function Menu({ itens }: { itens: Item[] }) {
 
       <div className="hidden md:flex md:flex-col md:gap-1">
         {itens.map((item, i) => {
-          const titulo = item.grupo && item.grupo !== itens[i - 1]?.grupo ? item.grupo : null;
+          const titulo = tituloDe(item) && tituloDe(item) !== tituloDe(itens[i - 1]) ? tituloDe(item) : null;
+          const subtitulo = subtituloAntes(itens, i);
           return (
             <div key={item.href} className="contents">
               {titulo && (
                 <p className="mt-5 mb-1 px-3 text-[10px] font-medium tracking-[0.25em] text-offwhite/40 uppercase">{titulo}</p>
               )}
+              {subtitulo && <Subtitulo texto={subtitulo} />}
               <ItemMenu item={item} ativo={ehAtivo(item.href)} />
             </div>
           );

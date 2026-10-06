@@ -81,28 +81,31 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
     ? ((await assinarAvatares(await criarClienteServidor(), [sessao.avatarCaminho])).get(sessao.avatarCaminho) ?? null)
     : null;
 
+  // Ordem segue o fluxo do cliente. `secao` (Aquisição/Comercial/Gestão) só titula no desktop;
+  // no celular esses itens ficam na faixa principal. Apenas a posição no menu muda: rotas e
+  // permissões de cada tela continuam as mesmas (Captura segue só para admin).
   const itens = [
     ...(sessao.atual
       ? [
           { href: "/inicio", rotulo: "Início" },
-          { href: "/negocios", rotulo: "Negócios" },
           { href: "/tarefas", rotulo: "Tarefas" },
-          ...(papel !== "sdr" ? [{ href: "/contatos", rotulo: "Contatos" }] : []),
+          ...(papel === "admin" ? [{ href: "/configuracoes/captura", rotulo: "Captura de leads", secao: "Aquisição" }] : []),
+          { href: "/negocios", rotulo: "Negócios", secao: "Comercial" },
+          ...(papel !== "sdr" ? [{ href: "/contatos", rotulo: "Contatos", secao: "Comercial" }] : []),
+          ...(papel === "admin" || papel === "gestor" ? [{ href: "/painel", rotulo: "Painel", secao: "Gestão" }] : []),
           ...itensGamificacao(papel, conquistaNova),
         ]
       : []),
-    ...(papel === "admin" || papel === "gestor" ? [{ href: "/painel", rotulo: "Painel" }] : []),
     ...(papel === "admin"
       ? [
-          { href: "/configuracoes/funil", rotulo: "Funis e etapas", grupo: "Configurações" },
-          { href: "/configuracoes/origens", rotulo: "Origens", grupo: "Configurações" },
-          { href: "/configuracoes/captura", rotulo: "Captura de leads", grupo: "Configurações" },
-          { href: "/configuracoes/listas", rotulo: "Etiquetas e motivos", grupo: "Configurações" },
-          { href: "/configuracoes/calculadora", rotulo: "Kits e calculadora", grupo: "Configurações" },
-          { href: "/configuracoes/propostas", rotulo: "Propostas comerciais", grupo: "Configurações" },
-          { href: "/configuracoes/contrato", rotulo: "Modelo de contrato", grupo: "Configurações" },
-          { href: "/configuracoes/usuarios", rotulo: "Usuários", grupo: "Configurações" },
-          { href: "/configuracoes/equipes", rotulo: "Equipes", grupo: "Configurações" },
+          { href: "/configuracoes/origens", rotulo: "Origens", grupo: "Configurações", subgrupo: "Aquisição" },
+          { href: "/configuracoes/funil", rotulo: "Funis e etapas", grupo: "Configurações", subgrupo: "Comercial" },
+          { href: "/configuracoes/listas", rotulo: "Etiquetas e motivos", grupo: "Configurações", subgrupo: "Comercial" },
+          { href: "/configuracoes/calculadora", rotulo: "Kits e calculadora", grupo: "Configurações", subgrupo: "Venda" },
+          { href: "/configuracoes/propostas", rotulo: "Propostas comerciais", grupo: "Configurações", subgrupo: "Venda" },
+          { href: "/configuracoes/contrato", rotulo: "Modelo de contrato", grupo: "Configurações", subgrupo: "Venda" },
+          { href: "/configuracoes/usuarios", rotulo: "Usuários", grupo: "Configurações", subgrupo: "Pessoas" },
+          { href: "/configuracoes/equipes", rotulo: "Equipes", grupo: "Configurações", subgrupo: "Pessoas" },
         ]
       : []),
     ...(sessao.superAdmin
