@@ -66,3 +66,24 @@ export function caminhoImagemRecompensaValido(empresaId: string, recompensaId: s
   const esperado = new RegExp(`^${empresaId}/${recompensaId}/${UUID}\.(webp|jpg|jpeg|png)$`, "i");
   return esperado.test(caminho);
 }
+
+/** Foto de perfil: saída exata de 512x512 (quadrada; o recorte pode ampliar uma imagem pequena). */
+export const SAIDA_AVATAR = { largura: 512, altura: 512 } as const;
+
+const UUID_MINUSCULO = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+const UUID_MINUSCULO_EXATO = new RegExp(`^${UUID_MINUSCULO}$`);
+
+/** Caminho no bucket 'avatares': `<user_id>/<uuid>.<ext>`. */
+export function montarCaminhoAvatar(userId: string, extensao: string, arquivoId: string): string {
+  return `${userId}/${arquivoId}.${extensao}`;
+}
+
+/**
+ * Confere se `caminho` é um arquivo gerado pelo app na pasta do próprio usuário:
+ * `<user_id>/<uuid>.(webp|jpg|png)`, sem outras pastas nem `..`. Mesma regra (e mesma
+ * sensibilidade a maiúsculas) do check de perfis.avatar_caminho e das políticas do bucket.
+ */
+export function caminhoAvatarValido(userId: string, caminho: string): boolean {
+  if (!UUID_MINUSCULO_EXATO.test(userId)) return false;
+  return new RegExp(`^${userId}/${UUID_MINUSCULO}\\.(webp|jpg|png)$`).test(caminho);
+}

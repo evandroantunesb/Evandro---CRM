@@ -5,10 +5,13 @@
 import { describe, expect, it } from "vitest";
 import {
   calcularDimensoesSaida,
+  caminhoAvatarValido,
   caminhoImagemRecompensaValido,
   extensaoDoTipo,
   LIMITE_BYTES_IMAGEM,
+  montarCaminhoAvatar,
   montarCaminhoImagemRecompensa,
+  SAIDA_AVATAR,
   validarArquivoImagem,
 } from "@/lib/imagem-upload";
 import { assinarImagensEmLote } from "@/lib/storage-imagens";
@@ -170,5 +173,50 @@ describe("assinarImagensEmLote", () => {
       },
     };
     expect((await assinarImagensEmLote(quebrado, "recompensas", ["a/1.webp"])).size).toBe(0);
+  });
+});
+
+describe("avatar: caminho e saída", () => {
+  const USUARIO = "44444444-4444-4444-8444-444444444444";
+  const OUTRO = "55555555-5555-4555-8555-555555555555";
+
+  it("a saída do avatar é 512x512", () => {
+    expect(SAIDA_AVATAR).toEqual({ largura: 512, altura: 512 });
+  });
+
+  it("monta <user_id>/<uuid>.<ext> e o caminho montado é válido para o próprio usuário", () => {
+    for (const ext of ["webp", "jpg", "png"]) {
+      const caminho = montarCaminhoAvatar(USUARIO, ext, ARQUIVO);
+      expect(caminho).toBe(`${USUARIO}/${ARQUIVO}.${ext}`);
+      expect(caminhoAvatarValido(USUARIO, caminho)).toBe(true);
+    }
+  });
+
+  it("recusa caminho na pasta de outro usuário", () => {
+    expect(caminhoAvatarValido(OUTRO, `${USUARIO}/${ARQUIVO}.webp`)).toBe(false);
+  });
+
+  it("recusa subpasta, '..', extensão fora de webp/jpg/png, nome não-uuid e sufixo extra", () => {
+    const invalidos = [
+      `${USUARIO}/sub/${ARQUIVO}.webp`,
+      `${USUARIO}/../${OUTRO}/${ARQUIVO}.webp`,
+      `${USUARIO}/${ARQUIVO}.jpeg`,
+      `${USUARIO}/${ARQUIVO}.gif`,
+      `${USUARIO}/${ARQUIVO}.svg`,
+      `${USUARIO}/foto.webp`,
+      `${USUARIO}/${ARQUIVO}.webp.webp`,
+      `${USUARIO}/${ARQUIVO}.webp/`,
+      `${ARQUIVO}.webp`,
+      `/${USUARIO}/${ARQUIVO}.webp`,
+      `${USUARIO}/${ARQUIVO}x.webp`,
+      `${USUARIO}/AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA.webp`,
+      "",
+    ];
+    for (const caminho of invalidos) expect(caminhoAvatarValido(USUARIO, caminho), caminho).toBe(false);
+  });
+
+  it("recusa userId que não seja uuid (evita regex montada com texto livre)", () => {
+    expect(caminhoAvatarValido(".*", `${USUARIO}/${ARQUIVO}.webp`)).toBe(false);
+    expect(caminhoAvatarValido("", `/${ARQUIVO}.webp`)).toBe(false);
   });
 });
