@@ -15,6 +15,7 @@ import { CartaoGf, EstadoVazioGf, IndicadorKpiGf } from "../_compartilhado/ui";
 import "./gerencial.css";
 
 const PERIODOS_VALIDOS = ["mes", "mes-passado"] as const;
+type PeriodoGerencial = (typeof PERIODOS_VALIDOS)[number];
 
 function formatarValorMeta(unidade: "moeda" | "quantidade" | "percentual", valor: number) {
   if (unidade === "moeda") return formatarMoeda(valor);
@@ -105,19 +106,53 @@ function ListaMetas({ metas }: { metas: MetaGerencial[] }) {
   );
 }
 
-function Conteudo({ dados, periodoRotulo }: { dados: DadosGerencial; periodoRotulo: string }) {
+const OPCOES_PERIODO: { chave: PeriodoGerencial; rotulo: string }[] = [
+  { chave: "mes", rotulo: "Este mês" },
+  { chave: "mes-passado", rotulo: "Mês passado" },
+];
+
+function Conteudo({
+  dados,
+  periodo,
+  periodoRotulo,
+}: {
+  dados: DadosGerencial;
+  periodo: PeriodoGerencial;
+  periodoRotulo: string;
+}) {
   const daEmpresa = dados.escopo === "empresa";
   const rotuloEscopo = daEmpresa ? "da empresa" : "da equipe";
   const rotuloEscopoRanking = daEmpresa ? "Empresa" : "Sua equipe";
 
   return (
     <div className="gf-gerencial">
-      <header className="flex flex-col gap-0.5">
-        <h1 className="text-2xl font-semibold text-[var(--gf-texto)]">Gamificação</h1>
-        <p className="text-sm text-[var(--gf-texto-sec)]">
-          {daEmpresa ? "Visão gerencial da empresa" : "Visão gerencial da sua equipe"} ·{" "}
-          {periodoRotulo.toLowerCase()}
-        </p>
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex flex-col gap-0.5">
+          <h1 className="text-2xl font-semibold text-[var(--gf-texto)]">Gamificação</h1>
+          <p className="text-sm text-[var(--gf-texto-sec)]">
+            {daEmpresa ? "Visão gerencial da empresa" : "Visão gerencial da sua equipe"} ·{" "}
+            {periodoRotulo.toLowerCase()}
+          </p>
+        </div>
+        <nav
+          aria-label="Período"
+          className="flex w-fit gap-1 rounded-lg bg-[var(--gf-surface-alta)] p-1"
+        >
+          {OPCOES_PERIODO.map((p) => (
+            <Link
+              key={p.chave}
+              href={`/gamificacao?periodo=${p.chave}`}
+              aria-current={periodo === p.chave ? "page" : undefined}
+              className={`rounded-md px-3 py-1 text-sm transition-colors ${
+                periodo === p.chave
+                  ? "bg-[var(--gf-surface)] font-medium text-[var(--gf-texto)] shadow-sm"
+                  : "text-[var(--gf-texto-sec)] hover:text-[var(--gf-texto)]"
+              }`}
+            >
+              {p.rotulo}
+            </Link>
+          ))}
+        </nav>
       </header>
 
       {dados.gestorSemEquipe && (
@@ -315,7 +350,11 @@ export async function DashboardGerencial({
 
   return (
     <div className="-m-4 min-h-screen bg-[var(--gf-bg)] p-4 text-[var(--gf-texto)] md:-m-10 md:p-10">
-      <Conteudo dados={dados} periodoRotulo={periodo === "mes-passado" ? "Mês passado" : "Este mês"} />
+      <Conteudo
+        dados={dados}
+        periodo={periodo}
+        periodoRotulo={periodo === "mes-passado" ? "Mês passado" : "Este mês"}
+      />
     </div>
   );
 }
