@@ -80,7 +80,7 @@ function ListaMetas({ metas }: { metas: MetaGerencial[] }) {
           >
             <div className="flex items-start justify-between gap-3">
               <div className="flex min-w-0 items-center gap-2.5">
-                <IniciaisAvatarGf nome={m.membroNome} tamanho={36} />
+                <IniciaisAvatarGf nome={m.membroNome} tamanho={36} src={m.avatarUrl} />
                 <div className="min-w-0">
                   <p className="gf-t-item break-words">{m.membroNome}</p>
                   <p className="gf-t-aux break-words">
@@ -231,6 +231,7 @@ function Conteudo({
                 <LinhaLancamento
                   key={l.id}
                   autor={l.membroNome}
+                  avatarUrl={l.avatarUrl}
                   descricao={l.descricao}
                   tempo={tempoDesde(l.createdAt)}
                   xp={l.xp}
@@ -263,6 +264,11 @@ function Conteudo({
                   <div className="min-w-0 flex-1">
                     <p className="gf-t-item break-words">{c.conquistaNome}</p>
                     <p className="gf-t-aux break-words">
+                      {c.avatarUrl && (
+                        <span className="mr-1.5 inline-flex align-text-bottom">
+                          <IniciaisAvatarGf nome={c.membroNome} tamanho={16} src={c.avatarUrl} />
+                        </span>
+                      )}
                       {c.membroNome} · {tempoDesde(c.desbloqueadaEm)}
                     </p>
                   </div>

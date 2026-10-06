@@ -10,9 +10,9 @@ import {
   validarArquivoImagem,
 } from "@/lib/imagem-upload";
 import { criarClienteNavegador } from "@/lib/supabase/navegador";
-import { EditorImagem } from "../../_compartilhado/editor-imagem";
+import { EditorImagem } from "@/components/editor-imagem";
 import { ImagemRecompensaGf } from "../../_compartilhado/imagem-recompensa-gf";
-import type { ImagemRecortada } from "../../_compartilhado/recortar-imagem";
+import type { ImagemRecortada } from "@/lib/recortar-imagem";
 import { definirImagemRecompensa, removerImagemRecompensa } from "./actions";
 import { MenuImagemRecompensa } from "./menu-imagem-recompensa";
 

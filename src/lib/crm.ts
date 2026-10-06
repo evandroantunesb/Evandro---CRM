@@ -19,7 +19,14 @@ export type Funil = { id: string; nome: string; ativo: boolean };
 export type Origem = { id: string; nome: string; cor: string | null; ativa: boolean; prazoAutoAprovacaoMinutos: number };
 export type ItemLista = { id: string; nome: string; ativo: boolean };
 export type Etiqueta = { id: string; nome: string; cor: string | null; ativa: boolean };
-export type MembroResumo = { id: string; nome: string; papel: string; ativo: boolean };
+export type MembroResumo = {
+  id: string;
+  nome: string;
+  papel: string;
+  ativo: boolean;
+  /** Caminho da foto no bucket 'avatares' (perfis.avatar_caminho). Quem exibe assina a URL em lote. */
+  avatarCaminho?: string | null;
+};
 export type KitSolar = { id: string; nome: string; potenciaKwp: number; preco: number; descricao: string | null; ativo: boolean };
 
 /** Configurações da empresa usadas em quase todas as telas do CRM. */
@@ -42,7 +49,7 @@ export async function carregarConfiguracao(empresaId: string) {
       .select("id, nome, cor, ativa, prazo_auto_aprovacao_minutos")
       .eq("empresa_id", empresaId)
       .order("nome"),
-    supabase.from("empresa_membros").select("id, papel, ativo, perfis(nome, email)").eq("empresa_id", empresaId),
+    supabase.from("empresa_membros").select("id, papel, ativo, perfis(nome, email, avatar_caminho)").eq("empresa_id", empresaId),
     supabase.from("motivos_perda").select("id, nome, ativo").eq("empresa_id", empresaId).order("created_at"),
     supabase.from("etiquetas").select("id, nome, cor, ativa").eq("empresa_id", empresaId).order("nome"),
     supabase
@@ -79,8 +86,14 @@ export async function carregarConfiguracao(empresaId: string) {
     })) as Origem[],
     membros: (membros.data ?? [])
       .map((m) => {
-        const p = m.perfis as unknown as { nome: string; email: string } | null;
-        return { id: m.id, nome: p?.nome || p?.email || "(sem nome)", papel: m.papel, ativo: m.ativo };
+        const p = m.perfis as unknown as { nome: string; email: string; avatar_caminho: string | null } | null;
+        return {
+          id: m.id,
+          nome: p?.nome || p?.email || "(sem nome)",
+          papel: m.papel,
+          ativo: m.ativo,
+          avatarCaminho: p?.avatar_caminho ?? null,
+        };
       })
       .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")) as MembroResumo[],
     motivos: (motivos.data ?? []) as ItemLista[],

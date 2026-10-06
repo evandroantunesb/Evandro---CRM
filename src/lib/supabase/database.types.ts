@@ -2338,6 +2338,7 @@ export type Database = {
       };
       perfis: {
         Row: {
+          avatar_caminho: string | null;
           created_at: string;
           email: string;
           id: string;
@@ -2346,6 +2347,7 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          avatar_caminho?: string | null;
           created_at?: string;
           email: string;
           id: string;
@@ -2354,6 +2356,7 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
+          avatar_caminho?: string | null;
           created_at?: string;
           email?: string;
           id?: string;
@@ -3294,6 +3297,7 @@ export type Database = {
       incrementar_visualizacao_formulario: { Args: { p_id: string }; Returns: undefined };
       membro_ativo: { Args: { p_empresa_id: string }; Returns: boolean };
       meu_membro_id: { Args: { p_empresa_id: string }; Returns: string };
+      pode_ver_avatar: { Args: { p_pasta: string }; Returns: boolean };
       pode_ver_contato: { Args: { p_contato_id: string }; Returns: boolean };
       pode_ver_contato_linha: {
         Args: { p_contato_id: string; p_criado_por: string; p_empresa_id: string };

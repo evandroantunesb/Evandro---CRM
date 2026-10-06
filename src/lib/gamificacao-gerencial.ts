@@ -1,4 +1,5 @@
 import "server-only";
+import { assinarAvatares } from "@/lib/avatares";
 import { inicioDaSemana } from "@/lib/formatacao";
 import { calcularProgresso, calcularRealizado, type Meta, type ProgressoMeta } from "@/lib/metas";
 import type { Vinculo } from "@/lib/sessao";
@@ -23,7 +24,7 @@ export const PERFIS_RANKING_GERENCIAL = [
 ] as const satisfies readonly PerfilGamificacao[];
 export type PerfilRankingGerencial = (typeof PERFIS_RANKING_GERENCIAL)[number];
 
-export type RankingLinha = { posicao: number; membroId: string; nome: string; total: number };
+export type RankingLinha = { posicao: number; membroId: string; nome: string; total: number; avatarUrl?: string };
 type LinhaBrutaRanking = { membro_id: string; total_xp: number };
 
 // ---------------------------------------------------------------------------
@@ -130,6 +131,8 @@ export type MetaGerencial = {
   titulo: string;
   metrica: MetricaMeta;
   membroNome: string;
+  /** URL assinada da foto de perfil; sem ela, a tela mostra as iniciais. */
+  avatarUrl?: string;
   valorAlvo: number;
   progresso: ProgressoMeta;
 };
@@ -137,6 +140,7 @@ export type MetaGerencial = {
 export type AtividadeGerencial = {
   id: string;
   membroNome: string;
+  avatarUrl?: string;
   descricao: string;
   xp: number;
   moedas: number;
@@ -146,6 +150,7 @@ export type AtividadeGerencial = {
 export type ConquistaRecenteGerencial = {
   id: string;
   membroNome: string;
+  avatarUrl?: string;
   conquistaNome: string;
   icone: string | null;
   desbloqueadaEm: string;
@@ -248,7 +253,7 @@ export async function carregarDadosGerencial(
 
   let queryMembros = supabase
     .from("empresa_membros")
-    .select("id, perfis(nome, email)")
+    .select("id, perfis(nome, email, avatar_caminho)")
     .eq("empresa_id", empresaId);
   if (listaEscopo) queryMembros = queryMembros.in("id", listaEscopo);
 
@@ -323,6 +328,24 @@ export async function carregarDadosGerencial(
     }),
   );
 
+  // Fotos de perfil: uma única assinatura em lote para tudo que a tela mostra com avatar
+  // (pódios dos rankings, metas, atividade e conquistas recentes).
+  const caminhoAvatar = new Map(
+    (membros ?? []).map((m) => [m.id, (m.perfis as unknown as { avatar_caminho: string | null } | null)?.avatar_caminho ?? null] as const),
+  );
+  const membrosComFoto = [
+    ...rankings.flatMap((r) => [...r.semana, ...r.mes, ...r.geral].map((l) => l.membro_id)),
+    ...(metasLinhas ?? []).map((m) => m.membro_id),
+    ...(atividadeBruta ?? []).map((l) => l.membro_id),
+    ...(recentesBrutas ?? []).map((d) => d.membro_id),
+  ];
+  const urlsAvatar = await assinarAvatares(
+    supabase,
+    membrosComFoto.map((id) => caminhoAvatar.get(id)),
+  );
+  const avatarDe = (membroId: string) => urlsAvatar.get(caminhoAvatar.get(membroId) ?? "");
+  const comFoto = (linhas: RankingLinha[]): RankingLinha[] => linhas.map((l) => ({ ...l, avatarUrl: avatarDe(l.membroId) }));
+
   // KPIs de XP/participantes: linhas COMPLETAS do período, de todos os perfis, antes do top N.
   const linhasPeriodo = rankings.map((r) => r.mes);
   const xpDistribuido = linhasPeriodo.reduce((s, l) => s + somarXp(l), 0);
@@ -348,6 +371,7 @@ export async function carregarDadosGerencial(
         titulo: m.titulo,
         metrica: m.metrica,
         membroNome: nomeMembro.get(m.membroId) ?? "(removido)",
+        avatarUrl: avatarDe(m.membroId),
         valorAlvo: m.valorAlvo,
         progresso: calcularProgresso(
           m.valorAlvo,
@@ -372,14 +396,15 @@ export async function carregarDadosGerencial(
     conquistasPeriodo: conquistasPeriodo ?? 0,
     rankings: rankings.map((r) => ({
       perfil: r.perfil,
-      semana: construirRankingCompleto(r.semana, nomeMembro),
-      mes: construirRankingCompleto(r.mes, nomeMembro),
-      geral: construirRankingCompleto(r.geral, nomeMembro),
+      semana: comFoto(construirRankingCompleto(r.semana, nomeMembro)),
+      mes: comFoto(construirRankingCompleto(r.mes, nomeMembro)),
+      geral: comFoto(construirRankingCompleto(r.geral, nomeMembro)),
     })),
     metas: metasGerenciais,
     atividade: (atividadeBruta ?? []).map((l) => ({
       id: l.id,
       membroNome: nomeMembro.get(l.membro_id) ?? "(removido)",
+      avatarUrl: avatarDe(l.membro_id),
       descricao: l.descricao || "Ponto lançado",
       xp: l.xp,
       moedas: l.moedas,
@@ -388,6 +413,7 @@ export async function carregarDadosGerencial(
     conquistasRecentes: (recentesBrutas ?? []).map((d) => ({
       id: d.id,
       membroNome: nomeMembro.get(d.membro_id) ?? "(removido)",
+      avatarUrl: avatarDe(d.membro_id),
       conquistaNome: catalogo.get(d.conquista_id)?.nome ?? "(conquista removida)",
       icone: catalogo.get(d.conquista_id)?.icone ?? null,
       desbloqueadaEm: d.desbloqueada_em,

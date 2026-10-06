@@ -1,3 +1,5 @@
+import { FotoAvatar } from "@/components/foto-avatar";
+
 export function iniciais(nome: string) {
   return nome
     .split(/[\s@]/)
@@ -7,9 +9,12 @@ export function iniciais(nome: string) {
     .join("");
 }
 
-/** Avatar circular com as iniciais de uma pessoa, usado onde ainda não há foto. */
-export function Avatar({ nome, tamanho = 28 }: { nome: string; tamanho?: number }) {
-  return (
+/**
+ * Avatar circular de uma pessoa: a foto (`src`, URL assinada) quando houver; senão — ou se a
+ * imagem falhar ao carregar — as iniciais. Sem `src`, o resultado é o mesmo de sempre.
+ */
+export function Avatar({ nome, tamanho = 28, src }: { nome: string; tamanho?: number; src?: string | null }) {
+  const comIniciais = (
     <span
       title={nome}
       style={{ width: tamanho, height: tamanho, fontSize: tamanho * 0.4 }}
@@ -18,4 +23,6 @@ export function Avatar({ nome, tamanho = 28 }: { nome: string; tamanho?: number 
       {iniciais(nome) || "?"}
     </span>
   );
+  if (!src) return comIniciais;
+  return <FotoAvatar src={src} alt={nome} tamanho={tamanho} fallback={comIniciais} />;
 }

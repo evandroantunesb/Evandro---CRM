@@ -1,4 +1,5 @@
 import { CalendarDays, Target } from "lucide-react";
+import { assinarAvatares } from "@/lib/avatares";
 import { carregarConfiguracao } from "@/lib/crm";
 import { calcularProgresso, calcularRealizado, type Meta } from "@/lib/metas";
 import { exigirPapel } from "@/lib/sessao";
@@ -33,6 +34,12 @@ export default async function MinhasMetas() {
   ]);
 
   const nomeMembro = new Map(config.membros.map((m) => [m.id, m.nome]));
+  // Fotos das pessoas das metas: uma assinatura em lote para a tela inteira.
+  const caminhoAvatar = new Map(config.membros.map((m) => [m.id, m.avatarCaminho]));
+  const urlsAvatar = await assinarAvatares(
+    supabase,
+    (linhas ?? []).map((m) => caminhoAvatar.get(m.membro_id)),
+  );
   const metas: Meta[] = (linhas ?? []).map((m) => ({
     id: m.id,
     titulo: m.titulo,
@@ -88,7 +95,7 @@ export default async function MinhasMetas() {
             >
               <div className="flex flex-col gap-4">
                 <div className="flex items-center gap-3">
-                  <IniciaisAvatarGf nome={pessoa} tamanho={40} />
+                  <IniciaisAvatarGf nome={pessoa} tamanho={40} src={urlsAvatar.get(caminhoAvatar.get(meta.membroId) ?? "")} />
                   <div className="min-w-0">
                     <p className="gf-t-item break-words">{pessoa}</p>
                     <p className="gf-t-aux break-words">

@@ -1,4 +1,5 @@
 import { Crown, Users } from "lucide-react";
+import { assinarAvatares } from "@/lib/avatares";
 import { calcularNivel } from "@/lib/gamificacao";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
@@ -52,7 +53,7 @@ export default async function Ranking({ searchParams }: { searchParams: Promise<
     supabase.rpc("ranking_gamificacao", { p_empresa_id: atual.empresaId, p_perfil: perfil, p_desde: calcularDesde(periodo) ?? undefined }),
     supabase
       .from("empresa_membros")
-      .select("id, ativo, perfis(nome, email)")
+      .select("id, ativo, perfis(nome, email, avatar_caminho)")
       .eq("empresa_id", atual.empresaId)
       .eq("ativo", true),
     supabase.from("niveis_gamificacao").select("nivel, nome, xp_minimo").eq("empresa_id", atual.empresaId).eq("ativa", true).order("xp_minimo"),
@@ -63,6 +64,9 @@ export default async function Ranking({ searchParams }: { searchParams: Promise<
       const p = m.perfis as unknown as { nome: string; email: string } | null;
       return [m.id, p?.nome || p?.email || "(sem nome)"];
     }),
+  );
+  const caminhosAvatar = new Map(
+    (membros ?? []).map((m) => [m.id, (m.perfis as unknown as { avatar_caminho: string | null } | null)?.avatar_caminho ?? null]),
   );
 
   // Nível exibido no ranking é sempre o nível real da pessoa (XP ativo da
@@ -88,12 +92,19 @@ export default async function Ranking({ searchParams }: { searchParams: Promise<
       nivel: calcularNivel(niveisNormalizados, xpGlobalPorMembro.get(l.membro_id) ?? 0),
     }));
 
+  // Fotos: uma assinatura em lote para todo o ranking.
+  const urlsAvatar = await assinarAvatares(
+    supabase,
+    linhas.map((l) => caminhosAvatar.get(l.membroId)),
+  );
+
   const maiorTotal = Math.max(1, ...linhas.map((l) => l.total));
   const itens: ItemRankingGf[] = linhas.map((l, i) => ({
     posicao: i + 1,
     membroId: l.membroId,
     nome: l.nome,
     total: l.total,
+    avatarUrl: urlsAvatar.get(caminhosAvatar.get(l.membroId) ?? ""),
     detalhe: `Nível ${l.nivel.nivel}${l.nivel.nome ? ` · ${l.nivel.nome}` : ""}`,
   }));
   const podio = itens.slice(0, 3);

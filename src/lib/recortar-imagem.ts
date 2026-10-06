@@ -20,18 +20,26 @@ function gerarBlob(canvas: HTMLCanvasElement, tipo: string, qualidade: number): 
   return new Promise((resolve) => canvas.toBlob(resolve, tipo, qualidade));
 }
 
+export type OpcoesRecorte = {
+  /** Limite superior da saída (nunca amplia). Padrão: 1200x900. Ignorado se houver `saidaExata`. */
+  saidaMaxima?: { largura: number; altura: number };
+  /** Saída exatamente nessa dimensão (amplia uma imagem pequena se preciso). Usada no avatar (512x512). */
+  saidaExata?: { largura: number; altura: number };
+};
+
 /**
- * Recorta `src` na `area` e devolve WebP (qualidade ~0.85, no máximo 1200x900, sem ampliar).
+ * Recorta `src` na `area` e devolve WebP (qualidade ~0.85, por padrão no máximo 1200x900, sem ampliar;
+ * com `saidaExata`, exatamente essa dimensão).
  * Se o navegador não codifica WebP no canvas, cai para JPEG (fundo branco no lugar da
  * transparência). Se o arquivo passar do limite, repete com qualidade menor.
  */
 export async function recortarImagem(
   src: string,
   area: AreaRecorte,
-  saidaMaxima: { largura: number; altura: number } = SAIDA_MAXIMA_IMAGEM,
+  { saidaMaxima = SAIDA_MAXIMA_IMAGEM, saidaExata }: OpcoesRecorte = {},
 ): Promise<ImagemRecortada> {
   const img = await carregarImagem(src);
-  const { largura, altura } = calcularDimensoesSaida(area.width, area.height, saidaMaxima);
+  const { largura, altura } = saidaExata ?? calcularDimensoesSaida(area.width, area.height, saidaMaxima);
   const canvas = document.createElement("canvas");
   canvas.width = largura;
   canvas.height = altura;

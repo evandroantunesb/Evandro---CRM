@@ -12,6 +12,7 @@ import {
   Trophy,
   Zap,
 } from "lucide-react";
+import { assinarAvatares } from "@/lib/avatares";
 import { carregarConfiguracao } from "@/lib/crm";
 import { inicioDaSemana, tempoDesde } from "@/lib/formatacao";
 import { calcularNivel } from "@/lib/gamificacao";
@@ -35,7 +36,7 @@ import { formatarValorMeta, ProgressoMetaGf, SituacaoMetaGf } from "../_comparti
 import { RecompensaChipGf } from "../_compartilhado/recompensa-preview";
 import { RankingTabsGf } from "../_compartilhado/ranking-tabs";
 
-type RankingLinha = { posicao: number; membroId: string; nome: string; total: number };
+type RankingLinha = { posicao: number; membroId: string; nome: string; total: number; avatarUrl?: string };
 type DiaSequencia = { data: string; dia_util: boolean; produtivo: boolean };
 
 const PERIODOS = [
@@ -218,6 +219,7 @@ export async function DashboardPessoal({
   ]);
 
   const nomeMembro = new Map(config.membros.map((m) => [m.id, m.nome]));
+  const caminhoAvatar = new Map(config.membros.map((m) => [m.id, m.avatarCaminho]));
   // Miniaturas da prévia da loja: uma única chamada assina as (até 3) imagens exibidas.
   const urlsImagemRecompensa = await assinarImagensEmLote(
     supabase,
@@ -269,7 +271,7 @@ export async function DashboardPessoal({
   const rankingCompleto = construirRanking(rankingBruto, nomeMembro);
   const ranking = rankingCompleto.slice(0, 5);
   // Abas do card de Ranking — mesma fonte, três janelas diferentes.
-  const rankingPorAba = {
+  const rankingPorAbaSemFoto = {
     semana: construirRanking(rankingSemanaBruto, nomeMembro).slice(0, 5),
     mes: ranking,
     geral: construirRanking(rankingGeralBruto, nomeMembro).slice(0, 5),
@@ -281,6 +283,27 @@ export async function DashboardPessoal({
   const acimaDeMim = minhaPosicaoRanking
     ? (rankingCompleto.find((r) => r.posicao === minhaPosicaoRanking.posicao - 1) ?? null)
     : null;
+
+  // Fotos de quem aparece nesta tela (abas do ranking, minha posição e o próximo colocado):
+  // uma única assinatura em lote.
+  const membrosComFoto = [
+    ...rankingPorAbaSemFoto.semana,
+    ...rankingPorAbaSemFoto.mes,
+    ...rankingPorAbaSemFoto.geral,
+    ...(minhaPosicaoRanking ? [minhaPosicaoRanking] : []),
+    ...(acimaDeMim ? [acimaDeMim] : []),
+  ];
+  const urlsAvatar = await assinarAvatares(
+    supabase,
+    membrosComFoto.map((r) => caminhoAvatar.get(r.membroId)),
+  );
+  const avatarDe = (membroId: string) => urlsAvatar.get(caminhoAvatar.get(membroId) ?? "");
+  const comFoto = (linhas: RankingLinha[]) => linhas.map((r) => ({ ...r, avatarUrl: avatarDe(r.membroId) }));
+  const rankingPorAba = {
+    semana: comFoto(rankingPorAbaSemFoto.semana),
+    mes: comFoto(rankingPorAbaSemFoto.mes),
+    geral: comFoto(rankingPorAbaSemFoto.geral),
+  };
 
   const rankingSemanaPassada = construirRanking(rankingHistoricoSemanaBruto, nomeMembro);
   const minhaPosicaoSemanaPassada =
@@ -424,6 +447,12 @@ export async function DashboardPessoal({
                 <p className="gf-t-rotulo flex items-center gap-1.5">
                   <Trophy size={14} className="shrink-0 text-[var(--gf-dourado)]" aria-hidden />
                   Minha posição
+                  <IniciaisAvatarGf
+                    nome={minhaPosicaoRanking.nome}
+                    tamanho={24}
+                    tom="verde"
+                    src={avatarDe(minhaPosicaoRanking.membroId)}
+                  />
                 </p>
                 <p className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
                   <span className="gf-t-kpi-lg">{`#${minhaPosicaoRanking.posicao}`}</span>
@@ -578,7 +607,7 @@ export async function DashboardPessoal({
                   { linha: acimaDeMim, rotulo: acimaDeMim.nome, destaque: false },
                 ].map(({ linha, rotulo, destaque }) => (
                   <div key={linha.membroId} className="flex items-center gap-3">
-                    <IniciaisAvatarGf nome={linha.nome} tamanho={36} tom={destaque ? "verde" : "neutro"} />
+                    <IniciaisAvatarGf nome={linha.nome} tamanho={36} tom={destaque ? "verde" : "neutro"} src={avatarDe(linha.membroId)} />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-baseline justify-between gap-3 text-sm">
                         <span

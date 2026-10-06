@@ -4,11 +4,42 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import Cropper from "react-easy-crop";
 import { Minus, Plus } from "lucide-react";
 import { Botao } from "@/components/ui";
-import { recortarImagem, type AreaRecorte, type ImagemRecortada } from "./recortar-imagem";
+import { recortarImagem, type AreaRecorte, type ImagemRecortada } from "@/lib/recortar-imagem";
 
 const ZOOM_MIN = 1;
 const ZOOM_MAX = 3;
 const ZOOM_PASSO = 0.1;
+
+/**
+ * Estilos por tema. "gamificacao" usa as variáveis `--gf-*` e as classes `gf-t-*` (só existem
+ * dentro de `.tema-gamificacao`); "claro" usa a identidade padrão do app, para telas fora do módulo.
+ */
+const TEMAS = {
+  gamificacao: {
+    dialogo:
+      "border-[var(--gf-borda)] bg-[var(--gf-surface)] text-[var(--gf-texto)]",
+    titulo: "gf-t-item text-base",
+    aux: "gf-t-aux",
+    rotulo: "text-[var(--gf-texto)]",
+    botaoZoom:
+      "border-[var(--gf-borda)] bg-[var(--gf-surface-alta)] text-[var(--gf-texto)] hover:border-[var(--gf-verde)]",
+    faixa: "accent-[var(--gf-verde)]",
+    erro: "bg-[var(--gf-vermelho-10)] text-[var(--gf-vermelho)]",
+    rodape: "border-[var(--gf-borda)]",
+    bordaRecorte: "2px solid var(--gf-verde)",
+  },
+  claro: {
+    dialogo: "border-zinc-200 bg-white text-carvao",
+    titulo: "font-titulo text-base font-semibold text-carvao",
+    aux: "text-[0.8125rem] leading-snug text-zinc-500",
+    rotulo: "text-zinc-700",
+    botaoZoom: "border-zinc-200 bg-white text-carvao hover:border-dourado",
+    faixa: "accent-dourado",
+    erro: "bg-red-50 text-red-800",
+    rodape: "border-zinc-200",
+    bordaRecorte: "2px solid var(--color-dourado)",
+  },
+} as const;
 
 /**
  * Editor de recorte de imagem (janela modal): o usuário enquadra a imagem com arrastar/pinça/setas e
@@ -16,15 +47,19 @@ const ZOOM_PASSO = 0.1;
  * `onConfirmar`. Quem chama faz o envio e informa `enviando`/`erro`. Esc e "Cancelar" fecham
  * (exceto durante o envio).
  *
- * `aspecto` = largura/altura do recorte (4/3 nas recompensas). `mascara` define o formato do
- * enquadramento: "retangulo" agora; "circulo" fica pronto para o avatar (o arquivo gerado continua
- * retangular — só a máscara visual muda).
+ * `aspecto` = largura/altura do recorte (4/3 nas recompensas, 1 no avatar). `mascara` define o
+ * formato do enquadramento: "retangulo" ou "circulo" (o arquivo gerado continua retangular — só a
+ * máscara visual muda). `saidaExata` gera a imagem final nessa dimensão (ampliando se preciso);
+ * sem ela, o recorte nunca amplia e fica em no máximo 1200x900. `tema` escolhe o visual: padrão
+ * "gamificacao" (escuro, dentro de `.tema-gamificacao`) ou "claro" (resto do app).
  */
 export function EditorImagem({
   arquivo,
   titulo,
   aspecto = 4 / 3,
   mascara = "retangulo",
+  tema = "gamificacao",
+  saidaExata,
   enviando = false,
   erro = null,
   rotuloConfirmar = "Usar esta imagem",
@@ -35,12 +70,15 @@ export function EditorImagem({
   titulo: string;
   aspecto?: number;
   mascara?: "retangulo" | "circulo";
+  tema?: "gamificacao" | "claro";
+  saidaExata?: { largura: number; altura: number };
   enviando?: boolean;
   erro?: string | null;
   rotuloConfirmar?: string;
   onConfirmar: (imagem: ImagemRecortada) => void | Promise<void>;
   onCancelar: () => void;
 }) {
+  const t = TEMAS[tema];
   const idTitulo = useId();
   const idZoom = useId();
   const dialogo = useRef<HTMLDialogElement>(null);
@@ -82,7 +120,7 @@ export function EditorImagem({
     setErroLocal(null);
     setGerando(true);
     try {
-      const imagem = await recortarImagem(src, area);
+      const imagem = await recortarImagem(src, area, { saidaExata });
       setGerando(false);
       await onConfirmar(imagem);
     } catch (e) {
@@ -102,13 +140,13 @@ export function EditorImagem({
         e.preventDefault();
         if (!ocupado) onCancelar();
       }}
-      className="m-auto max-h-[94dvh] w-[min(94vw,40rem)] overflow-y-auto rounded-xl border border-[var(--gf-borda)] bg-[var(--gf-surface)] p-0 text-[var(--gf-texto)] shadow-2xl backdrop:bg-black/70"
+      className={`m-auto max-h-[94dvh] w-[min(94vw,40rem)] overflow-y-auto rounded-xl border p-0 shadow-2xl backdrop:bg-black/70 ${t.dialogo}`}
     >
       <div className="flex flex-col gap-4 p-4 sm:p-5">
-        <h2 id={idTitulo} className="gf-t-item text-base">
+        <h2 id={idTitulo} className={t.titulo}>
           {titulo}
         </h2>
-        <p className="gf-t-aux">
+        <p className={t.aux}>
           Arraste a imagem para enquadrar (ou use as setas do teclado com o recorte selecionado) e ajuste o zoom.
         </p>
 
@@ -127,13 +165,13 @@ export function EditorImagem({
               onCropChange={setPosicao}
               onZoomChange={setZoom}
               onCropComplete={aoCompletar}
-              style={{ cropAreaStyle: { border: "2px solid var(--gf-verde)" } }}
+              style={{ cropAreaStyle: { border: t.bordaRecorte } }}
             />
           )}
         </div>
 
         <div className="flex items-center gap-3">
-          <label htmlFor={idZoom} className="text-sm font-medium text-[var(--gf-texto)]">
+          <label htmlFor={idZoom} className={`text-sm font-medium ${t.rotulo}`}>
             Zoom
           </label>
           <button
@@ -141,7 +179,7 @@ export function EditorImagem({
             aria-label="Diminuir zoom"
             disabled={ocupado || zoom <= ZOOM_MIN}
             onClick={() => setZoom((z) => Math.max(ZOOM_MIN, Math.round((z - ZOOM_PASSO) * 100) / 100))}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[var(--gf-borda)] bg-[var(--gf-surface-alta)] text-[var(--gf-texto)] hover:border-[var(--gf-verde)] disabled:opacity-50"
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border disabled:opacity-50 ${t.botaoZoom}`}
           >
             <Minus size={16} aria-hidden />
           </button>
@@ -155,31 +193,31 @@ export function EditorImagem({
             disabled={ocupado}
             onChange={(e) => setZoom(Number(e.target.value))}
             aria-valuetext={`${Math.round(zoom * 100)}%`}
-            className="h-11 min-h-0 flex-1 cursor-pointer accent-[var(--gf-verde)]"
+            className={`h-11 min-h-0 flex-1 cursor-pointer ${t.faixa}`}
           />
           <button
             type="button"
             aria-label="Aumentar zoom"
             disabled={ocupado || zoom >= ZOOM_MAX}
             onClick={() => setZoom((z) => Math.min(ZOOM_MAX, Math.round((z + ZOOM_PASSO) * 100) / 100))}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[var(--gf-borda)] bg-[var(--gf-surface-alta)] text-[var(--gf-texto)] hover:border-[var(--gf-verde)] disabled:opacity-50"
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border disabled:opacity-50 ${t.botaoZoom}`}
           >
             <Plus size={16} aria-hidden />
           </button>
         </div>
 
         {mensagemErro && (
-          <p role="alert" className="rounded-lg bg-[var(--gf-vermelho-10)] px-3 py-2 text-sm text-[var(--gf-vermelho)]">
+          <p role="alert" className={`rounded-lg px-3 py-2 text-sm ${t.erro}`}>
             {mensagemErro}
           </p>
         )}
         {ocupado && (
-          <p role="status" className="gf-t-aux">
+          <p role="status" className={t.aux}>
             {enviando ? "Enviando a imagem…" : "Preparando o recorte…"}
           </p>
         )}
 
-        <div className="flex flex-wrap items-center justify-end gap-3 border-t border-[var(--gf-borda)] pt-4">
+        <div className={`flex flex-wrap items-center justify-end gap-3 border-t pt-4 ${t.rodape}`}>
           <Botao type="button" variante="secundario" onClick={onCancelar} disabled={ocupado}>
             Cancelar
           </Botao>
