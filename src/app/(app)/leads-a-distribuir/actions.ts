@@ -29,5 +29,5 @@ export async function decidirAtribuicaoLead(_: ResultadoAcao, formData: FormData
   revalidatePath("/painel");
   revalidatePath("/inicio");
   revalidatePath("/", "layout");
-  return { ok: true, mensagem: dados.data.membro_final_id ? "Lead reatribuído." : "Lead aprovado." };
+  return { ok: true, mensagem: "Lead distribuído com sucesso." };
 }
