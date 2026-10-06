@@ -18,6 +18,7 @@ import { calcularNivel } from "@/lib/gamificacao";
 import { calcularProgresso, calcularRealizado, type Meta } from "@/lib/metas";
 import type { Vinculo } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
+import { assinarImagensEmLote } from "@/lib/storage-imagens";
 import { UNIDADE_METRICA_META, type MetricaMeta } from "@/lib/tipos";
 import {
   BarraProgressoGf,
@@ -200,7 +201,7 @@ export async function DashboardPessoal({
       .order("desbloqueada_em", { ascending: false }),
     supabase
       .from("recompensas")
-      .select("id, nome, descricao, custo_moedas")
+      .select("id, nome, descricao, custo_moedas, imagem_caminho")
       .eq("empresa_id", atual.empresaId)
       .eq("ativa", true)
       .or(`validade_ate.is.null,validade_ate.gte.${paraDataCurta(new Date())}`)
@@ -217,6 +218,12 @@ export async function DashboardPessoal({
   ]);
 
   const nomeMembro = new Map(config.membros.map((m) => [m.id, m.nome]));
+  // Miniaturas da prévia da loja: uma única chamada assina as (até 3) imagens exibidas.
+  const urlsImagemRecompensa = await assinarImagensEmLote(
+    supabase,
+    "recompensas",
+    (recompensas ?? []).slice(0, 3).map((r) => r.imagem_caminho),
+  );
 
   // KPIs -----------------------------------------------------------------
   const totalXpPeriodo = (pontosPeriodo ?? []).reduce((s, l) => s + l.xp, 0);
@@ -735,7 +742,12 @@ export async function DashboardPessoal({
                     <RecompensaChipGf
                       key={r.id}
                       saldo={meuSaldoMoedas}
-                      recompensa={{ id: r.id, nome: r.nome, custoMoedas: r.custo_moedas }}
+                      recompensa={{
+                        id: r.id,
+                        nome: r.nome,
+                        custoMoedas: r.custo_moedas,
+                        imagemUrl: r.imagem_caminho ? (urlsImagemRecompensa.get(r.imagem_caminho) ?? null) : null,
+                      }}
                     />
                   ))}
                 </div>

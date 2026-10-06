@@ -30,6 +30,7 @@ import {
   editarRecompensa,
   editarRegra,
 } from "./actions";
+import { ImagemRecompensaAdmin } from "./imagem-recompensa-admin";
 
 type EventoOpcao = { tipo: string; rotulo: string; campos: readonly string[] };
 
@@ -405,6 +406,9 @@ export type RecompensaSalva = {
   limitePorMembro: number | null;
   validadeAte: string | null;
   ativa: boolean;
+  imagemCaminho: string | null;
+  /** URL assinada (1 h) da imagem, gerada no servidor; nula sem imagem ou se a assinatura falhar. */
+  imagemUrl: string | null;
 };
 
 export function NovaRecompensa() {
@@ -419,6 +423,7 @@ export function NovaRecompensa() {
         <Campo rotulo="Limite por colaborador (opcional)" name="limitePorMembro" type="number" min={1} step={1} placeholder="Sem limite" />
       </div>
       <Campo rotulo="Validade (opcional)" name="validadeAte" type="date" />
+      <p className="gf-t-micro">Depois de criar, você poderá adicionar uma imagem à recompensa.</p>
       <Botao type="submit" disabled={pendente} className="self-start">
         Criar recompensa
       </Botao>
@@ -427,43 +432,53 @@ export function NovaRecompensa() {
   );
 }
 
-export function LinhaRecompensa({ recompensa }: { recompensa: RecompensaSalva }) {
+export function LinhaRecompensa({ empresaId, recompensa }: { empresaId: string; recompensa: RecompensaSalva }) {
   const [resultado, acao, pendente] = useActionState(editarRecompensa, null);
   return (
-    <form action={acao} className="gf-item-edicao flex flex-col gap-4">
-      <input type="hidden" name="id" value={recompensa.id} />
+    <div className="gf-item-edicao flex flex-col gap-4">
       <CabecalhoItemGf titulo={recompensa.nome}>
         <BadgeGf tom="atencao">{formatarNumeroGf(recompensa.custoMoedas)} moedas</BadgeGf>
         <StatusAtivoGf ativa={recompensa.ativa} />
       </CabecalhoItemGf>
-      <Campo rotulo="Nome" name="nome" defaultValue={recompensa.nome} required />
-      <Campo rotulo="Descrição" name="descricao" defaultValue={recompensa.descricao} />
-      <div className="grid gap-3 @min-[620px]:grid-cols-3">
-        <Campo rotulo="Custo em moedas" name="custoMoedas" type="number" min={1} step={1} defaultValue={recompensa.custoMoedas} required />
-        <Campo rotulo="Estoque" name="estoque" type="number" min={0} step={1} defaultValue={recompensa.estoque ?? undefined} placeholder="Ilimitado" />
-        <Campo
-          rotulo="Limite por colaborador"
-          name="limitePorMembro"
-          type="number"
-          min={1}
-          step={1}
-          defaultValue={recompensa.limitePorMembro ?? undefined}
-          placeholder="Sem limite"
-        />
-      </div>
-      <Campo rotulo="Validade" name="validadeAte" type="date" defaultValue={recompensa.validadeAte ?? ""} />
-      <div className="flex flex-wrap items-center gap-3 border-t border-[var(--gf-borda)] pt-4">
-        <label className="flex items-center gap-2 text-sm text-[var(--gf-texto)]">
-          <input type="checkbox" name="ativa" defaultChecked={recompensa.ativa} /> Ativa
-        </label>
-        <Botao type="submit" variante="secundario" disabled={pendente}>
-          Salvar
-        </Botao>
-        <button type="submit" formAction={apagarRecompensa} className="gf-botao-texto sm:ml-auto">
-          Apagar
-        </button>
-        <Mensagem resultado={resultado} />
-      </div>
-    </form>
+      {/* Fora do <form>: o envio da imagem é direto ao Storage e tem ações próprias. */}
+      <ImagemRecompensaAdmin
+        empresaId={empresaId}
+        recompensaId={recompensa.id}
+        nome={recompensa.nome}
+        imagemUrl={recompensa.imagemUrl}
+        temImagem={!!recompensa.imagemCaminho}
+      />
+      <form action={acao} className="flex flex-col gap-4">
+        <input type="hidden" name="id" value={recompensa.id} />
+        <Campo rotulo="Nome" name="nome" defaultValue={recompensa.nome} required />
+        <Campo rotulo="Descrição" name="descricao" defaultValue={recompensa.descricao} />
+        <div className="grid gap-3 @min-[620px]:grid-cols-3">
+          <Campo rotulo="Custo em moedas" name="custoMoedas" type="number" min={1} step={1} defaultValue={recompensa.custoMoedas} required />
+          <Campo rotulo="Estoque" name="estoque" type="number" min={0} step={1} defaultValue={recompensa.estoque ?? undefined} placeholder="Ilimitado" />
+          <Campo
+            rotulo="Limite por colaborador"
+            name="limitePorMembro"
+            type="number"
+            min={1}
+            step={1}
+            defaultValue={recompensa.limitePorMembro ?? undefined}
+            placeholder="Sem limite"
+          />
+        </div>
+        <Campo rotulo="Validade" name="validadeAte" type="date" defaultValue={recompensa.validadeAte ?? ""} />
+        <div className="flex flex-wrap items-center gap-3 border-t border-[var(--gf-borda)] pt-4">
+          <label className="flex items-center gap-2 text-sm text-[var(--gf-texto)]">
+            <input type="checkbox" name="ativa" defaultChecked={recompensa.ativa} /> Ativa
+          </label>
+          <Botao type="submit" variante="secundario" disabled={pendente}>
+            Salvar
+          </Botao>
+          <button type="submit" formAction={apagarRecompensa} className="gf-botao-texto sm:ml-auto">
+            Apagar
+          </button>
+          <Mensagem resultado={resultado} />
+        </div>
+      </form>
+    </div>
   );
 }
