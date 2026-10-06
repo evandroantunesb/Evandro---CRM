@@ -177,35 +177,98 @@ async function encontrarDemoExistente(usuariosAuth) {
 }
 
 // ---------------------------------------------------------------------------
-// 2. Configuração copiada da empresa de origem
+// 2. Configuração da empresa demo
 //
 // Inventário do que a empresa demo JÁ GANHA dos gatilhos de `empresas` ao nascer
-// (não é copiado, para não duplicar):
+// (não é recriado, para não duplicar):
 //   - criar_padroes_empresa(): funil "Vendas" + 4 etapas e 9 origens;
 //   - criar_motivos_padrao(): 7 motivos de perda;
 //   - criar_parametros_calculadora_padrao(): 1 linha de parametros_calculadora
-//     (valores padrão — sobrescritos abaixo com os da origem, via UPDATE).
+//     (valores padrão — sobrescritos com os da empresa de origem, via UPDATE).
 // Nada de gamificação, modelos, kits ou recompensas nasce com a empresa.
 //
-// Copiado (só o que está ativo na origem), pela sessão do admin — mesmo caminho e
-// mesmas policies das telas de Gamificação > Administração:
-//   gamification_rules, niveis_gamificacao, conquistas, recompensas.
+// A gamificação da demo é PRÓPRIA (aprovada por Evandro em 2026-10-05), não copiada
+// da origem: a origem não tem níveis/conquistas ativos e suas regras ativas são de
+// eventos não pontuáveis. Usa só eventos pontuáveis do catálogo atual
+// (src/lib/gamificacao.ts) e é criada pela sessão do admin — mesmo caminho e mesmas
+// policies das telas de Gamificação > Administração. A empresa de origem não é tocada.
 // Não copiado: modelos de contrato/proposta e identidade da proposta (texto e logos
 // da empresa real), kits, etiquetas, equipes, formulários de captura.
-//
-// Nenhuma linha é copiada por JSON cru: cada registro é remontado campo a campo, e
-// `condicao`/`criterio` só passam se usarem campos conhecidos do catálogo atual
-// (src/lib/gamificacao.ts) e nenhum UUID — um ID de outra empresa nunca é levado
-// para a demo. Hoje nenhum campo de condição do catálogo guarda ID (nem de etapa),
-// então não há o que remapear; se aparecer, o script bloqueia em vez de copiar.
 // ---------------------------------------------------------------------------
 
-// União de EVENTOS_GAMIFICACAO[].campos em src/lib/gamificacao.ts.
-const CAMPOS_CONDICAO_CONHECIDOS = new Set(["valor", "tipo", "no_prazo", "resultado"]);
-// Marcados `naoPontuavel` ou `legado` no mesmo catálogo.
+// Marcados `naoPontuavel` ou `legado` em src/lib/gamificacao.ts — guarda contra regra
+// da demo cair num deles por engano.
 const EVENTOS_NAO_PONTUAVEIS = new Set(["deal.created", "deal.stage_changed", "deal.owner_changed", "task.created", "note.created", "deal.first_contact_done"]);
-const METRICAS_CONQUISTA = new Set(["xp_acumulado", "marco_contagem"]);
-const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+// Exigem teto (EVENTOS_TETO_OBRIGATORIO) — sem ele o motor ignora a regra.
+const EVENTOS_TETO_OBRIGATORIO = new Set(["task.completed", "reuniao.realizada", "visita.realizada"]);
+
+const REGRAS_DEMO = [
+  { nome: "Entrou em negociação", evento_tipo: "deal.negotiation_started", perfil_aplicavel: "closer", xp: 10, moedas: 0, unica_por_negocio: true },
+  { nome: "Negócio ganho", evento_tipo: "deal.won", perfil_aplicavel: "closer", xp: 20, moedas: 0, unica_por_negocio: true },
+  {
+    nome: "Venda acima de R$ 50 mil",
+    evento_tipo: "deal.won",
+    perfil_aplicavel: "closer",
+    xp: 20,
+    moedas: 0,
+    unica_por_negocio: true,
+    condicao: { campo: "valor", operador: ">=", valor: "50000" },
+  },
+  { nome: "Contrato assinado", evento_tipo: "contrato.assinado", perfil_aplicavel: "closer", xp: 50, moedas: 40, unica_por_negocio: true },
+  { nome: "Pagamento confirmado", evento_tipo: "pagamento.confirmado", perfil_aplicavel: "closer", xp: 30, moedas: 30, unica_por_negocio: true },
+  { nome: "Reunião realizada", evento_tipo: "reuniao.realizada", perfil_aplicavel: "closer", xp: 10, moedas: 0, limite_periodo: "dia", limite_quantidade: 5 },
+  { nome: "Lead entregue para vendas", evento_tipo: "handoff.created", perfil_aplicavel: "sdr", xp: 5, moedas: 0, unica_por_negocio: true },
+  { nome: "Oportunidade aceita", evento_tipo: "oportunidade_aceita", perfil_aplicavel: "sdr", xp: 10, moedas: 5, unica_por_negocio: true },
+  { nome: "Lead entregue virou venda", evento_tipo: "handoff.won", perfil_aplicavel: "sdr", xp: 30, moedas: 20, unica_por_negocio: true },
+  { nome: "Contrato da oportunidade originada", evento_tipo: "handoff.contrato_assinado", perfil_aplicavel: "sdr", xp: 20, moedas: 0, unica_por_negocio: true },
+  {
+    nome: "Primeiro contato realizado",
+    evento_tipo: "task.completed",
+    perfil_aplicavel: "sdr",
+    xp: 2,
+    moedas: 0,
+    condicao: { campo: "resultado", operador: "=", valor: "contato_realizado" },
+    limite_periodo: "dia",
+    limite_quantidade: 20,
+  },
+  { nome: "Negócio qualificado", evento_tipo: "deal.qualified", perfil_aplicavel: "sdr", xp: 5, moedas: 0, unica_por_negocio: true },
+];
+
+const NIVEIS_DEMO = [
+  { nivel: 1, nome: "Iniciante", xp_minimo: 0 },
+  { nivel: 2, nome: "Bronze", xp_minimo: 100 },
+  { nivel: 3, nome: "Prata", xp_minimo: 250 },
+  { nivel: 4, nome: "Ouro", xp_minimo: 450 },
+  { nivel: 5, nome: "Diamante", xp_minimo: 700 },
+];
+
+const CONQUISTAS_DEMO = [
+  { nome: "Primeira assinatura", icone: "✍️", descricao: "Assinou o primeiro contrato.", criterio: { metrica: "marco_contagem", marco: "contrato.assinado", valor: 1 }, perfil_aplicavel: "closer", xp_bonus: 10 },
+  { nome: "Cinco contratos", icone: "🏅", descricao: "Assinou cinco contratos.", criterio: { metrica: "marco_contagem", marco: "contrato.assinado", valor: 5 }, perfil_aplicavel: "closer", xp_bonus: 30 },
+  { nome: "Primeiro pagamento", icone: "💰", descricao: "Teve o primeiro pagamento confirmado.", criterio: { metrica: "marco_contagem", marco: "pagamento.confirmado", valor: 1 }, perfil_aplicavel: "closer", xp_bonus: 10 },
+  { nome: "Negociador", icone: "🤝", descricao: "Levou cinco negócios à negociação.", criterio: { metrica: "marco_contagem", marco: "deal.negotiation_started", valor: 5 }, perfil_aplicavel: "closer", xp_bonus: 15 },
+  { nome: "Ponte de vendas", icone: "🌉", descricao: "Três leads entregues viraram venda.", criterio: { metrica: "marco_contagem", marco: "handoff.won", valor: 3 }, perfil_aplicavel: "sdr", xp_bonus: 20 },
+  // Bônus 0 de propósito: conquista por XP não alimenta o próprio XP.
+  { nome: "Rumo ao Ouro", icone: "🥇", descricao: "Acumulou 500 XP.", criterio: { metrica: "xp_acumulado", valor: 500 }, perfil_aplicavel: null, xp_bonus: 0 },
+  { nome: "Qualificador", icone: "🎯", descricao: "Qualificou cinco negócios.", criterio: { metrica: "marco_contagem", marco: "deal.qualified", valor: 5 }, perfil_aplicavel: "sdr", xp_bonus: 10 },
+];
+
+const RECOMPENSAS_DEMO = [
+  { nome: "Café da manhã especial", descricao: "Café da manhã para a equipe por conta da empresa.", custo_moedas: 80 },
+  { nome: "Vale-presente R$ 100", descricao: "Vale-presente em loja parceira.", custo_moedas: 200 },
+  { nome: "Meio período de folga", descricao: "Meio período de folga, combinado com o gestor.", custo_moedas: 400 },
+];
+
+// Resultado esperado pelo plano dos 35 negócios com a configuração acima (XP inclui
+// o bônus das conquistas). Só para conferência — nunca é escrito em lugar nenhum.
+const ESPERADO_POR_PESSOA = {
+  lucas: { xp: 605, nivel: "Ouro", moedas: 290 },
+  mariana: { xp: 420, nivel: "Prata", moedas: 220 },
+  rafael: { xp: 210, nivel: "Bronze", moedas: 110 },
+  bruno: { xp: 130, nivel: "Bronze", moedas: 70 },
+  gabriel: { xp: 355, nivel: "Prata", moedas: 125 },
+};
+
 const PARAMETROS_COPIADOS = [
   "comissao_percentual",
   "custo_engenharia",
@@ -218,133 +281,69 @@ const PARAMETROS_COPIADOS = [
   "produtividade_kwh_kwp_mes",
 ];
 
-async function lerAtivos(tabela, origemId, filtrarAtiva = true) {
-  let consulta = db.from(tabela).select("*").eq("empresa_id", origemId);
-  if (filtrarAtiva) consulta = consulta.eq("ativa", true);
-  const { data, error } = await consulta;
-  if (error) throw error;
-  return data ?? [];
-}
-
-async function carregarConfiguracaoOrigem(origemId) {
-  const [regras, niveis, conquistas, recompensas] = await Promise.all([
-    lerAtivos("gamification_rules", origemId),
-    lerAtivos("niveis_gamificacao", origemId),
-    lerAtivos("conquistas", origemId),
-    lerAtivos("recompensas", origemId),
-  ]);
-  const { data: parametros, error: eParam } = await db.from("parametros_calculadora").select(PARAMETROS_COPIADOS.join(", ")).eq("empresa_id", origemId).single();
-  if (eParam) throw eParam;
-
+function conferirGamificacaoDemo() {
   const bloqueios = [];
-  const avisos = [];
-
-  const regrasDemo = [];
-  for (const r of regras) {
-    let condicao = null;
-    if (r.condicao !== null && r.condicao !== undefined) {
-      const c = r.condicao;
-      const chaves = c && typeof c === "object" && !Array.isArray(c) ? Object.keys(c).sort().join(",") : "";
-      if (chaves !== "campo,operador,valor") {
-        bloqueios.push(`regra "${r.nome}": condição em formato inesperado (${JSON.stringify(c)}).`);
-        continue;
-      }
-      if (!CAMPOS_CONDICAO_CONHECIDOS.has(c.campo) || UUID_RE.test(String(c.valor))) {
-        bloqueios.push(`regra "${r.nome}": condição ${c.campo} ${c.operador} ${c.valor} usa campo fora do catálogo ou um ID — não é copiada às cegas.`);
-        continue;
-      }
-      condicao = { campo: c.campo, operador: c.operador, valor: c.valor };
-    }
-    if (EVENTOS_NAO_PONTUAVEIS.has(r.evento_tipo)) {
-      avisos.push(`regra "${r.nome}" (${r.evento_tipo}: ${r.xp} XP / ${r.moedas} moedas) é de evento marcado como não pontuável/legado no catálogo atual — será copiada como está ativa na origem.`);
-    }
-    regrasDemo.push({
-      nome: r.nome,
-      evento_tipo: r.evento_tipo,
-      xp: r.xp,
-      moedas: r.moedas,
-      perfil_aplicavel: r.perfil_aplicavel,
-      condicao,
-      limite_periodo: r.limite_periodo,
-      limite_quantidade: r.limite_quantidade,
-      unica_por_negocio: r.unica_por_negocio,
-    });
+  for (const r of REGRAS_DEMO) {
+    if (EVENTOS_NAO_PONTUAVEIS.has(r.evento_tipo)) bloqueios.push(`regra "${r.nome}" usa evento não pontuável ${r.evento_tipo}.`);
+    if (EVENTOS_TETO_OBRIGATORIO.has(r.evento_tipo) && !(r.limite_periodo && r.limite_quantidade)) bloqueios.push(`regra "${r.nome}" precisa de teto.`);
   }
-
-  const conquistasDemo = [];
-  for (const c of conquistas) {
-    const k = c.criterio;
-    const valido =
-      k && typeof k === "object" && METRICAS_CONQUISTA.has(k.metrica) && Number.isInteger(k.valor) && (k.metrica !== "marco_contagem" || typeof k.marco === "string");
-    if (!valido || UUID_RE.test(JSON.stringify(k))) {
-      bloqueios.push(`conquista "${c.nome}": critério em formato inesperado ou com ID (${JSON.stringify(k)}).`);
-      continue;
-    }
-    conquistasDemo.push({
-      nome: c.nome,
-      descricao: c.descricao,
-      icone: c.icone,
-      criterio: k.metrica === "marco_contagem" ? { metrica: k.metrica, marco: k.marco, valor: k.valor } : { metrica: k.metrica, valor: k.valor },
-      xp_bonus: c.xp_bonus,
-      perfil_aplicavel: c.perfil_aplicavel,
-    });
+  for (let i = 1; i < NIVEIS_DEMO.length; i++) {
+    if (NIVEIS_DEMO[i].xp_minimo <= NIVEIS_DEMO[i - 1].xp_minimo) bloqueios.push("níveis com XP mínimo fora de ordem.");
   }
-
-  const niveisDemo = niveis.map((n) => ({ nivel: n.nivel, nome: n.nome, xp_minimo: n.xp_minimo }));
-  const recompensasDemo = recompensas.map((r) => ({
-    nome: r.nome,
-    descricao: r.descricao,
-    custo_moedas: r.custo_moedas,
-    estoque: r.estoque,
-    limite_por_membro: r.limite_por_membro,
-    validade_ate: r.validade_ate,
-  }));
-
-  if (!regrasDemo.length) avisos.push("a origem não tem nenhuma regra de gamificação ativa — a demo não vai gerar XP.");
-  if (!niveisDemo.length) avisos.push("a origem não tem níveis ativos.");
-
-  return { regras: regrasDemo, niveis: niveisDemo, conquistas: conquistasDemo, recompensas: recompensasDemo, parametros, bloqueios, avisos };
+  return bloqueios;
 }
 
-function imprimirPlano({ origemId, origemNome, config, demoExistente }) {
-  console.log(`\nEmpresa de origem (só leitura): ${origemNome} (empresa_id=${origemId})`);
+async function carregarParametrosOrigem(origemId) {
+  const { data, error } = await db.from("parametros_calculadora").select(PARAMETROS_COPIADOS.join(", ")).eq("empresa_id", origemId).single();
+  if (error) throw error;
+  return data;
+}
+
+function imprimirPlano({ origemId, origemNome, demoExistente }) {
+  console.log(`\nEmpresa de origem (só leitura, fonte dos parâmetros da calculadora): ${origemNome} (empresa_id=${origemId})`);
   console.log(`Empresa a criar: "${NOME_EMPRESA_DEMO}" — situação ativa, sem plano de cobrança (aparece na cobrança com R$ 0).`);
-  console.log("\nCriado automaticamente pelos gatilhos de `empresas` (não copiado):");
-  console.log('  funil "Vendas" + 4 etapas (viram as 4 primeiras das 9 do funil demo), 9 origens, 7 motivos de perda, parâmetros da calculadora (valores padrão).');
-  console.log("\nCopiado da origem pela sessão do admin (só registros ativos, remontados campo a campo):");
-  console.log(`  regras de gamificação: ${config.regras.length}`);
-  for (const r of config.regras) {
-    const cond = r.condicao ? ` [se ${r.condicao.campo} ${r.condicao.operador} ${r.condicao.valor}]` : "";
-    console.log(`    - ${r.nome}: ${r.evento_tipo} → ${r.xp} XP / ${r.moedas} moedas${r.perfil_aplicavel ? ` (perfil ${r.perfil_aplicavel})` : ""}${cond}`);
+  console.log("\nCriado automaticamente pelos gatilhos de `empresas` (não recriado):");
+  console.log('  funil "Vendas" + 4 etapas (viram as 4 primeiras das 9 do funil demo), 9 origens, 7 motivos de perda, parâmetros da calculadora.');
+  console.log(`Copiado da origem: parâmetros da calculadora (${PARAMETROS_COPIADOS.length} campos, UPDATE na linha criada pelo gatilho).`);
+  console.log("Não copiado: gamificação da origem, modelos de contrato/proposta, identidade da proposta, kits, etiquetas, equipes, formulários de captura.");
+
+  console.log("\nGamificação própria da demo (criada pela sessão do admin):");
+  console.log(`  regras (${REGRAS_DEMO.length}):`);
+  for (const r of REGRAS_DEMO) {
+    const cond = r.condicao ? ` se ${r.condicao.campo} ${r.condicao.operador} ${r.condicao.valor}` : "";
+    const teto = r.limite_periodo ? ` · teto ${r.limite_quantidade}/${r.limite_periodo}` : "";
+    console.log(`    - ${r.nome}: ${r.evento_tipo}${cond} [${r.perfil_aplicavel}] → ${r.xp} XP / ${r.moedas} moedas${teto}`);
   }
-  console.log(`  níveis: ${config.niveis.length} · conquistas: ${config.conquistas.length} · recompensas: ${config.recompensas.length}`);
-  console.log(`  parâmetros da calculadora: ${PARAMETROS_COPIADOS.length} campos (UPDATE na linha criada pelo gatilho)`);
-  console.log("Não copiado: modelos de contrato/proposta, identidade da proposta, kits, etiquetas, equipes, formulários de captura.");
+  console.log(`  níveis: ${NIVEIS_DEMO.map((n) => `${n.nome} ${n.xp_minimo}`).join(" · ")}`);
+  console.log(`  conquistas (${CONQUISTAS_DEMO.length}):`);
+  for (const c of CONQUISTAS_DEMO) {
+    const k = c.criterio;
+    const crit = k.metrica === "xp_acumulado" ? `XP acumulado ≥ ${k.valor}` : `${k.marco} ≥ ${k.valor}`;
+    console.log(`    - ${c.nome}: ${crit}${c.perfil_aplicavel ? ` [${c.perfil_aplicavel}]` : ""} · bônus ${c.xp_bonus} XP`);
+  }
+  console.log(`  recompensas: ${RECOMPENSAS_DEMO.map((r) => `${r.nome} (${r.custo_moedas})`).join(" · ")}`);
+  console.log("  esperado após o seed:");
+  for (const [chave, e] of Object.entries(ESPERADO_POR_PESSOA)) console.log(`    ${chave}: ${e.xp} XP · ${e.nivel} · ${e.moedas} moedas`);
+
   console.log(`\nUsuários fictícios: ${PESSOAS.length} (${demoExistente.usuariosDemo.length} já existem no Auth e serão reaproveitados, com a senha de demonstração redefinida).`);
   for (const p of PESSOAS) console.log(`  - ${p.nome} <${p.email}> — papel=${p.papel}, perfil_gamificacao=${p.perfil_gamificacao}`);
-
-  if (config.avisos.length) {
-    console.log("\nAvisos:");
-    for (const a of config.avisos) console.log(`  ⚠ ${a}`);
-  }
 }
 
-async function copiarConfiguracao(clienteAdmin, demoId, demoAdminMembroId, config) {
+async function configurarEmpresaDemo(clienteAdmin, demoId, demoAdminMembroId, parametrosOrigem) {
   const lotes = [
-    ["gamification_rules", config.regras.map((r) => ({ ...r, empresa_id: demoId, criado_por: demoAdminMembroId }))],
-    ["niveis_gamificacao", config.niveis.map((n) => ({ ...n, empresa_id: demoId }))],
-    ["conquistas", config.conquistas.map((c) => ({ ...c, empresa_id: demoId }))],
-    ["recompensas", config.recompensas.map((r) => ({ ...r, empresa_id: demoId, criado_por: demoAdminMembroId }))],
+    ["gamification_rules", REGRAS_DEMO.map((r) => ({ condicao: null, limite_periodo: null, limite_quantidade: null, unica_por_negocio: false, ...r, empresa_id: demoId, criado_por: demoAdminMembroId }))],
+    ["niveis_gamificacao", NIVEIS_DEMO.map((n) => ({ ...n, empresa_id: demoId }))],
+    ["conquistas", CONQUISTAS_DEMO.map((c) => ({ ...c, empresa_id: demoId }))],
+    ["recompensas", RECOMPENSAS_DEMO.map((r) => ({ ...r, empresa_id: demoId, criado_por: demoAdminMembroId }))],
   ];
   for (const [tabela, linhas] of lotes) {
-    if (!linhas.length) continue;
     const { error } = await clienteAdmin.from(tabela).insert(linhas);
-    if (error) throw new Error(`Falha ao copiar ${tabela}: ${error.message}`);
+    if (error) throw new Error(`Falha ao criar ${tabela}: ${error.message}`);
     console.log(`  ${tabela}: ${linhas.length}`);
   }
-  const { error: eParam } = await clienteAdmin.from("parametros_calculadora").update(config.parametros).eq("empresa_id", demoId);
+  const { error: eParam } = await clienteAdmin.from("parametros_calculadora").update(parametrosOrigem).eq("empresa_id", demoId);
   if (eParam) throw new Error(`Falha ao copiar parâmetros da calculadora: ${eParam.message}`);
-  console.log("  parametros_calculadora: atualizados");
+  console.log("  parametros_calculadora: copiados da origem");
 }
 
 // ---------------------------------------------------------------------------
@@ -1006,7 +1005,11 @@ async function validarPosSeed(empresaId, pessoas) {
     .in("membro_id", [...closerIds, pessoas.gabriel.membroId]);
   if (eLedger) throw eLedger;
   const xpPorMembro = {};
-  for (const l of lancamentos) xpPorMembro[l.membro_id] = (xpPorMembro[l.membro_id] ?? 0) + l.xp;
+  const moedasPorMembro = {};
+  for (const l of lancamentos) {
+    xpPorMembro[l.membro_id] = (xpPorMembro[l.membro_id] ?? 0) + l.xp;
+    moedasPorMembro[l.membro_id] = (moedasPorMembro[l.membro_id] ?? 0) + l.moedas;
+  }
 
   const { data: niveis } = await db.from("niveis_gamificacao").select("nivel, nome, xp_minimo").eq("empresa_id", empresaId).order("xp_minimo", { ascending: true });
   function nivelDe(xp) {
@@ -1017,9 +1020,19 @@ async function validarPosSeed(empresaId, pessoas) {
     return atual ? `nível ${atual.nivel}${atual.nome ? ` (${atual.nome})` : ""}` : "sem nível configurado";
   }
 
-  const rankingTodos = [...closers, "gabriel"].map((c) => ({ chave: c, nome: pessoas[c].nome, xp: xpPorMembro[pessoas[c].membroId] ?? 0 }));
-  rankingTodos.sort((a, b) => b.xp - a.xp);
-  for (const r of rankingTodos) console.log(`  ${r.nome}: ${r.xp} XP — ${nivelDe(r.xp)}`);
+  // O ranking da tela é separado por perfil (abas Closer e SDR): Gabriel não concorre com os closers.
+  for (const c of [...closers, "gabriel"]) {
+    const membroId = pessoas[c].membroId;
+    const xp = xpPorMembro[membroId] ?? 0;
+    const moedas = moedasPorMembro[membroId] ?? 0;
+    const esperado = ESPERADO_POR_PESSOA[c];
+    const nivel = nivelDe(xp);
+    const confere = xp === esperado.xp && moedas === esperado.moedas && nivel.includes(esperado.nivel);
+    console.log(
+      `  ${pessoas[c].nome}: ${xp} XP — ${nivel} — ${moedas} moedas` +
+        (confere ? " (confere)" : ` ⚠ esperado ${esperado.xp} XP · ${esperado.nivel} · ${esperado.moedas} moedas`),
+    );
+  }
 
   const xpClosers = closers.map((c) => xpPorMembro[pessoas[c].membroId] ?? 0);
   const ordemOk = xpClosers.every((v, i) => i === 0 || v <= xpClosers[i - 1]);
@@ -1082,12 +1095,12 @@ async function main() {
   const usuariosAuth = await listarUsuariosAuth();
   const { adminUserId, origemId, origemNome } = await resolverAdminEOrigem(usuariosAuth);
   const demoExistente = await encontrarDemoExistente(usuariosAuth);
-  const config = await carregarConfiguracaoOrigem(origemId);
+  const parametrosOrigem = await carregarParametrosOrigem(origemId);
   const plano35 = montarPlano();
 
-  imprimirPlano({ origemId, origemNome, config, demoExistente });
+  imprimirPlano({ origemId, origemNome, demoExistente });
 
-  const bloqueios = [...config.bloqueios];
+  const bloqueios = conferirGamificacaoDemo();
   for (const e of demoExistente.porNome) bloqueios.push(`já existe empresa "${e.nome}" (empresa_id=${e.id}, situação ${e.situacao}) — a Base Demo não é recriada nem duplicada.`);
   for (const v of demoExistente.vinculosAtivos) {
     const email = demoExistente.usuariosDemo.find((u) => u.id === v.user_id)?.email;
@@ -1115,8 +1128,8 @@ async function main() {
   const { funilId, etapas: etapasDemo } = await montarFunilDemo(clienteAdmin, empresaId);
   const etapas = etapasDemo.map((e) => ({ ...e, funilId }));
 
-  console.log("\nCopiando a configuração da origem (sessão do admin)...");
-  await copiarConfiguracao(clienteAdmin, empresaId, adminMembroId, config);
+  console.log("\nCriando a gamificação da demo e copiando os parâmetros da calculadora (sessão do admin)...");
+  await configurarEmpresaDemo(clienteAdmin, empresaId, adminMembroId, parametrosOrigem);
 
   console.log("\nCriando os 5 membros fictícios...");
   const pessoas = { adminMembroId };
