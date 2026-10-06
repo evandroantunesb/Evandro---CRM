@@ -8,7 +8,7 @@ import { apagarEvento, criarEvento, obterAccessToken } from "@/lib/google-agenda
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteAdmin } from "@/lib/supabase/admin";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { TIPOS_TAREFA, type ResultadoAcao } from "@/lib/tipos";
+import { RESULTADOS_TAREFA, TIPOS_TAREFA, type ResultadoAcao } from "@/lib/tipos";
 
 const DURACAO_EVENTO_MINUTOS = 30;
 
@@ -128,21 +128,37 @@ export async function criarTarefa(_: ResultadoAcao, formData: FormData): Promise
   return { ok: true, mensagem: "Tarefa criada." };
 }
 
-/** Marca como concluída ou volta para pendente. */
-export async function alternarConclusao(formData: FormData) {
-  await exigirPapel();
-  const d = z
-    .object({ tarefaId: z.string().uuid(), concluir: z.enum(["true", "false"]) })
-    .safeParse(Object.fromEntries(formData));
-  if (!d.success) return;
+const esquemaConclusao = z.object({
+  tarefaId: z.string().uuid(),
+  concluir: z.enum(["true", "false"]),
+  resultado: z
+    .string()
+    .optional()
+    .transform((v) => v || undefined)
+    .pipe(z.enum(RESULTADOS_TAREFA).optional()),
+});
 
+/**
+ * Marca como concluída ou volta para pendente. Ligação/WhatsApp e reunião/visita exigem
+ * `resultado` pra concluir — o banco valida (inclusive o horário pra realizada/no_show) e
+ * devolve a mensagem certa; reabrir sempre limpa o resultado, sem precisar informar nada.
+ */
+export async function alternarConclusao(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  await exigirPapel();
+  const d = esquemaConclusao.safeParse(Object.fromEntries(formData));
+  if (!d.success) return { ok: false, mensagem: d.error.issues[0].message };
+
+  const concluir = d.data.concluir === "true";
   const supabase = await criarClienteServidor();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("tarefas")
-    .update({ concluida_em: d.data.concluir === "true" ? new Date().toISOString() : null })
+    .update({ concluida_em: concluir ? new Date().toISOString() : null, resultado: concluir ? (d.data.resultado ?? null) : null })
     .eq("id", d.data.tarefaId)
     .select("negocio_id");
+  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível concluir a tarefa.") };
+
   atualizarTelas(data?.[0]?.negocio_id ?? null);
+  return { ok: true, mensagem: concluir ? "Tarefa concluída." : "Tarefa reaberta." };
 }
 
 export async function apagarTarefa(formData: FormData) {

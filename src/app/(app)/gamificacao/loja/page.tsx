@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Cartao, Selo } from "@/components/ui";
 import { formatarDataHora } from "@/lib/formatacao";
 import { exigirPapel } from "@/lib/sessao";
@@ -18,30 +19,39 @@ export default async function LojaDeRecompensas() {
   const hoje = new Date().toISOString().slice(0, 10);
 
   const [{ data: lancamentos }, { data: recompensas }, { data: meusResgates }] = await Promise.all([
-    supabase.from("point_ledger").select("pontos").eq("membro_id", atual.membroId).eq("estornado", false),
+    supabase.from("point_ledger").select("moedas").eq("membro_id", atual.membroId).eq("estornado", false),
     supabase
       .from("recompensas")
-      .select("id, nome, descricao, custo_pontos")
+      .select("id, nome, descricao, custo_moedas")
       .eq("empresa_id", atual.empresaId)
       .eq("ativa", true)
       .or(`validade_ate.is.null,validade_ate.gte.${hoje}`)
-      .order("custo_pontos"),
+      .order("custo_moedas"),
     supabase
       .from("resgates")
-      .select("id, status, pontos_debitados, created_at, recompensas(nome)")
+      .select("id, status, moedas_debitadas, created_at, recompensas(nome)")
       .eq("membro_id", atual.membroId)
       .order("created_at", { ascending: false })
       .limit(50),
   ]);
 
-  const saldo = (lancamentos ?? []).reduce((soma, l) => soma + l.pontos, 0);
+  // Saldo real pode ficar negativo (moedas já gastas cuja origem foi revertida depois
+  // — decisão do Evandro: estado válido, nunca corrigido artificialmente). O resgate
+  // continua bloqueado com base no saldo REAL (via RPC); a exibição clampa em 0 e
+  // mostra o ajuste pendente separadamente, pra não parecer uma dívida financeira.
+  const saldoReal = (lancamentos ?? []).reduce((soma, l) => soma + l.moedas, 0);
+  const saldoExibido = Math.max(saldoReal, 0);
+  const ajusteNegativo = saldoReal < 0 ? -saldoReal : 0;
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4">
       <h1 className="text-2xl font-semibold text-zinc-900">Loja de recompensas</h1>
 
-      <Cartao titulo="Seu saldo">
-        <p className="text-3xl font-semibold text-zinc-900">{saldo.toLocaleString("pt-BR")} pts</p>
+      <Cartao titulo="Seu saldo" acao={<Link href="/gamificacao/extrato" className="text-sm text-dourado hover:underline">Ver extrato →</Link>}>
+        <p className="text-3xl font-semibold text-zinc-900">{saldoExibido.toLocaleString("pt-BR")} moedas</p>
+        {ajusteNegativo > 0 && (
+          <p className="text-sm text-zinc-500">{ajusteNegativo.toLocaleString("pt-BR")} moedas em ajuste</p>
+        )}
       </Cartao>
 
       <Cartao titulo="Recompensas disponíveis">
@@ -50,8 +60,8 @@ export default async function LojaDeRecompensas() {
           {(recompensas ?? []).map((r) => (
             <CartaoRecompensa
               key={r.id}
-              recompensa={{ id: r.id, nome: r.nome, descricao: r.descricao, custoPontos: r.custo_pontos }}
-              saldo={saldo}
+              recompensa={{ id: r.id, nome: r.nome, descricao: r.descricao, custoMoedas: r.custo_moedas }}
+              saldo={saldoReal}
             />
           ))}
         </div>
@@ -69,7 +79,7 @@ export default async function LojaDeRecompensas() {
                   <span className="text-xs text-zinc-500">{formatarDataHora(r.created_at)}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-zinc-600">{r.pontos_debitados.toLocaleString("pt-BR")} pts</span>
+                  <span className="text-zinc-600">{r.moedas_debitadas.toLocaleString("pt-BR")} moedas</span>
                   <Selo tom={TOM_STATUS[r.status as StatusResgate]}>{ROTULO_STATUS_RESGATE[r.status as StatusResgate]}</Selo>
                 </div>
               </li>

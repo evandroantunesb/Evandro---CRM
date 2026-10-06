@@ -5,13 +5,14 @@ import { z } from "zod";
 import { criarUsuarioDireto } from "@/lib/convites";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { PAPEIS, TIPOS_VENDEDOR, STATUS_MEMBRO, type ResultadoAcao } from "@/lib/tipos";
+import { PAPEIS, PERFIS_GAMIFICACAO, TIPOS_VENDEDOR, STATUS_MEMBRO, type ResultadoAcao } from "@/lib/tipos";
 
 const esquemaConvite = z.object({
   nome: z.string().trim().min(2, "Informe o nome"),
   email: z.string().trim().email("E-mail inválido"),
   papel: z.enum(PAPEIS),
   tipo_vendedor: z.enum(TIPOS_VENDEDOR),
+  perfil_gamificacao: z.enum(PERFIS_GAMIFICACAO).optional().or(z.literal("").transform(() => undefined)),
   senha: z
     .string()
     .trim()
@@ -49,6 +50,7 @@ export async function convidarMembro(_: ResultadoAcao, formData: FormData): Prom
     user_id: userId,
     papel: dados.data.papel,
     tipo_vendedor: dados.data.papel === "vendedor" ? dados.data.tipo_vendedor : null,
+    perfil_gamificacao: dados.data.perfil_gamificacao ?? null,
   });
   if (error) {
     if (error.code === "23505") return { ok: false, mensagem: "Essa pessoa já faz parte da empresa." };
@@ -68,6 +70,7 @@ const esquemaAtualizacao = z.object({
   membroId: z.string().uuid(),
   papel: z.enum(PAPEIS),
   tipo_vendedor: z.enum(TIPOS_VENDEDOR),
+  perfil_gamificacao: z.enum(PERFIS_GAMIFICACAO).optional().or(z.literal("").transform(() => undefined)),
   recebe_leads: z.enum(["on"]).optional(),
   status: z.enum(STATUS_MEMBRO),
 });
@@ -98,6 +101,7 @@ export async function atualizarMembro(_: ResultadoAcao, formData: FormData): Pro
     .update({
       papel: dados.data.papel,
       tipo_vendedor: dados.data.papel === "vendedor" ? dados.data.tipo_vendedor : null,
+      perfil_gamificacao: dados.data.perfil_gamificacao ?? null,
       recebe_leads: dados.data.recebe_leads === "on",
       status: dados.data.status,
     })

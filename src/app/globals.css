@@ -58,3 +58,308 @@ h3,
   font-family: var(--font-titulo);
   letter-spacing: -0.01em;
 }
+
+/*
+ * Tema escuro da Gamificação — escopado à classe .tema-gamificacao (aplicada só
+ * pelo layout de src/app/(app)/gamificacao). Não altera --color-* acima nem a
+ * paleta do resto do produto. Verde é a cor contextual (XP/progresso/CTA);
+ * dourado fica reservado a prestígio (1º lugar, conquistas, recompensas
+ * premium); vermelho só para alerta/queda/erro — decisão do Evandro, 2026-10-01.
+ */
+.tema-gamificacao {
+  --gf-bg: var(--color-carvao);
+  --gf-surface: #1a1a1c;
+  --gf-surface-alta: #232326;
+  --gf-borda: #2e2e32;
+  --gf-texto: var(--color-offwhite);
+  --gf-texto-sec: #a3a3aa;
+  --gf-texto-ter: #6b6b72;
+  --gf-verde: #34d399;
+  --gf-verde-10: rgb(52 211 153 / 12%);
+  --gf-dourado: var(--color-dourado);
+  --gf-dourado-10: rgb(212 175 55 / 12%);
+  --gf-vermelho: #f87171;
+  --gf-vermelho-10: rgb(248 113 113 / 12%);
+}
+
+/*
+ * Hero "Minha posição": a paisagem faz parte da linguagem visual em qualquer
+ * breakpoint. O estado vazio usa o mesmo container e não altera a geometria.
+ * Seletores escopados pelas classes semânticas de src/app/(app)/gamificacao/page.tsx
+ * (.gf-cabecalho, .gf-kpis, .gf-hero, .gf-hero-posicao, .gf-hero-secundario,
+ * .gf-area, .gf-cartao-ranking, .gf-col-centro, .gf-col-lateral) em vez de
+ * :nth-child posicional, pra não quebrar se a ordem/estrutura dos cards mudar.
+ */
+.tema-gamificacao .gf-hero-posicao {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 77% 21%, rgb(212 175 55 / 20%) 0 2%, transparent 12%),
+    radial-gradient(circle at 73% 31%, rgb(52 211 153 / 18%), transparent 28%),
+    linear-gradient(115deg, #07110d 0%, #0b1b14 48%, #101614 100%);
+}
+
+.tema-gamificacao .gf-hero-posicao::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  right: -3%;
+  bottom: -20%;
+  width: 72%;
+  height: 92%;
+  clip-path: polygon(0 100%, 13% 73%, 24% 82%, 39% 47%, 48% 61%, 61% 18%, 72% 52%, 82% 39%, 100% 100%);
+  background:
+    linear-gradient(155deg, rgb(52 211 153 / 30%), transparent 48%),
+    linear-gradient(180deg, #163b2b, #08110d 78%);
+  opacity: 0.95;
+}
+
+.tema-gamificacao .gf-hero-posicao::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgb(4 10 7 / 92%) 0%, rgb(4 10 7 / 52%) 48%, transparent 76%),
+    radial-gradient(circle at 73% 23%, rgb(52 211 153 / 12%), transparent 26%);
+  pointer-events: none;
+}
+
+.tema-gamificacao .gf-hero-posicao > * {
+  position: relative;
+  z-index: 1;
+}
+
+/*
+ * Mobile oficial (mockup aprovado): uma coluna de leitura, KPIs 2x2, posição em
+ * largura total e Nível/Sequência lado a lado. Os containers têm altura estável
+ * dentro do breakpoint; dados a mais são resumidos pela própria Visão geral.
+ */
+@media (max-width: 767px) {
+  .tema-gamificacao .max-w-\[1500px\] {
+    width: 100%;
+    max-width: none;
+    margin-inline: 0;
+    gap: 10px;
+  }
+
+  .tema-gamificacao .gf-cabecalho {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 10px;
+  }
+
+  .tema-gamificacao .gf-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .tema-gamificacao .gf-kpis > div {
+    min-height: 56px;
+  }
+
+  .tema-gamificacao .gf-hero {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    height: auto !important;
+    gap: 8px;
+  }
+
+  .tema-gamificacao .gf-hero-posicao {
+    grid-column: 1 / -1;
+    height: 158px;
+  }
+
+  .tema-gamificacao .gf-hero-secundario {
+    height: 148px;
+    min-width: 0;
+  }
+
+  .tema-gamificacao .gf-area {
+    grid-template-columns: minmax(0, 1fr) !important;
+    height: auto !important;
+    gap: 8px;
+  }
+
+  .tema-gamificacao .gf-cartao-ranking {
+    height: 360px;
+    min-height: 360px;
+  }
+
+  .tema-gamificacao .gf-col-centro {
+    display: grid;
+    height: auto !important;
+    grid-template-rows: 118px 250px !important;
+    gap: 8px;
+  }
+
+  .tema-gamificacao .gf-col-lateral {
+    display: grid;
+    height: auto !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: 110px 145px 150px !important;
+    gap: 8px;
+  }
+
+  .tema-gamificacao .max-w-\[1500px\] section {
+    border-radius: 12px;
+  }
+}
+
+/* Celulares muito estreitos: Nível e Sequência deixam de disputar largura. */
+@media (max-width: 359px) {
+  .tema-gamificacao .gf-hero {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .tema-gamificacao .gf-hero-posicao {
+    grid-column: auto;
+  }
+}
+
+/*
+ * Tablet e notebook: duas colunas reais. O desktop de três colunas entra a
+ * partir de 1280 px (ver bloco abaixo) — 1024 px ainda é região intermediária.
+ */
+@media (min-width: 768px) and (max-width: 1279px) {
+  .tema-gamificacao .max-w-\[1500px\] {
+    width: 100%;
+    max-width: none;
+    margin-inline: 0;
+  }
+
+  .tema-gamificacao .gf-cabecalho {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .tema-gamificacao .gf-hero {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    height: auto !important;
+  }
+
+  .tema-gamificacao .gf-hero-posicao {
+    grid-column: 1 / -1;
+    height: 180px;
+  }
+
+  .tema-gamificacao .gf-hero-secundario {
+    height: 154px;
+  }
+
+  .tema-gamificacao .gf-area {
+    grid-template-columns: 1.15fr 1fr !important;
+    height: auto !important;
+  }
+
+  .tema-gamificacao .gf-cartao-ranking {
+    height: 430px;
+    min-height: 430px;
+  }
+
+  .tema-gamificacao .gf-col-centro {
+    height: 430px !important;
+    grid-template-rows: 120px 1fr !important;
+  }
+
+  .tema-gamificacao .gf-col-lateral {
+    grid-column: 1 / -1;
+    height: 145px !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+  }
+}
+
+/*
+ * Desktop largo: wireframe oficial da referência. Aqui sim a geometria de três
+ * colunas fica fixa e independente da quantidade de dados cadastrados. A
+ * partir de 1280 px já há largura útil suficiente pra manter a composição
+ * desktop (1280/1366 não devem cair no layout intermediário de 2 colunas).
+ */
+@media (min-width: 1280px) {
+  .tema-gamificacao .max-w-\[1500px\] {
+    width: 100%;
+    max-width: none;
+    margin-inline: 0;
+  }
+
+  .tema-gamificacao .gf-kpis > div {
+    min-height: 7dvh;
+  }
+
+  .tema-gamificacao .gf-hero {
+    height: 22dvh !important;
+    min-height: 126px;
+  }
+
+  .tema-gamificacao .gf-area {
+    height: 55dvh !important;
+    min-height: 318px;
+  }
+
+  .tema-gamificacao .gf-col-centro {
+    grid-template-rows: 38fr 62fr !important;
+  }
+
+  .tema-gamificacao .gf-col-lateral {
+    grid-template-rows: 32fr 40fr 28fr !important;
+  }
+}
+
+/*
+ * Estabilização de alinhamento da Visão Geral.
+ * Evita que títulos/ações quebrem a geometria em larguras intermediárias e
+ * mantém os pares de cartões com a mesma caixa visual.
+ */
+.tema-gamificacao .gf-area .gf-cartao-cabecalho {
+  flex-wrap: nowrap !important;
+  align-items: center;
+  min-width: 0;
+}
+
+.tema-gamificacao .gf-area .gf-cartao-cabecalho > h2 {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tema-gamificacao .gf-area .gf-cartao-cabecalho > a {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+@media (max-width: 767px) {
+  .tema-gamificacao .gf-kpis > div {
+    height: 56px;
+    min-height: 56px;
+  }
+
+  .tema-gamificacao .gf-hero-secundario {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-self: stretch;
+  }
+
+  .tema-gamificacao .gf-area > section,
+  .tema-gamificacao .gf-col > section {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .tema-gamificacao .gf-area .gf-cartao-cabecalho {
+    min-height: 24px;
+    margin-bottom: 12px;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1279px) {
+  .tema-gamificacao .gf-area > section,
+  .tema-gamificacao .gf-col {
+    min-width: 0;
+  }
+
+  .tema-gamificacao .gf-area .gf-cartao-cabecalho {
+    min-height: 24px;
+  }
+}

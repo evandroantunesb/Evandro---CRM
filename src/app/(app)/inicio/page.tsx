@@ -20,6 +20,7 @@ import { redirect } from "next/navigation";
 import { ListaTarefas, type TarefaLista } from "@/components/lista-tarefas";
 import { Cartao, Selo } from "@/components/ui";
 import { carregarConfiguracao, formatarMoeda, inicioDoDia, tempoDesde } from "@/lib/crm";
+import { calcularNivel, responsavelCongeladoPorNegocio } from "@/lib/gamificacao";
 import { carregarLeadsParados } from "@/lib/leads-parados";
 import { carregarLeadsSemContato } from "@/lib/leads-sem-contato";
 import { calcularProgresso, calcularRealizado, type Meta } from "@/lib/metas";
@@ -161,9 +162,13 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
   if (pessoal) consultaFunilMes = consultaFunilMes.eq("responsavel_id", atual.membroId);
 
   // Ganhos recentes: só usado na visão de Equipe (gestor), pra saber de quem foi cada negócio fechado.
+  // Lista pelo estado vivo (status='ganho' só pode ser resultado do último fechamento causal
+  // ser deal.won — reabertura sempre passa por 'aberto' antes); a ATRIBUIÇÃO, porém, vem do
+  // responsável congelado no próprio evento deal.won (ver abaixo), nunca de negocios.responsavel_id
+  // ao vivo, que pode ter trocado depois do ganho.
   const consultaGanhosRecentes = supabase
     .from("negocios")
-    .select("id, numero, valor, fechado_em, responsavel_id, contatos(nome)")
+    .select("id, numero, valor, fechado_em, contatos(nome)")
     .eq("empresa_id", atual.empresaId)
     .eq("status", "ganho")
     .order("fechado_em", { ascending: false })
@@ -225,9 +230,11 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
       .lt("vence_em", new Date(hojeFimExclusivo).toISOString())
       .order("vence_em", { ascending: true })
       .limit(20),
-    supabase.from("niveis_gamificacao").select("nivel, nome, xp_minimo").eq("empresa_id", atual.empresaId).order("xp_minimo"),
-    supabase.from("point_ledger").select("pontos").eq("membro_id", atual.membroId).eq("estornado", false).limit(20000),
-    supabase.rpc("ranking_gamificacao", { p_empresa_id: atual.empresaId, p_desde: mesAtual.inicioIso }),
+    supabase.from("niveis_gamificacao").select("nivel, nome, xp_minimo").eq("empresa_id", atual.empresaId).eq("ativa", true).order("xp_minimo"),
+    supabase.from("point_ledger").select("xp").eq("membro_id", atual.membroId).eq("estornado", false).limit(20000),
+    atual.perfilGamificacao
+      ? supabase.rpc("ranking_gamificacao", { p_empresa_id: atual.empresaId, p_perfil: atual.perfilGamificacao, p_desde: mesAtual.inicioIso })
+      : Promise.resolve({ data: [] as { membro_id: string; total_xp: number }[] }),
     supabase
       .from("conquistas_desbloqueadas")
       .select("id", { count: "exact", head: true })
@@ -251,6 +258,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
     id: m.id,
     titulo: m.titulo,
     metrica: "receita",
+    empresaId: atual.empresaId,
     membroId: m.membro_id,
     periodoInicio: m.periodo_inicio,
     periodoFim: m.periodo_fim,
@@ -312,16 +320,35 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
   ];
 
   // Ganhos recentes: quem fechou cada um dos últimos negócios ganhos (visão de Equipe/gestor) -------------------
+  // Atribuição causal: o responsável congelado no próprio evento deal.won que tornou o
+  // negócio 'ganho' agora (nunca negocios.responsavel_id ao vivo, que pode ter trocado
+  // depois do ganho). Como o negócio só está com status='ganho' porque seu fechamento
+  // causal mais recente foi deal.won (reabertura sempre passa por 'aberto' antes de
+  // qualquer novo ganho), o deal.won mais recente desse negócio É o fechamento ativo —
+  // sem precisar da CTE completa de fechamentos usada em Metas/Comissões.
+  const idsGanhosRecentes = (ganhosRecentes ?? []).map((n) => n.id);
+  const { data: eventosGanhoRecente } = idsGanhosRecentes.length
+    ? await supabase
+        .from("eventos")
+        .select("entidade_id, payload, created_at")
+        .eq("empresa_id", atual.empresaId)
+        .eq("tipo", "deal.won")
+        .in("entidade_id", idsGanhosRecentes)
+        .order("created_at", { ascending: false })
+    : { data: [] as { entidade_id: string; payload: unknown; created_at: string }[] };
+  const mapaResponsavelCongelado = responsavelCongeladoPorNegocio(eventosGanhoRecente ?? []);
+
   const nomeMembro = new Map(config.membros.map((m) => [m.id, m.nome]));
   const listaGanhosRecentes = (ganhosRecentes ?? []).map((n) => {
     const contato = n.contatos as unknown as { nome: string } | null;
+    const responsavelId = mapaResponsavelCongelado.get(n.id) ?? null;
     return {
       id: n.id,
       numero: n.numero,
       contato: contato?.nome ?? "Sem contato",
       valor: n.valor,
       fechadoEm: n.fechado_em,
-      vendedor: n.responsavel_id ? (nomeMembro.get(n.responsavel_id) ?? "Ninguém") : "Ninguém",
+      vendedor: responsavelId ? (nomeMembro.get(responsavelId) ?? "Ninguém") : "Ninguém",
     };
   });
 
@@ -418,22 +445,11 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
   });
 
   // Gamificação --------------------------------------------------------------
-  function nivelPara(totalXp: number) {
-    let resultado = { nivel: 1, nome: null as string | null };
-    for (const n of niveis ?? []) {
-      if (n.xp_minimo <= totalXp) resultado = { nivel: n.nivel, nome: n.nome };
-      else break;
-    }
-    return resultado;
-  }
-  const meuTotalXp = (pontosTotais ?? []).reduce((s, l) => s + l.pontos, 0);
-  const meuNivel = nivelPara(meuTotalXp);
-  const proximoNivel = (niveis ?? []).find((n) => n.xp_minimo > meuTotalXp) ?? null;
-  const xpBaseNivel = niveis?.find((n) => n.nivel === meuNivel.nivel)?.xp_minimo ?? 0;
-  const progressoNivel = proximoNivel
-    ? Math.min(100, Math.round(((meuTotalXp - xpBaseNivel) / (proximoNivel.xp_minimo - xpBaseNivel)) * 100))
-    : 100;
-  const rankingOrdenado = (rankingBruto ?? []).slice().sort((a, b) => b.total_pontos - a.total_pontos);
+  const niveisNormalizados = (niveis ?? []).map((n) => ({ nivel: n.nivel, nome: n.nome, xpMinimo: n.xp_minimo }));
+  const meuTotalXp = (pontosTotais ?? []).reduce((s, l) => s + l.xp, 0);
+  const { nivel: nivelNumero, nome: nivelNome, proximoNivel, progresso: progressoNivel } = calcularNivel(niveisNormalizados, meuTotalXp);
+  const meuNivel = { nivel: nivelNumero, nome: nivelNome };
+  const rankingOrdenado = (rankingBruto ?? []).slice().sort((a, b) => b.total_xp - a.total_xp);
   const minhaPosicao = rankingOrdenado.findIndex((r) => r.membro_id === atual.membroId);
   const nomeMembroRanking = new Map(config.membros.map((m) => [m.id, m.nome]));
 
@@ -654,13 +670,13 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
                 </div>
                 {proximoNivel && (
                   <p className="mt-1 text-xs text-zinc-600">
-                    {meuTotalXp.toLocaleString("pt-BR")} / {proximoNivel.xp_minimo.toLocaleString("pt-BR")} pontos para o próximo nível
+                    {meuTotalXp.toLocaleString("pt-BR")} / {proximoNivel.xpMinimo.toLocaleString("pt-BR")} XP para o próximo nível
                   </p>
                 )}
               </div>
             </div>
             <div className="mt-3 grid grid-cols-3 gap-2">
-              <MiniCartaoJornada valor={meuTotalXp.toLocaleString("pt-BR")} legenda="Pontos" />
+              <MiniCartaoJornada valor={meuTotalXp.toLocaleString("pt-BR")} legenda="XP" />
               <MiniCartaoJornada valor={minhaPosicao >= 0 ? `${minhaPosicao + 1}º` : "—"} legenda="Ranking" />
               <MiniCartaoJornada valor={String(conquistasCount ?? 0)} legenda="Conquistas" />
             </div>
@@ -682,7 +698,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
                     {i + 1}º
                   </span>
                   <span className="min-w-0 flex-1 truncate text-sm font-medium text-zinc-900">{nomeMembroRanking.get(r.membro_id) ?? "—"}</span>
-                  <span className="shrink-0 text-sm font-semibold text-zinc-900">{r.total_pontos.toLocaleString("pt-BR")} pts</span>
+                  <span className="shrink-0 text-sm font-semibold text-zinc-900">{r.total_xp.toLocaleString("pt-BR")} XP</span>
                 </li>
               ))}
             </ul>

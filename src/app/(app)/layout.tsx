@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Avatar } from "@/components/avatar";
 import { LogoRaion } from "@/components/marca";
 import { carregarDiasConsideradoParado, carregarHorasConsideradoSemContato } from "@/lib/crm";
-import { carregarNotificacoesNaoLidas, contarPendencias } from "@/lib/notificacoes";
+import { carregarNotificacoesNaoLidas, contarPendencias, temConquistaNaoVisualizada } from "@/lib/notificacoes";
 import { obterSessao } from "@/lib/sessao";
 import { trocarEmpresa } from "@/lib/acoes/empresa-atual";
 import { ROTULO_PAPEL } from "@/lib/tipos";
@@ -16,14 +16,16 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
 
   let pendencias = 0;
   let notificacoes: Awaited<ReturnType<typeof carregarNotificacoesNaoLidas>> = [];
+  let conquistaNova = false;
   if (sessao.atual) {
     const [dias, horas] = await Promise.all([
       carregarDiasConsideradoParado(sessao.atual.empresaId),
       carregarHorasConsideradoSemContato(sessao.atual.empresaId),
     ]);
-    [pendencias, notificacoes] = await Promise.all([
+    [pendencias, notificacoes, conquistaNova] = await Promise.all([
       contarPendencias(sessao.atual.empresaId, sessao.atual.membroId, sessao.atual.papel, dias, horas),
       carregarNotificacoesNaoLidas(sessao.atual.empresaId, sessao.atual.membroId),
+      temConquistaNaoVisualizada(sessao.atual.empresaId, sessao.atual.membroId),
     ]);
   }
 
@@ -34,13 +36,12 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
           { href: "/negocios", rotulo: "Negócios" },
           { href: "/tarefas", rotulo: "Tarefas" },
           ...(papel !== "sdr" ? [{ href: "/contatos", rotulo: "Contatos" }] : []),
-          { href: "/gamificacao", rotulo: "Visão geral", grupo: "Gamificação" },
-          { href: "/gamificacao/jornada", rotulo: "Minha jornada", grupo: "Gamificação" },
+          { href: "/gamificacao", rotulo: "Visão geral", grupo: "Gamificação", novo: conquistaNova },
           { href: "/gamificacao/ranking", rotulo: "Ranking", grupo: "Gamificação" },
-          { href: "/gamificacao/loja", rotulo: "Loja de recompensas", grupo: "Gamificação" },
-          { href: "/gamificacao/extrato", rotulo: "Extrato de pontos", grupo: "Gamificação" },
           { href: "/gamificacao/metas", rotulo: "Metas", grupo: "Gamificação" },
           { href: "/gamificacao/comissoes", rotulo: "Comissões", grupo: "Gamificação" },
+          { href: "/gamificacao/loja", rotulo: "Loja de recompensas", grupo: "Gamificação" },
+          ...(papel === "admin" ? [{ href: "/gamificacao/administracao", rotulo: "Administração", grupo: "Gamificação" }] : []),
         ]
       : []),
     ...(papel === "admin" || papel === "gestor" ? [{ href: "/painel", rotulo: "Painel" }] : []),
@@ -53,10 +54,6 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
           { href: "/configuracoes/calculadora", rotulo: "Kits e calculadora", grupo: "Configurações" },
           { href: "/configuracoes/propostas", rotulo: "Propostas comerciais", grupo: "Configurações" },
           { href: "/configuracoes/contrato", rotulo: "Modelo de contrato", grupo: "Configurações" },
-          { href: "/configuracoes/gamificacao", rotulo: "Gamificação", grupo: "Configurações" },
-          { href: "/configuracoes/metas", rotulo: "Metas", grupo: "Configurações" },
-          { href: "/configuracoes/comissoes", rotulo: "Comissões", grupo: "Configurações" },
-          { href: "/configuracoes/resgates", rotulo: "Resgates", grupo: "Configurações" },
           { href: "/configuracoes/usuarios", rotulo: "Usuários", grupo: "Configurações" },
           { href: "/configuracoes/equipes", rotulo: "Equipes", grupo: "Configurações" },
         ]

@@ -1,35 +1,32 @@
-import { Cartao } from "@/components/ui";
+import { Cartao, Selo } from "@/components/ui";
 import type { FaixaComissao } from "@/lib/comissoes";
+import { formatarFaixa } from "@/lib/comissoes";
 import { formatarMoeda } from "@/lib/formatacao";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { ROTULO_TIPO_CALCULO_COMISSAO, type TipoCalculoComissao } from "@/lib/tipos";
+import { ROTULO_STATUS_COMISSAO, ROTULO_TIPO_CALCULO_COMISSAO, type StatusComissao, type TipoCalculoComissao } from "@/lib/tipos";
 
 function formatarReferencia(referencia: string) {
   return new Date(`${referencia}T00:00:00Z`).toLocaleDateString("pt-BR", { month: "long", year: "numeric", timeZone: "UTC" });
 }
 
-function formatarFaixa(tipoCalculo: TipoCalculoComissao, faixa: FaixaComissao) {
-  const de = formatarMoeda(faixa.resultado_minimo);
-  const ate = faixa.resultado_maximo === null ? "sem teto" : formatarMoeda(faixa.resultado_maximo);
-  const valor = tipoCalculo === "percentual" ? `${faixa.valor}%` : `${faixa.valor}x`;
-  return `${de} até ${ate}: ${valor}`;
-}
-
 export default async function MinhasComissoes() {
   const { atual } = await exigirPapel();
   const supabase = await criarClienteServidor();
+  const hoje = new Date().toISOString().slice(0, 10);
   const [{ data: plano }, { data: historico }] = await Promise.all([
     supabase
       .from("planos_comissao")
       .select("salario_base, meta_ote, tipo_calculo, faixas")
       .eq("empresa_id", atual.empresaId)
       .eq("membro_id", atual.membroId)
-      .eq("ativo", true)
+      .lte("vigencia_inicio", hoje)
+      .order("vigencia_inicio", { ascending: false })
+      .limit(1)
       .maybeSingle(),
     supabase
       .from("comissoes_calculadas")
-      .select("id, referencia, resultado_apurado, salario_base, valor_comissao, valor_total")
+      .select("id, referencia, resultado_apurado, salario_base, valor_comissao, valor_total, status")
       .eq("empresa_id", atual.empresaId)
       .eq("membro_id", atual.membroId)
       .order("referencia", { ascending: false })
@@ -73,8 +70,11 @@ export default async function MinhasComissoes() {
         {!historico?.length && <p className="text-sm text-zinc-600">Nenhum cálculo feito ainda.</p>}
         <ul className="flex flex-col">
           {(historico ?? []).map((h) => (
-            <li key={h.id} className="flex items-center justify-between gap-3 border-t border-zinc-100 py-2 text-sm first:border-t-0">
-              <span className="text-zinc-900">{formatarReferencia(h.referencia)}</span>
+            <li key={h.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-zinc-100 py-2 text-sm first:border-t-0">
+              <span className="flex items-center gap-2 text-zinc-900">
+                {formatarReferencia(h.referencia)}
+                <Selo tom={h.status === "fechada" ? "neutro" : "atencao"}>{ROTULO_STATUS_COMISSAO[h.status as StatusComissao]}</Selo>
+              </span>
               <span className="text-zinc-600">
                 Resultado {formatarMoeda(h.resultado_apurado)} · Comissão {formatarMoeda(h.valor_comissao)} · Total{" "}
                 <span className="font-medium text-zinc-900">{formatarMoeda(h.valor_total)}</span>

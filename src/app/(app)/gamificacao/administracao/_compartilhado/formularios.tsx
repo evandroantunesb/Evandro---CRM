@@ -2,12 +2,16 @@
 
 import { useActionState, useState } from "react";
 import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
+import { EVENTOS_TETO_OBRIGATORIO, MARCOS_CONQUISTA, ROTULO_MARCO_CONQUISTA, type MarcoConquista } from "@/lib/gamificacao";
 import {
   OPERADORES_CONDICAO,
+  PERFIS_GAMIFICACAO,
   PERIODOS_LIMITE_REGRA,
   ROTULO_OPERADOR_CONDICAO,
+  ROTULO_PERFIL_GAMIFICACAO,
   ROTULO_PERIODO_LIMITE_REGRA,
   type OperadorCondicao,
+  type PerfilGamificacao,
   type PeriodoLimiteRegra,
 } from "@/lib/tipos";
 import {
@@ -16,12 +20,13 @@ import {
   apagarRecompensa,
   apagarRegra,
   criarConquista,
+  criarNivel,
   criarRecompensa,
   criarRegra,
   editarConquista,
+  editarNivel,
   editarRecompensa,
   editarRegra,
-  salvarNivel,
 } from "./actions";
 
 type EventoOpcao = { tipo: string; rotulo: string; campos: readonly string[] };
@@ -31,11 +36,27 @@ export type RegraSalva = {
   nome: string;
   eventoTipo: string;
   condicao: { campo: string; operador: OperadorCondicao; valor: string } | null;
-  pontos: number;
+  xp: number;
+  moedas: number;
+  perfilAplicavel: PerfilGamificacao | null;
   limitePeriodo: PeriodoLimiteRegra | null;
   limiteQuantidade: number | null;
+  unicaPorNegocio: boolean;
   ativa: boolean;
 };
+
+function SeletorPerfil({ defaultValue }: { defaultValue: PerfilGamificacao | "" }) {
+  return (
+    <Selecao rotulo="Perfil (opcional)" name="perfilAplicavel" defaultValue={defaultValue}>
+      <option value="">Qualquer perfil</option>
+      {PERFIS_GAMIFICACAO.map((p) => (
+        <option key={p} value={p}>
+          {ROTULO_PERFIL_GAMIFICACAO[p]}
+        </option>
+      ))}
+    </Selecao>
+  );
+}
 
 export function NovaRegra({ eventos }: { eventos: readonly EventoOpcao[] }) {
   const [resultado, acao, pendente] = useActionState(criarRegra, null);
@@ -54,8 +75,15 @@ export function NovaRegra({ eventos }: { eventos: readonly EventoOpcao[] }) {
           ))}
         </Selecao>
       </div>
-      <Campo rotulo="Pontos" name="pontos" type="number" step={1} defaultValue={10} required />
-      <CondicaoTeto campos={campos} />
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Campo rotulo="XP" name="xp" type="number" step={1} defaultValue={10} required />
+        <Campo rotulo="Moedas" name="moedas" type="number" step={1} defaultValue={10} required />
+        <SeletorPerfil defaultValue="" />
+      </div>
+      <CondicaoTeto campos={campos} tetoObrigatorio={(EVENTOS_TETO_OBRIGATORIO as readonly string[]).includes(eventoTipo)} />
+      <label className="flex items-center gap-1 text-sm text-zinc-700">
+        <input type="checkbox" name="unicaPorNegocio" /> Pontua só a primeira vez por negócio (evita pontuar de novo se o card sair e voltar)
+      </label>
       <div className="flex items-center gap-2">
         <Botao type="submit" disabled={pendente} className="self-start">
           Criar regra
@@ -84,8 +112,21 @@ export function LinhaRegra({ regra, eventos }: { regra: RegraSalva; eventos: rea
           ))}
         </Selecao>
       </div>
-      <Campo rotulo="Pontos" name="pontos" type="number" step={1} defaultValue={regra.pontos} required />
-      <CondicaoTeto campos={campos} condicaoInicial={regra.condicao} limitePeriodoInicial={regra.limitePeriodo} limiteQuantidadeInicial={regra.limiteQuantidade} />
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Campo rotulo="XP" name="xp" type="number" step={1} defaultValue={regra.xp} required />
+        <Campo rotulo="Moedas" name="moedas" type="number" step={1} defaultValue={regra.moedas} required />
+        <SeletorPerfil defaultValue={regra.perfilAplicavel ?? ""} />
+      </div>
+      <CondicaoTeto
+        campos={campos}
+        condicaoInicial={regra.condicao}
+        limitePeriodoInicial={regra.limitePeriodo}
+        limiteQuantidadeInicial={regra.limiteQuantidade}
+        tetoObrigatorio={(EVENTOS_TETO_OBRIGATORIO as readonly string[]).includes(eventoTipo)}
+      />
+      <label className="flex items-center gap-1 text-sm text-zinc-700">
+        <input type="checkbox" name="unicaPorNegocio" defaultChecked={regra.unicaPorNegocio} /> Pontua só a primeira vez por negócio (evita pontuar de novo se o card sair e voltar)
+      </label>
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-1 text-sm text-zinc-700">
           <input type="checkbox" name="ativa" defaultChecked={regra.ativa} /> Ativa
@@ -107,11 +148,13 @@ function CondicaoTeto({
   condicaoInicial,
   limitePeriodoInicial,
   limiteQuantidadeInicial,
+  tetoObrigatorio,
 }: {
   campos: readonly string[];
   condicaoInicial?: { campo: string; operador: OperadorCondicao; valor: string } | null;
   limitePeriodoInicial?: PeriodoLimiteRegra | null;
   limiteQuantidadeInicial?: number | null;
+  tetoObrigatorio: boolean;
 }) {
   return (
     <div className="grid gap-3 sm:grid-cols-2">
@@ -136,9 +179,16 @@ function CondicaoTeto({
         <Campo rotulo="Valor" name="condicaoValor" placeholder="Ex.: 5000" defaultValue={condicaoInicial?.valor ?? ""} />
       </fieldset>
       <fieldset className="flex flex-col gap-2 rounded-lg border border-zinc-200 p-3">
-        <legend className="px-1 text-xs font-medium text-zinc-500">Teto (opcional)</legend>
-        <Selecao rotulo="Período" name="limitePeriodo" defaultValue={limitePeriodoInicial ?? ""}>
-          <option value="">Sem teto</option>
+        <legend className="px-1 text-xs font-medium text-zinc-500">{tetoObrigatorio ? "Teto (obrigatório)" : "Teto (opcional)"}</legend>
+        {tetoObrigatorio && (
+          <p className="text-xs text-zinc-500">
+            Essa é uma atividade repetível — sem período e quantidade definidos, a regra não pontua.
+          </p>
+        )}
+        <Selecao rotulo="Período" name="limitePeriodo" defaultValue={limitePeriodoInicial ?? ""} required={tetoObrigatorio}>
+          <option value="" disabled={tetoObrigatorio}>
+            Sem teto
+          </option>
           {PERIODOS_LIMITE_REGRA.map((p) => (
             <option key={p} value={p}>
               {ROTULO_PERIODO_LIMITE_REGRA[p]}
@@ -152,16 +202,17 @@ function CondicaoTeto({
           min={1}
           step={1}
           defaultValue={limiteQuantidadeInicial ?? undefined}
+          required={tetoObrigatorio}
         />
       </fieldset>
     </div>
   );
 }
 
-export type NivelSalvo = { nivel: number; nome: string | null; xpMinimo: number };
+export type NivelSalvo = { nivel: number; nome: string | null; xpMinimo: number; ativa: boolean };
 
 export function NovoNivel() {
-  const [resultado, acao, pendente] = useActionState(salvarNivel, null);
+  const [resultado, acao, pendente] = useActionState(criarNivel, null);
   return (
     <form action={acao} className="flex flex-wrap items-end gap-2">
       <Campo rotulo="Nível" name="nivel" type="number" min={1} step={1} required />
@@ -176,12 +227,15 @@ export function NovoNivel() {
 }
 
 export function LinhaNivel({ nivel }: { nivel: NivelSalvo }) {
-  const [resultado, acao, pendente] = useActionState(salvarNivel, null);
+  const [resultado, acao, pendente] = useActionState(editarNivel, null);
   return (
     <form action={acao} className="flex flex-wrap items-end gap-2 border-t border-zinc-100 py-2 first:border-t-0">
       <Campo rotulo="Nível" name="nivel" type="number" defaultValue={nivel.nivel} readOnly />
       <Campo rotulo="Nome" name="nome" defaultValue={nivel.nome ?? ""} placeholder="Ex.: Veterano" />
       <Campo rotulo="XP mínimo" name="xpMinimo" type="number" min={0} step={1} defaultValue={nivel.xpMinimo} required />
+      <label className="flex items-center gap-1 text-sm text-zinc-700">
+        <input type="checkbox" name="ativa" defaultChecked={nivel.ativa} /> Ativo
+      </label>
       <Botao type="submit" variante="secundario" disabled={pendente}>
         Salvar
       </Botao>
@@ -198,23 +252,65 @@ export type ConquistaSalva = {
   nome: string;
   descricao: string;
   icone: string;
-  valorPontos: number;
+  metrica: "xp_acumulado" | "marco_contagem";
+  marco: MarcoConquista | null;
+  valor: number;
   xpBonus: number;
+  perfilAplicavel: PerfilGamificacao | null;
   ativa: boolean;
 };
 
+function SeletorMetricaConquista({
+  metrica,
+  setMetrica,
+  marco,
+}: {
+  metrica: "xp_acumulado" | "marco_contagem";
+  setMetrica: (m: "xp_acumulado" | "marco_contagem") => void;
+  marco: MarcoConquista | "";
+}) {
+  return (
+    <>
+      <Selecao
+        rotulo="Critério"
+        name="metrica"
+        value={metrica}
+        onChange={(e) => setMetrica(e.target.value as "xp_acumulado" | "marco_contagem")}
+      >
+        <option value="xp_acumulado">XP acumulado</option>
+        <option value="marco_contagem">Quantidade de um marco (independente de XP)</option>
+      </Selecao>
+      {metrica === "marco_contagem" && (
+        <Selecao rotulo="Marco" name="marco" defaultValue={marco}>
+          <option value="">Escolha o marco</option>
+          {MARCOS_CONQUISTA.map((m) => (
+            <option key={m} value={m}>
+              {ROTULO_MARCO_CONQUISTA[m]}
+            </option>
+          ))}
+        </Selecao>
+      )}
+    </>
+  );
+}
+
 export function NovaConquista() {
   const [resultado, acao, pendente] = useActionState(criarConquista, null);
+  const [metrica, setMetrica] = useState<"xp_acumulado" | "marco_contagem">("xp_acumulado");
   return (
     <form action={acao} className="flex flex-col gap-3">
       <div className="grid gap-3 sm:grid-cols-[80px_1fr]">
         <Campo rotulo="Ícone" name="icone" defaultValue="🏆" maxLength={8} />
         <Campo rotulo="Nome" name="nome" placeholder="Ex.: Veterano" required />
       </div>
-      <Campo rotulo="Descrição (opcional)" name="descricao" placeholder="Ex.: Acumule 5.000 pontos" />
+      <Campo rotulo="Descrição (opcional)" name="descricao" placeholder="Ex.: Acumule 5.000 XP" />
       <div className="grid gap-3 sm:grid-cols-2">
-        <Campo rotulo="Pontos necessários" name="valorPontos" type="number" min={1} step={1} required />
+        <SeletorMetricaConquista metrica={metrica} setMetrica={setMetrica} marco="" />
+      </div>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Campo rotulo={metrica === "marco_contagem" ? "Quantidade necessária" : "XP necessário"} name="valor" type="number" min={1} step={1} required />
         <Campo rotulo="XP bônus ao desbloquear" name="xpBonus" type="number" min={0} step={1} defaultValue={0} />
+        <SeletorPerfil defaultValue="" />
       </div>
       <Botao type="submit" disabled={pendente} className="self-start">
         Criar conquista
@@ -226,6 +322,7 @@ export function NovaConquista() {
 
 export function LinhaConquista({ conquista }: { conquista: ConquistaSalva }) {
   const [resultado, acao, pendente] = useActionState(editarConquista, null);
+  const [metrica, setMetrica] = useState<"xp_acumulado" | "marco_contagem">(conquista.metrica);
   return (
     <form action={acao} className="flex flex-col gap-3 border-t border-zinc-100 py-3 first:border-t-0">
       <input type="hidden" name="id" value={conquista.id} />
@@ -235,8 +332,20 @@ export function LinhaConquista({ conquista }: { conquista: ConquistaSalva }) {
       </div>
       <Campo rotulo="Descrição" name="descricao" defaultValue={conquista.descricao} />
       <div className="grid gap-3 sm:grid-cols-2">
-        <Campo rotulo="Pontos necessários" name="valorPontos" type="number" min={1} step={1} defaultValue={conquista.valorPontos} required />
+        <SeletorMetricaConquista metrica={metrica} setMetrica={setMetrica} marco={conquista.marco ?? ""} />
+      </div>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Campo
+          rotulo={metrica === "marco_contagem" ? "Quantidade necessária" : "XP necessário"}
+          name="valor"
+          type="number"
+          min={1}
+          step={1}
+          defaultValue={conquista.valor}
+          required
+        />
         <Campo rotulo="XP bônus ao desbloquear" name="xpBonus" type="number" min={0} step={1} defaultValue={conquista.xpBonus} />
+        <SeletorPerfil defaultValue={conquista.perfilAplicavel ?? ""} />
       </div>
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-1 text-sm text-zinc-700">
@@ -258,7 +367,7 @@ export type RecompensaSalva = {
   id: string;
   nome: string;
   descricao: string;
-  custoPontos: number;
+  custoMoedas: number;
   estoque: number | null;
   limitePorMembro: number | null;
   validadeAte: string | null;
@@ -272,7 +381,7 @@ export function NovaRecompensa() {
       <Campo rotulo="Nome" name="nome" placeholder="Ex.: Vale-presente R$ 100" required />
       <Campo rotulo="Descrição (opcional)" name="descricao" />
       <div className="grid gap-3 sm:grid-cols-3">
-        <Campo rotulo="Custo em pontos" name="custoPontos" type="number" min={1} step={1} required />
+        <Campo rotulo="Custo em moedas" name="custoMoedas" type="number" min={1} step={1} required />
         <Campo rotulo="Estoque (opcional)" name="estoque" type="number" min={0} step={1} placeholder="Ilimitado" />
         <Campo rotulo="Limite por colaborador (opcional)" name="limitePorMembro" type="number" min={1} step={1} placeholder="Sem limite" />
       </div>
@@ -293,7 +402,7 @@ export function LinhaRecompensa({ recompensa }: { recompensa: RecompensaSalva })
       <Campo rotulo="Nome" name="nome" defaultValue={recompensa.nome} required />
       <Campo rotulo="Descrição" name="descricao" defaultValue={recompensa.descricao} />
       <div className="grid gap-3 sm:grid-cols-3">
-        <Campo rotulo="Custo em pontos" name="custoPontos" type="number" min={1} step={1} defaultValue={recompensa.custoPontos} required />
+        <Campo rotulo="Custo em moedas" name="custoMoedas" type="number" min={1} step={1} defaultValue={recompensa.custoMoedas} required />
         <Campo rotulo="Estoque" name="estoque" type="number" min={0} step={1} defaultValue={recompensa.estoque ?? undefined} placeholder="Ilimitado" />
         <Campo
           rotulo="Limite por colaborador"

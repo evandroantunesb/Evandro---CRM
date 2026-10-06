@@ -68,6 +68,6 @@ Next.js 16 (App Router, **APIs mudaram** — ver `AGENTS.md`) + React 19 + TypeS
 
 - **Multiempresa:** todo dado tem `empresa_id` e é isolado por RLS; o código nunca é a única barreira.
 - **Migrations:** confira os prefixos das PRs abertas antes de criar uma; depois rode `pnpm db:types`. Detalhes em `docs/arquitetura.md`.
-- **Identidade visual (não alterar):** Carvão `#0F0F10`, Dourado Solar `#D4AF37`, Off-white `#FAF8F3`, Cinza `#6B7280`, Cinza claro `#E5E7EB` (em `src/app/globals.css`); Manrope nos títulos, Inter nos textos; logo em `src/components/marca.tsx` + `public/marca/`. **Verde só no WhatsApp, vermelho só para perda e erro.**
+- **Identidade visual (não alterar):** Carvão `#0F0F10`, Dourado Solar `#D4AF37`, Off-white `#FAF8F3`, Cinza `#6B7280`, Cinza claro `#E5E7EB` (em `src/app/globals.css`); Manrope nos títulos, Inter nos textos; logo em `src/components/marca.tsx` + `public/marca/`. **Verde só no WhatsApp, vermelho só para perda e erro.** Exceção confirmada pelo Evandro em 2026-10-01: dentro da área `/gamificacao`, verde é a cor contextual principal (sensação de "entrar em outra área", competitiva), com dourado reservado a prestígio/conquistas e vermelho limitado a alertas (queda de posição, meta em risco) — carvão/dourado continuam sem mudança no resto do produto.
 - Interface, rotas, nomes e commits em português. Mobile é prioridade; reutilize `src/components/ui.tsx`.
 - Repositório público: nenhuma senha ou segredo em arquivos.

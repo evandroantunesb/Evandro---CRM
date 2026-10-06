@@ -469,8 +469,10 @@ const esquemaHandoff = z.object({
 
 /**
  * "Enviar para vendas" (spec RAION_SDR_REGRAS_PERMISSOES, fase 5, §20-22): exige negócio
- * qualificado, atribui o vendedor escolhido e registra o handoff (snapshot da qualificação,
- * não só a troca de responsável). Notificação ao vendedor e transferência de tarefas ficam
+ * qualificado e registra o handoff como "pendente" (snapshot da qualificação, não só a
+ * troca de responsável). `responsavel_id` só passa pro closer quando ele aceita (ver
+ * `aceitarHandoff`) — fluxo aprovado pelo Evandro em 2026-10-01, substitui a transferência
+ * imediata que existia antes. Notificação ao vendedor e transferência de tarefas ficam
  * pra fase futura (§9/§45 da spec).
  */
 export async function enviarParaVendas(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
@@ -495,12 +497,21 @@ export async function enviarParaVendas(_: ResultadoAcao, formData: FormData): Pr
     return { ok: false, mensagem: `Qualifique o negócio antes de enviar para vendas (${status.atendidos} de ${status.total} critérios atendidos).` };
   }
 
+  const { data: pendenteExistente } = await supabase
+    .from("handoffs")
+    .select("id")
+    .eq("negocio_id", d.negocioId)
+    .eq("status", "pendente")
+    .maybeSingle();
+  if (pendenteExistente) return { ok: false, mensagem: "Já existe uma oportunidade pendente de aceite pra esse negócio." };
+
   const { error: erroHandoff } = await supabase.from("handoffs").insert({
     empresa_id: negocio.empresa_id,
     negocio_id: negocio.id,
     contato_id: negocio.contato_id,
     de_membro_id: negocio.responsavel_id ?? atual.membroId,
     para_membro_id: d.paraMembroId,
+    status: "pendente",
     status_qualificacao: status.rotulo,
     qualificacao_snapshot: {
       tipo_cliente: negocio.qualif_tipo_cliente,
@@ -519,11 +530,45 @@ export async function enviarParaVendas(_: ResultadoAcao, formData: FormData): Pr
   });
   if (erroHandoff) return { ok: false, mensagem: mensagemErro(erroHandoff, "Não foi possível registrar o handoff.") };
 
-  const { error: erroResponsavel } = await supabase.from("negocios").update({ responsavel_id: d.paraMembroId }).eq("id", d.negocioId);
-  if (erroResponsavel) return { ok: false, mensagem: mensagemErro(erroResponsavel, "Handoff registrado, mas não foi possível atualizar o responsável.") };
-
   revalidatePath(`/negocios/${d.negocioId}`);
-  return { ok: true, mensagem: "Enviado para vendas." };
+  return { ok: true, mensagem: "Enviado para vendas — aguardando aceite." };
+}
+
+const esquemaRespostaHandoff = z.object({
+  handoffId: z.string().uuid(),
+  negocioId: z.string().uuid(),
+});
+
+/** Closer aceita a oportunidade: `responsavel_id` passa pra ele (ver migration 20261001170000). */
+export async function aceitarHandoff(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  await exigirPapel();
+  const dados = esquemaRespostaHandoff.safeParse(Object.fromEntries(formData));
+  if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
+
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.rpc("aceitar_handoff", { p_handoff_id: dados.data.handoffId });
+  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível aceitar.") };
+
+  revalidatePath(`/negocios/${dados.data.negocioId}`);
+  return { ok: true, mensagem: "Oportunidade aceita." };
+}
+
+const esquemaDevolucaoHandoff = esquemaRespostaHandoff.extend({
+  motivo: z.string().trim().min(1, "Escreva o motivo da devolução.").max(1000),
+});
+
+/** Closer devolve a oportunidade pro SDR; o negócio nunca reabre, um novo envio cria handoff novo. */
+export async function devolverHandoff(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  await exigirPapel();
+  const dados = esquemaDevolucaoHandoff.safeParse(Object.fromEntries(formData));
+  if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
+
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.rpc("devolver_handoff", { p_handoff_id: dados.data.handoffId, p_motivo: dados.data.motivo });
+  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível devolver.") };
+
+  revalidatePath(`/negocios/${dados.data.negocioId}`);
+  return { ok: true, mensagem: "Oportunidade devolvida." };
 }
 
 const esquemaFeedbackHandoff = z.object({
