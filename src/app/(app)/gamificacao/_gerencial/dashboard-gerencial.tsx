@@ -196,7 +196,7 @@ function Conteudo({
         <KpiGerencial
           Icone={Award}
           tom="dourado"
-          rotulo="Conquistas desbloqueadas no período"
+          rotulo="Conquistas no período"
           valor={dados.conquistasPeriodo.toLocaleString("pt-BR")}
           legenda={rotuloEscopo}
         />

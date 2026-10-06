@@ -39,7 +39,8 @@
 
 .tema-gamificacao .gf-gerencial-ranking {
   display: flex;
-  height: 480px;
+  /* Altura natural pelo conteúdo, com teto: a lista rola por dentro. */
+  max-height: 420px;
   min-width: 0;
   flex-direction: column;
 }
@@ -51,13 +52,7 @@
   }
 
   .tema-gamificacao .gf-gerencial-ranking {
-    height: 540px;
-  }
-}
-
-@media (min-width: 1280px) {
-  .tema-gamificacao .gf-gerencial-ranking {
-    height: max(540px, 58dvh);
+    max-height: 520px;
   }
 }
 
