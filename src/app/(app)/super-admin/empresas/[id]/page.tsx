@@ -13,7 +13,6 @@ export default async function Empresa({ params }: PageProps<"/super-admin/empres
   const sessao = await exigirSuperAdmin();
   const { id } = await params;
   const supabase = await criarClienteServidor();
-  const meuVinculo = sessao.vinculos.find((v) => v.empresaId === id);
 
   const [{ data: empresa }, { data: plano }] = await Promise.all([
     supabase
@@ -30,6 +29,10 @@ export default async function Empresa({ params }: PageProps<"/super-admin/empres
   if (!empresa) notFound();
 
   const outrasSituacoes = (["ativa", "suspensa", "cancelada"] as const).filter((s) => s !== empresa.situacao);
+  // Só entra quem já tem vínculo ativo com a empresa (e a empresa está ativa) — os mesmos
+  // `vinculos` que o seletor lateral usa; trocarEmpresa() confere de novo no servidor.
+  const vinculo = sessao.vinculos.find((v) => v.empresaId === empresa.id);
+  const ehAtual = sessao.atual?.empresaId === empresa.id;
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-4">
@@ -39,18 +42,16 @@ export default async function Empresa({ params }: PageProps<"/super-admin/empres
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-semibold text-zinc-900">{empresa.nome}</h1>
         <SeloSituacao situacao={empresa.situacao} />
-      </div>
-      {meuVinculo && (
-        <Cartao titulo="Sua visão nesta empresa">
-          <p className="mb-3 text-sm text-zinc-600">
-            Você é {ROTULO_PAPEL[meuVinculo.papel]} aqui. Entre pra ver a empresa como ela aparece pro time, fora do painel de
-            super-admin.
-          </p>
-          <form action={trocarEmpresa}>
+        {ehAtual && <Selo>Empresa atual</Selo>}
+        {vinculo && (
+          <form action={trocarEmpresa} className="ml-auto">
             <input type="hidden" name="empresaId" value={empresa.id} />
-            <Botao type="submit">Entrar nesta empresa</Botao>
+            <Botao>Entrar na empresa</Botao>
           </form>
-        </Cartao>
+        )}
+      </div>
+      {!vinculo && (
+        <p className="text-sm text-zinc-500">Para entrar nesta empresa, você precisa ser membro ativo dela e ela precisa estar ativa.</p>
       )}
       <Cartao titulo="Dados da empresa">
         <FormularioEdicaoEmpresa empresa={{ id: empresa.id, nome: empresa.nome, cnpj: empresa.cnpj }} />
