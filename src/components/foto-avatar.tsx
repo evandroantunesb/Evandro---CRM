@@ -33,6 +33,11 @@ export function FotoAvatar({
       loading="lazy"
       decoding="async"
       onError={() => setFalhou(src)}
+      // A imagem renderizada no servidor pode falhar ANTES da hidratação, quando o onError ainda
+      // não existe: ao montar, confere se ela já terminou com erro.
+      ref={(img) => {
+        if (img?.complete && img.naturalWidth === 0) setFalhou(src);
+      }}
       style={{ width: tamanho, height: tamanho }}
       className={`shrink-0 rounded-full object-cover ${className}`}
     />
