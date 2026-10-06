@@ -4,7 +4,7 @@ Não altere nenhuma destas regras sem pedido explícito do Evandro.
 
 - **Funil padrão (atual na `main`):** 4 etapas criadas para cada empresa nova — Novo lead → Contato feito → Visita agendada → Proposta enviada. Configurável só por admin.
 - **Ganho e Perdido não são etapas do funil:** são valores de `negocios.status` (`aberto`/`ganho`/`perdido`). A perda exige motivo (`motivo_perda_id`). Uma etapa pode ter `fecha_como` (`ganho` ou `perdido`) para fechar o negócio ao receber o card; "perdido" sempre passa pelo motivo.
-- **Funil de 9 etapas (só na empresa "Raion Solar Demo", PR #132 — não mesclada):** Novo Lead → Qualificação → Contato Realizado → Levantamento/Diagnóstico → Proposta Enviada → Follow-up → Negociação → Assinado (`fecha_como='ganho'`) → Pago. Não altera o funil de nenhuma empresa existente.
+- **Funil de 9 etapas (só na empresa "Raion Solar Demo", criada pelo seed da PR #132):** Novo Lead → Qualificação → Contato Realizado → Levantamento/Diagnóstico → Proposta Enviada → Follow-up → Negociação → Assinado (`fecha_como='ganho'`) → Pago. Não altera o funil de nenhuma empresa existente.
 - **Distribuição de leads:** rodízio automático entre vendedores ativos, com fila de aprovação do gestor; prazo de auto-aprovação configurável por origem (padrão 1h). Expiração via `pg_cron` a cada 5 min.
 - **Status do vendedor:** Ativo / Inativo / Desligado; só ativos entram no rodízio.
 - **Leads parados:** negócio aberto sem mudar de etapa nem ganhar nota há mais que `empresas.dias_considerado_parado` (padrão 7).

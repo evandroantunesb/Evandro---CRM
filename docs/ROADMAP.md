@@ -19,7 +19,7 @@ Legenda da coluna Situação: **produção** = mesclado na `main` e em produçã
 | Propostas | 50% | produção |
 | Gamificação | 88% | produção: motor, dashboards gerencial/pessoal, menu e tema escuro (#130, #131, #136–#138) · **branch (PR #139):** imagem nas recompensas (migration já aplicada em produção) |
 | Interface/UX geral | 55% | produção |
-| Base Demo | 85% | **branch (PR #132):** script cria empresa separada "Raion Solar Demo" sem apagar nada; 1ª execução real parou no 1º negócio (corrigido); retomada pendente de autorização |
+| Base Demo | 85% | **produção:** empresa separada "Raion Solar Demo" criada e validada (35 negócios, ranking conferido) · **branch (PR #132):** script ainda não mesclado |
 | Segurança/Produção | 70% | produção |
 | Onboarding | 15% | — |
 | Tipos de Solução | 10% | — |
