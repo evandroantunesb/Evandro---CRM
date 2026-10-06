@@ -26,9 +26,12 @@ CRM de funil de vendas para empresas de energia solar, multiempresa (SaaS revend
 
 O modelo principal é escolhido pelo Evandro; nunca diga que trocou de modelo se a troca não foi executada de fato.
 
-- **Sonnet (padrão):** telas e componentes, CSS/responsividade, formulários, CRUD, bugs simples e intermediários, ajustes em funcionalidades existentes, refatorações pequenas, docs pontuais e tudo com requisitos e arquitetura já definidos.
-- **Opus (só com justificativa técnica):** arquitetura, planejamento de funcionalidade ou regra de negócio complexa, bug difícil entre vários módulos ou que o Sonnet não resolveu, refatoração estrutural, decisões de segurança/escalabilidade. Concluído o planejamento, a implementação volta ao Sonnet.
-- Muitos arquivos não justificam Opus: antes, tente dividir a tarefa em etapas menores. Ao receber uma tarefa, avalie a complexidade e, se Opus fizer sentido, recomende-o dizendo por quê.
+Sonnet 5.5 é o padrão, para economizar créditos. Opus 5.5 só quando o risco ou a complexidade justificar.
+
+- **Sonnet 5.5 (padrão):** implementação de tarefas já bem definidas, correções simples, ajustes de scripts, pequenas alterações de interface, documentação, testes, refactors locais e tudo com arquitetura já decidida.
+- **Opus 5.5 (só quando o risco ou a complexidade justificar):** decisões de arquitetura, migrations delicadas, banco de produção, RLS e permissões, regras de gamificação, metas e comissões, mudanças com impacto em vários módulos, revisão de PR grande, investigação de bug difícil ou comportamento inconsistente.
+- **Fluxo preferencial:** Opus analisa/define quando necessário → a decisão é validada pelo Evandro → Sonnet implementa → Opus revisa só se o risco justificar.
+- Não usar Opus para execução mecânica de tarefa já claramente especificada. Muitos arquivos não justificam Opus: antes, tente dividir a tarefa em etapas menores. Ao receber uma tarefa, avalie a complexidade e, se Opus fizer sentido, recomende-o dizendo por quê.
 - Agentes: quando forem mesmo necessários, passe `model: "sonnet"` para trabalho de implementação; Opus só nos casos acima.
 
 ## Execução
