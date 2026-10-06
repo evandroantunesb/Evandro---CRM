@@ -14,7 +14,10 @@
 //
 // Uso:
 //   node scripts/seed-base-demo.mjs                        # dry run: valida e mostra o plano
+//                                                          # (com a demo já existente: diagnostica
+//                                                          #  e mostra o plano de retomada)
 //   CRIAR_BASE_DEMO=sim node scripts/seed-base-demo.mjs    # cria a empresa demo de verdade
+//   RETOMAR_BASE_DEMO=sim node scripts/seed-base-demo.mjs  # completa uma demo parcial, só o que falta
 // Variáveis: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, ADMIN_EMAIL (admin da empresa de
 // origem, vira admin da demo) e, só se esse admin for admin de mais de uma empresa,
 // EMPRESA_ORIGEM_ID.
@@ -25,6 +28,7 @@ const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SU
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? "vando12star@gmail.com";
 const EMPRESA_ORIGEM_ID = process.env.EMPRESA_ORIGEM_ID || null;
 const CRIAR_BASE_DEMO = process.env.CRIAR_BASE_DEMO === "sim";
+const RETOMAR_BASE_DEMO = process.env.RETOMAR_BASE_DEMO === "sim";
 const NOME_EMPRESA_DEMO = "Raion Solar Demo";
 const SENHA_DEMO = "123456";
 const UM_DIA_MS = 24 * 60 * 60 * 1000;
@@ -301,7 +305,8 @@ async function carregarParametrosOrigem(origemId) {
 
 function imprimirPlano({ origemId, origemNome, demoExistente }) {
   console.log(`\nEmpresa de origem (só leitura, fonte dos parâmetros da calculadora): ${origemNome} (empresa_id=${origemId})`);
-  console.log(`Empresa a criar: "${NOME_EMPRESA_DEMO}" — situação ativa, sem plano de cobrança (aparece na cobrança com R$ 0).`);
+  if (demoExistente.porNome.length) console.log(`Empresa demo: "${NOME_EMPRESA_DEMO}" já existe — é reaproveitada (ver plano de retomada abaixo).`);
+  else console.log(`Empresa a criar: "${NOME_EMPRESA_DEMO}" — situação ativa, sem plano de cobrança (aparece na cobrança com R$ 0).`);
   console.log("\nCriado automaticamente pelos gatilhos de `empresas` (não recriado):");
   console.log('  funil "Vendas" + 4 etapas (viram as 4 primeiras das 9 do funil demo), 9 origens, 7 motivos de perda, parâmetros da calculadora.');
   console.log(`Copiado da origem: parâmetros da calculadora (${PARAMETROS_COPIADOS.length} campos, UPDATE na linha criada pelo gatilho).`);
@@ -325,7 +330,10 @@ function imprimirPlano({ origemId, origemNome, demoExistente }) {
   console.log("  esperado após o seed:");
   for (const [chave, e] of Object.entries(ESPERADO_POR_PESSOA)) console.log(`    ${chave}: ${e.xp} XP · ${e.nivel} · ${e.moedas} moedas`);
 
-  console.log(`\nUsuários fictícios: ${PESSOAS.length} (${demoExistente.usuariosDemo.length} já existem no Auth e serão reaproveitados, com a senha de demonstração redefinida).`);
+  const situacaoUsuarios = demoExistente.porNome.length
+    ? "na retomada só são validados — nada é alterado neles"
+    : `${demoExistente.usuariosDemo.length} já existem no Auth e serão reaproveitados, com a senha de demonstração redefinida`;
+  console.log(`\nUsuários fictícios: ${PESSOAS.length} (${situacaoUsuarios}).`);
   for (const p of PESSOAS) console.log(`  - ${p.nome} <${p.email}> — papel=${p.papel}, perfil_gamificacao=${p.perfil_gamificacao}`);
 }
 
@@ -623,104 +631,230 @@ async function moverEtapa(clienteCloser, negocioId, etapaId, { backdateSaidaAnte
   }
 }
 
-async function executarNegocio(ctx, deal) {
-  const { empresaId, etapas, parametros, pessoas, motivosPerdaPorNome, origensPorNome } = ctx;
-  const closer = pessoas[deal.closer];
-  const criador = deal.viaSdr ? pessoas.gabriel : closer;
-  const clienteCriador = await clienteComo(criador.email);
+const TITULO_TAREFA_SDR = "Realizar primeiro contato";
 
-  const dataCriacao = hA(deal.diasAtrasCriacao);
-  const kit = kitDoTier(deal.tier, parametros);
+function tituloNegocio(deal) {
+  return `${deal.tier.startsWith("comercial") ? "Sistema solar comercial" : "Sistema solar residencial"} — ${deal.contato.nome}`;
+}
+
+/** Mesmo mapeamento campo a campo de src/lib/acoes/calculadora.ts (colunas em snake_case). */
+function linhaCalculoSolar(empresaId, negocioId, deal, kit) {
   const tierInfo = TIERS[deal.tier];
-
-  const { data: contatoRow, error: eContato } = await clienteCriador
-    .from("contatos")
-    .insert({ empresa_id: empresaId, ...deal.contato })
-    .select("id")
-    .single();
-  if (eContato) throw eContato;
-
-  const origemId = origensPorNome.get(deal.origemNome);
-  const { data: negocioRow, error: eNegocio } = await clienteCriador
-    .from("negocios")
-    .insert({
-      empresa_id: empresaId,
-      titulo: `${deal.tier.startsWith("comercial") ? "Sistema solar comercial" : "Sistema solar residencial"} — ${deal.contato.nome}`,
-      contato_id: contatoRow.id,
-      funil_id: etapas[0].funilId,
-      etapa_id: etapas[0].id,
-      origem_id: origemId,
-      responsavel_id: criador.membroId,
-      valor: kit.preco,
-      status: "aberto",
-      created_at: dataCriacao,
-    })
-    .select("id")
-    .single();
-  if (eNegocio) throw eNegocio;
-  const negocioId = negocioRow.id;
-  await retrodatarEtapaAtual(negocioId, etapas[0].id, dataCriacao);
-
-  const { error: eCalculo } = await db.from("calculos_solares").insert({
+  const potenciaKwp = (tierInfo.modulos * tierInfo.potenciaModuloW) / 1000;
+  const disponibilidadeKwh = kit.parametros[DISPONIBILIDADE_COLUNA[tierInfo.ligacao]];
+  const resultado = calcular({
+    potenciaKwp,
+    precoKit: kit.preco,
+    consumoMedioKwh: tierInfo.consumo,
+    tarifaKwh: kit.tarifaKwh,
+    produtividadeKwhKwpMes: kit.parametros.produtividade_kwh_kwp_mes,
+    percentualFioB: kit.parametros.percentual_fio_b,
+    disponibilidadeKwh,
+  });
+  return {
     empresa_id: empresaId,
     negocio_id: negocioId,
     kit_id: null,
     kit_nome: kit.nome,
-    kit_potencia_kwp: arredondar((tierInfo.modulos * tierInfo.potenciaModuloW) / 1000, 2),
+    kit_potencia_kwp: arredondar(potenciaKwp, 2),
     kit_preco: kit.preco,
     tipo_ligacao: tierInfo.ligacao,
     consumo_medio_kwh: tierInfo.consumo,
     tarifa_kwh: kit.tarifaKwh,
     produtividade_kwh_kwp_mes: kit.parametros.produtividade_kwh_kwp_mes,
     percentual_fio_b: kit.parametros.percentual_fio_b,
-    disponibilidade_kwh: kit.parametros[DISPONIBILIDADE_COLUNA[tierInfo.ligacao]],
-    ...calcular({
-      potenciaKwp: (tierInfo.modulos * tierInfo.potenciaModuloW) / 1000,
-      precoKit: kit.preco,
-      consumoMedioKwh: tierInfo.consumo,
-      tarifaKwh: kit.tarifaKwh,
-      produtividadeKwhKwpMes: kit.parametros.produtividade_kwh_kwp_mes,
-      percentualFioB: kit.parametros.percentual_fio_b,
-      disponibilidadeKwh: kit.parametros[DISPONIBILIDADE_COLUNA[tierInfo.ligacao]],
-    }),
-  });
-  if (eCalculo) throw eCalculo;
-  await db.from("kit_componentes").insert(kit.componentes.map((c, i) => ({ empresa_id: empresaId, negocio_id: negocioId, ordem: i, ...c })));
-  await db.from("propostas").insert({ empresa_id: empresaId, negocio_id: negocioId });
+    disponibilidade_kwh: disponibilidadeKwh,
+    geracao_estimada_kwh_mes: resultado.geracaoEstimadaKwhMes,
+    kwh_faturado: resultado.kwhFaturado,
+    kwh_compensado: resultado.kwhCompensado,
+    custo_fio_b: resultado.custoFioB,
+    conta_sem_solar: resultado.contaSemSolar,
+    conta_com_solar: resultado.contaComSolar,
+    economia_mensal: resultado.economiaMensal,
+    payback_meses: resultado.paybackMeses,
+  };
+}
 
-  // Primeiro contato do SDR: o gatilho criar_tarefa_primeiro_contato_sdr() já criou a
+/** Datas cosméticas do negócio — mesma conta para criação e retomada. */
+function cronogramaDeal(deal) {
+  const diasTotal = Math.max(deal.diasAtrasCriacao - 2, deal.etapaFinal + 1);
+  const passo = deal.etapaFinal > 0 ? diasTotal / (deal.etapaFinal + 1) : 0;
+  return {
+    dataCriacao: hA(deal.diasAtrasCriacao),
+    entradaEtapa: (idx) => hA(Math.max(1, Math.round(deal.diasAtrasCriacao - passo * idx))),
+    dataAssinatura: hA(Math.max(5, deal.diasAtrasCriacao - Math.round(passo * 7))),
+    dataPago: hA(Math.max(2, deal.diasAtrasCriacao - Math.round(passo * 8))),
+  };
+}
+
+/**
+ * Passos de um negócio do plano, na ordem em que o seed os executa. Cada um diz, a
+ * partir do estado lido do banco, se já está feito — é o que permite retomar um
+ * negócio parcial sem repetir nem pular nenhuma ação.
+ */
+function passosDoNegocio(deal, etapas, pessoas, estado) {
+  const closer = pessoas[deal.closer];
+  const idxEtapa = estado.negocio ? etapas.findIndex((e) => e.id === estado.negocio.etapa_id) : -1;
+  const handoff = estado.handoffs[0] ?? null;
+  const contrato = estado.contratos[0] ?? null;
+  const ganho = deal.resultado === "ganho_pago" || deal.resultado === "ganho_aguardando";
+  const alvoIntermediario = Math.min(deal.etapaFinal, 6);
+
+  const passos = [
+    { chave: "contato", feito: !!estado.contato },
+    { chave: "negocio", feito: !!estado.negocio },
+    { chave: "calculo", feito: estado.calculos > 0 },
+    { chave: "kit", feito: estado.kits > 0 },
+    { chave: "proposta", feito: estado.propostas > 0 },
+  ];
+  if (deal.viaSdr) {
+    passos.push(
+      { chave: "tarefa_sdr", feito: estado.tarefasSdr.length === 1 && !!estado.tarefasSdr[0].concluida_em && estado.tarefasSdr[0].resultado === "contato_realizado" },
+      { chave: "handoff", feito: !!handoff },
+      { chave: "aceite", feito: handoff?.status === "aceito" && estado.negocio?.responsavel_id === closer.membroId },
+    );
+  }
+  passos.push({ chave: "etapas", feito: idxEtapa >= alvoIntermediario });
+  if (deal.resultado === "perdido") passos.push({ chave: "perda", feito: estado.negocio?.status === "perdido" });
+  if (ganho) {
+    passos.push(
+      { chave: "assinado_etapa", feito: idxEtapa >= 7 && estado.negocio?.status === "ganho" },
+      { chave: "contrato", feito: !!contrato },
+      { chave: "assinatura", feito: contrato?.status === "assinado" },
+    );
+  }
+  if (deal.resultado === "ganho_pago") {
+    passos.push({ chave: "pago_etapa", feito: idxEtapa === 8 }, { chave: "pagamento", feito: estado.confirmacoesAtivas > 0 });
+  }
+  return { passos, idxEtapa, alvoIntermediario };
+}
+
+/** Confere se o estado existente de um negócio é coerente com o plano; devolve os problemas. */
+function divergenciasDoNegocio(deal, etapas, pessoas, estado) {
+  const problemas = [];
+  const closer = pessoas[deal.closer];
+  const criador = deal.viaSdr ? pessoas.gabriel : closer;
+  const { passos, idxEtapa } = passosDoNegocio(deal, etapas, pessoas, estado);
+
+  const primeiroPendente = passos.findIndex((p) => !p.feito);
+  if (primeiroPendente >= 0) {
+    const adiantados = passos.slice(primeiroPendente + 1).filter((p) => p.feito);
+    if (adiantados.length) problemas.push(`passos fora de ordem: ${adiantados.map((p) => p.chave).join(", ")} feitos antes de ${passos[primeiroPendente].chave}`);
+  }
+  if (estado.contatosMesmoNome > 1) problemas.push(`${estado.contatosMesmoNome} contatos com o nome "${deal.contato.nome}"`);
+  if (estado.negociosDoContato > 1) problemas.push(`${estado.negociosDoContato} negócios para o mesmo contato`);
+  if (estado.calculos > 1 || estado.propostas > 1) problemas.push("cálculo/proposta duplicados");
+  if (estado.kits > 0 && estado.kits !== 2) problemas.push(`kit com ${estado.kits} componentes (esperado 2)`);
+  if (estado.handoffs.length > 1 || estado.contratos.length > 1 || estado.confirmacoesAtivas > 1) problemas.push("handoff/contrato/pagamento duplicados");
+  if (deal.viaSdr ? estado.tarefasSdr.length > 1 : estado.tarefasSdr.length > 0) problemas.push(`${estado.tarefasSdr.length} tarefa(s) automática(s) de primeiro contato`);
+  if (estado.handoffs[0] && (estado.handoffs[0].para_membro_id !== closer.membroId || estado.handoffs[0].de_membro_id !== pessoas.gabriel.membroId)) problemas.push("handoff com origem/destino diferente do plano");
+
+  const n = estado.negocio;
+  if (n) {
+    if (n.titulo !== tituloNegocio(deal)) problemas.push(`título diferente do plano ("${n.titulo}")`);
+    if (n.contato_id !== estado.contato?.id) problemas.push("negócio ligado a outro contato");
+    if (idxEtapa < 0) problemas.push("negócio numa etapa fora do funil demo");
+    if (idxEtapa > deal.etapaFinal) problemas.push(`negócio além da etapa final do plano (${etapas[idxEtapa]?.nome})`);
+    const aceito = estado.handoffs[0]?.status === "aceito";
+    const responsavelEsperado = deal.viaSdr && !aceito ? criador.membroId : closer.membroId;
+    if (n.responsavel_id !== responsavelEsperado) problemas.push("responsável diferente do esperado nesse ponto do fluxo");
+    if (n.status === "ganho" && deal.resultado === "perdido") problemas.push("negócio ganho, mas o plano é perda");
+    if (n.status === "perdido" && deal.resultado !== "perdido") problemas.push("negócio perdido, mas o plano é ganho/andamento");
+    if (n.status === "ganho" && deal.resultado === "andamento") problemas.push("negócio ganho, mas o plano é em andamento");
+  }
+  return problemas;
+}
+
+async function executarNegocio(ctx, deal, estadoExistente) {
+  const { empresaId, etapas, parametros, pessoas, motivosPerdaPorNome, origensPorNome } = ctx;
+  const estado = estadoExistente ?? estadoVazio();
+  const closer = pessoas[deal.closer];
+  const criador = deal.viaSdr ? pessoas.gabriel : closer;
+  const clienteCriador = await clienteComo(criador.email);
+  const clienteCloser = await clienteComo(closer.email);
+  const kit = kitDoTier(deal.tier, parametros);
+  const datas = cronogramaDeal(deal);
+  const { passos, idxEtapa, alvoIntermediario } = passosDoNegocio(deal, etapas, pessoas, estado);
+  const pendente = new Set(passos.filter((p) => !p.feito).map((p) => p.chave));
+  const executados = [];
+
+  let contatoId = estado.contato?.id;
+  if (pendente.has("contato")) {
+    const { data, error } = await clienteCriador.from("contatos").insert({ empresa_id: empresaId, ...deal.contato }).select("id").single();
+    if (error) throw error;
+    contatoId = data.id;
+    executados.push("contato");
+  }
+
+  let negocioId = estado.negocio?.id;
+  if (pendente.has("negocio")) {
+    const { data, error } = await clienteCriador
+      .from("negocios")
+      .insert({
+        empresa_id: empresaId,
+        titulo: tituloNegocio(deal),
+        contato_id: contatoId,
+        funil_id: etapas[0].funilId,
+        etapa_id: etapas[0].id,
+        origem_id: origensPorNome.get(deal.origemNome),
+        responsavel_id: criador.membroId,
+        valor: kit.preco,
+        status: "aberto",
+        created_at: datas.dataCriacao,
+      })
+      .select("id")
+      .single();
+    if (error) throw error;
+    negocioId = data.id;
+    await retrodatarEtapaAtual(negocioId, etapas[0].id, datas.dataCriacao);
+    executados.push("negocio");
+  }
+
+  if (pendente.has("calculo")) {
+    const { error } = await db.from("calculos_solares").insert(linhaCalculoSolar(empresaId, negocioId, deal, kit));
+    if (error) throw error;
+    executados.push("calculo");
+  }
+  if (pendente.has("kit")) {
+    const { error } = await db.from("kit_componentes").insert(kit.componentes.map((c, i) => ({ empresa_id: empresaId, negocio_id: negocioId, ordem: i, ...c })));
+    if (error) throw error;
+    executados.push("kit");
+  }
+  if (pendente.has("proposta")) {
+    const { error } = await db.from("propostas").insert({ empresa_id: empresaId, negocio_id: negocioId });
+    if (error) throw error;
+    executados.push("proposta");
+  }
+
+  // Primeiro contato do SDR: o gatilho criar_tarefa_primeiro_contato_sdr() cria a
   // tarefa "Realizar primeiro contato" ao inserir o negócio com Gabriel (papel sdr) como
   // responsável. Gabriel conclui pela própria sessão, igual a alternarConclusao() em
   // src/lib/acoes/tarefas.ts (preparar_tarefa() valida o resultado e registrar_tarefa()
-  // emite task.completed) — antes do handoff.
-  if (deal.viaSdr) {
-    const { data: tarefasSdr, error: eTarefasSdr } = await clienteCriador
+  // emite task.completed) — antes do handoff. Na retomada, conclui a tarefa que já existe.
+  if (pendente.has("tarefa_sdr")) {
+    const { data: tarefas, error: eTarefas } = await clienteCriador
       .from("tarefas")
       .select("id")
       .eq("negocio_id", negocioId)
       .eq("responsavel_id", pessoas.gabriel.membroId)
-      .eq("titulo", "Realizar primeiro contato")
+      .eq("titulo", TITULO_TAREFA_SDR)
       .is("concluida_em", null);
-    if (eTarefasSdr) throw eTarefasSdr;
-    await falhaSe(
-      tarefasSdr.length !== 1,
-      `Esperava 1 tarefa automática de primeiro contato no negócio ${negocioId}, achei ${tarefasSdr.length} — confira se Gabriel está com papel 'sdr'.`,
-    );
-    const { error: eConcluir } = await clienteCriador
-      .from("tarefas")
-      .update({ concluida_em: new Date().toISOString(), resultado: "contato_realizado" })
-      .eq("id", tarefasSdr[0].id);
-    if (eConcluir) throw eConcluir;
+    if (eTarefas) throw eTarefas;
+    await falhaSe(tarefas.length !== 1, `Esperava 1 tarefa automática aberta de primeiro contato no negócio ${negocioId}, achei ${tarefas.length}.`);
+    const { error } = await clienteCriador.from("tarefas").update({ concluida_em: new Date().toISOString(), resultado: "contato_realizado" }).eq("id", tarefas[0].id);
+    if (error) throw error;
+    executados.push("tarefa_sdr");
   }
 
   // Handoff SDR → closer: Gabriel cria, closer aceita (transfere responsavel_id de verdade).
-  if (deal.viaSdr) {
-    const { data: handoff, error: eHandoff } = await clienteCriador
+  let handoffId = estado.handoffs[0]?.id;
+  if (pendente.has("handoff")) {
+    const { data, error } = await clienteCriador
       .from("handoffs")
       .insert({
         empresa_id: empresaId,
         negocio_id: negocioId,
-        contato_id: contatoRow.id,
+        contato_id: contatoId,
         de_membro_id: pessoas.gabriel.membroId,
         para_membro_id: closer.membroId,
         status_qualificacao: "qualificado",
@@ -728,64 +862,71 @@ async function executarNegocio(ctx, deal) {
       })
       .select("id")
       .single();
-    if (eHandoff) throw eHandoff;
-    const clienteFechador = await clienteComo(closer.email);
-    const { error: eAceite } = await clienteFechador.rpc("aceitar_handoff", { p_handoff_id: handoff.id });
-    if (eAceite) throw eAceite;
-  }
-
-  // Avança as etapas de verdade, na sessão do closer (responsável a partir daqui),
-  // com timestamps retrodatados espalhados entre a criação e a etapa final.
-  // Índices 7 ("Assinado") e 8 ("Pago") nunca entram neste loop genérico — são
-  // tratados abaixo, exclusivamente pelo bloco de ganho (é ali que o negócio
-  // vira 'ganho' de verdade, nunca antes, e onde o contrato é criado/assinado
-  // antes de mover pra "Assinado").
-  const etapaIntermediariaFinal = Math.min(deal.etapaFinal, 6);
-  const clienteCloser = await clienteComo(closer.email);
-  const diasTotal = Math.max(deal.diasAtrasCriacao - 2, deal.etapaFinal + 1);
-  const passo = deal.etapaFinal > 0 ? diasTotal / (deal.etapaFinal + 1) : 0;
-  for (let idx = 1; idx <= etapaIntermediariaFinal; idx++) {
-    const diasAtrasEntrada = Math.max(1, Math.round(deal.diasAtrasCriacao - passo * idx));
-    const dataSaida = hA(diasAtrasEntrada);
-    await moverEtapa(clienteCloser, negocioId, etapas[idx].id, { backdateSaidaAnteriorIso: dataSaida, backdateEntradaIso: dataSaida });
-  }
-
-  // Fecha ganho/perdido pela sessão real do closer.
-  if (deal.resultado === "perdido") {
-    const motivoId = motivosPerdaPorNome.get(deal.motivoNome);
-    const { error } = await clienteCloser.from("negocios").update({ status: "perdido", motivo_perda_id: motivoId }).eq("id", negocioId);
     if (error) throw error;
-    return { negocioId, closer: closer.membroId, resultado: deal.resultado };
+    handoffId = data.id;
+    executados.push("handoff");
+  }
+  if (pendente.has("aceite")) {
+    const { error } = await clienteCloser.rpc("aceitar_handoff", { p_handoff_id: handoffId });
+    if (error) throw error;
+    executados.push("aceite");
   }
 
-  if (deal.resultado === "ganho_pago" || deal.resultado === "ganho_aguardando") {
-    // etapas[7] = "Assinado" (fecha_como='ganho') — status vira 'ganho' nesse exato passo,
-    // nunca antes (instrução explícita: ganho só na assinatura).
-    const dataAssinatura = hA(Math.max(5, deal.diasAtrasCriacao - Math.round(passo * 7)));
-    await moverEtapa(clienteCloser, negocioId, etapas[7].id, { backdateSaidaAnteriorIso: dataAssinatura, backdateEntradaIso: dataAssinatura });
+  // Avança as etapas de verdade, na sessão do closer, a partir da etapa atual.
+  // Índices 7 ("Assinado") e 8 ("Pago") nunca entram neste loop — o negócio só vira
+  // 'ganho' no bloco de ganho, ao entrar em "Assinado".
+  if (pendente.has("etapas")) {
+    for (let idx = Math.max(idxEtapa, 0) + 1; idx <= alvoIntermediario; idx++) {
+      const data = datas.entradaEtapa(idx);
+      await moverEtapa(clienteCloser, negocioId, etapas[idx].id, { backdateSaidaAnteriorIso: data, backdateEntradaIso: data });
+    }
+    executados.push("etapas");
+  }
 
+  if (pendente.has("perda")) {
+    const { error } = await clienteCloser.from("negocios").update({ status: "perdido", motivo_perda_id: motivosPerdaPorNome.get(deal.motivoNome) }).eq("id", negocioId);
+    if (error) throw error;
+    executados.push("perda");
+  }
+
+  // etapas[7] = "Assinado" (fecha_como='ganho') — status vira 'ganho' nesse passo.
+  if (pendente.has("assinado_etapa")) {
+    await moverEtapa(clienteCloser, negocioId, etapas[7].id, { backdateSaidaAnteriorIso: datas.dataAssinatura, backdateEntradaIso: datas.dataAssinatura });
+    executados.push("assinado_etapa");
+  }
+  let contratoId = estado.contratos[0]?.id;
+  if (pendente.has("contrato")) {
     const { data: modelo } = await db.from("modelos_contrato").select("conteudo").eq("empresa_id", empresaId).maybeSingle();
-    const { data: contratoRascunho, error: eContratoIns } = await clienteCloser
+    const { data, error } = await clienteCloser
       .from("contratos")
       .insert({ empresa_id: empresaId, negocio_id: negocioId, conteudo: modelo?.conteudo || "Contrato de instalação de sistema fotovoltaico — demonstração." })
       .select("id")
       .single();
-    if (eContratoIns) throw eContratoIns;
-    const { error: eAssinar } = await clienteCloser.from("contratos").update({ status: "assinado" }).eq("id", contratoRascunho.id);
-    if (eAssinar) throw eAssinar;
-
-    if (deal.resultado === "ganho_pago") {
-      const dataPago = hA(Math.max(2, deal.diasAtrasCriacao - Math.round(passo * 8)));
-      await moverEtapa(clienteCloser, negocioId, etapas[8].id, { backdateSaidaAnteriorIso: dataPago, backdateEntradaIso: dataPago });
-
-      const clienteAdmin = await clienteComo(ADMIN_EMAIL);
-      const { error: ePagamento } = await clienteAdmin.rpc("confirmar_pagamento", { p_contrato_id: contratoRascunho.id });
-      if (ePagamento) throw ePagamento;
-    }
-    return { negocioId, closer: closer.membroId, resultado: deal.resultado, contratoId: contratoRascunho.id, valor: kit.preco };
+    if (error) throw error;
+    contratoId = data.id;
+    executados.push("contrato");
+  }
+  if (pendente.has("assinatura")) {
+    const { error } = await clienteCloser.from("contratos").update({ status: "assinado" }).eq("id", contratoId);
+    if (error) throw error;
+    executados.push("assinatura");
+  }
+  if (pendente.has("pago_etapa")) {
+    await moverEtapa(clienteCloser, negocioId, etapas[8].id, { backdateSaidaAnteriorIso: datas.dataPago, backdateEntradaIso: datas.dataPago });
+    executados.push("pago_etapa");
+  }
+  if (pendente.has("pagamento")) {
+    const clienteAdmin = await clienteComo(ADMIN_EMAIL);
+    const { error } = await clienteAdmin.rpc("confirmar_pagamento", { p_contrato_id: contratoId });
+    if (error) throw error;
+    executados.push("pagamento");
   }
 
-  return { negocioId, closer: closer.membroId, resultado: deal.resultado };
+  return { negocioId, executados };
+}
+
+function estadoVazio() {
+  return { contato: null, negocio: null, calculos: 0, kits: 0, propostas: 0, tarefasSdr: [], handoffs: [], contratos: [], confirmacoesAtivas: 0, contatosMesmoNome: 0, negociosDoContato: 0 };
 }
 
 // ---------------------------------------------------------------------------
@@ -844,6 +985,19 @@ async function calcularEFecharComissoes(empresaId, pessoas, fechar) {
   const resultados = [];
   for (const chave of ["lucas", "mariana", "rafael", "bruno"]) {
     const membroId = pessoas[chave].membroId;
+    // Retomada: comissão já fechada não é recalculada nem fechada de novo (mesma regra de calcularComissaoMes()).
+    const { data: existente, error: eExistente } = await db
+      .from("comissoes_calculadas")
+      .select("status, resultado_apurado, valor_total")
+      .eq("empresa_id", empresaId)
+      .eq("membro_id", membroId)
+      .eq("referencia", referencia)
+      .maybeSingle();
+    if (eExistente) throw eExistente;
+    if (existente?.status === "fechada") {
+      resultados.push({ chave, resultadoApurado: existente.resultado_apurado, valorTotal: existente.valor_total, fechada: true });
+      continue;
+    }
     const planoId = await garantirPlanoComissao(clienteAdmin, empresaId, membroId, pessoas.adminMembroId);
     const { data: resultadoApurado, error: eCalc } = await clienteAdmin.rpc("calcular_receita_causal_comissao", {
       p_empresa_id: empresaId,
@@ -1087,10 +1241,242 @@ async function validarPosSeed(empresaId, pessoas) {
 }
 
 // ---------------------------------------------------------------------------
+// 11. Retomada de uma Base Demo parcial (RETOMAR_BASE_DEMO=sim)
+//
+// Só leitura até o fim desta seção: valida que a demo existente é exatamente o que
+// este script criaria (empresa, admin, membros, funil, gamificação, parâmetros) e
+// que os negócios existentes são um prefixo do plano, com no máximo o último
+// incompleto e coerente. Qualquer divergência é bloqueio — nada é corrigido,
+// apagado ou recriado; a retomada só faz os passos que faltam, pelos fluxos reais.
+// ---------------------------------------------------------------------------
+
+const chaveCondicao = (c) => (c ? [c.campo, c.operador, String(c.valor)] : null);
+const chaveCriterio = (k) => [k.metrica, k.marco ?? null, Number(k.valor)];
+
+function chaveRegra(r) {
+  return JSON.stringify([
+    r.nome,
+    r.evento_tipo,
+    r.perfil_aplicavel ?? null,
+    r.xp,
+    r.moedas,
+    chaveCondicao(r.condicao),
+    r.limite_periodo ?? null,
+    r.limite_quantidade ?? null,
+    !!r.unica_por_negocio,
+    r.ativa ?? true,
+  ]);
+}
+
+function compararConjuntos(rotulo, existentes, esperados, bloqueios) {
+  const a = [...existentes].sort();
+  const b = [...esperados].sort();
+  if (JSON.stringify(a) !== JSON.stringify(b)) bloqueios.push(`${rotulo} da demo diferente da configuração do script (existem ${a.length}, esperado ${b.length}).`);
+}
+
+async function lerTudo(tabela, colunas, empresaId) {
+  const { data, error } = await db.from(tabela).select(colunas).eq("empresa_id", empresaId);
+  if (error) throw error;
+  return data ?? [];
+}
+
+async function avaliarDemoExistente({ demoExistente, adminUserId, parametrosOrigem, plano }) {
+  const bloqueios = [];
+  await falhaSe(demoExistente.porNome.length !== 1, `Esperava exatamente 1 empresa "${NOME_EMPRESA_DEMO}", achei ${demoExistente.porNome.length}.`);
+  const empresa = demoExistente.porNome[0];
+  const empresaId = empresa.id;
+  if (empresa.situacao !== "ativa") bloqueios.push(`empresa demo com situação ${empresa.situacao}.`);
+  for (const v of demoExistente.vinculosAtivos) {
+    if (v.empresa_id !== empresaId) bloqueios.push(`usuário fictício também é membro ativo de "${v.empresas?.nome}" (empresa_id=${v.empresa_id}).`);
+  }
+
+  // Membros: exatamente o admin + os 5 fictícios, ativos, com papel/perfil do plano.
+  const membros = await lerTudo("empresa_membros", "id, user_id, papel, perfil_gamificacao, status, ativo, perfis(email)", empresaId);
+  const pessoas = {};
+  const admin = membros.find((m) => m.user_id === adminUserId);
+  if (!admin || admin.papel !== "admin" || !admin.ativo) bloqueios.push(`${ADMIN_EMAIL} não é admin ativo da demo.`);
+  else pessoas.adminMembroId = admin.id;
+  for (const p of PESSOAS) {
+    const m = membros.find((x) => x.perfis?.email?.toLowerCase() === p.email.toLowerCase());
+    if (!m) {
+      bloqueios.push(`membro ${p.nome} não existe na demo.`);
+      continue;
+    }
+    if (m.papel !== p.papel || m.perfil_gamificacao !== p.perfil_gamificacao || !m.ativo || m.status !== "ativo") {
+      bloqueios.push(`membro ${p.nome} com papel=${m.papel}, perfil=${m.perfil_gamificacao}, ativo=${m.ativo}, status=${m.status} (esperado ${p.papel}/${p.perfil_gamificacao}, ativo).`);
+    }
+    pessoas[p.chave] = { ...p, membroId: m.id, userId: m.user_id };
+  }
+  const conhecidos = new Set([admin?.id, ...PESSOAS.map((p) => pessoas[p.chave]?.membroId)]);
+  const extras = membros.filter((m) => !conhecidos.has(m.id));
+  if (extras.length) bloqueios.push(`membros fora do plano na demo: ${extras.map((m) => m.perfis?.email ?? m.id).join(", ")}.`);
+
+  // Funil: 1 funil com as 9 etapas do plano.
+  const funis = await lerTudo("funis", "id", empresaId);
+  let etapas = [];
+  if (funis.length !== 1) bloqueios.push(`demo com ${funis.length} funis (esperado 1).`);
+  else {
+    const { data, error } = await db.from("etapas").select("id, nome, ordem, inicial, fecha_como, marca_negociacao, ativa").eq("funil_id", funis[0].id).order("ordem");
+    if (error) throw error;
+    etapas = data.map((e) => ({ ...e, funilId: funis[0].id }));
+    const iguais =
+      etapas.length === ETAPAS_DEMO.length &&
+      etapas.every((e, i) => e.nome === ETAPAS_DEMO[i].nome && (e.fecha_como ?? null) === ETAPAS_DEMO[i].fecha_como && e.marca_negociacao === ETAPAS_DEMO[i].marca_negociacao && e.inicial === (i === 0) && e.ativa);
+    if (!iguais) bloqueios.push(`funil da demo diferente do plano (${etapas.map((e) => e.nome).join(", ")}).`);
+  }
+
+  // Gamificação e parâmetros: idênticos à configuração do script.
+  const regras = await lerTudo("gamification_rules", "nome, evento_tipo, perfil_aplicavel, xp, moedas, condicao, limite_periodo, limite_quantidade, unica_por_negocio, ativa", empresaId);
+  compararConjuntos("regras de gamificação", regras.map(chaveRegra), REGRAS_DEMO.map(chaveRegra), bloqueios);
+  const niveis = await lerTudo("niveis_gamificacao", "nivel, nome, xp_minimo, ativa", empresaId);
+  compararConjuntos("níveis", niveis.map((n) => JSON.stringify([n.nivel, n.nome, n.xp_minimo, n.ativa])), NIVEIS_DEMO.map((n) => JSON.stringify([n.nivel, n.nome, n.xp_minimo, true])), bloqueios);
+  const conquistas = await lerTudo("conquistas", "nome, criterio, perfil_aplicavel, xp_bonus, ativa", empresaId);
+  compararConjuntos(
+    "conquistas",
+    conquistas.map((c) => JSON.stringify([c.nome, chaveCriterio(c.criterio), c.perfil_aplicavel ?? null, c.xp_bonus, c.ativa])),
+    CONQUISTAS_DEMO.map((c) => JSON.stringify([c.nome, chaveCriterio(c.criterio), c.perfil_aplicavel ?? null, c.xp_bonus, true])),
+    bloqueios,
+  );
+  const recompensas = await lerTudo("recompensas", "nome, custo_moedas, ativa", empresaId);
+  compararConjuntos("recompensas", recompensas.map((r) => JSON.stringify([r.nome, r.custo_moedas, r.ativa])), RECOMPENSAS_DEMO.map((r) => JSON.stringify([r.nome, r.custo_moedas, true])), bloqueios);
+  const { data: parametrosDemo, error: eParam } = await db.from("parametros_calculadora").select(PARAMETROS_COPIADOS.join(", ")).eq("empresa_id", empresaId).single();
+  if (eParam) throw eParam;
+  const paramDiferentes = PARAMETROS_COPIADOS.filter((c) => Number(parametrosDemo[c]) !== Number(parametrosOrigem[c]));
+  if (paramDiferentes.length) bloqueios.push(`parâmetros da calculadora diferentes da origem: ${paramDiferentes.join(", ")}.`);
+
+  // Negócios: estado de cada negócio do plano, identificado pelo nome determinístico do contato.
+  const [contatos, negocios, calculos, kits, propostas, tarefas, handoffs, contratos, confirmacoes, metas, planos, comissoes] = await Promise.all([
+    lerTudo("contatos", "id, nome", empresaId),
+    lerTudo("negocios", "id, titulo, contato_id, etapa_id, status, responsavel_id", empresaId),
+    lerTudo("calculos_solares", "negocio_id", empresaId),
+    lerTudo("kit_componentes", "negocio_id", empresaId),
+    lerTudo("propostas", "negocio_id", empresaId),
+    lerTudo("tarefas", "negocio_id, titulo, responsavel_id, concluida_em, resultado", empresaId),
+    lerTudo("handoffs", "id, negocio_id, status, de_membro_id, para_membro_id", empresaId),
+    lerTudo("contratos", "id, negocio_id, status", empresaId),
+    lerTudo("confirmacoes_pagamento", "negocio_id, estornado_em", empresaId),
+    lerTudo("metas", "id", empresaId),
+    lerTudo("planos_comissao", "id", empresaId),
+    lerTudo("comissoes_calculadas", "id", empresaId),
+  ]);
+  const contar = (linhas, negocioId) => linhas.filter((l) => l.negocio_id === negocioId).length;
+
+  const nomesPlano = new Set(plano.map((d) => d.contato.nome));
+  const contatosFora = contatos.filter((c) => !nomesPlano.has(c.nome));
+  if (contatosFora.length) bloqueios.push(`contatos fora do plano: ${contatosFora.map((c) => c.nome).join(", ")}.`);
+  const negociosUsados = new Set();
+
+  const estados = plano.map((deal) => {
+    const doNome = contatos.filter((c) => c.nome === deal.contato.nome);
+    const contato = doNome[0] ?? null;
+    const doContato = contato ? negocios.filter((n) => n.contato_id === contato.id) : [];
+    const negocio = doContato[0] ?? null;
+    if (negocio) negociosUsados.add(negocio.id);
+    const nid = negocio?.id;
+    return {
+      contato,
+      negocio,
+      calculos: nid ? contar(calculos, nid) : 0,
+      kits: nid ? contar(kits, nid) : 0,
+      propostas: nid ? contar(propostas, nid) : 0,
+      tarefasSdr: nid ? tarefas.filter((t) => t.negocio_id === nid && t.titulo === TITULO_TAREFA_SDR) : [],
+      handoffs: nid ? handoffs.filter((h) => h.negocio_id === nid) : [],
+      contratos: nid ? contratos.filter((c) => c.negocio_id === nid) : [],
+      confirmacoesAtivas: nid ? confirmacoes.filter((c) => c.negocio_id === nid && !c.estornado_em).length : 0,
+      contatosMesmoNome: doNome.length,
+      negociosDoContato: doContato.length,
+    };
+  });
+  const negociosFora = negocios.filter((n) => !negociosUsados.has(n.id));
+  if (negociosFora.length) bloqueios.push(`negócios fora do plano: ${negociosFora.map((n) => n.titulo).join(", ")}.`);
+
+  // Prefixo do plano: completos, depois no máximo 1 parcial, depois nada.
+  const situacoes = estados.map((estado, i) => {
+    if (!estado.contato && !estado.negocio) return { tipo: "novo" };
+    const { passos } = passosDoNegocio(plano[i], etapas, pessoas, estado);
+    const pendentes = passos.filter((p) => !p.feito).map((p) => p.chave);
+    return { tipo: pendentes.length ? "parcial" : "completo", pendentes };
+  });
+  const primeiroNaoCompleto = situacoes.findIndex((s) => s.tipo !== "completo");
+  const fim = primeiroNaoCompleto < 0 ? situacoes.length : primeiroNaoCompleto;
+  for (let i = fim + 1; i < situacoes.length; i++) {
+    if (situacoes[i].tipo !== "novo") bloqueios.push(`negócio ${i + 1} do plano (${plano[i].contato.nome}) existe, mas o ${fim + 1} ainda não está completo.`);
+  }
+  if (etapas.length === ETAPAS_DEMO.length && Object.keys(pessoas).length === PESSOAS.length + 1) {
+    estados.forEach((estado, i) => {
+      if (situacoes[i].tipo === "novo") return;
+      for (const p of divergenciasDoNegocio(plano[i], etapas, pessoas, estado)) bloqueios.push(`negócio ${i + 1} (${plano[i].contato.nome}): ${p}.`);
+    });
+  }
+
+  const todosCompletos = situacoes.every((s) => s.tipo === "completo");
+  if (!todosCompletos && (metas.length || planos.length || comissoes.length)) {
+    bloqueios.push(`já existem metas/planos/comissões (${metas.length}/${planos.length}/${comissoes.length}) com negócios ainda incompletos.`);
+  }
+
+  return { empresaId, pessoas, etapas, estados, situacoes, bloqueios };
+}
+
+function imprimirPlanoRetomada({ empresaId, situacoes, plano }) {
+  console.log(`\nBase Demo existente encontrada: "${NOME_EMPRESA_DEMO}" (empresa_id=${empresaId}).`);
+  const completos = situacoes.filter((s) => s.tipo === "completo").length;
+  const parcial = situacoes.findIndex((s) => s.tipo === "parcial");
+  const novos = situacoes.filter((s) => s.tipo === "novo").length;
+  console.log(`Negócios do plano: ${completos} completos · ${parcial >= 0 ? 1 : 0} parcial · ${novos} a criar.`);
+  if (parcial >= 0) {
+    const d = plano[parcial];
+    console.log(`  parcial: negócio ${parcial + 1} — ${d.contato.nome} (${d.closer}, ${d.resultado}${d.viaSdr ? ", via SDR" : ""})`);
+    console.log(`  passos que faltam, nesta ordem: ${situacoes[parcial].pendentes.join(" → ")}`);
+  }
+  console.log("Depois: comissões (planos pela sessão do admin), metas e validação pós-seed. Nada existente é apagado ou recriado.");
+}
+
+// ---------------------------------------------------------------------------
 // main
 // ---------------------------------------------------------------------------
 
+async function contextoNegocios(empresaId, etapas, pessoas) {
+  const { data: parametros, error: eParam } = await db.from("parametros_calculadora").select("*").eq("empresa_id", empresaId).single();
+  if (eParam) throw eParam;
+  const { data: motivos } = await db.from("motivos_perda").select("id, nome").eq("empresa_id", empresaId);
+  const motivosPerdaPorNome = new Map((motivos ?? []).map((m) => [m.nome, m.id]));
+  const { data: origens } = await db.from("origens").select("id, nome").eq("empresa_id", empresaId);
+  const origensPorNome = new Map((origens ?? []).map((o) => [o.nome, o.id]));
+  const faltando = [...ORIGENS_POOL.filter((o) => !origensPorNome.has(o)), ...MOTIVOS_PERDA.filter((m) => !motivosPerdaPorNome.has(m))];
+  await falhaSe(faltando.length > 0, `Origens/motivos padrão ausentes na empresa demo: ${faltando.join(", ")}.`);
+  return { empresaId, etapas, parametros, pessoas, motivosPerdaPorNome, origensPorNome };
+}
+
+async function executarNegociosEFechamento(ctx, plano, estados) {
+  const { empresaId, pessoas } = ctx;
+  console.log("\nNegócios (sessões reais, eventos/gamificação disparados pelos gatilhos)...");
+  for (let i = 0; i < plano.length; i++) {
+    const deal = plano[i];
+    const r = await executarNegocio(ctx, deal, estados?.[i]);
+    const feito = r.executados.length ? r.executados.join(", ") : "já completo — nada a fazer";
+    console.log(`  ${i + 1}. ${deal.closer}: negócio ${r.negocioId} (${deal.resultado}) — ${feito}`);
+  }
+
+  console.log("\nCalculando e fechando comissões do mês atual (closers)...");
+  const comissoes = await calcularEFecharComissoes(empresaId, pessoas, new Set(["lucas", "mariana"]));
+  for (const c of comissoes) console.log(`  ${c.chave}: resultado apurado R$ ${c.resultadoApurado} → comissão R$ ${arredondar(c.valorTotal, 2)}${c.fechada ? " (fechada)" : ""}`);
+
+  console.log("\nCriando metas de receita do mês atual...");
+  await criarMetas(empresaId, pessoas.adminMembroId, pessoas, { lucas: 90000, mariana: 70000, rafael: 45000, bruno: 35000 });
+
+  await validarPosSeed(empresaId, pessoas);
+  console.log(`\nConcluído. Empresa "${NOME_EMPRESA_DEMO}" (empresa_id=${empresaId}) — ${ADMIN_EMAIL} acessa pelo seletor de empresa do menu.`);
+}
+
+function encerrarComBloqueios(bloqueios) {
+  console.log("\nBLOQUEIOS — nada foi escrito:");
+  for (const b of bloqueios) console.log(`  ✗ ${b}`);
+  process.exit(1);
+}
+
 async function main() {
+  await falhaSe(CRIAR_BASE_DEMO && RETOMAR_BASE_DEMO, "CRIAR_BASE_DEMO e RETOMAR_BASE_DEMO não podem ser usadas juntas — abortando sem escrever nada.");
+
   // --- Só leitura: tudo o que pode bloquear é checado antes da primeira escrita. ---
   const usuariosAuth = await listarUsuariosAuth();
   const { adminUserId, origemId, origemNome } = await resolverAdminEOrigem(usuariosAuth);
@@ -1101,25 +1487,38 @@ async function main() {
   imprimirPlano({ origemId, origemNome, demoExistente });
 
   const bloqueios = conferirGamificacaoDemo();
-  for (const e of demoExistente.porNome) bloqueios.push(`já existe empresa "${e.nome}" (empresa_id=${e.id}, situação ${e.situacao}) — a Base Demo não é recriada nem duplicada.`);
+  if (plano35.length !== 35) bloqueios.push(`plano gerou ${plano35.length} negócios, esperava 35.`);
+
+  // --- Demo já existe: só diagnóstico + plano de retomada; escreve só com RETOMAR_BASE_DEMO=sim. ---
+  if (demoExistente.porNome.length) {
+    if (CRIAR_BASE_DEMO) bloqueios.push(`já existe empresa "${NOME_EMPRESA_DEMO}" — ela não é recriada nem duplicada; para continuá-la, use RETOMAR_BASE_DEMO=sim.`);
+    const avaliacao = await avaliarDemoExistente({ demoExistente, adminUserId, parametrosOrigem, plano: plano35 });
+    imprimirPlanoRetomada({ empresaId: avaliacao.empresaId, situacoes: avaliacao.situacoes, plano: plano35 });
+    bloqueios.push(...avaliacao.bloqueios);
+    if (bloqueios.length) encerrarComBloqueios(bloqueios);
+    if (!RETOMAR_BASE_DEMO) {
+      console.log("\nRETOMAR_BASE_DEMO não está definido como 'sim' — nada foi escrito. Dry run da retomada encerrado.");
+      return;
+    }
+    console.log(`\nRETOMAR_BASE_DEMO=sim — retomando "${NOME_EMPRESA_DEMO}" (empresa e configuração existentes são reaproveitadas)...`);
+    const ctx = await contextoNegocios(avaliacao.empresaId, avaliacao.etapas, avaliacao.pessoas);
+    await executarNegociosEFechamento(ctx, plano35, avaliacao.estados);
+    return;
+  }
+
+  // --- Demo não existe: criação. ---
+  if (RETOMAR_BASE_DEMO) bloqueios.push(`não existe empresa "${NOME_EMPRESA_DEMO}" para retomar.`);
   for (const v of demoExistente.vinculosAtivos) {
     const email = demoExistente.usuariosDemo.find((u) => u.id === v.user_id)?.email;
     bloqueios.push(`${email} já é membro ativo da empresa "${v.empresas?.nome}" (empresa_id=${v.empresa_id}).`);
   }
-  if (plano35.length !== 35) bloqueios.push(`plano gerou ${plano35.length} negócios, esperava 35.`);
-
-  if (bloqueios.length) {
-    console.log("\nBLOQUEIOS — nada foi criado:");
-    for (const b of bloqueios) console.log(`  ✗ ${b}`);
-    process.exit(1);
-  }
+  if (bloqueios.length) encerrarComBloqueios(bloqueios);
 
   if (!CRIAR_BASE_DEMO) {
     console.log("\nCRIAR_BASE_DEMO não está definido como 'sim' — nada foi criado. Dry run encerrado.");
     return;
   }
 
-  // --- Escritas: só dentro da empresa demo nova. ---
   console.log(`\nCRIAR_BASE_DEMO=sim — criando "${NOME_EMPRESA_DEMO}"...`);
   const { demoId: empresaId, demoAdminMembroId: adminMembroId } = await criarEmpresaDemo(adminUserId);
   const clienteAdmin = await clienteComo(ADMIN_EMAIL);
@@ -1138,36 +1537,8 @@ async function main() {
     pessoas[p.chave] = { ...p, ...(await garantirMembro(empresaId, p)) };
   }
 
-  const { data: parametros, error: eParam } = await db.from("parametros_calculadora").select("*").eq("empresa_id", empresaId).single();
-  if (eParam) throw eParam;
-
-  const { data: motivos } = await db.from("motivos_perda").select("id, nome").eq("empresa_id", empresaId);
-  const motivosPerdaPorNome = new Map((motivos ?? []).map((m) => [m.nome, m.id]));
-  const { data: origens } = await db.from("origens").select("id, nome").eq("empresa_id", empresaId);
-  const origensPorNome = new Map((origens ?? []).map((o) => [o.nome, o.id]));
-  const faltando = [...ORIGENS_POOL.filter((o) => !origensPorNome.has(o)), ...MOTIVOS_PERDA.filter((m) => !motivosPerdaPorNome.has(m))];
-  await falhaSe(faltando.length > 0, `Origens/motivos padrão ausentes na empresa demo: ${faltando.join(", ")}.`);
-
-  const ctx = { empresaId, etapas, parametros, pessoas, motivosPerdaPorNome, origensPorNome };
-
-  console.log("\nCriando os 35 negócios (sessões reais, eventos/gamificação disparados pelos gatilhos)...");
-  const resultados = [];
-  for (const deal of plano35) {
-    const r = await executarNegocio(ctx, deal);
-    resultados.push(r);
-    console.log(`  ${deal.closer}: negócio ${r.negocioId} (${deal.resultado})`);
-  }
-
-  console.log("\nCalculando e fechando comissões do mês atual (closers)...");
-  const comissoes = await calcularEFecharComissoes(empresaId, pessoas, new Set(["lucas", "mariana"]));
-  for (const c of comissoes) console.log(`  ${c.chave}: resultado apurado R$ ${c.resultadoApurado} → comissão R$ ${arredondar(c.valorTotal, 2)}${c.fechada ? " (fechada)" : ""}`);
-
-  console.log("\nCriando metas de receita do mês atual...");
-  await criarMetas(empresaId, adminMembroId, pessoas, { lucas: 90000, mariana: 70000, rafael: 45000, bruno: 35000 });
-
-  await validarPosSeed(empresaId, pessoas);
-
-  console.log(`\nConcluído. Empresa "${NOME_EMPRESA_DEMO}" (empresa_id=${empresaId}) — ${ADMIN_EMAIL} acessa pelo seletor de empresa do menu.`);
+  const ctx = await contextoNegocios(empresaId, etapas, pessoas);
+  await executarNegociosEFechamento(ctx, plano35, null);
 }
 
 main().catch((err) => {
