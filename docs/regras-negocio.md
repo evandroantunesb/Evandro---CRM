@@ -11,6 +11,7 @@ Não altere nenhuma destas regras sem pedido explícito do Evandro.
 - **Propostas paradas:** proposta gerada sem o cliente abrir de novo nem mudar etapa no mesmo prazo.
 - Parados aparecem no Painel (com botão Reatribuir), na Início e no sininho de notificações.
 - **Gamificação (pontos padrão):** negócio criado 5, etapa avançada 2, negócio ganho 50, tarefa concluída 3, nota 1. Há níveis, conquistas, ranking, loja de recompensas, metas e comissões.
+- **Imagem da recompensa:** opcional; só admin adiciona, edita, substitui ou remove. Arquivo de até 3 MB, somente JPEG, PNG ou WebP (SVG recusado), sempre recortado em 4:3 antes do envio.
 - **WhatsApp:** só botão `wa.me` + registro manual (sem API oficial).
 - **Cobrança:** super-admin define plano/valor por empresa; sem gateway de pagamento.
 - **Proposta e contrato** "fotografam" o modelo na geração; editar o modelo depois não muda o documento já gerado. Contrato só pode ser regerado em rascunho.

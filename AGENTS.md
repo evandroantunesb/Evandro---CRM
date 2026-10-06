@@ -34,7 +34,7 @@ Regras de trabalho (autorização, merges, produção, gamificação) estão no 
 - Nome: `AAAAMMDDHHMMSS_nome.sql`. **Confira as migrations das PRs abertas antes de escolher o prefixo** — versões duplicadas quebram o `db push`.
 - `src/lib/supabase/database.types.ts` é **gerado** (`pnpm db:types`). Não edite à mão; o CI compara byte a byte.
 - **Migrations em produção só pelo fluxo existente:** `banco-producao.yml` roda `supabase db push --include-all` em push na `main` que toque `supabase/migrations/**`, ou via `workflow_dispatch`. Nunca aplique manualmente.
-- Produção pode ter migration de PR ainda não mesclada (aplicada antes do merge); confira em `docs/PROJECT_STATUS.md`.
+- Migration aplicada em produção antes do merge só com autorização explícita do Evandro; enquanto isso, produção fica à frente da `main` — confira antes de criar ou reaplicar migration.
 - **O preview da Vercel usa o banco de produção.** PR com migration nova quebra no preview até a migration ser aplicada; código que depende de coluna nova não pode chegar antes da migration.
 - `point_ledger` e `eventos` são imutáveis até para `service_role` (só a função motor `security definer` escreve, sempre com `now()`). `atividades` é imutável para todos. `negocios.updated_at` é sempre sobrescrito por `tocar_updated_at()`.
 
@@ -62,7 +62,7 @@ Sem Docker (sessões na nuvem), valide com lint + typecheck + testes puros + bui
 | Distribuição e leads parados | `src/lib/distribuicao-leads.ts`, `leads-parados.ts`, `leads-sem-contato.ts`, `propostas-paradas.ts` · `src/app/(app)/painel` |
 | Calculadora, kit, proposta | `src/lib/calculadora.ts` · `src/lib/acoes/calculadora.ts`, `propostas.ts` · `src/lib/propostas/` · `src/components/kit-componentes.tsx` · `src/app/(app)/configuracoes/{calculadora,propostas}` |
 | Contrato e pagamento | `src/lib/contrato.ts` · `src/lib/acoes/contratos.ts` · `src/app/contrato/[token]` · trigger `travar_contrato_com_pagamento` · RPC `confirmar_pagamento` |
-| Gamificação | `src/lib/gamificacao.ts` · `src/app/(app)/gamificacao` — visões em `_gerencial/` (admin/gestor) e `_pessoal/` (participantes), componentes, tema escuro e CSS em `_compartilhado/` (`gamificacao.css`, `tema-gamificacao.tsx`), telas admin em `administracao/` · migrations `*gamificacao*` · testes `tests/gamificacao-*` |
+| Gamificação | `src/lib/gamificacao.ts` · `src/app/(app)/gamificacao` — visões em `_gerencial/` (admin/gestor) e `_pessoal/` (participantes), componentes, tema escuro e CSS em `_compartilhado/` (`gamificacao.css`, `tema-gamificacao.tsx`), telas admin em `administracao/` · imagem das recompensas: `administracao/_compartilhado/imagem-recompensa-admin.tsx`, `menu-imagem-recompensa.tsx`, `_compartilhado/editor-imagem.tsx`, `recortar-imagem.ts`, `imagem-recompensa-gf.tsx`, `src/lib/imagem-upload.ts`, `src/lib/storage-imagens.ts`, migration `20261006120000_recompensas_imagem.sql` · migrations `*gamificacao*` · testes `tests/gamificacao-*`, `tests/imagem-upload.test.ts`, `tests/recompensas-imagem-db.test.ts` |
 | Metas e comissões | `src/lib/metas.ts`, `src/lib/comissoes.ts` · `calcular_realizado_meta`, `calcular_receita_causal_comissao`, `fechar_comissao` |
 | Captura de leads | `src/lib/acoes/captura.ts` · `src/app/captura/[token]` · `src/app/(app)/configuracoes/captura` |
 | Super-admin e cobrança | `src/app/(app)/super-admin` · `src/lib/cobranca.ts` |

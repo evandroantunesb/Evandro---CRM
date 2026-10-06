@@ -17,7 +17,7 @@ Legenda da coluna Situação: **produção** = mesclado na `main` e em produçã
 | Calculadora Solar | 72% | produção: calculadora, kit e proposta · **branch (PR #101):** motor de dimensionamento reconciliado no wizard de 3 etapas |
 | Catálogo Técnico | 75% | **branch (PR #101):** parte relevante do avanço — catálogo de equipamentos, dados solares, tarifas ANEEL, municípios/distribuidoras (13 migrations pendentes); não está na `main` nem em produção |
 | Propostas | 50% | produção |
-| Gamificação | 88% | produção: motor, dashboards gerencial/pessoal, menu e tema escuro (#130, #131, #136–#138) · **branch (PR #139):** imagem nas recompensas (migration já aplicada em produção) |
+| Gamificação | 88% | produção: motor, dashboards gerencial/pessoal, menu e tema escuro e imagem nas recompensas (#130, #131, #136–#139) |
 | Interface/UX geral | 55% | produção |
 | Base Demo | 85% | **produção:** empresa separada "Raion Solar Demo" criada e validada (35 negócios, ranking conferido) · **branch (PR #132):** script ainda não mesclado |
 | Segurança/Produção | 70% | produção |

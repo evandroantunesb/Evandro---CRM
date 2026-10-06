@@ -37,13 +37,14 @@ scripts/                criar-super-admin, seed-equipe-cascavel (legado), seed-m
 - Rotas públicas: lista `ROTAS_PUBLICAS` em `src/lib/supabase/proxy.ts`. Página pública nova precisa entrar nela.
 - Links públicos usam `env.siteUrl` (`src/lib/env.ts`), resolvido pelas variáveis automáticas do Vercel. `raion-crm.vercel.app` é de terceiros; o app real é `raion-crm-roan.vercel.app`.
 - Auditoria em `logs_auditoria` (imutável); gamificação em `eventos`/`point_ledger`.
+- Storage: bucket privado `recompensas` (imagens das recompensas da gamificação), caminho `<empresa_id>/<recompensa_id>/<uuid>.<ext>`; leitura por membro ativo da empresa via URL assinada, envio e atualização só por admin e só para recompensa existente da própria empresa; remoção só por admin (funciona também depois de apagar a recompensa, para limpar a pasta) (`20261006120000_recompensas_imagem.sql`).
 - Cadastro público desligado: só entra quem é convidado ou cadastrado pelo gestor.
 
 ## Banco e migrations
 
 - Arquivo novo: `supabase/migrations/AAAAMMDDHHMMSS_nome.sql`. **Confira as migrations das PRs abertas antes de escolher o prefixo** — versões iguais quebram o `db push`.
 - `src/lib/supabase/database.types.ts` é **gerado** por `pnpm db:types` depois de mudar o banco. Nunca edite à mão — o CI compara byte a byte com a saída do gerador. O arquivo é grande: para consultar, busque a tabela pelo nome.
-- Produção pode estar à frente da `main` quando uma migration de PR é aplicada antes do merge (ex.: `20261006120000_recompensas_imagem.sql`, PR #139). Confira antes de escolher prefixo ou reaplicar.
+- Excepcionalmente, com autorização explícita do Evandro, uma migration de PR pode ser aplicada em produção antes do merge; nesse intervalo produção fica à frente da `main`. Confira antes de escolher prefixo ou reaplicar; no merge, o `db push` não reaplica versão já registrada.
 - Produção: `banco-producao.yml` roda `supabase db push --include-all` a cada push na `main` que toque migrations (ou manualmente). O preview do Vercel usa o **mesmo** banco de produção: PR com migration nova dá erro no preview até ser aplicada.
 - Entrega que depende de tabela de PR não mesclada nasce da branch dessa PR (PR empilhada).
 
