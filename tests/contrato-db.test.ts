@@ -87,14 +87,26 @@ describe("contrato com RLS real", () => {
   });
 
   it("contrato antigo com campo sem resolver ou chave isolada não vai para assinatura", async () => {
-    for (const sobra of ["{{cliente_nom}}", "texto }}"]) {
-      const id = await negocio(`Antigo ${sobra}`);
+    for (const [i, sobra] of ["{{cliente_nom}}", "texto }}"].entries()) {
+      // Título neutro: a sobra fica só no texto simulado do contrato antigo.
+      const id = await negocio(`Antigo ${i + 1}`);
       expect((await gerar(id)).ok).toBe(true);
       // Simula contrato gerado antes da validação (texto gravado direto, só no banco local).
       await servico.from("contratos").update({ conteudo: `Contrato antigo ${sobra}` }).eq("negocio_id", id);
       const r = await status(id, "aguardando_assinatura");
       expect(r.ok, sobra).toBe(false);
       expect((await contrato(id))!.status).toBe("rascunho");
+    }
+  });
+
+  it("dado do cliente com {{ ou }} bloqueia a geração (nunca vira contrato pronto)", async () => {
+    for (const [i, nome] of ["Maria {{cliente_nom}}", "Maria }}", "{{ Maria"].entries()) {
+      const id = await negocio(`Chaves ${i + 1}`);
+      const { data: n } = await servico.from("negocios").select("contato_id").eq("id", id).single();
+      await servico.from("contatos").update({ nome }).eq("id", n!.contato_id);
+      const r = await gerar(id);
+      expect(r.ok, nome).toBe(false);
+      expect(await contrato(id), nome).toBeNull();
     }
   });
 
