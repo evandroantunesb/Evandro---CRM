@@ -29,22 +29,27 @@ export function estadoSetor(fluxo: {
 /** Marco resolvido = concluído ou "não se aplica" (só `pendente` ainda impede a conclusão da obra). */
 export const marcoResolvido = (status: string) => status === "concluido" || status === "nao_se_aplica";
 
+/** Os 2 marcos fixos que toda obra tem (criados junto com ela em `garantir_obra`). */
+export const MARCOS_OBRA = ["nf_cliente", "garantia"] as const;
+
 /**
  * Situação geral: cancelada > pausada > concluída > em andamento.
- * Concluída exige os 3 setores no status final e todos os marcos resolvidos.
+ * Concluída exige os 3 setores no status final e os 2 marcos fixos presentes e resolvidos
+ * (marco ausente nunca conta como resolvido).
  */
 export function situacaoObra(entrada: {
   canceladaEm: string | null;
   pausadaEm: string | null;
   fluxos: readonly { setor: SetorObra; status: string | null }[];
-  marcos: readonly { status: string }[];
+  marcos: readonly { marco: string; status: string }[];
 }): SituacaoObra {
   if (entrada.canceladaEm) return "cancelada";
   if (entrada.pausadaEm) return "pausada";
   const tresSetoresConcluidos = (["compras", "engenharia", "operacional"] as const).every((setor) =>
     entrada.fluxos.some((f) => f.setor === setor && setorConcluido(setor, f.status)),
   );
-  if (tresSetoresConcluidos && entrada.marcos.every((m) => marcoResolvido(m.status))) return "concluida";
+  const marcosResolvidos = MARCOS_OBRA.every((marco) => entrada.marcos.some((m) => m.marco === marco && marcoResolvido(m.status)));
+  if (tresSetoresConcluidos && marcosResolvidos) return "concluida";
   return "em_andamento";
 }
 

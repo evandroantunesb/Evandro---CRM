@@ -127,7 +127,7 @@ function Indicadores({ kpis }: { kpis: KpisObras }) {
     ["Pausadas", kpis.pausadas],
     ["Canceladas", kpis.canceladas],
     ["Com setor parado", kpis.comSetorParado],
-    ["Aguardando terceiros", kpis.comSetorAguardando],
+    ["Com setor aguardando", kpis.comSetorAguardando],
     ["Pagamento estornado", kpis.comEstorno],
     ["Venda alterada", kpis.comVendaAlterada],
   ];

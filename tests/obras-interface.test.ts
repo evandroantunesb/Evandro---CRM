@@ -91,14 +91,23 @@ describe("derivados de Obras", () => {
     expect(estadoSetor({ setor: "compras", status: "faturado_fornecedor", parado: false, aguardando: null })).toBe("concluido");
   });
 
-  const marcosOk = [{ status: "concluido" }, { status: "nao_se_aplica" }];
+  const marcosOk = [
+    { marco: "nf_cliente", status: "concluido" },
+    { marco: "garantia", status: "nao_se_aplica" },
+  ];
   const entrada = { canceladaEm: null, pausadaEm: null, fluxos: FLUXOS_FINAIS, marcos: marcosOk };
 
   it("situação: concluída exige 3 setores finais e marcos resolvidos", () => {
     expect(situacaoObra(entrada)).toBe("concluida");
-    expect(situacaoObra({ ...entrada, marcos: [{ status: "concluido" }, { status: "pendente" }] })).toBe("em_andamento");
+    expect(situacaoObra({ ...entrada, marcos: [marcosOk[0], { marco: "garantia", status: "pendente" }] })).toBe("em_andamento");
     expect(situacaoObra({ ...entrada, fluxos: [FLUXOS_FINAIS[0], FLUXOS_FINAIS[1], { setor: "operacional", status: "agendada" }] })).toBe("em_andamento");
     expect(situacaoObra({ ...entrada, fluxos: FLUXOS_FINAIS.slice(0, 2) })).toBe("em_andamento");
+  });
+
+  it("situação: marco fixo ausente nunca conta como resolvido", () => {
+    expect(situacaoObra({ ...entrada, marcos: [] })).toBe("em_andamento");
+    expect(situacaoObra({ ...entrada, marcos: [marcosOk[0]] })).toBe("em_andamento");
+    expect(situacaoObra({ ...entrada, marcos: [marcosOk[0], marcosOk[0]] })).toBe("em_andamento");
   });
 
   it("situação: cancelada > pausada > concluída > em andamento", () => {

@@ -94,7 +94,7 @@ type LinhaObra = {
 };
 
 type LinhaFluxo = { obra_id: string; setor: string; status: string; parado: boolean; aguardando: string | null };
-type LinhaMarco = { obra_id: string; status: string };
+type LinhaMarco = { obra_id: string; marco: string; status: string };
 type LinhaParticipante = { obra_id: string; setor: string; membro_id: string };
 
 const ehSetor = (setor: string): setor is SetorObra => (SETORES_OBRA as readonly string[]).includes(setor);
@@ -194,7 +194,7 @@ export async function carregarObras(
         supabase.from("obra_fluxos").select("obra_id, setor, status, parado, aguardando").eq("empresa_id", empresaId).in("obra_id", ids),
       ),
     ),
-    Promise.all(lotesDeIds.map((ids) => supabase.from("obra_marcos").select("obra_id, status").eq("empresa_id", empresaId).in("obra_id", ids))),
+    Promise.all(lotesDeIds.map((ids) => supabase.from("obra_marcos").select("obra_id, marco, status").eq("empresa_id", empresaId).in("obra_id", ids))),
     Promise.all(
       lotesDeIds.map((ids) =>
         supabase
