@@ -296,7 +296,12 @@ describe("dados da venda mudaram", () => {
 
   it("mudança no valor liga o aviso (comercial)", async () => {
     const { negocioId, obra } = await vendaCompleta("Valor mudou");
-    const { error } = await servico.from("negocios").update({ valor: 31000 }).eq("id", negocioId);
+    // Negócio ganho só muda de valor pela ação oficial "Corrigir valor".
+    const { error } = await admin.cliente.rpc("corrigir_valor_negocio", {
+      p_negocio_id: negocioId,
+      p_novo_valor: 31000,
+      p_motivo: "Ajuste de teste",
+    });
     expect(error).toBeNull();
 
     const [atual] = await obraDoNegocio(negocioId);
