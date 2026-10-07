@@ -252,6 +252,28 @@ revoke all on function public.exigir_responsavel_comercial() from public, anon, 
 revoke all on function public.restringir_reatribuicao_tarefa() from public, anon, authenticated, service_role;
 revoke all on function public.validar_handoff_empresa() from public, anon, authenticated, service_role;
 
+-- Feedback de handoff: só o texto é editável. Identidade (id, empresa, handoff, autor,
+-- criação) é fixa — impede, por exemplo, mover um feedback da empresa B para a A trocando
+-- empresa_id/autor_id. updated_at segue com handoffs_feedback_updated_at.
+create or replace function public.proteger_identidade_handoff_feedback()
+returns trigger
+language plpgsql set search_path = ''
+as $$
+begin
+  if (new.id, new.empresa_id, new.handoff_id, new.autor_id, new.created_at)
+     is distinct from (old.id, old.empresa_id, old.handoff_id, old.autor_id, old.created_at) then
+    raise exception 'Só o texto do feedback pode ser alterado.' using errcode = 'check_violation', hint = 'mensagem_usuario';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger handoffs_feedback_identidade_imutavel
+  before update on public.handoffs_feedback
+  for each row execute function public.proteger_identidade_handoff_feedback();
+
+revoke all on function public.proteger_identidade_handoff_feedback() from public, anon, authenticated, service_role;
+
 -- ---------------------------------------------------------------------------
 -- Membros da empresa: `operacao` vê só a própria linha
 -- (empresas continua com membro_ativo: cada um lê a empresa da qual participa)

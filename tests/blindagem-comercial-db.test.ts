@@ -337,14 +337,14 @@ describe("handoff: integridade multiempresa", () => {
     expect(count).toBe(0);
   });
 
-  it("feedback de handoff de outra empresa é recusado", async () => {
-    // Handoff legítimo na empresa B: vendedorB → duplo (membro das duas empresas).
-    const { data: cB } = await servico.from("contatos").insert({ empresa_id: empresaB, nome: "Cliente feedback B" }).select("id").single();
+  /** Handoff legítimo na empresa B: vendedorB → duplo (membro das duas empresas). */
+  async function handoffEmB(titulo: string) {
+    const { data: cB } = await servico.from("contatos").insert({ empresa_id: empresaB, nome: `Cliente ${titulo}` }).select("id").single();
     const { data: fB } = await servico.from("funis").select("id").eq("empresa_id", empresaB).single();
     const { data: etB } = await servico.from("etapas").select("id").eq("funil_id", fB!.id).order("ordem").limit(1).single();
     const { data: nB, error: erroN } = await servico
       .from("negocios")
-      .insert({ empresa_id: empresaB, titulo: "Negócio feedback B", contato_id: cB!.id, funil_id: fB!.id, etapa_id: etB!.id, responsavel_id: membroVendedorB })
+      .insert({ empresa_id: empresaB, titulo, contato_id: cB!.id, funil_id: fB!.id, etapa_id: etB!.id, responsavel_id: membroVendedorB })
       .select("id")
       .single();
     if (erroN) throw erroN;
@@ -354,17 +354,50 @@ describe("handoff: integridade multiempresa", () => {
       .select("id")
       .single();
     if (erroH) throw erroH;
+    return hB!.id;
+  }
+
+  it("feedback de handoff de outra empresa é recusado", async () => {
+    const handoffB = await handoffEmB("Negócio feedback B");
 
     // Combinações cruzadas com a empresa A: recusadas.
     for (const autor_id of [duploEmA, duploEmB]) {
-      const { error } = await duplo.cliente.from("handoffs_feedback").insert({ empresa_id: empresa, handoff_id: hB!.id, autor_id, feedback: "Cruzado" });
+      const { error } = await duplo.cliente.from("handoffs_feedback").insert({ empresa_id: empresa, handoff_id: handoffB, autor_id, feedback: "Cruzado" });
       expect(error, autor_id).not.toBeNull();
     }
     // Controle: na própria empresa do handoff, o destinatário registra o feedback.
     const { error: erroOk } = await duplo.cliente
       .from("handoffs_feedback")
-      .insert({ empresa_id: empresaB, handoff_id: hB!.id, autor_id: duploEmB, feedback: "Legítimo" });
+      .insert({ empresa_id: empresaB, handoff_id: handoffB, autor_id: duploEmB, feedback: "Legítimo" });
     expect(erroOk).toBeNull();
+  });
+
+  it("feedback: o autor edita só o texto; identidade não muda", async () => {
+    const handoffB = await handoffEmB("Negócio edição feedback B");
+    const outroHandoffB = await handoffEmB("Negócio outro handoff B");
+    const { data: fb, error: erroFb } = await duplo.cliente
+      .from("handoffs_feedback")
+      .insert({ empresa_id: empresaB, handoff_id: handoffB, autor_id: duploEmB, feedback: "Original" })
+      .select("id, empresa_id, handoff_id, autor_id, created_at")
+      .single();
+    if (erroFb) throw erroFb;
+
+    // 1. editar só o texto: passa
+    const texto = await duplo.cliente.from("handoffs_feedback").update({ feedback: "Editado" }).eq("id", fb!.id).select("feedback");
+    expect(texto.error).toBeNull();
+    expect(texto.data).toEqual([{ feedback: "Editado" }]);
+
+    // 2. trocar empresa_id + autor_id para o vínculo da empresa A: falha
+    const cruzado = await duplo.cliente.from("handoffs_feedback").update({ empresa_id: empresa, autor_id: duploEmA }).eq("id", fb!.id).select("id");
+    expect(cruzado.error).not.toBeNull();
+
+    // 3. trocar handoff_id: falha
+    const outroHandoff = await duplo.cliente.from("handoffs_feedback").update({ handoff_id: outroHandoffB }).eq("id", fb!.id).select("id");
+    expect(outroHandoff.error).not.toBeNull();
+
+    // 4. vínculo original intacto
+    const { data: atual } = await servico.from("handoffs_feedback").select("id, empresa_id, handoff_id, autor_id, created_at, feedback").eq("id", fb!.id).single();
+    expect(atual).toEqual({ ...fb, feedback: "Editado" });
   });
 
   it("destinatário operacao continua recusado", async () => {
@@ -503,7 +536,12 @@ describe("funções novas: privilégios", () => {
   });
 
   it("funções de gatilho novas não são executáveis por clientes", async () => {
-    for (const fn of ["exigir_responsavel_comercial()", "restringir_reatribuicao_tarefa()", "validar_handoff_empresa()"]) {
+    for (const fn of [
+      "exigir_responsavel_comercial()",
+      "restringir_reatribuicao_tarefa()",
+      "validar_handoff_empresa()",
+      "proteger_identidade_handoff_feedback()",
+    ]) {
       const papeis = await quemExecuta(`public.${fn}`);
       for (const papel of ["PUBLIC", "anon", "authenticated", "service_role"]) expect(papeis, fn).not.toContain(papel);
     }
