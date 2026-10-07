@@ -3617,6 +3617,7 @@ export type Database = {
         };
       };
       e_closer_de_handoff_pendente: { Args: { p_negocio_id: string }; Returns: boolean };
+      e_membro_comercial: { Args: { p_membro_id: string }; Returns: boolean };
       e_plataforma_admin: { Args: Record<PropertyKey, never>; Returns: boolean };
       empresa_da_pasta_marca: { Args: { p_caminho: string }; Returns: string };
       estornar_confirmacao_pagamento: {
@@ -3740,6 +3741,7 @@ export type Database = {
         Args: { p_contrato_id: string };
         Returns: Database["public"]["Enums"]["status_pagamento_contrato"];
       };
+      tem_acesso_comercial: { Args: { p_empresa_id: string }; Returns: boolean };
       tem_papel: {
         Args: { p_empresa_id: string; p_papeis: Database["public"]["Enums"]["papel_membro"][] };
         Returns: boolean;
@@ -3758,7 +3760,7 @@ export type Database = {
       modelo_cobranca: "por_usuario" | "fixo" | "fixo_mais_usuario";
       modo_distribuicao_leads: "somente_vendedores" | "somente_sdr" | "parcial" | "aleatorio";
       modo_preco_proposta: "sem_preco" | "parcelado" | "avista" | "completo";
-      papel_membro: "admin" | "gestor" | "vendedor" | "sdr";
+      papel_membro: "admin" | "gestor" | "vendedor" | "sdr" | "operacao";
       perfil_gamificacao: "sdr" | "closer" | "cs_farmer";
       periodo_limite_regra: "dia" | "mes";
       proposta_bloco_quebra: "auto" | "nova_pagina" | "pagina_exclusiva";
@@ -3921,7 +3923,7 @@ export const Constants = {
       modelo_cobranca: ["por_usuario", "fixo", "fixo_mais_usuario"],
       modo_distribuicao_leads: ["somente_vendedores", "somente_sdr", "parcial", "aleatorio"],
       modo_preco_proposta: ["sem_preco", "parcelado", "avista", "completo"],
-      papel_membro: ["admin", "gestor", "vendedor", "sdr"],
+      papel_membro: ["admin", "gestor", "vendedor", "sdr", "operacao"],
       perfil_gamificacao: ["sdr", "closer", "cs_farmer"],
       periodo_limite_regra: ["dia", "mes"],
       proposta_bloco_quebra: ["auto", "nova_pagina", "pagina_exclusiva"],
