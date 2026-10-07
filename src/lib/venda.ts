@@ -14,8 +14,8 @@ export type SituacaoContrato = "nao_gerado" | StatusContrato;
 
 export const ROTULO_SITUACAO_PROPOSTA: Record<SituacaoProposta, string> = {
   nao_gerada: "Não gerada",
-  nunca_aberta: "Gerada, nunca aberta",
-  aberta: "Aberta",
+  nunca_aberta: "Cliente ainda não viu",
+  aberta: "Vista pelo cliente",
 };
 export const ROTULO_SITUACAO_CONTRATO: Record<SituacaoContrato, string> = {
   nao_gerado: "Não gerado",
@@ -24,11 +24,11 @@ export const ROTULO_SITUACAO_CONTRATO: Record<SituacaoContrato, string> = {
   assinado: "Assinado",
 };
 export const ROTULO_PAGAMENTO: Record<StatusPagamentoContrato, string> = {
-  pendente: "Pendente",
+  pendente: "A confirmar",
   confirmado: "Confirmado",
   estornado: "Estornado",
 };
-export const ROTULO_NEGOCIO: Record<StatusNegocio, string> = { aberto: "Aberto", ganho: "Ganho", perdido: "Perdido" };
+export const ROTULO_NEGOCIO: Record<StatusNegocio, string> = { aberto: "Em andamento", ganho: "Ganho", perdido: "Perdido" };
 
 export type LinhaVenda = {
   negocioId: string;
@@ -69,10 +69,10 @@ export function maisRecente(datas: readonly (string | null | undefined)[]): stri
 }
 
 export const ATALHOS_VENDA = {
-  proposta_nunca_aberta: "Proposta nunca aberta",
+  proposta_nunca_aberta: "Cliente ainda não viu",
   aguardando_assinatura: "Aguardando assinatura",
-  assinado_sem_pagamento: "Assinado sem pagamento",
-  pago_nao_ganho: "Pago e não marcado como ganho",
+  assinado_sem_pagamento: "Assinado, falta confirmar pagamento",
+  pago_nao_ganho: "Pago, falta marcar como ganho",
 } as const;
 export type AtalhoVenda = keyof typeof ATALHOS_VENDA;
 
@@ -123,6 +123,36 @@ export function filtrarLinhasVenda(linhas: readonly LinhaVenda[], f: FiltrosVend
     if (f.atalho && !atendeAtalho(l, f.atalho)) return false;
     return true;
   });
+}
+
+// ---------------------------------------------------------------------------
+// Visões (guias Propostas / Contratos) — mesma consulta, recortes diferentes
+// ---------------------------------------------------------------------------
+
+export const VISOES_VENDA = ["propostas", "contratos"] as const;
+export type VisaoVenda = (typeof VISOES_VENDA)[number];
+export const ROTULO_VISAO_VENDA: Record<VisaoVenda, string> = { propostas: "Propostas", contratos: "Contratos" };
+
+export const ATALHOS_POR_VISAO: Record<VisaoVenda, readonly AtalhoVenda[]> = {
+  propostas: ["proposta_nunca_aberta"],
+  contratos: ["aguardando_assinatura", "assinado_sem_pagamento", "pago_nao_ganho"],
+};
+
+/** Guia Propostas: negócios com proposta gerada. Guia Contratos: negócios com contrato gerado. */
+export function linhasDaVisao(linhas: readonly LinhaVenda[], visao: VisaoVenda): LinhaVenda[] {
+  return linhas.filter((l) => (visao === "propostas" ? l.proposta !== "nao_gerada" : l.contrato !== "nao_gerado"));
+}
+
+/** Descarta filtros que não pertencem à guia (ex.: contrato/pagamento na guia Propostas, atalho de outra guia). */
+export function filtrosDaVisao(visao: VisaoVenda, f: FiltrosVenda): FiltrosVenda {
+  const atalho = f.atalho && ATALHOS_POR_VISAO[visao].includes(f.atalho) ? f.atalho : undefined;
+  if (visao === "propostas") return { busca: f.busca, negocio: f.negocio, responsaveis: f.responsaveis, atalho };
+  return { ...f, atalho };
+}
+
+/** Linhas da guia já filtradas — o que a tela mostra. */
+export function linhasVisiveis(linhas: readonly LinhaVenda[], visao: VisaoVenda, f: FiltrosVenda): LinhaVenda[] {
+  return filtrarLinhasVenda(linhasDaVisao(linhas, visao), filtrosDaVisao(visao, f));
 }
 
 // ---------------------------------------------------------------------------

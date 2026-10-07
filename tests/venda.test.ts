@@ -4,7 +4,18 @@
  * filtros/atalhos. Funções puras — não precisa de banco.
  */
 import { describe, expect, it } from "vitest";
-import { filtrarLinhasVenda, maisRecente, responsaveisPermitidos, situacaoProposta, statusPagamento, type LinhaVenda } from "@/lib/venda";
+import {
+  ATALHOS_POR_VISAO,
+  filtrarLinhasVenda,
+  filtrosDaVisao,
+  linhasDaVisao,
+  linhasVisiveis,
+  maisRecente,
+  responsaveisPermitidos,
+  situacaoProposta,
+  statusPagamento,
+  type LinhaVenda,
+} from "@/lib/venda";
 
 const linha = (parcial: Partial<LinhaVenda>): LinhaVenda => ({
   negocioId: "n",
@@ -107,5 +118,47 @@ describe("filtrarLinhasVenda", () => {
     expect(ids({ atalho: "aguardando_assinatura" })).toEqual(["b"]);
     expect(ids({ atalho: "assinado_sem_pagamento" })).toEqual(["c", "d"]);
     expect(ids({ atalho: "pago_nao_ganho" })).toEqual(["e"]);
+  });
+});
+
+describe("visões Propostas / Contratos", () => {
+  const linhas = [
+    linha({ negocioId: "p1", numero: 20, clienteNome: "Só proposta", proposta: "nunca_aberta" }),
+    linha({ negocioId: "p2", numero: 21, clienteNome: "Proposta aberta", proposta: "aberta", negocio: "perdido" }),
+    linha({ negocioId: "c1", numero: 22, clienteNome: "Só contrato", proposta: "nao_gerada", contrato: "aguardando_assinatura" }),
+    linha({ negocioId: "pc", numero: 23, clienteNome: "Os dois", proposta: "aberta", contrato: "assinado", pagamento: "confirmado" }),
+  ];
+  const ids = (ls: LinhaVenda[]) => ls.map((l) => l.negocioId);
+
+  it("Propostas lista negócios com proposta gerada; Contratos, com contrato gerado", () => {
+    expect(ids(linhasDaVisao(linhas, "propostas"))).toEqual(["p1", "p2", "pc"]);
+    expect(ids(linhasDaVisao(linhas, "contratos"))).toEqual(["c1", "pc"]);
+  });
+
+  it("cada guia tem seus atalhos", () => {
+    expect(ATALHOS_POR_VISAO.propostas).toEqual(["proposta_nunca_aberta"]);
+    expect(ATALHOS_POR_VISAO.contratos).toEqual(["aguardando_assinatura", "assinado_sem_pagamento", "pago_nao_ganho"]);
+  });
+
+  it("guia Propostas ignora filtros de contrato/pagamento e atalhos de contrato", () => {
+    const f = filtrosDaVisao("propostas", { busca: "x", contrato: "assinado", pagamento: "confirmado", negocio: "aberto", atalho: "pago_nao_ganho" });
+    expect(f).toEqual({ busca: "x", negocio: "aberto", responsaveis: undefined, atalho: undefined });
+    expect(ids(linhasVisiveis(linhas, "propostas", { contrato: "assinado" }))).toEqual(["p1", "p2", "pc"]);
+    expect(ids(linhasVisiveis(linhas, "propostas", { atalho: "proposta_nunca_aberta" }))).toEqual(["p1"]);
+    expect(ids(linhasVisiveis(linhas, "propostas", { negocio: "perdido" }))).toEqual(["p2"]);
+  });
+
+  it("guia Contratos aplica contrato, pagamento e negócio; ignora atalho de proposta", () => {
+    expect(ids(linhasVisiveis(linhas, "contratos", { contrato: "aguardando_assinatura" }))).toEqual(["c1"]);
+    expect(ids(linhasVisiveis(linhas, "contratos", { pagamento: "confirmado" }))).toEqual(["pc"]);
+    expect(ids(linhasVisiveis(linhas, "contratos", { atalho: "proposta_nunca_aberta" }))).toEqual(["c1", "pc"]);
+    expect(ids(linhasVisiveis(linhas, "contratos", { atalho: "pago_nao_ganho" }))).toEqual(["pc"]);
+  });
+
+  it("responsável/equipe valem nas duas guias", () => {
+    const outro = [...linhas, linha({ negocioId: "m9", proposta: "aberta", contrato: "rascunho", responsavelId: "m9" })];
+    const so = responsaveisPermitidos("m9", undefined);
+    expect(ids(linhasVisiveis(outro, "propostas", { responsaveis: so }))).toEqual(["m9"]);
+    expect(ids(linhasVisiveis(outro, "contratos", { responsaveis: so }))).toEqual(["m9"]);
   });
 });
