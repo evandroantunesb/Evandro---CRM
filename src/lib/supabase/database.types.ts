@@ -2245,6 +2245,368 @@ export type Database = {
           },
         ];
       };
+      obra_dados_comerciais: {
+        Row: {
+          created_at: string;
+          empresa_id: string;
+          obra_id: string;
+          snapshot: NonNullable<Json>;
+          snapshot_versao: number;
+          updated_at: string;
+          valor_vendido: number | null;
+        };
+        Insert: {
+          created_at?: string;
+          empresa_id: string;
+          obra_id: string;
+          snapshot: NonNullable<Json>;
+          snapshot_versao?: number;
+          updated_at?: string;
+          valor_vendido?: number | null;
+        };
+        Update: {
+          created_at?: string;
+          empresa_id?: string;
+          obra_id?: string;
+          snapshot?: NonNullable<Json>;
+          snapshot_versao?: number;
+          updated_at?: string;
+          valor_vendido?: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "obra_dados_comerciais_empresa_id_obra_id_fkey";
+            columns: ["empresa_id", "obra_id"];
+            isOneToOne: false;
+            referencedRelation: "obras";
+            referencedColumns: ["empresa_id", "id"];
+          },
+        ];
+      };
+      obra_fluxos: {
+        Row: {
+          aguardando: Database["public"]["Enums"]["aguardando_obra"] | null;
+          aguardando_desde: string | null;
+          concluido_em: string | null;
+          created_at: string;
+          empresa_id: string;
+          iniciado_em: string | null;
+          obra_id: string;
+          parado: boolean;
+          parado_motivo: string | null;
+          setor: Database["public"]["Enums"]["setor_obra"];
+          status: string;
+          status_desde: string;
+          updated_at: string;
+        };
+        Insert: {
+          aguardando?: Database["public"]["Enums"]["aguardando_obra"] | null;
+          aguardando_desde?: string | null;
+          concluido_em?: string | null;
+          created_at?: string;
+          empresa_id: string;
+          iniciado_em?: string | null;
+          obra_id: string;
+          parado?: boolean;
+          parado_motivo?: string | null;
+          setor: Database["public"]["Enums"]["setor_obra"];
+          status: string;
+          status_desde?: string;
+          updated_at?: string;
+        };
+        Update: {
+          aguardando?: Database["public"]["Enums"]["aguardando_obra"] | null;
+          aguardando_desde?: string | null;
+          concluido_em?: string | null;
+          created_at?: string;
+          empresa_id?: string;
+          iniciado_em?: string | null;
+          obra_id?: string;
+          parado?: boolean;
+          parado_motivo?: string | null;
+          setor?: Database["public"]["Enums"]["setor_obra"];
+          status?: string;
+          status_desde?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "obra_fluxos_empresa_id_obra_id_fkey";
+            columns: ["empresa_id", "obra_id"];
+            isOneToOne: false;
+            referencedRelation: "obras";
+            referencedColumns: ["empresa_id", "id"];
+          },
+        ];
+      };
+      obra_historico: {
+        Row: {
+          autor_contexto: Json | null;
+          autor_membro_id: string | null;
+          autor_user_id: string | null;
+          created_at: string;
+          dados: NonNullable<Json>;
+          empresa_id: string;
+          id: number;
+          obra_id: string;
+          setor: Database["public"]["Enums"]["setor_obra"] | null;
+          tipo: string;
+        };
+        Insert: {
+          autor_contexto?: Json | null;
+          autor_membro_id?: string | null;
+          autor_user_id?: string | null;
+          created_at?: string;
+          dados?: NonNullable<Json>;
+          empresa_id: string;
+          id?: never;
+          obra_id: string;
+          setor?: Database["public"]["Enums"]["setor_obra"] | null;
+          tipo: string;
+        };
+        Update: {
+          autor_contexto?: Json | null;
+          autor_membro_id?: string | null;
+          autor_user_id?: string | null;
+          created_at?: string;
+          dados?: NonNullable<Json>;
+          empresa_id?: string;
+          id?: never;
+          obra_id?: string;
+          setor?: Database["public"]["Enums"]["setor_obra"] | null;
+          tipo?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "obra_historico_empresa_id_obra_id_fkey";
+            columns: ["empresa_id", "obra_id"];
+            isOneToOne: false;
+            referencedRelation: "obras";
+            referencedColumns: ["empresa_id", "id"];
+          },
+        ];
+      };
+      obra_marcos: {
+        Row: {
+          concluido_em: string | null;
+          concluido_por_membro_id: string | null;
+          created_at: string;
+          empresa_id: string;
+          marco: Database["public"]["Enums"]["marco_obra"];
+          motivo: string | null;
+          obra_id: string;
+          status: Database["public"]["Enums"]["status_marco_obra"];
+          updated_at: string;
+        };
+        Insert: {
+          concluido_em?: string | null;
+          concluido_por_membro_id?: string | null;
+          created_at?: string;
+          empresa_id: string;
+          marco: Database["public"]["Enums"]["marco_obra"];
+          motivo?: string | null;
+          obra_id: string;
+          status?: Database["public"]["Enums"]["status_marco_obra"];
+          updated_at?: string;
+        };
+        Update: {
+          concluido_em?: string | null;
+          concluido_por_membro_id?: string | null;
+          created_at?: string;
+          empresa_id?: string;
+          marco?: Database["public"]["Enums"]["marco_obra"];
+          motivo?: string | null;
+          obra_id?: string;
+          status?: Database["public"]["Enums"]["status_marco_obra"];
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "obra_marcos_empresa_id_obra_id_fkey";
+            columns: ["empresa_id", "obra_id"];
+            isOneToOne: false;
+            referencedRelation: "obras";
+            referencedColumns: ["empresa_id", "id"];
+          },
+        ];
+      };
+      obra_participantes: {
+        Row: {
+          created_at: string;
+          criado_por_user_id: string | null;
+          empresa_id: string;
+          fim: string | null;
+          funcao: Database["public"]["Enums"]["funcao_participante_obra"];
+          id: string;
+          inicio: string;
+          membro_id: string;
+          obra_id: string;
+          principal: boolean;
+          setor: Database["public"]["Enums"]["setor_obra"];
+          substitui_id: string | null;
+        };
+        Insert: {
+          created_at?: string;
+          criado_por_user_id?: string | null;
+          empresa_id: string;
+          fim?: string | null;
+          funcao: Database["public"]["Enums"]["funcao_participante_obra"];
+          id?: string;
+          inicio?: string;
+          membro_id: string;
+          obra_id: string;
+          principal?: boolean;
+          setor: Database["public"]["Enums"]["setor_obra"];
+          substitui_id?: string | null;
+        };
+        Update: {
+          created_at?: string;
+          criado_por_user_id?: string | null;
+          empresa_id?: string;
+          fim?: string | null;
+          funcao?: Database["public"]["Enums"]["funcao_participante_obra"];
+          id?: string;
+          inicio?: string;
+          membro_id?: string;
+          obra_id?: string;
+          principal?: boolean;
+          setor?: Database["public"]["Enums"]["setor_obra"];
+          substitui_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "obra_participantes_empresa_id_membro_id_fkey";
+            columns: ["empresa_id", "membro_id"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["empresa_id", "id"];
+          },
+          {
+            foreignKeyName: "obra_participantes_empresa_id_obra_id_fkey";
+            columns: ["empresa_id", "obra_id"];
+            isOneToOne: false;
+            referencedRelation: "obras";
+            referencedColumns: ["empresa_id", "id"];
+          },
+          {
+            foreignKeyName: "obra_participantes_substitui_id_obra_id_empresa_id_setor_fkey";
+            columns: ["substitui_id", "obra_id", "empresa_id", "setor"];
+            isOneToOne: false;
+            referencedRelation: "obra_participantes";
+            referencedColumns: ["id", "obra_id", "empresa_id", "setor"];
+          },
+        ];
+      };
+      obras: {
+        Row: {
+          alerta_pagamento_estornado_em: string | null;
+          cancelada_em: string | null;
+          cancelamento_motivo: string | null;
+          cidade: string | null;
+          cliente_nome: string;
+          confirmacao_pagamento_id: string;
+          contrato_id: string;
+          created_at: string;
+          empresa_id: string;
+          id: string;
+          negocio_id: string;
+          numero: number;
+          pausa_motivo: string | null;
+          pausada_em: string | null;
+          potencia_kwp: number | null;
+          sdr_id: string | null;
+          snapshot: NonNullable<Json>;
+          snapshot_versao: number;
+          tipo_ligacao: Database["public"]["Enums"]["tipo_ligacao"] | null;
+          uf: string | null;
+          unidade_consumidora: string | null;
+          updated_at: string;
+          venda_alterada_em: string | null;
+          vendedor_id: string | null;
+        };
+        Insert: {
+          alerta_pagamento_estornado_em?: string | null;
+          cancelada_em?: string | null;
+          cancelamento_motivo?: string | null;
+          cidade?: string | null;
+          cliente_nome: string;
+          confirmacao_pagamento_id: string;
+          contrato_id: string;
+          created_at?: string;
+          empresa_id: string;
+          id?: string;
+          negocio_id: string;
+          numero: number;
+          pausa_motivo?: string | null;
+          pausada_em?: string | null;
+          potencia_kwp?: number | null;
+          sdr_id?: string | null;
+          snapshot: NonNullable<Json>;
+          snapshot_versao?: number;
+          tipo_ligacao?: Database["public"]["Enums"]["tipo_ligacao"] | null;
+          uf?: string | null;
+          unidade_consumidora?: string | null;
+          updated_at?: string;
+          venda_alterada_em?: string | null;
+          vendedor_id?: string | null;
+        };
+        Update: {
+          alerta_pagamento_estornado_em?: string | null;
+          cancelada_em?: string | null;
+          cancelamento_motivo?: string | null;
+          cidade?: string | null;
+          cliente_nome?: string;
+          confirmacao_pagamento_id?: string;
+          contrato_id?: string;
+          created_at?: string;
+          empresa_id?: string;
+          id?: string;
+          negocio_id?: string;
+          numero?: number;
+          pausa_motivo?: string | null;
+          pausada_em?: string | null;
+          potencia_kwp?: number | null;
+          sdr_id?: string | null;
+          snapshot?: NonNullable<Json>;
+          snapshot_versao?: number;
+          tipo_ligacao?: Database["public"]["Enums"]["tipo_ligacao"] | null;
+          uf?: string | null;
+          unidade_consumidora?: string | null;
+          updated_at?: string;
+          venda_alterada_em?: string | null;
+          vendedor_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "obras_confirmacao_pagamento_id_fkey";
+            columns: ["confirmacao_pagamento_id"];
+            isOneToOne: false;
+            referencedRelation: "confirmacoes_pagamento";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "obras_contrato_id_fkey";
+            columns: ["contrato_id"];
+            isOneToOne: false;
+            referencedRelation: "contratos";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "obras_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "obras_negocio_id_fkey";
+            columns: ["negocio_id"];
+            isOneToOne: true;
+            referencedRelation: "negocios";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       origens: {
         Row: {
           ativa: boolean;
@@ -3293,10 +3655,14 @@ export type Database = {
       };
       expirar_atribuicoes_leads: { Args: Record<PropertyKey, never>; Returns: undefined };
       fechar_comissao: { Args: { p_comissao_id: string }; Returns: undefined };
+      garantir_obra: { Args: { p_negocio_id: string }; Returns: string };
       incrementar_preenchimento_formulario: { Args: { p_id: string }; Returns: undefined };
       incrementar_visualizacao_formulario: { Args: { p_id: string }; Returns: undefined };
+      marcar_venda_alterada_obra: { Args: { p_negocio_id: string }; Returns: undefined };
       membro_ativo: { Args: { p_empresa_id: string }; Returns: boolean };
       meu_membro_id: { Args: { p_empresa_id: string }; Returns: string };
+      obra_snapshot_comercial: { Args: { p_negocio_id: string }; Returns: Json };
+      obra_snapshot_tecnico: { Args: { p_negocio_id: string }; Returns: Json };
       pode_ver_avatar: { Args: { p_pasta: string }; Returns: boolean };
       pode_ver_contato: { Args: { p_contato_id: string }; Returns: boolean };
       pode_ver_contato_linha: {
@@ -3304,11 +3670,13 @@ export type Database = {
         Returns: boolean;
       };
       pode_ver_negocio: { Args: { p_negocio_id: string }; Returns: boolean };
+      pode_ver_obra: { Args: { p_obra_id: string }; Returns: boolean };
       pode_ver_pasta_anexo: { Args: { p_caminho: string }; Returns: boolean };
       pode_ver_responsavel: {
         Args: { p_empresa_id: string; p_responsavel_id: string };
         Returns: boolean;
       };
+      pode_ver_valor_vendido_obra: { Args: { p_obra_id: string }; Returns: boolean };
       progresso_conquistas_membro: {
         Args: { p_empresa_id: string };
         Returns: {
@@ -3331,6 +3699,15 @@ export type Database = {
       };
       reavaliar_credito_condicionado_valor: {
         Args: { p_estornado_por: string; p_evento_won_id: number; p_novo_valor: number };
+        Returns: undefined;
+      };
+      registrar_historico_obra: {
+        Args: {
+          p_dados: Json;
+          p_obra_id: string;
+          p_setor: Database["public"]["Enums"]["setor_obra"];
+          p_tipo: string;
+        };
         Returns: undefined;
       };
       sequencia_produtiva_membro: {
@@ -3369,6 +3746,14 @@ export type Database = {
       };
     };
     Enums: {
+      aguardando_obra:
+        | "cliente"
+        | "fornecedor"
+        | "concessionaria"
+        | "transportadora"
+        | "equipe_campo";
+      funcao_participante_obra: "vendedor" | "sdr" | "responsavel" | "apoio" | "substituto";
+      marco_obra: "nf_cliente" | "garantia";
       metrica_meta: "receita" | "negocios_ganhos" | "reunioes" | "conversao" | "tarefas_concluidas";
       modelo_cobranca: "por_usuario" | "fixo" | "fixo_mais_usuario";
       modo_distribuicao_leads: "somente_vendedores" | "somente_sdr" | "parcial" | "aleatorio";
@@ -3388,10 +3773,12 @@ export type Database = {
         | "realizada"
         | "no_show"
         | "cancelada";
+      setor_obra: "comercial" | "compras" | "engenharia" | "operacional";
       situacao_empresa: "ativa" | "suspensa" | "cancelada";
       status_atribuicao_lead: "pendente" | "aprovada" | "reatribuida" | "expirada";
       status_comissao: "aberta" | "fechada";
       status_contrato: "rascunho" | "aguardando_assinatura" | "assinado";
+      status_marco_obra: "pendente" | "concluido" | "nao_se_aplica";
       status_membro: "ativo" | "inativo" | "desligado";
       status_negocio: "aberto" | "ganho" | "perdido";
       status_pagamento_contrato: "pendente" | "confirmado" | "estornado";
@@ -3521,6 +3908,15 @@ export const Constants = {
   },
   public: {
     Enums: {
+      aguardando_obra: [
+        "cliente",
+        "fornecedor",
+        "concessionaria",
+        "transportadora",
+        "equipe_campo",
+      ],
+      funcao_participante_obra: ["vendedor", "sdr", "responsavel", "apoio", "substituto"],
+      marco_obra: ["nf_cliente", "garantia"],
       metrica_meta: ["receita", "negocios_ganhos", "reunioes", "conversao", "tarefas_concluidas"],
       modelo_cobranca: ["por_usuario", "fixo", "fixo_mais_usuario"],
       modo_distribuicao_leads: ["somente_vendedores", "somente_sdr", "parcial", "aleatorio"],
@@ -3541,10 +3937,12 @@ export const Constants = {
         "no_show",
         "cancelada",
       ],
+      setor_obra: ["comercial", "compras", "engenharia", "operacional"],
       situacao_empresa: ["ativa", "suspensa", "cancelada"],
       status_atribuicao_lead: ["pendente", "aprovada", "reatribuida", "expirada"],
       status_comissao: ["aberta", "fechada"],
       status_contrato: ["rascunho", "aguardando_assinatura", "assinado"],
+      status_marco_obra: ["pendente", "concluido", "nao_se_aplica"],
       status_membro: ["ativo", "inativo", "desligado"],
       status_negocio: ["aberto", "ganho", "perdido"],
       status_pagamento_contrato: ["pendente", "confirmado", "estornado"],
