@@ -39,6 +39,7 @@ let opInativoCoordena: Usuario;
 let opAlvo: Usuario;
 let adminB: Usuario;
 let opCoordenaB: Usuario;
+let vendedorB: Usuario;
 let empresa: string;
 let empresaB: string;
 const membro: Record<string, string> = {};
@@ -148,6 +149,7 @@ beforeAll(async () => {
     opAlvo,
     adminB,
     opCoordenaB,
+    vendedorB,
   ] = await Promise.all(
     [
       "oa-admin",
@@ -166,6 +168,7 @@ beforeAll(async () => {
       "oa-op-alvo",
       "oa-admin-b",
       "oa-op-coordena-b",
+      "oa-vendedor-b",
     ].map(criarUsuario),
   );
 
@@ -206,6 +209,12 @@ beforeAll(async () => {
       { empresa_id: empresa, user_id: opAlvo.id, papel: "operacao" },
       { empresa_id: empresaB, user_id: adminB.id, papel: "admin" },
       { empresa_id: empresaB, user_id: opCoordenaB.id, papel: "operacao" },
+      {
+        empresa_id: empresaB,
+        user_id: vendedorB.id,
+        papel: "vendedor",
+        perfil_gamificacao: "closer",
+      },
     ])
     .select("id, user_id");
   for (const v of vinculos!) membro[v.user_id] = v.id;
@@ -258,8 +267,8 @@ beforeAll(async () => {
     empresaB,
     funilB,
     etapaInicialB,
-    membro[adminB.id],
-    adminB,
+    membro[vendedorB.id],
+    vendedorB,
     adminB,
     "Obra da empresa B",
   );
@@ -484,7 +493,7 @@ describe("identidade_membros", () => {
   it("devolve só membros da empresa pedida", async () => {
     const { data } = await adminB.cliente.rpc("identidade_membros", { p_empresa_id: empresaB });
     expect(data!.map((r) => r.membro_id).sort()).toEqual(
-      [membro[adminB.id], membro[opCoordenaB.id]].sort(),
+      [membro[adminB.id], membro[opCoordenaB.id], membro[vendedorB.id]].sort(),
     );
   });
 });
