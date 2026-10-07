@@ -4,6 +4,8 @@
  * (nome + avatar, sem e-mail/telefone) e a tabela `membro_setores_obra`. Valor vendido
  * continua fechado para `operacao`; os 4 papéis comerciais veem exatamente o que viam;
  * quem não é `operacao` não ganha acesso só por constar em obra_participantes.
+ * `operacao` lê 0 linhas de `obras` direto: lê pela RPC `obras_operacao`, com snapshot sem o
+ * bloco `cliente` e dados pessoais só para participante ativo no setor (matriz aprovada).
  * Precisa do Supabase local (roda no CI).
  */
 import { randomUUID } from "node:crypto";
@@ -37,6 +39,8 @@ let opExecuta: Usuario;
 let opInativoParticipante: Usuario;
 let opInativoCoordena: Usuario;
 let opAlvo: Usuario;
+let opInstalador: Usuario;
+let opComprador: Usuario;
 let adminB: Usuario;
 let opCoordenaB: Usuario;
 let vendedorB: Usuario;
@@ -50,6 +54,16 @@ let etapaInicialB: string;
 let obraA: string;
 let obraB: string;
 let obraDeB: string;
+
+// Dados pessoais do cliente com valores sentinela: se aparecerem serializados onde não
+// deviam, o teste acusa.
+const PESSOAIS = {
+  documento: "123.456.789-09",
+  telefone: "(62) 98888-0001",
+  telefone2: "(62) 98888-0002",
+  email: "cliente.sigiloso@exemplo.test",
+  endereco: "Rua Sigilosa, 123 - Setor Teste",
+};
 
 async function noBanco(sql: string, params: unknown[]) {
   const banco = new Client({ connectionString: urlBancoLocal() });
@@ -67,12 +81,19 @@ async function participar(
   obraId: string,
   empresaId: string,
   membroId: string,
-  opcoes: { encerrado?: boolean } = {},
+  opcoes: { encerrado?: boolean; setor?: string; principal?: boolean } = {},
 ) {
   await noBanco(
-    `insert into public.obra_participantes (obra_id, empresa_id, membro_id, setor, funcao, fim)
-     values ($1, $2, $3, 'engenharia', 'apoio', ${opcoes.encerrado ? "now()" : "null"})`,
-    [obraId, empresaId, membroId],
+    `insert into public.obra_participantes (obra_id, empresa_id, membro_id, setor, funcao, principal, fim)
+     values ($1, $2, $3, $4, $5, $6, ${opcoes.encerrado ? "now()" : "null"})`,
+    [
+      obraId,
+      empresaId,
+      membroId,
+      opcoes.setor ?? "engenharia",
+      opcoes.principal ? "responsavel" : "apoio",
+      opcoes.principal ?? false,
+    ],
   );
 }
 
@@ -87,7 +108,17 @@ async function criarVenda(
 ) {
   const { data: c } = await servico
     .from("contatos")
-    .insert({ empresa_id: emp, nome: `Cliente ${titulo}`, cidade: "Goiânia", uf: "GO" })
+    .insert({
+      empresa_id: emp,
+      nome: `Cliente ${titulo}`,
+      cidade: "Goiânia",
+      uf: "GO",
+      documento: PESSOAIS.documento,
+      telefone: PESSOAIS.telefone,
+      telefone2: PESSOAIS.telefone2,
+      email: PESSOAIS.email,
+      endereco: PESSOAIS.endereco,
+    })
     .select("id")
     .single();
   const { data: neg, error } = await servico
@@ -147,6 +178,8 @@ beforeAll(async () => {
     opInativoParticipante,
     opInativoCoordena,
     opAlvo,
+    opInstalador,
+    opComprador,
     adminB,
     opCoordenaB,
     vendedorB,
@@ -166,6 +199,8 @@ beforeAll(async () => {
       "oa-op-inativo-part",
       "oa-op-inativo-coord",
       "oa-op-alvo",
+      "oa-op-instalador",
+      "oa-op-comprador",
       "oa-admin-b",
       "oa-op-coordena-b",
       "oa-vendedor-b",
@@ -207,6 +242,8 @@ beforeAll(async () => {
       { empresa_id: empresa, user_id: opInativoParticipante.id, papel: "operacao" },
       { empresa_id: empresa, user_id: opInativoCoordena.id, papel: "operacao" },
       { empresa_id: empresa, user_id: opAlvo.id, papel: "operacao" },
+      { empresa_id: empresa, user_id: opInstalador.id, papel: "operacao" },
+      { empresa_id: empresa, user_id: opComprador.id, papel: "operacao" },
       { empresa_id: empresaB, user_id: adminB.id, papel: "admin" },
       { empresa_id: empresaB, user_id: opCoordenaB.id, papel: "operacao" },
       {
@@ -304,6 +341,15 @@ beforeAll(async () => {
   await participar(obraA, empresa, membro[vendedor2.id]);
   await participar(obraA, empresa, membro[gestorFora.id]);
   await participar(obraA, empresa, membro[sdr.id]);
+  // Matriz de dados pessoais: operacional e compras participam da obra A (opParticipante é
+  // engenharia). O coordenador já foi principal de engenharia na A, mas encerrou.
+  await participar(obraA, empresa, membro[opInstalador.id], { setor: "operacional" });
+  await participar(obraA, empresa, membro[opComprador.id], { setor: "compras" });
+  await participar(obraA, empresa, membro[opCoordena.id], {
+    setor: "engenharia",
+    principal: true,
+    encerrado: true,
+  });
 
   // Desligamento/inativação depois de definidos os vínculos.
   await servico
@@ -317,8 +363,9 @@ beforeAll(async () => {
 });
 
 async function enxerga(usuario: Usuario, obraId: string) {
-  const [obras, valor, fluxos, marcos, participantes, historico] = await Promise.all([
+  const [obras, rpc, valor, fluxos, marcos, participantes, historico] = await Promise.all([
     usuario.cliente.from("obras").select("id").eq("id", obraId),
+    usuario.cliente.rpc("obras_operacao", { p_obra_id: obraId }),
     usuario.cliente.from("obra_dados_comerciais").select("obra_id").eq("obra_id", obraId),
     usuario.cliente.from("obra_fluxos").select("setor").eq("obra_id", obraId),
     usuario.cliente.from("obra_marcos").select("marco").eq("obra_id", obraId),
@@ -327,6 +374,7 @@ async function enxerga(usuario: Usuario, obraId: string) {
   ]);
   return {
     obra: obras.data!.length,
+    rpc: rpc.data!.length,
     valor: valor.data!.length,
     fluxos: fluxos.data!.length,
     marcos: marcos.data!.length,
@@ -335,7 +383,7 @@ async function enxerga(usuario: Usuario, obraId: string) {
   };
 }
 
-const NADA = { obra: 0, valor: 0, fluxos: 0, marcos: 0, participantes: 0, historico: 0 };
+const NADA = { obra: 0, rpc: 0, valor: 0, fluxos: 0, marcos: 0, participantes: 0, historico: 0 };
 
 async function totalParticipantes(obraId: string) {
   const { count } = await servico
@@ -351,6 +399,7 @@ describe("papéis comerciais: visibilidade inalterada", () => {
     for (const usuario of [admin, vendedor, gestor]) {
       expect(await enxerga(usuario, obraA)).toEqual({
         obra: 1,
+        rpc: 0,
         valor: 1,
         fluxos: 3,
         marcos: 2,
@@ -380,12 +429,15 @@ describe("operacao: visibilidade de obras", () => {
     expect(await enxerga(opSemSetor, obraB)).toEqual(NADA);
     const { data } = await opSemSetor.cliente.from("obras").select("id");
     expect(data).toEqual([]);
+    const { data: pelaRpc } = await opSemSetor.cliente.rpc("obras_operacao");
+    expect(pelaRpc).toEqual([]);
   });
 
   it("participante ativo vê só aquela obra e as tabelas filhas dela, sem valor vendido", async () => {
     const participantes = await totalParticipantes(obraA);
     expect(await enxerga(opParticipante, obraA)).toEqual({
-      obra: 1,
+      obra: 0,
+      rpc: 1,
       valor: 0,
       fluxos: 3,
       marcos: 2,
@@ -394,8 +446,10 @@ describe("operacao: visibilidade de obras", () => {
     });
     expect(await enxerga(opParticipante, obraB)).toEqual(NADA);
     expect(await enxerga(opParticipante, obraDeB)).toEqual(NADA);
-    const { data } = await opParticipante.cliente.from("obras").select("id");
-    expect(data).toEqual([{ id: obraA }]);
+    const { data: direto } = await opParticipante.cliente.from("obras").select("id");
+    expect(direto).toEqual([]);
+    const { data } = await opParticipante.cliente.rpc("obras_operacao");
+    expect(data!.map((o) => o.obra_id)).toEqual([obraA]);
   });
 
   it("participação encerrada (fim preenchido) não dá acesso", async () => {
@@ -403,20 +457,20 @@ describe("operacao: visibilidade de obras", () => {
   });
 
   it("coordenador vê todas as obras da própria empresa, nenhuma de outra, sem valor vendido", async () => {
-    const { data } = await opCoordena.cliente.from("obras").select("id, empresa_id");
+    const { data } = await opCoordena.cliente.rpc("obras_operacao");
     expect(data!.length).toBeGreaterThanOrEqual(2);
     expect(data!.every((o) => o.empresa_id === empresa)).toBe(true);
-    expect(data!.map((o) => o.id)).toEqual(expect.arrayContaining([obraA, obraB]));
+    expect(data!.map((o) => o.obra_id)).toEqual(expect.arrayContaining([obraA, obraB]));
 
     for (const obra of [obraA, obraB]) {
       const v = await enxerga(opCoordena, obra);
-      expect(v).toMatchObject({ obra: 1, valor: 0, fluxos: 3, marcos: 2, historico: 1 });
+      expect(v).toMatchObject({ obra: 0, rpc: 1, valor: 0, fluxos: 3, marcos: 2, historico: 1 });
     }
     expect(await enxerga(opCoordena, obraDeB)).toEqual(NADA);
 
     // E o coordenador da empresa B vê só as obras da B.
-    const { data: deB } = await opCoordenaB.cliente.from("obras").select("id, empresa_id");
-    expect(deB!.map((o) => o.id)).toEqual([obraDeB]);
+    const { data: deB } = await opCoordenaB.cliente.rpc("obras_operacao");
+    expect(deB!.map((o) => o.obra_id)).toEqual([obraDeB]);
     expect(await enxerga(opCoordenaB, obraA)).toEqual(NADA);
   });
 
@@ -429,6 +483,165 @@ describe("operacao: visibilidade de obras", () => {
     expect(await enxerga(opInativoParticipante, obraA)).toEqual(NADA);
     for (const obra of [obraA, obraB]) {
       expect(await enxerga(opInativoCoordena, obra)).toEqual(NADA);
+    }
+  });
+});
+
+describe("operacao: dados pessoais do cliente (obras_operacao)", () => {
+  const COLUNAS = [
+    "alerta_pagamento_estornado_em",
+    "cancelada_em",
+    "cancelamento_motivo",
+    "cidade",
+    "cliente_documento",
+    "cliente_endereco",
+    "cliente_nome",
+    "cliente_telefone",
+    "cliente_telefone2",
+    "created_at",
+    "empresa_id",
+    "numero",
+    "obra_id",
+    "pausa_motivo",
+    "pausada_em",
+    "potencia_kwp",
+    "snapshot",
+    "snapshot_versao",
+    "tipo_ligacao",
+    "uf",
+    "unidade_consumidora",
+    "updated_at",
+    "venda_alterada_em",
+  ];
+
+  async function linha(usuario: Usuario, obraId: string) {
+    const { data, error } = await usuario.cliente.rpc("obras_operacao", { p_obra_id: obraId });
+    expect(error).toBeNull();
+    expect(data).toHaveLength(1);
+    return data![0];
+  }
+
+  /** Confere os campos pessoais e que nada além do autorizado aparece serializado. */
+  function confere(
+    l: Awaited<ReturnType<typeof linha>>,
+    esperado: { endereco: boolean; telefone: boolean; documento: boolean },
+  ) {
+    expect(Object.keys(l).sort()).toEqual(COLUNAS);
+    expect(l.cliente_endereco).toBe(esperado.endereco ? PESSOAIS.endereco : null);
+    expect(l.cliente_telefone).toBe(esperado.telefone ? PESSOAIS.telefone : null);
+    expect(l.cliente_telefone2).toBe(esperado.telefone ? PESSOAIS.telefone2 : null);
+    expect(l.cliente_documento).toBe(esperado.documento ? PESSOAIS.documento : null);
+    // Snapshot técnico preservado, sem o bloco `cliente`.
+    const snapshot = l.snapshot as Record<string, unknown>;
+    expect(snapshot).not.toHaveProperty("cliente");
+    expect(snapshot).toHaveProperty("negocio");
+    expect(snapshot).toHaveProperty("kit");
+    // Serialização: e-mail nunca; o resto só se autorizado.
+    const json = JSON.stringify(l);
+    expect(json).not.toContain(PESSOAIS.email);
+    if (!esperado.endereco) expect(json).not.toContain(PESSOAIS.endereco);
+    if (!esperado.telefone) {
+      expect(json).not.toContain(PESSOAIS.telefone);
+      expect(json).not.toContain(PESSOAIS.telefone2);
+    }
+    if (!esperado.documento) expect(json).not.toContain(PESSOAIS.documento);
+    // Nenhum valor em dinheiro.
+    expect(Object.keys(l).some((k) => k.includes("valor"))).toBe(false);
+  }
+
+  it("operacao lê 0 linhas de obras diretamente, nem o snapshot", async () => {
+    for (const usuario of [
+      opSemSetor,
+      opParticipante,
+      opInstalador,
+      opComprador,
+      opCoordena,
+      opExecuta,
+      opCoordenaB,
+    ]) {
+      const { data, error } = await usuario.cliente.from("obras").select("id, snapshot");
+      expect(error).toBeNull();
+      expect(data).toEqual([]);
+    }
+  });
+
+  it("matriz: operacional recebe endereço e telefones; engenharia, endereço e CPF/CNPJ; compras, nada", async () => {
+    confere(await linha(opInstalador, obraA), { endereco: true, telefone: true, documento: false });
+    confere(await linha(opParticipante, obraA), {
+      endereco: true,
+      telefone: false,
+      documento: true,
+    });
+    confere(await linha(opComprador, obraA), {
+      endereco: false,
+      telefone: false,
+      documento: false,
+    });
+  });
+
+  it("coordenador (e ex-principal) sem participação ativa vê a obra, mas sem dado pessoal", async () => {
+    for (const obra of [obraA, obraB]) {
+      confere(await linha(opCoordena, obra), {
+        endereco: false,
+        telefone: false,
+        documento: false,
+      });
+    }
+    const { data } = await opCoordena.cliente.rpc("obras_operacao");
+    for (const l of data!) confere(l, { endereco: false, telefone: false, documento: false });
+  });
+
+  it("encerrar a participação remove os dados pessoais na hora", async () => {
+    // Coordenador entra como operacional na obra B: passa a receber endereço e telefones.
+    await participar(obraB, empresa, membro[opCoordena.id], { setor: "operacional" });
+    confere(await linha(opCoordena, obraB), { endereco: true, telefone: true, documento: false });
+    // Participação encerrada: continua vendo a obra (coordena), sem dado pessoal.
+    await noBanco(
+      "update public.obra_participantes set fim = now() where obra_id = $1 and membro_id = $2 and fim is null",
+      [obraB, membro[opCoordena.id]],
+    );
+    confere(await linha(opCoordena, obraB), { endereco: false, telefone: false, documento: false });
+  });
+
+  it("participação encerrada e outra empresa: nada pela RPC", async () => {
+    const vazio = async (usuario: Usuario, obraId?: string) => {
+      const { data, error } = await usuario.cliente.rpc(
+        "obras_operacao",
+        obraId ? { p_obra_id: obraId } : {},
+      );
+      expect(error).toBeNull();
+      return data;
+    };
+    expect(await vazio(opParticipanteEncerrado, obraA)).toEqual([]);
+    expect(await vazio(opParticipanteEncerrado)).toEqual([]);
+    expect(await vazio(opInstalador, obraDeB)).toEqual([]);
+    expect(await vazio(opCoordenaB, obraA)).toEqual([]);
+    expect(await vazio(opCoordena, obraDeB)).toEqual([]);
+    expect(await vazio(opCoordena, randomUUID())).toEqual([]);
+    for (const usuario of [opInativoParticipante, opInativoCoordena]) {
+      expect(await vazio(usuario)).toEqual([]);
+    }
+  });
+
+  it("comercial continua igual: lê obras direto com o snapshot completo; a RPC não é caminho dele", async () => {
+    for (const usuario of [admin, vendedor, gestor]) {
+      const { data } = await usuario.cliente.from("obras").select("snapshot").eq("id", obraA);
+      const cliente = (data![0].snapshot as { cliente: Record<string, unknown> }).cliente;
+      expect(cliente).toMatchObject({
+        documento: PESSOAIS.documento,
+        telefone: PESSOAIS.telefone,
+        email: PESSOAIS.email,
+        endereco: PESSOAIS.endereco,
+      });
+      const { data: pelaRpc } = await usuario.cliente.rpc("obras_operacao");
+      expect(pelaRpc).toEqual([]);
+    }
+  });
+
+  it("valor vendido continua bloqueado para todo operacao", async () => {
+    for (const usuario of [opParticipante, opInstalador, opComprador, opCoordena, opCoordenaB]) {
+      const { data } = await usuario.cliente.from("obra_dados_comerciais").select("obra_id");
+      expect(data).toEqual([]);
     }
   });
 });
@@ -749,6 +962,8 @@ describe("funções novas: privilégios", () => {
       "definir_setores_membro(uuid, jsonb)",
       "identidade_membros(uuid)",
       "compartilha_empresa_identidade(uuid)",
+      "pode_ver_obra_operacao(uuid)",
+      "obras_operacao(uuid)",
     ]) {
       const papeis = await quemExecuta(`public.${fn}`);
       expect(papeis, fn).toContain("authenticated");
@@ -765,6 +980,7 @@ describe("funções novas: privilégios", () => {
       { auth: { persistSession: false } },
     );
     expect((await anon.rpc("identidade_membros", { p_empresa_id: empresa })).error).not.toBeNull();
+    expect((await anon.rpc("obras_operacao", { p_obra_id: obraA })).error).not.toBeNull();
     expect(
       (await anon.rpc("definir_setores_membro", { p_membro_id: membro[opAlvo.id], p_setores: [] }))
         .error,

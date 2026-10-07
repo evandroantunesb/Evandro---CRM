@@ -1,17 +1,24 @@
 -- Operação / Obras — PR 3b-2: acesso do papel `operacao` a Obras + identidade básica.
 -- Arquitetura aprovada pelo Evandro. Nenhuma tela nova e nenhum mecanismo da #145 é
--- alterado (criação, gatilhos, snapshots, histórico, `pode_ver_valor_vendido_obra`).
+-- alterado: `garantir_obra`, gatilhos, snapshots, histórico, `pode_ver_obra`, a policy de
+-- `obras` e `pode_ver_valor_vendido_obra` ficam exatamente como estão.
 --
 -- O que muda:
 -- 1. `membro_setores_obra`: setores e capacidade (executar/coordenar) de cada membro
 --    `operacao`, definidos só pelo admin da empresa (RPC `definir_setores_membro`).
--- 2. `pode_ver_obra` ganha o caminho de operação: participante ATIVO da obra ou
---    coordenador de algum setor (vê todas as obras da própria empresa). O caminho exige
---    EXPLICITAMENTE o papel `operacao`: um vendedor/gestor inserido como participante de
---    uma obra que não é dele continua sem ver por esse caminho.
--- 3. `operacao` continua SEM valor vendido (`pode_ver_valor_vendido_obra` intacta), sem
---    acesso comercial e sem ver perfis (e-mail/telefone) dos colegas.
--- 4. Identidade básica (nome + avatar) dos colegas ativos, para a tela de Obras mostrar
+-- 2. Caminho de operação SEPARADO do comercial (`pode_ver_obra_operacao`): papel
+--    `operacao` explícito E (participante ativo da obra OU coordenador de algum setor).
+--    Ele abre só as tabelas filhas (fluxos, marcos, participantes, histórico), que não têm
+--    dado pessoal. A tabela `obras` continua só no caminho comercial da #145: `operacao`
+--    lê 0 linhas dela diretamente (o snapshot traz CPF/CNPJ, telefone, e-mail, endereço).
+-- 3. `operacao` lê a obra pela RPC `obras_operacao`: colunas técnicas + snapshot SEM o
+--    bloco `cliente`. Dados pessoais vêm em campos separados e só para PARTICIPANTE ATIVO
+--    daquela obra naquele setor (coordenar não basta):
+--      operacional → endereço + telefones · engenharia → endereço + CPF/CNPJ ·
+--      compras → nenhum · e-mail → nenhum setor.
+-- 4. `operacao` continua SEM valor vendido, sem acesso comercial e sem ver perfis
+--    (e-mail/telefone) dos colegas.
+-- 5. Identidade básica (nome + avatar) dos colegas ativos, para a tela de Obras mostrar
 --    quem atua: RPC `identidade_membros` e `pode_ver_avatar` ampliada. O papel `operacao`
 --    ainda NÃO entra no cadastro de usuários.
 
@@ -133,43 +140,130 @@ revoke all on function public.definir_setores_membro(uuid, jsonb) from public, a
 grant execute on function public.definir_setores_membro(uuid, jsonb) to authenticated;
 
 -- ---------------------------------------------------------------------------
--- Quem vê a Obra
+-- Quem vê a Obra (caminho de operação)
 -- ---------------------------------------------------------------------------
 
--- Caminhos comerciais IDÊNTICOS aos da #145: admin/vendedor da venda/gestor da equipe
--- (pode_ver_responsavel) e SDR de origem. Acrescenta o caminho de operação, que exige o
--- papel `operacao` (ativo, empresa ativa) E uma destas condições:
+-- `pode_ver_obra` (comercial, #145) NÃO muda. Este é o caminho de operação, separado:
+-- exige o papel `operacao` (ativo, empresa ativa) E uma destas condições:
 --   - ser participante ativo (fim nulo) da obra; ou
 --   - coordenar algum setor na empresa da obra (vê todas as obras da própria empresa).
 -- Quem não é `operacao` não ganha nada por estar em obra_participantes.
--- Assinatura e grants preservados (create or replace).
-create or replace function public.pode_ver_obra(p_obra_id uuid)
+-- Usada nas policies das tabelas filhas e em `obras_operacao`; NÃO na policy de `obras`.
+create or replace function public.pode_ver_obra_operacao(p_obra_id uuid)
 returns boolean
 language sql stable security definer set search_path = ''
 as $$
   select coalesce((
-    select public.pode_ver_responsavel(o.empresa_id, o.vendedor_id)
-        or (o.sdr_id is not null and o.sdr_id = public.meu_membro_id(o.empresa_id))
-        or (
-          public.tem_papel(o.empresa_id, '{operacao}')
-          and (
-            exists (
-              select 1 from public.obra_participantes p
-              where p.obra_id = o.id
-                and p.membro_id = public.meu_membro_id(o.empresa_id)
-                and p.fim is null
-            )
-            or exists (
-              select 1 from public.membro_setores_obra s
-              where s.empresa_id = o.empresa_id
-                and s.membro_id = public.meu_membro_id(o.empresa_id)
-                and s.capacidade = 'coordenar'
-            )
-          )
+    select public.tem_papel(o.empresa_id, '{operacao}')
+      and (
+        exists (
+          select 1 from public.obra_participantes p
+          where p.obra_id = o.id
+            and p.membro_id = public.meu_membro_id(o.empresa_id)
+            and p.fim is null
         )
+        or exists (
+          select 1 from public.membro_setores_obra s
+          where s.empresa_id = o.empresa_id
+            and s.membro_id = public.meu_membro_id(o.empresa_id)
+            and s.capacidade = 'coordenar'
+        )
+      )
     from public.obras o where o.id = p_obra_id
   ), false);
 $$;
+
+-- Usada em policies: só `authenticated` executa.
+revoke all on function public.pode_ver_obra_operacao(uuid) from public, anon, authenticated, service_role;
+grant execute on function public.pode_ver_obra_operacao(uuid) to authenticated;
+
+-- Tabelas filhas (sem dado pessoal nem valor): caminho comercial da #145 OU operação.
+-- A policy de `obras` e a de `obra_dados_comerciais` não mudam.
+drop policy "ver fluxos da obra" on public.obra_fluxos;
+create policy "ver fluxos da obra" on public.obra_fluxos for select to authenticated
+  using (public.pode_ver_obra(obra_id) or public.pode_ver_obra_operacao(obra_id));
+drop policy "ver marcos da obra" on public.obra_marcos;
+create policy "ver marcos da obra" on public.obra_marcos for select to authenticated
+  using (public.pode_ver_obra(obra_id) or public.pode_ver_obra_operacao(obra_id));
+drop policy "ver participantes da obra" on public.obra_participantes;
+create policy "ver participantes da obra" on public.obra_participantes for select to authenticated
+  using (public.pode_ver_obra(obra_id) or public.pode_ver_obra_operacao(obra_id));
+drop policy "ver historico da obra" on public.obra_historico;
+create policy "ver historico da obra" on public.obra_historico for select to authenticated
+  using (public.pode_ver_obra(obra_id) or public.pode_ver_obra_operacao(obra_id));
+
+-- Leitura da obra por `operacao`. O usuário vem SEMPRE de auth.uid() (nenhum membro/user
+-- por parâmetro). p_obra_id nulo = todas as obras visíveis; preenchido = só aquela (vazio
+-- se não tiver acesso, sem revelar se existe).
+-- Devolve as colunas técnicas e o snapshot SEM o bloco `cliente`. Dados pessoais vêm em
+-- campos separados, nulos salvo para participante ATIVO daquela obra no setor:
+--   cliente_endereco  → operacional ou engenharia
+--   cliente_telefone(2) → operacional
+--   cliente_documento → engenharia (CPF/CNPJ)
+-- E-mail nunca é devolvido. Coordenador/principal sem participação ativa não recebe dado
+-- pessoal. Nunca devolve valor vendido (fica em obra_dados_comerciais).
+create or replace function public.obras_operacao(p_obra_id uuid default null)
+returns table (
+  obra_id uuid,
+  empresa_id uuid,
+  numero integer,
+  cliente_nome text,
+  cidade text,
+  uf text,
+  potencia_kwp numeric,
+  tipo_ligacao public.tipo_ligacao,
+  unidade_consumidora text,
+  snapshot jsonb,
+  snapshot_versao integer,
+  pausada_em timestamptz,
+  pausa_motivo text,
+  cancelada_em timestamptz,
+  cancelamento_motivo text,
+  alerta_pagamento_estornado_em timestamptz,
+  venda_alterada_em timestamptz,
+  created_at timestamptz,
+  updated_at timestamptz,
+  cliente_endereco text,
+  cliente_telefone text,
+  cliente_telefone2 text,
+  cliente_documento text
+)
+language sql stable security definer set search_path = ''
+as $$
+  select
+    o.id, o.empresa_id, o.numero, o.cliente_nome, o.cidade, o.uf, o.potencia_kwp,
+    o.tipo_ligacao, o.unidade_consumidora,
+    o.snapshot - 'cliente',
+    o.snapshot_versao, o.pausada_em, o.pausa_motivo, o.cancelada_em, o.cancelamento_motivo,
+    o.alerta_pagamento_estornado_em, o.venda_alterada_em, o.created_at, o.updated_at,
+    case when a.operacional or a.engenharia then o.snapshot -> 'cliente' ->> 'endereco' end,
+    case when a.operacional then o.snapshot -> 'cliente' ->> 'telefone' end,
+    case when a.operacional then o.snapshot -> 'cliente' ->> 'telefone2' end,
+    case when a.engenharia then o.snapshot -> 'cliente' ->> 'documento' end
+  from public.obras o
+  -- Setores em que EU sou participante ativo desta obra.
+  cross join lateral (
+    select
+      coalesce(bool_or(p.setor = 'operacional'), false) as operacional,
+      coalesce(bool_or(p.setor = 'engenharia'), false) as engenharia
+    from public.obra_participantes p
+    where p.obra_id = o.id
+      and p.empresa_id = o.empresa_id
+      and p.membro_id = public.meu_membro_id(o.empresa_id)
+      and p.fim is null
+  ) a
+  where o.empresa_id in (
+      select m.empresa_id from public.empresa_membros m
+      where m.user_id = (select auth.uid()) and m.ativo and m.papel = 'operacao'
+    )
+    and (p_obra_id is null or o.id = p_obra_id)
+    and public.pode_ver_obra_operacao(o.id)
+  order by o.created_at desc, o.numero desc;
+$$;
+
+-- RPC de cliente: só `authenticated` executa.
+revoke all on function public.obras_operacao(uuid) from public, anon, authenticated, service_role;
+grant execute on function public.obras_operacao(uuid) to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- Identidade básica dos colegas

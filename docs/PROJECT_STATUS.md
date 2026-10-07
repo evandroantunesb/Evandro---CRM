@@ -82,7 +82,7 @@ Membros fictícios: Lucas Martins, Mariana Costa, Rafael Almeida e Bruno Ferreir
 - Deduplicação de contatos e hardening de concorrência em `unica_por_negocio` — sem data.
 - `PROGRESS.md` e `HANDOFF.md` (raiz) estão desatualizados; servem só como histórico.
 - PR 3b (papel `operacao`/setores de Obras): conferir se a RLS de `tarefas` precisa alinhar com o app da PR 3a (#146) — no app, só admin e gestor atribuem tarefa a outra pessoa e veem tarefas de outros; o SDR cria só para si.
-- PR 3b-2 (branch `feature/obras-acesso-operacao`, ainda sem PR/merge): o papel `operacao` passa a ver Obras como participante ativo ou coordenador de setor (`membro_setores_obra`, definida só pelo admin via `definir_setores_membro`), com identidade básica dos colegas (`identidade_membros`, avatar), sem valor vendido e sem acesso comercial; `operacao` continua fora do cadastro de usuários e não há tela nova.
+- PR 3b-2 (#148, branch `feature/obras-acesso-operacao`, migration ainda não aplicada, sem merge): o papel `operacao` passa a ver Obras como participante ativo ou coordenador de setor (`membro_setores_obra`, definida só pelo admin via `definir_setores_membro`), com identidade básica dos colegas (`identidade_membros`, avatar), sem valor vendido e sem acesso comercial. `operacao` não lê a tabela `obras` direto (caminho próprio `pode_ver_obra_operacao` só nas tabelas filhas; `pode_ver_obra` da #145 intacta): lê pela RPC `obras_operacao`, com snapshot sem o bloco `cliente` e dados pessoais só para participante ativo no setor — operacional: endereço + telefones; engenharia: endereço + CPF/CNPJ; compras: nenhum; e-mail: nenhum. `operacao` continua fora do cadastro de usuários e não há tela nova.
 
 ## Próximas prioridades
 

@@ -3716,6 +3716,34 @@ export type Database = {
       meu_membro_id: { Args: { p_empresa_id: string }; Returns: string };
       obra_snapshot_comercial: { Args: { p_negocio_id: string }; Returns: Json };
       obra_snapshot_tecnico: { Args: { p_negocio_id: string }; Returns: Json };
+      obras_operacao: {
+        Args: { p_obra_id?: string };
+        Returns: {
+          alerta_pagamento_estornado_em: string;
+          cancelada_em: string;
+          cancelamento_motivo: string;
+          cidade: string;
+          cliente_documento: string;
+          cliente_endereco: string;
+          cliente_nome: string;
+          cliente_telefone: string;
+          cliente_telefone2: string;
+          created_at: string;
+          empresa_id: string;
+          numero: number;
+          obra_id: string;
+          pausa_motivo: string;
+          pausada_em: string;
+          potencia_kwp: number;
+          snapshot: Json;
+          snapshot_versao: number;
+          tipo_ligacao: Database["public"]["Enums"]["tipo_ligacao"];
+          uf: string;
+          unidade_consumidora: string;
+          updated_at: string;
+          venda_alterada_em: string;
+        }[];
+      };
       pode_ver_avatar: { Args: { p_pasta: string }; Returns: boolean };
       pode_ver_contato: { Args: { p_contato_id: string }; Returns: boolean };
       pode_ver_contato_linha: {
@@ -3724,6 +3752,7 @@ export type Database = {
       };
       pode_ver_negocio: { Args: { p_negocio_id: string }; Returns: boolean };
       pode_ver_obra: { Args: { p_obra_id: string }; Returns: boolean };
+      pode_ver_obra_operacao: { Args: { p_obra_id: string }; Returns: boolean };
       pode_ver_pasta_anexo: { Args: { p_caminho: string }; Returns: boolean };
       pode_ver_responsavel: {
         Args: { p_empresa_id: string; p_responsavel_id: string };
