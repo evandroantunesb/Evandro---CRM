@@ -4,16 +4,30 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { formatarMoeda } from "@/lib/formatacao";
 import { mensagemErro } from "@/lib/erros";
-import { preencherModeloContrato, type DadosContrato } from "@/lib/contrato";
+import {
+  contratoProntoParaCliente,
+  essenciaisFaltando,
+  marcadoresPendentes,
+  montarDadosContrato,
+  preencherModeloContrato,
+  validarModeloContrato,
+  type FontesContrato,
+} from "@/lib/contrato";
 import { exigirPapel } from "@/lib/sessao";
-import { CONFIRMAR_PAGAMENTO, NEGOCIOS, PROPOSTA_E_CONTRATO, pode } from "@/lib/permissoes";
+import { CONFIRMAR_PAGAMENTO, EDITAR_MODELO_CONTRATO, NEGOCIOS, PROPOSTA_E_CONTRATO, pode } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { STATUS_CONTRATO, type ResultadoAcao } from "@/lib/tipos";
 
 export async function salvarModeloContrato(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  const { atual } = await exigirPapel("admin");
+  const { atual } = await exigirPapel(...EDITAR_MODELO_CONTRATO);
   const conteudo = z.string().max(20000, "Modelo muito longo").safeParse(formData.get("conteudo"));
   if (!conteudo.success) return { ok: false, mensagem: "Modelo inválido." };
+  // Marcador desconhecido apareceria cru no contrato do cliente: recusa ao salvar.
+  const validacao = validarModeloContrato(conteudo.data);
+  if (validacao.desconhecidos.length) {
+    return { ok: false, mensagem: `Campos desconhecidos no modelo: ${validacao.desconhecidos.join(", ")}. Use só os campos da lista.` };
+  }
+  if (validacao.chavesSoltas) return { ok: false, mensagem: "Há chaves {{ ou }} sem par no modelo. Confira os campos." };
 
   const supabase = await criarClienteServidor();
   const { error } = await supabase
@@ -33,50 +47,56 @@ export async function gerarContrato(_: ResultadoAcao, formData: FormData): Promi
   if (!id.success) return { ok: false, mensagem: "Negócio inválido." };
 
   const supabase = await criarClienteServidor();
-  const [{ data: modelo }, { data: negocio }, { data: calculo }, { data: empresa }, { data: existente }] = await Promise.all([
-    supabase.from("modelos_contrato").select("conteudo").eq("empresa_id", atual.empresaId).maybeSingle(),
-    supabase
-      .from("negocios")
-      .select("titulo, valor, contatos(nome, documento, endereco, cidade, uf, email, telefone)")
-      .eq("id", id.data)
-      .maybeSingle(),
-    supabase.from("calculos_solares").select("kit_nome, kit_potencia_kwp").eq("negocio_id", id.data).maybeSingle(),
-    supabase.from("empresas").select("nome, cnpj").eq("id", atual.empresaId).maybeSingle(),
-    supabase.from("contratos").select("id, status").eq("negocio_id", id.data).maybeSingle(),
-  ]);
+  const [{ data: modelo }, { data: negocio }, { data: calculo }, { data: itensKit }, { data: empresa }, { data: existente }, { data: identidades }] =
+    await Promise.all([
+      supabase.from("modelos_contrato").select("conteudo").eq("empresa_id", atual.empresaId).maybeSingle(),
+      supabase
+        .from("negocios")
+        .select(
+          "titulo, numero, valor, unidade_consumidora, qualif_distribuidora, consumo_medio_kwh, responsavel_id, contatos(nome, documento, endereco, cidade, uf, email, telefone, telefone2)",
+        )
+        .eq("id", id.data)
+        .maybeSingle(),
+      supabase
+        .from("calculos_solares")
+        .select("kit_nome, kit_potencia_kwp, tipo_ligacao, consumo_medio_kwh, geracao_estimada_kwh_mes")
+        .eq("negocio_id", id.data)
+        .maybeSingle(),
+      supabase.from("kit_componentes").select("descricao, quantidade, potencia_w").eq("negocio_id", id.data).order("ordem"),
+      supabase.from("empresas").select("nome, cnpj").eq("id", atual.empresaId).maybeSingle(),
+      supabase.from("contratos").select("id, status").eq("negocio_id", id.data).maybeSingle(),
+      // Nome do vendedor responsável (só nome; nunca e-mail ou telefone).
+      supabase.rpc("identidade_membros", { p_empresa_id: atual.empresaId }),
+    ]);
   if (!modelo?.conteudo.trim()) return { ok: false, mensagem: "Cadastre o modelo de contrato em Configurações antes." };
   if (!negocio) return { ok: false, mensagem: "Negócio não encontrado." };
   if (existente && existente.status !== "rascunho") {
     return { ok: false, mensagem: "Este contrato já saiu do rascunho — o texto não muda mais automaticamente." };
   }
+  // Modelo salvo antes da validação pode ter campo desconhecido: não gera.
+  const validacao = validarModeloContrato(modelo.conteudo);
+  if (validacao.desconhecidos.length || validacao.chavesSoltas) {
+    return { ok: false, mensagem: "O modelo de contrato tem campos inválidos. Peça ao admin para corrigir em Configurações." };
+  }
 
-  const contato = negocio.contatos as unknown as {
-    nome: string;
-    documento: string | null;
-    endereco: string | null;
-    cidade: string | null;
-    uf: string | null;
-    email: string | null;
-    telefone: string | null;
-  } | null;
+  const dados = montarDadosContrato({
+    empresa,
+    negocio,
+    contato: negocio.contatos as unknown as FontesContrato["contato"],
+    calculo,
+    itensKit: itensKit ?? [],
+    vendedorNome: (identidades ?? []).find((m) => m.membro_id === negocio.responsavel_id)?.nome ?? null,
+    agora: new Date(),
+    formatarMoeda: (v) => formatarMoeda(v),
+  });
+  // Contrato sem identificar as partes ou o preço não vai para o cliente.
+  const faltando = essenciaisFaltando(modelo.conteudo, dados);
+  if (faltando.length) return { ok: false, mensagem: `Para gerar o contrato, preencha: ${faltando.join(", ")}.` };
 
-  const dados: DadosContrato = {
-    empresa_nome: empresa?.nome ?? "",
-    empresa_cnpj: empresa?.cnpj ?? "",
-    cliente_nome: contato?.nome ?? "",
-    cliente_documento: contato?.documento ?? "",
-    cliente_endereco: contato?.endereco ?? "",
-    cliente_cidade: contato?.cidade ?? "",
-    cliente_uf: contato?.uf ?? "",
-    cliente_email: contato?.email ?? "",
-    cliente_telefone: contato?.telefone ?? "",
-    negocio_titulo: negocio.titulo,
-    negocio_valor: negocio.valor != null ? formatarMoeda(negocio.valor) : "",
-    kit_nome: calculo?.kit_nome ?? "",
-    kit_potencia_kwp: calculo?.kit_potencia_kwp != null ? `${calculo.kit_potencia_kwp.toLocaleString("pt-BR")} kWp` : "",
-    data_hoje: new Date().toLocaleDateString("pt-BR"),
-  };
   const conteudoPreenchido = preencherModeloContrato(modelo.conteudo, dados);
+  if (!contratoProntoParaCliente(conteudoPreenchido)) {
+    return { ok: false, mensagem: `O contrato ficaria com campos sem resolver: ${marcadoresPendentes(conteudoPreenchido).join(", ")}.` };
+  }
 
   const { error } = await supabase.from("contratos").upsert(
     {
@@ -149,6 +169,13 @@ export async function atualizarStatusContrato(_: ResultadoAcao, formData: FormDa
   if (!dados.success) return { ok: false, mensagem: "Dados inválidos." };
 
   const supabase = await criarClienteServidor();
+  // Enviar para assinatura ou marcar assinado só com o texto completo (contrato antigo pode ter sobra).
+  if (dados.data.status !== "rascunho") {
+    const { data: contrato } = await supabase.from("contratos").select("conteudo").eq("negocio_id", dados.data.negocioId).maybeSingle();
+    if (contrato && !contratoProntoParaCliente(contrato.conteudo)) {
+      return { ok: false, mensagem: "O contrato tem campos sem resolver. Corrija o modelo e gere o contrato de novo." };
+    }
+  }
   const { error } = await supabase
     .from("contratos")
     .update({ status: dados.data.status, atualizado_por: atual.membroId })
