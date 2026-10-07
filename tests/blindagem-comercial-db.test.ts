@@ -2,9 +2,10 @@
  * Blindagem comercial no banco (PR 3b-1, 20261007100100_blindagem_comercial.sql). O papel
  * `operacao` nasce sem acesso ao domínio comercial, nem direto pelo Supabase: vê só a
  * própria empresa, a própria linha de membro e o próprio perfil. Cobre também: negócio,
- * tarefa e handoff só com responsável comercial; reatribuição de tarefa só por
- * admin/gestor; ranking com lista positiva. Os 4 papéis atuais seguem cobertos pelas
- * suítes existentes (rls, crm, gamificação, obras...).
+ * tarefa e handoff só com responsável comercial da mesma empresa; handoff com negócio,
+ * contato e membros da mesma empresa; reatribuição de tarefa só por admin/gestor; ranking
+ * com lista positiva; funções internas fechadas a clientes. Os 4 papéis atuais seguem
+ * cobertos pelas suítes existentes (rls, crm, gamificação, obras...).
  */
 import { Client } from "pg";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -17,17 +18,28 @@ let vendedor2: Usuario;
 let sdr: Usuario;
 let operacao: Usuario;
 let operacaoGestorEquipe: Usuario;
+let vendedorB: Usuario;
+let duplo: Usuario;
 let empresa: string;
+let empresaB: string;
 const membro: Record<string, string> = {};
+let membroVendedorB: string;
+let duploEmA: string;
 let negocio: string;
 let contato: string;
+let negocioB: string;
+let contatoB: string;
+let funilA: string;
+let etapaA: string;
 let tarefaDoVendedor: string;
 
 const VENCE = new Date(Date.now() + 86_400_000).toISOString();
 
 beforeAll(async () => {
-  [admin, gestor, vendedor, vendedor2, sdr, operacao, operacaoGestorEquipe] = await Promise.all(
-    ["bc-admin", "bc-gestor", "bc-vendedor", "bc-vendedor2", "bc-sdr", "bc-operacao", "bc-operacao-gestor"].map(criarUsuario),
+  [admin, gestor, vendedor, vendedor2, sdr, operacao, operacaoGestorEquipe, vendedorB, duplo] = await Promise.all(
+    ["bc-admin", "bc-gestor", "bc-vendedor", "bc-vendedor2", "bc-sdr", "bc-operacao", "bc-operacao-gestor", "bc-vendedor-b", "bc-duplo"].map(
+      criarUsuario,
+    ),
   );
   const { data: emp } = await servico.from("empresas").insert({ nome: `Blindagem ${sufixo}` }).select("id").single();
   empresa = emp!.id;
@@ -47,6 +59,36 @@ beforeAll(async () => {
   if (error) throw error;
   for (const v of vinculos!) membro[v.user_id] = v.id;
 
+  // Empresa B: um vendedor só dela e um usuário (`duplo`) vendedor nas duas.
+  const { data: empB } = await servico.from("empresas").insert({ nome: `Blindagem B ${sufixo}` }).select("id").single();
+  empresaB = empB!.id;
+  const { data: vB } = await servico
+    .from("empresa_membros")
+    .insert([
+      { empresa_id: empresaB, user_id: vendedorB.id, papel: "vendedor", perfil_gamificacao: "closer" },
+      { empresa_id: empresaB, user_id: duplo.id, papel: "vendedor", perfil_gamificacao: "closer" },
+    ])
+    .select("id, user_id");
+  membroVendedorB = vB!.find((v) => v.user_id === vendedorB.id)!.id;
+  const duploEmB = vB!.find((v) => v.user_id === duplo.id)!.id;
+  const { data: dA } = await servico
+    .from("empresa_membros")
+    .insert({ empresa_id: empresa, user_id: duplo.id, papel: "vendedor", perfil_gamificacao: "closer" })
+    .select("id")
+    .single();
+  duploEmA = dA!.id;
+  const { data: fB } = await servico.from("funis").select("id").eq("empresa_id", empresaB).single();
+  const { data: etB } = await servico.from("etapas").select("id").eq("funil_id", fB!.id).order("ordem").limit(1).single();
+  const { data: cB } = await servico.from("contatos").insert({ empresa_id: empresaB, nome: "Cliente B" }).select("id").single();
+  contatoB = cB!.id;
+  const { data: nB, error: erroNegocioB } = await servico
+    .from("negocios")
+    .insert({ empresa_id: empresaB, titulo: "Negócio B", contato_id: contatoB, funil_id: fB!.id, etapa_id: etB!.id, responsavel_id: duploEmB })
+    .select("id")
+    .single();
+  if (erroNegocioB) throw erroNegocioB;
+  negocioB = nB!.id;
+
   // Equipe: gestor e um `operacao` marcados como gestores do vendedor.
   const { data: equipe } = await servico.from("equipes").insert({ empresa_id: empresa, nome: "Equipe blindagem" }).select("id").single();
   await servico.from("equipe_membros").insert([
@@ -57,6 +99,8 @@ beforeAll(async () => {
 
   const { data: f } = await servico.from("funis").select("id").eq("empresa_id", empresa).single();
   const { data: et } = await servico.from("etapas").select("id").eq("funil_id", f!.id).order("ordem").limit(1).single();
+  funilA = f!.id;
+  etapaA = et!.id;
   const { data: c } = await servico.from("contatos").insert({ empresa_id: empresa, nome: "Cliente blindagem" }).select("id").single();
   contato = c!.id;
   const { data: n, error: erroNegocio } = await servico
@@ -94,7 +138,7 @@ describe("operacao: o que ele vê", () => {
   });
 
   it("não vê membros, perfis nem equipes de terceiros (comercial continua vendo)", async () => {
-    expect(await contar(vendedor, "empresa_membros")).toBe(7);
+    expect(await contar(vendedor, "empresa_membros")).toBe(8);
     const { data: perfisVendedor } = await vendedor.cliente.from("perfis").select("id").in("id", [admin.id, operacao.id]);
     expect(perfisVendedor).toHaveLength(2);
 
@@ -207,6 +251,104 @@ describe("responsável comercial", () => {
   });
 });
 
+describe("handoff: integridade multiempresa", () => {
+  /** Negócio novo na empresa A, do vendedor, com contato próprio. */
+  async function negocioDoVendedor(titulo: string) {
+    const { data: c } = await servico.from("contatos").insert({ empresa_id: empresa, nome: `Cliente ${titulo}` }).select("id").single();
+    const { data, error } = await servico
+      .from("negocios")
+      .insert({ empresa_id: empresa, titulo, contato_id: c!.id, funil_id: funilA, etapa_id: etapaA, responsavel_id: membro[vendedor.id] })
+      .select("id")
+      .single();
+    if (error) throw error;
+    return { negocioId: data!.id, contatoId: c!.id };
+  }
+
+  type DadosHandoff = { empresa_id: string; negocio_id: string; contato_id: string; de_membro_id: string; para_membro_id: string };
+  function handoff(cliente: Usuario["cliente"], dados: DadosHandoff) {
+    return cliente.from("handoffs").insert({ ...dados, status_qualificacao: "qualificado" }).select("id");
+  }
+
+  it("handoff normal continua funcionando", async () => {
+    const { negocioId, contatoId } = await negocioDoVendedor("Handoff normal");
+    const { data, error } = await handoff(vendedor.cliente, {
+      empresa_id: empresa,
+      negocio_id: negocioId,
+      contato_id: contatoId,
+      de_membro_id: membro[vendedor.id],
+      para_membro_id: membro[vendedor2.id],
+    });
+    expect(error).toBeNull();
+    expect(data).toHaveLength(1);
+  });
+
+  it("destinatário comercial de outra empresa é recusado", async () => {
+    const { negocioId, contatoId } = await negocioDoVendedor("Destinatário B");
+    const { error } = await handoff(vendedor.cliente, {
+      empresa_id: empresa,
+      negocio_id: negocioId,
+      contato_id: contatoId,
+      de_membro_id: membro[vendedor.id],
+      para_membro_id: membroVendedorB,
+    });
+    expect(error?.message).toContain("destinatário");
+  });
+
+  it("remetente de outra empresa é recusado", async () => {
+    const { negocioId, contatoId } = await negocioDoVendedor("Remetente B");
+    const { error } = await handoff(vendedor.cliente, {
+      empresa_id: empresa,
+      negocio_id: negocioId,
+      contato_id: contatoId,
+      de_membro_id: membroVendedorB,
+      para_membro_id: membro[vendedor2.id],
+    });
+    expect(error?.message).toContain("remetente");
+  });
+
+  it("negócio da empresa B com empresa_id da A é recusado, mesmo para quem é membro das duas", async () => {
+    const { error } = await handoff(duplo.cliente, {
+      empresa_id: empresa,
+      negocio_id: negocioB,
+      contato_id: contatoB,
+      de_membro_id: duploEmA,
+      para_membro_id: membro[vendedor.id],
+    });
+    expect(error).not.toBeNull();
+    const { count } = await servico.from("handoffs").select("id", { count: "exact", head: true }).eq("negocio_id", negocioB);
+    expect(count).toBe(0);
+  });
+
+  it("contato de outro negócio ou de outra empresa é recusado", async () => {
+    const { negocioId } = await negocioDoVendedor("Contato errado");
+    const { contatoId: outroContato } = await negocioDoVendedor("Outro contato");
+    for (const contatoErrado of [outroContato, contatoB]) {
+      const { error } = await handoff(vendedor.cliente, {
+        empresa_id: empresa,
+        negocio_id: negocioId,
+        contato_id: contatoErrado,
+        de_membro_id: membro[vendedor.id],
+        para_membro_id: membro[vendedor2.id],
+      });
+      expect(error).not.toBeNull();
+    }
+    const { count } = await servico.from("handoffs").select("id", { count: "exact", head: true }).eq("negocio_id", negocioId);
+    expect(count).toBe(0);
+  });
+
+  it("destinatário operacao continua recusado", async () => {
+    const { negocioId, contatoId } = await negocioDoVendedor("Destinatário operação");
+    const { error } = await handoff(vendedor.cliente, {
+      empresa_id: empresa,
+      negocio_id: negocioId,
+      contato_id: contatoId,
+      de_membro_id: membro[vendedor.id],
+      para_membro_id: membro[operacao.id],
+    });
+    expect(error?.message).toContain("destinatário");
+  });
+});
+
 describe("reatribuição de tarefa", () => {
   async function tarefaDeTerceiroNoNegocio() {
     // Admin cria, no negócio do vendedor, uma tarefa para o SDR (terceiro).
@@ -280,5 +422,47 @@ describe("ranking da gamificação", () => {
 
     const { data } = await operacao.cliente.rpc("ranking_gamificacao", { p_empresa_id: empresa, p_perfil: "closer" });
     expect(data ?? []).toEqual([]);
+  });
+});
+
+describe("funções novas: privilégios", () => {
+  /** Quem tem EXECUTE na função (PUBLIC = grantee 0). proacl nulo significaria o padrão (PUBLIC executa). */
+  async function quemExecuta(assinatura: string) {
+    const banco = new Client({ connectionString: urlBancoLocal() });
+    await banco.connect();
+    try {
+      const { rows: acl } = await banco.query("select proacl is null as padrao from pg_proc where oid = $1::regprocedure", [assinatura]);
+      expect(acl[0].padrao, `${assinatura} com privilégio padrão (PUBLIC executa)`).toBe(false);
+      const { rows } = await banco.query(
+        "select case when a.grantee = 0 then 'PUBLIC' else a.grantee::regrole::text end as papel " +
+          "from pg_proc p cross join lateral aclexplode(p.proacl) a " +
+          "where p.oid = $1::regprocedure and a.privilege_type = 'EXECUTE'",
+        [assinatura],
+      );
+      return rows.map((r) => r.papel as string);
+    } finally {
+      await banco.end();
+    }
+  }
+
+  it("e_membro_comercial é interna: nenhum cliente executa", async () => {
+    const papeis = await quemExecuta("public.e_membro_comercial(uuid, uuid)");
+    for (const papel of ["PUBLIC", "anon", "authenticated", "service_role"]) expect(papeis).not.toContain(papel);
+
+    const { error } = await vendedor.cliente.rpc("e_membro_comercial" as never, { p_empresa_id: empresaB, p_membro_id: membroVendedorB } as never);
+    expect(error).not.toBeNull();
+  });
+
+  it("tem_acesso_comercial: só authenticated executa (usada nas policies)", async () => {
+    const papeis = await quemExecuta("public.tem_acesso_comercial(uuid)");
+    expect(papeis).toContain("authenticated");
+    for (const papel of ["PUBLIC", "anon", "service_role"]) expect(papeis).not.toContain(papel);
+  });
+
+  it("funções de gatilho novas não são executáveis por clientes", async () => {
+    for (const fn of ["exigir_responsavel_comercial()", "restringir_reatribuicao_tarefa()", "validar_handoff_empresa()"]) {
+      const papeis = await quemExecuta(`public.${fn}`);
+      for (const papel of ["PUBLIC", "anon", "authenticated", "service_role"]) expect(papeis, fn).not.toContain(papel);
+    }
   });
 });

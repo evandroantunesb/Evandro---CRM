@@ -7,7 +7,8 @@
 -- próprio perfil. Os 4 papéis atuais (admin, gestor, vendedor, sdr) mantêm o acesso.
 --
 -- Também nesta PR:
--- - negócio, tarefa e handoff só apontam para membro com papel comercial;
+-- - negócio, tarefa e handoff só apontam para membro com papel comercial da mesma empresa;
+--   handoff exige negócio, contato e membros da mesma empresa;
 -- - tarefa: só admin/gestor reatribuem a terceiros (vendedor/SDR podem assumir para si e
 --   continuar concluindo tarefa de terceiro no contexto do próprio negócio);
 -- - ranking: `papel not in ('admin','gestor')` vira lista positiva `in ('vendedor','sdr')`.
@@ -25,19 +26,26 @@ as $$
   select public.tem_papel(p_empresa_id, '{admin,gestor,vendedor,sdr}');
 $$;
 
--- O membro (alvo de responsável/destinatário) tem papel comercial e está ativo.
-create or replace function public.e_membro_comercial(p_membro_id uuid)
+-- O membro (alvo de responsável/destinatário) é da empresa informada, está ativo e tem
+-- papel comercial. INTERNA: só os gatilhos abaixo a chamam (rodam como dono). Fechada a
+-- todos os clientes para não virar consulta de membros de outras empresas.
+create or replace function public.e_membro_comercial(p_empresa_id uuid, p_membro_id uuid)
 returns boolean
 language sql stable security definer set search_path = ''
 as $$
   select exists (
     select 1 from public.empresa_membros
-    where id = p_membro_id and ativo and papel = any ('{admin,gestor,vendedor,sdr}'::public.papel_membro[])
+    where id = p_membro_id
+      and empresa_id = p_empresa_id
+      and ativo
+      and papel = any ('{admin,gestor,vendedor,sdr}'::public.papel_membro[])
   );
 $$;
 
-revoke all on function public.tem_acesso_comercial(uuid) from anon;
-revoke all on function public.e_membro_comercial(uuid) from anon;
+-- tem_acesso_comercial é usada direto nas policies: só `authenticated` executa.
+revoke all on function public.tem_acesso_comercial(uuid) from public, anon, authenticated, service_role;
+grant execute on function public.tem_acesso_comercial(uuid) to authenticated;
+revoke all on function public.e_membro_comercial(uuid, uuid) from public, anon, authenticated, service_role;
 
 -- Base da RLS comercial. Igual à anterior, mas quem consulta precisa ter papel comercial:
 -- `operacao` não vê nada nem sendo marcado responsável ou gestor de equipe.
@@ -164,7 +172,7 @@ as $$
 begin
   if new.responsavel_id is not null
      and (tg_op = 'INSERT' or new.responsavel_id is distinct from old.responsavel_id)
-     and not public.e_membro_comercial(new.responsavel_id) then
+     and not public.e_membro_comercial(new.empresa_id, new.responsavel_id) then
     raise exception 'O responsável precisa ter papel comercial (admin, gestor, vendedor ou SDR).'
       using errcode = 'check_violation', hint = 'mensagem_usuario';
   end if;
@@ -205,8 +213,41 @@ create trigger tarefas_restringir_reatribuicao
   before update on public.tarefas
   for each row execute function public.restringir_reatribuicao_tarefa();
 
-revoke all on function public.exigir_responsavel_comercial() from public, anon, authenticated;
-revoke all on function public.restringir_reatribuicao_tarefa() from public, anon, authenticated;
+-- Handoff: tudo da mesma empresa. Negócio da empresa do handoff, contato desse negócio,
+-- destinatário e remetente (se houver) membros ativos e comerciais da mesma empresa.
+-- Mantém os 4 papéis comerciais como destinatários possíveis.
+create or replace function public.validar_handoff_empresa()
+returns trigger
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_contato uuid;
+begin
+  select contato_id into v_contato from public.negocios where id = new.negocio_id and empresa_id = new.empresa_id;
+  if not found then
+    raise exception 'Negócio de outra empresa.' using errcode = 'check_violation';
+  end if;
+  if new.contato_id is distinct from v_contato then
+    raise exception 'O contato do handoff precisa ser o contato do negócio.' using errcode = 'check_violation';
+  end if;
+  if not public.e_membro_comercial(new.empresa_id, new.para_membro_id) then
+    raise exception 'O destinatário precisa ser um membro ativo da empresa com papel comercial.'
+      using errcode = 'check_violation', hint = 'mensagem_usuario';
+  end if;
+  if new.de_membro_id is not null and not public.e_membro_comercial(new.empresa_id, new.de_membro_id) then
+    raise exception 'O remetente precisa ser um membro ativo da empresa com papel comercial.' using errcode = 'check_violation';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger handoffs_validar_empresa
+  before insert on public.handoffs
+  for each row execute function public.validar_handoff_empresa();
+
+revoke all on function public.exigir_responsavel_comercial() from public, anon, authenticated, service_role;
+revoke all on function public.restringir_reatribuicao_tarefa() from public, anon, authenticated, service_role;
+revoke all on function public.validar_handoff_empresa() from public, anon, authenticated, service_role;
 
 -- ---------------------------------------------------------------------------
 -- Membros da empresa: `operacao` vê só a própria linha
@@ -223,8 +264,9 @@ create policy "ver membros da empresa" on public.empresa_membros for select to a
 
 -- ---------------------------------------------------------------------------
 -- Policies comerciais: membro_ativo() → tem_acesso_comercial()
--- (texto de cada policy igual ao estado atual, só a função trocada; o insert de handoffs
--- também exige destinatário comercial)
+-- (texto de cada policy igual ao estado atual, só a função trocada; em handoffs e
+-- handoffs_feedback, o EXISTS também exige a mesma empresa, com a coluna da tabela
+-- qualificada: sem isso, `empresa_id` dentro do subselect resolve para a tabela interna)
 -- ---------------------------------------------------------------------------
 
 -- public.anexos
@@ -275,13 +317,13 @@ create policy "ver funis" on public.funis for select to authenticated using (pub
 
 -- public.handoffs
 drop policy "handoffs: criar quem vê o negócio" on public.handoffs;
-create policy "handoffs: criar quem vê o negócio" on public.handoffs for insert to authenticated with check ( public.tem_acesso_comercial(empresa_id) and exists ( select 1 from public.negocios n where n.id = negocio_id and public.pode_ver_responsavel(n.empresa_id, n.responsavel_id) ) and public.e_membro_comercial(para_membro_id) );
+create policy "handoffs: criar quem vê o negócio" on public.handoffs for insert to authenticated with check ( public.tem_acesso_comercial(empresa_id) and exists ( select 1 from public.negocios n where n.id = negocio_id and n.empresa_id = handoffs.empresa_id and public.pode_ver_responsavel(n.empresa_id, n.responsavel_id) ) );
 drop policy "handoffs: ver quem vê o negócio" on public.handoffs;
-create policy "handoffs: ver quem vê o negócio" on public.handoffs for select to authenticated using ( public.tem_acesso_comercial(empresa_id) and exists ( select 1 from public.negocios n where n.id = negocio_id and public.pode_ver_responsavel(n.empresa_id, n.responsavel_id) ) );
+create policy "handoffs: ver quem vê o negócio" on public.handoffs for select to authenticated using ( public.tem_acesso_comercial(empresa_id) and exists ( select 1 from public.negocios n where n.id = negocio_id and n.empresa_id = handoffs.empresa_id and public.pode_ver_responsavel(n.empresa_id, n.responsavel_id) ) );
 
 -- public.handoffs_feedback
 drop policy "handoffs_feedback: criar quem recebeu o handoff" on public.handoffs_feedback;
-create policy "handoffs_feedback: criar quem recebeu o handoff" on public.handoffs_feedback for insert to authenticated with check ( public.tem_acesso_comercial(empresa_id) and autor_id = public.meu_membro_id(empresa_id) and exists ( select 1 from public.handoffs h where h.id = handoff_id and h.empresa_id = empresa_id and h.para_membro_id = autor_id ) );
+create policy "handoffs_feedback: criar quem recebeu o handoff" on public.handoffs_feedback for insert to authenticated with check ( public.tem_acesso_comercial(empresa_id) and autor_id = public.meu_membro_id(empresa_id) and exists ( select 1 from public.handoffs h where h.id = handoff_id and h.empresa_id = handoffs_feedback.empresa_id and h.para_membro_id = autor_id ) );
 drop policy "handoffs_feedback: editar o próprio" on public.handoffs_feedback;
 create policy "handoffs_feedback: editar o próprio" on public.handoffs_feedback for update to authenticated using (public.tem_acesso_comercial(empresa_id) and autor_id = public.meu_membro_id(empresa_id)) with check (public.tem_acesso_comercial(empresa_id) and autor_id = public.meu_membro_id(empresa_id));
 drop policy "handoffs_feedback: ver admin/gestor ou o próprio autor" on public.handoffs_feedback;
