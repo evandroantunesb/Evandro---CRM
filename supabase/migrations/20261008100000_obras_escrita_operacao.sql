@@ -20,6 +20,8 @@
 --    fica "adormecida" — é encerrada automaticamente quando o setor é retirado do membro,
 --    quando o membro é desativado e quando ele deixa o papel `operacao`. Voltar exige nova
 --    atribuição. Participações comerciais (vendedor/SDR da #145) nunca são tocadas.
+--    Desativação ou saída do papel `operacao` revogam TUDO: participações operacionais e
+--    setores (membro_setores_obra). Voltar exige o admin configurar de novo.
 -- 3. Fluxos: `alterar_status_fluxo_obra`, `marcar_parado_fluxo_obra`,
 --    `definir_aguardando_fluxo_obra`. Qualquer status válido do próprio setor (retrocesso
 --    permitido e auditado). Datas só no servidor.
@@ -56,6 +58,9 @@ create table public.membro_setores_obra_historico (
   setor public.setor_obra not null,
   capacidade_antes public.capacidade_obra,
   capacidade_depois public.capacidade_obra,
+  -- definicao: admin em definir_setores_membro; desativacao_membro / troca_papel: revogação
+  -- automática quando o membro é desativado ou deixa o papel `operacao`.
+  origem text not null default 'definicao' check (origem in ('definicao', 'desativacao_membro', 'troca_papel')),
   autor_user_id uuid,
   autor_membro_id uuid,
   autor_contexto jsonb,
@@ -299,30 +304,48 @@ revoke all on function public.definir_setores_membro(uuid, jsonb) from public, a
 grant execute on function public.definir_setores_membro(uuid, jsonb) to authenticated;
 
 -- ---------------------------------------------------------------------------
--- Desativação / troca de papel encerram participações
+-- Desativação / troca de papel: revogação completa
 -- ---------------------------------------------------------------------------
 
--- Participação nunca fica adormecida: membro desativado, ou que deixa o papel `operacao`,
--- perde as participações operacionais ativas na hora (com histórico). Se voltar, precisa de
--- nova atribuição explícita. O autor é quem fez a mudança (auth.uid(); nulo se serviço).
+-- Nada fica adormecido: membro desativado, ou que deixa o papel `operacao`, perde na mesma
+-- transação (1) as participações operacionais ativas (participante_encerrado em cada obra)
+-- e (2) todos os setores em membro_setores_obra (uma linha de auditoria por setor). Se
+-- voltar, não recupera nada: o admin configura de novo (definir_setores_membro) e atribui
+-- de novo. Participações comerciais (#145) nunca são tocadas.
+-- Sem duplicidade: só age sobre o que ainda está ativo/existe — uma segunda mudança (ex.:
+-- troca de papel de quem já foi desativado) não encontra nada e não registra nada.
+-- Autor = quem fez a mudança (auth.uid(); no app é o admin pela própria sessão — a mesma
+-- ação também fica em logs_auditoria). Nulo só para script/serviço, nunca inferido.
 create or replace function public.obra_ao_alterar_membro()
 returns trigger
 language plpgsql security definer set search_path = ''
 as $$
+declare
+  v_origem text := case when old.ativo and not new.ativo then 'desativacao_membro' else 'troca_papel' end;
+  v_autor public.empresa_membros;
+  v_setor record;
 begin
-  if old.ativo and not new.ativo then
-    perform public.encerrar_participacoes_operacionais(new.id, null, 'membro_desativado',
-      'Colaborador desativado');
-  elsif old.papel = 'operacao' and new.papel <> 'operacao' then
-    perform public.encerrar_participacoes_operacionais(new.id, null, 'papel_alterado',
-      'Colaborador deixou o papel Operação');
-  end if;
+  perform public.encerrar_participacoes_operacionais(new.id, null, v_origem,
+    case v_origem when 'desativacao_membro' then 'Colaborador desativado' else 'Colaborador deixou o papel Operação' end);
+
+  select * into v_autor from public.empresa_membros m
+  where m.empresa_id = new.empresa_id and m.user_id = (select auth.uid());
+  for v_setor in
+    delete from public.membro_setores_obra
+    where empresa_id = new.empresa_id and membro_id = new.id
+    returning setor, capacidade
+  loop
+    insert into public.membro_setores_obra_historico
+      (empresa_id, membro_id, setor, capacidade_antes, capacidade_depois, origem, autor_user_id, autor_membro_id, autor_contexto)
+    values (new.empresa_id, new.id, v_setor.setor, v_setor.capacidade, null, v_origem, (select auth.uid()), v_autor.id,
+            case when v_autor.id is null then null else jsonb_build_object('papel', v_autor.papel) end);
+  end loop;
   return null;
 end;
 $$;
 
 -- Sem lista de colunas: `ativo` é recalculado num gatilho BEFORE a partir de `status`.
-create trigger empresa_membros_encerrar_participacoes_obra
+create trigger empresa_membros_revogar_obras
   after update on public.empresa_membros
   for each row when ((old.ativo and not new.ativo) or (old.papel = 'operacao' and new.papel <> 'operacao'))
   execute function public.obra_ao_alterar_membro();

@@ -1791,6 +1791,7 @@ export type Database = {
           empresa_id: string;
           id: number;
           membro_id: string;
+          origem: string;
           setor: Database["public"]["Enums"]["setor_obra"];
         };
         Insert: {
@@ -1803,6 +1804,7 @@ export type Database = {
           empresa_id: string;
           id?: never;
           membro_id: string;
+          origem?: string;
           setor: Database["public"]["Enums"]["setor_obra"];
         };
         Update: {
@@ -1815,6 +1817,7 @@ export type Database = {
           empresa_id?: string;
           id?: never;
           membro_id?: string;
+          origem?: string;
           setor?: Database["public"]["Enums"]["setor_obra"];
         };
         Relationships: [

@@ -412,7 +412,7 @@ async function historicoEsperado(obraId: string) {
       dados: expect.objectContaining({
         participante_id: participacao![0].id,
         membro_id: membro[opInativoParticipante.id],
-        origem: "membro_desativado",
+        origem: "desativacao_membro",
         motivo: "Colaborador desativado",
       }),
     },
@@ -931,12 +931,45 @@ describe("membro_setores_obra", () => {
     for (const [rotulo, cliente, alvo] of casos) {
       expect((await definir(cliente, alvo, valido)).error, rotulo).not.toBeNull();
     }
+    // Quem não é admin da empresa do alvo é recusado pela autorização: o alvo (`opAlvo`) está
+    // ativo e é operacao, então a recusa não vem do estado do alvo.
+    for (const [rotulo, cliente, alvo] of casos.slice(0, 5)) {
+      expect((await definir(cliente, alvo, valido)).error?.message, rotulo).toContain(
+        "não tem acesso a este colaborador",
+      );
+    }
     expect(await setoresDoAlvo()).toEqual([{ setor: "compras", capacidade: "executar" }]);
+    // A conferência dos setores do membro desligado (`opInativoCoordena`) está no teste
+    // seguinte: a partir da 3b-3, desligar o membro revoga os setores dele.
+  });
+
+  it("desligar o membro revoga os setores (3b-3) e a recusa sobre ele não recria nada", async () => {
+    const recusa = await definir(admin.cliente, membro[opInativoCoordena.id], [
+      { setor: "engenharia", capacidade: "coordenar" },
+    ]);
+    expect(recusa.error?.message).toContain("precisa estar ativo");
     const { data: coord } = await servico
       .from("membro_setores_obra")
       .select("setor")
       .eq("membro_id", membro[opInativoCoordena.id]);
-    expect(coord).toEqual([{ setor: "operacional" }]);
+    expect(coord).toEqual([]);
+    // Auditoria da revogação automática. O desligamento do setup é feito pelo serviço (sem
+    // usuário): autor nulo, nunca inferido.
+    const { data: revogacao } = await servico
+      .from("membro_setores_obra_historico")
+      .select("setor, capacidade_antes, capacidade_depois, origem, autor_user_id, autor_membro_id")
+      .eq("membro_id", membro[opInativoCoordena.id])
+      .neq("origem", "definicao");
+    expect(revogacao).toEqual([
+      {
+        setor: "operacional",
+        capacidade_antes: "coordenar",
+        capacidade_depois: null,
+        origem: "desativacao_membro",
+        autor_user_id: null,
+        autor_membro_id: null,
+      },
+    ]);
   });
 
   it("rejeita setor comercial, valores inválidos, setor repetido e formato errado, sem alterar nada", async () => {
