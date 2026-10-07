@@ -36,6 +36,9 @@ export const FILTRAR_NEGOCIOS_POR_RESPONSAVEL = ["admin", "gestor"] as const sat
 /** Gerar e alterar proposta e contrato. SDR fora (spec §40/§41). */
 export const PROPOSTA_E_CONTRATO = ["admin", "gestor", "vendedor"] as const satisfies ListaPapeis;
 
+/** Editar o modelo de contrato da empresa (Configurações e atalho na aba Contratos). */
+export const EDITAR_MODELO_CONTRATO = ["admin"] as const satisfies ListaPapeis;
+
 /** Confirmar ou estornar pagamento (a RPC no banco exige o mesmo). */
 export const CONFIRMAR_PAGAMENTO = ["admin", "gestor"] as const satisfies ListaPapeis;
 
