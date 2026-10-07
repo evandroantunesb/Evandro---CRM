@@ -7,11 +7,10 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
-  CAMPOS_ESSENCIAIS_CONTRATO,
   PLACEHOLDERS_CONTRATO,
+  camposSemDado,
   camposUsadosNoModelo,
   contratoProntoParaCliente,
-  essenciaisFaltando,
   formatarItensKit,
   marcadoresPendentes,
   montarDadosContrato,
@@ -155,8 +154,13 @@ describe("contrato para o cliente", () => {
   it("texto com marcador sobrando não está pronto", () => {
     expect(contratoProntoParaCliente("Tudo certo, Maria.")).toBe(true);
     expect(contratoProntoParaCliente("Cliente {{cliente_nom}}")).toBe(false);
-    expect(contratoProntoParaCliente("Cliente {{cliente")).toBe(false);
     expect(marcadoresPendentes("{{a}} e {{a}} e {{ b }}")).toEqual(["{{a}}", "{{ b }}"]);
+  });
+
+  it("chaves malformadas ou isoladas nunca contam como contrato pronto", () => {
+    for (const texto of ["Cliente {{cliente", "Cliente cliente_nome}}", "{{ }}", "{{cliente-nome}}", "Fim }}", "{{{cliente_nome}}}", "a {{ b"]) {
+      expect(contratoProntoParaCliente(texto), texto).toBe(false);
+    }
   });
 
   it("modelo antigo com campo desconhecido: o preenchimento deixa o marcador e o contrato é bloqueado", () => {
@@ -164,20 +168,24 @@ describe("contrato para o cliente", () => {
     expect(contratoProntoParaCliente(texto)).toBe(false);
   });
 
-  it("essenciais ausentes bloqueiam só se o modelo os usa", () => {
-    const semDoc = montarDadosContrato(fontes({ contato: { ...fontes().contato!, documento: null, endereco: "" } }));
-    expect(essenciaisFaltando("{{cliente_nome}} {{cliente_documento}} {{cliente_endereco}}", semDoc)).toEqual([
+  it("qualquer campo usado e sem dado bloqueia (inclusive não essencial), na ordem do modelo", () => {
+    const d = montarDadosContrato(
+      fontes({ contato: { ...fontes().contato!, documento: null, telefone2: "" }, vendedorNome: null, itensKit: [] }),
+    );
+    expect(camposSemDado("{{cliente_nome}} {{cliente_documento}} {{vendedor_nome}} {{kit_itens}} {{cliente_telefone2}}", d)).toEqual([
       "CPF/CNPJ do cliente",
-      "Endereço do cliente",
+      "Nome do vendedor responsável",
+      "Itens do kit (um por linha)",
+      "Segundo telefone do cliente",
     ]);
-    expect(essenciaisFaltando("{{cliente_nome}}", semDoc)).toEqual([]);
+    expect(camposSemDado("{{cliente_nome}}", d)).toEqual([]);
     const semValor = montarDadosContrato(fontes({ negocio: { ...fontes().negocio, valor: null } }));
-    expect(essenciaisFaltando("Valor: {{negocio_valor}}", semValor)).toEqual(["Valor do negócio (R$)"]);
+    expect(camposSemDado("Valor: {{negocio_valor}}", semValor)).toEqual(["Valor do negócio (R$)"]);
   });
 
-  it("essenciais são campos conhecidos", () => {
-    const chaves = new Set<string>(PLACEHOLDERS_CONTRATO.map((p) => p.chave));
-    for (const c of CAMPOS_ESSENCIAIS_CONTRATO) expect(chaves.has(c)).toBe(true);
+  it("compatibilidade: preencherModeloContrato continua trocando campo vazio por —", () => {
+    const d = montarDadosContrato(fontes({ vendedorNome: null }));
+    expect(preencherModeloContrato("Vendedor: {{vendedor_nome}}", d)).toBe("Vendedor: —");
   });
 });
 
@@ -199,8 +207,11 @@ describe("permissões", () => {
 
   it("geração e mudança de status checam o contrato antes de chegar ao cliente; página pública também", () => {
     const acoes = fonte("src", "lib", "acoes", "contratos.ts");
-    expect(acoes).toMatch(/gerarContrato[\s\S]*?validarModeloContrato[\s\S]*?essenciaisFaltando[\s\S]*?contratoProntoParaCliente/);
-    expect(acoes).toMatch(/atualizarStatusContrato[\s\S]*?contratoProntoParaCliente/);
+    expect(acoes).toMatch(/gerarContrato[\s\S]*?gerarContratoComCliente/);
+    expect(acoes).toMatch(/atualizarStatusContrato[\s\S]*?atualizarStatusContratoComCliente/);
+    const nucleo = fonte("src", "lib", "contratos-geracao.ts");
+    expect(nucleo).toMatch(/gerarContratoComCliente[\s\S]*?validarModeloContrato[\s\S]*?camposSemDado[\s\S]*?contratoProntoParaCliente/);
+    expect(nucleo).toMatch(/atualizarStatusContratoComCliente[\s\S]*?contratoProntoParaCliente/);
     expect(fonte("src", "app", "contrato", "[token]", "page.tsx")).toContain("contratoProntoParaCliente(contrato.conteudo)");
   });
 });

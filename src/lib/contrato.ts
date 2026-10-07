@@ -34,19 +34,6 @@ export type DadosContrato = Record<ChaveContrato, string>;
 const CHAVES = new Set<string>(PLACEHOLDERS_CONTRATO.map((p) => p.chave));
 const ROTULO = new Map<string, string>(PLACEHOLDERS_CONTRATO.map((p) => [p.chave, p.rotulo]));
 
-/**
- * Campos que, se usados no modelo, precisam ter valor para o contrato ser gerado: sem eles o
- * documento não identifica as partes ou o preço. Campo essencial que o modelo não usa não bloqueia.
- */
-export const CAMPOS_ESSENCIAIS_CONTRATO = [
-  "empresa_nome",
-  "empresa_cnpj",
-  "cliente_nome",
-  "cliente_documento",
-  "cliente_endereco",
-  "negocio_valor",
-] as const satisfies readonly ChaveContrato[];
-
 /** Qualquer coisa entre chaves duplas (inclusive malformada, como `{{ }}` ou `{{campo-x}}`). */
 const MARCADOR = /\{\{([^{}]*)\}\}/g;
 
@@ -89,15 +76,22 @@ export function marcadoresPendentes(texto: string): string[] {
   return [...new Set([...texto.matchAll(MARCADOR)].map((m) => m[0]))];
 }
 
-/** O contrato pode ser mostrado/enviado ao cliente: nenhum marcador sobrando. */
+/**
+ * O contrato pode ser mostrado/enviado ao cliente: nenhum marcador sobrando e nenhuma chave
+ * isolada (`{{` ou `}}` sem par), mesmo malformada.
+ */
 export function contratoProntoParaCliente(conteudo: string): boolean {
-  return marcadoresPendentes(conteudo).length === 0 && !conteudo.includes("{{");
+  return marcadoresPendentes(conteudo).length === 0 && !conteudo.includes("{{") && !conteudo.includes("}}");
 }
 
-/** Rótulos dos campos essenciais usados no modelo e sem valor nos dados. */
-export function essenciaisFaltando(modelo: string, dados: DadosContrato): string[] {
-  const usados = new Set<string>(camposUsadosNoModelo(modelo));
-  return CAMPOS_ESSENCIAIS_CONTRATO.filter((c) => usados.has(c) && !dados[c]?.trim()).map((c) => ROTULO.get(c) ?? c);
+/**
+ * Rótulos de TODOS os campos usados no modelo que estão sem dado (o contrato não sai com "—"
+ * no lugar de informação). Campo que o modelo não usa não bloqueia.
+ */
+export function camposSemDado(modelo: string, dados: DadosContrato): string[] {
+  return camposUsadosNoModelo(modelo)
+    .filter((c) => !dados[c]?.trim())
+    .map((c) => ROTULO.get(c) ?? c);
 }
 
 /** Dados de origem para o contrato, já lidos do banco (sob RLS) pela ação. */
