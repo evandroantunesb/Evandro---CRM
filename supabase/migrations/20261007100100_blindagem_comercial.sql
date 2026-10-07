@@ -12,7 +12,9 @@
 -- - tarefa: só admin/gestor reatribuem a terceiros (vendedor/SDR podem assumir para si e
 --   continuar concluindo tarefa de terceiro no contexto do próprio negócio);
 -- - ranking: `papel not in ('admin','gestor')` vira lista positiva `in ('vendedor','sdr')`.
--- Sem mudança de regra, pontuação ou tela de gamificação. Obras ficam para a 3b-2.
+-- Sem mudança de regra, pontuação ou tela de gamificação. Obras ficam para a 3b-2: até lá `operacao` também não vê
+-- obras (a RLS de `obras` da #145 usa `pode_ver_responsavel`, que passa a exigir papel
+-- comercial). O mecanismo de Obras (#145) não é alterado aqui.
 
 -- ---------------------------------------------------------------------------
 -- Funções auxiliares
@@ -114,10 +116,12 @@ as $$
   );
 $$;
 
--- Perfis (nome, e-mail, telefone) dos colegas: só para quem tem papel comercial na empresa
--- em comum. `operacao` vê só o próprio perfil (primeira condição da policy de perfis);
--- vale também para a leitura de avatares (pode_ver_avatar usa esta função).
-create or replace function public.compartilha_empresa(p_user_id uuid)
+-- Perfis (nome, e-mail, telefone) e avatares dos colegas: só para quem tem papel comercial
+-- na empresa em comum. Função PRÓPRIA, para não mudar o sentido de `compartilha_empresa`
+-- (que continua genérica: "compartilha empresa", sem relação com o comercial e sem
+-- alteração nesta PR). `operacao` vê só o próprio perfil e o próprio avatar; identidade
+-- básica de colegas (nome + avatar) para Obras fica para a 3b-2.
+create or replace function public.compartilha_empresa_comercial(p_user_id uuid)
 returns boolean
 language sql stable security definer set search_path = ''
 as $$
@@ -129,6 +133,36 @@ as $$
       and meu.ativo
       and meu.papel = any ('{admin,gestor,vendedor,sdr}'::public.papel_membro[])
       and outro.user_id = p_user_id
+  );
+$$;
+
+-- Usada nas policies de perfis e no pode_ver_avatar: só `authenticated` executa.
+revoke all on function public.compartilha_empresa_comercial(uuid) from public, anon, authenticated, service_role;
+grant execute on function public.compartilha_empresa_comercial(uuid) to authenticated;
+
+drop policy "ver perfis da mesma empresa" on public.perfis;
+create policy "ver perfis da mesma empresa" on public.perfis
+  for select to authenticated
+  using (
+    id = (select auth.uid())
+    or public.compartilha_empresa_comercial(id)
+    or public.e_plataforma_admin()
+  );
+
+-- Avatares (20261006200000_avatares.sql): mesma regra dos perfis nesta PR. Corpo idêntico ao
+-- original, só a função de "compartilha empresa" trocada pela comercial.
+create or replace function public.pode_ver_avatar(p_pasta text)
+returns boolean
+language sql stable security definer set search_path = ''
+as $$
+  select coalesce(
+    case
+      when p_pasta = (select auth.uid())::text then true
+      when p_pasta ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+        then public.compartilha_empresa_comercial(p_pasta::uuid)
+      else false
+    end,
+    false
   );
 $$;
 

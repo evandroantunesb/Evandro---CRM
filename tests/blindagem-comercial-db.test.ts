@@ -4,9 +4,11 @@
  * própria empresa, a própria linha de membro e o próprio perfil. Cobre também: negócio,
  * tarefa e handoff só com responsável comercial da mesma empresa; handoff com negócio,
  * contato e membros da mesma empresa; reatribuição de tarefa só por admin/gestor; ranking
- * com lista positiva; funções internas fechadas a clientes. Os 4 papéis atuais seguem
+ * com lista positiva; funções internas fechadas a clientes; perfis e avatares de colegas só
+ * para papel comercial (`compartilha_empresa_comercial`), com `compartilha_empresa` genérica. Os 4 papéis atuais seguem
  * cobertos pelas suítes existentes (rls, crm, gamificação, obras...).
  */
+import { randomUUID } from "node:crypto";
 import { Client } from "pg";
 import { beforeAll, describe, expect, it } from "vitest";
 import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
@@ -489,6 +491,107 @@ describe("ranking da gamificação", () => {
   });
 });
 
+describe("perfis e avatares: compartilha_empresa_comercial", () => {
+  let caminhoColega: string;
+  let caminhoOperacao: string;
+
+  beforeAll(async () => {
+    // Cada um envia o próprio avatar (policy de envio: só na própria pasta).
+    caminhoColega = `${vendedor2.id}/${randomUUID()}.png`;
+    caminhoOperacao = `${operacao.id}/${randomUUID()}.png`;
+    const png = () => new Blob([new Uint8Array(64)], { type: "image/png" });
+    for (const [quem, caminho] of [
+      [vendedor2, caminhoColega],
+      [operacao, caminhoOperacao],
+    ] as const) {
+      const { error } = await quem.cliente.storage
+        .from("avatares")
+        .upload(caminho, png(), { contentType: "image/png" });
+      expect(error).toBeNull();
+    }
+  });
+
+  it("os 4 papéis comerciais continuam vendo perfil e avatar dos colegas", async () => {
+    for (const quem of [admin, gestor, vendedor, sdr]) {
+      const { data: perfis } = await quem.cliente
+        .from("perfis")
+        .select("id")
+        .in("id", [vendedor2.id, operacao.id]);
+      expect(perfis, "perfis").toHaveLength(2);
+      const { data } = await quem.cliente.storage
+        .from("avatares")
+        .createSignedUrls([caminhoColega, caminhoOperacao], 60);
+      for (const item of data ?? [])
+        expect(item.signedUrl ?? "", item.path ?? "").toContain("token=");
+      expect(data).toHaveLength(2);
+    }
+  });
+
+  it("operacao vê o próprio perfil e avatar, mas não os dos colegas", async () => {
+    const { data: perfis } = await operacao.cliente
+      .from("perfis")
+      .select("id")
+      .in("id", [vendedor2.id, admin.id, operacao.id]);
+    expect(perfis).toEqual([{ id: operacao.id }]);
+
+    const proprio = await operacao.cliente.storage
+      .from("avatares")
+      .createSignedUrls([caminhoOperacao], 60);
+    expect(proprio.data?.[0]?.signedUrl ?? "").toContain("token=");
+
+    const alheio = await operacao.cliente.storage
+      .from("avatares")
+      .createSignedUrls([caminhoColega], 60);
+    expect(alheio.data?.[0]?.signedUrl ?? "").toBe("");
+    expect(
+      (await operacao.cliente.storage.from("avatares").download(caminhoColega)).error,
+    ).not.toBeNull();
+  });
+
+  it("operacao não chega ao avatar alheio por listagem nem por RPC", async () => {
+    const pasta = await operacao.cliente.storage.from("avatares").list(vendedor2.id);
+    expect(pasta.error).toBeNull();
+    expect(pasta.data ?? []).toHaveLength(0);
+    const raiz = await operacao.cliente.storage.from("avatares").list();
+    expect((raiz.data ?? []).map((i) => i.name)).not.toContain(vendedor2.id);
+
+    const { data: podeVer } = await operacao.cliente.rpc("pode_ver_avatar", {
+      p_pasta: vendedor2.id,
+    });
+    expect(podeVer).toBe(false);
+    const { data: comercial } = await operacao.cliente.rpc("compartilha_empresa_comercial", {
+      p_user_id: vendedor2.id,
+    });
+    expect(comercial).toBe(false);
+    const { data: vendedorVe } = await vendedor.cliente.rpc("pode_ver_avatar", {
+      p_pasta: vendedor2.id,
+    });
+    expect(vendedorVe).toBe(true);
+  });
+
+  it("compartilha_empresa mantém a semântica genérica (sem exigir papel comercial)", async () => {
+    const { data: mesmaEmpresa } = await operacao.cliente.rpc("compartilha_empresa", {
+      p_user_id: vendedor2.id,
+    });
+    expect(mesmaEmpresa).toBe(true);
+    const { data: outraEmpresa } = await operacao.cliente.rpc("compartilha_empresa", {
+      p_user_id: vendedorB.id,
+    });
+    expect(outraEmpresa).toBe(false);
+
+    const banco = new Client({ connectionString: urlBancoLocal() });
+    await banco.connect();
+    try {
+      const { rows } = await banco.query(
+        "select pg_get_functiondef('public.compartilha_empresa(uuid)'::regprocedure) as def",
+      );
+      expect(rows[0].def).not.toContain("papel");
+    } finally {
+      await banco.end();
+    }
+  });
+});
+
 describe("funções novas: privilégios", () => {
   /** Quem tem EXECUTE na função (PUBLIC = grantee 0). proacl nulo significaria o padrão (PUBLIC executa). */
   async function quemExecuta(assinatura: string) {
@@ -533,6 +636,12 @@ describe("funções novas: privilégios", () => {
     } finally {
       await banco.end();
     }
+  });
+
+  it("compartilha_empresa_comercial: só authenticated executa (usada em perfis e avatares)", async () => {
+    const papeis = await quemExecuta("public.compartilha_empresa_comercial(uuid)");
+    expect(papeis).toContain("authenticated");
+    for (const papel of ["PUBLIC", "anon", "service_role"]) expect(papeis).not.toContain(papel);
   });
 
   it("funções de gatilho novas não são executáveis por clientes", async () => {

@@ -3529,6 +3529,7 @@ export type Database = {
         Returns: number;
       };
       compartilha_empresa: { Args: { p_user_id: string }; Returns: boolean };
+      compartilha_empresa_comercial: { Args: { p_user_id: string }; Returns: boolean };
       confirmar_pagamento: {
         Args: { p_contrato_id: string };
         Returns: {
