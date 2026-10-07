@@ -1780,6 +1780,53 @@ export type Database = {
           },
         ];
       };
+      membro_setores_obra_historico: {
+        Row: {
+          autor_contexto: Json | null;
+          autor_membro_id: string | null;
+          autor_user_id: string | null;
+          capacidade_antes: Database["public"]["Enums"]["capacidade_obra"] | null;
+          capacidade_depois: Database["public"]["Enums"]["capacidade_obra"] | null;
+          created_at: string;
+          empresa_id: string;
+          id: number;
+          membro_id: string;
+          setor: Database["public"]["Enums"]["setor_obra"];
+        };
+        Insert: {
+          autor_contexto?: Json | null;
+          autor_membro_id?: string | null;
+          autor_user_id?: string | null;
+          capacidade_antes?: Database["public"]["Enums"]["capacidade_obra"] | null;
+          capacidade_depois?: Database["public"]["Enums"]["capacidade_obra"] | null;
+          created_at?: string;
+          empresa_id: string;
+          id?: never;
+          membro_id: string;
+          setor: Database["public"]["Enums"]["setor_obra"];
+        };
+        Update: {
+          autor_contexto?: Json | null;
+          autor_membro_id?: string | null;
+          autor_user_id?: string | null;
+          capacidade_antes?: Database["public"]["Enums"]["capacidade_obra"] | null;
+          capacidade_depois?: Database["public"]["Enums"]["capacidade_obra"] | null;
+          created_at?: string;
+          empresa_id?: string;
+          id?: never;
+          membro_id?: string;
+          setor?: Database["public"]["Enums"]["setor_obra"];
+        };
+        Relationships: [
+          {
+            foreignKeyName: "membro_setores_obra_historico_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       metas: {
         Row: {
           ativa: boolean;
@@ -3511,8 +3558,36 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      alterar_status_fluxo_obra: {
+        Args: {
+          p_obra_id: string;
+          p_setor: Database["public"]["Enums"]["setor_obra"];
+          p_status: string;
+        };
+        Returns: undefined;
+      };
       aprovar_atribuicao_lead: {
         Args: { p_id: string; p_membro_final_id?: string };
+        Returns: undefined;
+      };
+      atribuir_participante_obra: {
+        Args: {
+          p_funcao?: Database["public"]["Enums"]["funcao_participante_obra"];
+          p_membro_id: string;
+          p_obra_id: string;
+          p_principal?: boolean;
+          p_setor: Database["public"]["Enums"]["setor_obra"];
+          p_substitui_id?: string;
+        };
+        Returns: string;
+      };
+      atualizar_marco_obra: {
+        Args: {
+          p_marco: Database["public"]["Enums"]["marco_obra"];
+          p_motivo?: string;
+          p_obra_id: string;
+          p_status: Database["public"]["Enums"]["status_marco_obra"];
+        };
         Returns: undefined;
       };
       atualizar_status_resgate: {
@@ -3536,6 +3611,10 @@ export type Database = {
           isOneToOne: true;
           isSetofReturn: false;
         };
+      };
+      autorizacao_setor_obra: {
+        Args: { p_obra_id: string; p_setor: Database["public"]["Enums"]["setor_obra"] };
+        Returns: string;
       };
       avaliar_condicao_regra: { Args: { p_condicao: Json; p_payload: Json }; Returns: boolean };
       buscar_contato_duplicado: {
@@ -3630,6 +3709,14 @@ export type Database = {
         Args: { p_automatico: boolean; p_id: string; p_membro_final_id: string };
         Returns: undefined;
       };
+      definir_aguardando_fluxo_obra: {
+        Args: {
+          p_aguardando?: Database["public"]["Enums"]["aguardando_obra"];
+          p_obra_id: string;
+          p_setor: Database["public"]["Enums"]["setor_obra"];
+        };
+        Returns: undefined;
+      };
       definir_setores_membro: {
         Args: { p_membro_id: string; p_setores: Json };
         Returns: undefined;
@@ -3664,6 +3751,19 @@ export type Database = {
       e_membro_comercial: { Args: { p_empresa_id: string; p_membro_id: string }; Returns: boolean };
       e_plataforma_admin: { Args: Record<PropertyKey, never>; Returns: boolean };
       empresa_da_pasta_marca: { Args: { p_caminho: string }; Returns: string };
+      encerrar_participacoes_operacionais: {
+        Args: {
+          p_membro_id: string;
+          p_motivo: string;
+          p_origem: string;
+          p_setor: Database["public"]["Enums"]["setor_obra"];
+        };
+        Returns: undefined;
+      };
+      encerrar_participante_obra: {
+        Args: { p_motivo: string; p_participante_id: string };
+        Returns: undefined;
+      };
       estornar_confirmacao_pagamento: {
         Args: { p_contrato_id: string; p_motivo: string };
         Returns: {
@@ -3711,6 +3811,15 @@ export type Database = {
       };
       incrementar_preenchimento_formulario: { Args: { p_id: string }; Returns: undefined };
       incrementar_visualizacao_formulario: { Args: { p_id: string }; Returns: undefined };
+      marcar_parado_fluxo_obra: {
+        Args: {
+          p_motivo?: string;
+          p_obra_id: string;
+          p_parado: boolean;
+          p_setor: Database["public"]["Enums"]["setor_obra"];
+        };
+        Returns: undefined;
+      };
       marcar_venda_alterada_obra: { Args: { p_negocio_id: string }; Returns: undefined };
       membro_ativo: { Args: { p_empresa_id: string }; Returns: boolean };
       meu_membro_id: { Args: { p_empresa_id: string }; Returns: string };
@@ -3759,6 +3868,14 @@ export type Database = {
         Returns: boolean;
       };
       pode_ver_valor_vendido_obra: { Args: { p_obra_id: string }; Returns: boolean };
+      preparar_escrita_obra: {
+        Args: {
+          p_bloquear_pausada: boolean;
+          p_obra_id: string;
+          p_setor: Database["public"]["Enums"]["setor_obra"];
+        };
+        Returns: string;
+      };
       progresso_conquistas_membro: {
         Args: { p_empresa_id: string };
         Returns: {

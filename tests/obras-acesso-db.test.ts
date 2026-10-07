@@ -383,6 +383,43 @@ async function enxerga(usuario: Usuario, obraId: string) {
   };
 }
 
+// 3b-3 (20261008100000): desativar um membro encerra as participações operacionais dele e
+// registra `participante_encerrado`. O setup desativa `opInativoParticipante`, participante
+// ativo da obra A: a obra A passa a ter 2 linhas de histórico (obra_criada + esse
+// encerramento); as demais obras continuam com 1. Confere também o conteúdo da linha nova.
+async function historicoEsperado(obraId: string) {
+  if (obraId !== obraA) return 1;
+  const { data: participacao } = await servico
+    .from("obra_participantes")
+    .select("id, fim")
+    .eq("obra_id", obraA)
+    .eq("membro_id", membro[opInativoParticipante.id]);
+  expect(participacao).toHaveLength(1);
+  expect(participacao![0].fim).not.toBeNull();
+  const { data: linhas } = await servico
+    .from("obra_historico")
+    .select("obra_id, tipo, setor, autor_user_id, autor_membro_id, dados")
+    .eq("obra_id", obraA)
+    .neq("tipo", "obra_criada");
+  expect(linhas).toEqual([
+    {
+      obra_id: obraA,
+      tipo: "participante_encerrado",
+      setor: "engenharia",
+      // A desativação do setup é feita pelo serviço (sem usuário): autor nulo, nunca inferido.
+      autor_user_id: null,
+      autor_membro_id: null,
+      dados: expect.objectContaining({
+        participante_id: participacao![0].id,
+        membro_id: membro[opInativoParticipante.id],
+        origem: "membro_desativado",
+        motivo: "Colaborador desativado",
+      }),
+    },
+  ]);
+  return 2;
+}
+
 const NADA = { obra: 0, rpc: 0, valor: 0, fluxos: 0, marcos: 0, participantes: 0, historico: 0 };
 
 async function totalParticipantes(obraId: string) {
@@ -404,7 +441,7 @@ describe("papéis comerciais: visibilidade inalterada", () => {
         fluxos: 3,
         marcos: 2,
         participantes,
-        historico: 1,
+        historico: await historicoEsperado(obraA),
       });
     }
   });
@@ -442,7 +479,7 @@ describe("operacao: visibilidade de obras", () => {
       fluxos: 3,
       marcos: 2,
       participantes,
-      historico: 1,
+      historico: await historicoEsperado(obraA),
     });
     expect(await enxerga(opParticipante, obraB)).toEqual(NADA);
     expect(await enxerga(opParticipante, obraDeB)).toEqual(NADA);
@@ -464,7 +501,14 @@ describe("operacao: visibilidade de obras", () => {
 
     for (const obra of [obraA, obraB]) {
       const v = await enxerga(opCoordena, obra);
-      expect(v).toMatchObject({ obra: 0, rpc: 1, valor: 0, fluxos: 3, marcos: 2, historico: 1 });
+      expect(v).toMatchObject({
+        obra: 0,
+        rpc: 1,
+        valor: 0,
+        fluxos: 3,
+        marcos: 2,
+        historico: await historicoEsperado(obra),
+      });
     }
     expect(await enxerga(opCoordena, obraDeB)).toEqual(NADA);
 
