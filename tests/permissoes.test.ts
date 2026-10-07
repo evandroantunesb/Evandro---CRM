@@ -24,7 +24,7 @@ const MATRIZ: Record<string, string[]> = {
   ANEXOS_E_NOTAS: ["admin", "gestor", "vendedor", "sdr"],
   TAREFAS: ["admin", "gestor", "vendedor", "sdr"],
   VER_TAREFAS_DE_OUTROS: ["admin", "gestor"],
-  ATRIBUIR_TAREFA_A_OUTROS: ["admin", "gestor", "sdr"],
+  ATRIBUIR_TAREFA_A_OUTROS: ["admin", "gestor"],
   GOOGLE_AGENDA: ["admin", "gestor", "vendedor", "sdr"],
   GESTAO_COMERCIAL: ["admin", "gestor"],
   GAMIFICACAO: ["admin", "gestor", "vendedor", "sdr"],
@@ -48,6 +48,7 @@ describe("listas de permissão", () => {
       permissoes.ESCOLHER_RESPONSAVEL_NEGOCIO,
       permissoes.FILTRAR_NEGOCIOS_POR_RESPONSAVEL,
       permissoes.VER_TAREFAS_DE_OUTROS,
+      permissoes.ATRIBUIR_TAREFA_A_OUTROS,
       permissoes.GESTAO_COMERCIAL,
     ]) {
       expect(pode("sdr", lista)).toBe(false);

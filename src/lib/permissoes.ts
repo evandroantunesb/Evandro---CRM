@@ -54,10 +54,10 @@ export const TAREFAS = ["admin", "gestor", "vendedor", "sdr"] as const satisfies
 export const VER_TAREFAS_DE_OUTROS = ["admin", "gestor"] as const satisfies ListaPapeis;
 
 /**
- * Criar tarefa para outra pessoa. Mantém o comportamento atual (o SDR atribui);
- * pendente de decisão do Evandro.
+ * Criar tarefa para outra pessoa. Poder de gestão: os demais criam só para si
+ * (o SDR encaminha leads pelo handoff, não por tarefa).
  */
-export const ATRIBUIR_TAREFA_A_OUTROS = ["admin", "gestor", "sdr"] as const satisfies ListaPapeis;
+export const ATRIBUIR_TAREFA_A_OUTROS = ["admin", "gestor"] as const satisfies ListaPapeis;
 
 /** Integração com o Google Agenda. */
 export const GOOGLE_AGENDA = ["admin", "gestor", "vendedor", "sdr"] as const satisfies ListaPapeis;

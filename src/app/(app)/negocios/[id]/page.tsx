@@ -10,7 +10,7 @@ import { carregarConfiguracao, formatarDataHora, formatarMoeda } from "@/lib/crm
 import { env } from "@/lib/env";
 import { descreverAtividade } from "@/lib/linha-do-tempo";
 import { exigirPapel } from "@/lib/sessao";
-import { EDITAR_VALOR_NEGOCIO, ESCOLHER_RESPONSAVEL_NEGOCIO, NEGOCIOS, PROPOSTA_E_CONTRATO, pode } from "@/lib/permissoes";
+import { ATRIBUIR_TAREFA_A_OUTROS, EDITAR_VALOR_NEGOCIO, ESCOLHER_RESPONSAVEL_NEGOCIO, NEGOCIOS, PROPOSTA_E_CONTRATO, pode } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import {
   ROTULO_CATEGORIA_ANEXO,
@@ -411,7 +411,7 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
               />
               <NovaTarefa
                 negocioId={negocio.id}
-                responsaveis={pode(atual.papel, ESCOLHER_RESPONSAVEL_NEGOCIO) ? config.membros.filter((m) => m.ativo) : []}
+                responsaveis={pode(atual.papel, ATRIBUIR_TAREFA_A_OUTROS) ? config.membros.filter((m) => m.ativo) : []}
                 responsavelPadrao={negocio.responsavel_id}
               />
             </div>

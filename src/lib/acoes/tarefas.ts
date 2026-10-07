@@ -97,7 +97,7 @@ export async function criarTarefa(_: ResultadoAcao, formData: FormData): Promise
 
   const supabase = await criarClienteServidor();
   const venceEmIso = prazoParaIso(d.vence_em);
-  // Vendedor sempre cria para si; o banco confere quem pode atribuir para quem.
+  // Só admin e gestor atribuem tarefa a outra pessoa; os demais criam para si. O banco também confere.
   const responsavelId = pode(atual.papel, ATRIBUIR_TAREFA_A_OUTROS) ? (d.responsavel_id ?? atual.membroId) : atual.membroId;
   const { data: tarefa, error } = await supabase
     .from("tarefas")
