@@ -2,6 +2,7 @@ import { Banknote } from "lucide-react";
 import { carregarConfiguracao } from "@/lib/crm";
 import { formatarMoeda } from "@/lib/formatacao";
 import { exigirPapel } from "@/lib/sessao";
+import { RESPONSAVEL_COMERCIAL, pode } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import type { StatusComissao, TipoCalculoComissao } from "@/lib/tipos";
 import { formatarReferenciaComissao, StatusComissaoGf } from "../../gamificacao/_compartilhado/comissao-ui";
@@ -27,7 +28,7 @@ export default async function ConfigComissoes() {
     carregarConfiguracao(atual.empresaId),
   ]);
 
-  const membros = config.membros.filter((m) => m.ativo);
+  const membros = config.membros.filter((m) => m.ativo && pode(m.papel, RESPONSAVEL_COMERCIAL));
   const nomeMembro = new Map(config.membros.map((m) => [m.id, m.nome]));
 
   const versoesPorMembro = new Map<string, VersaoPlano[]>();

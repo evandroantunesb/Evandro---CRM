@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Cartao } from "@/components/ui";
 import { carregarConfiguracao } from "@/lib/crm";
 import { exigirPapel } from "@/lib/sessao";
-import { ESCOLHER_RESPONSAVEL_NEGOCIO, NEGOCIOS, pode } from "@/lib/permissoes";
+import { ESCOLHER_RESPONSAVEL_NEGOCIO, NEGOCIOS, RESPONSAVEL_COMERCIAL, pode } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { FormularioNegocio } from "./formulario";
 
@@ -29,7 +29,7 @@ export default async function NovoNegocio({ searchParams }: PageProps<"/negocios
           funilId={funilEscolhido.id}
           etapaId={etapaEscolhida?.id}
           origens={config.origens.filter((o) => o.ativa)}
-          responsaveis={pode(atual.papel, ESCOLHER_RESPONSAVEL_NEGOCIO) ? config.membros.filter((m) => m.ativo) : []}
+          responsaveis={pode(atual.papel, ESCOLHER_RESPONSAVEL_NEGOCIO) ? config.membros.filter((m) => m.ativo && pode(m.papel, RESPONSAVEL_COMERCIAL)) : []}
           meuMembroId={atual.membroId}
           parametros={
             parametros

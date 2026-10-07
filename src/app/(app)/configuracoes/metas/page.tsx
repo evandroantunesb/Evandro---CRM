@@ -1,6 +1,7 @@
 import { Target } from "lucide-react";
 import { carregarConfiguracao } from "@/lib/crm";
 import { exigirPapel } from "@/lib/sessao";
+import { RESPONSAVEL_COMERCIAL, pode } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import type { MetricaMeta } from "@/lib/tipos";
 import { CabecalhoPaginaGf, CartaoGf, EstadoVazioGf, PaginaGf, VoltarGf } from "../../gamificacao/_compartilhado/ui";
@@ -18,7 +19,7 @@ export default async function ConfigMetas() {
     carregarConfiguracao(atual.empresaId),
   ]);
 
-  const membros = config.membros.filter((m) => m.ativo);
+  const membros = config.membros.filter((m) => m.ativo && pode(m.papel, RESPONSAVEL_COMERCIAL));
   const nomeMembro = new Map(config.membros.map((m) => [m.id, m.nome]));
 
   return (

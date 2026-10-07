@@ -1,5 +1,9 @@
-export const PAPEIS = ["admin", "gestor", "vendedor", "sdr"] as const;
+/** Todos os papéis do banco (tipagem). Quem pode o quê está em `@/lib/permissoes`. */
+export const PAPEIS = ["admin", "gestor", "vendedor", "sdr", "operacao"] as const;
 export type Papel = (typeof PAPEIS)[number];
+
+/** Papéis oferecidos no cadastro de usuários. `operacao` entra quando houver setores de Obras (PR 3b-2). */
+export const PAPEIS_CADASTRAVEIS = ["admin", "gestor", "vendedor", "sdr"] as const satisfies readonly Papel[];
 
 export const TIPOS_VENDEDOR = ["interno", "representante"] as const;
 export type TipoVendedor = (typeof TIPOS_VENDEDOR)[number];
@@ -19,6 +23,7 @@ export const ROTULO_PAPEL: Record<Papel, string> = {
   gestor: "Gestor",
   vendedor: "Vendedor",
   sdr: "SDR",
+  operacao: "Operação",
 };
 
 export const ROTULO_TIPO_VENDEDOR: Record<TipoVendedor, string> = {
