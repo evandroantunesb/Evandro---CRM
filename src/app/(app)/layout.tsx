@@ -6,7 +6,7 @@ import { LogoRaion } from "@/components/marca";
 import { carregarDiasConsideradoParado, carregarHorasConsideradoSemContato } from "@/lib/crm";
 import { carregarNotificacoesNaoLidas, contarPendencias, temConquistaNaoVisualizada } from "@/lib/notificacoes";
 import { linksPendencias, type ContagemPendencias } from "@/lib/pendencias";
-import { CARTEIRA_CONTATOS, GAMIFICACAO, GESTAO_COMERCIAL, NEGOCIOS, PARTICIPANTES_GAMIFICACAO, PROPOSTA_E_CONTRATO, TAREFAS, pode } from "@/lib/permissoes";
+import { CARTEIRA_CONTATOS, GAMIFICACAO, GESTAO_COMERCIAL, NEGOCIOS, OBRAS, PARTICIPANTES_GAMIFICACAO, PROPOSTA_E_CONTRATO, TAREFAS, pode } from "@/lib/permissoes";
 import { obterSessao } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { trocarEmpresa } from "@/lib/acoes/empresa-atual";
@@ -98,6 +98,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
           ...(pode(papel, CARTEIRA_CONTATOS) ? [{ href: "/contatos", rotulo: "Contatos", secao: "Comercial" }] : []),
           // SDR não gera proposta nem contrato (spec RAION_SDR_REGRAS_PERMISSOES §40/§41).
           ...(pode(papel, PROPOSTA_E_CONTRATO) ? [{ href: "/propostas-contratos", rotulo: "Propostas e contratos", secao: "Venda" }] : []),
+          ...(pode(papel, OBRAS) ? [{ href: "/obras", rotulo: "Obras", secao: "Operação" }] : []),
           ...(pode(papel, GESTAO_COMERCIAL) ? [{ href: "/painel", rotulo: "Painel", secao: "Gestão" }] : []),
           ...itensGamificacao(papel, conquistaNova),
         ]

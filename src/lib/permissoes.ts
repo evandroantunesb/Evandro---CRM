@@ -73,6 +73,11 @@ export const GOOGLE_AGENDA = ["admin", "gestor", "vendedor", "sdr"] as const sat
 /** Gestão comercial: Painel, Leads a distribuir e as pendências de gestão do sininho. */
 export const GESTAO_COMERCIAL = ["admin", "gestor"] as const satisfies ListaPapeis;
 
+// --- Obras -------------------------------------------------------------------
+
+/** Leitura de Obras (/obras). Sempre limitada pela RLS/RPC: `operacao` lê só por `obras_operacao`. */
+export const OBRAS = ["admin", "gestor", "vendedor", "sdr", "operacao"] as const satisfies ListaPapeis;
+
 // --- Gamificação -------------------------------------------------------------
 
 /** Telas da Gamificação (visão geral, ranking, metas, jornada, loja, extrato, comissões). */
