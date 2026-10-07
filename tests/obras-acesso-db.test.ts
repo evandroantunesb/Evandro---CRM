@@ -383,6 +383,43 @@ async function enxerga(usuario: Usuario, obraId: string) {
   };
 }
 
+// 3b-3 (20261008100000): desativar um membro encerra as participações operacionais dele e
+// registra `participante_encerrado`. O setup desativa `opInativoParticipante`, participante
+// ativo da obra A: a obra A passa a ter 2 linhas de histórico (obra_criada + esse
+// encerramento); as demais obras continuam com 1. Confere também o conteúdo da linha nova.
+async function historicoEsperado(obraId: string) {
+  if (obraId !== obraA) return 1;
+  const { data: participacao } = await servico
+    .from("obra_participantes")
+    .select("id, fim")
+    .eq("obra_id", obraA)
+    .eq("membro_id", membro[opInativoParticipante.id]);
+  expect(participacao).toHaveLength(1);
+  expect(participacao![0].fim).not.toBeNull();
+  const { data: linhas } = await servico
+    .from("obra_historico")
+    .select("obra_id, tipo, setor, autor_user_id, autor_membro_id, dados")
+    .eq("obra_id", obraA)
+    .neq("tipo", "obra_criada");
+  expect(linhas).toEqual([
+    {
+      obra_id: obraA,
+      tipo: "participante_encerrado",
+      setor: "engenharia",
+      // A desativação do setup é feita pelo serviço (sem usuário): autor nulo, nunca inferido.
+      autor_user_id: null,
+      autor_membro_id: null,
+      dados: expect.objectContaining({
+        participante_id: participacao![0].id,
+        membro_id: membro[opInativoParticipante.id],
+        origem: "desativacao_membro",
+        motivo: "Colaborador desativado",
+      }),
+    },
+  ]);
+  return 2;
+}
+
 const NADA = { obra: 0, rpc: 0, valor: 0, fluxos: 0, marcos: 0, participantes: 0, historico: 0 };
 
 async function totalParticipantes(obraId: string) {
@@ -404,7 +441,7 @@ describe("papéis comerciais: visibilidade inalterada", () => {
         fluxos: 3,
         marcos: 2,
         participantes,
-        historico: 1,
+        historico: await historicoEsperado(obraA),
       });
     }
   });
@@ -442,7 +479,7 @@ describe("operacao: visibilidade de obras", () => {
       fluxos: 3,
       marcos: 2,
       participantes,
-      historico: 1,
+      historico: await historicoEsperado(obraA),
     });
     expect(await enxerga(opParticipante, obraB)).toEqual(NADA);
     expect(await enxerga(opParticipante, obraDeB)).toEqual(NADA);
@@ -464,7 +501,14 @@ describe("operacao: visibilidade de obras", () => {
 
     for (const obra of [obraA, obraB]) {
       const v = await enxerga(opCoordena, obra);
-      expect(v).toMatchObject({ obra: 0, rpc: 1, valor: 0, fluxos: 3, marcos: 2, historico: 1 });
+      expect(v).toMatchObject({
+        obra: 0,
+        rpc: 1,
+        valor: 0,
+        fluxos: 3,
+        marcos: 2,
+        historico: await historicoEsperado(obra),
+      });
     }
     expect(await enxerga(opCoordena, obraDeB)).toEqual(NADA);
 
@@ -887,12 +931,45 @@ describe("membro_setores_obra", () => {
     for (const [rotulo, cliente, alvo] of casos) {
       expect((await definir(cliente, alvo, valido)).error, rotulo).not.toBeNull();
     }
+    // Quem não é admin da empresa do alvo é recusado pela autorização: o alvo (`opAlvo`) está
+    // ativo e é operacao, então a recusa não vem do estado do alvo.
+    for (const [rotulo, cliente, alvo] of casos.slice(0, 5)) {
+      expect((await definir(cliente, alvo, valido)).error?.message, rotulo).toContain(
+        "não tem acesso a este colaborador",
+      );
+    }
     expect(await setoresDoAlvo()).toEqual([{ setor: "compras", capacidade: "executar" }]);
+    // A conferência dos setores do membro desligado (`opInativoCoordena`) está no teste
+    // seguinte: a partir da 3b-3, desligar o membro revoga os setores dele.
+  });
+
+  it("desligar o membro revoga os setores (3b-3) e a recusa sobre ele não recria nada", async () => {
+    const recusa = await definir(admin.cliente, membro[opInativoCoordena.id], [
+      { setor: "engenharia", capacidade: "coordenar" },
+    ]);
+    expect(recusa.error?.message).toContain("precisa estar ativo");
     const { data: coord } = await servico
       .from("membro_setores_obra")
       .select("setor")
       .eq("membro_id", membro[opInativoCoordena.id]);
-    expect(coord).toEqual([{ setor: "operacional" }]);
+    expect(coord).toEqual([]);
+    // Auditoria da revogação automática. O desligamento do setup é feito pelo serviço (sem
+    // usuário): autor nulo, nunca inferido.
+    const { data: revogacao } = await servico
+      .from("membro_setores_obra_historico")
+      .select("setor, capacidade_antes, capacidade_depois, origem, autor_user_id, autor_membro_id")
+      .eq("membro_id", membro[opInativoCoordena.id])
+      .neq("origem", "definicao");
+    expect(revogacao).toEqual([
+      {
+        setor: "operacional",
+        capacidade_antes: "coordenar",
+        capacidade_depois: null,
+        origem: "desativacao_membro",
+        autor_user_id: null,
+        autor_membro_id: null,
+      },
+    ]);
   });
 
   it("rejeita setor comercial, valores inválidos, setor repetido e formato errado, sem alterar nada", async () => {
