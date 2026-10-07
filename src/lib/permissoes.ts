@@ -82,6 +82,12 @@ export const GESTAO_COMERCIAL = ["admin", "gestor"] as const satisfies ListaPape
  */
 export const OBRAS = ["admin", "gestor", "vendedor", "sdr", "operacao"] as const satisfies ListaPapeis;
 
+/**
+ * Link "Ver negócio" no detalhe da obra. Só exibição: o SDR fica de fora porque, depois do
+ * handoff, em geral já não enxerga o negócio (o link levaria a um 404). A RLS não muda.
+ */
+export const VER_NEGOCIO_DA_OBRA = ["admin", "gestor", "vendedor"] as const satisfies ListaPapeis;
+
 // --- Gamificação -------------------------------------------------------------
 
 /** Telas da Gamificação (visão geral, ranking, metas, jornada, loja, extrato, comissões). */

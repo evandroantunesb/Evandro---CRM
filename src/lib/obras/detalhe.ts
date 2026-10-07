@@ -1,5 +1,6 @@
 import "server-only";
 import type { SupabaseServidor } from "@/lib/supabase/server";
+import { VER_NEGOCIO_DA_OBRA, pode } from "@/lib/permissoes";
 import { ROTULO_TIPO_LIGACAO } from "@/lib/tipos";
 import { alertasObra, estadoSetor, MARCOS_OBRA, situacaoObra } from "./derivados";
 import { montarHistorico, type ItemHistoricoVM } from "./historico";
@@ -68,7 +69,7 @@ export type ResumoObraVM = {
   /** Só se a obra estiver cancelada. */
   cancelamentoMotivo: string | null;
   criadaEm: string;
-  /** Só no caminho comercial (o papel `operacao` não acessa o negócio). */
+  /** Só no caminho comercial e para quem tem VER_NEGOCIO_DA_OBRA (`operacao` e SDR: null). */
   negocioId: string | null;
 };
 
@@ -305,7 +306,7 @@ export async function carregarDetalheObra(
     pausaMotivo: obra.pausadaEm && !obra.canceladaEm ? textoOuNull(obra.pausaMotivo) : null,
     cancelamentoMotivo: obra.canceladaEm ? textoOuNull(obra.cancelamentoMotivo) : null,
     criadaEm: obra.criadaEm,
-    negocioId: obra.negocioId,
+    negocioId: pode(papel, VER_NEGOCIO_DA_OBRA) ? obra.negocioId : null,
   };
 
   return {

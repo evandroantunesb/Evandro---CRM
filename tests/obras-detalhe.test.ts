@@ -573,7 +573,18 @@ describe("carregarDetalheObra: papéis comerciais", () => {
     expect(f.selects.obras).toMatch(/negocio_id/);
     expect(f.selects.obras).toMatch(/snapshot/);
     expect(vm?.contatoCliente).toBeNull();
-    expect(vm?.resumo.negocioId).toBe(NEGOCIO);
+    if (papel !== "sdr") expect(vm?.resumo.negocioId).toBe(NEGOCIO);
+  });
+
+  it("SDR vê a obra, mas sem o link do negócio (negocioId null); admin, gestor e vendedor têm o link", async () => {
+    const sdr = await carregarDetalheObra(comercial().cliente, { empresaId: EMPRESA, papel: "sdr", obraId: OBRA });
+    expect(sdr?.resumo.id).toBe(OBRA);
+    expect(sdr?.resumo.negocioId).toBeNull();
+    expect(JSON.stringify(sdr)).not.toContain(NEGOCIO);
+    for (const papel of ["admin", "gestor", "vendedor"]) {
+      const vm = await carregarDetalheObra(comercial().cliente, { empresaId: EMPRESA, papel, obraId: OBRA });
+      expect(vm?.resumo.negocioId, papel).toBe(NEGOCIO);
+    }
   });
 
   it("obra inexistente ou inacessível devolve null e nenhuma consulta secundária", async () => {
