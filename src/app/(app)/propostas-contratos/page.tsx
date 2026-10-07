@@ -231,7 +231,7 @@ function NegocioLink({ l }: { l: LinhaVenda }) {
   );
 }
 
-/** Tabela só no desktop; no celular, um card compacto por registro. */
+/** Tabela só no desktop (rola na horizontal só se não couber); no celular, um card compacto por registro. */
 function Lista({ cabecalho, linhas, celulas, card }: {
   cabecalho: string[];
   linhas: LinhaVenda[];
@@ -244,8 +244,8 @@ function Lista({ cabecalho, linhas, celulas, card }: {
         <table className="w-full text-left text-sm">
           <thead className="bg-zinc-50 text-zinc-600">
             <tr>
-              {cabecalho.map((c) => (
-                <th key={c} className="px-3 py-2 font-medium">
+              {cabecalho.map((c, i) => (
+                <th key={c} className={`px-3 py-2 font-medium whitespace-nowrap ${i === 0 ? "w-full" : ""}`}>
                   {c}
                 </th>
               ))}
@@ -255,7 +255,9 @@ function Lista({ cabecalho, linhas, celulas, card }: {
             {linhas.map((l) => (
               <tr key={l.negocioId} className="border-t border-zinc-100 hover:bg-zinc-50/60">
                 {celulas(l).map((c, i) => (
-                  <td key={i} className="px-3 py-2">
+                  // Cliente fica com o espaço que sobra (e pode quebrar); status, valor, responsável e
+                  // datas nunca quebram — se não couber, a tabela rola na horizontal.
+                  <td key={i} className={i === 0 ? "min-w-48 px-3 py-2" : "px-3 py-2 whitespace-nowrap"}>
                     {c}
                   </td>
                 ))}
@@ -279,7 +281,7 @@ function LinhaCard({ rotulo, children }: { rotulo: string; children: ReactNode }
   return (
     <div className="flex items-center justify-between gap-2">
       <span className="text-xs text-zinc-500">{rotulo}</span>
-      <span className="text-right">{children}</span>
+      <span className="text-right whitespace-nowrap">{children}</span>
     </div>
   );
 }
@@ -304,7 +306,7 @@ function Propostas({ linhas, veEquipe, nomeResponsavel }: PropsLista) {
             <div className="min-w-0">
               <NegocioLink l={l} />
             </div>
-            <Selo tom={TOM_PROPOSTA[l.proposta]}>{ROTULO_SITUACAO_PROPOSTA[l.proposta]}</Selo>
+            <span className="shrink-0 whitespace-nowrap"><Selo tom={TOM_PROPOSTA[l.proposta]}>{ROTULO_SITUACAO_PROPOSTA[l.proposta]}</Selo></span>
           </div>
           {veEquipe && <LinhaCard rotulo="Responsável">{nomeResponsavel(l)}</LinhaCard>}
           <LinhaCard rotulo="Valor">{valor(l)}</LinhaCard>
@@ -341,7 +343,7 @@ function Contratos({ linhas, veEquipe, nomeResponsavel }: PropsLista) {
             <div className="min-w-0">
               <NegocioLink l={l} />
             </div>
-            <Selo tom={TOM_CONTRATO[l.contrato]}>{ROTULO_SITUACAO_CONTRATO[l.contrato]}</Selo>
+            <span className="shrink-0 whitespace-nowrap"><Selo tom={TOM_CONTRATO[l.contrato]}>{ROTULO_SITUACAO_CONTRATO[l.contrato]}</Selo></span>
           </div>
           {veEquipe && <LinhaCard rotulo="Responsável">{nomeResponsavel(l)}</LinhaCard>}
           <LinhaCard rotulo="Valor">{valor(l)}</LinhaCard>
