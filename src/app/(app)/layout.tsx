@@ -94,6 +94,8 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
           ...(papel === "admin" ? [{ href: "/configuracoes/captura", rotulo: "Captura de leads", secao: "Aquisição" }] : []),
           { href: "/negocios", rotulo: "Negócios", secao: "Comercial" },
           ...(papel !== "sdr" ? [{ href: "/contatos", rotulo: "Contatos", secao: "Comercial" }] : []),
+          // SDR não gera proposta nem contrato (spec RAION_SDR_REGRAS_PERMISSOES §40/§41).
+          ...(papel !== "sdr" ? [{ href: "/propostas-contratos", rotulo: "Propostas e contratos", secao: "Venda" }] : []),
           ...(papel === "admin" || papel === "gestor" ? [{ href: "/painel", rotulo: "Painel", secao: "Gestão" }] : []),
           ...itensGamificacao(papel, conquistaNova),
         ]
