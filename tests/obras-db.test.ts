@@ -4,8 +4,10 @@
  * assinado + pagamento confirmado estão presentes, em qualquer ordem. Cobre: criação
  * idempotente, numeração própria, trilhas/marcos/participantes iniciais, histórico com
  * autor real, estorno (aviso, nunca apaga), "dados da venda mudaram", RLS de leitura
- * (valor vendido protegido) e bloqueio de escrita direta.
+ * (valor vendido protegido), bloqueio de escrita direta e as invariantes de integridade
+ * (status de Compras, participante da mesma empresa, substituição na mesma obra e setor).
  */
+import { Client } from "pg";
 import { beforeAll, describe, expect, it } from "vitest";
 import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
 
@@ -17,6 +19,7 @@ let vendedor2: Usuario;
 let sdr: Usuario;
 let outraEmpresa: Usuario;
 let empresa: string;
+let membroOutraEmpresa: string;
 const membro: Record<string, string> = {};
 let funil: string;
 let etapaInicial: string;
@@ -42,7 +45,12 @@ beforeAll(async () => {
   for (const v of vinculos!) membro[v.user_id] = v.id;
 
   const { data: emp2 } = await servico.from("empresas").insert({ nome: `Obras outra ${sufixo}` }).select("id").single();
-  await servico.from("empresa_membros").insert({ empresa_id: emp2!.id, user_id: outraEmpresa.id, papel: "admin" });
+  const { data: vinculoOutra } = await servico
+    .from("empresa_membros")
+    .insert({ empresa_id: emp2!.id, user_id: outraEmpresa.id, papel: "admin" })
+    .select("id")
+    .single();
+  membroOutraEmpresa = vinculoOutra!.id;
 
   const { data: f } = await servico.from("funis").select("id").eq("empresa_id", empresa).single();
   funil = f!.id;
@@ -364,5 +372,69 @@ describe("escrita direta bloqueada", () => {
     const apagar = await servico.from("negocios").delete().eq("id", negocioId);
     expect(apagar.error).not.toBeNull();
     expect(await obraDoNegocio(negocioId)).toHaveLength(1);
+  });
+});
+
+// Ninguém escreve nessas tabelas pela API (nem service_role), então as invariantes do banco
+// são conferidas com o dono do banco local, sempre dentro de uma transação desfeita no fim.
+const URL_BANCO = process.env.SUPABASE_DB_URL ?? "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
+
+async function noBanco(sql: string, params: unknown[]) {
+  const banco = new Client({ connectionString: URL_BANCO });
+  await banco.connect();
+  try {
+    await banco.query("begin");
+    await banco.query(sql, params);
+    return null;
+  } catch (erro) {
+    return erro as { code?: string; constraint?: string };
+  } finally {
+    await banco.query("rollback");
+    await banco.end();
+  }
+}
+
+const INSERIR_PARTICIPANTE = `
+  insert into public.obra_participantes (obra_id, empresa_id, membro_id, setor, funcao, substitui_id)
+  values ($1, $2, $3, $4, $5, $6)`;
+
+describe("integridade no banco", () => {
+  let obraA: string;
+  let obraB: string;
+  let vendedorEmA: string;
+  let vendedorEmB: string;
+
+  beforeAll(async () => {
+    obraA = (await vendaCompleta("Integridade A")).obra.id;
+    obraB = (await vendaCompleta("Integridade B")).obra.id;
+    const { data } = await servico.from("obra_participantes").select("id, obra_id").in("obra_id", [obraA, obraB]).eq("funcao", "vendedor");
+    vendedorEmA = data!.find((p) => p.obra_id === obraA)!.id;
+    vendedorEmB = data!.find((p) => p.obra_id === obraB)!.id;
+  });
+
+  it("Compras termina em faturado_fornecedor: 'concluido' é inválido", async () => {
+    const sql = "update public.obra_fluxos set status = $2 where obra_id = $1 and setor = 'compras'";
+    expect(await noBanco(sql, [obraA, "faturado_fornecedor"])).toBeNull();
+    expect(await noBanco(sql, [obraA, "concluido"])).toMatchObject({ code: "23514", constraint: "obra_fluxos_status_valido" });
+  });
+
+  it("participante precisa ser membro da mesma empresa da obra", async () => {
+    expect(await noBanco(INSERIR_PARTICIPANTE, [obraA, empresa, membro[vendedor2.id], "engenharia", "responsavel", null])).toBeNull();
+    expect(await noBanco(INSERIR_PARTICIPANTE, [obraA, empresa, membroOutraEmpresa, "engenharia", "responsavel", null])).toMatchObject({
+      code: "23503",
+    });
+  });
+
+  it("substituição só dentro da mesma obra, empresa e setor", async () => {
+    // Válida: mesmo setor (comercial) e mesma obra.
+    expect(await noBanco(INSERIR_PARTICIPANTE, [obraA, empresa, membro[vendedor2.id], "comercial", "substituto", vendedorEmA])).toBeNull();
+    // Outro setor.
+    expect(await noBanco(INSERIR_PARTICIPANTE, [obraA, empresa, membro[vendedor2.id], "engenharia", "substituto", vendedorEmA])).toMatchObject({
+      code: "23503",
+    });
+    // Outra obra.
+    expect(await noBanco(INSERIR_PARTICIPANTE, [obraA, empresa, membro[vendedor2.id], "comercial", "substituto", vendedorEmB])).toMatchObject({
+      code: "23503",
+    });
   });
 });

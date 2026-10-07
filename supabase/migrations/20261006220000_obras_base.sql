@@ -111,7 +111,8 @@ create table public.obra_fluxos (
   primary key (obra_id, setor),
   foreign key (empresa_id, obra_id) references public.obras (empresa_id, id) on delete cascade,
   constraint obra_fluxos_status_valido check (
-    (setor = 'compras' and status in ('a_comprar', 'cotando', 'pedido_realizado', 'faturado_fornecedor', 'concluido'))
+    -- Compras termina no faturamento; transporte e recebimento são da Logística (Operacional).
+    (setor = 'compras' and status in ('a_comprar', 'cotando', 'pedido_realizado', 'faturado_fornecedor'))
     or (setor = 'engenharia' and status in ('a_iniciar', 'projeto_em_elaboracao', 'enviado_concessionaria', 'aprovado', 'aguardando_vistoria', 'concluido'))
     or (setor = 'operacional' and status in ('aguardando_liberacao', 'liberada_agendamento', 'agendada', 'em_instalacao', 'instalacao_concluida', 'concluido'))
   ),
@@ -135,23 +136,35 @@ create table public.obra_marcos (
   constraint obra_marcos_nao_se_aplica_com_motivo check (status <> 'nao_se_aplica' or nullif(trim(motivo), '') is not null)
 );
 
+-- Alvo da FK composta (empresa_id, membro_id) de obra_participantes: garante no banco que
+-- o participante é membro da mesma empresa da Obra. `id` já é PK, então é sempre único.
+alter table public.empresa_membros add constraint empresa_membros_empresa_id_id_key unique (empresa_id, id);
+
 -- Quem atua na Obra. Vários por setor; no máximo 1 principal ativo por obra + setor.
 -- Troca nunca sobrescreve: encerra (fim) e cria outro registro (substitui_id).
 create table public.obra_participantes (
   id uuid primary key default gen_random_uuid(),
   obra_id uuid not null,
   empresa_id uuid not null,
-  membro_id uuid not null references public.empresa_membros (id),
+  membro_id uuid not null,
   setor public.setor_obra not null,
   funcao public.funcao_participante_obra not null,
   principal boolean not null default false,
   inicio timestamptz not null default now(),
   fim timestamptz,
-  substitui_id uuid references public.obra_participantes (id),
+  substitui_id uuid,
   criado_por_user_id uuid,
   created_at timestamptz not null default now(),
+  -- Alvo da FK de substituição (mesma obra, empresa e setor).
+  unique (id, obra_id, empresa_id, setor),
   foreign key (empresa_id, obra_id) references public.obras (empresa_id, id) on delete cascade,
-  constraint obra_participantes_periodo check (fim is null or fim >= inicio)
+  -- Membro da mesma empresa da Obra.
+  foreign key (empresa_id, membro_id) references public.empresa_membros (empresa_id, id),
+  -- Quem é substituído pertence à mesma obra, empresa e setor (MATCH SIMPLE: sem
+  -- substituição, substitui_id nulo, nada é conferido).
+  foreign key (substitui_id, obra_id, empresa_id, setor) references public.obra_participantes (id, obra_id, empresa_id, setor),
+  constraint obra_participantes_periodo check (fim is null or fim >= inicio),
+  constraint obra_participantes_nao_substitui_a_si check (substitui_id is distinct from id)
 );
 create unique index obra_participantes_um_principal_ativo
   on public.obra_participantes (obra_id, setor) where principal and fim is null;
