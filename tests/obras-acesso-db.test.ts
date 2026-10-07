@@ -81,6 +81,7 @@ async function criarVenda(
   etapa: string,
   responsavelId: string,
   ator: Usuario,
+  confirmador: Usuario,
   titulo: string,
 ) {
   const { data: c } = await servico
@@ -116,7 +117,8 @@ async function criarVenda(
     .update({ status: "assinado" })
     .eq("id", contrato!.id);
   if (assinado.error) throw assinado.error;
-  const { error: erroPagamento } = await ator.cliente.rpc("confirmar_pagamento", {
+  // Só gestor/admin confirma pagamento; o vendedor segue como ator comercial.
+  const { error: erroPagamento } = await confirmador.cliente.rpc("confirmar_pagamento", {
     p_contrato_id: contrato!.id,
   });
   if (erroPagamento) throw erroPagamento;
@@ -234,13 +236,30 @@ beforeAll(async () => {
   ]);
 
   // Obras pelo mecanismo real (ganho + contrato assinado + pagamento confirmado).
-  obraA = await criarVenda(empresa, funil, etapaInicial, membro[vendedor.id], vendedor, "Obra A");
-  obraB = await criarVenda(empresa, funil, etapaInicial, membro[vendedor.id], vendedor, "Obra B");
+  obraA = await criarVenda(
+    empresa,
+    funil,
+    etapaInicial,
+    membro[vendedor.id],
+    vendedor,
+    admin,
+    "Obra A",
+  );
+  obraB = await criarVenda(
+    empresa,
+    funil,
+    etapaInicial,
+    membro[vendedor.id],
+    vendedor,
+    admin,
+    "Obra B",
+  );
   obraDeB = await criarVenda(
     empresaB,
     funilB,
     etapaInicialB,
     membro[adminB.id],
+    adminB,
     adminB,
     "Obra da empresa B",
   );

@@ -527,7 +527,9 @@ describe("perfis e avatares: compartilha_empresa_comercial", () => {
     }
   });
 
-  it("operacao vê o próprio perfil e avatar, mas não os dos colegas", async () => {
+  // 3b-2: operacao vê avatar de colega ativo da mesma empresa (identidade
+  // básica), mas continua sem perfis alheios e sem acesso comercial.
+  it("operacao vê só o próprio perfil, mas vê o avatar de colega ativo (3b-2)", async () => {
     const { data: perfis } = await operacao.cliente
       .from("perfis")
       .select("id")
@@ -542,23 +544,23 @@ describe("perfis e avatares: compartilha_empresa_comercial", () => {
     const alheio = await operacao.cliente.storage
       .from("avatares")
       .createSignedUrls([caminhoColega], 60);
-    expect(alheio.data?.[0]?.signedUrl ?? "").toBe("");
+    expect(alheio.data?.[0]?.signedUrl ?? "").not.toBe("");
     expect(
       (await operacao.cliente.storage.from("avatares").download(caminhoColega)).error,
-    ).not.toBeNull();
+    ).toBeNull();
   });
 
-  it("operacao não chega ao avatar alheio por listagem nem por RPC", async () => {
+  it("operacao lista o avatar de colega ativo, sem virar comercial (3b-2)", async () => {
     const pasta = await operacao.cliente.storage.from("avatares").list(vendedor2.id);
     expect(pasta.error).toBeNull();
-    expect(pasta.data ?? []).toHaveLength(0);
+    expect((pasta.data ?? []).map((i) => `${vendedor2.id}/${i.name}`)).toContain(caminhoColega);
     const raiz = await operacao.cliente.storage.from("avatares").list();
-    expect((raiz.data ?? []).map((i) => i.name)).not.toContain(vendedor2.id);
+    expect((raiz.data ?? []).map((i) => i.name)).toContain(vendedor2.id);
 
     const { data: podeVer } = await operacao.cliente.rpc("pode_ver_avatar", {
       p_pasta: vendedor2.id,
     });
-    expect(podeVer).toBe(false);
+    expect(podeVer).toBe(true);
     const { data: comercial } = await operacao.cliente.rpc("compartilha_empresa_comercial", {
       p_user_id: vendedor2.id,
     });
