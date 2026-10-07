@@ -22,7 +22,7 @@ const snapshotCompleto = {
     distribuidora: "Copel",
     tipo_telhado: "Cerâmico",
     estrutura_telhado: "Madeira",
-    padrao_cliente: "Bifásico",
+    padrao_cliente: "PADRAO-COMERCIAL-SECRETO",
     consumo_medio_kwh: 450,
   },
   contrato_status: "CONTRATO-SECRETO",
@@ -60,16 +60,15 @@ describe("extrairDadosTecnicos", () => {
       distribuidora: "Copel",
       tipoTelhado: "Cerâmico",
       estruturaTelhado: "Madeira",
-      padraoCliente: "Bifásico",
     });
     expect(Object.keys(t).sort()).toEqual(
-      ["consumoMedioKwh", "distribuidora", "estruturaTelhado", "geracaoEstimadaKwhMes", "kit", "kitNome", "padraoCliente", "potenciaKwp", "tipoLigacao", "tipoTelhado"].sort(),
+      ["consumoMedioKwh", "distribuidora", "estruturaTelhado", "geracaoEstimadaKwhMes", "kit", "kitNome", "potenciaKwp", "tipoLigacao", "tipoTelhado"].sort(),
     );
   });
 
-  it("nunca contém cliente, título do negócio, número do negócio nem contrato_status", () => {
+  it("nunca contém cliente, título do negócio, número do negócio, contrato_status nem padrão do cliente", () => {
     const json = JSON.stringify(extrairDadosTecnicos(snapshotCompleto));
-    for (const proibido of ["Maria Segredo", "45988887777", "999.888.777-66", "maria@segredo.com", "TITULO-SECRETO", "CONTRATO-SECRETO", "UC-123", "cliente", "email"]) {
+    for (const proibido of ["Maria Segredo", "45988887777", "999.888.777-66", "maria@segredo.com", "TITULO-SECRETO", "CONTRATO-SECRETO", "PADRAO-COMERCIAL-SECRETO", "UC-123", "cliente", "email", "padrao"]) {
       expect(json, proibido).not.toContain(proibido);
     }
   });
@@ -105,7 +104,6 @@ describe("extrairDadosTecnicos", () => {
       distribuidora: null,
       tipoTelhado: null,
       estruturaTelhado: null,
-      padraoCliente: null,
     });
   });
 
@@ -544,6 +542,16 @@ describe("carregarDetalheObra: operacao", () => {
   it("sem nenhum campo de contato, contatoCliente é null", async () => {
     const vm = await carregarDetalheObra(operacao().cliente, { empresaId: EMPRESA, papel: "operacao", obraId: OBRA });
     expect(vm?.contatoCliente).toBeNull();
+  });
+
+  it("vê vendedor e SDR da obra (decisão: Operação sabe com quem falar no Comercial), só nome e função", async () => {
+    const vm = await carregarDetalheObra(operacao().cliente, { empresaId: EMPRESA, papel: "operacao", obraId: OBRA });
+    expect(vm?.participantesComerciais).toEqual([
+      { nome: "Dani", funcaoRotulo: expect.any(String), principal: true },
+      { nome: "Edu", funcaoRotulo: expect.any(String), principal: false },
+    ]);
+    const json = JSON.stringify(vm?.participantesComerciais);
+    for (const proibido of ["m-dani", "m-edu", "avatar", "dani.png"]) expect(json, proibido).not.toContain(proibido);
   });
 
   it("linha da RPC com outro obra_id não vale", async () => {

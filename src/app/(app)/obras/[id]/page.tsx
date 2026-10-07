@@ -217,7 +217,6 @@ function DadosTecnicos({ tecnico }: { tecnico: DadosTecnicosVM }) {
     ["Distribuidora", tecnico.distribuidora],
     ["Tipo de telhado", tecnico.tipoTelhado],
     ["Estrutura do telhado", tecnico.estruturaTelhado],
-    ["Padrão do cliente", tecnico.padraoCliente],
   ];
   const preenchidos = campos.filter((c): c is [string, string] => c[1] !== null);
   if (preenchidos.length === 0 && tecnico.kit.length === 0) return <p className="text-sm text-zinc-500">Sem dados técnicos registrados.</p>;

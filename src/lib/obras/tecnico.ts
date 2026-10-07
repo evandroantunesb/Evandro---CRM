@@ -4,8 +4,9 @@ import { ROTULO_TIPO_COMPONENTE_KIT, ROTULO_TIPO_LIGACAO } from "@/lib/tipos";
  * Dados técnicos da obra, extraídos do `snapshot` (jsonb) como um DTO EXPLÍCITO.
  * O snapshot é tratado como NÃO confiável: pode ter campos faltando, tipos errados ou extras.
  * Só as chaves listadas aqui são lidas, cada uma com validação de tipo; o resto é ignorado.
- * Nunca se lê `cliente` (dado pessoal), `negocio.titulo`, `negocio.numero` nem `contrato_status`,
- * e nenhum objeto do snapshot é copiado inteiro para o resultado.
+ * Nunca se lê `cliente` (dado pessoal), `negocio.titulo`, `negocio.numero`, `contrato_status`
+ * nem `negocio.padrao_cliente` (texto livre de significado ambíguo, pode ser classificação
+ * comercial), e nenhum objeto do snapshot é copiado inteiro para o resultado.
  */
 
 export type ItemKitVM = {
@@ -26,7 +27,6 @@ export type DadosTecnicosVM = {
   distribuidora: string | null;
   tipoTelhado: string | null;
   estruturaTelhado: string | null;
-  padraoCliente: string | null;
 };
 
 export const MAX_ITENS_KIT = 100;
@@ -96,6 +96,5 @@ export function extrairDadosTecnicos(snapshot: unknown): DadosTecnicosVM {
     distribuidora: texto(ler(negocio, "distribuidora")),
     tipoTelhado: texto(ler(negocio, "tipo_telhado")),
     estruturaTelhado: texto(ler(negocio, "estrutura_telhado")),
-    padraoCliente: texto(ler(negocio, "padrao_cliente")),
   };
 }

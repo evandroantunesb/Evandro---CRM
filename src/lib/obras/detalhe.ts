@@ -85,6 +85,11 @@ export type ObraDetalheVM = {
   contatoCliente: ContatoClienteVM | null;
   /** Sempre os 3 setores, na ordem compras, engenharia, operacional. */
   setores: SetorDetalheVM[];
+  /**
+   * Vendedor e SDR ativos da obra (setor comercial), só nome e função. Nos DOIS caminhos:
+   * `operacao` também os vê (a RLS da #148 libera os participantes da obra a quem tem acesso
+   * a ela), para saber com quem falar no Comercial. Sem contato, valor ou ids.
+   */
   participantesComerciais: ParticipanteObraVM[];
   /** Sempre os 2 marcos fixos. */
   marcos: MarcoDetalheVM[];
