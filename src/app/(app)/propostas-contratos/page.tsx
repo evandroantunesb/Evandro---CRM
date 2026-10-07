@@ -12,6 +12,7 @@ import {
   ROTULO_SITUACAO_PROPOSTA,
   carregarLinhasVenda,
   filtrarLinhasVenda,
+  responsaveisPermitidos,
   type AtalhoVenda,
   type LinhaVenda,
   type SituacaoContrato,
@@ -65,7 +66,7 @@ export default async function PropostasContratos({ searchParams }: PageProps<"/p
 
   const responsavel = veEquipe ? texto("responsavel") : "";
   const equipe = veEquipe ? equipes.get(texto("equipe")) : undefined;
-  const responsaveis = responsavel ? new Set([responsavel]) : equipe?.membros;
+  const responsaveis = responsaveisPermitidos(responsavel || undefined, equipe?.membros);
   const atalho = umDe(Object.keys(ATALHOS_VENDA) as AtalhoVenda[], texto("atalho"));
 
   const visiveis = filtrarLinhasVenda(linhas, {

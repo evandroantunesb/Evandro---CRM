@@ -4,7 +4,7 @@
  * filtros/atalhos. Funções puras — não precisa de banco.
  */
 import { describe, expect, it } from "vitest";
-import { filtrarLinhasVenda, maisRecente, situacaoProposta, statusPagamento, type LinhaVenda } from "@/lib/venda";
+import { filtrarLinhasVenda, maisRecente, responsaveisPermitidos, situacaoProposta, statusPagamento, type LinhaVenda } from "@/lib/venda";
 
 const linha = (parcial: Partial<LinhaVenda>): LinhaVenda => ({
   negocioId: "n",
@@ -85,6 +85,21 @@ describe("filtrarLinhasVenda", () => {
 
   it("filtra por responsáveis (responsável/equipe)", () => {
     expect(ids({ responsaveis: new Set(["m2"]) })).toEqual(["b"]);
+  });
+
+  it("equipe e responsável são cumulativos", () => {
+    const equipe = new Set(["m2", "m3"]);
+    // só equipe: membros da equipe
+    expect(ids({ responsaveis: responsaveisPermitidos(undefined, equipe) })).toEqual(["b"]);
+    // só responsável
+    expect(ids({ responsaveis: responsaveisPermitidos("m1", undefined) })).toEqual(["a", "c", "d", "e", "f"]);
+    // equipe + responsável que pertence à equipe
+    expect(ids({ responsaveis: responsaveisPermitidos("m2", equipe) })).toEqual(["b"]);
+    // equipe + responsável fora da equipe: nenhum resultado
+    expect(ids({ responsaveis: responsaveisPermitidos("m1", equipe) })).toEqual([]);
+    // nenhum dos dois: todos
+    expect(responsaveisPermitidos(undefined, undefined)).toBeUndefined();
+    expect(ids({ responsaveis: responsaveisPermitidos(undefined, undefined) })).toHaveLength(6);
   });
 
   it("atalhos", () => {

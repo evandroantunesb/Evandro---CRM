@@ -86,6 +86,17 @@ export type FiltrosVenda = {
   atalho?: AtalhoVenda;
 };
 
+/**
+ * Filtros de responsável e equipe são cumulativos: só equipe -> membros da equipe; só
+ * responsável -> ele; os dois -> ele, se pertencer à equipe, senão nenhum (conjunto vazio);
+ * nenhum -> undefined (todos).
+ */
+export function responsaveisPermitidos(responsavel: string | undefined, membrosEquipe: ReadonlySet<string> | undefined): ReadonlySet<string> | undefined {
+  if (responsavel && membrosEquipe) return membrosEquipe.has(responsavel) ? new Set([responsavel]) : new Set<string>();
+  if (responsavel) return new Set([responsavel]);
+  return membrosEquipe;
+}
+
 function atendeAtalho(l: LinhaVenda, atalho: AtalhoVenda): boolean {
   switch (atalho) {
     case "proposta_nunca_aberta":
