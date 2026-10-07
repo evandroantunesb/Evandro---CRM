@@ -10,6 +10,7 @@ import { carregarConfiguracao, formatarDataHora, formatarMoeda } from "@/lib/crm
 import { env } from "@/lib/env";
 import { descreverAtividade } from "@/lib/linha-do-tempo";
 import { exigirPapel } from "@/lib/sessao";
+import { ATRIBUIR_TAREFA_A_OUTROS, EDITAR_VALOR_NEGOCIO, ESCOLHER_RESPONSAVEL_NEGOCIO, NEGOCIOS, PROPOSTA_E_CONTRATO, pode } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import {
   ROTULO_CATEGORIA_ANEXO,
@@ -39,7 +40,7 @@ function tamanhoLegivel(bytes: number) {
 }
 
 export default async function DetalheNegocio({ params }: PageProps<"/negocios/[id]">) {
-  const { atual } = await exigirPapel();
+  const { atual } = await exigirPapel(...NEGOCIOS);
   const { id } = await params;
   const supabase = await criarClienteServidor();
 
@@ -236,8 +237,8 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
                 (e) => e.funilId === negocio.funil_id && (e.ativa || e.id === negocio.etapa_id),
               )}
               origens={config.origens.filter((o) => o.ativa || o.id === negocio.origem_id)}
-              responsaveis={atual.papel === "vendedor" ? [] : config.membros.filter((m) => m.ativo)}
-              podeEditarValor={atual.papel !== "sdr"}
+              responsaveis={pode(atual.papel, ESCOLHER_RESPONSAVEL_NEGOCIO) ? config.membros.filter((m) => m.ativo) : []}
+              podeEditarValor={pode(atual.papel, EDITAR_VALOR_NEGOCIO)}
             />
           </Cartao>
           <Cartao titulo="Kit personalizado">
@@ -353,7 +354,7 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
                 </Cartao>
               );
             })()}
-          {atual.papel !== "sdr" && (
+          {pode(atual.papel, PROPOSTA_E_CONTRATO) && (
             <Cartao titulo="Proposta">
               <Proposta
                 negocioId={negocio.id}
@@ -375,7 +376,7 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
               />
             </Cartao>
           )}
-          {atual.papel !== "sdr" && (
+          {pode(atual.papel, PROPOSTA_E_CONTRATO) && (
             <Cartao titulo="Contrato">
               <Contrato
                 negocioId={negocio.id}
@@ -384,7 +385,7 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
               />
             </Cartao>
           )}
-          {atual.papel !== "sdr" && contrato && statusPagamento && (
+          {pode(atual.papel, PROPOSTA_E_CONTRATO) && contrato && statusPagamento && (
             <Cartao titulo="Pagamento">
               <Pagamento
                 negocioId={negocio.id}
@@ -410,7 +411,7 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
               />
               <NovaTarefa
                 negocioId={negocio.id}
-                responsaveis={atual.papel === "vendedor" ? [] : config.membros.filter((m) => m.ativo)}
+                responsaveis={pode(atual.papel, ATRIBUIR_TAREFA_A_OUTROS) ? config.membros.filter((m) => m.ativo) : []}
                 responsavelPadrao={negocio.responsavel_id}
               />
             </div>

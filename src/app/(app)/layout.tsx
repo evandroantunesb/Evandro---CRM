@@ -6,6 +6,7 @@ import { LogoRaion } from "@/components/marca";
 import { carregarDiasConsideradoParado, carregarHorasConsideradoSemContato } from "@/lib/crm";
 import { carregarNotificacoesNaoLidas, contarPendencias, temConquistaNaoVisualizada } from "@/lib/notificacoes";
 import { linksPendencias, type ContagemPendencias } from "@/lib/pendencias";
+import { CARTEIRA_CONTATOS, GAMIFICACAO, GESTAO_COMERCIAL, NEGOCIOS, PARTICIPANTES_GAMIFICACAO, PROPOSTA_E_CONTRATO, TAREFAS, pode } from "@/lib/permissoes";
 import { obterSessao } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { trocarEmpresa } from "@/lib/acoes/empresa-atual";
@@ -21,6 +22,7 @@ const GRUPO_GAMIFICACAO = "Gamificação";
  * ativo nessas rotas). Administração (admin) segue como hub das telas de configuração.
  */
 function itensGamificacao(papel: Papel | undefined, conquistaNova: boolean) {
+  if (!pode(papel, GAMIFICACAO)) return [];
   const visaoGeral = {
     href: "/gamificacao",
     rotulo: "Visão geral",
@@ -50,7 +52,7 @@ function itensGamificacao(papel: Papel | undefined, conquistaNova: boolean) {
       },
     ];
   }
-  if (papel === "gestor") return [visaoGeral, desempenho];
+  if (!pode(papel, PARTICIPANTES_GAMIFICACAO)) return [visaoGeral, desempenho];
   return [
     visaoGeral,
     desempenho,
@@ -89,14 +91,14 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
     ...(sessao.atual
       ? [
           { href: "/inicio", rotulo: "Início" },
-          { href: "/tarefas", rotulo: "Tarefas" },
-          ...(papel === "admin" || papel === "gestor" ? [{ href: "/leads-a-distribuir", rotulo: "Leads a distribuir", secao: "Aquisição" }] : []),
+          ...(pode(papel, TAREFAS) ? [{ href: "/tarefas", rotulo: "Tarefas" }] : []),
+          ...(pode(papel, GESTAO_COMERCIAL) ? [{ href: "/leads-a-distribuir", rotulo: "Leads a distribuir", secao: "Aquisição" }] : []),
           ...(papel === "admin" ? [{ href: "/configuracoes/captura", rotulo: "Captura de leads", secao: "Aquisição" }] : []),
-          { href: "/negocios", rotulo: "Negócios", secao: "Comercial" },
-          ...(papel !== "sdr" ? [{ href: "/contatos", rotulo: "Contatos", secao: "Comercial" }] : []),
+          ...(pode(papel, NEGOCIOS) ? [{ href: "/negocios", rotulo: "Negócios", secao: "Comercial" }] : []),
+          ...(pode(papel, CARTEIRA_CONTATOS) ? [{ href: "/contatos", rotulo: "Contatos", secao: "Comercial" }] : []),
           // SDR não gera proposta nem contrato (spec RAION_SDR_REGRAS_PERMISSOES §40/§41).
-          ...(papel !== "sdr" ? [{ href: "/propostas-contratos", rotulo: "Propostas e contratos", secao: "Venda" }] : []),
-          ...(papel === "admin" || papel === "gestor" ? [{ href: "/painel", rotulo: "Painel", secao: "Gestão" }] : []),
+          ...(pode(papel, PROPOSTA_E_CONTRATO) ? [{ href: "/propostas-contratos", rotulo: "Propostas e contratos", secao: "Venda" }] : []),
+          ...(pode(papel, GESTAO_COMERCIAL) ? [{ href: "/painel", rotulo: "Painel", secao: "Gestão" }] : []),
           ...itensGamificacao(papel, conquistaNova),
         ]
       : []),

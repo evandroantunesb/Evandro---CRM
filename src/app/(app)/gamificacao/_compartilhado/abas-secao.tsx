@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { Papel } from "@/lib/tipos";
+import { PARTICIPANTES_GAMIFICACAO, pode } from "@/lib/permissoes";
 
 type Aba = { href: string; rotulo: string };
 
 /**
  * Navegação interna das seções agrupadas do menu lateral: Desempenho
  * (Ranking | Metas | Comissões) e Recompensas (Loja | Extrato / Meus resgates).
- * Comissões só aparece para quem participa (qualquer papel exceto admin/gestor);
+ * Comissões só aparece para quem participa (PARTICIPANTES_GAMIFICACAO: vendedor e SDR);
  * a página em si não muda — só deixa de ter aba para admin/gestor.
  */
 function abasDaSecao(secao: "desempenho" | "recompensas", papel: Papel): Aba[] {
@@ -23,7 +24,7 @@ function abasDaSecao(secao: "desempenho" | "recompensas", papel: Papel): Aba[] {
     { href: "/gamificacao/ranking", rotulo: "Ranking" },
     { href: "/gamificacao/metas", rotulo: "Metas" },
   ];
-  if (papel !== "admin" && papel !== "gestor") abas.push({ href: "/gamificacao/comissoes", rotulo: "Comissões" });
+  if (pode(papel, PARTICIPANTES_GAMIFICACAO)) abas.push({ href: "/gamificacao/comissoes", rotulo: "Comissões" });
   return abas;
 }
 

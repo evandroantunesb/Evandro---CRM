@@ -6,6 +6,7 @@ import { formatarMoeda } from "@/lib/formatacao";
 import { mensagemErro } from "@/lib/erros";
 import { preencherModeloContrato, type DadosContrato } from "@/lib/contrato";
 import { exigirPapel } from "@/lib/sessao";
+import { CONFIRMAR_PAGAMENTO, NEGOCIOS, PROPOSTA_E_CONTRATO, pode } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { STATUS_CONTRATO, type ResultadoAcao } from "@/lib/tipos";
 
@@ -26,8 +27,8 @@ export async function salvarModeloContrato(_: ResultadoAcao, formData: FormData)
 
 /** Gera (ou regera, enquanto ainda for rascunho) o contrato do negócio a partir do modelo da empresa. */
 export async function gerarContrato(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  const { atual } = await exigirPapel();
-  if (atual.papel === "sdr") return { ok: false, mensagem: "SDR não pode gerar contrato (spec RAION_SDR_REGRAS_PERMISSOES §41)." };
+  const { atual } = await exigirPapel(...NEGOCIOS);
+  if (!pode(atual.papel, PROPOSTA_E_CONTRATO)) return { ok: false, mensagem: "SDR não pode gerar contrato (spec RAION_SDR_REGRAS_PERMISSOES §41)." };
   const id = z.string().uuid().safeParse(formData.get("negocioId"));
   if (!id.success) return { ok: false, mensagem: "Negócio inválido." };
 
@@ -105,7 +106,8 @@ const esquemaConfirmarPagamento = z.object({
  * 20261001250000_gamificacao_pagamento_confirmado.sql).
  */
 export async function confirmarPagamento(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  await exigirPapel();
+  const { atual } = await exigirPapel(...NEGOCIOS);
+  if (!pode(atual.papel, CONFIRMAR_PAGAMENTO)) return { ok: false, mensagem: "Só gestor ou admin pode confirmar pagamento." };
   const dados = esquemaConfirmarPagamento.safeParse(Object.fromEntries(formData));
   if (!dados.success) return { ok: false, mensagem: "Dados inválidos." };
 
@@ -122,7 +124,8 @@ const esquemaEstornarPagamento = esquemaConfirmarPagamento.extend({
 });
 
 export async function estornarConfirmacaoPagamento(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  await exigirPapel();
+  const { atual } = await exigirPapel(...NEGOCIOS);
+  if (!pode(atual.papel, CONFIRMAR_PAGAMENTO)) return { ok: false, mensagem: "Só gestor ou admin pode estornar a confirmação." };
   const dados = esquemaEstornarPagamento.safeParse(Object.fromEntries(formData));
   if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
 
@@ -138,8 +141,8 @@ export async function estornarConfirmacaoPagamento(_: ResultadoAcao, formData: F
 }
 
 export async function atualizarStatusContrato(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  const { atual } = await exigirPapel();
-  if (atual.papel === "sdr") return { ok: false, mensagem: "SDR não pode alterar o status do contrato (spec RAION_SDR_REGRAS_PERMISSOES §41)." };
+  const { atual } = await exigirPapel(...NEGOCIOS);
+  if (!pode(atual.papel, PROPOSTA_E_CONTRATO)) return { ok: false, mensagem: "SDR não pode alterar o status do contrato (spec RAION_SDR_REGRAS_PERMISSOES §41)." };
   const dados = z
     .object({ negocioId: z.string().uuid(), status: z.enum(STATUS_CONTRATO) })
     .safeParse(Object.fromEntries(formData));

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { mensagemErro } from "@/lib/erros";
 import { exigirPapel } from "@/lib/sessao";
+import { NEGOCIOS, PROPOSTA_E_CONTRATO, pode } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { MODOS_PRECO, type ResultadoAcao } from "@/lib/tipos";
 
@@ -16,8 +17,8 @@ const esquemaGerar = z.object({ negocioId: z.string().uuid(), modeloId: z.string
  * momento: editar o modelo depois não muda uma proposta já emitida.
  */
 export async function gerarLinkProposta(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  const { atual } = await exigirPapel();
-  if (atual.papel === "sdr") return { ok: false, mensagem: "SDR não pode gerar proposta (spec RAION_SDR_REGRAS_PERMISSOES §40)." };
+  const { atual } = await exigirPapel(...NEGOCIOS);
+  if (!pode(atual.papel, PROPOSTA_E_CONTRATO)) return { ok: false, mensagem: "SDR não pode gerar proposta (spec RAION_SDR_REGRAS_PERMISSOES §40)." };
   const dados = esquemaGerar.safeParse({ negocioId: formData.get("negocioId"), modeloId: formData.get("modeloId") || undefined });
   if (!dados.success) return { ok: false, mensagem: "Negócio inválido." };
 
@@ -83,8 +84,8 @@ export async function gerarLinkProposta(_: ResultadoAcao, formData: FormData): P
 
 /** Preço e quais seções aparecem na proposta pública (o vendedor decide, por negócio). */
 export async function definirExibicaoProposta(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  const { atual } = await exigirPapel();
-  if (atual.papel === "sdr") return { ok: false, mensagem: "SDR não pode editar a exibição da proposta (spec RAION_SDR_REGRAS_PERMISSOES §40)." };
+  const { atual } = await exigirPapel(...NEGOCIOS);
+  if (!pode(atual.papel, PROPOSTA_E_CONTRATO)) return { ok: false, mensagem: "SDR não pode editar a exibição da proposta (spec RAION_SDR_REGRAS_PERMISSOES §40)." };
   const dados = z
     .object({
       negocioId: z.string().uuid(),

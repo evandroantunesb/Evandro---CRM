@@ -1,11 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { obterEmailConta, trocarCodigoPorTokens } from "@/lib/google-agenda";
 import { exigirPapel } from "@/lib/sessao";
+import { GOOGLE_AGENDA } from "@/lib/permissoes";
 import { criarClienteAdmin } from "@/lib/supabase/admin";
 
 /** Volta do Google com o código de autorização: troca por tokens e salva a conexão do membro. */
 export async function GET(request: NextRequest) {
-  const { atual } = await exigirPapel();
+  const { atual } = await exigirPapel(...GOOGLE_AGENDA);
   const { searchParams } = request.nextUrl;
   const code = searchParams.get("code");
   const state = searchParams.get("state");

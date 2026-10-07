@@ -3,6 +3,7 @@ import { assinarAvatares } from "@/lib/avatares";
 import { carregarConfiguracao } from "@/lib/crm";
 import { calcularProgresso, calcularRealizado, type Meta } from "@/lib/metas";
 import { exigirPapel } from "@/lib/sessao";
+import { GAMIFICACAO } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { ROTULO_METRICA_META, UNIDADE_METRICA_META, type MetricaMeta } from "@/lib/tipos";
 import { AbasSecao } from "../_compartilhado/abas-secao";
@@ -21,7 +22,7 @@ function formatarData(isoData: string) {
 }
 
 export default async function MinhasMetas() {
-  const { atual } = await exigirPapel();
+  const { atual } = await exigirPapel(...GAMIFICACAO);
   const supabase = await criarClienteServidor();
   const [{ data: linhas }, config] = await Promise.all([
     supabase

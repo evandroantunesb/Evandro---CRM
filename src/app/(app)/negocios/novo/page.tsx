@@ -2,11 +2,12 @@ import Link from "next/link";
 import { Cartao } from "@/components/ui";
 import { carregarConfiguracao } from "@/lib/crm";
 import { exigirPapel } from "@/lib/sessao";
+import { ESCOLHER_RESPONSAVEL_NEGOCIO, NEGOCIOS, pode } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { FormularioNegocio } from "./formulario";
 
 export default async function NovoNegocio({ searchParams }: PageProps<"/negocios/novo">) {
-  const { atual } = await exigirPapel();
+  const { atual } = await exigirPapel(...NEGOCIOS);
   const { funil, etapa } = await searchParams;
   const supabase = await criarClienteServidor();
   const [config, { data: parametros }] = await Promise.all([
@@ -28,7 +29,7 @@ export default async function NovoNegocio({ searchParams }: PageProps<"/negocios
           funilId={funilEscolhido.id}
           etapaId={etapaEscolhida?.id}
           origens={config.origens.filter((o) => o.ativa)}
-          responsaveis={atual.papel === "vendedor" ? [] : config.membros.filter((m) => m.ativo)}
+          responsaveis={pode(atual.papel, ESCOLHER_RESPONSAVEL_NEGOCIO) ? config.membros.filter((m) => m.ativo) : []}
           meuMembroId={atual.membroId}
           parametros={
             parametros

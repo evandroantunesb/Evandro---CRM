@@ -6,6 +6,7 @@ import { z } from "zod";
 import { montarLinhaCalculo } from "@/lib/acoes/calculadora";
 import { enviarAnexoNoServidor } from "@/lib/acoes/anexos";
 import { exigirPapel } from "@/lib/sessao";
+import { EDITAR_VALOR_NEGOCIO, ESCOLHER_RESPONSAVEL_NEGOCIO, FECHAR_NEGOCIO, NEGOCIOS, pode } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { mensagemErro } from "@/lib/erros";
 import { componentesJsonSchema, nomeKitPersonalizado, potenciaKitPersonalizadoKwp } from "@/lib/calculadora";
@@ -73,7 +74,7 @@ const esquemaNovo = z.object({
 });
 
 export async function criarNegocio(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  const { atual } = await exigirPapel();
+  const { atual } = await exigirPapel(...NEGOCIOS);
   const dados = esquemaNovo.safeParse(Object.fromEntries(formData));
   if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
   const d = dados.data;
@@ -128,8 +129,8 @@ export async function criarNegocio(_: ResultadoAcao, formData: FormData): Promis
       funil_id: d.funil_id,
       etapa_id: etapaId,
       origem_id: d.origem_id,
-      // Vendedor sempre fica como responsável; admin e gestor podem escolher.
-      responsavel_id: atual.papel === "vendedor" ? null : d.responsavel_id,
+      // Só admin e gestor escolhem o responsável; os demais ficam como responsáveis.
+      responsavel_id: pode(atual.papel, ESCOLHER_RESPONSAVEL_NEGOCIO) ? d.responsavel_id : null,
       valor: d.valor,
       descricao: d.descricao || null,
       contato_id: contatoId,
@@ -220,7 +221,7 @@ export async function criarNegocio(_: ResultadoAcao, formData: FormData): Promis
  * chamada (ganho automático não precisa de motivo, o gatilho do banco cuida sozinho).
  */
 export async function moverEtapa(negocioId: string, etapaId: string, comentario: string, motivoPerdaId?: string): Promise<ResultadoAcao> {
-  const { atual } = await exigirPapel();
+  const { atual } = await exigirPapel(...NEGOCIOS);
   const ids = z
     .object({
       negocioId: z.string().uuid(),
@@ -233,7 +234,7 @@ export async function moverEtapa(negocioId: string, etapaId: string, comentario:
 
   const supabase = await criarClienteServidor();
 
-  if (atual.papel === "sdr") {
+  if (!pode(atual.papel, FECHAR_NEGOCIO)) {
     // SDR não pode fechar o negócio (spec §39) — nem movendo pra uma etapa que fecha sozinha (ganho/perdido).
     const { data: etapaDestino } = await supabase.from("etapas").select("fecha_como").eq("id", ids.data.etapaId).maybeSingle();
     if (etapaDestino?.fecha_como) {
@@ -277,7 +278,7 @@ const esquemaEdicao = z.object({
 });
 
 export async function editarNegocio(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  const { atual } = await exigirPapel();
+  const { atual } = await exigirPapel(...NEGOCIOS);
   const dados = esquemaEdicao.safeParse(Object.fromEntries(formData));
   if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
   const d = dados.data;
@@ -296,8 +297,8 @@ export async function editarNegocio(_: ResultadoAcao, formData: FormData): Promi
       consumo_medio_kwh: d.consumo_medio_kwh,
       valor_conta_energia: d.valor_conta_energia,
       // SDR não pode alterar o valor financeiro do negócio (spec RAION_SDR_REGRAS_PERMISSOES §39) — só na criação.
-      ...(atual.papel !== "sdr" ? { valor: d.valor } : {}),
-      ...(atual.papel !== "vendedor" && d.responsavel_id ? { responsavel_id: d.responsavel_id } : {}),
+      ...(pode(atual.papel, EDITAR_VALOR_NEGOCIO) ? { valor: d.valor } : {}),
+      ...(pode(atual.papel, ESCOLHER_RESPONSAVEL_NEGOCIO) && d.responsavel_id ? { responsavel_id: d.responsavel_id } : {}),
     })
     .eq("id", d.negocioId)
     .select("id");
@@ -331,8 +332,8 @@ const esquemaFechamento = z.discriminatedUnion("status", [
 
 /** Marca como ganho, perdido (com motivo) ou reabre. SDR não fecha negócio (spec §39) — usa "Enviar para vendas". */
 export async function alterarStatus(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  const { atual } = await exigirPapel();
-  if (atual.papel === "sdr") return { ok: false, mensagem: "SDR não pode marcar o negócio como ganho ou perdido." };
+  const { atual } = await exigirPapel(...NEGOCIOS);
+  if (!pode(atual.papel, FECHAR_NEGOCIO)) return { ok: false, mensagem: "SDR não pode marcar o negócio como ganho ou perdido." };
   const dados = esquemaFechamento.safeParse(Object.fromEntries(formData));
   if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
   const d = dados.data;
@@ -357,7 +358,7 @@ export async function alterarStatus(_: ResultadoAcao, formData: FormData): Promi
 
 /** Marca ou desmarca uma etiqueta no negócio. */
 export async function alternarEtiqueta(formData: FormData) {
-  const { atual } = await exigirPapel();
+  const { atual } = await exigirPapel(...NEGOCIOS);
   const ids = z
     .object({ negocioId: z.string().uuid(), etiquetaId: z.string().uuid(), marcar: z.enum(["true", "false"]) })
     .safeParse(Object.fromEntries(formData));
@@ -378,7 +379,7 @@ export type Duplicado = { contatoId: string; nome: string; visivel: boolean; res
 
 /** Confere se já existe contato com esse telefone ou e-mail na empresa. */
 export async function verificarDuplicado(telefone: string, email: string): Promise<Duplicado[]> {
-  const { atual } = await exigirPapel();
+  const { atual } = await exigirPapel(...NEGOCIOS);
   const supabase = await criarClienteServidor();
   const { data } = await supabase.rpc("buscar_contato_duplicado", {
     p_empresa_id: atual.empresaId,
@@ -396,7 +397,7 @@ export async function verificarDuplicado(telefone: string, email: string): Promi
 
 /** Busca contatos visíveis para o seletor de "contato existente". */
 export async function buscarContatos(termo: string) {
-  const { atual } = await exigirPapel();
+  const { atual } = await exigirPapel(...NEGOCIOS);
   const t = termo.trim();
   if (t.length < 2) return [];
   const supabase = await criarClienteServidor();
@@ -431,7 +432,7 @@ const esquemaQualificacao = z.object({
 
 /** Salva o bloco "Qualificação SDR" do negócio (spec RAION_SDR_REGRAS_PERMISSOES, fase 4). */
 export async function atualizarQualificacao(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  await exigirPapel();
+  await exigirPapel(...NEGOCIOS);
   const dados = esquemaQualificacao.safeParse(Object.fromEntries(formData));
   if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
   const d = dados.data;
@@ -476,7 +477,7 @@ const esquemaHandoff = z.object({
  * pra fase futura (§9/§45 da spec).
  */
 export async function enviarParaVendas(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  const { atual } = await exigirPapel();
+  const { atual } = await exigirPapel(...NEGOCIOS);
   const dados = esquemaHandoff.safeParse(Object.fromEntries(formData));
   if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
   const d = dados.data;
@@ -541,7 +542,7 @@ const esquemaRespostaHandoff = z.object({
 
 /** Closer aceita a oportunidade: `responsavel_id` passa pra ele (ver migration 20261001170000). */
 export async function aceitarHandoff(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  await exigirPapel();
+  await exigirPapel(...NEGOCIOS);
   const dados = esquemaRespostaHandoff.safeParse(Object.fromEntries(formData));
   if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
 
@@ -559,7 +560,7 @@ const esquemaDevolucaoHandoff = esquemaRespostaHandoff.extend({
 
 /** Closer devolve a oportunidade pro SDR; o negócio nunca reabre, um novo envio cria handoff novo. */
 export async function devolverHandoff(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  await exigirPapel();
+  await exigirPapel(...NEGOCIOS);
   const dados = esquemaDevolucaoHandoff.safeParse(Object.fromEntries(formData));
   if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
 
@@ -583,7 +584,7 @@ const esquemaFeedbackHandoff = z.object({
  * handoffs_feedback garante isso, não só a tela). Serve de métrica pra avaliar o SDR.
  */
 export async function registrarFeedbackHandoff(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  const { atual } = await exigirPapel();
+  const { atual } = await exigirPapel(...NEGOCIOS);
   const dados = esquemaFeedbackHandoff.safeParse(Object.fromEntries(formData));
   if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
   const d = dados.data;

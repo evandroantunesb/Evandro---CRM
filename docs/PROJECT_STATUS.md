@@ -81,6 +81,7 @@ Membros fictícios: Lucas Martins, Mariana Costa, Rafael Almeida e Bruno Ferreir
 - Validar produção e migrations (aplicadas × `main` × PRs).
 - Deduplicação de contatos e hardening de concorrência em `unica_por_negocio` — sem data.
 - `PROGRESS.md` e `HANDOFF.md` (raiz) estão desatualizados; servem só como histórico.
+- PR 3b (papel `operacao`/setores de Obras): conferir se a RLS de `tarefas` precisa alinhar com o app da PR 3a (#146) — no app, só admin e gestor atribuem tarefa a outra pessoa e veem tarefas de outros; o SDR cria só para si.
 
 ## Próximas prioridades
 

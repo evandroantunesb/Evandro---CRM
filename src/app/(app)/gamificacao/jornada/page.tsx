@@ -1,6 +1,7 @@
 import { Award, Check, Lock } from "lucide-react";
 import { calcularNivel, ROTULO_MARCO_CONQUISTA, type MarcoConquista } from "@/lib/gamificacao";
 import { exigirPapel } from "@/lib/sessao";
+import { GAMIFICACAO } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import {
   BadgeGf,
@@ -24,7 +25,7 @@ function descreverCriterio(criterio: unknown) {
 const HEXAGONO = "[clip-path:polygon(25%_5%,75%_5%,100%_50%,75%_95%,25%_95%,0_50%)]";
 
 export default async function MinhaJornada() {
-  const { atual } = await exigirPapel();
+  const { atual } = await exigirPapel(...GAMIFICACAO);
   const supabase = await criarClienteServidor();
 
   const [{ data: lancamentos }, { data: niveis }, { data: conquistas }, { data: desbloqueadas }] = await Promise.all([

@@ -3,11 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { exigirPapel } from "@/lib/sessao";
+import { ANEXOS_E_NOTAS } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import type { ResultadoAcao } from "@/lib/tipos";
 
 export async function criarNota(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  const { atual } = await exigirPapel();
+  const { atual } = await exigirPapel(...ANEXOS_E_NOTAS);
   const dados = z
     .object({
       negocioId: z.string().uuid(),

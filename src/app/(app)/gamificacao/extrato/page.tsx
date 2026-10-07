@@ -1,5 +1,6 @@
 import { Receipt, Wallet, Zap } from "lucide-react";
 import { exigirPapel } from "@/lib/sessao";
+import { GAMIFICACAO } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { formatarDataHora } from "@/lib/formatacao";
 import { AbasSecao } from "../_compartilhado/abas-secao";
@@ -14,7 +15,7 @@ import {
 } from "../_compartilhado/ui";
 
 export default async function ExtratoDePontos() {
-  const { atual } = await exigirPapel();
+  const { atual } = await exigirPapel(...GAMIFICACAO);
   const supabase = await criarClienteServidor();
   const { data: lancamentos } = await supabase
     .from("point_ledger")

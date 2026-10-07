@@ -6,6 +6,7 @@ import { prazoParaIso } from "@/lib/crm";
 import { mensagemErro } from "@/lib/erros";
 import { apagarEvento, criarEvento, obterAccessToken } from "@/lib/google-agenda";
 import { exigirPapel } from "@/lib/sessao";
+import { ATRIBUIR_TAREFA_A_OUTROS, TAREFAS, pode } from "@/lib/permissoes";
 import { criarClienteAdmin } from "@/lib/supabase/admin";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { RESULTADOS_TAREFA, TIPOS_TAREFA, type ResultadoAcao } from "@/lib/tipos";
@@ -89,15 +90,15 @@ function atualizarTelas(negocioId: string | null) {
 }
 
 export async function criarTarefa(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  const { atual } = await exigirPapel();
+  const { atual } = await exigirPapel(...TAREFAS);
   const dados = esquemaTarefa.safeParse(Object.fromEntries(formData));
   if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
   const d = dados.data;
 
   const supabase = await criarClienteServidor();
   const venceEmIso = prazoParaIso(d.vence_em);
-  // Vendedor sempre cria para si; o banco confere quem pode atribuir para quem.
-  const responsavelId = atual.papel === "vendedor" ? atual.membroId : (d.responsavel_id ?? atual.membroId);
+  // Só admin e gestor atribuem tarefa a outra pessoa; os demais criam para si. O banco também confere.
+  const responsavelId = pode(atual.papel, ATRIBUIR_TAREFA_A_OUTROS) ? (d.responsavel_id ?? atual.membroId) : atual.membroId;
   const { data: tarefa, error } = await supabase
     .from("tarefas")
     .insert({
@@ -144,7 +145,7 @@ const esquemaConclusao = z.object({
  * devolve a mensagem certa; reabrir sempre limpa o resultado, sem precisar informar nada.
  */
 export async function alternarConclusao(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  await exigirPapel();
+  await exigirPapel(...TAREFAS);
   const d = esquemaConclusao.safeParse(Object.fromEntries(formData));
   if (!d.success) return { ok: false, mensagem: d.error.issues[0].message };
 
@@ -162,7 +163,7 @@ export async function alternarConclusao(_: ResultadoAcao, formData: FormData): P
 }
 
 export async function apagarTarefa(formData: FormData) {
-  await exigirPapel();
+  await exigirPapel(...TAREFAS);
   const id = z.string().uuid().safeParse(formData.get("tarefaId"));
   if (!id.success) return;
   const supabase = await criarClienteServidor();
