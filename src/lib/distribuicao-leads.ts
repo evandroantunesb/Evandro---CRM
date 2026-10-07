@@ -1,5 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { MembroResumo } from "@/lib/crm";
 import type { Database } from "@/lib/supabase/database.types";
 import type { ModoDistribuicaoLeads, Papel } from "@/lib/tipos";
 
@@ -61,4 +62,68 @@ export async function escolherProximoResponsavel(
   }
 
   return proximoPorRodizio(supabase, empresaId, ["vendedor"]);
+}
+
+// Fila "Leads a distribuir" ---------------------------------------------------------------
+
+export type AtribuicaoPendente = {
+  id: string;
+  negocioId: string;
+  negocioNumero: number;
+  contatoNome: string;
+  membroSugeridoId: string;
+  membroSugeridoNome: string;
+  expiraEm: string;
+};
+
+/** Leads que o rodízio sugeriu e ainda esperam aprovação (ou reatribuição) do gestor. */
+export async function carregarAtribuicoesPendentes(supabase: Cliente, empresaId: string): Promise<AtribuicaoPendente[]> {
+  const { data } = await supabase
+    .from("atribuicoes_leads")
+    .select(
+      "id, expira_em, negocios!inner(id, numero, contatos(nome)), empresa_membros!atribuicoes_leads_membro_sugerido_id_fkey(id, perfis(nome))",
+    )
+    .eq("empresa_id", empresaId)
+    .eq("status", "pendente")
+    .order("expira_em");
+
+  return (data ?? []).map((a) => {
+    const negocio = a.negocios as unknown as { id: string; numero: number; contatos: { nome: string } | null };
+    const membro = a.empresa_membros as unknown as { id: string; perfis: { nome: string } | null };
+    return {
+      id: a.id,
+      negocioId: negocio.id,
+      negocioNumero: negocio.numero,
+      contatoNome: negocio.contatos?.nome ?? "(sem nome)",
+      membroSugeridoId: membro.id,
+      membroSugeridoNome: membro.perfis?.nome ?? "(sem nome)",
+      expiraEm: a.expira_em,
+    };
+  });
+}
+
+/** Quantos leads esperam distribuição (só admin/gestor enxergam a tabela — RLS). */
+export async function contarAtribuicoesPendentes(supabase: Cliente, empresaId: string): Promise<number> {
+  const { count } = await supabase
+    .from("atribuicoes_leads")
+    .select("id", { count: "exact", head: true })
+    .eq("empresa_id", empresaId)
+    .eq("status", "pendente");
+  return count ?? 0;
+}
+
+/** Papéis que o rodízio pode sugerir (ver escolherProximoResponsavel) — os mesmos oferecidos na fila. */
+export const PAPEIS_CANDIDATOS_DISTRIBUICAO: readonly Papel[] = ["vendedor", "sdr"];
+
+/** Quem pode receber um lead na fila: membros ativos com papel vendedor ou SDR. */
+export function candidatosDistribuicao(membros: MembroResumo[]): MembroResumo[] {
+  return membros.filter((m) => m.ativo && (PAPEIS_CANDIDATOS_DISTRIBUICAO as readonly string[]).includes(m.papel));
+}
+
+/**
+ * Responsável pré-selecionado na fila: o sugerido pelo rodízio, se ainda for candidato.
+ * Senão, vazio — o gestor precisa escolher alguém (nunca cai sozinho no primeiro da lista).
+ */
+export function responsavelPadrao(candidatos: MembroResumo[], membroSugeridoId: string): string {
+  return candidatos.some((c) => c.id === membroSugeridoId) ? membroSugeridoId : "";
 }

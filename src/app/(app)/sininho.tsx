@@ -4,33 +4,39 @@ import { Bell } from "lucide-react";
 import Link from "next/link";
 import { marcarNotificacaoLida } from "@/lib/acoes/notificacoes";
 import type { Notificacao } from "@/lib/notificacoes";
+import type { LinkPendencias } from "@/lib/pendencias";
 
-/** Bell do menu: se há notificação individual não lida, abre um dropdown com elas; senão cai no link de pendências de sempre. */
-export function Sininho({
-  notificacoes,
-  linkPendencias,
-  textoPendencias,
-}: {
-  notificacoes: Notificacao[];
-  linkPendencias: string;
-  textoPendencias: string;
-}) {
+// Linha discreta, integrada ao sidebar (não compete com os itens do menu); leads a distribuir
+// ganham só um leve destaque dourado.
+const LINHA = "flex min-h-8 items-center gap-2 rounded-md border px-2.5 py-1.5 text-[13px] transition-colors";
+const LINHA_NEUTRA = `${LINHA} border-white/[0.06] text-offwhite/60 hover:bg-white/[0.04] hover:text-offwhite`;
+const LINHA_DESTAQUE = `${LINHA} border-dourado/20 text-offwhite/80 hover:bg-white/[0.04] hover:text-offwhite`;
+
+/**
+ * Bell do menu: se há notificação individual não lida, abre um dropdown com elas; senão mostra
+ * os links de pendências (admin/gestor: leads a distribuir e demais pendências separados).
+ */
+export function Sininho({ notificacoes, pendencias }: { notificacoes: Notificacao[]; pendencias: LinkPendencias[] }) {
   if (notificacoes.length === 0) {
     return (
-      <Link
-        href={linkPendencias}
-        className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-offwhite hover:border-dourado"
-      >
-        <Bell size={16} />
-        {textoPendencias}
-      </Link>
+      <div className="flex flex-col gap-1">
+        {pendencias.map((p) => {
+          const destaque = p.href === "/leads-a-distribuir";
+          return (
+            <Link key={p.href} href={p.href} className={destaque ? LINHA_DESTAQUE : LINHA_NEUTRA}>
+              <Bell size={14} strokeWidth={1.75} className={destaque ? "text-dourado" : ""} />
+              {p.texto}
+            </Link>
+          );
+        })}
+      </div>
     );
   }
 
   return (
     <details className="group relative">
-      <summary className="flex cursor-pointer list-none items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-offwhite hover:border-dourado">
-        <Bell size={16} />
+      <summary className={`${LINHA_DESTAQUE} cursor-pointer list-none`}>
+        <Bell size={14} strokeWidth={1.75} className="text-dourado" />
         {notificacoes.length} notificaç{notificacoes.length === 1 ? "ão" : "ões"}
       </summary>
       <div className="absolute top-full left-0 z-20 mt-1 w-72 rounded-lg border border-zinc-200 bg-white p-1 text-carvao shadow-lg">
@@ -49,9 +55,11 @@ export function Sininho({
             </button>
           </form>
         ))}
-        <Link href={linkPendencias} className="block rounded-md p-2 text-xs text-zinc-500 hover:bg-zinc-50 hover:underline">
-          {textoPendencias}
-        </Link>
+        {pendencias.map((p) => (
+          <Link key={p.href} href={p.href} className="block rounded-md p-2 text-xs text-zinc-500 hover:bg-zinc-50 hover:underline">
+            {p.texto}
+          </Link>
+        ))}
       </div>
     </details>
   );

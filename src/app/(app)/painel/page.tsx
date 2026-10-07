@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { Cartao, Selo } from "@/components/ui";
 import { carregarConfiguracao, formatarMoeda, tempoDesde } from "@/lib/crm";
+import { contarAtribuicoesPendentes } from "@/lib/distribuicao-leads";
 import {
-  carregarAtribuicoesPendentes,
   carregarIndicadores,
   carregarLeadsParadosPainel,
   carregarLeadsSemContatoPainel,
@@ -10,15 +10,15 @@ import {
   carregarTarefasAtrasadasLista,
 } from "@/lib/painel";
 import { exigirPapel } from "@/lib/sessao";
-import { LinhaAtribuicaoPendente } from "./atribuicoes-pendentes";
+import { criarClienteServidor } from "@/lib/supabase/server";
 import { LinhaParado } from "./linha-parado";
 
 export default async function Painel() {
   const { atual } = await exigirPapel("admin", "gestor");
   const config = await carregarConfiguracao(atual.empresaId);
-  const [indicadores, atribuicoesPendentes, tarefasAtrasadas, leadsParados, propostasParadas, leadsSemContato] = await Promise.all([
+  const [indicadores, leadsADistribuir, tarefasAtrasadas, leadsParados, propostasParadas, leadsSemContato] = await Promise.all([
     carregarIndicadores(atual.empresaId, config),
-    carregarAtribuicoesPendentes(atual.empresaId),
+    criarClienteServidor().then((supabase) => contarAtribuicoesPendentes(supabase, atual.empresaId)),
     carregarTarefasAtrasadasLista(atual.empresaId, config),
     carregarLeadsParadosPainel(atual.empresaId, config.diasConsideradoParado),
     carregarPropostasParadasPainel(atual.empresaId, config.diasConsideradoParado),
@@ -38,21 +38,16 @@ export default async function Painel() {
         <Estatistica rotulo="Tarefas atrasadas" valor={indicadores.tarefasAtrasadas} destaque={indicadores.tarefasAtrasadas ? "negativo" : "neutro"} />
       </div>
 
-      {atribuicoesPendentes.length > 0 && (
-        <Cartao titulo={`Leads aguardando aprovação (${atribuicoesPendentes.length})`}>
-          <p className="mb-2 text-sm text-zinc-600">
-            O rodízio sugeriu um vendedor pra cada lead abaixo. Aprove a sugestão ou escolha outro vendedor — sem decisão, o
-            lead é atribuído sozinho pro sugerido quando o prazo da origem vencer.
-          </p>
-          {atribuicoesPendentes.map((a) => (
-            <LinhaAtribuicaoPendente
-              key={a.id}
-              atribuicao={a}
-              minutosRestantes={Math.round((new Date(a.expiraEm).getTime() - agora.getTime()) / 60_000)}
-              vendedores={vendedores}
-            />
-          ))}
-        </Cartao>
+      {leadsADistribuir > 0 && (
+        <Link
+          href="/leads-a-distribuir"
+          className="flex items-center justify-between gap-3 rounded-xl border border-dourado/40 bg-dourado/5 px-4 py-3 text-sm text-zinc-900 hover:border-dourado"
+        >
+          <span>
+            <strong>{leadsADistribuir}</strong> lead{leadsADistribuir === 1 ? "" : "s"} aguardando distribuição
+          </span>
+          <span className="shrink-0 font-medium text-dourado">Distribuir →</span>
+        </Link>
       )}
 
       {leadsSemContato.length > 0 && (

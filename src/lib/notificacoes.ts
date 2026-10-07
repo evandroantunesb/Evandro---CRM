@@ -1,7 +1,9 @@
 import "server-only";
+import { contarAtribuicoesPendentes } from "@/lib/distribuicao-leads";
 import { carregarLeadsParados } from "@/lib/leads-parados";
 import { carregarLeadsSemContato } from "@/lib/leads-sem-contato";
 import { carregarPropostasParadas } from "@/lib/propostas-paradas";
+import type { ContagemPendencias } from "@/lib/pendencias";
 import { criarClienteServidor } from "@/lib/supabase/server";
 
 export type Notificacao = {
@@ -39,9 +41,9 @@ export async function temConquistaNaoVisualizada(empresaId: string, membroId: st
 }
 
 /**
- * Total de pendências do usuário logado — soma dos mesmos números do Painel (admin/gestor,
- * empresa toda) ou da Início (vendedor, só a própria carteira): tarefas atrasadas, leads
- * aguardando aprovação (só gestor/admin), leads sem contato, leads parados e propostas paradas.
+ * Pendências do usuário logado, separadas entre a fila de distribuição e o resto — mesmos
+ * números do Painel/Leads a distribuir (admin/gestor, empresa toda) ou da Início (vendedor/SDR,
+ * só a própria carteira): tarefas atrasadas, leads sem contato, leads parados e propostas paradas.
  */
 export async function contarPendencias(
   empresaId: string,
@@ -49,7 +51,7 @@ export async function contarPendencias(
   papel: string,
   diasConsideradoParado: number,
   horasConsideradoSemContato: number,
-): Promise<number> {
+): Promise<ContagemPendencias> {
   const supabase = await criarClienteServidor();
   // Vendedor e SDR só veem a própria carteira (spec RAION_SDR_REGRAS_PERMISSOES §10, "restrito"); admin/gestor veem a empresa toda.
   const carteiraPropria = papel === "vendedor" || papel === "sdr";
@@ -63,24 +65,19 @@ export async function contarPendencias(
     .lt("vence_em", new Date().toISOString());
   if (carteiraPropria) consultaTarefas = consultaTarefas.eq("responsavel_id", membroId);
 
-  const [leadsSemContato, leadsParados, propostasParadas, { count: tarefasAtrasadas }] = await Promise.all([
+  // Leads a distribuir são só do gestor/admin (SDR e vendedor não aprovam atribuição).
+  const decideDistribuicao = papel === "admin" || papel === "gestor";
+
+  const [leadsSemContato, leadsParados, propostasParadas, { count: tarefasAtrasadas }, leadsADistribuir] = await Promise.all([
     carregarLeadsSemContato(supabase, empresaId, { ...filtro, horasLimite: horasConsideradoSemContato }),
     carregarLeadsParados(supabase, empresaId, { ...filtro, diasLimite: diasConsideradoParado }),
     carregarPropostasParadas(supabase, empresaId, { ...filtro, diasLimite: diasConsideradoParado }),
     consultaTarefas,
+    decideDistribuicao ? contarAtribuicoesPendentes(supabase, empresaId) : Promise.resolve(0),
   ]);
 
-  let total = leadsSemContato.length + leadsParados.length + propostasParadas.length + (tarefasAtrasadas ?? 0);
-
-  // Leads aguardando aprovação são só do gestor/admin (SDR e vendedor não aprovam atribuição).
-  if (papel === "admin" || papel === "gestor") {
-    const { count: aguardando } = await supabase
-      .from("atribuicoes_leads")
-      .select("id", { count: "exact", head: true })
-      .eq("empresa_id", empresaId)
-      .eq("status", "pendente");
-    total += aguardando ?? 0;
-  }
-
-  return total;
+  return {
+    leadsADistribuir,
+    demais: leadsSemContato.length + leadsParados.length + propostasParadas.length + (tarefasAtrasadas ?? 0),
+  };
 }

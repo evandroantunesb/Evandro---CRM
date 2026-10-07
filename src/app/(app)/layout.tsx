@@ -5,6 +5,7 @@ import { assinarAvatares } from "@/lib/avatares";
 import { LogoRaion } from "@/components/marca";
 import { carregarDiasConsideradoParado, carregarHorasConsideradoSemContato } from "@/lib/crm";
 import { carregarNotificacoesNaoLidas, contarPendencias, temConquistaNaoVisualizada } from "@/lib/notificacoes";
+import { linksPendencias, type ContagemPendencias } from "@/lib/pendencias";
 import { obterSessao } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { trocarEmpresa } from "@/lib/acoes/empresa-atual";
@@ -61,7 +62,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
   const sessao = await obterSessao();
   const papel = sessao.atual?.papel;
 
-  let pendencias = 0;
+  let pendencias: ContagemPendencias = { leadsADistribuir: 0, demais: 0 };
   let notificacoes: Awaited<ReturnType<typeof carregarNotificacoesNaoLidas>> = [];
   let conquistaNova = false;
   if (sessao.atual) {
@@ -83,12 +84,13 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
 
   // Ordem segue o fluxo do cliente. `secao` (Aquisição/Comercial/Gestão) só titula no desktop;
   // no celular esses itens ficam na faixa principal. Apenas a posição no menu muda: rotas e
-  // permissões de cada tela continuam as mesmas (Captura segue só para admin).
+  // permissões de cada tela continuam as mesmas (Leads a distribuir: admin/gestor; Captura: só admin).
   const itens = [
     ...(sessao.atual
       ? [
           { href: "/inicio", rotulo: "Início" },
           { href: "/tarefas", rotulo: "Tarefas" },
+          ...(papel === "admin" || papel === "gestor" ? [{ href: "/leads-a-distribuir", rotulo: "Leads a distribuir", secao: "Aquisição" }] : []),
           ...(papel === "admin" ? [{ href: "/configuracoes/captura", rotulo: "Captura de leads", secao: "Aquisição" }] : []),
           { href: "/negocios", rotulo: "Negócios", secao: "Comercial" },
           ...(papel !== "sdr" ? [{ href: "/contatos", rotulo: "Contatos", secao: "Comercial" }] : []),
@@ -148,8 +150,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
         {sessao.atual && (
           <Sininho
             notificacoes={notificacoes}
-            linkPendencias={papel === "admin" || papel === "gestor" ? "/painel" : "/inicio"}
-            textoPendencias={pendencias > 0 ? `${pendencias} pendência${pendencias === 1 ? "" : "s"}` : "Nenhuma pendência"}
+            pendencias={linksPendencias(papel, pendencias)}
           />
         )}
         <Menu itens={itens} />
