@@ -6,9 +6,13 @@
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { InicioBasico } from "@/app/(app)/inicio/inicio-basico";
 import * as permissoes from "@/lib/permissoes";
-import { pode, type ListaPapeis } from "@/lib/permissoes";
+import { escopoPendencias, pode, type ListaPapeis } from "@/lib/permissoes";
+import type { Papel } from "@/lib/tipos";
 
 const MATRIZ: Record<string, string[]> = {
   NEGOCIOS: ["admin", "gestor", "vendedor", "sdr"],
@@ -61,6 +65,56 @@ describe("listas de permissão", () => {
       expect(pode(undefined, lista)).toBe(false);
       expect(pode(null, lista)).toBe(false);
     }
+  });
+});
+
+describe("pendências do sininho (contarPendencias)", () => {
+  it("gestão comercial conta a empresa toda e a fila de distribuição", () => {
+    for (const papel of ["admin", "gestor"]) {
+      expect(escopoPendencias(papel)).toEqual({ negocios: "empresa", tarefas: "empresa", leadsADistribuir: true });
+    }
+  });
+
+  it("vendedor e SDR contam só a própria carteira, sem fila de distribuição", () => {
+    for (const papel of ["vendedor", "sdr"]) {
+      expect(escopoPendencias(papel)).toEqual({ negocios: "propria", tarefas: "propria", leadsADistribuir: false });
+    }
+  });
+
+  it("papel desconhecido ou ausente não cai no escopo amplo: nada é contado", () => {
+    for (const papel of ["operacao", undefined, null]) {
+      expect(escopoPendencias(papel)).toEqual({ negocios: null, tarefas: null, leadsADistribuir: false });
+    }
+  });
+
+  it("contarPendencias retorna zero antes de consultar o banco quando não há escopo", () => {
+    const fonte = readFileSync(join(__dirname, "..", "src", "lib", "notificacoes.ts"), "utf8");
+    const corpo = fonte.slice(fonte.indexOf("export async function contarPendencias"));
+    const retornoZero = corpo.indexOf("return { leadsADistribuir: 0, demais: 0 }");
+    expect(retornoZero).toBeGreaterThan(-1);
+    expect(retornoZero).toBeLessThan(corpo.indexOf("criarClienteServidor()"));
+  });
+});
+
+describe("Início para papel sem acesso comercial", () => {
+  const fonte = readFileSync(join(__dirname, "..", "src", "app", "(app)", "inicio", "page.tsx"), "utf8");
+
+  it("a página retorna a Início básica antes de qualquer consulta comercial", () => {
+    const retornoBasico = fonte.indexOf("if (!pode(atual.papel, NEGOCIOS))");
+    expect(retornoBasico).toBeGreaterThan(-1);
+    for (const consulta of ["criarClienteServidor()", "carregarConfiguracao(", ".from("]) {
+      expect(retornoBasico).toBeLessThan(fonte.indexOf(consulta));
+    }
+  });
+
+  it("a Início básica não tem KPI, funil, proposta, meta, negócio nem atalho comercial", () => {
+    const html = renderToStaticMarkup(
+      createElement(InicioBasico, { nome: "Ana", saudacao: "Bom dia", empresaNome: "Raion", papel: "operacao" as Papel }),
+    );
+    expect(html).toContain("Bom dia, Ana.");
+    expect(html).toContain("Raion");
+    expect(html).not.toMatch(/href=/);
+    expect(html).not.toMatch(/neg[oó]cio|proposta|meta|funil|tarefa|lead|R\$/i);
   });
 });
 

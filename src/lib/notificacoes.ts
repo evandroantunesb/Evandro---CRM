@@ -4,6 +4,7 @@ import { carregarLeadsParados } from "@/lib/leads-parados";
 import { carregarLeadsSemContato } from "@/lib/leads-sem-contato";
 import { carregarPropostasParadas } from "@/lib/propostas-paradas";
 import type { ContagemPendencias } from "@/lib/pendencias";
+import { escopoPendencias } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 
 export type Notificacao = {
@@ -52,10 +53,13 @@ export async function contarPendencias(
   diasConsideradoParado: number,
   horasConsideradoSemContato: number,
 ): Promise<ContagemPendencias> {
+  // Escopo por lista positiva (spec RAION_SDR_REGRAS_PERMISSOES §10): gestão comercial vê a empresa
+  // toda; vendedor e SDR, a própria carteira; papel sem acesso comercial não conta nada.
+  const escopo = escopoPendencias(papel);
+  if (!escopo.negocios && !escopo.tarefas && !escopo.leadsADistribuir) return { leadsADistribuir: 0, demais: 0 };
+
   const supabase = await criarClienteServidor();
-  // Vendedor e SDR só veem a própria carteira (spec RAION_SDR_REGRAS_PERMISSOES §10, "restrito"); admin/gestor veem a empresa toda.
-  const carteiraPropria = papel === "vendedor" || papel === "sdr";
-  const filtro = carteiraPropria ? { responsavelId: membroId } : {};
+  const filtro = escopo.negocios === "propria" ? { responsavelId: membroId } : {};
 
   let consultaTarefas = supabase
     .from("tarefas")
@@ -63,21 +67,20 @@ export async function contarPendencias(
     .eq("empresa_id", empresaId)
     .is("concluida_em", null)
     .lt("vence_em", new Date().toISOString());
-  if (carteiraPropria) consultaTarefas = consultaTarefas.eq("responsavel_id", membroId);
+  if (escopo.tarefas === "propria") consultaTarefas = consultaTarefas.eq("responsavel_id", membroId);
 
-  // Leads a distribuir são só do gestor/admin (SDR e vendedor não aprovam atribuição).
-  const decideDistribuicao = papel === "admin" || papel === "gestor";
-
-  const [leadsSemContato, leadsParados, propostasParadas, { count: tarefasAtrasadas }, leadsADistribuir] = await Promise.all([
-    carregarLeadsSemContato(supabase, empresaId, { ...filtro, horasLimite: horasConsideradoSemContato }),
-    carregarLeadsParados(supabase, empresaId, { ...filtro, diasLimite: diasConsideradoParado }),
-    carregarPropostasParadas(supabase, empresaId, { ...filtro, diasLimite: diasConsideradoParado }),
-    consultaTarefas,
-    decideDistribuicao ? contarAtribuicoesPendentes(supabase, empresaId) : Promise.resolve(0),
+  const vazio = Promise.resolve([] as unknown[]);
+  const [leadsSemContato, leadsParados, propostasParadas, tarefasAtrasadas, leadsADistribuir] = await Promise.all([
+    escopo.negocios ? carregarLeadsSemContato(supabase, empresaId, { ...filtro, horasLimite: horasConsideradoSemContato }) : vazio,
+    escopo.negocios ? carregarLeadsParados(supabase, empresaId, { ...filtro, diasLimite: diasConsideradoParado }) : vazio,
+    escopo.negocios ? carregarPropostasParadas(supabase, empresaId, { ...filtro, diasLimite: diasConsideradoParado }) : vazio,
+    escopo.tarefas ? consultaTarefas.then(({ count }) => count ?? 0) : Promise.resolve(0),
+    // Leads a distribuir são só da gestão comercial (SDR e vendedor não aprovam atribuição).
+    escopo.leadsADistribuir ? contarAtribuicoesPendentes(supabase, empresaId) : Promise.resolve(0),
   ]);
 
   return {
     leadsADistribuir,
-    demais: leadsSemContato.length + leadsParados.length + propostasParadas.length + (tarefasAtrasadas ?? 0),
+    demais: leadsSemContato.length + leadsParados.length + propostasParadas.length + tarefasAtrasadas,
   };
 }

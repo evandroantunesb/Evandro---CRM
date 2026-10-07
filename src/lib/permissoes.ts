@@ -75,6 +75,24 @@ export const GAMIFICACAO = ["admin", "gestor", "vendedor", "sdr"] as const satis
 /** Quem compete e resgata: menu Recompensas e aba Comissões. */
 export const PARTICIPANTES_GAMIFICACAO = ["vendedor", "sdr"] as const satisfies ListaPapeis;
 
+/** Alcance de uma contagem: empresa toda, só a própria carteira, ou nenhum (papel sem acesso). */
+export type EscopoContagem = "empresa" | "propria" | null;
+
+/**
+ * Escopo das pendências do sininho. GESTAO_COMERCIAL usa a empresa toda; quem só tem acesso
+ * comercial conta a própria carteira; papel sem NEGOCIOS/TAREFAS não conta nada (nunca cai no
+ * escopo amplo por exclusão).
+ */
+export function escopoPendencias(papel: Papel | string | null | undefined): {
+  negocios: EscopoContagem;
+  tarefas: EscopoContagem;
+  leadsADistribuir: boolean;
+} {
+  const empresa = pode(papel, GESTAO_COMERCIAL);
+  const escopo = (lista: ListaPapeis): EscopoContagem => (!pode(papel, lista) ? null : empresa ? "empresa" : "propria");
+  return { negocios: escopo(NEGOCIOS), tarefas: escopo(TAREFAS), leadsADistribuir: empresa };
+}
+
 /** `papel` está na lista? Papel ausente (sem empresa) nunca pode. */
 export function pode(papel: Papel | string | null | undefined, lista: ListaPapeis): boolean {
   return papel != null && (lista as readonly string[]).includes(papel);
