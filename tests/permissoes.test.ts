@@ -34,6 +34,7 @@ const MATRIZ: Record<string, string[]> = {
   GESTAO_COMERCIAL: ["admin", "gestor"],
   GAMIFICACAO: ["admin", "gestor", "vendedor", "sdr"],
   PARTICIPANTES_GAMIFICACAO: ["vendedor", "sdr"],
+  OBRAS: ["admin", "gestor", "vendedor", "sdr", "operacao"],
 };
 
 const listas = Object.entries(permissoes).filter(([, v]) => Array.isArray(v)) as [string, ListaPapeis][];
@@ -62,7 +63,7 @@ describe("listas de permissão", () => {
 
   it("papel desconhecido ou ausente não herda nenhum acesso", () => {
     for (const [, lista] of listas) {
-      expect(pode("operacao", lista)).toBe(false);
+      expect(pode("visitante", lista)).toBe(false);
       expect(pode(undefined, lista)).toBe(false);
       expect(pode(null, lista)).toBe(false);
     }
