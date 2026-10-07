@@ -1742,6 +1742,44 @@ export type Database = {
           },
         ];
       };
+      membro_setores_obra: {
+        Row: {
+          capacidade: Database["public"]["Enums"]["capacidade_obra"];
+          created_at: string;
+          definido_por_user_id: string | null;
+          empresa_id: string;
+          membro_id: string;
+          setor: Database["public"]["Enums"]["setor_obra"];
+          updated_at: string;
+        };
+        Insert: {
+          capacidade: Database["public"]["Enums"]["capacidade_obra"];
+          created_at?: string;
+          definido_por_user_id?: string | null;
+          empresa_id: string;
+          membro_id: string;
+          setor: Database["public"]["Enums"]["setor_obra"];
+          updated_at?: string;
+        };
+        Update: {
+          capacidade?: Database["public"]["Enums"]["capacidade_obra"];
+          created_at?: string;
+          definido_por_user_id?: string | null;
+          empresa_id?: string;
+          membro_id?: string;
+          setor?: Database["public"]["Enums"]["setor_obra"];
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "membro_setores_obra_empresa_id_membro_id_fkey";
+            columns: ["empresa_id", "membro_id"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["empresa_id", "id"];
+          },
+        ];
+      };
       metas: {
         Row: {
           ativa: boolean;
@@ -3530,6 +3568,7 @@ export type Database = {
       };
       compartilha_empresa: { Args: { p_user_id: string }; Returns: boolean };
       compartilha_empresa_comercial: { Args: { p_user_id: string }; Returns: boolean };
+      compartilha_empresa_identidade: { Args: { p_user_id: string }; Returns: boolean };
       confirmar_pagamento: {
         Args: { p_contrato_id: string };
         Returns: {
@@ -3589,6 +3628,10 @@ export type Database = {
       };
       decidir_atribuicao_lead: {
         Args: { p_automatico: boolean; p_id: string; p_membro_final_id: string };
+        Returns: undefined;
+      };
+      definir_setores_membro: {
+        Args: { p_membro_id: string; p_setores: Json };
         Returns: undefined;
       };
       devolver_handoff: {
@@ -3658,6 +3701,14 @@ export type Database = {
       expirar_atribuicoes_leads: { Args: Record<PropertyKey, never>; Returns: undefined };
       fechar_comissao: { Args: { p_comissao_id: string }; Returns: undefined };
       garantir_obra: { Args: { p_negocio_id: string }; Returns: string };
+      identidade_membros: {
+        Args: { p_empresa_id: string };
+        Returns: {
+          avatar_caminho: string;
+          membro_id: string;
+          nome: string;
+        }[];
+      };
       incrementar_preenchimento_formulario: { Args: { p_id: string }; Returns: undefined };
       incrementar_visualizacao_formulario: { Args: { p_id: string }; Returns: undefined };
       marcar_venda_alterada_obra: { Args: { p_negocio_id: string }; Returns: undefined };
@@ -3665,6 +3716,34 @@ export type Database = {
       meu_membro_id: { Args: { p_empresa_id: string }; Returns: string };
       obra_snapshot_comercial: { Args: { p_negocio_id: string }; Returns: Json };
       obra_snapshot_tecnico: { Args: { p_negocio_id: string }; Returns: Json };
+      obras_operacao: {
+        Args: { p_obra_id?: string };
+        Returns: {
+          alerta_pagamento_estornado_em: string;
+          cancelada_em: string;
+          cancelamento_motivo: string;
+          cidade: string;
+          cliente_documento: string;
+          cliente_endereco: string;
+          cliente_nome: string;
+          cliente_telefone: string;
+          cliente_telefone2: string;
+          created_at: string;
+          empresa_id: string;
+          numero: number;
+          obra_id: string;
+          pausa_motivo: string;
+          pausada_em: string;
+          potencia_kwp: number;
+          snapshot: Json;
+          snapshot_versao: number;
+          tipo_ligacao: Database["public"]["Enums"]["tipo_ligacao"];
+          uf: string;
+          unidade_consumidora: string;
+          updated_at: string;
+          venda_alterada_em: string;
+        }[];
+      };
       pode_ver_avatar: { Args: { p_pasta: string }; Returns: boolean };
       pode_ver_contato: { Args: { p_contato_id: string }; Returns: boolean };
       pode_ver_contato_linha: {
@@ -3673,6 +3752,7 @@ export type Database = {
       };
       pode_ver_negocio: { Args: { p_negocio_id: string }; Returns: boolean };
       pode_ver_obra: { Args: { p_obra_id: string }; Returns: boolean };
+      pode_ver_obra_operacao: { Args: { p_obra_id: string }; Returns: boolean };
       pode_ver_pasta_anexo: { Args: { p_caminho: string }; Returns: boolean };
       pode_ver_responsavel: {
         Args: { p_empresa_id: string; p_responsavel_id: string };
@@ -3755,6 +3835,7 @@ export type Database = {
         | "concessionaria"
         | "transportadora"
         | "equipe_campo";
+      capacidade_obra: "executar" | "coordenar";
       funcao_participante_obra: "vendedor" | "sdr" | "responsavel" | "apoio" | "substituto";
       marco_obra: "nf_cliente" | "garantia";
       metrica_meta: "receita" | "negocios_ganhos" | "reunioes" | "conversao" | "tarefas_concluidas";
@@ -3918,6 +3999,7 @@ export const Constants = {
         "transportadora",
         "equipe_campo",
       ],
+      capacidade_obra: ["executar", "coordenar"],
       funcao_participante_obra: ["vendedor", "sdr", "responsavel", "apoio", "substituto"],
       marco_obra: ["nf_cliente", "garantia"],
       metrica_meta: ["receita", "negocios_ganhos", "reunioes", "conversao", "tarefas_concluidas"],
