@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { exigirPapel } from "@/lib/sessao";
+import { ANEXOS_E_NOTAS } from "@/lib/permissoes";
 import { criarClienteAdmin } from "@/lib/supabase/admin";
 import type { SupabaseServidor } from "@/lib/supabase/server";
 import { criarClienteServidor } from "@/lib/supabase/server";
@@ -57,7 +58,7 @@ export async function registrarAnexo(dados: {
   tipoMime: string;
   categoria?: string;
 }): Promise<ResultadoAcao> {
-  const { atual } = await exigirPapel();
+  const { atual } = await exigirPapel(...ANEXOS_E_NOTAS);
   const d = z
     .object({
       negocioId: z.string().uuid(),
@@ -98,7 +99,7 @@ export async function registrarAnexo(dados: {
 }
 
 export async function apagarAnexo(formData: FormData) {
-  await exigirPapel();
+  await exigirPapel(...ANEXOS_E_NOTAS);
   const id = z.string().uuid().safeParse(formData.get("anexoId"));
   if (!id.success) return;
 

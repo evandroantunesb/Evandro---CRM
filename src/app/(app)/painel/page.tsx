@@ -10,11 +10,12 @@ import {
   carregarTarefasAtrasadasLista,
 } from "@/lib/painel";
 import { exigirPapel } from "@/lib/sessao";
+import { GESTAO_COMERCIAL } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { LinhaParado } from "./linha-parado";
 
 export default async function Painel() {
-  const { atual } = await exigirPapel("admin", "gestor");
+  const { atual } = await exigirPapel(...GESTAO_COMERCIAL);
   const config = await carregarConfiguracao(atual.empresaId);
   const [indicadores, leadsADistribuir, tarefasAtrasadas, leadsParados, propostasParadas, leadsSemContato] = await Promise.all([
     carregarIndicadores(atual.empresaId, config),

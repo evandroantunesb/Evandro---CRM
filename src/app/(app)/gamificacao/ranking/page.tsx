@@ -2,6 +2,7 @@ import { Crown, Users } from "lucide-react";
 import { assinarAvatares } from "@/lib/avatares";
 import { calcularNivel } from "@/lib/gamificacao";
 import { exigirPapel } from "@/lib/sessao";
+import { GAMIFICACAO } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { ROTULO_PERFIL_GAMIFICACAO, type PerfilGamificacao } from "@/lib/tipos";
 import { AbasSecao } from "../_compartilhado/abas-secao";
@@ -34,7 +35,7 @@ function calcularDesde(periodo: Periodo): string | null {
 }
 
 export default async function Ranking({ searchParams }: { searchParams: Promise<{ periodo?: string; perfil?: string }> }) {
-  const { atual } = await exigirPapel();
+  const { atual } = await exigirPapel(...GAMIFICACAO);
   const { periodo: periodoParam, perfil: perfilParam } = await searchParams;
   const periodo = (PERIODOS.some((p) => p.chave === periodoParam) ? periodoParam : "mes") as Periodo;
   // Minha aba por padrão (sdr/closer); sem perfil (admin/gestor, que só visualiza, não compete)

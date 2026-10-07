@@ -3,6 +3,7 @@ import type { FaixaComissao } from "@/lib/comissoes";
 import { formatarFaixa } from "@/lib/comissoes";
 import { formatarMoeda } from "@/lib/formatacao";
 import { exigirPapel } from "@/lib/sessao";
+import { GAMIFICACAO } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { ROTULO_TIPO_CALCULO_COMISSAO, type StatusComissao, type TipoCalculoComissao } from "@/lib/tipos";
 import { AbasSecao } from "../_compartilhado/abas-secao";
@@ -24,7 +25,7 @@ function Valor({ rotulo, valor, forte = false }: { rotulo: string; valor: string
 }
 
 export default async function MinhasComissoes() {
-  const { atual } = await exigirPapel();
+  const { atual } = await exigirPapel(...GAMIFICACAO);
   const supabase = await criarClienteServidor();
   const hoje = new Date().toISOString().slice(0, 10);
   const [{ data: plano }, { data: historico }] = await Promise.all([

@@ -2,12 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { exigirPapel } from "@/lib/sessao";
+import { exigirMembro } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 
 /** Marca uma notificação do sininho como lida (RLS já restringe à própria: ver migration notificacoes). */
 export async function marcarNotificacaoLida(formData: FormData) {
-  await exigirPapel();
+  await exigirMembro();
   const id = z.string().uuid().safeParse(formData.get("id"));
   if (!id.success) return;
 

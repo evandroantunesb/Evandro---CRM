@@ -2,10 +2,11 @@ import { randomBytes } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { integracaoConfigurada, urlAutorizacao } from "@/lib/google-agenda";
 import { exigirPapel } from "@/lib/sessao";
+import { GOOGLE_AGENDA } from "@/lib/permissoes";
 
 /** Início do fluxo OAuth: manda o usuário pro consentimento do Google. */
 export async function GET(request: NextRequest) {
-  await exigirPapel();
+  await exigirPapel(...GOOGLE_AGENDA);
   if (!integracaoConfigurada()) return NextResponse.redirect(new URL("/perfil?google=nao-configurado", request.url));
 
   const redirectUri = new URL("/api/google-agenda/callback", request.url).toString();

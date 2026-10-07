@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { exigirPapel } from "@/lib/sessao";
+import { FICHA_CONTATO } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import type { ResultadoAcao } from "@/lib/tipos";
 
@@ -26,7 +27,7 @@ const esquema = z.object({
 });
 
 export async function editarContato(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  await exigirPapel();
+  await exigirPapel(...FICHA_CONTATO);
   const dados = esquema.safeParse(Object.fromEntries(formData));
   if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
   const { contatoId, ...campos } = dados.data;

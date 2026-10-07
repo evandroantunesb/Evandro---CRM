@@ -4,13 +4,14 @@ import { NovaTarefa } from "@/components/nova-tarefa";
 import { Botao, Cartao, Selecao } from "@/components/ui";
 import { carregarConfiguracao, fimDaSemana, inicioDoDia, situacaoPrazo } from "@/lib/crm";
 import { exigirPapel } from "@/lib/sessao";
+import { ATRIBUIR_TAREFA_A_OUTROS, TAREFAS, VER_TAREFAS_DE_OUTROS, pode } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import type { TipoTarefa } from "@/lib/tipos";
 
 export default async function Tarefas({ searchParams }: PageProps<"/tarefas">) {
-  const { atual } = await exigirPapel();
+  const { atual } = await exigirPapel(...TAREFAS);
   const filtros = await searchParams;
-  const podeVerOutros = atual.papel !== "vendedor";
+  const podeVerOutros = pode(atual.papel, VER_TAREFAS_DE_OUTROS);
   // Padrão: as minhas. Admin e gestor podem ver de outro usuário ou de todos que enxergam.
   const escolhido = typeof filtros.responsavel === "string" ? filtros.responsavel : atual.membroId;
   const responsavel = podeVerOutros ? escolhido : atual.membroId;
@@ -138,7 +139,7 @@ export default async function Tarefas({ searchParams }: PageProps<"/tarefas">) {
         <Cartao titulo="Nova tarefa avulsa">
           <p className="mb-2 text-sm text-zinc-600">Para tarefas de um cliente, crie pela tela do negócio.</p>
           <NovaTarefa
-            responsaveis={podeVerOutros ? config.membros.filter((m) => m.ativo) : []}
+            responsaveis={pode(atual.papel, ATRIBUIR_TAREFA_A_OUTROS) ? config.membros.filter((m) => m.ativo) : []}
             responsavelPadrao={atual.membroId}
           />
         </Cartao>

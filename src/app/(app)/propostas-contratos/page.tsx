@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Botao, Selecao, Selo } from "@/components/ui";
 import { carregarConfiguracao, formatarDataHora, formatarMoeda } from "@/lib/crm";
 import { exigirPapel } from "@/lib/sessao";
+import { PROPOSTA_E_CONTRATO } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import type { StatusPagamentoContrato } from "@/lib/tipos";
 import {
@@ -39,7 +40,7 @@ const umDe = <T extends string>(valores: readonly T[], v: string): T | undefined
 
 export default async function PropostasContratos({ searchParams }: PageProps<"/propostas-contratos">) {
   // SDR fora: não gera proposta nem contrato (spec RAION_SDR_REGRAS_PERMISSOES §40/§41).
-  const { atual } = await exigirPapel("admin", "gestor", "vendedor");
+  const { atual } = await exigirPapel(...PROPOSTA_E_CONTRATO);
   const filtros = await searchParams;
   const texto = (k: string) => (typeof filtros[k] === "string" ? (filtros[k] as string) : "");
   const veEquipe = atual.papel === "admin" || atual.papel === "gestor";

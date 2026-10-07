@@ -1,6 +1,7 @@
 import { Coins, Gift, PackageCheck } from "lucide-react";
 import { formatarDataHora } from "@/lib/formatacao";
 import { exigirPapel } from "@/lib/sessao";
+import { GAMIFICACAO } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { assinarImagensEmLote } from "@/lib/storage-imagens";
 import type { StatusResgate } from "@/lib/tipos";
@@ -19,7 +20,7 @@ import {
 import { CartaoRecompensa } from "./formulario";
 
 export default async function LojaDeRecompensas() {
-  const { atual } = await exigirPapel();
+  const { atual } = await exigirPapel(...GAMIFICACAO);
   const supabase = await criarClienteServidor();
   const hoje = new Date().toISOString().slice(0, 10);
 

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { calcular, componentesJsonSchema, DISPONIBILIDADE_PADRAO, nomeKitPersonalizado, potenciaKitPersonalizadoKwp } from "@/lib/calculadora";
 import { mensagemErro } from "@/lib/erros";
 import { exigirPapel } from "@/lib/sessao";
+import { CALCULADORA } from "@/lib/permissoes";
 import type { Database } from "@/lib/supabase/database.types";
 import type { SupabaseServidor } from "@/lib/supabase/server";
 import { criarClienteServidor } from "@/lib/supabase/server";
@@ -116,7 +117,7 @@ const numeroBrOpcional = z
  * valor do negócio (o kit personalizado não tem preço por item).
  */
 export async function salvarKitPersonalizado(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  const { atual } = await exigirPapel();
+  const { atual } = await exigirPapel(...CALCULADORA);
   const dados = z
     .object({
       negocioId: z.string().uuid(),
@@ -189,7 +190,7 @@ export async function salvarKitPersonalizado(_: ResultadoAcao, formData: FormDat
 }
 
 export async function apagarCalculo(formData: FormData) {
-  await exigirPapel();
+  await exigirPapel(...CALCULADORA);
   const id = z.string().uuid().safeParse(formData.get("calculoId"));
   if (!id.success) return;
   const supabase = await criarClienteServidor();

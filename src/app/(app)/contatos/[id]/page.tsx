@@ -3,12 +3,13 @@ import { notFound } from "next/navigation";
 import { Cartao, Selo } from "@/components/ui";
 import { carregarConfiguracao, formatarDataHora, formatarMoeda } from "@/lib/crm";
 import { exigirPapel } from "@/lib/sessao";
+import { FICHA_CONTATO } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { EdicaoContato } from "./edicao";
 import { ExcluirContato } from "./excluir";
 
 export default async function DetalheContato({ params }: PageProps<"/contatos/[id]">) {
-  const { atual } = await exigirPapel();
+  const { atual } = await exigirPapel(...FICHA_CONTATO);
   const { id } = await params;
   const supabase = await criarClienteServidor();
 

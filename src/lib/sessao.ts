@@ -74,11 +74,23 @@ export const obterSessao = cache(async (): Promise<Sessao> => {
   };
 });
 
-/** Exige uma empresa em uso com um dos papéis informados. */
-export async function exigirPapel(...papeis: Papel[]) {
+/**
+ * Exige uma empresa em uso com um dos papéis informados (ao menos um: a lista vazia,
+ * que aceitaria qualquer papel, não compila). Listas por recurso em `@/lib/permissoes`.
+ */
+export async function exigirPapel(...papeis: readonly [Papel, ...Papel[]]) {
+  const sessao = await exigirMembro();
+  if (!papeis.includes(sessao.atual.papel)) redirect("/inicio");
+  return sessao;
+}
+
+/**
+ * Exige só uma empresa em uso, com qualquer papel. Use apenas em recurso pessoal
+ * (notificações, perfil, início) — recurso de negócio usa `exigirPapel`.
+ */
+export async function exigirMembro() {
   const sessao = await obterSessao();
   if (!sessao.atual) redirect(sessao.superAdmin ? "/super-admin" : "/sem-acesso");
-  if (papeis.length && !papeis.includes(sessao.atual.papel)) redirect("/inicio");
   return { ...sessao, atual: sessao.atual };
 }
 

@@ -1,3 +1,5 @@
+import { GESTAO_COMERCIAL, pode } from "@/lib/permissoes";
+
 /** Pendências do sininho — tipos e links, sem dependência de servidor (contagem em lib/notificacoes). */
 
 export type ContagemPendencias = {
@@ -15,7 +17,7 @@ export type LinkPendencias = { href: string; texto: string };
  */
 export function linksPendencias(papel: string | undefined, contagem: ContagemPendencias): LinkPendencias[] {
   const textoDemais = contagem.demais > 0 ? `${contagem.demais} pendência${contagem.demais === 1 ? "" : "s"}` : "Nenhuma pendência";
-  if (papel !== "admin" && papel !== "gestor") return [{ href: "/inicio", texto: textoDemais }];
+  if (!pode(papel, GESTAO_COMERCIAL)) return [{ href: "/inicio", texto: textoDemais }];
 
   const links: LinkPendencias[] = [];
   if (contagem.leadsADistribuir > 0) {

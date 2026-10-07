@@ -28,6 +28,7 @@ import { carregarLeadsSemContato } from "@/lib/leads-sem-contato";
 import { calcularProgresso, calcularRealizado, type Meta } from "@/lib/metas";
 import { carregarPropostasParadas } from "@/lib/propostas-paradas";
 import { obterSessao } from "@/lib/sessao";
+import { NEGOCIOS, PROPOSTA_E_CONTRATO, TAREFAS, pode } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { ROTULO_PAPEL, type TipoTarefa } from "@/lib/tipos";
 import { GraficoDesempenho } from "./grafico-desempenho";
@@ -477,11 +478,11 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
 
   // Ações rápidas --------------------------------------------------------------
   const acoesRapidas = [
-    { href: "/negocios/novo", rotulo: "Novo negócio", Icone: Plus },
-    { href: "/tarefas", rotulo: "Nova tarefa", Icone: Calendar },
-    { href: "/negocios/novo", rotulo: "Novo contato", Icone: UserPlus },
-    { href: "/negocios", rotulo: "Gerar proposta", Icone: FileText },
-    { href: "/negocios", rotulo: "Abrir Kanban", Icone: KanbanSquare },
+    ...(pode(atual.papel, NEGOCIOS) ? [{ href: "/negocios/novo", rotulo: "Novo negócio", Icone: Plus }] : []),
+    ...(pode(atual.papel, TAREFAS) ? [{ href: "/tarefas", rotulo: "Nova tarefa", Icone: Calendar }] : []),
+    ...(pode(atual.papel, NEGOCIOS) ? [{ href: "/negocios/novo", rotulo: "Novo contato", Icone: UserPlus }] : []),
+    ...(pode(atual.papel, PROPOSTA_E_CONTRATO) ? [{ href: "/negocios", rotulo: "Gerar proposta", Icone: FileText }] : []),
+    ...(pode(atual.papel, NEGOCIOS) ? [{ href: "/negocios", rotulo: "Abrir Kanban", Icone: KanbanSquare }] : []),
     ...(atual.papel === "admin" ? [{ href: "/configuracoes/captura", rotulo: "Capturar leads", Icone: QrCode }] : []),
   ];
 

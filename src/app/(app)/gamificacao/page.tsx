@@ -1,4 +1,5 @@
 import { exigirPapel } from "@/lib/sessao";
+import { GAMIFICACAO } from "@/lib/permissoes";
 import { DashboardGerencial } from "./_gerencial/dashboard-gerencial";
 import { DashboardPessoal } from "./_pessoal/dashboard-pessoal";
 
@@ -13,7 +14,7 @@ export default async function GamificacaoDashboard({
 }: {
   searchParams: Promise<{ periodo?: string }>;
 }) {
-  const { atual } = await exigirPapel();
+  const { atual } = await exigirPapel(...GAMIFICACAO);
   const { periodo } = await searchParams;
 
   if (atual.papel === "admin" || atual.papel === "gestor") {

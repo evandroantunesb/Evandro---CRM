@@ -11,6 +11,7 @@ import {
   tempoDesde,
 } from "@/lib/crm";
 import { COOKIE_VISAO_NEGOCIOS, exigirPapel } from "@/lib/sessao";
+import { FILTRAR_NEGOCIOS_POR_RESPONSAVEL, NEGOCIOS, pode } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { Indicadores, type Indicador } from "./indicadores";
 import { Kanban, type Card } from "./kanban";
@@ -26,7 +27,7 @@ function agoraMs() {
 }
 
 export default async function Negocios({ searchParams }: PageProps<"/negocios">) {
-  const { atual } = await exigirPapel();
+  const { atual } = await exigirPapel(...NEGOCIOS);
   const filtros = await searchParams;
   const texto = (k: string) => (typeof filtros[k] === "string" ? (filtros[k] as string) : "");
 
@@ -119,7 +120,7 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
   if (atrasados) cards = cards.filter((c) => c.tarefa === "atrasada");
   if (semProxima) cards = cards.filter((c) => c.tarefa === "nenhuma");
 
-  const podeFiltrarResponsavel = atual.papel !== "vendedor";
+  const podeFiltrarResponsavel = pode(atual.papel, FILTRAR_NEGOCIOS_POR_RESPONSAVEL);
 
   // Base de todos os filtros ativos, usada para montar os links (alternância de visão, chips, limpar filtros)
   // sem perder o que já está escolhido.
