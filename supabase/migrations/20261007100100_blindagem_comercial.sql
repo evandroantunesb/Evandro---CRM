@@ -96,13 +96,16 @@ as $$
     );
 $$;
 
+-- Joins explícitos handoff → negócio → membro, todos na mesma empresa: segura também
+-- diante de dado legado inconsistente (o gatilho validar_handoff_empresa só cobre inserts novos).
 create or replace function public.e_closer_de_handoff_pendente(p_negocio_id uuid)
 returns boolean
 language sql stable security definer set search_path = ''
 as $$
   select exists (
     select 1 from public.handoffs h
-    join public.empresa_membros m on m.id = h.para_membro_id
+    join public.negocios n on n.id = h.negocio_id and n.empresa_id = h.empresa_id
+    join public.empresa_membros m on m.id = h.para_membro_id and m.empresa_id = h.empresa_id
     where h.negocio_id = p_negocio_id
       and h.status = 'pendente'
       and m.user_id = (select auth.uid())

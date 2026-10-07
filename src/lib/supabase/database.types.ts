@@ -3617,7 +3617,7 @@ export type Database = {
         };
       };
       e_closer_de_handoff_pendente: { Args: { p_negocio_id: string }; Returns: boolean };
-      e_membro_comercial: { Args: { p_membro_id: string }; Returns: boolean };
+      e_membro_comercial: { Args: { p_empresa_id: string; p_membro_id: string }; Returns: boolean };
       e_plataforma_admin: { Args: Record<PropertyKey, never>; Returns: boolean };
       empresa_da_pasta_marca: { Args: { p_caminho: string }; Returns: string };
       estornar_confirmacao_pagamento: {

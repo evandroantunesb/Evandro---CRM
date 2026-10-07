@@ -25,6 +25,7 @@ let empresaB: string;
 const membro: Record<string, string> = {};
 let membroVendedorB: string;
 let duploEmA: string;
+let duploEmB: string;
 let negocio: string;
 let contato: string;
 let negocioB: string;
@@ -70,7 +71,7 @@ beforeAll(async () => {
     ])
     .select("id, user_id");
   membroVendedorB = vB!.find((v) => v.user_id === vendedorB.id)!.id;
-  const duploEmB = vB!.find((v) => v.user_id === duplo.id)!.id;
+  duploEmB = vB!.find((v) => v.user_id === duplo.id)!.id;
   const { data: dA } = await servico
     .from("empresa_membros")
     .insert({ empresa_id: empresa, user_id: duplo.id, papel: "vendedor", perfil_gamificacao: "closer" })
@@ -336,6 +337,36 @@ describe("handoff: integridade multiempresa", () => {
     expect(count).toBe(0);
   });
 
+  it("feedback de handoff de outra empresa é recusado", async () => {
+    // Handoff legítimo na empresa B: vendedorB → duplo (membro das duas empresas).
+    const { data: cB } = await servico.from("contatos").insert({ empresa_id: empresaB, nome: "Cliente feedback B" }).select("id").single();
+    const { data: fB } = await servico.from("funis").select("id").eq("empresa_id", empresaB).single();
+    const { data: etB } = await servico.from("etapas").select("id").eq("funil_id", fB!.id).order("ordem").limit(1).single();
+    const { data: nB, error: erroN } = await servico
+      .from("negocios")
+      .insert({ empresa_id: empresaB, titulo: "Negócio feedback B", contato_id: cB!.id, funil_id: fB!.id, etapa_id: etB!.id, responsavel_id: membroVendedorB })
+      .select("id")
+      .single();
+    if (erroN) throw erroN;
+    const { data: hB, error: erroH } = await vendedorB.cliente
+      .from("handoffs")
+      .insert({ empresa_id: empresaB, negocio_id: nB!.id, contato_id: cB!.id, de_membro_id: membroVendedorB, para_membro_id: duploEmB, status_qualificacao: "qualificado" })
+      .select("id")
+      .single();
+    if (erroH) throw erroH;
+
+    // Combinações cruzadas com a empresa A: recusadas.
+    for (const autor_id of [duploEmA, duploEmB]) {
+      const { error } = await duplo.cliente.from("handoffs_feedback").insert({ empresa_id: empresa, handoff_id: hB!.id, autor_id, feedback: "Cruzado" });
+      expect(error, autor_id).not.toBeNull();
+    }
+    // Controle: na própria empresa do handoff, o destinatário registra o feedback.
+    const { error: erroOk } = await duplo.cliente
+      .from("handoffs_feedback")
+      .insert({ empresa_id: empresaB, handoff_id: hB!.id, autor_id: duploEmB, feedback: "Legítimo" });
+    expect(erroOk).toBeNull();
+  });
+
   it("destinatário operacao continua recusado", async () => {
     const { negocioId, contatoId } = await negocioDoVendedor("Destinatário operação");
     const { error } = await handoff(vendedor.cliente, {
@@ -457,6 +488,18 @@ describe("funções novas: privilégios", () => {
     const papeis = await quemExecuta("public.tem_acesso_comercial(uuid)");
     expect(papeis).toContain("authenticated");
     for (const papel of ["PUBLIC", "anon", "service_role"]) expect(papeis).not.toContain(papel);
+  });
+
+  it("closer de handoff pendente exige handoff, negócio e destinatário na mesma empresa (inclusive dado legado)", async () => {
+    const banco = new Client({ connectionString: urlBancoLocal() });
+    await banco.connect();
+    try {
+      const { rows } = await banco.query("select pg_get_functiondef('public.e_closer_de_handoff_pendente(uuid)'::regprocedure) as def");
+      expect(rows[0].def).toContain("join public.negocios n on n.id = h.negocio_id and n.empresa_id = h.empresa_id");
+      expect(rows[0].def).toContain("join public.empresa_membros m on m.id = h.para_membro_id and m.empresa_id = h.empresa_id");
+    } finally {
+      await banco.end();
+    }
   });
 
   it("funções de gatilho novas não são executáveis por clientes", async () => {
