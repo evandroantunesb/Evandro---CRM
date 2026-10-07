@@ -4,7 +4,7 @@ import { NovaTarefa } from "@/components/nova-tarefa";
 import { Botao, Cartao, Selecao } from "@/components/ui";
 import { carregarConfiguracao, fimDaSemana, inicioDoDia, situacaoPrazo } from "@/lib/crm";
 import { exigirPapel } from "@/lib/sessao";
-import { ATRIBUIR_TAREFA_A_OUTROS, TAREFAS, VER_TAREFAS_DE_OUTROS, pode } from "@/lib/permissoes";
+import { ATRIBUIR_TAREFA_A_OUTROS, RESPONSAVEL_COMERCIAL, TAREFAS, VER_TAREFAS_DE_OUTROS, pode } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import type { TipoTarefa } from "@/lib/tipos";
 
@@ -87,7 +87,7 @@ export default async function Tarefas({ searchParams }: PageProps<"/tarefas">) {
               <option value={atual.membroId}>Minhas tarefas</option>
               <option value="">Todos que eu acompanho</option>
               {config.membros
-                .filter((m) => m.ativo && m.id !== atual.membroId)
+                .filter((m) => m.ativo && m.id !== atual.membroId && pode(m.papel, RESPONSAVEL_COMERCIAL))
                 .map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.nome}
@@ -139,7 +139,7 @@ export default async function Tarefas({ searchParams }: PageProps<"/tarefas">) {
         <Cartao titulo="Nova tarefa avulsa">
           <p className="mb-2 text-sm text-zinc-600">Para tarefas de um cliente, crie pela tela do negócio.</p>
           <NovaTarefa
-            responsaveis={pode(atual.papel, ATRIBUIR_TAREFA_A_OUTROS) ? config.membros.filter((m) => m.ativo) : []}
+            responsaveis={pode(atual.papel, ATRIBUIR_TAREFA_A_OUTROS) ? config.membros.filter((m) => m.ativo && pode(m.papel, RESPONSAVEL_COMERCIAL)) : []}
             responsavelPadrao={atual.membroId}
           />
         </Cartao>

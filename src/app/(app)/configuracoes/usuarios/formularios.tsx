@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useState, useTransition } from "react";
 import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
 import {
-  PAPEIS,
+  PAPEIS_CADASTRAVEIS,
   PERFIS_GAMIFICACAO,
   ROTULO_PAPEL,
   ROTULO_PERFIL_GAMIFICACAO,
@@ -26,7 +26,7 @@ export function FormularioConvite() {
       <Campo rotulo="Nome" name="nome" required />
       <Campo rotulo="E-mail" name="email" type="email" required />
       <Selecao rotulo="Perfil" name="papel" value={papel} onChange={(e) => setPapel(e.target.value as Papel)}>
-        {PAPEIS.map((p) => (
+        {PAPEIS_CADASTRAVEIS.map((p) => (
           <option key={p} value={p}>
             {ROTULO_PAPEL[p]}
           </option>
@@ -114,7 +114,7 @@ export function LinhaMembro({ membro }: { membro: MembroLinha }) {
         <p className="truncate text-sm text-zinc-500">{membro.email}</p>
       </div>
       <Selecao name="papel" value={papel} onChange={(e) => setPapel(e.target.value as Papel)} aria-label="Perfil">
-        {PAPEIS.map((p) => (
+        {PAPEIS_CADASTRAVEIS.map((p) => (
           <option key={p} value={p}>
             {ROTULO_PAPEL[p]}
           </option>

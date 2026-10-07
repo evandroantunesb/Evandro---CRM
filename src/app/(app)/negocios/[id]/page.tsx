@@ -10,7 +10,7 @@ import { carregarConfiguracao, formatarDataHora, formatarMoeda } from "@/lib/crm
 import { env } from "@/lib/env";
 import { descreverAtividade } from "@/lib/linha-do-tempo";
 import { exigirPapel } from "@/lib/sessao";
-import { ATRIBUIR_TAREFA_A_OUTROS, EDITAR_VALOR_NEGOCIO, ESCOLHER_RESPONSAVEL_NEGOCIO, NEGOCIOS, PROPOSTA_E_CONTRATO, pode } from "@/lib/permissoes";
+import { ATRIBUIR_TAREFA_A_OUTROS, EDITAR_VALOR_NEGOCIO, ESCOLHER_RESPONSAVEL_NEGOCIO, NEGOCIOS, PROPOSTA_E_CONTRATO, RESPONSAVEL_COMERCIAL, pode } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import {
   ROTULO_CATEGORIA_ANEXO,
@@ -237,7 +237,7 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
                 (e) => e.funilId === negocio.funil_id && (e.ativa || e.id === negocio.etapa_id),
               )}
               origens={config.origens.filter((o) => o.ativa || o.id === negocio.origem_id)}
-              responsaveis={pode(atual.papel, ESCOLHER_RESPONSAVEL_NEGOCIO) ? config.membros.filter((m) => m.ativo) : []}
+              responsaveis={pode(atual.papel, ESCOLHER_RESPONSAVEL_NEGOCIO) ? config.membros.filter((m) => m.ativo && pode(m.papel, RESPONSAVEL_COMERCIAL)) : []}
               podeEditarValor={pode(atual.papel, EDITAR_VALOR_NEGOCIO)}
             />
           </Cartao>
@@ -411,7 +411,7 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
               />
               <NovaTarefa
                 negocioId={negocio.id}
-                responsaveis={pode(atual.papel, ATRIBUIR_TAREFA_A_OUTROS) ? config.membros.filter((m) => m.ativo) : []}
+                responsaveis={pode(atual.papel, ATRIBUIR_TAREFA_A_OUTROS) ? config.membros.filter((m) => m.ativo && pode(m.papel, RESPONSAVEL_COMERCIAL)) : []}
                 responsavelPadrao={negocio.responsavel_id}
               />
             </div>

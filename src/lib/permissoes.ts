@@ -45,6 +45,12 @@ export const CALCULADORA = ["admin", "gestor", "vendedor", "sdr"] as const satis
 /** Anexos e notas de negócio. */
 export const ANEXOS_E_NOTAS = ["admin", "gestor", "vendedor", "sdr"] as const satisfies ListaPapeis;
 
+/**
+ * Quem pode ser responsável ou destinatário comercial (negócio, tarefa, handoff).
+ * Espelha `e_membro_comercial()` no banco: `operacao` nunca entra.
+ */
+export const RESPONSAVEL_COMERCIAL = ["admin", "gestor", "vendedor", "sdr"] as const satisfies ListaPapeis;
+
 // --- Tarefas e agenda --------------------------------------------------------
 
 /** Tarefas (tela e ações). */

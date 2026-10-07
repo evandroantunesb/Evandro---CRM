@@ -26,6 +26,7 @@ const MATRIZ: Record<string, string[]> = {
   CONFIRMAR_PAGAMENTO: ["admin", "gestor"],
   CALCULADORA: ["admin", "gestor", "vendedor", "sdr"],
   ANEXOS_E_NOTAS: ["admin", "gestor", "vendedor", "sdr"],
+  RESPONSAVEL_COMERCIAL: ["admin", "gestor", "vendedor", "sdr"],
   TAREFAS: ["admin", "gestor", "vendedor", "sdr"],
   VER_TAREFAS_DE_OUTROS: ["admin", "gestor"],
   ATRIBUIR_TAREFA_A_OUTROS: ["admin", "gestor"],

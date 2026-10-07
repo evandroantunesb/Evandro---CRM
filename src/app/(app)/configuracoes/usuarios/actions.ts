@@ -5,12 +5,12 @@ import { z } from "zod";
 import { criarUsuarioDireto } from "@/lib/convites";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { PAPEIS, PERFIS_GAMIFICACAO, TIPOS_VENDEDOR, STATUS_MEMBRO, type ResultadoAcao } from "@/lib/tipos";
+import { PAPEIS_CADASTRAVEIS, PERFIS_GAMIFICACAO, TIPOS_VENDEDOR, STATUS_MEMBRO, type ResultadoAcao } from "@/lib/tipos";
 
 const esquemaConvite = z.object({
   nome: z.string().trim().min(2, "Informe o nome"),
   email: z.string().trim().email("E-mail inválido"),
-  papel: z.enum(PAPEIS),
+  papel: z.enum(PAPEIS_CADASTRAVEIS),
   tipo_vendedor: z.enum(TIPOS_VENDEDOR),
   perfil_gamificacao: z.enum(PERFIS_GAMIFICACAO).optional().or(z.literal("").transform(() => undefined)),
   senha: z
@@ -68,7 +68,7 @@ export async function convidarMembro(_: ResultadoAcao, formData: FormData): Prom
 
 const esquemaAtualizacao = z.object({
   membroId: z.string().uuid(),
-  papel: z.enum(PAPEIS),
+  papel: z.enum(PAPEIS_CADASTRAVEIS),
   tipo_vendedor: z.enum(TIPOS_VENDEDOR),
   perfil_gamificacao: z.enum(PERFIS_GAMIFICACAO).optional().or(z.literal("").transform(() => undefined)),
   recebe_leads: z.enum(["on"]).optional(),
