@@ -4,6 +4,8 @@
  * pelo app. Duas regras:
  * 1) kit com cálculo solar salvo nunca fica vazio (inclusive acesso de serviço e transações
  *    concorrentes); exclusão do negócio e remoção do cálculo continuam livres;
+ * 1b) cálculo só é criado (ou levado a outro negócio) com kit — fecha a corrida entre criar o
+ *    cálculo e apagar o último item; recálculo e cálculos antigos sem itens seguem iguais;
  * 2) SDR não muda status, motivo de perda nem valor — também pelo fechamento automático por
  *    etapa, sem alteração parcial. Os demais papéis e os fluxos de etapa/aceite seguem iguais.
  */
@@ -33,6 +35,19 @@ async function conectar() {
 
 const MENSAGEM_KIT = "Este kit tem cálculo solar salvo e não pode ficar sem equipamentos.";
 const MENSAGEM_SDR = "SDR não pode fechar, reabrir nem alterar o valor do negócio.";
+const MENSAGEM_CALCULO = "Monte o kit antes de salvar o cálculo solar.";
+
+/** Espera a sessão `pid` ficar bloqueada numa trava (prova de que a outra transação a segura). */
+async function aguardarTrava(observador: Client, pid: number) {
+  for (let i = 0; i < 50; i++) {
+    const { rows } = await observador.query("select wait_event_type from pg_stat_activity where pid = $1", [pid]);
+    if (rows[0]?.wait_event_type === "Lock") return true;
+    await new Promise((ok) => setTimeout(ok, 100));
+  }
+  return false;
+}
+
+const pidDe = async (c: Client) => (await c.query("select pg_backend_pid() as pid")).rows[0].pid as number;
 
 let admin: Usuario;
 let gestor: Usuario;
@@ -287,6 +302,227 @@ describe("kit com cálculo solar nunca fica vazio", () => {
     }
     expect(await lerKit(negocioId)).toEqual([b]);
     expect(await temCalculo(negocioId)).toBe(true);
+  });
+});
+
+const KIT_UM = JSON.stringify([{ tipo: "modulo", descricao: "Módulo 550 W", potenciaW: 550, quantidade: 10 }]);
+
+/** Linha de cálculo válida para gravar direto (sem passar pelo app). */
+const linhaCalculo = (negocioId: string, tarifa = 0.95) => ({
+  empresa_id: empresa,
+  negocio_id: negocioId,
+  kit_nome: "Kit direto",
+  kit_potencia_kwp: 5.5,
+  kit_preco: 25000,
+  tipo_ligacao: "trifasico" as const,
+  consumo_medio_kwh: 450,
+  tarifa_kwh: tarifa,
+  produtividade_kwh_kwp_mes: 120,
+  percentual_fio_b: 0.3,
+  disponibilidade_kwh: 100,
+  geracao_estimada_kwh_mes: 660,
+  kwh_faturado: 450,
+  kwh_compensado: 450,
+  custo_fio_b: 10,
+  conta_sem_solar: 427,
+  conta_com_solar: 110,
+  economia_mensal: 317,
+});
+
+function sqlCalculo(negocioId: string) {
+  const linha = linhaCalculo(negocioId);
+  const colunas = Object.keys(linha);
+  return {
+    sql: `insert into public.calculos_solares (${colunas.join(", ")}) values (${colunas.map((_, i) => `$${i + 1}`).join(", ")})`,
+    params: Object.values(linha),
+  };
+}
+
+const tarifaSalva = async (negocioId: string) =>
+  Number((await servico.from("calculos_solares").select("tarifa_kwh").eq("negocio_id", negocioId).single()).data!.tarifa_kwh);
+
+describe("cálculo solar só é criado com kit", () => {
+  it("R1: cálculo criado e, em paralelo, o último item apagado → a exclusão espera e é recusada", async () => {
+    const negocioId = await criarNegocio(vendedor, { componentes: KIT_UM });
+    const [item] = await lerKit(negocioId);
+    expect(await temCalculo(negocioId)).toBe(false);
+    const t1 = await conectar();
+    const t2 = await conectar();
+    const observador = await conectar();
+    try {
+      await t1.query("begin");
+      await t2.query("begin");
+      const pidT2 = await pidDe(t2);
+      const { sql, params } = sqlCalculo(negocioId);
+      await t1.query(sql, params); // trava o negócio; o kit ainda tem o item
+      const exclusao = t2.query("delete from public.kit_componentes where id = $1", [item.id]).then(
+        () => null,
+        (e: Error) => e,
+      );
+      expect(await aguardarTrava(observador, pidT2)).toBe(true);
+      await t1.query("commit");
+      expect((await exclusao)?.message).toContain(MENSAGEM_KIT);
+      await t2.query("rollback");
+    } finally {
+      await Promise.all([t1.end(), t2.end(), observador.end()]);
+    }
+    expect(await lerKit(negocioId)).toEqual([item]);
+    expect(await temCalculo(negocioId)).toBe(true);
+  });
+
+  it("R2: último item apagado e, em paralelo, cálculo criado → o cálculo espera e é recusado", async () => {
+    const negocioId = await criarNegocio(vendedor, { componentes: KIT_UM });
+    const [item] = await lerKit(negocioId);
+    const t1 = await conectar();
+    const t2 = await conectar();
+    const observador = await conectar();
+    try {
+      await t1.query("begin");
+      await t2.query("begin");
+      const pidT1 = await pidDe(t1);
+      await t2.query("delete from public.kit_componentes where id = $1", [item.id]); // sem cálculo: passa e trava o negócio
+      const { sql, params } = sqlCalculo(negocioId);
+      const criacao = t1.query(sql, params).then(
+        () => null,
+        (e: Error) => e,
+      );
+      expect(await aguardarTrava(observador, pidT1)).toBe(true);
+      await t2.query("commit");
+      expect((await criacao)?.message).toContain(MENSAGEM_CALCULO);
+      await t1.query("rollback");
+    } finally {
+      await Promise.all([t1.end(), t2.end(), observador.end()]);
+    }
+    expect(await lerKit(negocioId)).toEqual([]);
+    expect(await temCalculo(negocioId)).toBe(false);
+  });
+
+  it("R3: criar cálculo direto em negócio sem kit é recusado (vendedor e serviço)", async () => {
+    const negocioId = await criarNegocio(vendedor);
+    for (const c of [vendedor.cliente, servico]) {
+      const { error } = await c.from("calculos_solares").insert(linhaCalculo(negocioId));
+      expect(error?.message).toContain(MENSAGEM_CALCULO);
+      expect(error?.hint).toBe("mensagem_usuario");
+    }
+    expect(await temCalculo(negocioId)).toBe(false);
+  });
+
+  it("levar um cálculo para negócio sem kit é recusado; o cálculo fica onde estava", async () => {
+    const comCalculo = await negocioComCalculo();
+    const semKit = await criarNegocio(vendedor);
+    const { error } = await vendedor.cliente.from("calculos_solares").update({ negocio_id: semKit }).eq("negocio_id", comCalculo);
+    expect(error?.message).toContain(MENSAGEM_CALCULO);
+    expect(await temCalculo(comCalculo)).toBe(true);
+    expect(await temCalculo(semKit)).toBe(false);
+  });
+
+  it("criação normal com kit: direto pelo Supabase e pelo cadastro do app", async () => {
+    const negocioId = await criarNegocio(vendedor, { componentes: KIT_UM });
+    const { error } = await vendedor.cliente.from("calculos_solares").insert(linhaCalculo(negocioId));
+    expect(error).toBeNull();
+    expect(await temCalculo(negocioId)).toBe(true);
+    expect(await temCalculo(await negocioComCalculo())).toBe(true);
+  });
+
+  it("recálculo de cálculo existente: pelo app, por upsert e por update direto", async () => {
+    const negocioId = await negocioComCalculo();
+    const r = await salvarKitComCliente(
+      cliente(vendedor),
+      atual[vendedor.id],
+      fd({ negocioId, tipoLigacao: "trifasico", consumoMedioKwh: "450", tarifaKwh: "1,05", componentes: KIT }),
+    );
+    expect(r.ok).toBe(true);
+    expect(await tarifaSalva(negocioId)).toBeCloseTo(1.05);
+    const { error: erroUpsert } = await vendedor.cliente.from("calculos_solares").upsert(linhaCalculo(negocioId, 1.1), { onConflict: "negocio_id" });
+    expect(erroUpsert).toBeNull();
+    expect(await tarifaSalva(negocioId)).toBeCloseTo(1.1);
+    const { error: erroUpdate } = await vendedor.cliente.from("calculos_solares").update({ tarifa_kwh: 1.2 }).eq("negocio_id", negocioId);
+    expect(erroUpdate).toBeNull();
+    expect(await tarifaSalva(negocioId)).toBeCloseTo(1.2);
+  });
+
+  it("cálculo antigo sem itens (calculadora de catálogo): continua como está e pode ser recalculado ou apagado", async () => {
+    // Estado histórico fabricado só no banco de teste: gatilhos desligados nesta transação.
+    const historicos = [await criarNegocio(vendedor), await criarNegocio(vendedor)];
+    const banco = await conectar();
+    try {
+      await banco.query("begin");
+      await banco.query("set local session_replication_role = replica");
+      for (const id of historicos) {
+        const { sql, params } = sqlCalculo(id);
+        await banco.query(sql, params);
+      }
+      await banco.query("commit");
+    } finally {
+      await banco.end();
+    }
+    const [recalcular, apagar] = historicos;
+    expect(await temCalculo(recalcular)).toBe(true);
+    expect(await lerKit(recalcular)).toEqual([]);
+
+    expect((await vendedor.cliente.from("calculos_solares").update({ tarifa_kwh: 1.15 }).eq("negocio_id", recalcular)).error).toBeNull();
+    expect((await vendedor.cliente.from("calculos_solares").upsert(linhaCalculo(recalcular, 1.25), { onConflict: "negocio_id" })).error).toBeNull();
+    expect(await tarifaSalva(recalcular)).toBeCloseTo(1.25);
+    expect(await lerKit(recalcular)).toEqual([]); // nada corrigido sozinho
+
+    // Montar o kit pelo app recalcula normalmente (itens antes do cálculo).
+    const r = await salvarKitComCliente(
+      cliente(vendedor),
+      atual[vendedor.id],
+      fd({ negocioId: recalcular, tipoLigacao: "trifasico", consumoMedioKwh: "450", tarifaKwh: "0,95", componentes: KIT }),
+    );
+    expect(r.ok).toBe(true);
+    expect(await lerKit(recalcular)).toHaveLength(2);
+
+    // Sem autor registrado, a RLS ("apagar cálculo") deixa só o admin apagar.
+    const { data: apagado, error } = await admin.cliente.from("calculos_solares").delete().eq("negocio_id", apagar).select("id");
+    expect(error).toBeNull();
+    expect(apagado).toHaveLength(1);
+  });
+
+  it("risco residual: deadlock entre excluir o negócio e apagar item → uma operação falha com erro, dados íntegros", async () => {
+    const negocioId = await negocioComCalculo();
+    const [a, b] = await lerKit(negocioId);
+    const x = await conectar();
+    const t2 = await conectar();
+    const observador = await conectar();
+    try {
+      await t2.query("begin");
+      await t2.query("update public.kit_componentes set quantidade = 11 where id = $1", [a.id]); // T2 segura o item A
+      await x.query("begin");
+      const pidX = await pidDe(x);
+      const exclusaoNegocio = x.query("delete from public.negocios where id = $1", [negocioId]).then(
+        () => null,
+        (e: Error & { code?: string }) => e,
+      );
+      expect(await aguardarTrava(observador, pidX)).toBe(true); // X travou o negócio e espera o item A
+      const exclusaoItem = t2.query("delete from public.kit_componentes where id = $1", [b.id]).then(
+        () => null,
+        (e: Error & { code?: string }) => e,
+      ); // T2 espera o negócio: ciclo
+      const primeiro = await Promise.race([
+        exclusaoNegocio.then((e) => ({ quem: "negocio" as const, e })),
+        exclusaoItem.then((e) => ({ quem: "item" as const, e })),
+      ]);
+      // A primeira a terminar é a vítima do deadlock: sempre com erro, nunca como concluída.
+      expect(primeiro.e?.code).toBe("40P01");
+      if (primeiro.quem === "negocio") {
+        await x.query("rollback");
+        expect(await exclusaoItem).toBeNull();
+        await t2.query("commit");
+        expect(await lerKit(negocioId)).toEqual([a]);
+        expect(await temCalculo(negocioId)).toBe(true);
+      } else {
+        await t2.query("rollback");
+        expect(await exclusaoNegocio).toBeNull();
+        await x.query("commit");
+        expect(await lerKit(negocioId)).toEqual([]);
+        expect(await temCalculo(negocioId)).toBe(false);
+        expect((await servico.from("negocios").select("id").eq("id", negocioId).maybeSingle()).data).toBeNull();
+      }
+    } finally {
+      await Promise.all([x.end(), t2.end(), observador.end()]);
+    }
   });
 });
 
