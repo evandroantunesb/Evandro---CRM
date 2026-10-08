@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { Botao, Mensagem, Selecao } from "@/components/ui";
 import { alterarStatus } from "@/lib/acoes/negocios";
+import { avisoReabertura } from "@/lib/venda";
 
 type Opcao = { id: string; nome: string };
 
@@ -22,21 +23,37 @@ export function Fechamento({
 }) {
   const [resultado, acao, pendente] = useActionState(alterarStatus, null);
   const [perdendo, setPerdendo] = useState(false);
+  const [reabrindo, setReabrindo] = useState(false);
 
   if (somenteLeitura) {
     return <span className="text-sm text-zinc-700">{ROTULO_STATUS[status]}</span>;
   }
 
   if (status !== "aberto") {
+    if (reabrindo) {
+      return (
+        <form action={acao} onSubmit={() => setReabrindo(false)} className="flex flex-col gap-3">
+          <input type="hidden" name="negocioId" value={negocioId} />
+          <input type="hidden" name="status" value="aberto" />
+          <AvisoReabertura status={status} />
+          <div className="flex flex-wrap gap-2">
+            <Botao type="button" variante="secundario" onClick={() => setReabrindo(false)}>
+              Voltar
+            </Botao>
+            <Botao type="submit" disabled={pendente}>
+              Confirmar reabertura
+            </Botao>
+          </div>
+        </form>
+      );
+    }
     return (
-      <form action={acao} className="flex flex-wrap items-center gap-2">
-        <input type="hidden" name="negocioId" value={negocioId} />
-        <input type="hidden" name="status" value="aberto" />
-        <Botao type="submit" variante="secundario" disabled={pendente}>
+      <div className="flex flex-col gap-2">
+        <Botao type="button" variante="secundario" disabled={pendente} onClick={() => setReabrindo(true)} className="w-fit">
           Reabrir negócio
         </Botao>
         <Mensagem resultado={resultado} />
-      </form>
+      </div>
     );
   }
 
@@ -89,6 +106,19 @@ export function Fechamento({
         </Botao>
       </div>
       <Mensagem resultado={resultado} />
+    </div>
+  );
+}
+
+/** Texto da confirmação de reabertura. Reabrir não é cancelar a venda: nada é cancelado automaticamente. */
+export function AvisoReabertura({ status }: { status: "ganho" | "perdido" }) {
+  const aviso = avisoReabertura(status);
+  return (
+    <div role="alert" className="flex flex-col gap-1 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
+      <p className="font-semibold">{aviso.titulo}</p>
+      {aviso.linhas.map((linha) => (
+        <p key={linha}>{linha}</p>
+      ))}
     </div>
   );
 }
