@@ -24,6 +24,7 @@ const MATRIZ: Record<string, string[]> = {
   FILTRAR_NEGOCIOS_POR_RESPONSAVEL: ["admin", "gestor"],
   PROPOSTA_E_CONTRATO: ["admin", "gestor", "vendedor"],
   CONFIRMAR_PAGAMENTO: ["admin", "gestor"],
+  EDITAR_MODELO_CONTRATO: ["admin"],
   CALCULADORA: ["admin", "gestor", "vendedor", "sdr"],
   ANEXOS_E_NOTAS: ["admin", "gestor", "vendedor", "sdr"],
   RESPONSAVEL_COMERCIAL: ["admin", "gestor", "vendedor", "sdr"],

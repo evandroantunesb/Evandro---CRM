@@ -280,6 +280,21 @@ async function garantirNegocioComProposta(empresaId, { titulo, contato, negocio,
       disponibilidadeKwh: kit.parametros[disponibilidadeCol],
     });
 
+    // Itens do kit antes do cálculo: o banco só aceita cálculo de negócio com kit
+    // (gatilho calculos_solares_exige_kit). Numa reexecução após falha no cálculo, os
+    // itens já gravados são mantidos em vez de duplicados.
+    const { count: itensExistentes, error: eItens } = await db
+      .from("kit_componentes")
+      .select("id", { count: "exact", head: true })
+      .eq("negocio_id", negocioRow.id);
+    if (eItens) throw eItens;
+    if (!itensExistentes) {
+      const { error: eKit } = await db
+        .from("kit_componentes")
+        .insert(kit.componentes.map((c, i) => ({ empresa_id: empresaId, negocio_id: negocioRow.id, ordem: i, ...c })));
+      if (eKit) throw eKit;
+    }
+
     const { error: eCalculo } = await db.from("calculos_solares").insert({
       empresa_id: empresaId,
       negocio_id: negocioRow.id,
@@ -303,11 +318,6 @@ async function garantirNegocioComProposta(empresaId, { titulo, contato, negocio,
       payback_meses: calculo.paybackMeses,
     });
     if (eCalculo) throw eCalculo;
-
-    const { error: eKit } = await db
-      .from("kit_componentes")
-      .insert(kit.componentes.map((c, i) => ({ empresa_id: empresaId, negocio_id: negocioRow.id, ordem: i, ...c })));
-    if (eKit) throw eKit;
 
     const { error: eProposta } = await db.from("propostas").insert({ empresa_id: empresaId, negocio_id: negocioRow.id });
     if (eProposta) throw eProposta;

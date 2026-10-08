@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { useEnvioSemReset } from "@/components/envio-sem-reset";
 import { Botao, Campo, Mensagem, Selecao, Selo } from "@/components/ui";
 import { atualizarQualificacao, enviarParaVendas } from "@/lib/acoes/negocios";
 import { calcularStatusQualificacao } from "@/lib/qualificacao";
@@ -68,11 +69,12 @@ export function Qualificacao({
   vendedores: { id: string; nome: string }[];
 }) {
   const [resultado, acao, pendente] = useActionState(atualizarQualificacao, null);
+  const enviar = useEnvioSemReset(acao);
   const status = calcularStatusQualificacao(!!telefoneContato, negocio.qualifObjetivo, negocio.qualifEDecisor);
 
   return (
     <div className="flex flex-col gap-3">
-      <form action={acao} className="flex flex-col gap-3">
+      <form onSubmit={enviar} className="flex flex-col gap-3">
         <input type="hidden" name="negocioId" value={negocio.id} />
       <div className="flex items-center gap-2">
         <Selo tom={status.tom}>{status.rotulo}</Selo>

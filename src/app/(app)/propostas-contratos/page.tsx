@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { Botao, Selecao, Selo } from "@/components/ui";
 import { carregarConfiguracao, formatarDataHora, formatarMoeda } from "@/lib/crm";
 import { exigirPapel } from "@/lib/sessao";
-import { PROPOSTA_E_CONTRATO } from "@/lib/permissoes";
+import { EDITAR_MODELO_CONTRATO, PROPOSTA_E_CONTRATO, pode } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import type { StatusPagamentoContrato } from "@/lib/tipos";
 import {
@@ -93,13 +93,23 @@ export default async function PropostasContratos({ searchParams }: PageProps<"/p
 
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-4">
-      <div>
-        <h1 className="text-2xl font-semibold text-zinc-900 md:text-[28px]">Propostas e contratos</h1>
-        <p className="text-sm text-zinc-500">
-          {visao === "propostas"
-            ? "Propostas enviadas e se o cliente já viu."
-            : "Contratos, assinatura e pagamento de cada venda."}
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold text-zinc-900 md:text-[28px]">Propostas e contratos</h1>
+          <p className="text-sm text-zinc-500">
+            {visao === "propostas"
+              ? "Propostas enviadas e se o cliente já viu."
+              : "Contratos, assinatura e pagamento de cada venda."}
+          </p>
+        </div>
+        {visao === "contratos" && pode(atual.papel, EDITAR_MODELO_CONTRATO) && (
+          <Link
+            href="/configuracoes/contrato"
+            className="inline-flex min-h-10 items-center rounded-lg border border-zinc-200 bg-white px-3.5 py-2 text-sm font-medium text-carvao hover:bg-offwhite"
+          >
+            Editar modelo
+          </Link>
+        )}
       </div>
 
       <nav className="flex gap-1 border-b border-zinc-200" aria-label="Visão">

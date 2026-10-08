@@ -1,11 +1,15 @@
 "use client";
 
 import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, XCircle } from "lucide-react";
-import { useActionState, useId, useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { useId, useMemo, useRef, useState, useTransition } from "react";
 import { CampoArquivo } from "@/components/campo-arquivo";
 import { EditorComponentesKit, linhasParaComponentes, type LinhaComponente } from "@/components/kit-componentes";
 import { Botao, Campo, Mensagem, Selecao, Selo } from "@/components/ui";
 import { buscarContatos, criarNegocio, verificarDuplicado, type Duplicado } from "@/lib/acoes/negocios";
+import { registrarAnexo } from "@/lib/acoes/anexos";
+import { enviarArquivos } from "@/lib/anexos-navegador";
+import { ANEXOS_CRIACAO, prepararEnvioCriacao } from "@/lib/anexos-regras";
 import {
   calcular,
   custosInternosEstimados,
@@ -14,10 +18,20 @@ import {
   sugerirQuantidadeModulos,
 } from "@/lib/calculadora";
 import { formatarCep, formatarMascaraMoeda, formatarMoeda, formatarTelefoneBr } from "@/lib/formatacao";
-import { ROTULO_TIPO_LIGACAO, TIPOS_LIGACAO, type TipoLigacao } from "@/lib/tipos";
+import { montarEndereco } from "@/lib/negocio-dados";
+import { criarClienteNavegador } from "@/lib/supabase/navegador";
+import { ROTULO_TIPO_LIGACAO, TIPOS_LIGACAO, type ResultadoAcao, type TipoLigacao } from "@/lib/tipos";
 
 type Opcao = { id: string; nome: string };
-type ContatoEncontrado = { id: string; nome: string; telefone: string | null; email: string | null };
+type ContatoEncontrado = {
+  id: string;
+  nome: string;
+  telefone: string | null;
+  email: string | null;
+  endereco?: string | null;
+  cidade?: string | null;
+  uf?: string | null;
+};
 type Parametros = {
   produtividadeKwhKwpMes: number;
   percentualFioB: number;
@@ -158,8 +172,12 @@ export function FormularioNegocio({
   meuMembroId: string;
   parametros: Parametros | null;
 }) {
-  const [resultado, acao, pendente] = useActionState(criarNegocio, null);
+  const router = useRouter();
+  const [resultado, setResultado] = useState<ResultadoAcao>(null);
+  const [pendente, iniciarEnvio] = useTransition();
+  const [enviandoArquivos, setEnviandoArquivos] = useState(false);
   const [etapaAtual, setEtapaAtual] = useState<1 | 2 | 3>(1);
+  const etapasRef = useRef<Record<1 | 2 | 3, HTMLDivElement | null>>({ 1: null, 2: null, 3: null });
   const [erroEtapa, setErroEtapa] = useState<string | null>(null);
 
   const [modo, setModo] = useState<"novo" | "existente">("novo");
@@ -169,13 +187,15 @@ export function FormularioNegocio({
   const [duplicados, setDuplicados] = useState<Duplicado[]>([]);
   const [, iniciar] = useTransition();
 
+
   // Cliente (Etapa 1).
   const [contatoNome, setContatoNome] = useState("");
   const [contatoTelefone, setContatoTelefone] = useState("");
   const [contatoEmail, setContatoEmail] = useState("");
   const emailValido = contatoEmail === "" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contatoEmail);
 
-  // Localização (Etapa 1) — campos estruturados; concatenados no envio pro campo único que o backend já salva.
+  // Localização (Etapa 1) — rua/número/complemento/bairro/CEP vão juntos em `contatos.endereco`;
+  // cidade e UF vão em `contatos.cidade`/`uf` (antes ficavam só dentro do texto do endereço).
   const [cep, setCep] = useState("");
   const [rua, setRua] = useState("");
   const [numeroEndereco, setNumeroEndereco] = useState("");
@@ -205,16 +225,15 @@ export function FormularioNegocio({
     }
   }
 
-  const enderecoCompleto = useMemo(() => {
-    const partes = [
-      rua && numeroEndereco ? `${rua}, ${numeroEndereco}` : rua,
-      complemento,
-      bairro,
-      cidade && uf ? `${cidade} - ${uf}` : cidade,
-      cep ? `CEP ${cep}` : "",
-    ].filter(Boolean);
-    return partes.join(", ");
-  }, [rua, numeroEndereco, complemento, bairro, cidade, uf, cep]);
+  const enderecoCompleto = montarEndereco({ rua, numero: numeroEndereco, complemento, bairro, cep });
+
+  /** Contato existente: traz a cidade e a UF já cadastradas (o servidor só completa o que estiver vazio). */
+  function escolherContato(c: ContatoEncontrado) {
+    setContato(c);
+    if (c.cidade) setCidade(c.cidade);
+    const ufContato = c.uf?.trim().toUpperCase();
+    if (ufContato && ESTADOS_BR.includes(ufContato)) setUf(ufContato);
+  }
 
   // Consumo (Etapa 1): kWh direto ou valor da conta (com máscara), nunca os dois exigidos.
   const [consumoMedioKwh, setConsumoMedioKwh] = useState("");
@@ -293,6 +312,63 @@ export function FormularioNegocio({
     });
   }, [parametros, tipoLigacao, consumoMedioKwh, valorFaturaMedio, tarifaKwh, potenciaKwp, valor]);
 
+  /**
+   * Envio sem o reset automático (nada do que foi digitado se perde se o servidor recusar).
+   * Os arquivos não vão para a ação (limite de 1 MB): depois de criar o negócio, cada um vai
+   * direto ao Storage e só então é registrado; o que falhar vira aviso na ficha.
+   */
+  function enviar(evento: React.FormEvent<HTMLFormElement>) {
+    evento.preventDefault();
+    // O formulário tem `noValidate`: antes, um obrigatório vazio num passo escondido fazia o navegador
+    // bloquear o envio sem mostrar nada. Agora cada passo é conferido e o problema aparece no passo dele.
+    for (const etapa of [1, 2, 3] as const) {
+      const problemaEtapa = problemaDaEtapa(etapa);
+      if (problemaEtapa) return mostrarProblema(etapa, problemaEtapa);
+    }
+    setErroEtapa(null);
+    const { dados, arquivos, problema } = prepararEnvioCriacao(new FormData(evento.currentTarget));
+    if (problema) return setResultado({ ok: false, mensagem: `${problema} Escolha outro arquivo.` });
+    setResultado(null);
+    iniciarEnvio(async () => {
+      let r: Awaited<ReturnType<typeof criarNegocio>>;
+      try {
+        r = await criarNegocio(dados);
+      } catch {
+        setResultado({
+          ok: false,
+          mensagem: "Não foi possível salvar agora (falha de conexão ou do servidor). Seus dados continuam na tela; tente de novo.",
+        });
+        return;
+      }
+      if (!r.ok) {
+        setResultado({ ok: false, mensagem: r.mensagem });
+        // O contato novo foi gravado mas o negócio não: segue com ele como "existente" (o reenvio não duplica).
+        if (r.contatoId) {
+          setContato({ id: r.contatoId, nome: contatoNome, telefone: contatoTelefone, email: contatoEmail || null });
+          setModo("existente");
+        }
+        return;
+      }
+      const avisos = [...r.avisos];
+      if (arquivos.length) {
+        setEnviandoArquivos(true);
+        try {
+          const falhas = await enviarArquivos(
+            criarClienteNavegador(),
+            registrarAnexo,
+            { empresaId: r.empresaId, negocioId: r.negocioId },
+            arquivos.map((a) => ({ arquivo: a.arquivo, categoria: ANEXOS_CRIACAO.find((c) => c.campo === a.campo)!.categoria })),
+          );
+          if (falhas.length) avisos.push("anexos");
+        } catch {
+          // O negócio já existe: segue para a ficha avisando dos arquivos.
+          avisos.push("anexos");
+        }
+      }
+      router.push(`/negocios/${r.negocioId}${avisos.length ? `?avisos=${avisos.join(",")}` : ""}`);
+    });
+  }
+
   function pesquisar(termo: string) {
     setBusca(termo);
     iniciar(async () => setEncontrados(await buscarContatos(termo)));
@@ -303,31 +379,62 @@ export function FormularioNegocio({
     iniciar(async () => setDuplicados(await verificarDuplicado(tel, email)));
   }
 
-  function avancar() {
-    if (etapaAtual === 1) {
-      if (modo === "existente" && !contato) return setErroEtapa("Selecione um contato existente pra continuar.");
+  /** Primeiro campo inválido (regras do próprio campo: obrigatório, e-mail...) do passo, ignorando desativados. */
+  function campoInvalido(etapa: 1 | 2 | 3) {
+    const raiz = etapasRef.current[etapa];
+    if (!raiz) return null;
+    for (const campo of raiz.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>("input, select, textarea")) {
+      if (!campo.disabled && !campo.checkValidity()) return campo;
+    }
+    return null;
+  }
+
+  /** O que falta no passo: só os campos e conferências daquele passo (nada de exigência nova). */
+  function problemaDaEtapa(etapa: 1 | 2 | 3): { mensagem: string; campo?: HTMLElement } | null {
+    if (etapa === 1 && modo === "existente" && !contato) return { mensagem: "Selecione um contato existente pra continuar." };
+    const invalido = campoInvalido(etapa);
+    if (invalido) {
+      const rotulo = invalido.closest("label")?.querySelector("span")?.textContent?.replace(/\*$/, "").trim();
+      return { mensagem: `Preencha corretamente: ${rotulo || "campo obrigatório"}.`, campo: invalido };
+    }
+    if (etapa === 1) {
       if (modo === "novo") {
-        if (contatoNome.trim().length < 2) return setErroEtapa("Informe o nome do cliente.");
-        if (contatoTelefone.replace(/\D/g, "").length < 10) return setErroEtapa("Informe um WhatsApp válido.");
-        if (!emailValido) return setErroEtapa("Informe um e-mail válido ou deixe em branco.");
+        if (contatoNome.trim().length < 2) return { mensagem: "Informe o nome do cliente." };
+        if (contatoTelefone.replace(/\D/g, "").length < 10) return { mensagem: "Informe um WhatsApp válido." };
+        if (!emailValido) return { mensagem: "Informe um e-mail válido ou deixe em branco." };
       }
       const cepDigitos = cep.replace(/\D/g, "");
-      if (cepDigitos.length > 0 && cepDigitos.length !== 8) {
-        return setErroEtapa("CEP inválido — informe os 8 dígitos ou deixe em branco.");
-      }
-      if (!cidade.trim() || !uf.trim()) {
-        return setErroEtapa("Informe a cidade e o estado para identificarmos a distribuidora de energia.");
-      }
+      if (cepDigitos.length > 0 && cepDigitos.length !== 8) return { mensagem: "CEP inválido — informe os 8 dígitos ou deixe em branco." };
+      if (!cidade.trim() || !uf.trim()) return { mensagem: "Informe a cidade e o estado para identificarmos a distribuidora de energia." };
       if (numero(consumoMedioKwh) == null && numero(valorFaturaMedio) == null) {
-        return setErroEtapa("Informe o consumo médio mensal em kWh ou o valor médio da conta.");
+        return { mensagem: "Informe o consumo médio mensal em kWh ou o valor médio da conta." };
       }
-      setErroEtapa(null);
-      return setEtapaAtual(2);
     }
-    if (etapaAtual === 2) {
-      setErroEtapa(null);
-      return setEtapaAtual(3);
-    }
+    return null;
+  }
+
+  /** Leva ao passo do problema, mostra a mensagem e põe o cursor no campo. */
+  function mostrarProblema(etapa: 1 | 2 | 3, problema: { mensagem: string; campo?: HTMLElement }) {
+    setEtapaAtual(etapa);
+    setErroEtapa(problema.mensagem);
+    if (problema.campo) setTimeout(() => problema.campo?.focus(), 0);
+  }
+
+  function avancar() {
+    const problema = problemaDaEtapa(etapaAtual);
+    if (problema) return mostrarProblema(etapaAtual, problema);
+    setErroEtapa(null);
+    setEtapaAtual(etapaAtual === 1 ? 2 : 3);
+  }
+
+  /**
+   * Cancela a montagem do kit (no cadastro nada do kit está salvo ainda): fecha o editor e descarta
+   * só os itens. O valor só é limpo se era a sugestão automática do kit; valor digitado fica.
+   */
+  function cancelarMontagem() {
+    setLinhas([]);
+    setMostrarKit(false);
+    if (!valorTocado) setValor("");
   }
 
   function voltar() {
@@ -336,12 +443,14 @@ export function FormularioNegocio({
   }
 
   return (
-    <form action={acao} className="flex flex-col gap-5">
+    <form onSubmit={enviar} noValidate className="flex flex-col gap-5">
       <input type="hidden" name="funil_id" value={funilId} />
       {etapaId && <input type="hidden" name="etapa_id" value={etapaId} />}
       <input type="hidden" name="tipo_ligacao" value={tipoLigacao} />
       <input type="hidden" name="componentes" value={JSON.stringify(componentes)} />
       <input type="hidden" name="contato_endereco" value={enderecoCompleto} />
+      <input type="hidden" name="contato_cidade" value={cidade} />
+      <input type="hidden" name="contato_uf" value={uf} />
       <input type="hidden" name="contato_nome" value={contatoNome} />
       <input type="hidden" name="contato_telefone" value={contatoTelefone} />
       <input type="hidden" name="contato_email" value={contatoEmail} />
@@ -355,7 +464,7 @@ export function FormularioNegocio({
       <IndicadorEtapas atual={etapaAtual} />
 
       {/* Etapa 1 — Cliente e consumo */}
-      <div className={etapaAtual === 1 ? "flex flex-col gap-5" : "hidden"}>
+      <div ref={(el) => void (etapasRef.current[1] = el)} className={etapaAtual === 1 ? "flex flex-col gap-5" : "hidden"}>
         <fieldset className="grid gap-3 md:grid-cols-2">
           <legend className="mb-2 text-sm font-semibold text-zinc-900">Negócio</legend>
           <Campo rotulo="Nome do negócio" name="titulo" placeholder="Ex.: Residência 5 kWp" required />
@@ -414,7 +523,7 @@ export function FormularioNegocio({
                       <li key={c.id}>
                         <button
                           type="button"
-                          onClick={() => setContato(c)}
+                          onClick={() => escolherContato(c)}
                           className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-zinc-100"
                         >
                           <strong>{c.nome}</strong> <span className="text-zinc-500">{c.telefone ?? c.email}</span>
@@ -490,6 +599,12 @@ export function FormularioNegocio({
 
         <fieldset className="grid gap-3 md:grid-cols-3">
           <legend className="mb-2 text-sm font-semibold text-zinc-900">Localização</legend>
+          {modo === "existente" && contato?.endereco && (
+            <p className="rounded-md bg-zinc-50 px-3 py-2 text-xs text-zinc-600 md:col-span-3">
+              Endereço já cadastrado no contato: <strong>{contato.endereco}</strong>. Ele é mantido; o que for digitado
+              aqui só completa campos vazios do contato.
+            </p>
+          )}
           <Campo
             rotulo="CEP"
             inputMode="numeric"
@@ -569,7 +684,7 @@ export function FormularioNegocio({
       </div>
 
       {/* Etapa 2 — Sistema recomendado */}
-      <div className={etapaAtual === 2 ? "flex flex-col gap-5" : "hidden"}>
+      <div ref={(el) => void (etapasRef.current[2] = el)} className={etapaAtual === 2 ? "flex flex-col gap-5" : "hidden"}>
         <fieldset className="flex flex-col gap-3">
           <legend className="mb-2 text-sm font-semibold text-zinc-900">Resumo do sistema</legend>
           <dl className="grid grid-cols-2 gap-3 rounded-lg bg-zinc-50 px-4 py-3 text-sm md:grid-cols-3">
@@ -611,8 +726,8 @@ export function FormularioNegocio({
                 </div>
               </dl>
               <p className="mt-2 text-xs text-zinc-500">
-                Estimativa ilustrativa — os números reais aparecem ao montar o kit manualmente ou depois de informar a
-                tarifa, na Etapa 3.
+                Estimativa ilustrativa: não é salva no negócio. Para salvar um kit, monte-o manualmente; os números reais
+                aparecem depois de informar a tarifa, na Etapa 3.
               </p>
             </div>
           )}
@@ -676,6 +791,9 @@ export function FormularioNegocio({
           <fieldset className="flex flex-col gap-3">
             <legend className="mb-2 text-sm font-semibold text-zinc-900">Kit personalizado</legend>
             <EditorComponentesKit linhas={linhas} onChange={setLinhas} sugerirQuantidadeModulo={sugerirQuantidadeModulo} />
+            <Botao type="button" variante="secundario" onClick={cancelarMontagem} className="self-start">
+              Cancelar montagem
+            </Botao>
             {previa && (
               <>
                 <dl className="grid grid-cols-2 gap-3 rounded-lg bg-amber-50 px-4 py-3 text-sm md:grid-cols-4">
@@ -714,14 +832,15 @@ export function FormularioNegocio({
           <Botao type="button" variante="secundario" onClick={voltar} className="gap-1">
             <ChevronLeft className="h-4 w-4" /> Voltar
           </Botao>
+          {/* Um botão só: sem kit em montagem, ele deixa claro que o cadastro segue sem kit. */}
           <Botao type="button" onClick={avancar} className="gap-1">
-            Avançar <ChevronRight className="h-4 w-4" />
+            {mostrarKit || componentes.length ? "Avançar" : "Continuar sem kit"} <ChevronRight className="h-4 w-4" />
           </Botao>
         </div>
       </div>
 
       {/* Etapa 3 — Dados técnicos e complementares */}
-      <div className={etapaAtual === 3 ? "flex flex-col gap-5" : "hidden"}>
+      <div ref={(el) => void (etapasRef.current[3] = el)} className={etapaAtual === 3 ? "flex flex-col gap-5" : "hidden"}>
         <fieldset className="grid gap-3 md:grid-cols-2">
           <legend className="mb-2 text-sm font-semibold text-zinc-900">Dados da unidade consumidora</legend>
           <Campo rotulo="Unidade consumidora" name="unidade_consumidora" placeholder="Opcional" />
@@ -731,23 +850,31 @@ export function FormularioNegocio({
             inputMode="decimal"
             placeholder="ex.: 0,95"
             value={tarifaKwh}
+            disabled={!componentes.length}
             onChange={(e) => setTarifaKwh(e.target.value)}
           />
-          <Selecao rotulo="Tipo de ligação" value={tipoLigacao} onChange={(e) => setTipoLigacao(e.target.value as TipoLigacao)}>
+          <Selecao
+            rotulo="Tipo de ligação"
+            value={tipoLigacao}
+            disabled={!componentes.length}
+            onChange={(e) => setTipoLigacao(e.target.value as TipoLigacao)}
+          >
             {TIPOS_LIGACAO.map((t) => (
               <option key={t} value={t}>
                 {ROTULO_TIPO_LIGACAO[t]}
               </option>
             ))}
           </Selecao>
+          {!componentes.length && (
+            <p className="text-xs text-zinc-400 md:col-span-2">
+              Tarifa e tipo de ligação são usados no cálculo do kit: monte o kit na etapa 2 para informá-los.
+            </p>
+          )}
         </fieldset>
 
         <fieldset className="grid gap-3 md:grid-cols-2">
           <legend className="mb-2 text-sm font-semibold text-zinc-900">Características técnicas</legend>
           <Campo rotulo="Tipo do telhado" name="tipo_telhado" placeholder="Ex.: cerâmico, metálico, laje, solo" />
-          <Campo rotulo="Orientação" placeholder="Ex.: norte" />
-          <Campo rotulo="Inclinação" placeholder="Ex.: 15°" />
-          <Campo rotulo="Área disponível" placeholder="Ex.: 40 m²" />
           <Campo rotulo="Padrão do cliente" name="padrao_cliente" placeholder="Opcional" />
           <Campo
             rotulo="Estrutura do telhado"
@@ -767,17 +894,18 @@ export function FormularioNegocio({
             CNH e conta de energia já enviados na Etapa 1 aparecem aqui como anexos do negócio.{" "}
             <Selo tom="neutro">opcional</Selo>
           </p>
-          <CampoArquivo rotulo="Fotos" name="anexo_fatura_beneficiario" accept="image/*" multiple />
-          <CampoArquivo rotulo="Outros documentos" name="anexo_fatura_beneficiario" multiple />
+          <CampoArquivo rotulo="Fotos" name="anexo_geral" accept="image/*" multiple />
+          <CampoArquivo rotulo="Outros documentos" name="anexo_geral" multiple />
         </fieldset>
 
+        {erroEtapa && <Mensagem resultado={{ ok: false, mensagem: erroEtapa }} />}
         <Mensagem resultado={resultado} />
         <div className="flex justify-between">
           <Botao type="button" variante="secundario" onClick={voltar} className="gap-1">
             <ChevronLeft className="h-4 w-4" /> Voltar
           </Botao>
-          <Botao type="submit" disabled={pendente || (modo === "existente" && !contato)}>
-            {pendente ? "Salvando..." : "Salvar negócio"}
+          <Botao type="submit" disabled={pendente}>
+            {enviandoArquivos ? "Enviando arquivos..." : pendente ? "Salvando..." : "Salvar negócio"}
           </Botao>
         </div>
       </div>

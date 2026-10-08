@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { LogoRaion } from "@/components/marca";
 import { Selo } from "@/components/ui";
+import { contratoProntoParaCliente } from "@/lib/contrato";
 import { criarClienteAdmin } from "@/lib/supabase/admin";
 import { ROTULO_STATUS_CONTRATO, type StatusContrato } from "@/lib/tipos";
 
@@ -34,9 +35,16 @@ export default async function ContratoPublico({ params }: PageProps<"/contrato/[
         </Selo>
       </div>
 
-      <article className="rounded-xl border border-zinc-200/80 bg-white p-6 whitespace-pre-wrap text-sm text-zinc-800 shadow-[0_1px_2px_rgba(15,15,16,0.04)]">
-        {contrato.conteudo}
-      </article>
+      {/* Contrato com campo sem resolver (gerado antes da validação) não é mostrado ao cliente. */}
+      {contratoProntoParaCliente(contrato.conteudo) ? (
+        <article className="rounded-xl border border-zinc-200/80 bg-white p-6 whitespace-pre-wrap text-sm text-zinc-800 shadow-[0_1px_2px_rgba(15,15,16,0.04)]">
+          {contrato.conteudo}
+        </article>
+      ) : (
+        <p className="rounded-xl border border-zinc-200/80 bg-white p-6 text-sm text-zinc-600">
+          Este contrato ainda está sendo preparado pela empresa. Fale com o vendedor.
+        </p>
+      )}
 
       {status !== "assinado" && (
         <p className="text-xs text-zinc-400">

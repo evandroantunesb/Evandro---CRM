@@ -1,23 +1,31 @@
 "use client";
 
-import { useActionState } from "react";
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
 import { CampoArquivo } from "@/components/campo-arquivo";
 import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
+import { registrarAnexo } from "@/lib/acoes/anexos";
 import { editarNegocio } from "@/lib/acoes/negocios";
+import { enviarArquivos } from "@/lib/anexos-navegador";
+import { arquivosEscolhidos, metaArquivo, problemaArquivo } from "@/lib/anexos-regras";
+import { criarClienteNavegador } from "@/lib/supabase/navegador";
+import type { ResultadoAcao } from "@/lib/tipos";
 
 type Opcao = { id: string; nome: string };
 
+/** A etapa não é editada aqui: só pelo "Mover etapa"/Kanban, que exige comentário e respeita o papel. */
 export function EdicaoNegocio({
+  empresaId,
   negocio,
-  etapas,
   origens,
   responsaveis,
   podeEditarValor = true,
 }: {
+  /** Empresa do negócio (pasta da fatura no Storage). */
+  empresaId: string;
   negocio: {
     id: string;
     titulo: string;
-    etapaId: string;
     origemId: string | null;
     responsavelId: string | null;
     valor: number | null;
@@ -28,24 +36,47 @@ export function EdicaoNegocio({
     consumoMedioKwh: number | null;
     valorContaEnergia: number | null;
   };
-  etapas: Opcao[];
   origens: Opcao[];
   responsaveis: Opcao[];
   /** SDR não pode alterar o valor financeiro do negócio (spec RAION_SDR_REGRAS_PERMISSOES §39). */
   podeEditarValor?: boolean;
 }) {
-  const [resultado, acao, pendente] = useActionState(editarNegocio, null);
+  const router = useRouter();
+  const [resultado, setResultado] = useState<ResultadoAcao>(null);
+  const [pendente, iniciar] = useTransition();
+  // Sem o reset automático, o arquivo escolhido ficaria no campo: limpa só ele depois que a fatura chega.
+  const [versaoArquivo, setVersaoArquivo] = useState(0);
+
+  /**
+   * Salva sem limpar o formulário (nada do que foi digitado se perde se o servidor recusar).
+   * A fatura não passa pela ação (limite de 1 MB): depois de salvar, vai direto ao Storage.
+   */
+  function enviar(evento: React.FormEvent<HTMLFormElement>) {
+    evento.preventDefault();
+    const formulario = new FormData(evento.currentTarget);
+    const [fatura] = arquivosEscolhidos(formulario, "anexo_fatura_energia");
+    formulario.delete("anexo_fatura_energia");
+    const problema = fatura ? problemaArquivo(metaArquivo(fatura)) : null;
+    if (problema) return setResultado({ ok: false, mensagem: `${problema} Escolha outro arquivo.` });
+    iniciar(async () => {
+      const r = await editarNegocio(null, formulario);
+      if (!r?.ok || !fatura) return setResultado(r);
+      const [falha] = await enviarArquivos(criarClienteNavegador(), registrarAnexo, { empresaId, negocioId: negocio.id }, [
+        { arquivo: fatura, categoria: "fatura_gerador" },
+      ]);
+      router.refresh();
+      if (falha) {
+        // A fatura continua escolhida no campo: salvar de novo tenta outra vez (os dados não mudam).
+        return setResultado({ ok: false, mensagem: `Dados salvos, mas a fatura não foi anexada (${falha}). Salve de novo para tentar outra vez.` });
+      }
+      setVersaoArquivo((v) => v + 1);
+      setResultado({ ok: true, mensagem: "Salvo." });
+    });
+  }
   return (
-    <form action={acao} className="grid gap-3 md:grid-cols-2">
+    <form onSubmit={enviar} className="grid gap-3 md:grid-cols-2">
       <input type="hidden" name="negocioId" value={negocio.id} />
       <Campo rotulo="Nome do negócio" name="titulo" defaultValue={negocio.titulo} required />
-      <Selecao rotulo="Etapa" name="etapa_id" defaultValue={negocio.etapaId}>
-        {etapas.map((e) => (
-          <option key={e.id} value={e.id}>
-            {e.nome}
-          </option>
-        ))}
-      </Selecao>
       <Selecao rotulo="Origem" name="origem_id" defaultValue={negocio.origemId ?? ""}>
         <option value="">Sem origem</option>
         {origens.map((o) => (
@@ -93,7 +124,7 @@ export function EdicaoNegocio({
         placeholder="Ex.: cerâmico, metálico, laje, solo"
         defaultValue={negocio.tipoTelhado ?? ""}
       />
-      <CampoArquivo rotulo="Fatura de energia (opcional)" name="anexo_fatura_energia" accept="image/*,.pdf" />
+      <CampoArquivo key={versaoArquivo} rotulo="Fatura de energia (opcional)" name="anexo_fatura_energia" accept="image/*,.pdf" />
       <label className="flex flex-col gap-1 text-sm md:col-span-2">
         <span className="font-medium text-zinc-700">Descrição</span>
         <textarea

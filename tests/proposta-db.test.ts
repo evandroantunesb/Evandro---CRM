@@ -43,6 +43,11 @@ beforeAll(async () => {
     .insert({ empresa_id: empresa, nome: "Kit proposta", potencia_kwp: 4, preco: 18000 })
     .select("id")
     .single();
+  // Cálculo só é criado com kit montado (calculos_solares_exige_kit).
+  const { error: erroKit } = await servico
+    .from("kit_componentes")
+    .insert({ empresa_id: empresa, negocio_id: negocio, tipo: "modulo", descricao: "Módulo 550 W", potencia_w: 550, quantidade: 8, ordem: 0 });
+  if (erroKit) throw erroKit;
   const { data: calc, error } = await vendedor1.cliente
     .from("calculos_solares")
     .insert({

@@ -4,6 +4,8 @@ import { ListaTarefas } from "@/components/lista-tarefas";
 import { MoverEtapa } from "@/components/mover-etapa";
 import { NovaTarefa } from "@/components/nova-tarefa";
 import { Cartao, Selo } from "@/components/ui";
+import { conferirArquivos } from "@/lib/anexos-servidor";
+import { AVISOS_CRIACAO, avisosDaUrl } from "@/lib/negocio-dados";
 import { apagarAnexo } from "@/lib/acoes/anexos";
 import { alternarEtiqueta } from "@/lib/acoes/negocios";
 import { carregarConfiguracao, formatarDataHora, formatarMoeda } from "@/lib/crm";
@@ -26,6 +28,7 @@ import { Contrato } from "./contrato";
 import { EdicaoNegocio } from "./edicao";
 import { EnviarAnexo } from "./enviar-anexo";
 import { Fechamento } from "./fechamento";
+import { RegistrarArquivo } from "./registrar-arquivo";
 import { FeedbackHandoff } from "./feedback-handoff";
 import { HandoffAceite } from "./handoff-aceite";
 import { KitPersonalizado } from "./kit-personalizado";
@@ -39,16 +42,18 @@ function tamanhoLegivel(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1).replace(".", ",")} MB`;
 }
 
-export default async function DetalheNegocio({ params }: PageProps<"/negocios/[id]">) {
+export default async function DetalheNegocio({ params, searchParams }: PageProps<"/negocios/[id]">) {
   const { atual } = await exigirPapel(...NEGOCIOS);
   const { id } = await params;
+  // Gravação parcial na criação (códigos fixos; ver `criarNegocioComCliente`).
+  const avisos = avisosDaUrl((await searchParams).avisos);
   const supabase = await criarClienteServidor();
 
   const [{ data: negocio }, config, { data: parametros }] = await Promise.all([
     supabase
       .from("negocios")
       .select(
-        "id, numero, titulo, valor, descricao, status, funil_id, etapa_id, origem_id, responsavel_id, motivo_perda_id, motivo_perda_detalhe, fechado_em, created_at, updated_at, tipo_telhado, unidade_consumidora, padrao_cliente, estrutura_telhado, consumo_medio_kwh, valor_conta_energia, qualif_tipo_cliente, qualif_possui_conta_energia, qualif_distribuidora, qualif_imovel_proprio, qualif_objetivo, qualif_prazo_instalacao, qualif_busca_financiamento, qualif_orcamento_outra_empresa, qualif_e_decisor, qualif_outro_decisor, qualif_participantes_decisao, qualif_observacoes, contatos(id, nome, tipo, telefone, email, cidade, uf)",
+        "id, empresa_id, numero, titulo, valor, descricao, status, funil_id, etapa_id, origem_id, responsavel_id, motivo_perda_id, motivo_perda_detalhe, fechado_em, created_at, updated_at, tipo_telhado, unidade_consumidora, padrao_cliente, estrutura_telhado, consumo_medio_kwh, valor_conta_energia, qualif_tipo_cliente, qualif_possui_conta_energia, qualif_distribuidora, qualif_imovel_proprio, qualif_objetivo, qualif_prazo_instalacao, qualif_busca_financiamento, qualif_orcamento_outra_empresa, qualif_e_decisor, qualif_outro_decisor, qualif_participantes_decisao, qualif_observacoes, contatos(id, nome, tipo, telefone, email, endereco, cidade, uf)",
       )
       .eq("id", id)
       .maybeSingle(),
@@ -78,18 +83,23 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
         .order("vence_em"),
       supabase
         .from("anexos")
-        .select("id, nome, tamanho, categoria, enviado_por, created_at")
+        .select("id, nome, tamanho, categoria, enviado_por, created_at, caminho")
         .eq("negocio_id", id)
         .order("created_at", { ascending: false }),
       supabase.from("negocio_etiquetas").select("etiqueta_id").eq("negocio_id", id),
       supabase
         .from("calculos_solares")
         .select(
-          "id, kit_nome, tipo_ligacao, consumo_medio_kwh, tarifa_kwh, geracao_estimada_kwh_mes, economia_mensal, payback_meses, observacoes",
+          "id, kit_nome, tipo_ligacao, consumo_medio_kwh, valor_fatura_medio, tarifa_kwh, geracao_estimada_kwh_mes, economia_mensal, payback_meses, observacoes",
         )
         .eq("negocio_id", id)
         .maybeSingle(),
     ]);
+
+  // Confere a pasta no Storage: arquivo que chegou sem registro (envio parou no meio) e registro
+  // sem arquivo. Se não der para conferir, a ficha diz isso em vez de esconder a pendência.
+  const conferencia = await conferirArquivos(supabase, negocio.empresa_id, id, anexos ?? []);
+  const semArquivo = conferencia.conferido ? conferencia.semArquivo : new Set<string>();
 
   const { data: componentes } = await supabase
     .from("kit_componentes")
@@ -139,6 +149,7 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
     tipo: string;
     telefone: string | null;
     email: string | null;
+    endereco: string | null;
     cidade: string | null;
     uf: string | null;
   };
@@ -223,14 +234,39 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
         </p>
       )}
 
+      {avisos.length > 0 && (
+        <div role="alert" className="flex flex-col gap-1 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          <p className="font-medium">O negócio foi criado, mas nem tudo foi salvo:</p>
+          <ul className="list-disc pl-5">
+            {avisos.map((a) => (
+              <li key={a}>{AVISOS_CRIACAO[a]}</li>
+            ))}
+          </ul>
+          <Link href={`/negocios/${negocio.id}`} className="self-start text-xs font-medium underline">
+            Entendi
+          </Link>
+        </div>
+      )}
+      {!conferencia.conferido && (
+        <p role="alert" className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          Não foi possível conferir os arquivos deste negócio agora. Pode haver arquivo enviado pela metade; recarregue a
+          página para conferir de novo.
+        </p>
+      )}
+      {conferencia.conferido && (conferencia.semRegistro.length > 0 || semArquivo.size > 0) && (
+        <p role="alert" className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          Há arquivos com envio incompleto. Veja em Arquivos.
+        </p>
+      )}
+
       <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
         <div className="flex flex-col gap-4">
           <Cartao titulo="Dados do negócio">
             <EdicaoNegocio
+              empresaId={negocio.empresa_id}
               negocio={{
                 id: negocio.id,
                 titulo: negocio.titulo,
-                etapaId: negocio.etapa_id,
                 origemId: negocio.origem_id,
                 responsavelId: negocio.responsavel_id,
                 valor: negocio.valor,
@@ -241,9 +277,6 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
                 consumoMedioKwh: negocio.consumo_medio_kwh,
                 valorContaEnergia: negocio.valor_conta_energia,
               }}
-              etapas={config.etapas.filter(
-                (e) => e.funilId === negocio.funil_id && (e.ativa || e.id === negocio.etapa_id),
-              )}
               origens={config.origens.filter((o) => o.ativa || o.id === negocio.origem_id)}
               responsaveis={pode(atual.papel, ESCOLHER_RESPONSAVEL_NEGOCIO) ? config.membros.filter((m) => m.ativo && pode(m.papel, RESPONSAVEL_COMERCIAL)) : []}
               podeEditarValor={pode(atual.papel, EDITAR_VALOR_NEGOCIO)}
@@ -285,6 +318,7 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
                       kitNome: calculo.kit_nome,
                       tipoLigacao: calculo.tipo_ligacao as TipoLigacao,
                       consumoMedioKwh: calculo.consumo_medio_kwh,
+                      valorFaturaMedio: calculo.valor_fatura_medio,
                       tarifaKwh: calculo.tarifa_kwh,
                       geracaoEstimadaKwhMes: calculo.geracao_estimada_kwh_mes,
                       economiaMensal: calculo.economia_mensal,
@@ -480,6 +514,12 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
                   <dd>{contato.email}</dd>
                 </div>
               )}
+              {contato.endereco && (
+                <div>
+                  <dt className="text-zinc-500">Endereço</dt>
+                  <dd>{contato.endereco}</dd>
+                </div>
+              )}
               {(contato.cidade || contato.uf) && (
                 <div>
                   <dt className="text-zinc-500">Cidade</dt>
@@ -533,14 +573,20 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
                   key={a.id}
                   className="flex items-center gap-2 border-t border-zinc-100 py-2 text-sm first:border-t-0"
                 >
-                  <a
-                    href={`/anexos/${a.id}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="min-w-0 flex-1 truncate text-amber-700 hover:underline"
-                  >
-                    {a.nome}
-                  </a>
+                  {semArquivo.has(a.id) ? (
+                    <span className="min-w-0 flex-1 truncate text-zinc-500">
+                      {a.nome} <Selo tom="negativo">não recebido</Selo>
+                    </span>
+                  ) : (
+                    <a
+                      href={`/anexos/${a.id}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="min-w-0 flex-1 truncate text-amber-700 hover:underline"
+                    >
+                      {a.nome}
+                    </a>
+                  )}
                   {a.categoria !== "geral" && <Selo tom="atencao">{ROTULO_CATEGORIA_ANEXO[a.categoria as CategoriaAnexo]}</Selo>}
                   <span className="text-xs text-zinc-500">{tamanhoLegivel(a.tamanho)}</span>
                   {(souAdmin || a.enviado_por === atual.membroId) && (
@@ -552,6 +598,20 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
                 </li>
               ))}
             </ul>
+            {conferencia.conferido && conferencia.semRegistro.length > 0 && (
+              <div className="mb-3 flex flex-col gap-1 rounded-md bg-amber-50 p-2 text-sm text-amber-900">
+                <p className="text-xs">Arquivos que chegaram mas não foram registrados (o envio parou no meio):</p>
+                <ul className="flex flex-col">
+                  {conferencia.semRegistro.map((o) => (
+                    <li key={o.caminho} className="flex items-center gap-2 py-1">
+                      <span className="min-w-0 flex-1 truncate">{o.nome}</span>
+                      <span className="text-xs text-zinc-500">{tamanhoLegivel(o.tamanho)}</span>
+                      <RegistrarArquivo negocioId={negocio.id} arquivo={o} />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <EnviarAnexo empresaId={atual.empresaId} negocioId={negocio.id} />
           </Cartao>
         </div>
