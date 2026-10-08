@@ -3856,6 +3856,7 @@ export type Database = {
           venda_alterada_em: string;
         }[];
       };
+      pode_responder_handoff: { Args: { p_handoff_id: string }; Returns: boolean };
       pode_ver_avatar: { Args: { p_pasta: string }; Returns: boolean };
       pode_ver_contato: { Args: { p_contato_id: string }; Returns: boolean };
       pode_ver_contato_linha: {
