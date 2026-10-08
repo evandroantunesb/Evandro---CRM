@@ -2,7 +2,7 @@
 
 import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, XCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useId, useMemo, useState, useTransition } from "react";
+import { useId, useMemo, useRef, useState, useTransition } from "react";
 import { CampoArquivo } from "@/components/campo-arquivo";
 import { EditorComponentesKit, linhasParaComponentes, type LinhaComponente } from "@/components/kit-componentes";
 import { Botao, Campo, Mensagem, Selecao, Selo } from "@/components/ui";
@@ -177,6 +177,7 @@ export function FormularioNegocio({
   const [pendente, iniciarEnvio] = useTransition();
   const [enviandoArquivos, setEnviandoArquivos] = useState(false);
   const [etapaAtual, setEtapaAtual] = useState<1 | 2 | 3>(1);
+  const etapasRef = useRef<Record<1 | 2 | 3, HTMLDivElement | null>>({ 1: null, 2: null, 3: null });
   const [erroEtapa, setErroEtapa] = useState<string | null>(null);
 
   const [modo, setModo] = useState<"novo" | "existente">("novo");
@@ -230,7 +231,8 @@ export function FormularioNegocio({
   function escolherContato(c: ContatoEncontrado) {
     setContato(c);
     if (c.cidade) setCidade(c.cidade);
-    if (c.uf) setUf(c.uf);
+    const ufContato = c.uf?.trim().toUpperCase();
+    if (ufContato && ESTADOS_BR.includes(ufContato)) setUf(ufContato);
   }
 
   // Consumo (Etapa 1): kWh direto ou valor da conta (com máscara), nunca os dois exigidos.
@@ -317,11 +319,27 @@ export function FormularioNegocio({
    */
   function enviar(evento: React.FormEvent<HTMLFormElement>) {
     evento.preventDefault();
+    // O formulário tem `noValidate`: antes, um obrigatório vazio num passo escondido fazia o navegador
+    // bloquear o envio sem mostrar nada. Agora cada passo é conferido e o problema aparece no passo dele.
+    for (const etapa of [1, 2, 3] as const) {
+      const problemaEtapa = problemaDaEtapa(etapa);
+      if (problemaEtapa) return mostrarProblema(etapa, problemaEtapa);
+    }
+    setErroEtapa(null);
     const { dados, arquivos, problema } = prepararEnvioCriacao(new FormData(evento.currentTarget));
     if (problema) return setResultado({ ok: false, mensagem: `${problema} Escolha outro arquivo.` });
     setResultado(null);
     iniciarEnvio(async () => {
-      const r = await criarNegocio(dados);
+      let r: Awaited<ReturnType<typeof criarNegocio>>;
+      try {
+        r = await criarNegocio(dados);
+      } catch {
+        setResultado({
+          ok: false,
+          mensagem: "Não foi possível salvar agora (falha de conexão ou do servidor). Seus dados continuam na tela; tente de novo.",
+        });
+        return;
+      }
       if (!r.ok) {
         setResultado({ ok: false, mensagem: r.mensagem });
         // O contato novo foi gravado mas o negócio não: segue com ele como "existente" (o reenvio não duplica).
@@ -334,13 +352,18 @@ export function FormularioNegocio({
       const avisos = [...r.avisos];
       if (arquivos.length) {
         setEnviandoArquivos(true);
-        const falhas = await enviarArquivos(
-          criarClienteNavegador(),
-          registrarAnexo,
-          { empresaId: r.empresaId, negocioId: r.negocioId },
-          arquivos.map((a) => ({ arquivo: a.arquivo, categoria: ANEXOS_CRIACAO.find((c) => c.campo === a.campo)!.categoria })),
-        );
-        if (falhas.length) avisos.push("anexos");
+        try {
+          const falhas = await enviarArquivos(
+            criarClienteNavegador(),
+            registrarAnexo,
+            { empresaId: r.empresaId, negocioId: r.negocioId },
+            arquivos.map((a) => ({ arquivo: a.arquivo, categoria: ANEXOS_CRIACAO.find((c) => c.campo === a.campo)!.categoria })),
+          );
+          if (falhas.length) avisos.push("anexos");
+        } catch {
+          // O negócio já existe: segue para a ficha avisando dos arquivos.
+          avisos.push("anexos");
+        }
       }
       router.push(`/negocios/${r.negocioId}${avisos.length ? `?avisos=${avisos.join(",")}` : ""}`);
     });
@@ -356,31 +379,59 @@ export function FormularioNegocio({
     iniciar(async () => setDuplicados(await verificarDuplicado(tel, email)));
   }
 
-  function avancar() {
-    if (etapaAtual === 1) {
-      if (modo === "existente" && !contato) return setErroEtapa("Selecione um contato existente pra continuar.");
+  /** Primeiro campo inválido (regras do próprio campo: obrigatório, e-mail...) do passo, ignorando desativados. */
+  function campoInvalido(etapa: 1 | 2 | 3) {
+    const raiz = etapasRef.current[etapa];
+    if (!raiz) return null;
+    for (const campo of raiz.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>("input, select, textarea")) {
+      if (!campo.disabled && !campo.checkValidity()) return campo;
+    }
+    return null;
+  }
+
+  /** O que falta no passo: só os campos e conferências daquele passo (nada de exigência nova). */
+  function problemaDaEtapa(etapa: 1 | 2 | 3): { mensagem: string; campo?: HTMLElement } | null {
+    if (etapa === 1 && modo === "existente" && !contato) return { mensagem: "Selecione um contato existente pra continuar." };
+    const invalido = campoInvalido(etapa);
+    if (invalido) {
+      const rotulo = invalido.closest("label")?.querySelector("span")?.textContent?.replace(/\*$/, "").trim();
+      return { mensagem: `Preencha corretamente: ${rotulo || "campo obrigatório"}.`, campo: invalido };
+    }
+    if (etapa === 1) {
       if (modo === "novo") {
-        if (contatoNome.trim().length < 2) return setErroEtapa("Informe o nome do cliente.");
-        if (contatoTelefone.replace(/\D/g, "").length < 10) return setErroEtapa("Informe um WhatsApp válido.");
-        if (!emailValido) return setErroEtapa("Informe um e-mail válido ou deixe em branco.");
+        if (contatoNome.trim().length < 2) return { mensagem: "Informe o nome do cliente." };
+        if (contatoTelefone.replace(/\D/g, "").length < 10) return { mensagem: "Informe um WhatsApp válido." };
+        if (!emailValido) return { mensagem: "Informe um e-mail válido ou deixe em branco." };
       }
       const cepDigitos = cep.replace(/\D/g, "");
-      if (cepDigitos.length > 0 && cepDigitos.length !== 8) {
-        return setErroEtapa("CEP inválido — informe os 8 dígitos ou deixe em branco.");
-      }
-      if (!cidade.trim() || !uf.trim()) {
-        return setErroEtapa("Informe a cidade e o estado para identificarmos a distribuidora de energia.");
-      }
+      if (cepDigitos.length > 0 && cepDigitos.length !== 8) return { mensagem: "CEP inválido — informe os 8 dígitos ou deixe em branco." };
+      if (!cidade.trim() || !uf.trim()) return { mensagem: "Informe a cidade e o estado para identificarmos a distribuidora de energia." };
       if (numero(consumoMedioKwh) == null && numero(valorFaturaMedio) == null) {
-        return setErroEtapa("Informe o consumo médio mensal em kWh ou o valor médio da conta.");
+        return { mensagem: "Informe o consumo médio mensal em kWh ou o valor médio da conta." };
       }
-      setErroEtapa(null);
-      return setEtapaAtual(2);
     }
-    if (etapaAtual === 2) {
-      setErroEtapa(null);
-      return setEtapaAtual(3);
-    }
+    return null;
+  }
+
+  /** Leva ao passo do problema, mostra a mensagem e põe o cursor no campo. */
+  function mostrarProblema(etapa: 1 | 2 | 3, problema: { mensagem: string; campo?: HTMLElement }) {
+    setEtapaAtual(etapa);
+    setErroEtapa(problema.mensagem);
+    if (problema.campo) setTimeout(() => problema.campo?.focus(), 0);
+  }
+
+  function avancar() {
+    const problema = problemaDaEtapa(etapaAtual);
+    if (problema) return mostrarProblema(etapaAtual, problema);
+    setErroEtapa(null);
+    setEtapaAtual(etapaAtual === 1 ? 2 : 3);
+  }
+
+  /** Desiste do kit manual: esconde o editor e descarta só os itens (e o valor que veio do kit, se não foi digitado). */
+  function desistirDoKit() {
+    setLinhas([]);
+    setMostrarKit(false);
+    if (!valorTocado) setValor("");
   }
 
   function voltar() {
@@ -389,7 +440,7 @@ export function FormularioNegocio({
   }
 
   return (
-    <form onSubmit={enviar} className="flex flex-col gap-5">
+    <form onSubmit={enviar} noValidate className="flex flex-col gap-5">
       <input type="hidden" name="funil_id" value={funilId} />
       {etapaId && <input type="hidden" name="etapa_id" value={etapaId} />}
       <input type="hidden" name="tipo_ligacao" value={tipoLigacao} />
@@ -410,7 +461,7 @@ export function FormularioNegocio({
       <IndicadorEtapas atual={etapaAtual} />
 
       {/* Etapa 1 — Cliente e consumo */}
-      <div className={etapaAtual === 1 ? "flex flex-col gap-5" : "hidden"}>
+      <div ref={(el) => void (etapasRef.current[1] = el)} className={etapaAtual === 1 ? "flex flex-col gap-5" : "hidden"}>
         <fieldset className="grid gap-3 md:grid-cols-2">
           <legend className="mb-2 text-sm font-semibold text-zinc-900">Negócio</legend>
           <Campo rotulo="Nome do negócio" name="titulo" placeholder="Ex.: Residência 5 kWp" required />
@@ -630,7 +681,7 @@ export function FormularioNegocio({
       </div>
 
       {/* Etapa 2 — Sistema recomendado */}
-      <div className={etapaAtual === 2 ? "flex flex-col gap-5" : "hidden"}>
+      <div ref={(el) => void (etapasRef.current[2] = el)} className={etapaAtual === 2 ? "flex flex-col gap-5" : "hidden"}>
         <fieldset className="flex flex-col gap-3">
           <legend className="mb-2 text-sm font-semibold text-zinc-900">Resumo do sistema</legend>
           <dl className="grid grid-cols-2 gap-3 rounded-lg bg-zinc-50 px-4 py-3 text-sm md:grid-cols-3">
@@ -737,6 +788,9 @@ export function FormularioNegocio({
           <fieldset className="flex flex-col gap-3">
             <legend className="mb-2 text-sm font-semibold text-zinc-900">Kit personalizado</legend>
             <EditorComponentesKit linhas={linhas} onChange={setLinhas} sugerirQuantidadeModulo={sugerirQuantidadeModulo} />
+            <Botao type="button" variante="secundario" onClick={desistirDoKit} className="self-start">
+              Desistir do kit
+            </Botao>
             {previa && (
               <>
                 <dl className="grid grid-cols-2 gap-3 rounded-lg bg-amber-50 px-4 py-3 text-sm md:grid-cols-4">
@@ -782,7 +836,7 @@ export function FormularioNegocio({
       </div>
 
       {/* Etapa 3 — Dados técnicos e complementares */}
-      <div className={etapaAtual === 3 ? "flex flex-col gap-5" : "hidden"}>
+      <div ref={(el) => void (etapasRef.current[3] = el)} className={etapaAtual === 3 ? "flex flex-col gap-5" : "hidden"}>
         <fieldset className="grid gap-3 md:grid-cols-2">
           <legend className="mb-2 text-sm font-semibold text-zinc-900">Dados da unidade consumidora</legend>
           <Campo rotulo="Unidade consumidora" name="unidade_consumidora" placeholder="Opcional" />
@@ -840,12 +894,13 @@ export function FormularioNegocio({
           <CampoArquivo rotulo="Outros documentos" name="anexo_geral" multiple />
         </fieldset>
 
+        {erroEtapa && <Mensagem resultado={{ ok: false, mensagem: erroEtapa }} />}
         <Mensagem resultado={resultado} />
         <div className="flex justify-between">
           <Botao type="button" variante="secundario" onClick={voltar} className="gap-1">
             <ChevronLeft className="h-4 w-4" /> Voltar
           </Botao>
-          <Botao type="submit" disabled={pendente || (modo === "existente" && !contato)}>
+          <Botao type="submit" disabled={pendente}>
             {enviandoArquivos ? "Enviando arquivos..." : pendente ? "Salvando..." : "Salvar negócio"}
           </Botao>
         </div>

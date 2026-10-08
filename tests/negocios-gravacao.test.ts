@@ -174,6 +174,35 @@ describe("regressões de tela", () => {
     }
   });
 
+  it("cadastro: Salvar nunca fica mudo (obrigatório escondido em outro passo, erro do servidor, contato não escolhido)", () => {
+    // Sem a validação automática do navegador, que bloqueava o envio sem mensagem quando o campo
+    // obrigatório estava num passo escondido; cada passo é conferido e o erro aparece no passo dele.
+    expect(formulario).toContain("<form onSubmit={enviar} noValidate");
+    const enviar = formulario.slice(formulario.indexOf("function enviar("), formulario.indexOf("function pesquisar("));
+    expect(enviar.indexOf("for (const etapa of [1, 2, 3] as const)")).toBeLessThan(enviar.indexOf("prepararEnvioCriacao("));
+    expect(enviar).toMatch(/try \{\s*r = await criarNegocio\(dados\);\s*\} catch/);
+    expect(formulario).toContain('<Botao type="submit" disabled={pendente}>');
+    // A mensagem do passo também aparece no passo 3.
+    const passo3 = formulario.slice(formulario.indexOf("etapasRef.current[3] = el"));
+    expect(passo3).toContain("{erroEtapa && <Mensagem");
+  });
+
+  it("cadastro: Avançar confere só os campos do passo atual, sem exigência nova", () => {
+    const problema = formulario.slice(formulario.indexOf("function problemaDaEtapa("), formulario.indexOf("function mostrarProblema("));
+    expect(problema).toContain("campoInvalido(etapa)");
+    expect(formulario).toContain("etapasRef.current[etapa]");
+    // Os obrigatórios continuam os mesmos de antes: nome do negócio e origem (passo 1) e valor (passo 2).
+    expect(formulario.match(/\brequired\b/g)?.length).toBe(7);
+  });
+
+  it("cadastro: Desistir do kit esconde o editor e descarta só os itens", () => {
+    const desistir = formulario.slice(formulario.indexOf("function desistirDoKit("), formulario.indexOf("function desistirDoKit(") + 300);
+    expect(desistir).toContain("setLinhas([])");
+    expect(desistir).toContain("setMostrarKit(false)");
+    expect(desistir).toContain('if (!valorTocado) setValor("")');
+    expect(formulario).toContain("onClick={desistirDoKit}");
+  });
+
   it("etapa saiu do formulário de edição e da gravação", () => {
     expect(edicao).not.toContain("etapa_id");
     const esquemaEdicao = nucleo.slice(nucleo.indexOf("const esquemaEdicao"), nucleo.indexOf("export async function editarNegocioComCliente"));
