@@ -7,7 +7,12 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// `Fechamento` usa a Server Action `alterarStatus`, que puxa o cliente do Supabase e o `env.ts`.
+// Aqui só importa a renderização: a action vira um stub e o teste roda sem Supabase nem variáveis.
+// (A action em si não mudou nesta PR; os testes de integração cobrem o servidor.)
+vi.mock("@/lib/acoes/negocios", () => ({ alterarStatus: vi.fn(async () => null) }));
 import { AvisoReabertura, Fechamento } from "@/app/(app)/negocios/[id]/fechamento";
 import { MarcosVenda } from "@/app/(app)/negocios/[id]/marcos-venda";
 import { PROPOSTA_E_CONTRATO, pode } from "@/lib/permissoes";
@@ -247,6 +252,9 @@ describe("reabertura com confirmação", () => {
     expect(confirmacao).toContain("Voltar");
     expect(confirmacao).toContain("Confirmar reabertura");
     expect(f.match(/value="aberto"/g)).toHaveLength(1);
+    // O mock acima não substitui a ação real: o componente continua usando `alterarStatus`.
+    expect(f).toContain('import { alterarStatus } from "@/lib/acoes/negocios";');
+    expect(f).toContain("useActionState(alterarStatus, null)");
   });
 
   it("SDR continua só leitura no Fechamento", () => {
