@@ -68,8 +68,8 @@ beforeAll(async () => {
   const { data: eq } = await servico.from("equipes").insert({ empresa_id: empresa, nome: "Equipe travas" }).select("id").single();
   const { error: erroEquipe } = await servico.from("equipe_membros").insert([
     { equipe_id: eq!.id, empresa_id: empresa, membro_id: atual[gestor.id].membroId, e_gestor: true },
-    { equipe_id: eq!.id, empresa_id: empresa, membro_id: atual[vendedor.id].membroId },
-    { equipe_id: eq!.id, empresa_id: empresa, membro_id: atual[sdr.id].membroId },
+    { equipe_id: eq!.id, empresa_id: empresa, membro_id: atual[vendedor.id].membroId, e_gestor: false },
+    { equipe_id: eq!.id, empresa_id: empresa, membro_id: atual[sdr.id].membroId, e_gestor: false },
   ]);
   if (erroEquipe) throw erroEquipe;
 
