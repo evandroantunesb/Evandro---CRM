@@ -3,39 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { montarLinhaCalculo } from "@/lib/acoes/calculadora";
-import { enviarAnexoNoServidor } from "@/lib/acoes/anexos";
 import { exigirPapel } from "@/lib/sessao";
-import { EDITAR_VALOR_NEGOCIO, ESCOLHER_RESPONSAVEL_NEGOCIO, FECHAR_NEGOCIO, NEGOCIOS, pode } from "@/lib/permissoes";
+import { criarNegocioComCliente, editarNegocioComCliente } from "@/lib/negocios-gravacao";
+import { FECHAR_NEGOCIO, NEGOCIOS, pode } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { mensagemErro } from "@/lib/erros";
-import { componentesJsonSchema, nomeKitPersonalizado, potenciaKitPersonalizadoKwp } from "@/lib/calculadora";
 import { calcularStatusQualificacao } from "@/lib/qualificacao";
-import { PRAZOS_INSTALACAO_QUALIF, TIPOS_CLIENTE_QUALIF, TIPOS_LIGACAO, type ResultadoAcao } from "@/lib/tipos";
-
-const uuidOpcional = z
-  .string()
-  .optional()
-  .transform((v) => (v ? v : null))
-  .pipe(z.string().uuid().nullable());
-
-// Valor é obrigatório nos formulários de negócio (criar e editar); captura
-// pública e rodízio continuam criando negócios sem valor.
-const valorObrigatorio = z
-  .string({ error: "Informe o valor do negócio." })
-  .trim()
-  .min(1, "Informe o valor do negócio.")
-  .transform((v) => Number(v.includes(",") ? v.replace(/\./g, "").replace(",", ".") : v))
-  .pipe(z.number({ error: "Valor inválido" }).positive("Informe um valor maior que zero."));
-
-const numeroBrOpcional = z
-  .string()
-  .optional()
-  .transform((v) => {
-    if (!v || !v.trim()) return null;
-    return Number(v.includes(",") ? v.replace(/\./g, "").replace(",", ".") : v);
-  })
-  .pipe(z.number().positive().nullable());
+import { PRAZOS_INSTALACAO_QUALIF, TIPOS_CLIENTE_QUALIF, type ResultadoAcao } from "@/lib/tipos";
 
 /** Selects "sim"/"nao"/"" (não informado) viram boolean | null. */
 const boolOpcional = z
@@ -43,175 +17,18 @@ const boolOpcional = z
   .optional()
   .transform((v) => (v === "sim" ? true : v === "nao" ? false : null));
 
-const esquemaNovo = z.object({
-  titulo: z.string().trim().min(2, "Informe o nome do negócio"),
-  funil_id: z.string().uuid(),
-  etapa_id: uuidOpcional,
-  origem_id: uuidOpcional,
-  responsavel_id: uuidOpcional,
-  valor: valorObrigatorio,
-  descricao: z.string().trim().optional(),
-  // Dados de instalação: ficam no negócio, não no contato (que é só dado
-  // pessoal/residência do cliente).
-  unidade_consumidora: z.string().trim().max(60).optional(),
-  padrao_cliente: z.string().trim().max(60).optional(),
-  tipo_telhado: z.string().trim().max(60).optional(),
-  estrutura_telhado: z.string().trim().max(120).optional(),
-  contato_id: uuidOpcional,
-  contato_tipo: z.enum(["pf", "pj"]).default("pf"),
-  contato_nome: z.string().trim().optional(),
-  contato_telefone: z.string().trim().optional(),
-  contato_email: z.union([z.literal(""), z.string().trim().email("E-mail do contato inválido")]).optional(),
-  contato_endereco: z.string().trim().max(300, "Endereço muito longo").optional(),
-  // Calculadora solar: roda no backend a partir do kit personalizado (não é
-  // um passo separado) — quando os dados estão completos, o cálculo já
-  // fica pronto junto com o negócio (fluxo de "nova proposta").
-  tipo_ligacao: z.enum(TIPOS_LIGACAO).optional(),
-  consumo_medio_kwh: numeroBrOpcional,
-  valor_fatura_medio: numeroBrOpcional,
-  tarifa_kwh: numeroBrOpcional,
-  componentes: componentesJsonSchema,
-});
-
-export async function criarNegocio(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+/** Cria o negócio pelo núcleo `criarNegocioComCliente`; gravação parcial vai como aviso na ficha. */
+export async function criarNegocio(
+  _: ResultadoAcao,
+  formData: FormData,
+): Promise<ResultadoAcao & { contatoId?: string }> {
   const { atual } = await exigirPapel(...NEGOCIOS);
-  const dados = esquemaNovo.safeParse(Object.fromEntries(formData));
-  if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
-  const d = dados.data;
-
   const supabase = await criarClienteServidor();
-  let contatoId = d.contato_id;
-  if (!contatoId) {
-    if (!d.contato_nome || d.contato_nome.length < 2) return { ok: false, mensagem: "Informe o nome do contato." };
-    if (!d.contato_telefone) return { ok: false, mensagem: "Informe o telefone do contato." };
-    const { data: contato, error } = await supabase
-      .from("contatos")
-      .insert({
-        empresa_id: atual.empresaId,
-        tipo: d.contato_tipo,
-        nome: d.contato_nome,
-        telefone: d.contato_telefone || null,
-        email: d.contato_email || null,
-        endereco: d.contato_endereco || null,
-      })
-      .select("id")
-      .single();
-    if (error || !contato) return { ok: false, mensagem: "Não foi possível salvar o contato." };
-    contatoId = contato.id;
-  }
-
-  // Etapa pré-selecionada (ex.: "Adicionar negócio" numa coluna do Kanban), se pertencer ao funil e estiver ativa;
-  // senão cai na etapa inicial do funil, como sempre foi.
-  let etapaId = d.etapa_id;
-  if (etapaId) {
-    const { data: etapa } = await supabase.from("etapas").select("id").eq("id", etapaId).eq("funil_id", d.funil_id).eq("ativa", true).maybeSingle();
-    etapaId = etapa?.id ?? null;
-  }
-  if (!etapaId) {
-    const { data: etapaInicial } = await supabase
-      .from("etapas")
-      .select("id")
-      .eq("funil_id", d.funil_id)
-      .eq("ativa", true)
-      .order("inicial", { ascending: false })
-      .order("ordem")
-      .limit(1)
-      .single();
-    if (!etapaInicial) return { ok: false, mensagem: "O funil não tem etapas ativas." };
-    etapaId = etapaInicial.id;
-  }
-
-  const { data: negocio, error } = await supabase
-    .from("negocios")
-    .insert({
-      empresa_id: atual.empresaId,
-      titulo: d.titulo,
-      funil_id: d.funil_id,
-      etapa_id: etapaId,
-      origem_id: d.origem_id,
-      // Só admin e gestor escolhem o responsável; os demais ficam como responsáveis.
-      responsavel_id: pode(atual.papel, ESCOLHER_RESPONSAVEL_NEGOCIO) ? d.responsavel_id : null,
-      valor: d.valor,
-      descricao: d.descricao || null,
-      contato_id: contatoId,
-      unidade_consumidora: d.unidade_consumidora || null,
-      padrao_cliente: d.padrao_cliente || null,
-      tipo_telhado: d.tipo_telhado || null,
-      estrutura_telhado: d.estrutura_telhado || null,
-      consumo_medio_kwh: d.consumo_medio_kwh,
-      valor_conta_energia: d.valor_fatura_medio,
-    })
-    .select("id")
-    .single();
-  if (error || !negocio) {
-    return { ok: false, mensagem: mensagemErro(error, "Não foi possível criar o negócio. Confira o responsável escolhido.") };
-  }
-
-  // Kit personalizado montado junto com o negócio: já deixa o cálculo
-  // pronto, sem o vendedor precisar abrir a calculadora à parte (fluxo de
-  // "nova proposta"). O cálculo roda no backend — não é um passo visível.
-  if (d.tipo_ligacao && d.tarifa_kwh != null && d.componentes.length) {
-    const montado = await montarLinhaCalculo(supabase, atual.empresaId, {
-      kitNome: nomeKitPersonalizado(d.componentes),
-      potenciaKwp: potenciaKitPersonalizadoKwp(d.componentes),
-      precoKit: d.valor ?? 0,
-      tipoLigacao: d.tipo_ligacao,
-      consumoMedioKwh: d.consumo_medio_kwh,
-      valorFaturaMedio: d.valor_fatura_medio,
-      tarifaKwh: d.tarifa_kwh,
-    });
-    if (montado.ok) {
-      await supabase.from("calculos_solares").insert({
-        ...montado.linha,
-        negocio_id: negocio.id,
-        atualizado_por: atual.membroId,
-        criado_por: atual.membroId,
-      });
-      await supabase.from("kit_componentes").insert(
-        d.componentes.map((c, i) => ({
-          empresa_id: atual.empresaId,
-          negocio_id: negocio.id,
-          tipo: c.tipo,
-          descricao: c.descricao,
-          potencia_w: c.potenciaW,
-          quantidade: c.quantidade,
-          ordem: i,
-        })),
-      );
-    }
-    // Um kit mal preenchido não deve impedir a criação do negócio — o
-    // vendedor ainda pode calcular depois, direto na página do negócio.
-  }
-
-  // Anexos escolhidos ainda na criação (CNH, faturas): só dá para subir
-  // depois que o negócio existe (a pasta no Storage é por negócio).
-  const anexos: { campo: string; categoria: "cnh" | "fatura_gerador" | "fatura_beneficiario" }[] = [
-    { campo: "anexo_cnh_negocio", categoria: "cnh" },
-    { campo: "anexo_cnh_contato", categoria: "cnh" },
-    { campo: "anexo_fatura_gerador", categoria: "fatura_gerador" },
-  ];
-  await Promise.all([
-    ...anexos.flatMap(({ campo, categoria }) =>
-      formData
-        .getAll(campo)
-        .filter((v): v is File => v instanceof File && v.size > 0)
-        .map((arquivo) => enviarAnexoNoServidor(supabase, { empresaId: atual.empresaId, negocioId: negocio.id, arquivo, categoria })),
-    ),
-    ...formData
-      .getAll("anexo_fatura_beneficiario")
-      .filter((v): v is File => v instanceof File && v.size > 0)
-      .map((arquivo) =>
-        enviarAnexoNoServidor(supabase, {
-          empresaId: atual.empresaId,
-          negocioId: negocio.id,
-          arquivo,
-          categoria: "fatura_beneficiario",
-        }),
-      ),
-  ]);
+  const r = await criarNegocioComCliente(supabase, atual, formData);
+  if (!r.ok) return r;
 
   revalidatePath("/negocios");
-  redirect(`/negocios/${negocio.id}`);
+  redirect(`/negocios/${r.negocioId}${r.avisos.length ? `?avisos=${r.avisos.join(",")}` : ""}`);
 }
 
 /**
@@ -262,61 +79,15 @@ export async function moverEtapa(negocioId: string, etapaId: string, comentario:
   return { ok: true, mensagem: ids.data.motivoPerdaId ? "Negócio marcado como perdido." : "Negócio movido." };
 }
 
-const esquemaEdicao = z.object({
-  negocioId: z.string().uuid(),
-  titulo: z.string().trim().min(2, "Informe o nome do negócio"),
-  etapa_id: z.string().uuid(),
-  origem_id: uuidOpcional,
-  responsavel_id: uuidOpcional,
-  valor: valorObrigatorio,
-  descricao: z.string().trim().optional(),
-  unidade_consumidora: z.string().trim().max(60).optional(),
-  padrao_cliente: z.string().trim().max(60).optional(),
-  tipo_telhado: z.string().trim().max(60).optional(),
-  consumo_medio_kwh: numeroBrOpcional,
-  valor_conta_energia: numeroBrOpcional,
-});
-
 export async function editarNegocio(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
   const { atual } = await exigirPapel(...NEGOCIOS);
-  const dados = esquemaEdicao.safeParse(Object.fromEntries(formData));
-  if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
-  const d = dados.data;
-
   const supabase = await criarClienteServidor();
-  const { data, error } = await supabase
-    .from("negocios")
-    .update({
-      titulo: d.titulo,
-      etapa_id: d.etapa_id,
-      origem_id: d.origem_id,
-      descricao: d.descricao || null,
-      unidade_consumidora: d.unidade_consumidora || null,
-      padrao_cliente: d.padrao_cliente || null,
-      tipo_telhado: d.tipo_telhado || null,
-      consumo_medio_kwh: d.consumo_medio_kwh,
-      valor_conta_energia: d.valor_conta_energia,
-      // SDR não pode alterar o valor financeiro do negócio (spec RAION_SDR_REGRAS_PERMISSOES §39) — só na criação.
-      ...(pode(atual.papel, EDITAR_VALOR_NEGOCIO) ? { valor: d.valor } : {}),
-      ...(pode(atual.papel, ESCOLHER_RESPONSAVEL_NEGOCIO) && d.responsavel_id ? { responsavel_id: d.responsavel_id } : {}),
-    })
-    .eq("id", d.negocioId)
-    .select("id");
-  if (error || !data?.length) return { ok: false, mensagem: mensagemErro(error, "Não foi possível salvar.") };
-
-  const arquivoFatura = formData.get("anexo_fatura_energia");
-  if (arquivoFatura instanceof File && arquivoFatura.size > 0) {
-    await enviarAnexoNoServidor(supabase, {
-      empresaId: atual.empresaId,
-      negocioId: d.negocioId,
-      arquivo: arquivoFatura,
-      categoria: "fatura_gerador",
-    });
+  const { negocioId, ...r } = await editarNegocioComCliente(supabase, atual, formData);
+  if (negocioId) {
+    revalidatePath("/negocios");
+    revalidatePath(`/negocios/${negocioId}`);
   }
-
-  revalidatePath("/negocios");
-  revalidatePath(`/negocios/${d.negocioId}`);
-  return { ok: true, mensagem: "Salvo." };
+  return r;
 }
 
 const esquemaFechamento = z.discriminatedUnion("status", [
@@ -406,7 +177,7 @@ export async function buscarContatos(termo: string) {
   if (digitos.length >= 4) filtro.push(`telefone_digitos.like.%${digitos}%`);
   const { data } = await supabase
     .from("contatos")
-    .select("id, nome, telefone, email")
+    .select("id, nome, telefone, email, endereco, cidade, uf")
     .eq("empresa_id", atual.empresaId)
     .or(filtro.join(","))
     .order("nome")

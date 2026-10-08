@@ -2,6 +2,7 @@
 
 import { useActionState, useMemo, useState } from "react";
 import { EditorComponentesKit, linhasParaComponentes, type LinhaComponente } from "@/components/kit-componentes";
+import { useEnvioSemReset } from "@/components/envio-sem-reset";
 import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
 import { salvarKitPersonalizado } from "@/lib/acoes/calculadora";
 import {
@@ -26,6 +27,7 @@ export type CalculoSalvo = {
   kitNome: string;
   tipoLigacao: TipoLigacao;
   consumoMedioKwh: number;
+  valorFaturaMedio: number | null;
   tarifaKwh: number;
   geracaoEstimadaKwhMes: number;
   economiaMensal: number;
@@ -78,6 +80,7 @@ export function KitPersonalizado({
   parametros: Parametros | null;
 }) {
   const [resultado, acao, pendente] = useActionState(salvarKitPersonalizado, null);
+  const enviar = useEnvioSemReset(acao);
   const [editando, setEditando] = useState(!calculo);
   // Fecha o formulário assim que salva (sem useEffect, ajustando durante a renderização).
   const [ultimoResultado, setUltimoResultado] = useState(resultado);
@@ -100,9 +103,11 @@ export function KitPersonalizado({
     if (calculo) return numeroBr(calculo.consumoMedioKwh);
     return consumoMedioKwhPadrao != null ? numeroBr(consumoMedioKwhPadrao) : "";
   });
-  const [valorFaturaMedio, setValorFaturaMedio] = useState(() =>
-    !calculo && valorFaturaMedioPadrao != null ? numeroBr(valorFaturaMedioPadrao) : "",
-  );
+  // Ao reabrir, vem o valor da conta já salvo no cálculo (antes vinha vazio e se perdia ao salvar de novo).
+  const [valorFaturaMedio, setValorFaturaMedio] = useState(() => {
+    const salvo = calculo ? calculo.valorFaturaMedio : valorFaturaMedioPadrao;
+    return salvo != null ? numeroBr(salvo) : "";
+  });
   const [tarifaKwh, setTarifaKwh] = useState(calculo ? numeroBr(calculo.tarifaKwh) : "");
 
   const componentes = useMemo(() => linhasParaComponentes(linhas), [linhas]);
@@ -225,9 +230,14 @@ export function KitPersonalizado({
   }
 
   return (
-    <form action={acao} className="flex flex-col gap-3">
+    <form onSubmit={enviar} className="flex flex-col gap-3">
       <input type="hidden" name="negocioId" value={negocioId} />
       <input type="hidden" name="componentes" value={JSON.stringify(componentes)} />
+      {!calculo && componentesSalvos.length > 0 && (
+        <p className="rounded-md bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
+          Itens do kit salvos, ainda sem cálculo. Informe a tarifa para calcular geração, economia e payback.
+        </p>
+      )}
       {!padraoCliente && (
         <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
           Favor adicionar o padrão atual do cliente (em &quot;Dados do negócio&quot;) para conferir compatibilidade com o kit.
@@ -281,7 +291,6 @@ export function KitPersonalizado({
         rotulo="Tarifa (R$/kWh)"
         name="tarifaKwh"
         inputMode="decimal"
-        required
         placeholder="ex.: 0,95"
         value={tarifaKwh}
         onChange={(e) => setTarifaKwh(e.target.value)}
@@ -319,7 +328,7 @@ export function KitPersonalizado({
       </label>
       <div className="flex items-center gap-2">
         <Botao type="submit" disabled={pendente}>
-          {pendente ? "Calculando..." : "Salvar kit e calcular"}
+          {pendente ? "Salvando..." : numero(tarifaKwh) ? "Salvar kit e calcular" : "Salvar kit"}
         </Botao>
         {calculo && (
           <Botao type="button" variante="secundario" onClick={() => setEditando(false)}>

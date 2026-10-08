@@ -5,49 +5,8 @@ import { z } from "zod";
 import { exigirPapel } from "@/lib/sessao";
 import { ANEXOS_E_NOTAS } from "@/lib/permissoes";
 import { criarClienteAdmin } from "@/lib/supabase/admin";
-import type { SupabaseServidor } from "@/lib/supabase/server";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { CATEGORIAS_ANEXO, type CategoriaAnexo, type ResultadoAcao } from "@/lib/tipos";
-
-/** Nome seguro para o caminho no Storage (o nome original fica no registro). */
-function nomeSeguro(nome: string) {
-  const limpo = nome
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/[^a-zA-Z0-9._-]+/g, "-")
-    .slice(-80);
-  return `${crypto.randomUUID()}-${limpo || "arquivo"}`;
-}
-
-const LIMITE_ANEXO = 20 * 1024 * 1024;
-
-/**
- * Envia um arquivo direto do servidor (ex.: anexos escolhidos ainda na criação
- * do negócio, antes de existir uma tela para o upload de cliente-para-Storage).
- * Não bloqueia a operação principal se falhar — só não anexa o arquivo.
- */
-export async function enviarAnexoNoServidor(
-  supabase: SupabaseServidor,
-  dados: { empresaId: string; negocioId: string; arquivo: File; categoria: CategoriaAnexo },
-) {
-  const { empresaId, negocioId, arquivo, categoria } = dados;
-  if (!arquivo.size || arquivo.size > LIMITE_ANEXO) return;
-  const caminho = `${empresaId}/${negocioId}/${nomeSeguro(arquivo.name)}`;
-  const { error: erroUpload } = await supabase.storage
-    .from("anexos")
-    .upload(caminho, arquivo, { contentType: arquivo.type || undefined });
-  if (erroUpload) return;
-  const { error: erroRegistro } = await supabase.from("anexos").insert({
-    empresa_id: empresaId,
-    negocio_id: negocioId,
-    caminho,
-    nome: arquivo.name || "arquivo",
-    tamanho: arquivo.size,
-    tipo_mime: arquivo.type || null,
-    categoria,
-  });
-  if (erroRegistro) await criarClienteAdmin().storage.from("anexos").remove([caminho]);
-}
+import { CATEGORIAS_ANEXO, type ResultadoAcao } from "@/lib/tipos";
 
 /** O arquivo já foi enviado pelo navegador direto para o Storage; aqui só registramos. */
 export async function registrarAnexo(dados: {

@@ -1,15 +1,16 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { CampoArquivo } from "@/components/campo-arquivo";
+import { useEnvioSemReset } from "@/components/envio-sem-reset";
 import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
 import { editarNegocio } from "@/lib/acoes/negocios";
 
 type Opcao = { id: string; nome: string };
 
+/** A etapa não é editada aqui: só pelo "Mover etapa"/Kanban, que exige comentário e respeita o papel. */
 export function EdicaoNegocio({
   negocio,
-  etapas,
   origens,
   responsaveis,
   podeEditarValor = true,
@@ -17,7 +18,6 @@ export function EdicaoNegocio({
   negocio: {
     id: string;
     titulo: string;
-    etapaId: string;
     origemId: string | null;
     responsavelId: string | null;
     valor: number | null;
@@ -28,24 +28,24 @@ export function EdicaoNegocio({
     consumoMedioKwh: number | null;
     valorContaEnergia: number | null;
   };
-  etapas: Opcao[];
   origens: Opcao[];
   responsaveis: Opcao[];
   /** SDR não pode alterar o valor financeiro do negócio (spec RAION_SDR_REGRAS_PERMISSOES §39). */
   podeEditarValor?: boolean;
 }) {
   const [resultado, acao, pendente] = useActionState(editarNegocio, null);
+  const enviar = useEnvioSemReset(acao);
+  // Sem o reset automático, o arquivo escolhido ficaria no campo: limpa só ele quando salva.
+  const [versaoArquivo, setVersaoArquivo] = useState(0);
+  const [ultimoResultado, setUltimoResultado] = useState(resultado);
+  if (resultado !== ultimoResultado) {
+    setUltimoResultado(resultado);
+    if (resultado?.ok) setVersaoArquivo((v) => v + 1);
+  }
   return (
-    <form action={acao} className="grid gap-3 md:grid-cols-2">
+    <form onSubmit={enviar} className="grid gap-3 md:grid-cols-2">
       <input type="hidden" name="negocioId" value={negocio.id} />
       <Campo rotulo="Nome do negócio" name="titulo" defaultValue={negocio.titulo} required />
-      <Selecao rotulo="Etapa" name="etapa_id" defaultValue={negocio.etapaId}>
-        {etapas.map((e) => (
-          <option key={e.id} value={e.id}>
-            {e.nome}
-          </option>
-        ))}
-      </Selecao>
       <Selecao rotulo="Origem" name="origem_id" defaultValue={negocio.origemId ?? ""}>
         <option value="">Sem origem</option>
         {origens.map((o) => (
@@ -93,7 +93,7 @@ export function EdicaoNegocio({
         placeholder="Ex.: cerâmico, metálico, laje, solo"
         defaultValue={negocio.tipoTelhado ?? ""}
       />
-      <CampoArquivo rotulo="Fatura de energia (opcional)" name="anexo_fatura_energia" accept="image/*,.pdf" />
+      <CampoArquivo key={versaoArquivo} rotulo="Fatura de energia (opcional)" name="anexo_fatura_energia" accept="image/*,.pdf" />
       <label className="flex flex-col gap-1 text-sm md:col-span-2">
         <span className="font-medium text-zinc-700">Descrição</span>
         <textarea

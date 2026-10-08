@@ -4,6 +4,7 @@ import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, XCircle } from 
 import { useActionState, useId, useMemo, useState, useTransition } from "react";
 import { CampoArquivo } from "@/components/campo-arquivo";
 import { EditorComponentesKit, linhasParaComponentes, type LinhaComponente } from "@/components/kit-componentes";
+import { useEnvioSemReset } from "@/components/envio-sem-reset";
 import { Botao, Campo, Mensagem, Selecao, Selo } from "@/components/ui";
 import { buscarContatos, criarNegocio, verificarDuplicado, type Duplicado } from "@/lib/acoes/negocios";
 import {
@@ -14,10 +15,19 @@ import {
   sugerirQuantidadeModulos,
 } from "@/lib/calculadora";
 import { formatarCep, formatarMascaraMoeda, formatarMoeda, formatarTelefoneBr } from "@/lib/formatacao";
+import { montarEndereco } from "@/lib/negocio-dados";
 import { ROTULO_TIPO_LIGACAO, TIPOS_LIGACAO, type TipoLigacao } from "@/lib/tipos";
 
 type Opcao = { id: string; nome: string };
-type ContatoEncontrado = { id: string; nome: string; telefone: string | null; email: string | null };
+type ContatoEncontrado = {
+  id: string;
+  nome: string;
+  telefone: string | null;
+  email: string | null;
+  endereco?: string | null;
+  cidade?: string | null;
+  uf?: string | null;
+};
 type Parametros = {
   produtividadeKwhKwpMes: number;
   percentualFioB: number;
@@ -159,6 +169,8 @@ export function FormularioNegocio({
   parametros: Parametros | null;
 }) {
   const [resultado, acao, pendente] = useActionState(criarNegocio, null);
+  // Sem o reset automático: se o servidor recusar, nada do que foi digitado se perde.
+  const enviar = useEnvioSemReset(acao);
   const [etapaAtual, setEtapaAtual] = useState<1 | 2 | 3>(1);
   const [erroEtapa, setErroEtapa] = useState<string | null>(null);
 
@@ -169,13 +181,15 @@ export function FormularioNegocio({
   const [duplicados, setDuplicados] = useState<Duplicado[]>([]);
   const [, iniciar] = useTransition();
 
+
   // Cliente (Etapa 1).
   const [contatoNome, setContatoNome] = useState("");
   const [contatoTelefone, setContatoTelefone] = useState("");
   const [contatoEmail, setContatoEmail] = useState("");
   const emailValido = contatoEmail === "" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contatoEmail);
 
-  // Localização (Etapa 1) — campos estruturados; concatenados no envio pro campo único que o backend já salva.
+  // Localização (Etapa 1) — rua/número/complemento/bairro/CEP vão juntos em `contatos.endereco`;
+  // cidade e UF vão em `contatos.cidade`/`uf` (antes ficavam só dentro do texto do endereço).
   const [cep, setCep] = useState("");
   const [rua, setRua] = useState("");
   const [numeroEndereco, setNumeroEndereco] = useState("");
@@ -205,16 +219,14 @@ export function FormularioNegocio({
     }
   }
 
-  const enderecoCompleto = useMemo(() => {
-    const partes = [
-      rua && numeroEndereco ? `${rua}, ${numeroEndereco}` : rua,
-      complemento,
-      bairro,
-      cidade && uf ? `${cidade} - ${uf}` : cidade,
-      cep ? `CEP ${cep}` : "",
-    ].filter(Boolean);
-    return partes.join(", ");
-  }, [rua, numeroEndereco, complemento, bairro, cidade, uf, cep]);
+  const enderecoCompleto = montarEndereco({ rua, numero: numeroEndereco, complemento, bairro, cep });
+
+  /** Contato existente: traz a cidade e a UF já cadastradas (o servidor só completa o que estiver vazio). */
+  function escolherContato(c: ContatoEncontrado) {
+    setContato(c);
+    if (c.cidade) setCidade(c.cidade);
+    if (c.uf) setUf(c.uf);
+  }
 
   // Consumo (Etapa 1): kWh direto ou valor da conta (com máscara), nunca os dois exigidos.
   const [consumoMedioKwh, setConsumoMedioKwh] = useState("");
@@ -293,6 +305,16 @@ export function FormularioNegocio({
     });
   }, [parametros, tipoLigacao, consumoMedioKwh, valorFaturaMedio, tarifaKwh, potenciaKwp, valor]);
 
+  // O contato novo foi gravado mas o negócio não: segue com ele como "existente" (o reenvio não duplica).
+  const [ultimoResultado, setUltimoResultado] = useState(resultado);
+  if (resultado !== ultimoResultado) {
+    setUltimoResultado(resultado);
+    if (resultado && !resultado.ok && resultado.contatoId) {
+      setContato({ id: resultado.contatoId, nome: contatoNome, telefone: contatoTelefone, email: contatoEmail || null });
+      setModo("existente");
+    }
+  }
+
   function pesquisar(termo: string) {
     setBusca(termo);
     iniciar(async () => setEncontrados(await buscarContatos(termo)));
@@ -336,12 +358,14 @@ export function FormularioNegocio({
   }
 
   return (
-    <form action={acao} className="flex flex-col gap-5">
+    <form onSubmit={enviar} className="flex flex-col gap-5">
       <input type="hidden" name="funil_id" value={funilId} />
       {etapaId && <input type="hidden" name="etapa_id" value={etapaId} />}
       <input type="hidden" name="tipo_ligacao" value={tipoLigacao} />
       <input type="hidden" name="componentes" value={JSON.stringify(componentes)} />
       <input type="hidden" name="contato_endereco" value={enderecoCompleto} />
+      <input type="hidden" name="contato_cidade" value={cidade} />
+      <input type="hidden" name="contato_uf" value={uf} />
       <input type="hidden" name="contato_nome" value={contatoNome} />
       <input type="hidden" name="contato_telefone" value={contatoTelefone} />
       <input type="hidden" name="contato_email" value={contatoEmail} />
@@ -414,7 +438,7 @@ export function FormularioNegocio({
                       <li key={c.id}>
                         <button
                           type="button"
-                          onClick={() => setContato(c)}
+                          onClick={() => escolherContato(c)}
                           className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-zinc-100"
                         >
                           <strong>{c.nome}</strong> <span className="text-zinc-500">{c.telefone ?? c.email}</span>
@@ -490,6 +514,12 @@ export function FormularioNegocio({
 
         <fieldset className="grid gap-3 md:grid-cols-3">
           <legend className="mb-2 text-sm font-semibold text-zinc-900">Localização</legend>
+          {modo === "existente" && contato?.endereco && (
+            <p className="rounded-md bg-zinc-50 px-3 py-2 text-xs text-zinc-600 md:col-span-3">
+              Endereço já cadastrado no contato: <strong>{contato.endereco}</strong>. Ele é mantido; o que for digitado
+              aqui só completa campos vazios do contato.
+            </p>
+          )}
           <Campo
             rotulo="CEP"
             inputMode="numeric"
@@ -731,23 +761,31 @@ export function FormularioNegocio({
             inputMode="decimal"
             placeholder="ex.: 0,95"
             value={tarifaKwh}
+            disabled={!componentes.length}
             onChange={(e) => setTarifaKwh(e.target.value)}
           />
-          <Selecao rotulo="Tipo de ligação" value={tipoLigacao} onChange={(e) => setTipoLigacao(e.target.value as TipoLigacao)}>
+          <Selecao
+            rotulo="Tipo de ligação"
+            value={tipoLigacao}
+            disabled={!componentes.length}
+            onChange={(e) => setTipoLigacao(e.target.value as TipoLigacao)}
+          >
             {TIPOS_LIGACAO.map((t) => (
               <option key={t} value={t}>
                 {ROTULO_TIPO_LIGACAO[t]}
               </option>
             ))}
           </Selecao>
+          {!componentes.length && (
+            <p className="text-xs text-zinc-400 md:col-span-2">
+              Tarifa e tipo de ligação são usados no cálculo do kit: monte o kit na etapa 2 para informá-los.
+            </p>
+          )}
         </fieldset>
 
         <fieldset className="grid gap-3 md:grid-cols-2">
           <legend className="mb-2 text-sm font-semibold text-zinc-900">Características técnicas</legend>
           <Campo rotulo="Tipo do telhado" name="tipo_telhado" placeholder="Ex.: cerâmico, metálico, laje, solo" />
-          <Campo rotulo="Orientação" placeholder="Ex.: norte" />
-          <Campo rotulo="Inclinação" placeholder="Ex.: 15°" />
-          <Campo rotulo="Área disponível" placeholder="Ex.: 40 m²" />
           <Campo rotulo="Padrão do cliente" name="padrao_cliente" placeholder="Opcional" />
           <Campo
             rotulo="Estrutura do telhado"
@@ -767,8 +805,8 @@ export function FormularioNegocio({
             CNH e conta de energia já enviados na Etapa 1 aparecem aqui como anexos do negócio.{" "}
             <Selo tom="neutro">opcional</Selo>
           </p>
-          <CampoArquivo rotulo="Fotos" name="anexo_fatura_beneficiario" accept="image/*" multiple />
-          <CampoArquivo rotulo="Outros documentos" name="anexo_fatura_beneficiario" multiple />
+          <CampoArquivo rotulo="Fotos" name="anexo_geral" accept="image/*" multiple />
+          <CampoArquivo rotulo="Outros documentos" name="anexo_geral" multiple />
         </fieldset>
 
         <Mensagem resultado={resultado} />

@@ -16,7 +16,7 @@ export default async function DetalheContato({ params }: PageProps<"/contatos/[i
   const [{ data: contato }, config] = await Promise.all([
     supabase
       .from("contatos")
-      .select("id, tipo, nome, telefone, telefone2, email, documento, cidade, uf")
+      .select("id, tipo, nome, telefone, telefone2, email, documento, endereco, cidade, uf")
       .eq("id", id)
       .maybeSingle(),
     carregarConfiguracao(atual.empresaId),

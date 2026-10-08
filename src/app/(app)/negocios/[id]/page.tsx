@@ -4,6 +4,7 @@ import { ListaTarefas } from "@/components/lista-tarefas";
 import { MoverEtapa } from "@/components/mover-etapa";
 import { NovaTarefa } from "@/components/nova-tarefa";
 import { Cartao, Selo } from "@/components/ui";
+import { AVISOS_CRIACAO, avisosDaUrl } from "@/lib/negocio-dados";
 import { apagarAnexo } from "@/lib/acoes/anexos";
 import { alternarEtiqueta } from "@/lib/acoes/negocios";
 import { carregarConfiguracao, formatarDataHora, formatarMoeda } from "@/lib/crm";
@@ -39,16 +40,18 @@ function tamanhoLegivel(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1).replace(".", ",")} MB`;
 }
 
-export default async function DetalheNegocio({ params }: PageProps<"/negocios/[id]">) {
+export default async function DetalheNegocio({ params, searchParams }: PageProps<"/negocios/[id]">) {
   const { atual } = await exigirPapel(...NEGOCIOS);
   const { id } = await params;
+  // Gravação parcial na criação (códigos fixos; ver `criarNegocioComCliente`).
+  const avisos = avisosDaUrl((await searchParams).avisos);
   const supabase = await criarClienteServidor();
 
   const [{ data: negocio }, config, { data: parametros }] = await Promise.all([
     supabase
       .from("negocios")
       .select(
-        "id, numero, titulo, valor, descricao, status, funil_id, etapa_id, origem_id, responsavel_id, motivo_perda_id, motivo_perda_detalhe, fechado_em, created_at, updated_at, tipo_telhado, unidade_consumidora, padrao_cliente, estrutura_telhado, consumo_medio_kwh, valor_conta_energia, qualif_tipo_cliente, qualif_possui_conta_energia, qualif_distribuidora, qualif_imovel_proprio, qualif_objetivo, qualif_prazo_instalacao, qualif_busca_financiamento, qualif_orcamento_outra_empresa, qualif_e_decisor, qualif_outro_decisor, qualif_participantes_decisao, qualif_observacoes, contatos(id, nome, tipo, telefone, email, cidade, uf)",
+        "id, numero, titulo, valor, descricao, status, funil_id, etapa_id, origem_id, responsavel_id, motivo_perda_id, motivo_perda_detalhe, fechado_em, created_at, updated_at, tipo_telhado, unidade_consumidora, padrao_cliente, estrutura_telhado, consumo_medio_kwh, valor_conta_energia, qualif_tipo_cliente, qualif_possui_conta_energia, qualif_distribuidora, qualif_imovel_proprio, qualif_objetivo, qualif_prazo_instalacao, qualif_busca_financiamento, qualif_orcamento_outra_empresa, qualif_e_decisor, qualif_outro_decisor, qualif_participantes_decisao, qualif_observacoes, contatos(id, nome, tipo, telefone, email, endereco, cidade, uf)",
       )
       .eq("id", id)
       .maybeSingle(),
@@ -85,7 +88,7 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
       supabase
         .from("calculos_solares")
         .select(
-          "id, kit_nome, tipo_ligacao, consumo_medio_kwh, tarifa_kwh, geracao_estimada_kwh_mes, economia_mensal, payback_meses, observacoes",
+          "id, kit_nome, tipo_ligacao, consumo_medio_kwh, valor_fatura_medio, tarifa_kwh, geracao_estimada_kwh_mes, economia_mensal, payback_meses, observacoes",
         )
         .eq("negocio_id", id)
         .maybeSingle(),
@@ -136,6 +139,7 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
     tipo: string;
     telefone: string | null;
     email: string | null;
+    endereco: string | null;
     cidade: string | null;
     uf: string | null;
   };
@@ -215,6 +219,20 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
         </p>
       )}
 
+      {avisos.length > 0 && (
+        <div role="alert" className="flex flex-col gap-1 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          <p className="font-medium">O negócio foi criado, mas nem tudo foi salvo:</p>
+          <ul className="list-disc pl-5">
+            {avisos.map((a) => (
+              <li key={a}>{AVISOS_CRIACAO[a]}</li>
+            ))}
+          </ul>
+          <Link href={`/negocios/${negocio.id}`} className="self-start text-xs font-medium underline">
+            Entendi
+          </Link>
+        </div>
+      )}
+
       <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
         <div className="flex flex-col gap-4">
           <Cartao titulo="Dados do negócio">
@@ -222,7 +240,6 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
               negocio={{
                 id: negocio.id,
                 titulo: negocio.titulo,
-                etapaId: negocio.etapa_id,
                 origemId: negocio.origem_id,
                 responsavelId: negocio.responsavel_id,
                 valor: negocio.valor,
@@ -233,9 +250,6 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
                 consumoMedioKwh: negocio.consumo_medio_kwh,
                 valorContaEnergia: negocio.valor_conta_energia,
               }}
-              etapas={config.etapas.filter(
-                (e) => e.funilId === negocio.funil_id && (e.ativa || e.id === negocio.etapa_id),
-              )}
               origens={config.origens.filter((o) => o.ativa || o.id === negocio.origem_id)}
               responsaveis={pode(atual.papel, ESCOLHER_RESPONSAVEL_NEGOCIO) ? config.membros.filter((m) => m.ativo && pode(m.papel, RESPONSAVEL_COMERCIAL)) : []}
               podeEditarValor={pode(atual.papel, EDITAR_VALOR_NEGOCIO)}
@@ -277,6 +291,7 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
                       kitNome: calculo.kit_nome,
                       tipoLigacao: calculo.tipo_ligacao as TipoLigacao,
                       consumoMedioKwh: calculo.consumo_medio_kwh,
+                      valorFaturaMedio: calculo.valor_fatura_medio,
                       tarifaKwh: calculo.tarifa_kwh,
                       geracaoEstimadaKwhMes: calculo.geracao_estimada_kwh_mes,
                       economiaMensal: calculo.economia_mensal,
@@ -470,6 +485,12 @@ export default async function DetalheNegocio({ params }: PageProps<"/negocios/[i
                 <div>
                   <dt className="text-zinc-500">E-mail</dt>
                   <dd>{contato.email}</dd>
+                </div>
+              )}
+              {contato.endereco && (
+                <div>
+                  <dt className="text-zinc-500">Endereço</dt>
+                  <dd>{contato.endereco}</dd>
                 </div>
               )}
               {(contato.cidade || contato.uf) && (
