@@ -11,8 +11,11 @@
 -- (aceitar_handoff: 20261001220000_gamificacao_contrato_sdr; devolver_handoff:
 -- 20261001200000_gamificacao_handoff_fechamento) — histórico, notificações, eventos,
 -- perfil congelado, handoff_origem_id e troca de responsável ficam iguais.
+-- Também cria oportunidades_pendentes_equipe(): lista restrita (colunas explícitas) para o
+-- gestor/admin encontrar e responder as pendências da equipe sem ampliar a RLS de negócios,
+-- contatos, propostas ou contratos.
 -- Sem alteração de dados. Reversão: migration nova com o texto anterior das duas funções
--- e drop function pode_responder_handoff.
+-- e drop function de pode_responder_handoff e oportunidades_pendentes_equipe.
 
 -- Regra única, usada pelas duas funções e pela tela (botões só para quem pode responder).
 -- Só devolve um booleano sobre o próprio usuário logado.
@@ -147,3 +150,81 @@ begin
   return v_handoff;
 end;
 $$;
+
+-- ---------------------------------------------------------------------------
+-- Lista restrita de oportunidades pendentes para o Painel (gestor e admin)
+-- ---------------------------------------------------------------------------
+
+-- Só leitura, colunas explícitas. Linhas: handoffs pendentes da empresa informada que o
+-- usuário pode responder (pode_responder_handoff: empresa ativa, vínculo ativo, papel e
+-- equipe ativa do destinatário), e só para admin ou gestor (o destinatário já vê na ficha).
+-- Fica de fora de propósito: valor e dados financeiros, telefone, e-mail, documento,
+-- endereço, proposta, contrato, anexos, notas, tarefas, as observações livres do envio e
+-- "quem participa da decisão" (texto livre com nomes de terceiros). Do contato, só nome,
+-- cidade e UF; o telefone aparece apenas como "informado" (critério da qualificação).
+create or replace function public.oportunidades_pendentes_equipe(p_empresa_id uuid)
+returns table (
+  handoff_id uuid,
+  negocio_id uuid,
+  negocio_numero integer,
+  negocio_titulo text,
+  contato_nome text,
+  contato_cidade text,
+  contato_uf text,
+  telefone_informado boolean,
+  sdr_nome text,
+  destinatario_nome text,
+  enviado_em timestamptz,
+  status_qualificacao text,
+  tipo_cliente text,
+  possui_conta_energia boolean,
+  distribuidora text,
+  imovel_proprio boolean,
+  objetivo text,
+  prazo_instalacao text,
+  busca_financiamento boolean,
+  orcamento_outra_empresa boolean,
+  e_decisor boolean,
+  outro_decisor boolean
+)
+language sql stable security definer set search_path = ''
+as $$
+  select
+    h.id,
+    n.id,
+    n.numero,
+    n.titulo,
+    c.nome,
+    c.cidade,
+    c.uf,
+    nullif(c.telefone, '') is not null,
+    ps.nome,
+    pd.nome,
+    h.created_at,
+    h.status_qualificacao,
+    h.qualificacao_snapshot ->> 'tipo_cliente',
+    (h.qualificacao_snapshot ->> 'possui_conta_energia')::boolean,
+    h.qualificacao_snapshot ->> 'distribuidora',
+    (h.qualificacao_snapshot ->> 'imovel_proprio')::boolean,
+    h.qualificacao_snapshot ->> 'objetivo',
+    h.qualificacao_snapshot ->> 'prazo_instalacao',
+    (h.qualificacao_snapshot ->> 'busca_financiamento')::boolean,
+    (h.qualificacao_snapshot ->> 'orcamento_outra_empresa')::boolean,
+    (h.qualificacao_snapshot ->> 'e_decisor')::boolean,
+    (h.qualificacao_snapshot ->> 'outro_decisor')::boolean
+  from public.handoffs h
+  join public.negocios n on n.id = h.negocio_id and n.empresa_id = h.empresa_id
+  join public.contatos c on c.id = h.contato_id and c.empresa_id = h.empresa_id
+  join public.empresa_membros md on md.id = h.para_membro_id
+  left join public.perfis pd on pd.id = md.user_id
+  left join public.empresa_membros ms on ms.id = h.de_membro_id
+  left join public.perfis ps on ps.id = ms.user_id
+  where h.empresa_id = p_empresa_id
+    and h.status = 'pendente'
+    and public.tem_papel(p_empresa_id, '{admin,gestor}')
+    and public.pode_responder_handoff(h.id)
+  order by h.created_at;
+$$;
+
+revoke all on function public.oportunidades_pendentes_equipe(uuid) from public, anon, authenticated, service_role;
+grant execute on function public.oportunidades_pendentes_equipe(uuid) to authenticated;

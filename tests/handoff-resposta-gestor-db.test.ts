@@ -5,8 +5,11 @@
  * Gestor só do SDR remetente, de equipe inativa, inativo, vendedor marcado como gestor de
  * equipe e usuários de outra empresa são recusados. O resto do aceite/devolução (histórico,
  * notificação, eventos, perfil congelado, handoff_origem_id, responsável) não muda.
+ * oportunidades_pendentes_equipe: lista restrita do Painel (gestor/admin), colunas fixas,
+ * sem dados pessoais/financeiros, isolada por empresa e equipe.
  */
 import { beforeAll, describe, expect, it } from "vitest";
+import type { Json } from "@/lib/supabase/database.types";
 import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
 
 const NOMES = [
@@ -21,6 +24,9 @@ const NOMES = [
   "outroVendedor",
   "adminOutra",
   "gestorOutra",
+  "gestorDuasEmpresas",
+  "sdrOutra",
+  "closerOutra",
 ] as const;
 type Nome = (typeof NOMES)[number];
 
@@ -31,6 +37,9 @@ let outra: string;
 let funil: string;
 let etapaInicial: string;
 let contato: string;
+let funilOutra: string;
+let etapaOutra: string;
+let contatoOutra: string;
 
 async function equipe(empresaId: string, nome: string, ativa: boolean, gestor: Nome, membros: Nome[]) {
   const { data: eq, error } = await servico.from("equipes").insert({ empresa_id: empresaId, nome, ativa }).select("id").single();
@@ -65,6 +74,9 @@ beforeAll(async () => {
     ["outroVendedor", empresa, "vendedor", true],
     ["adminOutra", outra, "admin", true],
     ["gestorOutra", outra, "gestor", true],
+    ["gestorDuasEmpresas", empresa, "gestor", true],
+    ["sdrOutra", outra, "sdr", true],
+    ["closerOutra", outra, "vendedor", true],
   ];
   const { data: vinculos, error } = await servico
     .from("empresa_membros")
@@ -81,12 +93,21 @@ beforeAll(async () => {
     .select("id, user_id");
   if (error) throw error;
   for (const n of NOMES) membro[n] = vinculos!.find((v) => v.user_id === u[n].id)!.id;
+  // Mesmo usuário também é admin da outra empresa (vínculo extra; membro[] guarda o da empresa A).
+  const { data: vinculoB, error: erroB } = await servico
+    .from("empresa_membros")
+    .insert({ empresa_id: outra, user_id: u.gestorDuasEmpresas.id, papel: "admin" })
+    .select("id")
+    .single();
+  if (erroB) throw erroB;
+  void vinculoB;
 
   await equipe(empresa, "Equipe do closer", true, "gestorDest", ["closer"]);
   await equipe(empresa, "Equipe do SDR", true, "gestorSdr", ["sdr"]);
   await equipe(empresa, "Equipe antiga do closer", false, "gestorEquipeInativa", ["closer"]);
   await equipe(empresa, "Equipe do gestor inativo", true, "gestorInativo", ["closer"]);
   await equipe(empresa, "Equipe com vendedor marcado", true, "vendedorMarcadoGestor", ["closer"]);
+  await equipe(empresa, "Equipe do gestor de duas empresas", true, "gestorDuasEmpresas", ["closer"]);
 
   const { data: f } = await servico.from("funis").select("id").eq("empresa_id", empresa).single();
   funil = f!.id;
@@ -94,25 +115,47 @@ beforeAll(async () => {
   etapaInicial = et!.id;
   const { data: c } = await servico.from("contatos").insert({ empresa_id: empresa, nome: "Cliente resposta handoff" }).select("id").single();
   contato = c!.id;
+
+  const { data: fB } = await servico.from("funis").select("id").eq("empresa_id", outra).single();
+  funilOutra = fB!.id;
+  const { data: etB } = await servico.from("etapas").select("id").eq("funil_id", funilOutra).order("ordem").limit(1).single();
+  etapaOutra = etB!.id;
+  const { data: cB } = await servico.from("contatos").insert({ empresa_id: outra, nome: "Cliente da outra empresa" }).select("id").single();
+  contatoOutra = cB!.id;
 });
 
 /** Negócio do SDR com handoff pendente SDR → closer (aberto pelo próprio SDR, via RLS). */
-async function handoffPendente(titulo: string) {
+async function handoffPendente(
+  titulo: string,
+  extra: { contatoId?: string; snapshot?: { [chave: string]: Json }; observacoes?: string; outraEmpresa?: boolean } = {},
+) {
+  const b = extra.outraEmpresa;
+  const contatoId = extra.contatoId ?? (b ? contatoOutra : contato);
   const { data: negocio, error } = await servico
     .from("negocios")
-    .insert({ empresa_id: empresa, titulo, contato_id: contato, funil_id: funil, etapa_id: etapaInicial, responsavel_id: membro.sdr })
+    .insert({
+      empresa_id: b ? outra : empresa,
+      titulo,
+      contato_id: contatoId,
+      funil_id: b ? funilOutra : funil,
+      etapa_id: b ? etapaOutra : etapaInicial,
+      responsavel_id: b ? membro.sdrOutra : membro.sdr,
+      valor: 98765,
+    })
     .select("id")
     .single();
   if (error) throw error;
-  const { data: handoff, error: erroHandoff } = await u.sdr.cliente
+  const { data: handoff, error: erroHandoff } = await (b ? u.sdrOutra : u.sdr).cliente
     .from("handoffs")
     .insert({
-      empresa_id: empresa,
+      empresa_id: b ? outra : empresa,
       negocio_id: negocio!.id,
-      contato_id: contato,
-      de_membro_id: membro.sdr,
-      para_membro_id: membro.closer,
+      contato_id: contatoId,
+      de_membro_id: b ? membro.sdrOutra : membro.sdr,
+      para_membro_id: b ? membro.closerOutra : membro.closer,
       status_qualificacao: "qualificado",
+      qualificacao_snapshot: extra.snapshot ?? {},
+      observacoes: extra.observacoes ?? null,
     })
     .select("id")
     .single();
@@ -133,8 +176,19 @@ const estado = async (handoffId: string, negocioId: string) => {
   return { handoff: h!, negocio: n!, eventosResposta: eventos };
 };
 
-const AUTORIZADOS: Nome[] = ["closer", "admin", "gestorDest"];
-const RECUSADOS: Nome[] = ["gestorSdr", "gestorEquipeInativa", "gestorInativo", "vendedorMarcadoGestor", "sdr", "outroVendedor", "adminOutra", "gestorOutra"];
+const AUTORIZADOS: Nome[] = ["closer", "admin", "gestorDest", "gestorDuasEmpresas"];
+const RECUSADOS: Nome[] = [
+  "gestorSdr",
+  "gestorEquipeInativa",
+  "gestorInativo",
+  "vendedorMarcadoGestor",
+  "sdr",
+  "outroVendedor",
+  "adminOutra",
+  "gestorOutra",
+  "sdrOutra",
+  "closerOutra",
+];
 
 describe("pode_responder_handoff (regra usada pela tela e pelas RPCs)", () => {
   it("verdadeiro só para destinatário, admin da empresa e gestor de equipe ativa do destinatário", async () => {
@@ -245,5 +299,142 @@ describe("visibilidade (sem ampliação nesta PR)", () => {
     // O gestor do SDR vê o negócio (cartão "Aguardando aceite"), mas não pode responder.
     const { data: vistoPeloGestorSdr } = await u.gestorSdr.cliente.from("negocios").select("id").eq("id", negocioId);
     expect(vistoPeloGestorSdr).toHaveLength(1);
+  });
+});
+
+describe("oportunidades_pendentes_equipe (lista restrita do Painel)", () => {
+  const COLUNAS = [
+    "handoff_id",
+    "negocio_id",
+    "negocio_numero",
+    "negocio_titulo",
+    "contato_nome",
+    "contato_cidade",
+    "contato_uf",
+    "telefone_informado",
+    "sdr_nome",
+    "destinatario_nome",
+    "enviado_em",
+    "status_qualificacao",
+    "tipo_cliente",
+    "possui_conta_energia",
+    "distribuidora",
+    "imovel_proprio",
+    "objetivo",
+    "prazo_instalacao",
+    "busca_financiamento",
+    "orcamento_outra_empresa",
+    "e_decisor",
+    "outro_decisor",
+  ].sort();
+
+  const listar = async (n: Nome, empresaId = empresa) => {
+    const { data, error } = await u[n].cliente.rpc("oportunidades_pendentes_equipe", { p_empresa_id: empresaId });
+    expect(error, n).toBeNull();
+    return data ?? [];
+  };
+
+  it("gestor da equipe do destinatário e admin veem; demais papéis, equipes e empresas não", async () => {
+    const { handoffId } = await handoffPendente("Lista por papel");
+    const veem: Nome[] = ["admin", "gestorDest", "gestorDuasEmpresas"];
+    for (const n of NOMES) {
+      const ids = (await listar(n)).map((o) => o.handoff_id);
+      expect(ids.includes(handoffId), n).toBe(veem.includes(n));
+    }
+  });
+
+  it("usuário em duas empresas: cada empresa só devolve as próprias pendências", async () => {
+    const a = await handoffPendente("Lista empresa A");
+    const b = await handoffPendente("Lista empresa B", { outraEmpresa: true });
+    const naA = (await listar("gestorDuasEmpresas", empresa)).map((o) => o.handoff_id);
+    const naB = (await listar("gestorDuasEmpresas", outra)).map((o) => o.handoff_id);
+    expect(naA).toContain(a.handoffId);
+    expect(naA).not.toContain(b.handoffId);
+    expect(naB).toContain(b.handoffId); // admin na empresa B
+    expect(naB).not.toContain(a.handoffId);
+    // Admin de B pedindo a empresa A não recebe nada.
+    expect(await listar("adminOutra", empresa)).toEqual([]);
+  });
+
+  it("devolve só as colunas autorizadas, sem dados pessoais, financeiros nem textos livres", async () => {
+    const { data: c } = await servico
+      .from("contatos")
+      .insert({
+        empresa_id: empresa,
+        nome: "Maria Cliente Teste",
+        telefone: "(45) 98888-7777",
+        email: "maria.secreta@exemplo.com",
+        documento: "123.456.789-09",
+        endereco: "Rua Escondida, 99",
+        cidade: "Cascavel",
+        uf: "PR",
+      })
+      .select("id")
+      .single();
+    const { handoffId } = await handoffPendente("Lista com dados", {
+      contatoId: c!.id,
+      snapshot: {
+        tipo_cliente: "residencial",
+        possui_conta_energia: true,
+        distribuidora: "Copel",
+        imovel_proprio: false,
+        objetivo: "Reduzir a conta",
+        prazo_instalacao: null,
+        busca_financiamento: true,
+        orcamento_outra_empresa: false,
+        e_decisor: true,
+        outro_decisor: false,
+        participantes_decisao: "Fulano Terceiro Secreto",
+      },
+      observacoes: "Observação livre secreta",
+    });
+    const item = (await listar("gestorDest")).find((o) => o.handoff_id === handoffId)!;
+    expect(Object.keys(item).sort()).toEqual(COLUNAS);
+    expect(item).toMatchObject({
+      contato_nome: "Maria Cliente Teste",
+      contato_cidade: "Cascavel",
+      contato_uf: "PR",
+      telefone_informado: true,
+      tipo_cliente: "residencial",
+      possui_conta_energia: true,
+      distribuidora: "Copel",
+      imovel_proprio: false,
+      objetivo: "Reduzir a conta",
+      prazo_instalacao: null,
+      busca_financiamento: true,
+      orcamento_outra_empresa: false,
+      e_decisor: true,
+      outro_decisor: false,
+    });
+    const texto = JSON.stringify(item);
+    for (const proibido of ["98888", "maria.secreta", "123.456.789", "Rua Escondida", "98765", "Fulano Terceiro", "Observação livre"]) {
+      expect(texto, proibido).not.toContain(proibido);
+    }
+  });
+
+  it("depois do aceite ou da devolução a oportunidade deixa de ser listada; a consulta não altera nada", async () => {
+    const aceitar = await handoffPendente("Lista some no aceite");
+    const devolver = await handoffPendente("Lista some na devolução");
+    const antes = (await listar("gestorDest")).map((o) => o.handoff_id);
+    expect(antes).toEqual(expect.arrayContaining([aceitar.handoffId, devolver.handoffId]));
+    expect((await estado(aceitar.handoffId, aceitar.negocioId)).handoff.status).toBe("pendente");
+
+    expect((await u.gestorDest.cliente.rpc("aceitar_handoff", { p_handoff_id: aceitar.handoffId })).error).toBeNull();
+    expect((await u.gestorDest.cliente.rpc("devolver_handoff", { p_handoff_id: devolver.handoffId, p_motivo: "Sem perfil" })).error).toBeNull();
+    const depois = (await listar("gestorDest")).map((o) => o.handoff_id);
+    expect(depois).not.toContain(aceitar.handoffId);
+    expect(depois).not.toContain(devolver.handoffId);
+    // No aceite, o vendedor da equipe vira o responsável: o gestor passa a ver o negócio pela RLS normal.
+    expect((await u.gestorDest.cliente.from("negocios").select("id").eq("id", aceitar.negocioId)).data).toHaveLength(1);
+    // Na devolução, o negócio fica com o SDR: o gestor do destinatário continua sem vê-lo.
+    expect((await u.gestorDest.cliente.from("negocios").select("id").eq("id", devolver.negocioId)).data).toEqual([]);
+  });
+
+  it("anônimo não executa a função", async () => {
+    const { createClient } = await import("@supabase/supabase-js");
+    const anon = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { auth: { persistSession: false } });
+    const { data, error } = await anon.rpc("oportunidades_pendentes_equipe", { p_empresa_id: empresa });
+    expect(error).not.toBeNull();
+    expect(data).toBeNull();
   });
 });

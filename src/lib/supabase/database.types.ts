@@ -3856,6 +3856,33 @@ export type Database = {
           venda_alterada_em: string;
         }[];
       };
+      oportunidades_pendentes_equipe: {
+        Args: { p_empresa_id: string };
+        Returns: {
+          busca_financiamento: boolean;
+          contato_cidade: string;
+          contato_nome: string;
+          contato_uf: string;
+          destinatario_nome: string;
+          distribuidora: string;
+          e_decisor: boolean;
+          enviado_em: string;
+          handoff_id: string;
+          imovel_proprio: boolean;
+          negocio_id: string;
+          negocio_numero: number;
+          negocio_titulo: string;
+          objetivo: string;
+          orcamento_outra_empresa: boolean;
+          outro_decisor: boolean;
+          possui_conta_energia: boolean;
+          prazo_instalacao: string;
+          sdr_nome: string;
+          status_qualificacao: string;
+          telefone_informado: boolean;
+          tipo_cliente: string;
+        }[];
+      };
       pode_responder_handoff: { Args: { p_handoff_id: string }; Returns: boolean };
       pode_ver_avatar: { Args: { p_pasta: string }; Returns: boolean };
       pode_ver_contato: { Args: { p_contato_id: string }; Returns: boolean };

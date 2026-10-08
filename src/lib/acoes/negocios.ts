@@ -319,6 +319,7 @@ export async function aceitarHandoff(_: ResultadoAcao, formData: FormData): Prom
   if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível aceitar.") };
 
   revalidatePath(`/negocios/${dados.data.negocioId}`);
+  revalidatePath("/painel");
   return { ok: true, mensagem: "Oportunidade aceita." };
 }
 
@@ -337,6 +338,7 @@ export async function devolverHandoff(_: ResultadoAcao, formData: FormData): Pro
   if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível devolver.") };
 
   revalidatePath(`/negocios/${dados.data.negocioId}`);
+  revalidatePath("/painel");
   return { ok: true, mensagem: "Oportunidade devolvida." };
 }
 
