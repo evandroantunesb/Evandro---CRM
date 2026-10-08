@@ -340,13 +340,15 @@ async function restaurarKit(supabase: SupabaseServidor, negocioId: string, antig
   const idsAtuais = new Set(atuais.map((a) => a.id));
   const sobrando = atuais.filter((a) => !idsAntigos.has(a.id)).map((a) => a.id);
   const faltando = antigos.filter((a) => !idsAtuais.has(a.id));
-  if (sobrando.length) {
-    const { data, error: erro } = await supabase.from("kit_componentes").delete().in("id", sobrando).select("id");
-    if (erro || data?.length !== sobrando.length) return false;
-  }
+  // Reinsere antes de apagar: o kit nunca fica vazio no meio do caminho (com cálculo salvo,
+  // o banco recusa kit vazio — kit_com_calculo_nao_esvazia).
   if (faltando.length) {
     const { error: erro } = await supabase.from("kit_componentes").insert(faltando);
     if (erro) return false;
+  }
+  if (sobrando.length) {
+    const { data, error: erro } = await supabase.from("kit_componentes").delete().in("id", sobrando).select("id");
+    if (erro || data?.length !== sobrando.length) return false;
   }
   return true;
 }

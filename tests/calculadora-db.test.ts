@@ -100,6 +100,11 @@ describe("kits", () => {
 
 describe("cálculo do negócio", () => {
   it("vendedor calcula e o resultado fica preso ao negócio (upsert por negócio)", async () => {
+    // Cálculo só é criado com kit montado (calculos_solares_exige_kit).
+    const { error: erroKit } = await servico
+      .from("kit_componentes")
+      .insert({ empresa_id: empresa, negocio_id: negocio, tipo: "modulo", descricao: "Módulo 550 W", potencia_w: 550, quantidade: 11, ordem: 0 });
+    expect(erroKit).toBeNull();
     const { error } = await vendedor1.cliente.from("calculos_solares").insert({
       empresa_id: empresa,
       negocio_id: negocio,
