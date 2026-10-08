@@ -6,8 +6,9 @@
 --   - gestor ativo que gerencia uma equipe ativa da qual o destinatário faz parte.
 -- O gestor que acompanha só o SDR remetente (sem gerenciar o destinatário) não responde.
 --
--- Única mudança nas duas funções: a checagem de permissão passa a usar
--- pode_responder_handoff(). O resto é cópia literal das versões vigentes
+-- Mudanças nas duas funções: a checagem de permissão passa a usar pode_responder_handoff(),
+-- e o retorno sai sem qualificacao_snapshot e observacoes (sanitizado só na variável local;
+-- nenhum consumidor usa esses campos). O resto é cópia literal das versões vigentes
 -- (aceitar_handoff: 20261001220000_gamificacao_contrato_sdr; devolver_handoff:
 -- 20261001200000_gamificacao_handoff_fechamento) — histórico, notificações, eventos,
 -- perfil congelado, handoff_origem_id e troca de responsável ficam iguais.
@@ -96,6 +97,11 @@ begin
               v_perfil_sdr);
   end if;
 
+  -- Retorno sanitizado (só a variável local; o registro gravado não muda): quem responde pode
+  -- ser o gestor do destinatário sem acesso ao negócio, então campos livres e o snapshot da
+  -- qualificação não saem por aqui (mesmo critério de oportunidades_pendentes_equipe).
+  v_handoff.qualificacao_snapshot := '{}'::jsonb;
+  v_handoff.observacoes := null;
   return v_handoff;
 end;
 $$;
@@ -147,6 +153,11 @@ begin
               'Sua oportunidade foi devolvida: ' || v_motivo, '/negocios/' || v_handoff.negocio_id);
   end if;
 
+  -- Retorno sanitizado (só a variável local; o registro gravado não muda): quem responde pode
+  -- ser o gestor do destinatário sem acesso ao negócio, então campos livres e o snapshot da
+  -- qualificação não saem por aqui (mesmo critério de oportunidades_pendentes_equipe).
+  v_handoff.qualificacao_snapshot := '{}'::jsonb;
+  v_handoff.observacoes := null;
   return v_handoff;
 end;
 $$;

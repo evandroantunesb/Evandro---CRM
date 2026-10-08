@@ -29,6 +29,8 @@ export default async function Painel() {
     criarClienteServidor().then((supabase) => supabase.rpc("oportunidades_pendentes_equipe", { p_empresa_id: atual.empresaId })),
   ]);
   const oportunidadesPendentes: OportunidadePendente[] = pendentes.data ?? [];
+  // Falha na consulta não pode parecer "nenhuma pendência": o cartão avisa, sem detalhes internos.
+  if (pendentes.error) console.error("Painel: falha ao carregar oportunidades pendentes", pendentes.error.code);
   const vendedores = config.membros.filter((m) => m.ativo && m.papel === "vendedor");
   const agora = new Date();
 
@@ -53,6 +55,12 @@ export default async function Painel() {
           </span>
           <span className="shrink-0 font-medium text-dourado">Distribuir →</span>
         </Link>
+      )}
+
+      {pendentes.error && (
+        <Cartao titulo="Oportunidades aguardando aceite">
+          <p className="text-sm text-zinc-600">Não foi possível carregar as oportunidades aguardando aceite agora. Atualize a página em instantes.</p>
+        </Cartao>
       )}
 
       {oportunidadesPendentes.length > 0 && (

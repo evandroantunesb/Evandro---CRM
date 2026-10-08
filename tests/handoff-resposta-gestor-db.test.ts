@@ -438,3 +438,42 @@ describe("oportunidades_pendentes_equipe (lista restrita do Painel)", () => {
     expect(data).toBeNull();
   });
 });
+
+describe("retorno das RPCs de aceite e devolução sem dados confidenciais", () => {
+  const SNAPSHOT = {
+    tipo_cliente: "residencial",
+    objetivo: "Objetivo confidencial do cliente",
+    e_decisor: false,
+    outro_decisor: true,
+    participantes_decisao: "Terceiro Confidencial da Silva",
+  };
+  const OBSERVACAO = "Observação confidencial do SDR";
+  const PROIBIDOS = ["Objetivo confidencial", "Terceiro Confidencial", "Observação confidencial"];
+
+  for (const acao of ["aceitar", "devolver"] as const) {
+    it.each(["gestorDest", "closer", "admin"] as Nome[])(`${acao} por %s: retorno sem snapshot nem observações; registro gravado intacto`, async (n) => {
+      const { negocioId, handoffId } = await handoffPendente(`Retorno ${acao} ${n}`, { snapshot: SNAPSHOT, observacoes: OBSERVACAO });
+      if (n === "gestorDest") {
+        // Gestor só do destinatário: sem acesso normal ao negócio nem ao handoff.
+        expect((await u.gestorDest.cliente.from("negocios").select("id").eq("id", negocioId)).data).toEqual([]);
+        expect((await u.gestorDest.cliente.from("handoffs").select("id").eq("id", handoffId)).data).toEqual([]);
+      }
+      const { data, error } =
+        acao === "aceitar"
+          ? await u[n].cliente.rpc("aceitar_handoff", { p_handoff_id: handoffId })
+          : await u[n].cliente.rpc("devolver_handoff", { p_handoff_id: handoffId, p_motivo: "Fora do perfil" });
+      expect(error).toBeNull();
+      // Campos que os consumidores usam continuam no retorno.
+      expect(data).toMatchObject({ id: handoffId, status: acao === "aceitar" ? "aceito" : "devolvido", respondido_por: membro[n] });
+      if (acao === "devolver") expect(data!.motivo_devolucao).toBe("Fora do perfil");
+      expect(data!.qualificacao_snapshot).toEqual({});
+      expect(data!.observacoes).toBeNull();
+      const texto = JSON.stringify(data);
+      for (const proibido of PROIBIDOS) expect(texto, proibido).not.toContain(proibido);
+
+      // A sanitização é só do retorno: o registro gravado não muda.
+      const { data: gravado } = await servico.from("handoffs").select("qualificacao_snapshot, observacoes").eq("id", handoffId).single();
+      expect(gravado).toEqual({ qualificacao_snapshot: SNAPSHOT, observacoes: OBSERVACAO });
+    });
+  }
+});
