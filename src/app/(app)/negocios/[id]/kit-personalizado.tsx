@@ -13,6 +13,7 @@ import {
   sugerirQuantidadeModulos,
 } from "@/lib/calculadora";
 import { formatarMoeda } from "@/lib/formatacao";
+import { estadoSalvoDoKit } from "@/lib/kit-formulario";
 import { MENSAGEM_REMOCAO_COM_CALCULO } from "@/lib/negocio-dados";
 import { ROTULO_TIPO_COMPONENTE_KIT, ROTULO_TIPO_LIGACAO, TIPOS_LIGACAO, type TipoComponenteKit, type TipoLigacao } from "@/lib/tipos";
 
@@ -90,37 +91,32 @@ export function KitPersonalizado({
     if (resultado?.ok) setEditando(false);
   }
 
-  const linhasSalvas = () =>
-    componentesSalvos.map((c) => ({
-      tipo: c.tipo,
-      descricao: c.descricao,
-      potenciaW: c.potenciaW != null ? numeroBr(c.potenciaW) : "",
-      quantidade: String(c.quantidade),
-    }));
-  const consumoSalvo = () => (calculo ? numeroBr(calculo.consumoMedioKwh) : consumoMedioKwhPadrao != null ? numeroBr(consumoMedioKwhPadrao) : "");
+  // Sempre a partir do que está gravado: ao abrir e no Cancelar.
+  const salvo = () =>
+    estadoSalvoDoKit({ componentesSalvos, calculo, estruturaTelhado, consumoMedioKwhPadrao, valorFaturaMedioPadrao });
+  const [linhas, setLinhas] = useState<LinhaComponente[]>(() => salvo().linhas);
+  const [estrutura, setEstrutura] = useState(() => salvo().estrutura);
+  const [tipoLigacao, setTipoLigacao] = useState<TipoLigacao>(() => salvo().tipoLigacao);
+  const [consumoMedioKwh, setConsumoMedioKwh] = useState(() => salvo().consumoMedioKwh);
   // Ao reabrir, vem o valor da conta já salvo no cálculo (antes vinha vazio e se perdia ao salvar de novo).
-  const faturaSalva = () => {
-    const salvo = calculo ? calculo.valorFaturaMedio : valorFaturaMedioPadrao;
-    return salvo != null ? numeroBr(salvo) : "";
-  };
-  const [linhas, setLinhas] = useState<LinhaComponente[]>(linhasSalvas);
-  const [estrutura, setEstrutura] = useState(estruturaTelhado ?? "");
-  const [tipoLigacao, setTipoLigacao] = useState<TipoLigacao>(calculo?.tipoLigacao ?? "trifasico");
-  const [consumoMedioKwh, setConsumoMedioKwh] = useState(consumoSalvo);
-  const [valorFaturaMedio, setValorFaturaMedio] = useState(faturaSalva);
-  const [tarifaKwh, setTarifaKwh] = useState(calculo ? numeroBr(calculo.tarifaKwh) : "");
+  const [valorFaturaMedio, setValorFaturaMedio] = useState(() => salvo().valorFaturaMedio);
+  const [tarifaKwh, setTarifaKwh] = useState(() => salvo().tarifaKwh);
   const [confirmaRemocao, setConfirmaRemocao] = useState(false);
   // Muda a cada Cancelar para recriar o campo de observações (não controlado) com o valor salvo.
   const [versaoObservacoes, setVersaoObservacoes] = useState(0);
 
-  /** Cancelar: não grava nada; só descarta o que foi mexido na tela e volta ao que está salvo. */
+  /**
+   * Cancelar: não grava nem apaga nada no banco; só descarta o que foi mexido na tela e volta ao
+   * que está salvo. Na primeira montagem (nada salvo), limpa os itens não gravados.
+   */
   function cancelarEdicao() {
-    setLinhas(linhasSalvas());
-    setEstrutura(estruturaTelhado ?? "");
-    setTipoLigacao(calculo?.tipoLigacao ?? "trifasico");
-    setConsumoMedioKwh(consumoSalvo());
-    setValorFaturaMedio(faturaSalva());
-    setTarifaKwh(calculo ? numeroBr(calculo.tarifaKwh) : "");
+    const s = salvo();
+    setLinhas(s.linhas);
+    setEstrutura(s.estrutura);
+    setTipoLigacao(s.tipoLigacao);
+    setConsumoMedioKwh(s.consumoMedioKwh);
+    setValorFaturaMedio(s.valorFaturaMedio);
+    setTarifaKwh(s.tarifaKwh);
     setConfirmaRemocao(false);
     setVersaoObservacoes((v) => v + 1);
     if (calculo) setEditando(false);
@@ -368,11 +364,10 @@ export function KitPersonalizado({
         <Botao type="submit" disabled={pendente || (removendoKitSalvo && (!!calculo || !confirmaRemocao))}>
           {pendente ? "Salvando..." : removendoKitSalvo ? "Remover kit salvo" : numero(tarifaKwh) ? "Salvar kit e calcular" : "Salvar kit"}
         </Botao>
-        {(calculo || componentesSalvos.length > 0) && (
-          <Botao type="button" variante="secundario" onClick={cancelarEdicao}>
-            Cancelar
-          </Botao>
-        )}
+        {/* Sempre disponível, inclusive na primeira montagem. */}
+        <Botao type="button" variante="secundario" onClick={cancelarEdicao}>
+          Cancelar
+        </Botao>
       </div>
       <Mensagem resultado={resultado} />
     </form>

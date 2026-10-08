@@ -15,6 +15,7 @@ import {
   prepararEnvioCriacao,
   problemaArquivo,
 } from "@/lib/anexos-regras";
+import { estadoSalvoDoKit } from "@/lib/kit-formulario";
 import { AVISOS_CRIACAO, avisosDaUrl, completarContato, montarEndereco } from "@/lib/negocio-dados";
 
 const fonte = (...partes: string[]) => readFileSync(join(__dirname, "..", ...partes), "utf8");
@@ -238,9 +239,65 @@ describe("regressões de tela", () => {
     const inicio = kit.indexOf("function cancelarEdicao(");
     const cancelar = kit.slice(inicio, kit.indexOf("\n  }\n", inicio));
     expect(cancelar).not.toMatch(/\bacao\(|\benviar\(|salvarKitPersonalizado/);
-    expect(cancelar).toContain("setLinhas(linhasSalvas())");
-    expect(cancelar).toContain("setTarifaKwh(");
-    expect(kit).toContain('<Botao type="button" variante="secundario" onClick={cancelarEdicao}>');
+    // Volta ao estado gravado (mesma função usada ao abrir o cartão).
+    expect(cancelar).toContain("const s = salvo();");
+    for (const campo of ["setLinhas(s.linhas)", "setEstrutura(s.estrutura)", "setTipoLigacao(s.tipoLigacao)", "setTarifaKwh(s.tarifaKwh)"]) {
+      expect(cancelar).toContain(campo);
+    }
+    expect(kit).toContain("estadoSalvoDoKit({ componentesSalvos, calculo, estruturaTelhado, consumoMedioKwhPadrao, valorFaturaMedioPadrao })");
+    // Cancelar sempre visível, inclusive na primeira montagem (sem condição em volta do botão).
+    const botao = kit.indexOf('<Botao type="button" variante="secundario" onClick={cancelarEdicao}>');
+    expect(botao).toBeGreaterThan(-1);
+    expect(kit.slice(botao - 200, botao)).not.toMatch(/&&\s*\(\s*$/);
+  });
+
+  describe("estado salvo do kit (usado ao abrir e no Cancelar)", () => {
+    const base = { estruturaTelhado: null, consumoMedioKwhPadrao: 450, valorFaturaMedioPadrao: 320 };
+
+    it("primeira montagem (nada salvo): Cancelar limpa os itens e mantém os dados do negócio", () => {
+      expect(estadoSalvoDoKit({ ...base, componentesSalvos: [], calculo: null })).toEqual({
+        linhas: [],
+        estrutura: "",
+        tipoLigacao: "trifasico",
+        consumoMedioKwh: "450",
+        valorFaturaMedio: "320",
+        tarifaKwh: "",
+      });
+    });
+
+    it("kit salvo com cálculo: Cancelar restaura exatamente o que está gravado", () => {
+      const estado = estadoSalvoDoKit({
+        componentesSalvos: [
+          { tipo: "modulo", descricao: "Módulo 550 W", potenciaW: 550, quantidade: 10 },
+          { tipo: "inversor", descricao: "Inversor 5 kW", potenciaW: 5000, quantidade: 1 },
+        ],
+        calculo: { tipoLigacao: "bifasico", consumoMedioKwh: 480.5, valorFaturaMedio: 300, tarifaKwh: 0.9512 },
+        estruturaTelhado: "gancho",
+        consumoMedioKwhPadrao: 450,
+        valorFaturaMedioPadrao: 320,
+      });
+      expect(estado).toEqual({
+        linhas: [
+          { tipo: "modulo", descricao: "Módulo 550 W", potenciaW: "550", quantidade: "10" },
+          { tipo: "inversor", descricao: "Inversor 5 kW", potenciaW: (5000).toLocaleString("pt-BR"), quantidade: "1" },
+        ],
+        estrutura: "gancho",
+        tipoLigacao: "bifasico",
+        consumoMedioKwh: (480.5).toLocaleString("pt-BR"),
+        valorFaturaMedio: "300",
+        tarifaKwh: (0.9512).toLocaleString("pt-BR", { maximumFractionDigits: 2 }),
+      });
+    });
+
+    it("kit salvo sem cálculo: itens gravados, consumo e conta do negócio", () => {
+      const estado = estadoSalvoDoKit({
+        ...base,
+        componentesSalvos: [{ tipo: "modulo", descricao: "Módulo 600 W", potenciaW: null, quantidade: 8 }],
+        calculo: null,
+      });
+      expect(estado.linhas).toEqual([{ tipo: "modulo", descricao: "Módulo 600 W", potenciaW: "", quantidade: "8" }]);
+      expect(estado).toMatchObject({ consumoMedioKwh: "450", valorFaturaMedio: "320", tarifaKwh: "" });
+    });
   });
 
   it("ficha: remover kit salvo pede confirmação; com cálculo, a tela explica a recusa", () => {
@@ -254,7 +311,8 @@ describe("regressões de tela", () => {
 
   it("kit reaberto traz o valor da conta salvo no cálculo", () => {
     const kit = fonte("src", "app", "(app)", "negocios", "[id]", "kit-personalizado.tsx");
-    expect(kit).toContain("calculo ? calculo.valorFaturaMedio : valorFaturaMedioPadrao");
+    // O estado inicial vem de `estadoSalvoDoKit`, que usa a conta salva no cálculo (testado acima).
+    expect(kit).toContain("useState(() => salvo().valorFaturaMedio)");
     expect(fonte("src", "app", "(app)", "negocios", "[id]", "page.tsx")).toMatch(/valorFaturaMedio: calculo\.valor_fatura_medio/);
   });
 
