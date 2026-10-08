@@ -1,7 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import { ANEXOS_CRIACAO, problemaArquivo } from "@/lib/anexos-regras";
-import { arquivoMetaSchema, reservarAnexosComCliente, type Reserva } from "@/lib/anexos-servidor";
+import { arquivoMetaSchema } from "@/lib/anexos-servidor";
 import { componentesJsonSchema, nomeKitPersonalizado, potenciaKitPersonalizadoKwp, type ComponenteKit } from "@/lib/calculadora";
 import { montarLinhaCalculo } from "@/lib/calculo-servidor";
 import { mensagemErro } from "@/lib/erros";
@@ -54,7 +54,10 @@ const ufOpcional = z
   .optional()
   .transform((v) => (v ? v.toUpperCase().slice(0, 2) : null));
 
-/** Dados dos arquivos do cadastro (o conteúdo vai direto do navegador ao Storage, nunca pela ação). */
+/**
+ * Dados dos arquivos do cadastro, só para recusar vazio ou grande demais antes de criar qualquer
+ * coisa. O conteúdo vai depois, direto do navegador ao Storage, nunca pela ação.
+ */
 const anexosCriacaoSchema = z
   .string()
   .default("[]")
@@ -103,9 +106,9 @@ const esquemaNovo = z.object({
   anexos: anexosCriacaoSchema,
 });
 
-/** `reservas[i]` é o caminho no Storage do i-ésimo arquivo de `anexos` (vazio se a reserva falhou). */
+/** Os arquivos vão depois, do navegador direto ao Storage (`enviarArquivos`), para `empresaId/negocioId`. */
 export type ResultadoCriacao =
-  | { ok: true; negocioId: string; avisos: AvisoCriacao[]; reservas: Reserva[] }
+  | { ok: true; negocioId: string; empresaId: string; avisos: AvisoCriacao[] }
   | { ok: false; mensagem: string; contatoId?: string };
 
 async function inserirItensKit(supabase: SupabaseServidor, empresaId: string, negocioId: string, componentes: ComponenteKit[]) {
@@ -244,20 +247,7 @@ export async function criarNegocioComCliente(supabase: SupabaseServidor, atual: 
     }
   }
 
-  // Anexos: só o registro é reservado aqui; o navegador envia o conteúdo direto ao Storage
-  // (sem passar pelo limite de 1 MB das Server Actions). Registro sem arquivo = pendente na ficha.
-  let reservas: Reserva[] = [];
-  if (d.anexos.length) {
-    const reserva = await reservarAnexosComCliente(supabase, {
-      empresaId: atual.empresaId,
-      negocioId: negocio.id,
-      arquivos: d.anexos.map((a) => ({ ...a, categoria: ANEXOS_CRIACAO.find((c) => c.campo === a.campo)!.categoria })),
-    });
-    if (reserva.ok) reservas = reserva.reservas;
-    else avisos.push("anexos");
-  }
-
-  return { ok: true, negocioId: negocio.id, avisos, reservas };
+  return { ok: true, negocioId: negocio.id, empresaId: atual.empresaId, avisos };
 }
 
 // A etapa não é editada aqui: mudar de etapa é só pelo "Mover etapa"/Kanban (`moverEtapa`),
@@ -276,7 +266,7 @@ const esquemaEdicao = z.object({
   valor_conta_energia: numeroBrOpcional,
 });
 
-/** Salva "Dados do negócio". A fatura escolhida no formulário vai depois, direto ao Storage (ver `reservarAnexos`). */
+/** Salva "Dados do negócio". A fatura escolhida no formulário vai depois, direto ao Storage (ver `enviarArquivos`). */
 export async function editarNegocioComCliente(
   supabase: SupabaseServidor,
   atual: Atual,

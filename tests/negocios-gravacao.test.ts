@@ -6,7 +6,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { arquivosEscolhidos, LIMITE_ANEXO, prepararEnvioCriacao, problemaArquivo } from "@/lib/anexos-regras";
+import { arquivosEscolhidos, LIMITE_ANEXO, nomeDoObjeto, prepararEnvioCriacao, problemaArquivo } from "@/lib/anexos-regras";
 import { AVISOS_CRIACAO, avisosDaUrl, completarContato, montarEndereco } from "@/lib/negocio-dados";
 
 const fonte = (...partes: string[]) => readFileSync(join(__dirname, "..", ...partes), "utf8");
@@ -65,6 +65,18 @@ describe("arquivos fora da Server Action", () => {
     expect(arquivosEscolhidos(f, "anexo_geral").map((a) => a.name)).toEqual(["vazio.png", "ok.png"]);
   });
 
+  it("nome legível de arquivo no Storage tira o prefixo uuid", () => {
+    expect(nomeDoObjeto("0f8fad5b-d9cb-469f-a165-70867728950e-conta-luz.pdf")).toBe("conta-luz.pdf");
+    expect(nomeDoObjeto("sem-prefixo.pdf")).toBe("sem-prefixo.pdf");
+  });
+
+  it("envio do navegador registra só depois de o arquivo chegar (linha do tempo fiel)", () => {
+    const envio = fonte("src", "lib", "anexos-navegador.ts");
+    expect(envio.indexOf(".upload(")).toBeGreaterThan(-1);
+    expect(envio.indexOf(".upload(")).toBeLessThan(envio.indexOf("await registrar("));
+    expect(fonte("src", "lib", "negocios-gravacao.ts")).not.toMatch(/from\("anexos"\)/);
+  });
+
   it("recusa vazio e acima de 20 MB", () => {
     expect(problemaArquivo({ nome: "a.png", tamanho: 0 })).toContain("vazio");
     expect(problemaArquivo({ nome: "a.png", tamanho: LIMITE_ANEXO + 1 })).toContain("20 MB");
@@ -92,9 +104,9 @@ describe("arquivos fora da Server Action", () => {
     const formulario = fonte("src", "app", "(app)", "negocios", "novo", "formulario.tsx");
     const edicao = fonte("src", "app", "(app)", "negocios", "[id]", "edicao.tsx");
     expect(formulario).toContain("prepararEnvioCriacao(new FormData(evento.currentTarget))");
-    expect(formulario).toContain("enviarArquivosReservados(");
+    expect(formulario).toContain("enviarArquivos(");
     expect(edicao).toContain('formulario.delete("anexo_fatura_energia")');
-    expect(edicao).toContain("enviarArquivosReservados(");
+    expect(edicao).toContain("enviarArquivos(");
     expect(fonte("src", "lib", "negocios-gravacao.ts")).not.toMatch(/instanceof File|\.upload\(/);
   });
 });
@@ -146,10 +158,11 @@ describe("regressões de tela", () => {
     expect(editar).not.toMatch(/etapa_id|status:/);
   });
 
-  it("ficha marca arquivo registrado que não chegou ao Storage", () => {
+  it("ficha confere o Storage e avisa quando não conseguiu conferir", () => {
     const ficha = fonte("src", "app", "(app)", "negocios", "[id]", "page.tsx");
-    expect(ficha).toContain("anexosNaoRecebidos(supabase, negocio.empresa_id, id, anexos ?? [])");
-    expect(ficha).toContain("naoRecebidos.has(a.id)");
+    expect(ficha).toContain("conferirArquivos(supabase, negocio.empresa_id, id, anexos ?? [])");
+    expect(ficha).toContain("!conferencia.conferido");
+    expect(ficha).toContain("<RegistrarArquivo");
   });
 
   it("kit reaberto traz o valor da conta salvo no cálculo", () => {

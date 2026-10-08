@@ -6,28 +6,15 @@ import { exigirPapel } from "@/lib/sessao";
 import { ANEXOS_E_NOTAS } from "@/lib/permissoes";
 import { criarClienteAdmin } from "@/lib/supabase/admin";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { reservarAnexosComCliente, reservaSchema, type Reserva } from "@/lib/anexos-servidor";
+import { problemaArquivo } from "@/lib/anexos-regras";
 import { CATEGORIAS_ANEXO, type ResultadoAcao } from "@/lib/tipos";
 
 /**
- * Reserva o registro dos arquivos de um negócio e devolve os caminhos para o navegador enviar o
- * conteúdo direto ao Storage (arquivo não passa pela Server Action, limitada a 1 MB). Usado pela
- * fatura do formulário "Dados do negócio".
+ * O arquivo já foi enviado pelo navegador direto para o Storage; aqui só registramos (é este
+ * registro que aparece como "anexo adicionado" na linha do tempo). Usado pelo cartão Arquivos,
+ * pelo cadastro do negócio, pela fatura de "Dados do negócio" e para registrar um arquivo que
+ * chegou sem registro.
  */
-export async function reservarAnexos(
-  negocioId: string,
-  arquivos: { nome: string; tamanho: number; tipoMime: string; categoria: string }[],
-): Promise<{ ok: true; reservas: Reserva[] } | { ok: false; mensagem: string }> {
-  const { atual } = await exigirPapel(...ANEXOS_E_NOTAS);
-  const d = z.object({ negocioId: z.string().uuid(), arquivos: z.array(reservaSchema).min(1).max(30) }).safeParse({ negocioId, arquivos });
-  if (!d.success) return { ok: false, mensagem: "Dados do arquivo inválidos." };
-  const supabase = await criarClienteServidor();
-  const r = await reservarAnexosComCliente(supabase, { empresaId: atual.empresaId, negocioId: d.data.negocioId, arquivos: d.data.arquivos });
-  revalidatePath(`/negocios/${d.data.negocioId}`);
-  return r;
-}
-
-/** O arquivo já foi enviado pelo navegador direto para o Storage; aqui só registramos. */
 export async function registrarAnexo(dados: {
   negocioId: string;
   caminho: string;
@@ -50,6 +37,9 @@ export async function registrarAnexo(dados: {
   if (!d.success || !d.data.caminho.startsWith(`${atual.empresaId}/${d.data.negocioId}/`)) {
     return { ok: false, mensagem: "Dados do arquivo inválidos." };
   }
+  // Vazio ou acima de 20 MB nunca vira registro (o bucket também recusa acima do limite).
+  const problema = problemaArquivo({ nome: d.data.nome, tamanho: d.data.tamanho });
+  if (problema) return { ok: false, mensagem: problema };
 
   const supabase = await criarClienteServidor();
   const { error } = await supabase.from("anexos").insert({

@@ -1,8 +1,8 @@
 /**
  * Regras de anexos usadas no navegador e no servidor. Arquivo nunca passa por Server Action
- * (limite padrão de 1 MB do corpo): a ação só recebe os dados do arquivo (nome, tamanho,
- * tipo), reserva o registro em `anexos` e o navegador envia o conteúdo direto ao Storage.
- * Registro sem arquivo no Storage = envio que não chegou (aparece como pendente na ficha).
+ * (limite padrão de 1 MB do corpo): o navegador envia o conteúdo direto ao Storage e só depois
+ * registra em `anexos` (`registrarAnexo`) — a linha do tempo diz "anexo adicionado" só para
+ * arquivo que chegou. Arquivo no Storage sem registro aparece na ficha para ser registrado.
  */
 import type { CategoriaAnexo } from "@/lib/tipos";
 
@@ -46,6 +46,14 @@ export function nomeSeguro(nome: string) {
     .replace(/[^a-zA-Z0-9._-]+/g, "-")
     .slice(-80);
   return `${crypto.randomUUID()}-${limpo || "arquivo"}`;
+}
+
+/** Caminho no Storage: sempre dentro da pasta da empresa e do negócio (as políticas exigem isso). */
+export const caminhoAnexo = (empresaId: string, negocioId: string, nome: string) => `${empresaId}/${negocioId}/${nomeSeguro(nome)}`;
+
+/** Nome legível de um objeto do Storage (tira o prefixo `uuid-` de `nomeSeguro`). */
+export function nomeDoObjeto(objeto: string): string {
+  return objeto.replace(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-/i, "") || objeto;
 }
 
 /**

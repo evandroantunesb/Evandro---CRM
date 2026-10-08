@@ -4,7 +4,7 @@ import { ListaTarefas } from "@/components/lista-tarefas";
 import { MoverEtapa } from "@/components/mover-etapa";
 import { NovaTarefa } from "@/components/nova-tarefa";
 import { Cartao, Selo } from "@/components/ui";
-import { anexosNaoRecebidos } from "@/lib/anexos-servidor";
+import { conferirArquivos } from "@/lib/anexos-servidor";
 import { AVISOS_CRIACAO, avisosDaUrl } from "@/lib/negocio-dados";
 import { apagarAnexo } from "@/lib/acoes/anexos";
 import { alternarEtiqueta } from "@/lib/acoes/negocios";
@@ -28,6 +28,7 @@ import { Contrato } from "./contrato";
 import { EdicaoNegocio } from "./edicao";
 import { EnviarAnexo } from "./enviar-anexo";
 import { Fechamento } from "./fechamento";
+import { RegistrarArquivo } from "./registrar-arquivo";
 import { FeedbackHandoff } from "./feedback-handoff";
 import { HandoffAceite } from "./handoff-aceite";
 import { KitPersonalizado } from "./kit-personalizado";
@@ -95,8 +96,10 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
         .maybeSingle(),
     ]);
 
-  // Registro sem arquivo no Storage: envio que não chegou (o navegador fechou, a rede caiu...).
-  const naoRecebidos = await anexosNaoRecebidos(supabase, negocio.empresa_id, id, anexos ?? []);
+  // Confere a pasta no Storage: arquivo que chegou sem registro (envio parou no meio) e registro
+  // sem arquivo. Se não der para conferir, a ficha diz isso em vez de esconder a pendência.
+  const conferencia = await conferirArquivos(supabase, negocio.empresa_id, id, anexos ?? []);
+  const semArquivo = conferencia.conferido ? conferencia.semArquivo : new Set<string>();
 
   const { data: componentes } = await supabase
     .from("kit_componentes")
@@ -236,10 +239,15 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
           </Link>
         </div>
       )}
-      {naoRecebidos.size > 0 && !avisos.includes("anexos") && (
+      {!conferencia.conferido && (
         <p role="alert" className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          {naoRecebidos.size === 1 ? "1 arquivo registrado não chegou" : `${naoRecebidos.size} arquivos registrados não chegaram`}. Veja
-          em Arquivos: remova e envie de novo.
+          Não foi possível conferir os arquivos deste negócio agora. Pode haver arquivo enviado pela metade; recarregue a
+          página para conferir de novo.
+        </p>
+      )}
+      {conferencia.conferido && (conferencia.semRegistro.length > 0 || semArquivo.size > 0) && (
+        <p role="alert" className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          Há arquivos com envio incompleto. Veja em Arquivos.
         </p>
       )}
 
@@ -247,6 +255,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
         <div className="flex flex-col gap-4">
           <Cartao titulo="Dados do negócio">
             <EdicaoNegocio
+              empresaId={negocio.empresa_id}
               negocio={{
                 id: negocio.id,
                 titulo: negocio.titulo,
@@ -556,7 +565,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
                   key={a.id}
                   className="flex items-center gap-2 border-t border-zinc-100 py-2 text-sm first:border-t-0"
                 >
-                  {naoRecebidos.has(a.id) ? (
+                  {semArquivo.has(a.id) ? (
                     <span className="min-w-0 flex-1 truncate text-zinc-500">
                       {a.nome} <Selo tom="negativo">não recebido</Selo>
                     </span>
@@ -581,6 +590,20 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
                 </li>
               ))}
             </ul>
+            {conferencia.conferido && conferencia.semRegistro.length > 0 && (
+              <div className="mb-3 flex flex-col gap-1 rounded-md bg-amber-50 p-2 text-sm text-amber-900">
+                <p className="text-xs">Arquivos que chegaram mas não foram registrados (o envio parou no meio):</p>
+                <ul className="flex flex-col">
+                  {conferencia.semRegistro.map((o) => (
+                    <li key={o.caminho} className="flex items-center gap-2 py-1">
+                      <span className="min-w-0 flex-1 truncate">{o.nome}</span>
+                      <span className="text-xs text-zinc-500">{tamanhoLegivel(o.tamanho)}</span>
+                      <RegistrarArquivo negocioId={negocio.id} arquivo={o} />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <EnviarAnexo empresaId={atual.empresaId} negocioId={negocio.id} />
           </Cartao>
         </div>

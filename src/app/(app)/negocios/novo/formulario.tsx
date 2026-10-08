@@ -7,8 +7,9 @@ import { CampoArquivo } from "@/components/campo-arquivo";
 import { EditorComponentesKit, linhasParaComponentes, type LinhaComponente } from "@/components/kit-componentes";
 import { Botao, Campo, Mensagem, Selecao, Selo } from "@/components/ui";
 import { buscarContatos, criarNegocio, verificarDuplicado, type Duplicado } from "@/lib/acoes/negocios";
-import { enviarArquivosReservados } from "@/lib/anexos-navegador";
-import { prepararEnvioCriacao } from "@/lib/anexos-regras";
+import { registrarAnexo } from "@/lib/acoes/anexos";
+import { enviarArquivos } from "@/lib/anexos-navegador";
+import { ANEXOS_CRIACAO, prepararEnvioCriacao } from "@/lib/anexos-regras";
 import {
   calcular,
   custosInternosEstimados,
@@ -312,7 +313,7 @@ export function FormularioNegocio({
   /**
    * Envio sem o reset automático (nada do que foi digitado se perde se o servidor recusar).
    * Os arquivos não vão para a ação (limite de 1 MB): depois de criar o negócio, cada um vai
-   * direto ao Storage no caminho reservado; o que não chegar fica pendente na ficha.
+   * direto ao Storage e só então é registrado; o que falhar vira aviso na ficha.
    */
   function enviar(evento: React.FormEvent<HTMLFormElement>) {
     evento.preventDefault();
@@ -331,13 +332,15 @@ export function FormularioNegocio({
         return;
       }
       const avisos = [...r.avisos];
-      if (r.reservas.length) {
+      if (arquivos.length) {
         setEnviandoArquivos(true);
-        const falhas = await enviarArquivosReservados(
+        const falhas = await enviarArquivos(
           criarClienteNavegador(),
-          r.reservas.map((reserva, i) => ({ caminho: reserva.caminho, arquivo: arquivos[i].arquivo })),
+          registrarAnexo,
+          { empresaId: r.empresaId, negocioId: r.negocioId },
+          arquivos.map((a) => ({ arquivo: a.arquivo, categoria: ANEXOS_CRIACAO.find((c) => c.campo === a.campo)!.categoria })),
         );
-        if (falhas.length && !avisos.includes("anexos")) avisos.push("anexos");
+        if (falhas.length) avisos.push("anexos");
       }
       router.push(`/negocios/${r.negocioId}${avisos.length ? `?avisos=${avisos.join(",")}` : ""}`);
     });

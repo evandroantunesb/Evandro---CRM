@@ -43,7 +43,7 @@ export const AVISOS_CRIACAO = {
     "O contato já tinha endereço, cidade ou UF diferentes do que foi digitado; os dados existentes foram mantidos. Para trocar, edite a ficha do contato.",
   kit: "Os itens do kit não foram salvos. Monte o kit de novo no cartão Kit personalizado.",
   calculo: "Os itens do kit foram salvos, mas o cálculo não. Abra o cartão Kit personalizado e salve de novo.",
-  anexos: "Algum arquivo não chegou. Ele aparece como “não recebido” em Arquivos: remova e envie de novo.",
+  anexos: "Algum arquivo não foi anexado. Confira em Arquivos e envie de novo.",
 } as const;
 
 export type AvisoCriacao = keyof typeof AVISOS_CRIACAO;

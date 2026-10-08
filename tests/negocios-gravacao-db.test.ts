@@ -3,7 +3,7 @@
  * (`@/lib/negocios-gravacao`) e com o cliente autenticado de cada papel (RLS real).
  * Ciclo completo: criar → salvar → reabrir (mesma leitura da ficha) → editar → salvar → reabrir.
  * Cobre contato novo e existente, kit com e sem tarifa (com restauração e reenvio seguro),
- * reserva de anexos, falhas parciais (nunca como sucesso) e a etapa fora do formulário de
+ * anexos (validação, conferência do Storage e RLS), falhas parciais (nunca como sucesso) e a etapa fora do formulário de
  * edição (SDR não fecha negócio por ali). O caminho pelas ações fica em negocios-acoes-db.
  */
 import { beforeAll, describe, expect, it } from "vitest";
@@ -14,9 +14,10 @@ import {
   salvarKitComCliente,
   type Atual,
 } from "@/lib/negocios-gravacao";
-import { anexosNaoRecebidos } from "@/lib/anexos-servidor";
+import { conferirArquivos } from "@/lib/anexos-servidor";
 import type { SupabaseServidor } from "@/lib/supabase/server";
 import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
+import { comFalha } from "./falhas";
 
 let admin: Usuario;
 let vendedor: Usuario;
@@ -292,6 +293,31 @@ describe("kit", () => {
     expect((await reabrir(vendedor, r.negocioId)).kit.map((k) => k.descricao)).toEqual(["Módulo 550 W", "Inversor 5 kW"]);
   });
 
+  it("falha ao apagar os itens antigos: restaura o kit inteiro; se nem a restauração fecha, avisa e o reenvio corrige", async () => {
+    const r = await criar(vendedor, novoNegocio({ componentes: KIT }));
+    const lerKit = async () =>
+      (await servico.from("kit_componentes").select("id, descricao, ordem").eq("negocio_id", r.negocioId).order("ordem").order("id")).data!;
+    const antes = await lerKit();
+    const outroKit = JSON.stringify([{ tipo: "modulo", descricao: "Módulo 600 W", potenciaW: 600, quantidade: 8 }]);
+    const form = () => fd({ negocioId: r.negocioId, tipoLigacao: "trifasico", tarifaKwh: "", componentes: outroKit });
+
+    // 1) A exclusão dos antigos falha; a restauração funciona: kit idêntico (mesmos ids).
+    const res1 = await salvarKitComCliente(comFalha(vendedor.cliente, { apagarKit: 1 }), atual[vendedor.id], form());
+    expect(res1).toMatchObject({ ok: false, mensagem: "Não foi possível substituir os itens do kit. Nada foi alterado." });
+    expect(await lerKit()).toEqual(antes);
+
+    // 2) A exclusão falha e a restauração também: não promete "nada foi alterado".
+    const res2 = await salvarKitComCliente(comFalha(vendedor.cliente, { apagarKit: 2 }), atual[vendedor.id], form());
+    expect(res2.ok).toBe(false);
+    expect(res2.mensagem).not.toContain("Nada foi alterado");
+    expect(res2.mensagem).toContain("salve de novo");
+    expect((await lerKit()).length).toBe(3); // antigos + novo
+
+    // 3) Reenvio sem falha: exatamente a lista da tela.
+    expect((await salvarKitComCliente(cliente(vendedor), atual[vendedor.id], form())).ok).toBe(true);
+    expect((await reabrir(vendedor, r.negocioId)).kit.map((k) => k.descricao)).toEqual(["Módulo 600 W"]);
+  });
+
   it("cálculo que não fecha na criação vira aviso; os itens ficam salvos", async () => {
     const soInversor = JSON.stringify([{ tipo: "inversor", descricao: "Inversor 5 kW", potenciaW: 5000, quantidade: 1 }]);
     const r = await criar(vendedor, novoNegocio({ componentes: soInversor, tarifa_kwh: "0,95", consumo_medio_kwh: "450" }));
@@ -302,7 +328,7 @@ describe("kit", () => {
   });
 });
 
-describe("anexos (reserva no servidor, conteúdo direto ao Storage)", () => {
+describe("anexos: validação, conferência do Storage e RLS", () => {
   const meta = (campo: string, nome: string, tamanho: number, tipoMime = "image/png") => ({ campo, nome, tamanho, tipoMime });
 
   it("arquivo vazio ou acima de 20 MB é recusado antes de criar qualquer coisa", async () => {
@@ -319,23 +345,59 @@ describe("anexos (reserva no servidor, conteúdo direto ao Storage)", () => {
     }
   });
 
-  it("reserva um registro por arquivo, com a categoria do campo; sem o arquivo, fica como não recebido", async () => {
-    const r = await criar(
-      vendedor,
-      novoNegocio({ anexos: JSON.stringify([meta("anexo_geral", "foto.png", 16), meta("anexo_cnh_contato", "cnh.png", 16)]) }),
-    );
-    expect(r.reservas).toHaveLength(2);
-    expect((await reabrir(vendedor, r.negocioId)).anexos).toEqual([
-      { nome: "cnh.png", categoria: "cnh" },
-      { nome: "foto.png", categoria: "geral" },
-    ]);
+  it("criar não registra anexo nem escreve na linha do tempo antes de o arquivo chegar", async () => {
+    const r = await criar(vendedor, novoNegocio({ anexos: JSON.stringify([meta("anexo_geral", "foto.png", 16)]) }));
+    expect((await reabrir(vendedor, r.negocioId)).anexos).toEqual([]);
+    const { count } = await servico
+      .from("atividades")
+      .select("id", { count: "exact", head: true })
+      .eq("negocio_id", r.negocioId)
+      .eq("tipo", "anexo_adicionado");
+    expect(count).toBe(0);
+  });
 
-    // Só a foto chega ao Storage: a CNH continua identificável como não recebida ao reabrir.
-    const { error } = await vendedor.cliente.storage.from("anexos").upload(r.reservas[0].caminho, arquivo("foto.png"));
-    expect(error).toBeNull();
+  it("confere a pasta: arquivo sem registro e registro sem arquivo; listagem com falha nunca vira 'tudo certo'", async () => {
+    const r = await criar(vendedor, novoNegocio());
+    const pasta = `${empresa}/${r.negocioId}`;
+    // Chegou ao Storage, mas o navegador fechou antes do registro.
+    expect((await vendedor.cliente.storage.from("anexos").upload(`${pasta}/orfao.png`, arquivo("orfao.png"))).error).toBeNull();
+    // Registro sem arquivo (dado antigo ou arquivo removido do Storage).
+    await servico.from("anexos").insert({ empresa_id: empresa, negocio_id: r.negocioId, caminho: `${pasta}/sumiu.png`, nome: "sumiu.png", tamanho: 16 });
     const { data: registros } = await vendedor.cliente.from("anexos").select("id, caminho").eq("negocio_id", r.negocioId);
-    const pendentes = await anexosNaoRecebidos(cliente(vendedor), empresa, r.negocioId, registros!);
-    expect([...pendentes]).toEqual([r.reservas[1].id]);
+
+    const c = await conferirArquivos(cliente(vendedor), empresa, r.negocioId, registros!);
+    expect(c.conferido).toBe(true);
+    if (!c.conferido) return;
+    expect(c.semRegistro).toEqual([{ caminho: `${pasta}/orfao.png`, nome: "orfao.png", tamanho: 16, tipoMime: "image/png" }]);
+    expect([...c.semArquivo]).toEqual([registros!.find((a) => a.caminho.endsWith("sumiu.png"))!.id]);
+
+    // Falha injetada na listagem: a ficha recebe "não conferido", não uma lista vazia.
+    const quebrado = comFalha(vendedor.cliente, { listar: 1 });
+    expect(await conferirArquivos(quebrado, empresa, r.negocioId, registros!)).toEqual({ conferido: false });
+  });
+
+  it("RLS: outra empresa e SDR sem acesso ao negócio não enviam, não listam, não registram e ninguém apaga direto no Storage", async () => {
+    const r = await criar(vendedor, novoNegocio());
+    const pasta = `${empresa}/${r.negocioId}`;
+    expect((await vendedor.cliente.storage.from("anexos").upload(`${pasta}/doc.png`, arquivo("doc.png"))).error).toBeNull();
+
+    const [fora] = await Promise.all([criarUsuario("ng-fora")]);
+    const { data: outra } = await servico.from("empresas").insert({ nome: `Outra ${sufixo}` }).select("id").single();
+    await servico.from("empresa_membros").insert({ empresa_id: outra!.id, user_id: fora.id, papel: "admin" });
+
+    for (const [quem, u] of [["outra empresa", fora], ["SDR sem o negócio", sdr]] as const) {
+      expect((await u.cliente.storage.from("anexos").upload(`${pasta}/${quem}.png`, arquivo("x.png"))).error, quem).not.toBeNull();
+      const { data: lista } = await u.cliente.storage.from("anexos").list(pasta);
+      expect(lista ?? [], quem).toEqual([]);
+      const { error } = await u.cliente
+        .from("anexos")
+        .insert({ empresa_id: empresa, negocio_id: r.negocioId, caminho: `${pasta}/doc.png`, nome: "doc.png", tamanho: 16 });
+      expect(error, quem).not.toBeNull();
+    }
+    // Sem política de exclusão no Storage: nem quem enviou apaga direto (só o servidor, depois do banco autorizar).
+    await vendedor.cliente.storage.from("anexos").remove([`${pasta}/doc.png`]);
+    const { data: ainda } = await vendedor.cliente.storage.from("anexos").list(pasta);
+    expect(ainda!.map((o) => o.name)).toContain("doc.png");
   });
 });
 

@@ -4,9 +4,9 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { CampoArquivo } from "@/components/campo-arquivo";
 import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
-import { reservarAnexos } from "@/lib/acoes/anexos";
+import { registrarAnexo } from "@/lib/acoes/anexos";
 import { editarNegocio } from "@/lib/acoes/negocios";
-import { enviarArquivosReservados } from "@/lib/anexos-navegador";
+import { enviarArquivos } from "@/lib/anexos-navegador";
 import { arquivosEscolhidos, metaArquivo, problemaArquivo } from "@/lib/anexos-regras";
 import { criarClienteNavegador } from "@/lib/supabase/navegador";
 import type { ResultadoAcao } from "@/lib/tipos";
@@ -15,11 +15,14 @@ type Opcao = { id: string; nome: string };
 
 /** A etapa não é editada aqui: só pelo "Mover etapa"/Kanban, que exige comentário e respeita o papel. */
 export function EdicaoNegocio({
+  empresaId,
   negocio,
   origens,
   responsaveis,
   podeEditarValor = true,
 }: {
+  /** Empresa do negócio (pasta da fatura no Storage). */
+  empresaId: string;
   negocio: {
     id: string;
     titulo: string;
@@ -41,7 +44,7 @@ export function EdicaoNegocio({
   const router = useRouter();
   const [resultado, setResultado] = useState<ResultadoAcao>(null);
   const [pendente, iniciar] = useTransition();
-  // Sem o reset automático, o arquivo escolhido ficaria no campo: limpa só ele depois de tentar enviar.
+  // Sem o reset automático, o arquivo escolhido ficaria no campo: limpa só ele depois que a fatura chega.
   const [versaoArquivo, setVersaoArquivo] = useState(0);
 
   /**
@@ -58,22 +61,16 @@ export function EdicaoNegocio({
     iniciar(async () => {
       const r = await editarNegocio(null, formulario);
       if (!r?.ok || !fatura) return setResultado(r);
-      const reserva = await reservarAnexos(negocio.id, [{ ...metaArquivo(fatura), categoria: "fatura_gerador" }]);
-      const falhas = reserva.ok
-        ? await enviarArquivosReservados(criarClienteNavegador(), [{ caminho: reserva.reservas[0].caminho, arquivo: fatura }])
-        : [fatura.name];
-      setVersaoArquivo((v) => v + 1);
+      const [falha] = await enviarArquivos(criarClienteNavegador(), registrarAnexo, { empresaId, negocioId: negocio.id }, [
+        { arquivo: fatura, categoria: "fatura_gerador" },
+      ]);
       router.refresh();
-      setResultado(
-        falhas.length
-          ? {
-              ok: false,
-              mensagem: reserva.ok
-                ? "Dados salvos, mas a fatura não chegou. Ela aparece como “não recebido” em Arquivos: remova e envie de novo."
-                : `Dados salvos, mas a fatura não foi anexada (${reserva.mensagem}). Envie de novo.`,
-            }
-          : { ok: true, mensagem: "Salvo." },
-      );
+      if (falha) {
+        // A fatura continua escolhida no campo: salvar de novo tenta outra vez (os dados não mudam).
+        return setResultado({ ok: false, mensagem: `Dados salvos, mas a fatura não foi anexada (${falha}). Salve de novo para tentar outra vez.` });
+      }
+      setVersaoArquivo((v) => v + 1);
+      setResultado({ ok: true, mensagem: "Salvo." });
     });
   }
   return (

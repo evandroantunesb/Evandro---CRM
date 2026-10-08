@@ -1,9 +1,9 @@
 /**
  * Caminho real das telas, com Supabase local (roda no CI): as Server Actions de verdade
- * (`criarNegocio`, `editarNegocio`, `reservarAnexos`, `apagarAnexo`, `salvarKitPersonalizado`,
+ * (`criarNegocio`, `editarNegocio`, `registrarAnexo`, `apagarAnexo`, `salvarKitPersonalizado`,
  * `editarContato`) recebendo o mesmo FormData que o formulário monta (`prepararEnvioCriacao`),
- * e o envio dos arquivos como o navegador faz (`enviarArquivosReservados`, direto ao Storage,
- * com o cliente do usuário). Só a sessão é substituída: `exigirPapel` devolve o membro do teste
+ * e o envio dos arquivos como o navegador faz (`enviarArquivos`: direto ao Storage com o
+ * cliente do usuário e, só depois, `registrarAnexo`). Só a sessão é substituída: `exigirPapel` devolve o membro do teste
  * (e recusa papel fora da lista, como o real) e `criarClienteServidor` devolve o cliente dele.
  */
 import { beforeAll, describe, expect, it, vi } from "vitest";
@@ -28,13 +28,13 @@ vi.mock("next/navigation", () => ({
   },
 }));
 
-const { apagarAnexo, reservarAnexos } = await import("@/lib/acoes/anexos");
+const { apagarAnexo, registrarAnexo } = await import("@/lib/acoes/anexos");
 const { salvarKitPersonalizado } = await import("@/lib/acoes/calculadora");
 const { editarContato } = await import("@/lib/acoes/contatos");
 const { criarNegocio, editarNegocio } = await import("@/lib/acoes/negocios");
-const { enviarArquivosReservados } = await import("@/lib/anexos-navegador");
-const { prepararEnvioCriacao } = await import("@/lib/anexos-regras");
-const { anexosNaoRecebidos } = await import("@/lib/anexos-servidor");
+const { enviarArquivos } = await import("@/lib/anexos-navegador");
+const { ANEXOS_CRIACAO, prepararEnvioCriacao } = await import("@/lib/anexos-regras");
+const { conferirArquivos } = await import("@/lib/anexos-servidor");
 const { criarUsuario, servico, sufixo } = await import("./ajuda");
 
 let vendedor: Usuario;
@@ -96,6 +96,24 @@ async function registros(negocioId: string) {
   return data ?? [];
 }
 
+const categoria = (campo: string) => ANEXOS_CRIACAO.find((c) => c.campo === campo)!.categoria;
+
+/** O que a tela faz depois de criar: envia cada arquivo ao Storage e só então registra. */
+async function enviarComoATela(r: { negocioId: string; empresaId: string }, arquivos: { campo: string; arquivo: File }[]) {
+  return enviarArquivos(
+    vendedor.cliente,
+    registrarAnexo,
+    { empresaId: r.empresaId, negocioId: r.negocioId },
+    arquivos.map((a) => ({ arquivo: a.arquivo, categoria: categoria(a.campo) })),
+  );
+}
+
+async function conferir(negocioId: string) {
+  const c = await conferirArquivos(vendedor.cliente as never, empresa, negocioId, await registros(negocioId));
+  if (!c.conferido) throw new Error("não conferido");
+  return c;
+}
+
 describe("cadastro pela tela", () => {
   it("arquivos acima de 1 MB chegam: a ação recebe só os dados deles e o conteúdo vai direto ao Storage", async () => {
     const { dados, arquivos, problema } = prepararEnvioCriacao(
@@ -111,18 +129,23 @@ describe("cadastro pela tela", () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.avisos).toEqual([]);
-    const falhas = await enviarArquivosReservados(
-      vendedor.cliente,
-      r.reservas.map((reserva, i) => ({ caminho: reserva.caminho, arquivo: arquivos[i].arquivo })),
-    );
-    expect(falhas).toEqual([]);
+    expect(await enviarComoATela(r, arquivos)).toEqual([]);
 
     const lista = await registros(r.negocioId);
     expect(lista.map((a) => [a.nome, a.categoria])).toEqual([
       ["fatura.pdf", "fatura_gerador"],
       ["foto.jpg", "geral"],
     ]);
-    expect((await anexosNaoRecebidos(vendedor.cliente as never, empresa, r.negocioId, lista)).size).toBe(0);
+    const c = await conferir(r.negocioId);
+    expect(c.semRegistro).toEqual([]);
+    expect(c.semArquivo.size).toBe(0);
+    // Linha do tempo: um "anexo adicionado" por arquivo que chegou, nenhum antes disso.
+    const { count } = await servico
+      .from("atividades")
+      .select("id", { count: "exact", head: true })
+      .eq("negocio_id", r.negocioId)
+      .eq("tipo", "anexo_adicionado");
+    expect(count).toBe(2);
     const { data: contato } = await vendedor.cliente.from("negocios").select("contatos(endereco, cidade, uf)").eq("id", r.negocioId).single();
     expect(contato!.contatos).toEqual({ endereco: "Rua A, 10", cidade: "Cascavel", uf: "PR" });
   });
@@ -136,33 +159,55 @@ describe("cadastro pela tela", () => {
     expect(r.ok).toBe(false);
     const { count } = await servico.from("negocios").select("id", { count: "exact", head: true }).eq("titulo", String(formulario.get("titulo")));
     expect(count).toBe(0);
+    // O registro também recusa arquivo vazio.
+    const n = await criarNegocio(prepararEnvioCriacao(formularioCadastro({})).dados);
+    if (!n.ok) throw new Error(n.mensagem);
+    expect(
+      await registrarAnexo({ negocioId: n.negocioId, caminho: `${empresa}/${n.negocioId}/x-vazio.png`, nome: "vazio.png", tamanho: 0, tipoMime: "image/png" }),
+    ).toMatchObject({ ok: false });
   });
 
-  it("envio interrompido fica identificável ao reabrir e pode ser refeito", async () => {
-    const { dados, arquivos } = prepararEnvioCriacao(
-      formularioCadastro({ anexo_geral: [arquivo("a.png", 1024), arquivo("b.png", 1024)] }),
-    );
+  it("envio interrompido entre o Storage e o registro fica visível ao reabrir e é registrado pela ficha", async () => {
+    const { dados, arquivos } = prepararEnvioCriacao(formularioCadastro({ anexo_geral: [arquivo("a.png", 1024), arquivo("b.png", 2048)] }));
     const r = await criarNegocio(dados);
     if (!r.ok) throw new Error(r.mensagem);
-    // O navegador fechou depois do primeiro arquivo.
-    await enviarArquivosReservados(vendedor.cliente, [{ caminho: r.reservas[0].caminho, arquivo: arquivos[0].arquivo }]);
+    // O navegador enviou e registrou "a"; enviou "b" e fechou antes de registrar.
+    expect(await enviarComoATela(r, [arquivos[0]])).toEqual([]);
+    const caminhoB = `${empresa}/${r.negocioId}/00000000-0000-4000-8000-000000000000-b.png`;
+    expect((await vendedor.cliente.storage.from("anexos").upload(caminhoB, arquivos[1].arquivo)).error).toBeNull();
 
-    // Reabrindo a ficha (outra sessão, sem aviso na URL): o segundo aparece como não recebido.
-    let lista = await registros(r.negocioId);
-    const pendentes = await anexosNaoRecebidos(vendedor.cliente as never, empresa, r.negocioId, lista);
-    expect([...pendentes]).toEqual([lista.find((a) => a.nome === "b.png")!.id]);
+    // Reabrindo a ficha (sem aviso na URL): "b" aparece como recebido sem registro.
+    let c = await conferir(r.negocioId);
+    expect(c.semRegistro).toEqual([{ caminho: caminhoB, nome: "b.png", tamanho: 2048, tipoMime: "image/png" }]);
 
-    // Recuperação pela tela: remove o pendente e envia de novo (reserva + Storage).
+    // Botão "Registrar" da ficha.
+    expect(await registrarAnexo({ negocioId: r.negocioId, ...c.semRegistro[0], categoria: "geral" })).toMatchObject({ ok: true });
+    c = await conferir(r.negocioId);
+    expect(c.semRegistro).toEqual([]);
+    expect((await registros(r.negocioId)).map((a) => a.nome)).toEqual(["a.png", "b.png"]);
+  });
+
+  it("registro e exclusão respeitam empresa e autoria", async () => {
+    const r = await criarNegocio(prepararEnvioCriacao(formularioCadastro({})).dados);
+    if (!r.ok) throw new Error(r.mensagem);
+    expect(await enviarComoATela(r, [{ campo: "anexo_geral", arquivo: arquivo("doc.png", 64) }])).toEqual([]);
+    const [doc] = await registros(r.negocioId);
+
+    // Sessão de outra empresa: caminho fora da pasta dela é recusado antes de gravar.
+    const antes = sessao.atual;
+    sessao.atual = { ...antes, empresaId: crypto.randomUUID() };
+    expect(await registrarAnexo({ negocioId: r.negocioId, caminho: doc.caminho, nome: "doc.png", tamanho: 64, tipoMime: "image/png" })).toEqual({
+      ok: false,
+      mensagem: "Dados do arquivo inválidos.",
+    });
+    sessao.atual = antes;
+
+    // Apagar pela ação: o banco decide (autor ou admin); só então o arquivo sai do Storage.
     const remover = new FormData();
-    remover.append("anexoId", [...pendentes][0]);
+    remover.append("anexoId", doc.id);
     await apagarAnexo(remover);
-    const reserva = await reservarAnexos(r.negocioId, [{ nome: "b.png", tamanho: 1024, tipoMime: "image/png", categoria: "geral" }]);
-    if (!reserva.ok) throw new Error(reserva.mensagem);
-    expect(await enviarArquivosReservados(vendedor.cliente, [{ caminho: reserva.reservas[0].caminho, arquivo: arquivo("b.png", 1024) }])).toEqual([]);
-
-    lista = await registros(r.negocioId);
-    expect(lista.map((a) => a.nome)).toEqual(["a.png", "b.png"]);
-    expect((await anexosNaoRecebidos(vendedor.cliente as never, empresa, r.negocioId, lista)).size).toBe(0);
+    expect(await registros(r.negocioId)).toEqual([]);
+    expect((await conferir(r.negocioId)).semRegistro).toEqual([]);
   });
 });
 
@@ -189,9 +234,9 @@ describe("ficha pela tela", () => {
       edicao.append(k, v);
     expect(await editarNegocio(null, edicao)).toEqual({ ok: true, mensagem: "Salvo." });
     const fatura = arquivo("fatura.pdf", 2 * MB, "application/pdf");
-    const reserva = await reservarAnexos(r.negocioId, [{ nome: fatura.name, tamanho: fatura.size, tipoMime: fatura.type, categoria: "fatura_gerador" }]);
-    if (!reserva.ok) throw new Error(reserva.mensagem);
-    expect(await enviarArquivosReservados(vendedor.cliente, [{ caminho: reserva.reservas[0].caminho, arquivo: fatura }])).toEqual([]);
+    expect(
+      await enviarArquivos(vendedor.cliente, registrarAnexo, { empresaId: r.empresaId, negocioId: r.negocioId }, [{ arquivo: fatura, categoria: "fatura_gerador" }]),
+    ).toEqual([]);
 
     const kit = new FormData();
     for (const [k, v] of Object.entries({
@@ -238,7 +283,7 @@ describe("ficha pela tela", () => {
     expect(c).toEqual({ nome: "Cliente editado", documento: "123.456.789-09", endereco: "Rua Nova, 1", cidade: "Cascavel", uf: "PR" });
     expect(calc).toEqual({ valor_fatura_medio: 320, tarifa_kwh: 0.95 });
     expect(lista.map((a) => [a.nome, a.categoria])).toEqual([["fatura.pdf", "fatura_gerador"]]);
-    expect((await anexosNaoRecebidos(vendedor.cliente as never, empresa, r.negocioId, lista)).size).toBe(0);
+    expect((await conferir(r.negocioId)).semRegistro).toEqual([]);
   });
 
   it("papel fora da lista não usa as ações (mesma checagem da sessão real)", async () => {
