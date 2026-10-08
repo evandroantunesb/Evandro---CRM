@@ -140,6 +140,9 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
     .limit(1)
     .maybeSingle();
 
+  // Obra gerada por esta venda (a RLS decide se a pessoa a enxerga).
+  const { data: obraDoNegocio } = await supabase.from("obras").select("id, numero").eq("negocio_id", negocio.id).maybeSingle();
+
   const contato = negocio.contatos as unknown as {
     id: string;
     nome: string;
@@ -219,6 +222,11 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
         {formatarDataHora(negocio.created_at)}
         {negocio.fechado_em && <> · Fechado em {formatarDataHora(negocio.fechado_em)}</>}
       </p>
+      {obraDoNegocio && (
+        <Link href={`/obras/${obraDoNegocio.id}`} className="w-fit text-sm text-zinc-600 underline hover:text-zinc-900">
+          Ver obra nº {obraDoNegocio.numero}
+        </Link>
+      )}
       {negocio.status === "perdido" && negocio.motivo_perda_id && (
         <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">
           Motivo da perda: {nomes.motivo(negocio.motivo_perda_id)}

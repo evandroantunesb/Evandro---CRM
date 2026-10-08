@@ -175,8 +175,12 @@ function CelulaSetor({ s }: { s: SetorObraVM }) {
 function ListaObras({ obras }: { obras: ObraListaVM[] }) {
   const cabecalho = ["Obra", "Cliente", "Cidade/UF", "Potência", ...SETORES_OBRA.map((s) => ROTULO_SETOR[s]), "Situação"];
   const celulas = (o: ObraListaVM): ReactNode[] => [
-    <span key="n" className="font-medium text-zinc-900">#{o.numero}</span>,
-    <span key="c" className="text-zinc-900">{o.clienteNome}</span>,
+    <Link key="n" href={`/obras/${o.id}`} className="font-medium text-zinc-900 underline-offset-2 hover:underline">
+      #{o.numero}
+    </Link>,
+    <Link key="c" href={`/obras/${o.id}`} className="text-zinc-900 underline-offset-2 hover:underline">
+      {o.clienteNome}
+    </Link>,
     <span key="u" className="text-zinc-700">{cidadeUf(o)}</span>,
     <span key="p" className="text-zinc-700">{formatarPotencia(o.potenciaKwp)}</span>,
     ...o.setores.map((s) => <CelulaSetor key={s.setor} s={s} />),
@@ -215,9 +219,9 @@ function ListaObras({ obras }: { obras: ObraListaVM[] }) {
             <div className="flex flex-col gap-2">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="font-medium text-zinc-900">
+                  <Link href={`/obras/${o.id}`} className="font-medium text-zinc-900 underline-offset-2 hover:underline">
                     #{o.numero} {o.clienteNome}
-                  </p>
+                  </Link>
                   <p className="text-xs text-zinc-500">
                     {cidadeUf(o)} · {formatarPotencia(o.potenciaKwp)}
                   </p>
