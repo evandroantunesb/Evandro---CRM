@@ -38,14 +38,27 @@ export function arquivosEscolhidos(formData: FormData, campo: string): File[] {
   return formData.getAll(campo).filter((v): v is File => v instanceof File && !(v.size === 0 && v.name === ""));
 }
 
+/** Parte legível do nome no Storage: sem acento, só letras, números, ponto, hífen e sublinhado. */
+export function limparNome(nome: string) {
+  return (
+    nome
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-zA-Z0-9._-]+/g, "-")
+      .slice(-80) || "arquivo"
+  );
+}
+
 /** Nome seguro para o caminho no Storage (o nome original fica no registro). */
 export function nomeSeguro(nome: string) {
-  const limpo = nome
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/[^a-zA-Z0-9._-]+/g, "-")
-    .slice(-80);
-  return `${crypto.randomUUID()}-${limpo || "arquivo"}`;
+  return `${crypto.randomUUID()}-${limparNome(nome)}`;
+}
+
+const PREFIXO_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-/i;
+
+/** O objeto do Storage corresponde ao nome informado (`uuid-` + nome limpo)? */
+export function objetoConfereComNome(objeto: string, nome: string): boolean {
+  return PREFIXO_UUID.test(objeto) && objeto.replace(PREFIXO_UUID, "") === limparNome(nome);
 }
 
 /** Caminho no Storage: sempre dentro da pasta da empresa e do negócio (as políticas exigem isso). */
@@ -53,7 +66,7 @@ export const caminhoAnexo = (empresaId: string, negocioId: string, nome: string)
 
 /** Nome legível de um objeto do Storage (tira o prefixo `uuid-` de `nomeSeguro`). */
 export function nomeDoObjeto(objeto: string): string {
-  return objeto.replace(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-/i, "") || objeto;
+  return objeto.replace(PREFIXO_UUID, "") || objeto;
 }
 
 /**

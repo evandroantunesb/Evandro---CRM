@@ -33,7 +33,7 @@ const { salvarKitPersonalizado } = await import("@/lib/acoes/calculadora");
 const { editarContato } = await import("@/lib/acoes/contatos");
 const { criarNegocio, editarNegocio } = await import("@/lib/acoes/negocios");
 const { enviarArquivos } = await import("@/lib/anexos-navegador");
-const { ANEXOS_CRIACAO, prepararEnvioCriacao } = await import("@/lib/anexos-regras");
+const { ANEXOS_CRIACAO, nomeSeguro, prepararEnvioCriacao } = await import("@/lib/anexos-regras");
 const { conferirArquivos } = await import("@/lib/anexos-servidor");
 const { criarUsuario, servico, sufixo } = await import("./ajuda");
 
@@ -162,9 +162,10 @@ describe("cadastro pela tela", () => {
     // O registro também recusa arquivo vazio.
     const n = await criarNegocio(prepararEnvioCriacao(formularioCadastro({})).dados);
     if (!n.ok) throw new Error(n.mensagem);
-    expect(
-      await registrarAnexo({ negocioId: n.negocioId, caminho: `${empresa}/${n.negocioId}/x-vazio.png`, nome: "vazio.png", tamanho: 0, tipoMime: "image/png" }),
-    ).toMatchObject({ ok: false });
+    const caminhoVazio = `${empresa}/${n.negocioId}/${nomeSeguro("vazio.png")}`;
+    await vendedor.cliente.storage.from("anexos").upload(caminhoVazio, new File([], "vazio.png", { type: "image/png" }));
+    expect(await registrarAnexo({ negocioId: n.negocioId, caminho: caminhoVazio, nome: "vazio.png" })).toMatchObject({ ok: false });
+    expect(await registros(n.negocioId)).toEqual([]);
   });
 
   it("envio interrompido entre o Storage e o registro fica visível ao reabrir e é registrado pela ficha", async () => {
@@ -208,6 +209,129 @@ describe("cadastro pela tela", () => {
     await apagarAnexo(remover);
     expect(await registros(r.negocioId)).toEqual([]);
     expect((await conferir(r.negocioId)).semRegistro).toEqual([]);
+  });
+});
+
+describe("registrarAnexo não confia no navegador", () => {
+  let negocioId: string;
+  let outroNegocioId: string;
+  let pasta: string;
+  let sdr: Usuario;
+  let fora: Usuario;
+  let membroSdr: string;
+  let membroFora: string;
+  let outraEmpresa: string;
+
+  beforeAll(async () => {
+    const r = await criarNegocio(prepararEnvioCriacao(formularioCadastro({})).dados);
+    const r2 = await criarNegocio(prepararEnvioCriacao(formularioCadastro({})).dados);
+    if (!r.ok || !r2.ok) throw new Error("negócio não criado");
+    negocioId = r.negocioId;
+    outroNegocioId = r2.negocioId;
+    pasta = `${empresa}/${negocioId}`;
+
+    [sdr, fora] = await Promise.all([criarUsuario("na-sdr"), criarUsuario("na-fora")]);
+    const { data: ms } = await servico
+      .from("empresa_membros")
+      .insert({ empresa_id: empresa, user_id: sdr.id, papel: "sdr", perfil_gamificacao: "sdr" })
+      .select("id")
+      .single();
+    membroSdr = ms!.id;
+    const { data: outra } = await servico.from("empresas").insert({ nome: `Outra ações ${sufixo}` }).select("id").single();
+    outraEmpresa = outra!.id;
+    const { data: mf } = await servico.from("empresa_membros").insert({ empresa_id: outraEmpresa, user_id: fora.id, papel: "admin" }).select("id").single();
+    membroFora = mf!.id;
+  });
+
+  /** Executa como outro usuário (sessão e cliente dele) e volta para o vendedor. */
+  async function como<T>(u: Usuario, atual: { empresaId: string; membroId: string; papel: string }, f: () => Promise<T>) {
+    const antes = { usuario: sessao.usuario, atual: sessao.atual };
+    sessao.usuario = u;
+    sessao.atual = atual;
+    try {
+      return await f();
+    } finally {
+      sessao.usuario = antes.usuario;
+      sessao.atual = antes.atual;
+    }
+  }
+
+  async function subir(nome: string, bytes = 64, tipo = "image/png", destino = pasta) {
+    const caminho = `${destino}/${nomeSeguro(nome)}`;
+    const { error } = await vendedor.cliente.storage.from("anexos").upload(caminho, arquivo(nome, bytes, tipo));
+    if (error) throw error;
+    return caminho;
+  }
+
+  const atividadesDeAnexo = async (id: string) =>
+    (await servico.from("atividades").select("id", { count: "exact", head: true }).eq("negocio_id", id).eq("tipo", "anexo_adicionado")).count;
+
+  it("objeto inexistente: recusa, sem registro e sem atividade na linha do tempo", async () => {
+    const antes = await atividadesDeAnexo(negocioId);
+    const r = await registrarAnexo({ negocioId, caminho: `${pasta}/${nomeSeguro("ficticio.pdf")}`, nome: "ficticio.pdf", tamanho: 1000, tipoMime: "application/pdf" });
+    expect(r).toEqual({ ok: false, mensagem: "Arquivo não encontrado no armazenamento. Envie de novo." });
+    expect((await registros(negocioId)).map((a) => a.nome)).not.toContain("ficticio.pdf");
+    expect(await atividadesDeAnexo(negocioId)).toBe(antes);
+  });
+
+  it("arquivo legítimo: registra com tamanho e tipo do Storage, não os do navegador", async () => {
+    const caminho = await subir("foto.png", 64, "image/png");
+    const antes = await atividadesDeAnexo(negocioId);
+    expect(await registrarAnexo({ negocioId, caminho, nome: "foto.png", tamanho: 999_999, tipoMime: "application/pdf", categoria: "cnh" })).toEqual({
+      ok: true,
+      mensagem: "Arquivo anexado.",
+    });
+    const { data: linha } = await vendedor.cliente.from("anexos").select("tamanho, tipo_mime, categoria").eq("caminho", caminho).single();
+    expect(linha).toEqual({ tamanho: 64, tipo_mime: "image/png", categoria: "cnh" });
+    expect(await atividadesDeAnexo(negocioId)).toBe((antes ?? 0) + 1);
+  });
+
+  it("nome que não corresponde ao objeto, subpasta ou pasta de outro negócio: recusa", async () => {
+    const caminho = await subir("doc.png");
+    const invalido = { ok: false, mensagem: "Dados do arquivo inválidos." };
+    expect(await registrarAnexo({ negocioId, caminho, nome: "outro.pdf" })).toEqual(invalido);
+    expect(await registrarAnexo({ negocioId, caminho: `${pasta}/sub/${nomeSeguro("doc.png")}`, nome: "doc.png" })).toEqual(invalido);
+    const deOutroNegocio = await subir("doc.png", 64, "image/png", `${empresa}/${outroNegocioId}`);
+    expect(await registrarAnexo({ negocioId, caminho: deOutroNegocio, nome: "doc.png" })).toEqual(invalido);
+    expect((await registros(negocioId)).some((a) => a.caminho === caminho)).toBe(false);
+  });
+
+  it("falha na gravação não apaga o arquivo (nem o de outra tentativa)", async () => {
+    const caminho = await subir("dup.png");
+    expect((await registrarAnexo({ negocioId, caminho, nome: "dup.png" }))?.ok).toBe(true);
+    expect(await registrarAnexo({ negocioId, caminho, nome: "dup.png" })).toEqual({ ok: false, mensagem: "Este arquivo já está registrado." });
+    expect((await registros(negocioId)).filter((a) => a.caminho === caminho)).toHaveLength(1);
+    const objeto = caminho.split("/")[2];
+    const { data: lista } = await vendedor.cliente.storage.from("anexos").list(pasta, { search: objeto });
+    expect(lista!.map((o) => o.name)).toContain(objeto);
+  });
+
+  it("outra empresa e SDR sem o negócio não registram; quem vê o negócio recupera escolhendo a categoria", async () => {
+    const caminho = await subir("orfao.pdf", 128, "application/pdf");
+    const objeto = caminho.split("/")[2];
+
+    // Outra empresa: o caminho não é da pasta dela; e na pasta dela não há esse objeto.
+    await como(fora, { empresaId: outraEmpresa, membroId: membroFora, papel: "admin" }, async () => {
+      expect((await registrarAnexo({ negocioId, caminho, nome: "orfao.pdf" }))?.ok).toBe(false);
+      expect((await registrarAnexo({ negocioId, caminho: `${outraEmpresa}/${negocioId}/${objeto}`, nome: "orfao.pdf" }))?.ok).toBe(false);
+    });
+    // SDR da mesma empresa, sem acesso ao negócio: a RLS do Storage não mostra a pasta.
+    await como(sdr, { empresaId: empresa, membroId: membroSdr, papel: "sdr" }, async () => {
+      expect(await registrarAnexo({ negocioId, caminho, nome: "orfao.pdf" })).toEqual({
+        ok: false,
+        mensagem: "Arquivo não encontrado no armazenamento. Envie de novo.",
+      });
+    });
+    expect((await registros(negocioId)).some((a) => a.caminho === caminho)).toBe(false);
+
+    // Recuperação na ficha (botão "Registrar" com categoria).
+    const c = await conferirArquivos(vendedor.cliente as never, empresa, negocioId, await registros(negocioId));
+    if (!c.conferido) throw new Error("não conferido");
+    const semRegistro = c.semRegistro.find((o) => o.caminho === caminho)!;
+    expect(semRegistro).toMatchObject({ nome: "orfao.pdf", tamanho: 128 });
+    expect(await registrarAnexo({ negocioId, caminho: semRegistro.caminho, nome: semRegistro.nome, categoria: "fatura_gerador" })).toMatchObject({ ok: true });
+    const { data: linha } = await vendedor.cliente.from("anexos").select("categoria, tamanho").eq("caminho", caminho).single();
+    expect(linha).toEqual({ categoria: "fatura_gerador", tamanho: 128 });
   });
 });
 

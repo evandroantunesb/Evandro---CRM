@@ -6,7 +6,15 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { arquivosEscolhidos, LIMITE_ANEXO, nomeDoObjeto, prepararEnvioCriacao, problemaArquivo } from "@/lib/anexos-regras";
+import {
+  arquivosEscolhidos,
+  LIMITE_ANEXO,
+  nomeDoObjeto,
+  nomeSeguro,
+  objetoConfereComNome,
+  prepararEnvioCriacao,
+  problemaArquivo,
+} from "@/lib/anexos-regras";
 import { AVISOS_CRIACAO, avisosDaUrl, completarContato, montarEndereco } from "@/lib/negocio-dados";
 
 const fonte = (...partes: string[]) => readFileSync(join(__dirname, "..", ...partes), "utf8");
@@ -75,6 +83,22 @@ describe("arquivos fora da Server Action", () => {
     expect(envio.indexOf(".upload(")).toBeGreaterThan(-1);
     expect(envio.indexOf(".upload(")).toBeLessThan(envio.indexOf("await registrar("));
     expect(fonte("src", "lib", "negocios-gravacao.ts")).not.toMatch(/from\("anexos"\)/);
+  });
+
+  it("objeto do Storage só confere com o nome que o gerou", () => {
+    const objeto = nomeSeguro("Conta de Luz ção.pdf");
+    expect(objetoConfereComNome(objeto, "Conta de Luz ção.pdf")).toBe(true);
+    expect(objetoConfereComNome(objeto, "outra.pdf")).toBe(false);
+    expect(objetoConfereComNome("sem-uuid-conta.pdf", "conta.pdf")).toBe(false);
+    expect(objetoConfereComNome("0f8fad5b-d9cb-469f-a165-70867728950e-orfao.pdf", nomeDoObjeto("0f8fad5b-d9cb-469f-a165-70867728950e-orfao.pdf"))).toBe(true);
+  });
+
+  it("registrarAnexo confere o objeto no Storage e não apaga arquivo quando a gravação falha", () => {
+    const acao = fonte("src", "lib", "acoes", "anexos.ts");
+    const registrar = acao.slice(acao.indexOf("export async function registrarAnexo"), acao.indexOf("export async function apagarAnexo"));
+    expect(registrar).toMatch(/localizarObjeto\(supabase, pasta, objeto\)[\s\S]*from\("anexos"\)\.insert/);
+    expect(registrar).toContain("tamanho: real.tamanho");
+    expect(registrar).not.toMatch(/criarClienteAdmin|\.remove\(/);
   });
 
   it("recusa vazio e acima de 20 MB", () => {

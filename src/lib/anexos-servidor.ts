@@ -12,6 +12,24 @@ export const arquivoMetaSchema = z.object({
 export type ArquivoSemRegistro = { caminho: string; nome: string; tamanho: number; tipoMime: string };
 
 /**
+ * Procura o objeto na pasta com o cliente de quem chama (a RLS do Storage só mostra pastas de
+ * negócios que ele vê). Devolve tamanho e tipo reais do Storage — nunca os informados pelo
+ * navegador —, `null` se o objeto não existe, ou `"erro"` se não deu para conferir.
+ */
+export async function localizarObjeto(
+  supabase: SupabaseServidor,
+  pasta: string,
+  objeto: string,
+): Promise<{ tamanho: number; tipoMime: string } | null | "erro"> {
+  const { data, error } = await supabase.storage.from("anexos").list(pasta, { search: objeto, limit: 100 });
+  if (error || !data) return "erro";
+  const achado = data.find((o) => o.id && o.name === objeto);
+  if (!achado) return null;
+  const meta = (achado.metadata ?? {}) as { size?: number; mimetype?: string };
+  return { tamanho: Number(meta.size ?? 0), tipoMime: meta.mimetype ?? "" };
+}
+
+/**
  * Confere a pasta do negócio no Storage contra os registros de `anexos`:
  * - `semRegistro`: arquivo que chegou mas não foi registrado (o navegador fechou entre o envio
  *   e o registro) — pode ser registrado pela ficha;
