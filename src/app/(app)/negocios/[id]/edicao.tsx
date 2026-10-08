@@ -1,10 +1,15 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
 import { CampoArquivo } from "@/components/campo-arquivo";
-import { useEnvioSemReset } from "@/components/envio-sem-reset";
 import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
+import { reservarAnexos } from "@/lib/acoes/anexos";
 import { editarNegocio } from "@/lib/acoes/negocios";
+import { enviarArquivosReservados } from "@/lib/anexos-navegador";
+import { arquivosEscolhidos, metaArquivo, problemaArquivo } from "@/lib/anexos-regras";
+import { criarClienteNavegador } from "@/lib/supabase/navegador";
+import type { ResultadoAcao } from "@/lib/tipos";
 
 type Opcao = { id: string; nome: string };
 
@@ -33,14 +38,43 @@ export function EdicaoNegocio({
   /** SDR não pode alterar o valor financeiro do negócio (spec RAION_SDR_REGRAS_PERMISSOES §39). */
   podeEditarValor?: boolean;
 }) {
-  const [resultado, acao, pendente] = useActionState(editarNegocio, null);
-  const enviar = useEnvioSemReset(acao);
-  // Sem o reset automático, o arquivo escolhido ficaria no campo: limpa só ele quando salva.
+  const router = useRouter();
+  const [resultado, setResultado] = useState<ResultadoAcao>(null);
+  const [pendente, iniciar] = useTransition();
+  // Sem o reset automático, o arquivo escolhido ficaria no campo: limpa só ele depois de tentar enviar.
   const [versaoArquivo, setVersaoArquivo] = useState(0);
-  const [ultimoResultado, setUltimoResultado] = useState(resultado);
-  if (resultado !== ultimoResultado) {
-    setUltimoResultado(resultado);
-    if (resultado?.ok) setVersaoArquivo((v) => v + 1);
+
+  /**
+   * Salva sem limpar o formulário (nada do que foi digitado se perde se o servidor recusar).
+   * A fatura não passa pela ação (limite de 1 MB): depois de salvar, vai direto ao Storage.
+   */
+  function enviar(evento: React.FormEvent<HTMLFormElement>) {
+    evento.preventDefault();
+    const formulario = new FormData(evento.currentTarget);
+    const [fatura] = arquivosEscolhidos(formulario, "anexo_fatura_energia");
+    formulario.delete("anexo_fatura_energia");
+    const problema = fatura ? problemaArquivo(metaArquivo(fatura)) : null;
+    if (problema) return setResultado({ ok: false, mensagem: `${problema} Escolha outro arquivo.` });
+    iniciar(async () => {
+      const r = await editarNegocio(null, formulario);
+      if (!r?.ok || !fatura) return setResultado(r);
+      const reserva = await reservarAnexos(negocio.id, [{ ...metaArquivo(fatura), categoria: "fatura_gerador" }]);
+      const falhas = reserva.ok
+        ? await enviarArquivosReservados(criarClienteNavegador(), [{ caminho: reserva.reservas[0].caminho, arquivo: fatura }])
+        : [fatura.name];
+      setVersaoArquivo((v) => v + 1);
+      router.refresh();
+      setResultado(
+        falhas.length
+          ? {
+              ok: false,
+              mensagem: reserva.ok
+                ? "Dados salvos, mas a fatura não chegou. Ela aparece como “não recebido” em Arquivos: remova e envie de novo."
+                : `Dados salvos, mas a fatura não foi anexada (${reserva.mensagem}). Envie de novo.`,
+            }
+          : { ok: true, mensagem: "Salvo." },
+      );
+    });
   }
   return (
     <form onSubmit={enviar} className="grid gap-3 md:grid-cols-2">

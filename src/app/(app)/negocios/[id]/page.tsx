@@ -4,6 +4,7 @@ import { ListaTarefas } from "@/components/lista-tarefas";
 import { MoverEtapa } from "@/components/mover-etapa";
 import { NovaTarefa } from "@/components/nova-tarefa";
 import { Cartao, Selo } from "@/components/ui";
+import { anexosNaoRecebidos } from "@/lib/anexos-servidor";
 import { AVISOS_CRIACAO, avisosDaUrl } from "@/lib/negocio-dados";
 import { apagarAnexo } from "@/lib/acoes/anexos";
 import { alternarEtiqueta } from "@/lib/acoes/negocios";
@@ -51,7 +52,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
     supabase
       .from("negocios")
       .select(
-        "id, numero, titulo, valor, descricao, status, funil_id, etapa_id, origem_id, responsavel_id, motivo_perda_id, motivo_perda_detalhe, fechado_em, created_at, updated_at, tipo_telhado, unidade_consumidora, padrao_cliente, estrutura_telhado, consumo_medio_kwh, valor_conta_energia, qualif_tipo_cliente, qualif_possui_conta_energia, qualif_distribuidora, qualif_imovel_proprio, qualif_objetivo, qualif_prazo_instalacao, qualif_busca_financiamento, qualif_orcamento_outra_empresa, qualif_e_decisor, qualif_outro_decisor, qualif_participantes_decisao, qualif_observacoes, contatos(id, nome, tipo, telefone, email, endereco, cidade, uf)",
+        "id, empresa_id, numero, titulo, valor, descricao, status, funil_id, etapa_id, origem_id, responsavel_id, motivo_perda_id, motivo_perda_detalhe, fechado_em, created_at, updated_at, tipo_telhado, unidade_consumidora, padrao_cliente, estrutura_telhado, consumo_medio_kwh, valor_conta_energia, qualif_tipo_cliente, qualif_possui_conta_energia, qualif_distribuidora, qualif_imovel_proprio, qualif_objetivo, qualif_prazo_instalacao, qualif_busca_financiamento, qualif_orcamento_outra_empresa, qualif_e_decisor, qualif_outro_decisor, qualif_participantes_decisao, qualif_observacoes, contatos(id, nome, tipo, telefone, email, endereco, cidade, uf)",
       )
       .eq("id", id)
       .maybeSingle(),
@@ -81,7 +82,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
         .order("vence_em"),
       supabase
         .from("anexos")
-        .select("id, nome, tamanho, categoria, enviado_por, created_at")
+        .select("id, nome, tamanho, categoria, enviado_por, created_at, caminho")
         .eq("negocio_id", id)
         .order("created_at", { ascending: false }),
       supabase.from("negocio_etiquetas").select("etiqueta_id").eq("negocio_id", id),
@@ -93,6 +94,9 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
         .eq("negocio_id", id)
         .maybeSingle(),
     ]);
+
+  // Registro sem arquivo no Storage: envio que não chegou (o navegador fechou, a rede caiu...).
+  const naoRecebidos = await anexosNaoRecebidos(supabase, negocio.empresa_id, id, anexos ?? []);
 
   const { data: componentes } = await supabase
     .from("kit_componentes")
@@ -231,6 +235,12 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
             Entendi
           </Link>
         </div>
+      )}
+      {naoRecebidos.size > 0 && !avisos.includes("anexos") && (
+        <p role="alert" className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          {naoRecebidos.size === 1 ? "1 arquivo registrado não chegou" : `${naoRecebidos.size} arquivos registrados não chegaram`}. Veja
+          em Arquivos: remova e envie de novo.
+        </p>
       )}
 
       <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
@@ -546,14 +556,20 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
                   key={a.id}
                   className="flex items-center gap-2 border-t border-zinc-100 py-2 text-sm first:border-t-0"
                 >
-                  <a
-                    href={`/anexos/${a.id}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="min-w-0 flex-1 truncate text-amber-700 hover:underline"
-                  >
-                    {a.nome}
-                  </a>
+                  {naoRecebidos.has(a.id) ? (
+                    <span className="min-w-0 flex-1 truncate text-zinc-500">
+                      {a.nome} <Selo tom="negativo">não recebido</Selo>
+                    </span>
+                  ) : (
+                    <a
+                      href={`/anexos/${a.id}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="min-w-0 flex-1 truncate text-amber-700 hover:underline"
+                    >
+                      {a.nome}
+                    </a>
+                  )}
                   {a.categoria !== "geral" && <Selo tom="atencao">{ROTULO_CATEGORIA_ANEXO[a.categoria as CategoriaAnexo]}</Selo>}
                   <span className="text-xs text-zinc-500">{tamanhoLegivel(a.tamanho)}</span>
                   {(souAdmin || a.enviado_por === atual.membroId) && (

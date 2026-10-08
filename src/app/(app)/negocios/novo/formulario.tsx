@@ -1,12 +1,14 @@
 "use client";
 
 import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, XCircle } from "lucide-react";
-import { useActionState, useId, useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { useId, useMemo, useState, useTransition } from "react";
 import { CampoArquivo } from "@/components/campo-arquivo";
 import { EditorComponentesKit, linhasParaComponentes, type LinhaComponente } from "@/components/kit-componentes";
-import { useEnvioSemReset } from "@/components/envio-sem-reset";
 import { Botao, Campo, Mensagem, Selecao, Selo } from "@/components/ui";
 import { buscarContatos, criarNegocio, verificarDuplicado, type Duplicado } from "@/lib/acoes/negocios";
+import { enviarArquivosReservados } from "@/lib/anexos-navegador";
+import { prepararEnvioCriacao } from "@/lib/anexos-regras";
 import {
   calcular,
   custosInternosEstimados,
@@ -16,7 +18,8 @@ import {
 } from "@/lib/calculadora";
 import { formatarCep, formatarMascaraMoeda, formatarMoeda, formatarTelefoneBr } from "@/lib/formatacao";
 import { montarEndereco } from "@/lib/negocio-dados";
-import { ROTULO_TIPO_LIGACAO, TIPOS_LIGACAO, type TipoLigacao } from "@/lib/tipos";
+import { criarClienteNavegador } from "@/lib/supabase/navegador";
+import { ROTULO_TIPO_LIGACAO, TIPOS_LIGACAO, type ResultadoAcao, type TipoLigacao } from "@/lib/tipos";
 
 type Opcao = { id: string; nome: string };
 type ContatoEncontrado = {
@@ -168,9 +171,10 @@ export function FormularioNegocio({
   meuMembroId: string;
   parametros: Parametros | null;
 }) {
-  const [resultado, acao, pendente] = useActionState(criarNegocio, null);
-  // Sem o reset automático: se o servidor recusar, nada do que foi digitado se perde.
-  const enviar = useEnvioSemReset(acao);
+  const router = useRouter();
+  const [resultado, setResultado] = useState<ResultadoAcao>(null);
+  const [pendente, iniciarEnvio] = useTransition();
+  const [enviandoArquivos, setEnviandoArquivos] = useState(false);
   const [etapaAtual, setEtapaAtual] = useState<1 | 2 | 3>(1);
   const [erroEtapa, setErroEtapa] = useState<string | null>(null);
 
@@ -305,14 +309,38 @@ export function FormularioNegocio({
     });
   }, [parametros, tipoLigacao, consumoMedioKwh, valorFaturaMedio, tarifaKwh, potenciaKwp, valor]);
 
-  // O contato novo foi gravado mas o negócio não: segue com ele como "existente" (o reenvio não duplica).
-  const [ultimoResultado, setUltimoResultado] = useState(resultado);
-  if (resultado !== ultimoResultado) {
-    setUltimoResultado(resultado);
-    if (resultado && !resultado.ok && resultado.contatoId) {
-      setContato({ id: resultado.contatoId, nome: contatoNome, telefone: contatoTelefone, email: contatoEmail || null });
-      setModo("existente");
-    }
+  /**
+   * Envio sem o reset automático (nada do que foi digitado se perde se o servidor recusar).
+   * Os arquivos não vão para a ação (limite de 1 MB): depois de criar o negócio, cada um vai
+   * direto ao Storage no caminho reservado; o que não chegar fica pendente na ficha.
+   */
+  function enviar(evento: React.FormEvent<HTMLFormElement>) {
+    evento.preventDefault();
+    const { dados, arquivos, problema } = prepararEnvioCriacao(new FormData(evento.currentTarget));
+    if (problema) return setResultado({ ok: false, mensagem: `${problema} Escolha outro arquivo.` });
+    setResultado(null);
+    iniciarEnvio(async () => {
+      const r = await criarNegocio(dados);
+      if (!r.ok) {
+        setResultado({ ok: false, mensagem: r.mensagem });
+        // O contato novo foi gravado mas o negócio não: segue com ele como "existente" (o reenvio não duplica).
+        if (r.contatoId) {
+          setContato({ id: r.contatoId, nome: contatoNome, telefone: contatoTelefone, email: contatoEmail || null });
+          setModo("existente");
+        }
+        return;
+      }
+      const avisos = [...r.avisos];
+      if (r.reservas.length) {
+        setEnviandoArquivos(true);
+        const falhas = await enviarArquivosReservados(
+          criarClienteNavegador(),
+          r.reservas.map((reserva, i) => ({ caminho: reserva.caminho, arquivo: arquivos[i].arquivo })),
+        );
+        if (falhas.length && !avisos.includes("anexos")) avisos.push("anexos");
+      }
+      router.push(`/negocios/${r.negocioId}${avisos.length ? `?avisos=${avisos.join(",")}` : ""}`);
+    });
   }
 
   function pesquisar(termo: string) {
@@ -815,7 +843,7 @@ export function FormularioNegocio({
             <ChevronLeft className="h-4 w-4" /> Voltar
           </Botao>
           <Botao type="submit" disabled={pendente || (modo === "existente" && !contato)}>
-            {pendente ? "Salvando..." : "Salvar negócio"}
+            {enviandoArquivos ? "Enviando arquivos..." : pendente ? "Salvando..." : "Salvar negócio"}
           </Botao>
         </div>
       </div>

@@ -1,10 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { z } from "zod";
 import { exigirPapel } from "@/lib/sessao";
-import { criarNegocioComCliente, editarNegocioComCliente } from "@/lib/negocios-gravacao";
+import { criarNegocioComCliente, editarNegocioComCliente, type ResultadoCriacao } from "@/lib/negocios-gravacao";
 import { FECHAR_NEGOCIO, NEGOCIOS, pode } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { mensagemErro } from "@/lib/erros";
@@ -17,18 +16,16 @@ const boolOpcional = z
   .optional()
   .transform((v) => (v === "sim" ? true : v === "nao" ? false : null));
 
-/** Cria o negócio pelo núcleo `criarNegocioComCliente`; gravação parcial vai como aviso na ficha. */
-export async function criarNegocio(
-  _: ResultadoAcao,
-  formData: FormData,
-): Promise<ResultadoAcao & { contatoId?: string }> {
+/**
+ * Cria o negócio pelo núcleo `criarNegocioComCliente`. Não redireciona: a tela ainda envia os
+ * arquivos direto ao Storage (caminhos em `reservas`) e depois abre a ficha com os avisos.
+ */
+export async function criarNegocio(formData: FormData): Promise<ResultadoCriacao> {
   const { atual } = await exigirPapel(...NEGOCIOS);
   const supabase = await criarClienteServidor();
   const r = await criarNegocioComCliente(supabase, atual, formData);
-  if (!r.ok) return r;
-
-  revalidatePath("/negocios");
-  redirect(`/negocios/${r.negocioId}${r.avisos.length ? `?avisos=${r.avisos.join(",")}` : ""}`);
+  if (r.ok) revalidatePath("/negocios");
+  return r;
 }
 
 /**

@@ -2,8 +2,9 @@
  * Gravação do negócio com Supabase local (roda no CI), pelo mesmo núcleo das ações
  * (`@/lib/negocios-gravacao`) e com o cliente autenticado de cada papel (RLS real).
  * Ciclo completo: criar → salvar → reabrir (mesma leitura da ficha) → editar → salvar → reabrir.
- * Cobre contato novo e existente, kit com e sem tarifa, anexos, falhas parciais (nunca como
- * sucesso) e a etapa fora do formulário de edição (SDR não fecha negócio por ali).
+ * Cobre contato novo e existente, kit com e sem tarifa (com restauração e reenvio seguro),
+ * reserva de anexos, falhas parciais (nunca como sucesso) e a etapa fora do formulário de
+ * edição (SDR não fecha negócio por ali). O caminho pelas ações fica em negocios-acoes-db.
  */
 import { beforeAll, describe, expect, it } from "vitest";
 import {
@@ -13,6 +14,7 @@ import {
   salvarKitComCliente,
   type Atual,
 } from "@/lib/negocios-gravacao";
+import { anexosNaoRecebidos } from "@/lib/anexos-servidor";
 import type { SupabaseServidor } from "@/lib/supabase/server";
 import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
 
@@ -262,6 +264,34 @@ describe("kit", () => {
     expect((await reabrir(vendedor, r2.negocioId)).kit).toEqual([]);
   });
 
+  it("cálculo recusado pelo banco restaura o kit anterior e só então diz que nada mudou", async () => {
+    const r = await criar(vendedor, novoNegocio({ componentes: KIT, consumo_medio_kwh: "450" }));
+    const kitForm = (extra: Record<string, string>) =>
+      fd({ negocioId: r.negocioId, tipoLigacao: "trifasico", consumoMedioKwh: "450", tarifaKwh: "0,95", componentes: KIT, ...extra });
+    expect((await salvarKitComCliente(cliente(vendedor), atual[vendedor.id], kitForm({}))).ok).toBe(true);
+    const { data: antes } = await servico.from("kit_componentes").select("id, descricao").eq("negocio_id", r.negocioId).order("ordem");
+    const calculoAntes = (await reabrir(vendedor, r.negocioId)).calculo;
+
+    // Tarifa acima do limite da coluna: o cálculo é montado, mas o banco recusa a gravação.
+    const outroKit = JSON.stringify([{ tipo: "modulo", descricao: "Módulo 600 W", potenciaW: 600, quantidade: 8 }]);
+    const res = await salvarKitComCliente(cliente(vendedor), atual[vendedor.id], kitForm({ tarifaKwh: "100000", componentes: outroKit }));
+    expect(res.ok).toBe(false);
+    expect(res.mensagem).toContain("Nada foi alterado");
+    const { data: depois } = await servico.from("kit_componentes").select("id, descricao").eq("negocio_id", r.negocioId).order("ordem");
+    expect(depois).toEqual(antes);
+    expect((await reabrir(vendedor, r.negocioId)).calculo).toEqual(calculoAntes);
+  });
+
+  it("reenviar é seguro: substitui a lista inteira, mesmo com itens repetidos de uma falha anterior", async () => {
+    const r = await criar(vendedor, novoNegocio({ componentes: KIT }));
+    // Simula o pior caso de uma falha sem restauração: itens repetidos.
+    await servico.from("kit_componentes").insert({ empresa_id: empresa, negocio_id: r.negocioId, tipo: "modulo", descricao: "Módulo 550 W", potencia_w: 550, quantidade: 10, ordem: 0 });
+    const form = () => fd({ negocioId: r.negocioId, tipoLigacao: "trifasico", tarifaKwh: "", componentes: KIT });
+    expect((await salvarKitComCliente(cliente(vendedor), atual[vendedor.id], form())).ok).toBe(true);
+    expect((await salvarKitComCliente(cliente(vendedor), atual[vendedor.id], form())).ok).toBe(true);
+    expect((await reabrir(vendedor, r.negocioId)).kit.map((k) => k.descricao)).toEqual(["Módulo 550 W", "Inversor 5 kW"]);
+  });
+
   it("cálculo que não fecha na criação vira aviso; os itens ficam salvos", async () => {
     const soInversor = JSON.stringify([{ tipo: "inversor", descricao: "Inversor 5 kW", potenciaW: 5000, quantidade: 1 }]);
     const r = await criar(vendedor, novoNegocio({ componentes: soInversor, tarifa_kwh: "0,95", consumo_medio_kwh: "450" }));
@@ -272,44 +302,40 @@ describe("kit", () => {
   });
 });
 
-describe("anexos", () => {
-  it("fotos e documentos entram como geral; arquivo acima de 20 MB vira aviso, não sucesso", async () => {
-    const r = await criar(vendedor, novoNegocio());
-    expect(r.avisos).toEqual([]);
+describe("anexos (reserva no servidor, conteúdo direto ao Storage)", () => {
+  const meta = (campo: string, nome: string, tamanho: number, tipoMime = "image/png") => ({ campo, nome, tamanho, tipoMime });
 
-    const r2 = await criarNegocioComCliente(
-      cliente(vendedor),
-      atual[vendedor.id],
-      (() => {
-        const f = novoNegocio();
-        f.append("anexo_geral", arquivo("foto.png"));
-        f.append("anexo_cnh_contato", arquivo("cnh.png"));
-        f.append("anexo_fatura_gerador", arquivo("fatura.pdf", 20 * 1024 * 1024 + 1, "application/pdf"));
-        return f;
-      })(),
+  it("arquivo vazio ou acima de 20 MB é recusado antes de criar qualquer coisa", async () => {
+    for (const [nome, tamanho] of [["vazio.png", 0], ["grande.pdf", 20 * 1024 * 1024 + 1]] as const) {
+      const titulo = `Recusado ${nome} ${sufixo}`;
+      const r = await criarNegocioComCliente(
+        cliente(vendedor),
+        atual[vendedor.id],
+        novoNegocio({ titulo, anexos: JSON.stringify([meta("anexo_geral", nome, tamanho)]) }),
+      );
+      expect(r.ok, nome).toBe(false);
+      const { count } = await servico.from("negocios").select("id", { count: "exact", head: true }).eq("titulo", titulo);
+      expect(count, nome).toBe(0);
+    }
+  });
+
+  it("reserva um registro por arquivo, com a categoria do campo; sem o arquivo, fica como não recebido", async () => {
+    const r = await criar(
+      vendedor,
+      novoNegocio({ anexos: JSON.stringify([meta("anexo_geral", "foto.png", 16), meta("anexo_cnh_contato", "cnh.png", 16)]) }),
     );
-    expect(r2.ok).toBe(true);
-    const id = r2.ok ? r2.negocioId : "";
-    expect(r2.ok && r2.avisos).toEqual(["anexos"]);
-    expect((await reabrir(vendedor, id)).anexos).toEqual([
+    expect(r.reservas).toHaveLength(2);
+    expect((await reabrir(vendedor, r.negocioId)).anexos).toEqual([
       { nome: "cnh.png", categoria: "cnh" },
       { nome: "foto.png", categoria: "geral" },
     ]);
 
-    // Edição: dados salvos, fatura grande recusada com mensagem (sem "Salvo.").
-    const antes = await reabrir(vendedor, r.negocioId);
-    const f = edicaoAtual(r.negocioId, antes.negocio, { titulo: "Com fatura grande" });
-    f.append("anexo_fatura_energia", arquivo("grande.pdf", 20 * 1024 * 1024 + 1, "application/pdf"));
-    const res = await editarNegocioComCliente(cliente(vendedor), atual[vendedor.id], f);
-    expect(res.ok).toBe(false);
-    expect(res.mensagem).toContain("Dados salvos, mas a fatura não foi anexada");
-    expect((await reabrir(vendedor, r.negocioId)).negocio.titulo).toBe("Com fatura grande");
-
-    // Fatura válida na edição: anexada como fatura do gerador.
-    const g = edicaoAtual(r.negocioId, antes.negocio, { titulo: "Com fatura" });
-    g.append("anexo_fatura_energia", arquivo("fatura.png"));
-    expect(await editarNegocioComCliente(cliente(vendedor), atual[vendedor.id], g)).toMatchObject({ ok: true, mensagem: "Salvo." });
-    expect((await reabrir(vendedor, r.negocioId)).anexos).toEqual([{ nome: "fatura.png", categoria: "fatura_gerador" }]);
+    // Só a foto chega ao Storage: a CNH continua identificável como não recebida ao reabrir.
+    const { error } = await vendedor.cliente.storage.from("anexos").upload(r.reservas[0].caminho, arquivo("foto.png"));
+    expect(error).toBeNull();
+    const { data: registros } = await vendedor.cliente.from("anexos").select("id, caminho").eq("negocio_id", r.negocioId);
+    const pendentes = await anexosNaoRecebidos(cliente(vendedor), empresa, r.negocioId, registros!);
+    expect([...pendentes]).toEqual([r.reservas[1].id]);
   });
 });
 

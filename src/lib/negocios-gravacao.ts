@@ -1,13 +1,14 @@
 import "server-only";
 import { z } from "zod";
-import { enviarAnexoComCliente, arquivosDoCampo } from "@/lib/anexos-servidor";
+import { ANEXOS_CRIACAO, problemaArquivo } from "@/lib/anexos-regras";
+import { arquivoMetaSchema, reservarAnexosComCliente, type Reserva } from "@/lib/anexos-servidor";
 import { componentesJsonSchema, nomeKitPersonalizado, potenciaKitPersonalizadoKwp, type ComponenteKit } from "@/lib/calculadora";
 import { montarLinhaCalculo } from "@/lib/calculo-servidor";
 import { mensagemErro } from "@/lib/erros";
 import { completarContato, type AvisoCriacao } from "@/lib/negocio-dados";
 import { EDITAR_VALOR_NEGOCIO, ESCOLHER_RESPONSAVEL_NEGOCIO, pode } from "@/lib/permissoes";
 import type { SupabaseServidor } from "@/lib/supabase/server";
-import { TIPOS_LIGACAO, type CategoriaAnexo, type Papel, type ResultadoAcao } from "@/lib/tipos";
+import { TIPOS_LIGACAO, type Papel, type ResultadoAcao } from "@/lib/tipos";
 
 /**
  * Núcleo da gravação do negócio, do kit e do contato. O cliente vem por parâmetro: as ações
@@ -53,6 +54,22 @@ const ufOpcional = z
   .optional()
   .transform((v) => (v ? v.toUpperCase().slice(0, 2) : null));
 
+/** Dados dos arquivos do cadastro (o conteúdo vai direto do navegador ao Storage, nunca pela ação). */
+const anexosCriacaoSchema = z
+  .string()
+  .default("[]")
+  .transform((v, ctx) => {
+    try {
+      const r = z
+        .array(arquivoMetaSchema.extend({ campo: z.string().refine((c) => ANEXOS_CRIACAO.some((a) => a.campo === c)) }))
+        .max(30, "No máximo 30 arquivos")
+        .safeParse(JSON.parse(v));
+      if (r.success) return r.data;
+    } catch {}
+    ctx.addIssue({ code: "custom", message: "Arquivos inválidos" });
+    return z.NEVER;
+  });
+
 const esquemaNovo = z.object({
   titulo: z.string().trim().min(2, "Informe o nome do negócio"),
   funil_id: z.string().uuid(),
@@ -83,18 +100,12 @@ const esquemaNovo = z.object({
   valor_fatura_medio: numeroBrOpcional,
   tarifa_kwh: numeroBrOpcional,
   componentes: componentesJsonSchema,
+  anexos: anexosCriacaoSchema,
 });
 
-/** Campos de arquivo do formulário de criação e a categoria de cada um. */
-export const ANEXOS_CRIACAO: { campo: string; categoria: CategoriaAnexo }[] = [
-  { campo: "anexo_cnh_contato", categoria: "cnh" },
-  { campo: "anexo_fatura_gerador", categoria: "fatura_gerador" },
-  // Fotos e outros documentos: categoria geral (antes caíam como "fatura do beneficiário").
-  { campo: "anexo_geral", categoria: "geral" },
-];
-
+/** `reservas[i]` é o caminho no Storage do i-ésimo arquivo de `anexos` (vazio se a reserva falhou). */
 export type ResultadoCriacao =
-  | { ok: true; negocioId: string; avisos: AvisoCriacao[] }
+  | { ok: true; negocioId: string; avisos: AvisoCriacao[]; reservas: Reserva[] }
   | { ok: false; mensagem: string; contatoId?: string };
 
 async function inserirItensKit(supabase: SupabaseServidor, empresaId: string, negocioId: string, componentes: ComponenteKit[]) {
@@ -119,6 +130,9 @@ export async function criarNegocioComCliente(supabase: SupabaseServidor, atual: 
   const dados = esquemaNovo.safeParse(Object.fromEntries(formData));
   if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
   const d = dados.data;
+  // Arquivo vazio ou grande demais: recusa antes de gravar qualquer coisa.
+  const problema = d.anexos.map(problemaArquivo).find(Boolean);
+  if (problema) return { ok: false, mensagem: `${problema} Escolha outro arquivo.` };
   const avisos: AvisoCriacao[] = [];
   const local = { endereco: d.contato_endereco, cidade: d.contato_cidade, uf: d.contato_uf };
 
@@ -230,17 +244,20 @@ export async function criarNegocioComCliente(supabase: SupabaseServidor, atual: 
     }
   }
 
-  // Anexos escolhidos ainda na criação: só dá para subir depois que o negócio existe (pasta por negócio).
-  const envios = await Promise.all(
-    ANEXOS_CRIACAO.flatMap(({ campo, categoria }) =>
-      arquivosDoCampo(formData, campo).map((arquivo) =>
-        enviarAnexoComCliente(supabase, { empresaId: atual.empresaId, negocioId: negocio.id, arquivo, categoria }),
-      ),
-    ),
-  );
-  if (envios.some((e) => !e.ok)) avisos.push("anexos");
+  // Anexos: só o registro é reservado aqui; o navegador envia o conteúdo direto ao Storage
+  // (sem passar pelo limite de 1 MB das Server Actions). Registro sem arquivo = pendente na ficha.
+  let reservas: Reserva[] = [];
+  if (d.anexos.length) {
+    const reserva = await reservarAnexosComCliente(supabase, {
+      empresaId: atual.empresaId,
+      negocioId: negocio.id,
+      arquivos: d.anexos.map((a) => ({ ...a, categoria: ANEXOS_CRIACAO.find((c) => c.campo === a.campo)!.categoria })),
+    });
+    if (reserva.ok) reservas = reserva.reservas;
+    else avisos.push("anexos");
+  }
 
-  return { ok: true, negocioId: negocio.id, avisos };
+  return { ok: true, negocioId: negocio.id, avisos, reservas };
 }
 
 // A etapa não é editada aqui: mudar de etapa é só pelo "Mover etapa"/Kanban (`moverEtapa`),
@@ -259,7 +276,7 @@ const esquemaEdicao = z.object({
   valor_conta_energia: numeroBrOpcional,
 });
 
-/** Salva "Dados do negócio" e, se escolhida, anexa a fatura de energia. */
+/** Salva "Dados do negócio". A fatura escolhida no formulário vai depois, direto ao Storage (ver `reservarAnexos`). */
 export async function editarNegocioComCliente(
   supabase: SupabaseServidor,
   atual: Atual,
@@ -288,18 +305,6 @@ export async function editarNegocioComCliente(
     .select("id");
   if (error || !data?.length) return { ok: false, mensagem: mensagemErro(error, "Não foi possível salvar.") };
 
-  const [fatura] = arquivosDoCampo(formData, "anexo_fatura_energia");
-  if (fatura) {
-    const envio = await enviarAnexoComCliente(supabase, {
-      empresaId: atual.empresaId,
-      negocioId: d.negocioId,
-      arquivo: fatura,
-      categoria: "fatura_gerador",
-    });
-    if (!envio.ok) {
-      return { ok: false, negocioId: d.negocioId, mensagem: `Dados salvos, mas a fatura não foi anexada (${envio.motivo}). Envie de novo.` };
-    }
-  }
   return { ok: true, negocioId: d.negocioId, mensagem: "Salvo." };
 }
 
@@ -314,12 +319,49 @@ const esquemaKit = z.object({
   observacoes: z.string().trim().max(2000, "Máximo de 2.000 caracteres").optional(),
 });
 
+type ItemKitSalvo = {
+  id: string;
+  empresa_id: string;
+  negocio_id: string;
+  tipo: ComponenteKit["tipo"];
+  descricao: string;
+  potencia_w: number | null;
+  quantidade: number;
+  ordem: number;
+};
+
+/**
+ * Volta o kit do negócio exatamente para `antigos` (apaga o que sobrou, reinsere o que sumiu, com
+ * os mesmos ids). Idempotente. Devolve se conseguiu confirmar o estado anterior.
+ */
+async function restaurarKit(supabase: SupabaseServidor, negocioId: string, antigos: ItemKitSalvo[]): Promise<boolean> {
+  const { data: atuais, error } = await supabase.from("kit_componentes").select("id").eq("negocio_id", negocioId);
+  if (error || !atuais) return false;
+  const idsAntigos = new Set(antigos.map((a) => a.id));
+  const idsAtuais = new Set(atuais.map((a) => a.id));
+  const sobrando = atuais.filter((a) => !idsAntigos.has(a.id)).map((a) => a.id);
+  const faltando = antigos.filter((a) => !idsAtuais.has(a.id));
+  if (sobrando.length) {
+    const { data, error: erro } = await supabase.from("kit_componentes").delete().in("id", sobrando).select("id");
+    if (erro || data?.length !== sobrando.length) return false;
+  }
+  if (faltando.length) {
+    const { error: erro } = await supabase.from("kit_componentes").insert(faltando);
+    if (erro) return false;
+  }
+  return true;
+}
+
+const KIT_INCERTO = "O kit não pôde ser conferido depois da falha: confira os itens e salve de novo (salvar de novo substitui a lista inteira).";
+
 /**
  * Salva os itens do kit (com ou sem tarifa) e, com tarifa, recalcula o cálculo solar. O preço
  * usado no payback é o valor do negócio (o kit personalizado não tem preço por item).
  *
- * Ordem segura: o cálculo é montado antes de gravar qualquer coisa; os itens novos entram antes
- * de apagar os antigos (se a inserção falha, o kit anterior continua inteiro).
+ * Sem transação no banco: o cálculo é montado antes de gravar qualquer coisa; os itens novos
+ * entram antes de apagar os antigos; se algo falha depois de mexer nos itens, o kit anterior é
+ * restaurado. "Nada foi alterado" só aparece quando a restauração foi confirmada. Reenviar é
+ * sempre seguro: cada envio substitui a lista inteira pelo que está na tela.
  */
 export async function salvarKitComCliente(
   supabase: SupabaseServidor,
@@ -330,12 +372,16 @@ export async function salvarKitComCliente(
   if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
   const d = dados.data;
 
-  const [{ data: negocio }, { data: calculoAtual }, { data: itensAntigos }] = await Promise.all([
+  const [{ data: negocio }, { data: calculoAtual }, { data: itensAntigos, error: erroAntigos }] = await Promise.all([
     supabase.from("negocios").select("valor").eq("id", d.negocioId).maybeSingle(),
     supabase.from("calculos_solares").select("id").eq("negocio_id", d.negocioId).maybeSingle(),
-    supabase.from("kit_componentes").select("id").eq("negocio_id", d.negocioId),
+    supabase
+      .from("kit_componentes")
+      .select("id, empresa_id, negocio_id, tipo, descricao, potencia_w, quantidade, ordem")
+      .eq("negocio_id", d.negocioId),
   ]);
   if (!negocio) return { ok: false, mensagem: "Negócio não encontrado." };
+  if (erroAntigos || !itensAntigos) return { ok: false, mensagem: "Não foi possível ler o kit atual. Nada foi alterado." };
 
   let montado: Awaited<ReturnType<typeof montarLinhaCalculo>> | null = null;
   if (d.tarifaKwh != null) {
@@ -353,19 +399,21 @@ export async function salvarKitComCliente(
     return { ok: false, mensagem: "Informe a tarifa para recalcular — sem ela o cálculo salvo ficaria desatualizado. Nada foi alterado." };
   }
 
-  // Substitui a lista de itens: novos primeiro, antigos depois.
-  let novos: string[] = [];
+  // Substitui a lista de itens: novos primeiro (uma inserção, tudo ou nada), antigos depois.
   if (d.componentes.length) {
-    const { data: inseridos, error } = await inserirItensKit(supabase, atual.empresaId, d.negocioId, d.componentes);
-    if (error || !inseridos) return { ok: false, mensagem: "Não foi possível salvar os itens do kit. Nada foi alterado." };
-    novos = inseridos.map((i) => i.id);
+    const { error } = await inserirItensKit(supabase, atual.empresaId, d.negocioId, d.componentes);
+    if (error) return { ok: false, mensagem: "Não foi possível salvar os itens do kit. Nada foi alterado." };
   }
-  const antigos = (itensAntigos ?? []).map((i) => i.id);
+  const antigos = itensAntigos.map((i) => i.id);
   if (antigos.length) {
-    const { error } = await supabase.from("kit_componentes").delete().in("id", antigos);
-    if (error) {
-      if (novos.length) await supabase.from("kit_componentes").delete().in("id", novos);
-      return { ok: false, mensagem: "Não foi possível substituir os itens do kit. Nada foi alterado." };
+    const { data: apagados, error } = await supabase.from("kit_componentes").delete().in("id", antigos).select("id");
+    if (error || apagados?.length !== antigos.length) {
+      const restaurado = await restaurarKit(supabase, d.negocioId, itensAntigos);
+      return {
+        ok: false,
+        negocioId: d.negocioId,
+        mensagem: restaurado ? "Não foi possível substituir os itens do kit. Nada foi alterado." : `Não foi possível substituir os itens do kit. ${KIT_INCERTO}`,
+      };
     }
   }
 
@@ -381,7 +429,14 @@ export async function salvarKitComCliente(
       { onConflict: "negocio_id", ignoreDuplicates: false },
     );
     if (error) {
-      return { ok: false, negocioId: d.negocioId, mensagem: mensagemErro(error, "Itens do kit salvos, mas o cálculo não foi atualizado. Salve de novo.") };
+      // O cálculo anterior continua como estava (o upsert é uma instrução só); volta os itens.
+      const restaurado = await restaurarKit(supabase, d.negocioId, itensAntigos);
+      const motivo = mensagemErro(error, "Não foi possível salvar o cálculo.");
+      return {
+        ok: false,
+        negocioId: d.negocioId,
+        mensagem: restaurado ? `${motivo} Nada foi alterado.` : `${motivo} ${KIT_INCERTO}`,
+      };
     }
   }
 
@@ -391,7 +446,11 @@ export async function salvarKitComCliente(
     .eq("id", d.negocioId)
     .select("id");
   if (erroEstrutura || !estrutura?.length) {
-    return { ok: false, negocioId: d.negocioId, mensagem: "Kit salvo, mas a estrutura do telhado não foi gravada. Salve de novo." };
+    return {
+      ok: false,
+      negocioId: d.negocioId,
+      mensagem: `${montado ? "Kit e cálculo salvos" : "Itens do kit salvos"}, mas a estrutura do telhado não foi gravada. Salve de novo.`,
+    };
   }
 
   return {
