@@ -1,18 +1,22 @@
 import "server-only";
 import type { SupabaseServidor } from "@/lib/supabase/server";
 import type { Papel } from "@/lib/tipos";
-import { SETORES_OPERACIONAIS, STATUS_INICIAL, type SetorOperacional } from "./rotulos";
+import { SETORES_OPERACIONAIS, type SetorOperacional } from "./rotulos";
 
+/**
+ * Responsável principal. `nome` nulo = não foi possível resolver a identidade (a tela mostra
+ * "Responsável indisponível"; nada aqui confirma que o membro esteja inativo).
+ */
 export type PrincipalVM = { membroId: string; nome: string | null; avatarCaminho: string | null };
 
+/**
+ * Mínimo que a carteira renderiza. O motivo da parada e as datas ficam para a futura
+ * /obras/[id]; aqui só o fato (parado / aguardando / status).
+ */
 export type SetorResumoVM = {
   status: string;
-  statusDesde: string | null;
   parado: boolean;
-  paradoMotivo: string | null;
   aguardando: string | null;
-  aguardandoDesde: string | null;
-  concluidoEm: string | null;
   principal: PrincipalVM | null;
 };
 
@@ -34,7 +38,8 @@ export type ObraResumoVM = {
   alertaEstorno: boolean;
   vendaAlterada: boolean;
   criadaEm: string;
-  setores: Record<SetorOperacional, SetorResumoVM>;
+  /** `null` = fluxo ausente em obra_fluxos (inconsistência de dados): nada é inventado. */
+  setores: Record<SetorOperacional, SetorResumoVM | null>;
 };
 
 type SessaoObras = { papel: Papel; empresaId: string; membroId: string };
@@ -57,8 +62,7 @@ type LinhaObra = {
 const COLUNAS_OBRA =
   "id, numero, cliente_nome, cidade, uf, potencia_kwp, tipo_ligacao, pausada_em, cancelada_em, alerta_pagamento_estornado_em, venda_alterada_em, created_at";
 
-const COLUNAS_FLUXO =
-  "obra_id, setor, status, status_desde, parado, parado_motivo, aguardando, aguardando_desde, concluido_em";
+const COLUNAS_FLUXO = "obra_id, setor, status, parado, aguardando";
 
 async function lerObras(supabase: SupabaseServidor, sessao: SessaoObras): Promise<LinhaObra[]> {
   if (sessao.papel === "operacao") {
@@ -116,7 +120,8 @@ export async function carregarObras(
   const fluxoDe = new Map<string, NonNullable<typeof fluxos.data>[number]>();
   for (const f of fluxos.data ?? []) fluxoDe.set(`${f.obra_id}:${f.setor}`, f);
 
-  // Membro inativo não aparece em identidade_membros: nome nulo ("Ex-colaborador" na tela).
+  // Quem não vem em identidade_membros fica com nome nulo ("Responsável indisponível").
+  // identidade_membros não informa o motivo (inativo, outra empresa…), então nada é presumido.
   const identidade = new Map((identidades.data ?? []).map((m) => [m.membro_id, m]));
   const principalDe = new Map<string, PrincipalVM>();
   for (const p of principais.data ?? []) {
@@ -129,19 +134,18 @@ export async function carregarObras(
   }
 
   return obras.map((o) => {
-    const setores = {} as Record<SetorOperacional, SetorResumoVM>;
+    const setores = {} as Record<SetorOperacional, SetorResumoVM | null>;
     for (const s of SETORES_OPERACIONAIS) {
       const f = fluxoDe.get(`${o.id}:${s}`);
-      setores[s] = {
-        status: f?.status ?? STATUS_INICIAL[s],
-        statusDesde: f?.status_desde ?? null,
-        parado: f?.parado ?? false,
-        paradoMotivo: f?.parado_motivo ?? null,
-        aguardando: f?.aguardando ?? null,
-        aguardandoDesde: f?.aguardando_desde ?? null,
-        concluidoEm: f?.concluido_em ?? null,
-        principal: principalDe.get(`${o.id}:${s}`) ?? null,
-      };
+      // Fluxo ausente: não sintetiza status; a tela mostra "Indisponível" e alerta.
+      setores[s] = f
+        ? {
+            status: f.status,
+            parado: f.parado,
+            aguardando: f.aguardando,
+            principal: principalDe.get(`${o.id}:${s}`) ?? null,
+          }
+        : null;
     }
     return {
       id: o.id,

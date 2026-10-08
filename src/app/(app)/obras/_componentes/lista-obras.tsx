@@ -64,13 +64,20 @@ export function ListaObras({
           onChange={(e) => setEstadoSetor(e.target.value as EstadoSetor | "todos")}
         >
           <option value="todos">Qualquer estado do setor</option>
-          {(["parado", "aguardando", "em_andamento", "nao_iniciado", "concluido"] as const).map(
-            (e) => (
-              <option key={e} value={e}>
-                {ROTULO_ESTADO_SETOR[e]}
-              </option>
-            ),
-          )}
+          {(
+            [
+              "parado",
+              "aguardando",
+              "em_andamento",
+              "nao_iniciado",
+              "concluido",
+              "indisponivel",
+            ] as const
+          ).map((e) => (
+            <option key={e} value={e}>
+              {ROTULO_ESTADO_SETOR[e]}
+            </option>
+          ))}
         </Selecao>
         <Selecao
           aria-label="Estado da obra"

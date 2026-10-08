@@ -11,14 +11,22 @@ import {
 
 export type FluxoEstado = { status: string; parado: boolean; aguardando: string | null };
 
-export type EstadoSetor = "concluido" | "parado" | "aguardando" | "nao_iniciado" | "em_andamento";
+export type EstadoSetor =
+  | "indisponivel"
+  | "concluido"
+  | "parado"
+  | "aguardando"
+  | "nao_iniciado"
+  | "em_andamento";
 
 /**
- * Precedência: parado > aguardando > concluído > não iniciado > em andamento.
- * Parado e aguardando são fatos que bloqueiam e precisam ficar visíveis mesmo que o status
- * já esteja no fim do fluxo (ex.: setor concluído e depois marcado como parado → "parado").
+ * Precedência: indisponível (fluxo ausente) > parado > aguardando > concluído > não
+ * iniciado > em andamento. Fluxo ausente é inconsistência de dados: nenhum status é
+ * inventado. Parado e aguardando são fatos que bloqueiam e precisam ficar visíveis mesmo
+ * que o status já esteja no fim do fluxo.
  */
-export function estadoSetor(setor: SetorOperacional, fluxo: FluxoEstado): EstadoSetor {
+export function estadoSetor(setor: SetorOperacional, fluxo: FluxoEstado | null): EstadoSetor {
+  if (!fluxo) return "indisponivel";
   if (fluxo.parado) return "parado";
   if (fluxo.aguardando != null) return "aguardando";
   if (fluxo.status === STATUS_FINAL[setor]) return "concluido";
@@ -27,6 +35,7 @@ export function estadoSetor(setor: SetorOperacional, fluxo: FluxoEstado): Estado
 }
 
 export const ROTULO_ESTADO_SETOR: Record<EstadoSetor, string> = {
+  indisponivel: "Indisponível",
   concluido: "Concluído",
   parado: "Parado",
   aguardando: "Aguardando",
@@ -39,7 +48,8 @@ export type ObraEstado = {
   cancelada: boolean;
   alertaEstorno: boolean;
   vendaAlterada: boolean;
-  setores: Record<SetorOperacional, FluxoEstado>;
+  /** `null` = fluxo ausente. */
+  setores: Record<SetorOperacional, FluxoEstado | null>;
 };
 
 export type EstadoObra =
@@ -47,6 +57,7 @@ export type EstadoObra =
   | "pausada"
   | "estorno"
   | "venda_alterada"
+  | "fluxo_ausente"
   | "parado"
   | "aguardando"
   | "concluida";
@@ -56,6 +67,7 @@ export const ROTULO_ESTADO_OBRA: Record<EstadoObra, string> = {
   pausada: "Pausada",
   estorno: "Pagamento estornado",
   venda_alterada: "Venda alterada",
+  fluxo_ausente: "Fluxo ausente",
   parado: "Setor parado",
   aguardando: "Aguardando terceiro",
   concluida: "Concluída",
@@ -82,10 +94,20 @@ export function estadosObra(obra: ObraEstado): EstadoObra[] {
   if (obra.pausada) lista.push("pausada");
   if (obra.alertaEstorno) lista.push("estorno");
   if (obra.vendaAlterada) lista.push("venda_alterada");
+  if (SETORES_OPERACIONAIS.some((s) => e[s] === "indisponivel")) lista.push("fluxo_ausente");
   if (SETORES_OPERACIONAIS.some((s) => e[s] === "parado")) lista.push("parado");
   if (SETORES_OPERACIONAIS.some((s) => e[s] === "aguardando")) lista.push("aguardando");
   if (SETORES_OPERACIONAIS.every((s) => e[s] === "concluido")) lista.push("concluida");
   return lista;
+}
+
+/** Alertas factuais: estorno, venda alterada ou fluxo ausente (inconsistência de dados). */
+export function temAlerta(obra: ObraEstado): boolean {
+  return (
+    obra.alertaEstorno ||
+    obra.vendaAlterada ||
+    SETORES_OPERACIONAIS.some((s) => obra.setores[s] == null)
+  );
 }
 
 export type Kpis = {
@@ -99,7 +121,10 @@ export type Kpis = {
   comAlerta: number;
 };
 
-/** Contagens simples (sem percentuais). Em andamento = não cancelada e não concluída. */
+/**
+ * Contagens simples (sem percentuais). Em andamento = não cancelada e não concluída.
+ * Com alerta = estorno, venda alterada ou fluxo ausente.
+ */
 export function kpis(lista: readonly ObraEstado[]): Kpis {
   const k: Kpis = {
     total: lista.length,
@@ -120,7 +145,7 @@ export function kpis(lista: readonly ObraEstado[]): Kpis {
     if (concluida) k.concluidas++;
     if (obra.pausada) k.pausadas++;
     if (obra.cancelada) k.canceladas++;
-    if (obra.alertaEstorno || obra.vendaAlterada) k.comAlerta++;
+    if (temAlerta(obra)) k.comAlerta++;
   }
   return k;
 }
@@ -168,7 +193,7 @@ export function filtrar<T extends ObraFiltravel>(lista: readonly T[], f: Filtros
       case "cancelada":
         return obra.cancelada;
       case "alerta":
-        return obra.alertaEstorno || obra.vendaAlterada;
+        return temAlerta(obra);
       default:
         return true;
     }

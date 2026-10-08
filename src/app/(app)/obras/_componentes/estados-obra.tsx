@@ -7,6 +7,7 @@ const TOM: Record<EstadoObra, "neutro" | "positivo" | "negativo" | "atencao"> = 
   pausada: "atencao",
   estorno: "atencao",
   venda_alterada: "atencao",
+  fluxo_ausente: "atencao",
   parado: "atencao",
   aguardando: "neutro",
   concluida: "positivo",

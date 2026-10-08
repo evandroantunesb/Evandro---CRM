@@ -5,6 +5,7 @@ import type { SetorResumoVM } from "@/lib/obras/dados";
 import { ROTULO_AGUARDANDO, rotuloStatus, type SetorOperacional } from "@/lib/obras/rotulos";
 
 export const TOM_ESTADO_SETOR: Record<EstadoSetor, "neutro" | "positivo" | "atencao"> = {
+  indisponivel: "atencao",
   concluido: "positivo",
   parado: "atencao",
   aguardando: "atencao",
@@ -19,11 +20,23 @@ export function SetorCelula({
   urlsAvatar,
 }: {
   setor: SetorOperacional;
-  dados: SetorResumoVM;
+  dados: SetorResumoVM | null;
   urlsAvatar: Record<string, string>;
 }) {
   const estado = estadoSetor(setor, dados);
-  const nome = dados.principal ? (dados.principal.nome ?? "Ex-colaborador") : null;
+  if (!dados) {
+    // Fluxo ausente: inconsistência de dados. Nenhum status é inventado.
+    return (
+      <div className="flex flex-col gap-1">
+        <span className="text-sm text-zinc-500">Fluxo ausente</span>
+        <div>
+          <Selo tom={TOM_ESTADO_SETOR[estado]}>{ROTULO_ESTADO_SETOR[estado]}</Selo>
+        </div>
+      </div>
+    );
+  }
+  // Nome não resolvido não prova inatividade: rótulo neutro.
+  const nome = dados.principal ? (dados.principal.nome ?? "Responsável indisponível") : null;
   const foto = dados.principal?.avatarCaminho
     ? (urlsAvatar[dados.principal.avatarCaminho] ?? null)
     : null;
@@ -38,9 +51,6 @@ export function SetorCelula({
           </span>
         )}
       </div>
-      {dados.parado && dados.paradoMotivo && (
-        <span className="text-xs text-zinc-500">{dados.paradoMotivo}</span>
-      )}
       {nome && (
         <span className="flex items-center gap-1.5 text-xs text-zinc-600">
           <Avatar nome={nome} tamanho={18} src={foto} />

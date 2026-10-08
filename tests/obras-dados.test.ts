@@ -62,7 +62,7 @@ const FLUXOS = [
 ];
 const PRINCIPAIS = [
   { obra_id: "o1", membro_id: "m1", setor: "compras" },
-  { obra_id: "o1", membro_id: "m-ex", setor: "engenharia" },
+  { obra_id: "o1", membro_id: "m-unresolvido", setor: "engenharia" },
 ];
 const IDENTIDADES = [{ membro_id: "m1", nome: "Ana Souza", avatar_caminho: "a/ana.png" }];
 
@@ -173,25 +173,24 @@ describe("carregarObras", () => {
     for (const c of chamadas.filter((c) => c.select)) expect(c.select).not.toContain("snapshot");
 
     const s = r[0].setores;
-    expect(s.compras).toMatchObject({
+    // Carteira mínima: só status, parado, aguardando e principal (sem motivo nem datas).
+    expect(s.compras).toEqual({
       status: "cotando",
       parado: true,
-      paradoMotivo: "Sem fornecedor",
+      aguardando: null,
+      principal: { membroId: "m1", nome: "Ana Souza", avatarCaminho: "a/ana.png" },
     });
-    expect(s.compras.principal).toEqual({
-      membroId: "m1",
-      nome: "Ana Souza",
-      avatarCaminho: "a/ana.png",
+    expect(JSON.stringify(r)).not.toContain("Sem fornecedor");
+    expect(JSON.stringify(r)).not.toContain("2026-10-03");
+    expect(s.engenharia?.aguardando).toBe("cliente");
+    // Identidade não resolvida: nome nulo (tela: "Responsável indisponível"), sem presumir inatividade.
+    expect(s.engenharia?.principal).toEqual({
+      membroId: "m-unresolvido",
+      nome: null,
+      avatarCaminho: null,
     });
-    expect(s.engenharia.aguardando).toBe("cliente");
-    // membro inativo: sem nome (a tela mostra "Ex-colaborador")
-    expect(s.engenharia.principal).toEqual({ membroId: "m-ex", nome: null, avatarCaminho: null });
-    // fluxo ausente: status inicial
-    expect(s.operacional).toMatchObject({
-      status: "aguardando_liberacao",
-      parado: false,
-      principal: null,
-    });
+    // Fluxo ausente: nada é inventado.
+    expect(s.operacional).toBeNull();
     semVazamento(r);
   });
 

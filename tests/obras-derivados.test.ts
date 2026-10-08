@@ -36,7 +36,7 @@ const fluxo = (
 
 function obra(
   o: Partial<ObraFiltravel> & {
-    s?: Partial<Record<"compras" | "engenharia" | "operacional", ReturnType<typeof fluxo>>>;
+    s?: Partial<Record<"compras" | "engenharia" | "operacional", ReturnType<typeof fluxo> | null>>;
   } = {},
 ): ObraFiltravel {
   const { s, ...resto } = o;
@@ -205,5 +205,22 @@ describe("filtrar", () => {
         estadoSetor: "parado",
       }),
     ).toEqual([b]);
+  });
+});
+
+describe("fluxo ausente (inconsistência de dados)", () => {
+  it("setor sem fluxo fica indisponível: nenhum status é inventado", () => {
+    expect(estadoSetor("operacional", null)).toBe("indisponivel");
+  });
+
+  it("vira alerta factual na obra, não conta como concluída e entra no filtro de alerta", () => {
+    const semFluxo = obra({ s: { ...concluidas, operacional: null } });
+    expect(estadosObra(semFluxo)).toEqual(["fluxo_ausente"]);
+    const k = kpis([semFluxo, obra()]);
+    expect(k.comAlerta).toBe(1);
+    expect(k.concluidas).toBe(0);
+    expect(k.emAndamento).toBe(2);
+    expect(filtrar([semFluxo, obra()], { estadoObra: "alerta" })).toEqual([semFluxo]);
+    expect(filtrar([semFluxo, obra()], { estadoSetor: "indisponivel" })).toEqual([semFluxo]);
   });
 });

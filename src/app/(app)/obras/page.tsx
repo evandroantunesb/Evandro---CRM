@@ -17,7 +17,7 @@ export default async function Obras() {
   const k = kpis(obras);
 
   const caminhos = obras.flatMap((o) =>
-    Object.values(o.setores).map((s) => s.principal?.avatarCaminho),
+    Object.values(o.setores).map((s) => s?.principal?.avatarCaminho),
   );
   const urlsAvatar = Object.fromEntries(await assinarAvatares(supabase, caminhos));
 
