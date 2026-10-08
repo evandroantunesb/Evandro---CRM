@@ -53,3 +53,10 @@ export function avisosDaUrl(valor: string | string[] | undefined): AvisoCriacao[
   const texto = Array.isArray(valor) ? valor.join(",") : (valor ?? "");
   return [...new Set(texto.split(","))].filter((c): c is AvisoCriacao => Object.hasOwn(AVISOS_CRIACAO, c));
 }
+
+/** Remover todos os itens de um kit salvo: recusado com cálculo associado (ficaria inconsistente). */
+export const MENSAGEM_REMOCAO_COM_CALCULO =
+  "Este kit tem cálculo solar salvo. Remover todos os equipamentos deixaria o cálculo sem kit, por isso a remoção foi recusada. Para trocar o kit, monte os novos itens e salve com a tarifa. Nada foi alterado.";
+
+/** Remover um kit salvo sem cálculo: só com confirmação explícita. */
+export const MENSAGEM_REMOCAO_SEM_CONFIRMACAO = "Para remover o kit salvo, confirme a remoção. Nada foi alterado.";

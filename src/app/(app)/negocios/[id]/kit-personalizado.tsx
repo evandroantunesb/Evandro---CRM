@@ -13,6 +13,7 @@ import {
   sugerirQuantidadeModulos,
 } from "@/lib/calculadora";
 import { formatarMoeda } from "@/lib/formatacao";
+import { MENSAGEM_REMOCAO_COM_CALCULO } from "@/lib/negocio-dados";
 import { ROTULO_TIPO_COMPONENTE_KIT, ROTULO_TIPO_LIGACAO, TIPOS_LIGACAO, type TipoComponenteKit, type TipoLigacao } from "@/lib/tipos";
 
 export type ComponenteSalvo = {
@@ -89,29 +90,46 @@ export function KitPersonalizado({
     if (resultado?.ok) setEditando(false);
   }
 
-  const [linhas, setLinhas] = useState<LinhaComponente[]>(() =>
+  const linhasSalvas = () =>
     componentesSalvos.map((c) => ({
       tipo: c.tipo,
       descricao: c.descricao,
       potenciaW: c.potenciaW != null ? numeroBr(c.potenciaW) : "",
       quantidade: String(c.quantidade),
-    })),
-  );
-  const [estrutura, setEstrutura] = useState(estruturaTelhado ?? "");
-  const [tipoLigacao, setTipoLigacao] = useState<TipoLigacao>(calculo?.tipoLigacao ?? "trifasico");
-  const [consumoMedioKwh, setConsumoMedioKwh] = useState(() => {
-    if (calculo) return numeroBr(calculo.consumoMedioKwh);
-    return consumoMedioKwhPadrao != null ? numeroBr(consumoMedioKwhPadrao) : "";
-  });
+    }));
+  const consumoSalvo = () => (calculo ? numeroBr(calculo.consumoMedioKwh) : consumoMedioKwhPadrao != null ? numeroBr(consumoMedioKwhPadrao) : "");
   // Ao reabrir, vem o valor da conta já salvo no cálculo (antes vinha vazio e se perdia ao salvar de novo).
-  const [valorFaturaMedio, setValorFaturaMedio] = useState(() => {
+  const faturaSalva = () => {
     const salvo = calculo ? calculo.valorFaturaMedio : valorFaturaMedioPadrao;
     return salvo != null ? numeroBr(salvo) : "";
-  });
+  };
+  const [linhas, setLinhas] = useState<LinhaComponente[]>(linhasSalvas);
+  const [estrutura, setEstrutura] = useState(estruturaTelhado ?? "");
+  const [tipoLigacao, setTipoLigacao] = useState<TipoLigacao>(calculo?.tipoLigacao ?? "trifasico");
+  const [consumoMedioKwh, setConsumoMedioKwh] = useState(consumoSalvo);
+  const [valorFaturaMedio, setValorFaturaMedio] = useState(faturaSalva);
   const [tarifaKwh, setTarifaKwh] = useState(calculo ? numeroBr(calculo.tarifaKwh) : "");
+  const [confirmaRemocao, setConfirmaRemocao] = useState(false);
+  // Muda a cada Cancelar para recriar o campo de observações (não controlado) com o valor salvo.
+  const [versaoObservacoes, setVersaoObservacoes] = useState(0);
+
+  /** Cancelar: não grava nada; só descarta o que foi mexido na tela e volta ao que está salvo. */
+  function cancelarEdicao() {
+    setLinhas(linhasSalvas());
+    setEstrutura(estruturaTelhado ?? "");
+    setTipoLigacao(calculo?.tipoLigacao ?? "trifasico");
+    setConsumoMedioKwh(consumoSalvo());
+    setValorFaturaMedio(faturaSalva());
+    setTarifaKwh(calculo ? numeroBr(calculo.tarifaKwh) : "");
+    setConfirmaRemocao(false);
+    setVersaoObservacoes((v) => v + 1);
+    if (calculo) setEditando(false);
+  }
 
   const componentes = useMemo(() => linhasParaComponentes(linhas), [linhas]);
   const potenciaKwp = potenciaKitPersonalizadoKwp(componentes);
+  // Tirou todos os itens de um kit salvo: isso é remover o kit (com cálculo, o servidor recusa).
+  const removendoKitSalvo = componentesSalvos.length > 0 && componentes.length === 0;
 
   // Consumo médio em kWh, vindo do campo direto ou calculado a partir da fatura + tarifa.
   const consumoMedioEstimado = useMemo(() => {
@@ -320,18 +338,38 @@ export function KitPersonalizado({
       <label className="flex flex-col gap-1 text-sm">
         <span className="font-medium text-zinc-700">Observações (opcional)</span>
         <textarea
+          key={versaoObservacoes}
           name="observacoes"
           rows={2}
           defaultValue={calculo?.observacoes ?? ""}
           className="rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-dourado focus:ring-2 focus:ring-dourado/20"
         />
       </label>
+      {removendoKitSalvo &&
+        (calculo ? (
+          <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">{MENSAGEM_REMOCAO_COM_CALCULO}</p>
+        ) : (
+          <label className="flex items-start gap-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            <input
+              type="checkbox"
+              name="confirmarRemocao"
+              value="sim"
+              checked={confirmaRemocao}
+              onChange={(e) => setConfirmaRemocao(e.target.checked)}
+              className="mt-1"
+            />
+            <span>
+              Confirmo a remoção do kit salvo ({componentesSalvos.length} {componentesSalvos.length === 1 ? "item" : "itens"}). Para
+              manter o kit, use Cancelar.
+            </span>
+          </label>
+        ))}
       <div className="flex items-center gap-2">
-        <Botao type="submit" disabled={pendente}>
-          {pendente ? "Salvando..." : numero(tarifaKwh) ? "Salvar kit e calcular" : "Salvar kit"}
+        <Botao type="submit" disabled={pendente || (removendoKitSalvo && (!!calculo || !confirmaRemocao))}>
+          {pendente ? "Salvando..." : removendoKitSalvo ? "Remover kit salvo" : numero(tarifaKwh) ? "Salvar kit e calcular" : "Salvar kit"}
         </Botao>
-        {calculo && (
-          <Botao type="button" variante="secundario" onClick={() => setEditando(false)}>
+        {(calculo || componentesSalvos.length > 0) && (
+          <Botao type="button" variante="secundario" onClick={cancelarEdicao}>
             Cancelar
           </Botao>
         )}

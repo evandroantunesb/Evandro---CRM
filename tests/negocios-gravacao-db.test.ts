@@ -15,6 +15,7 @@ import {
   type Atual,
 } from "@/lib/negocios-gravacao";
 import { conferirArquivos } from "@/lib/anexos-servidor";
+import { MENSAGEM_REMOCAO_COM_CALCULO, MENSAGEM_REMOCAO_SEM_CONFIRMACAO } from "@/lib/negocio-dados";
 import type { SupabaseServidor } from "@/lib/supabase/server";
 import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
 import { comFalha } from "./falhas";
@@ -316,6 +317,37 @@ describe("kit", () => {
     // 3) Reenvio sem falha: exatamente a lista da tela.
     expect((await salvarKitComCliente(cliente(vendedor), atual[vendedor.id], form())).ok).toBe(true);
     expect((await reabrir(vendedor, r.negocioId)).kit.map((k) => k.descricao)).toEqual(["Módulo 600 W"]);
+  });
+
+  it("remover kit salvo: sem confirmação é recusado; com confirmação remove; com cálculo nunca", async () => {
+    // Sem cálculo.
+    const r = await criar(vendedor, novoNegocio({ componentes: KIT }));
+    const remover = (negocioId: string, extra: Record<string, string> = {}) =>
+      salvarKitComCliente(cliente(vendedor), atual[vendedor.id], fd({ negocioId, tipoLigacao: "trifasico", tarifaKwh: "", componentes: "[]", ...extra }));
+    expect(await remover(r.negocioId)).toEqual({ ok: false, mensagem: MENSAGEM_REMOCAO_SEM_CONFIRMACAO });
+    expect((await reabrir(vendedor, r.negocioId)).kit).toHaveLength(2);
+    expect((await remover(r.negocioId, { confirmarRemocao: "sim" })).ok).toBe(true);
+    expect((await reabrir(vendedor, r.negocioId)).kit).toEqual([]);
+
+    // Com cálculo associado: recusa mesmo com confirmação e mesmo informando a tarifa.
+    const c = await criar(vendedor, novoNegocio({ componentes: KIT, consumo_medio_kwh: "450", tarifa_kwh: "0,95" }));
+    const antes = await reabrir(vendedor, c.negocioId);
+    expect(antes.calculo).not.toBeNull();
+    const tentativas: Record<string, string>[] = [{ confirmarRemocao: "sim" }, { confirmarRemocao: "sim", tarifaKwh: "0,95", consumoMedioKwh: "450" }];
+    for (const extra of tentativas) {
+      expect(await remover(c.negocioId, extra)).toEqual({ ok: false, mensagem: MENSAGEM_REMOCAO_COM_CALCULO });
+    }
+    const depois = await reabrir(vendedor, c.negocioId);
+    expect(depois.kit).toEqual(antes.kit);
+    expect(depois.calculo).toEqual(antes.calculo);
+  });
+
+  it("editar itens de um kit salvo (sem esvaziar) não pede confirmação", async () => {
+    const r = await criar(vendedor, novoNegocio({ componentes: KIT }));
+    const soModulo = JSON.stringify([{ tipo: "modulo", descricao: "Módulo 550 W", potenciaW: 550, quantidade: 12 }]);
+    const res = await salvarKitComCliente(cliente(vendedor), atual[vendedor.id], fd({ negocioId: r.negocioId, tipoLigacao: "trifasico", tarifaKwh: "", componentes: soModulo }));
+    expect(res.ok).toBe(true);
+    expect((await reabrir(vendedor, r.negocioId)).kit).toEqual([{ tipo: "modulo", descricao: "Módulo 550 W", potencia_w: 550, quantidade: 12 }]);
   });
 
   it("cálculo que não fecha na criação vira aviso; os itens ficam salvos", async () => {

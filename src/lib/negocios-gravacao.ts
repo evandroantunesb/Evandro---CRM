@@ -5,7 +5,7 @@ import { arquivoMetaSchema } from "@/lib/anexos-servidor";
 import { componentesJsonSchema, nomeKitPersonalizado, potenciaKitPersonalizadoKwp, type ComponenteKit } from "@/lib/calculadora";
 import { montarLinhaCalculo } from "@/lib/calculo-servidor";
 import { mensagemErro } from "@/lib/erros";
-import { completarContato, type AvisoCriacao } from "@/lib/negocio-dados";
+import { completarContato, MENSAGEM_REMOCAO_COM_CALCULO, MENSAGEM_REMOCAO_SEM_CONFIRMACAO, type AvisoCriacao } from "@/lib/negocio-dados";
 import { EDITAR_VALOR_NEGOCIO, ESCOLHER_RESPONSAVEL_NEGOCIO, pode } from "@/lib/permissoes";
 import type { SupabaseServidor } from "@/lib/supabase/server";
 import { TIPOS_LIGACAO, type Papel, type ResultadoAcao } from "@/lib/tipos";
@@ -307,7 +307,10 @@ const esquemaKit = z.object({
   estruturaTelhado: z.string().trim().max(120).optional(),
   componentes: componentesJsonSchema,
   observacoes: z.string().trim().max(2000, "Máximo de 2.000 caracteres").optional(),
+  // Remover um kit salvo (lista vazia) só com confirmação explícita da tela.
+  confirmarRemocao: z.literal("sim").optional(),
 });
+
 
 type ItemKitSalvo = {
   id: string;
@@ -372,6 +375,12 @@ export async function salvarKitComCliente(
   ]);
   if (!negocio) return { ok: false, mensagem: "Negócio não encontrado." };
   if (erroAntigos || !itensAntigos) return { ok: false, mensagem: "Não foi possível ler o kit atual. Nada foi alterado." };
+
+  // Lista vazia com kit salvo = remover o kit: nunca com cálculo associado e sempre com confirmação.
+  if (!d.componentes.length && itensAntigos.length) {
+    if (calculoAtual) return { ok: false, mensagem: MENSAGEM_REMOCAO_COM_CALCULO };
+    if (d.confirmarRemocao !== "sim") return { ok: false, mensagem: MENSAGEM_REMOCAO_SEM_CONFIRMACAO };
+  }
 
   let montado: Awaited<ReturnType<typeof montarLinhaCalculo>> | null = null;
   if (d.tarifaKwh != null) {

@@ -427,8 +427,11 @@ export function FormularioNegocio({
     setEtapaAtual(etapaAtual === 1 ? 2 : 3);
   }
 
-  /** Desiste do kit manual: esconde o editor e descarta só os itens (e o valor que veio do kit, se não foi digitado). */
-  function desistirDoKit() {
+  /**
+   * Cancela a montagem do kit (no cadastro nada do kit está salvo ainda): fecha o editor e descarta
+   * só os itens. O valor só é limpo se era a sugestão automática do kit; valor digitado fica.
+   */
+  function cancelarMontagem() {
     setLinhas([]);
     setMostrarKit(false);
     if (!valorTocado) setValor("");
@@ -723,8 +726,8 @@ export function FormularioNegocio({
                 </div>
               </dl>
               <p className="mt-2 text-xs text-zinc-500">
-                Estimativa ilustrativa — os números reais aparecem ao montar o kit manualmente ou depois de informar a
-                tarifa, na Etapa 3.
+                Estimativa ilustrativa: não é salva no negócio. Para salvar um kit, monte-o manualmente; os números reais
+                aparecem depois de informar a tarifa, na Etapa 3.
               </p>
             </div>
           )}
@@ -788,8 +791,8 @@ export function FormularioNegocio({
           <fieldset className="flex flex-col gap-3">
             <legend className="mb-2 text-sm font-semibold text-zinc-900">Kit personalizado</legend>
             <EditorComponentesKit linhas={linhas} onChange={setLinhas} sugerirQuantidadeModulo={sugerirQuantidadeModulo} />
-            <Botao type="button" variante="secundario" onClick={desistirDoKit} className="self-start">
-              Desistir do kit
+            <Botao type="button" variante="secundario" onClick={cancelarMontagem} className="self-start">
+              Cancelar montagem
             </Botao>
             {previa && (
               <>
@@ -829,8 +832,9 @@ export function FormularioNegocio({
           <Botao type="button" variante="secundario" onClick={voltar} className="gap-1">
             <ChevronLeft className="h-4 w-4" /> Voltar
           </Botao>
+          {/* Um botão só: sem kit em montagem, ele deixa claro que o cadastro segue sem kit. */}
           <Botao type="button" onClick={avancar} className="gap-1">
-            Avançar <ChevronRight className="h-4 w-4" />
+            {mostrarKit || componentes.length ? "Avançar" : "Continuar sem kit"} <ChevronRight className="h-4 w-4" />
           </Botao>
         </div>
       </div>

@@ -195,12 +195,27 @@ describe("regressões de tela", () => {
     expect(formulario.match(/\brequired\b/g)?.length).toBe(7);
   });
 
-  it("cadastro: Desistir do kit esconde o editor e descarta só os itens", () => {
-    const desistir = formulario.slice(formulario.indexOf("function desistirDoKit("), formulario.indexOf("function desistirDoKit(") + 300);
-    expect(desistir).toContain("setLinhas([])");
-    expect(desistir).toContain("setMostrarKit(false)");
-    expect(desistir).toContain('if (!valorTocado) setValor("")');
-    expect(formulario).toContain("onClick={desistirDoKit}");
+  it("cadastro: Cancelar montagem fecha o editor e descarta só os itens; valor digitado fica", () => {
+    const inicio = formulario.indexOf("function cancelarMontagem(");
+    const cancelar = formulario.slice(inicio, formulario.indexOf("\n  }\n", inicio));
+    expect(cancelar).toContain("setLinhas([])");
+    expect(cancelar).toContain("setMostrarKit(false)");
+    // Só o valor que veio da sugestão automática é limpo.
+    expect(cancelar).toContain('if (!valorTocado) setValor("")');
+    // Cliente, consumo, localização e valor digitado não são tocados.
+    expect(cancelar).not.toMatch(/setContato|setConsumoMedioKwh|setValorFaturaMedio|setCidade|setUf|setRua|setCep|setValorTocado/);
+    expect(formulario).toContain("onClick={cancelarMontagem}");
+    expect(formulario).toContain("Cancelar montagem");
+    expect(formulario).not.toContain("Desistir do kit");
+  });
+
+  it("cadastro: passo 2 tem um botão só para seguir, que vira 'Continuar sem kit' sem kit em montagem", () => {
+    expect(formulario.match(/onClick=\{avancar\}/g)).toHaveLength(2); // passo 1 e passo 2
+    expect(formulario).toContain('{mostrarKit || componentes.length ? "Avançar" : "Continuar sem kit"}');
+    expect(formulario).toContain("Montar kit manualmente");
+    // Sugestão automática do valor continua, sempre identificada como estimativa.
+    expect(formulario).toContain("estimativa, não é cotação real");
+    expect(formulario).toContain("Estimativa ilustrativa: não é salva no negócio.");
   });
 
   it("etapa saiu do formulário de edição e da gravação", () => {
@@ -216,6 +231,25 @@ describe("regressões de tela", () => {
     expect(ficha).toContain("conferirArquivos(supabase, negocio.empresa_id, id, anexos ?? [])");
     expect(ficha).toContain("!conferencia.conferido");
     expect(ficha).toContain("<RegistrarArquivo");
+  });
+
+  it("ficha: Cancelar na edição do kit não grava nada e volta ao que está salvo", () => {
+    const kit = fonte("src", "app", "(app)", "negocios", "[id]", "kit-personalizado.tsx");
+    const inicio = kit.indexOf("function cancelarEdicao(");
+    const cancelar = kit.slice(inicio, kit.indexOf("\n  }\n", inicio));
+    expect(cancelar).not.toMatch(/\bacao\(|\benviar\(|salvarKitPersonalizado/);
+    expect(cancelar).toContain("setLinhas(linhasSalvas())");
+    expect(cancelar).toContain("setTarifaKwh(");
+    expect(kit).toContain('<Botao type="button" variante="secundario" onClick={cancelarEdicao}>');
+  });
+
+  it("ficha: remover kit salvo pede confirmação; com cálculo, a tela explica a recusa", () => {
+    const kit = fonte("src", "app", "(app)", "negocios", "[id]", "kit-personalizado.tsx");
+    expect(kit).toContain("const removendoKitSalvo = componentesSalvos.length > 0 && componentes.length === 0;");
+    expect(kit).toContain('name="confirmarRemocao"');
+    expect(kit).toContain("disabled={pendente || (removendoKitSalvo && (!!calculo || !confirmaRemocao))}");
+    expect(kit).toContain("{MENSAGEM_REMOCAO_COM_CALCULO}");
+    expect(kit).toContain('"Remover kit salvo"');
   });
 
   it("kit reaberto traz o valor da conta salvo no cálculo", () => {
