@@ -324,7 +324,6 @@ describe("SDR não fecha, não reabre e não muda o valor", () => {
     const tentativas = [
       { titulo: "Junto com o ganho", status: "ganho" as const },
       { titulo: "Junto com a perda", status: "perdido" as const, motivo_perda_id: motivo!.id },
-      { titulo: "Só o motivo", motivo_perda_detalhe: "Detalhe" },
       { titulo: "Junto com o valor", valor: 99999 },
     ];
     for (const t of tentativas) {
@@ -336,13 +335,35 @@ describe("SDR não fecha, não reabre e não muda o valor", () => {
     expect(await ler(negocioId)).toEqual(antes);
   });
 
-  it("reabrir negócio fechado também é recusado ao SDR", async () => {
-    const negocioId = await criarNegocio(sdr);
-    expect((await servico.from("negocios").update({ status: "ganho" }).eq("id", negocioId)).error).toBeNull();
-    const antes = await ler(negocioId);
-    const { error } = await sdr.cliente.from("negocios").update({ status: "aberto" }).eq("id", negocioId);
-    expect(error?.message).toContain(MENSAGEM_SDR);
-    expect(await ler(negocioId)).toEqual(antes);
+  it("negócio fechado: SDR não reabre nem troca o motivo de perda", async () => {
+    // Em negócio aberto o motivo é sempre zerado por preparar_negocio; o caso real é o perdido.
+    const { data: motivos } = await servico
+      .from("motivos_perda")
+      .insert([
+        { empresa_id: empresa, nome: `Perda A ${sufixo}` },
+        { empresa_id: empresa, nome: `Perda B ${sufixo}` },
+      ])
+      .select("id");
+    const ganho = await criarNegocio(sdr);
+    const perdido = await criarNegocio(sdr);
+    expect((await servico.from("negocios").update({ status: "ganho" }).eq("id", ganho)).error).toBeNull();
+    expect(
+      (await servico.from("negocios").update({ status: "perdido", motivo_perda_id: motivos![0].id, motivo_perda_detalhe: "Original" }).eq("id", perdido)).error,
+    ).toBeNull();
+    const antesGanho = await ler(ganho);
+    const antesPerdido = await ler(perdido);
+    const tentativas: [string, { status?: "aberto"; titulo?: string; motivo_perda_id?: string; motivo_perda_detalhe?: string }][] = [
+      [ganho, { status: "aberto" }],
+      [perdido, { status: "aberto" }],
+      [perdido, { titulo: "Junto com o motivo", motivo_perda_id: motivos![1].id }],
+      [perdido, { titulo: "Junto com o detalhe", motivo_perda_detalhe: "Trocado" }],
+    ];
+    for (const [id, mudanca] of tentativas) {
+      const { error } = await sdr.cliente.from("negocios").update(mudanca).eq("id", id);
+      expect(error?.message).toContain(MENSAGEM_SDR);
+    }
+    expect(await ler(ganho)).toEqual(antesGanho);
+    expect(await ler(perdido)).toEqual(antesPerdido);
   });
 
   it("etapa que fecha sozinha (ganho e perdido): recusada; etapa, datas e motivo padrão intactos", async () => {
