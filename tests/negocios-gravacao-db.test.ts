@@ -15,7 +15,7 @@ import {
   type Atual,
 } from "@/lib/negocios-gravacao";
 import { conferirArquivos } from "@/lib/anexos-servidor";
-import { MENSAGEM_REMOCAO_COM_CALCULO, MENSAGEM_REMOCAO_SEM_CONFIRMACAO } from "@/lib/negocio-dados";
+import { MENSAGEM_CALCULO_NAO_CONFERIDO, MENSAGEM_REMOCAO_COM_CALCULO, MENSAGEM_REMOCAO_SEM_CONFIRMACAO } from "@/lib/negocio-dados";
 import type { SupabaseServidor } from "@/lib/supabase/server";
 import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
 import { comFalha } from "./falhas";
@@ -336,6 +336,26 @@ describe("kit", () => {
     const tentativas: Record<string, string>[] = [{ confirmarRemocao: "sim" }, { confirmarRemocao: "sim", tarifaKwh: "0,95", consumoMedioKwh: "450" }];
     for (const extra of tentativas) {
       expect(await remover(c.negocioId, extra)).toEqual({ ok: false, mensagem: MENSAGEM_REMOCAO_COM_CALCULO });
+    }
+    const depois = await reabrir(vendedor, c.negocioId);
+    expect(depois.kit).toEqual(antes.kit);
+    expect(depois.calculo).toEqual(antes.calculo);
+  });
+
+  it("falha ao ler o cálculo: recusa antes de gravar ou apagar; kit e cálculo intactos", async () => {
+    const c = await criar(vendedor, novoNegocio({ componentes: KIT, consumo_medio_kwh: "450", tarifa_kwh: "0,95" }));
+    const antes = await reabrir(vendedor, c.negocioId);
+    expect(antes.calculo).not.toBeNull();
+    const outroKit = JSON.stringify([{ tipo: "modulo", descricao: "Módulo 550 W", potenciaW: 550, quantidade: 12 }]);
+    // Remoção confirmada (seria a brecha) e troca de itens com tarifa: ambas recusadas.
+    const tentativas: Record<string, string>[] = [
+      { componentes: "[]", tarifaKwh: "", confirmarRemocao: "sim" },
+      { componentes: outroKit, tarifaKwh: "0,95", consumoMedioKwh: "450" },
+    ];
+    for (const extra of tentativas) {
+      const quebrado = comFalha(vendedor.cliente, { lerCalculo: 1 });
+      const res = await salvarKitComCliente(quebrado, atual[vendedor.id], fd({ negocioId: c.negocioId, tipoLigacao: "trifasico", ...extra }));
+      expect(res).toEqual({ ok: false, mensagem: MENSAGEM_CALCULO_NAO_CONFERIDO });
     }
     const depois = await reabrir(vendedor, c.negocioId);
     expect(depois.kit).toEqual(antes.kit);

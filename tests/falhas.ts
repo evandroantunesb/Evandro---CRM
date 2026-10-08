@@ -2,13 +2,14 @@
  * Injeção controlada de falha no cliente do Supabase, para testar caminhos que o banco local não
  * reproduz sob demanda. Todo o resto passa direto para o cliente real (RLS real).
  * - `apagarKit`: as próximas N chamadas de `.from("kit_componentes").delete()` falham sem executar;
+ * - `lerCalculo`: as próximas N leituras (`select`) de `calculos_solares` falham sem executar;
  * - `listar`: as próximas N listagens do Storage falham.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 import type { SupabaseServidor } from "@/lib/supabase/server";
 
-type Contadores = { apagarKit?: number; listar?: number };
+type Contadores = { apagarKit?: number; lerCalculo?: number; listar?: number };
 
 const ERRO = { message: "falha injetada", code: "XX000", details: "", hint: "" };
 
@@ -16,7 +17,7 @@ const ERRO = { message: "falha injetada", code: "XX000", details: "", hint: "" }
 function cadeiaComErro(): unknown {
   const resultado = { data: null, error: ERRO, count: null, status: 500, statusText: "falha injetada" };
   const cadeia: Record<string, unknown> = {};
-  for (const metodo of ["in", "eq", "select", "order", "limit"]) cadeia[metodo] = () => cadeia;
+  for (const metodo of ["in", "eq", "select", "order", "limit", "maybeSingle", "single"]) cadeia[metodo] = () => cadeia;
   cadeia.then = (ok: (v: unknown) => unknown, erro?: (e: unknown) => unknown) => Promise.resolve(resultado).then(ok, erro);
   return cadeia;
 }
@@ -33,6 +34,17 @@ export function comFalha(cliente: SupabaseClient<Database>, contadores: Contador
       if (prop === "from") {
         return (tabela: string) => {
           const consulta = alvo.from(tabela as never);
+          if (tabela === "calculos_solares") {
+            return new Proxy(consulta, {
+              get(q, p) {
+                if (p === "select" && (c.lerCalculo ?? 0) > 0) {
+                  c.lerCalculo!--;
+                  return () => cadeiaComErro();
+                }
+                return ligar(q, p);
+              },
+            });
+          }
           if (tabela !== "kit_componentes") return consulta;
           return new Proxy(consulta, {
             get(q, p) {

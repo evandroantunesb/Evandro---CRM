@@ -60,3 +60,6 @@ export const MENSAGEM_REMOCAO_COM_CALCULO =
 
 /** Remover um kit salvo sem cálculo: só com confirmação explícita. */
 export const MENSAGEM_REMOCAO_SEM_CONFIRMACAO = "Para remover o kit salvo, confirme a remoção. Nada foi alterado.";
+
+/** Leitura do cálculo falhou: sem saber se há cálculo, o kit não é gravado nem removido. */
+export const MENSAGEM_CALCULO_NAO_CONFERIDO = "Não foi possível conferir o cálculo solar. Nada foi alterado. Tente novamente.";

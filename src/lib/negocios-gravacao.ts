@@ -5,7 +5,13 @@ import { arquivoMetaSchema } from "@/lib/anexos-servidor";
 import { componentesJsonSchema, nomeKitPersonalizado, potenciaKitPersonalizadoKwp, type ComponenteKit } from "@/lib/calculadora";
 import { montarLinhaCalculo } from "@/lib/calculo-servidor";
 import { mensagemErro } from "@/lib/erros";
-import { completarContato, MENSAGEM_REMOCAO_COM_CALCULO, MENSAGEM_REMOCAO_SEM_CONFIRMACAO, type AvisoCriacao } from "@/lib/negocio-dados";
+import {
+  completarContato,
+  MENSAGEM_CALCULO_NAO_CONFERIDO,
+  MENSAGEM_REMOCAO_COM_CALCULO,
+  MENSAGEM_REMOCAO_SEM_CONFIRMACAO,
+  type AvisoCriacao,
+} from "@/lib/negocio-dados";
 import { EDITAR_VALOR_NEGOCIO, ESCOLHER_RESPONSAVEL_NEGOCIO, pode } from "@/lib/permissoes";
 import type { SupabaseServidor } from "@/lib/supabase/server";
 import { TIPOS_LIGACAO, type Papel, type ResultadoAcao } from "@/lib/tipos";
@@ -365,7 +371,7 @@ export async function salvarKitComCliente(
   if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
   const d = dados.data;
 
-  const [{ data: negocio }, { data: calculoAtual }, { data: itensAntigos, error: erroAntigos }] = await Promise.all([
+  const [{ data: negocio }, { data: calculoAtual, error: erroCalculo }, { data: itensAntigos, error: erroAntigos }] = await Promise.all([
     supabase.from("negocios").select("valor").eq("id", d.negocioId).maybeSingle(),
     supabase.from("calculos_solares").select("id").eq("negocio_id", d.negocioId).maybeSingle(),
     supabase
@@ -375,6 +381,8 @@ export async function salvarKitComCliente(
   ]);
   if (!negocio) return { ok: false, mensagem: "Negócio não encontrado." };
   if (erroAntigos || !itensAntigos) return { ok: false, mensagem: "Não foi possível ler o kit atual. Nada foi alterado." };
+  // Falha ao ler o cálculo nunca vale como "sem cálculo": abriria a remoção do kit protegido.
+  if (erroCalculo) return { ok: false, mensagem: MENSAGEM_CALCULO_NAO_CONFERIDO };
 
   // Lista vazia com kit salvo = remover o kit: nunca com cálculo associado e sempre com confirmação.
   if (!d.componentes.length && itensAntigos.length) {
