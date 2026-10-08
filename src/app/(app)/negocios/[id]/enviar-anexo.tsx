@@ -4,20 +4,11 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { Selecao } from "@/components/ui";
 import { registrarAnexo } from "@/lib/acoes/anexos";
+import { nomeSeguro } from "@/lib/anexos-regras";
 import { criarClienteNavegador } from "@/lib/supabase/navegador";
 import { CATEGORIAS_ANEXO, ROTULO_CATEGORIA_ANEXO, type CategoriaAnexo } from "@/lib/tipos";
 
 const LIMITE = 20 * 1024 * 1024;
-
-/** Nome seguro para o caminho no Storage (o nome original fica no registro). */
-function nomeSeguro(nome: string) {
-  const limpo = nome
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/[^a-zA-Z0-9._-]+/g, "-")
-    .slice(-80);
-  return `${crypto.randomUUID()}-${limpo || "arquivo"}`;
-}
 
 export function EnviarAnexo({ empresaId, negocioId }: { empresaId: string; negocioId: string }) {
   const router = useRouter();

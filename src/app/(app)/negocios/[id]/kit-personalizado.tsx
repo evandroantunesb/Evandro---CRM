@@ -2,6 +2,7 @@
 
 import { useActionState, useMemo, useState } from "react";
 import { EditorComponentesKit, linhasParaComponentes, type LinhaComponente } from "@/components/kit-componentes";
+import { useEnvioSemReset } from "@/components/envio-sem-reset";
 import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
 import { salvarKitPersonalizado } from "@/lib/acoes/calculadora";
 import {
@@ -12,6 +13,8 @@ import {
   sugerirQuantidadeModulos,
 } from "@/lib/calculadora";
 import { formatarMoeda } from "@/lib/formatacao";
+import { estadoSalvoDoKit } from "@/lib/kit-formulario";
+import { MENSAGEM_REMOCAO_COM_CALCULO } from "@/lib/negocio-dados";
 import { ROTULO_TIPO_COMPONENTE_KIT, ROTULO_TIPO_LIGACAO, TIPOS_LIGACAO, type TipoComponenteKit, type TipoLigacao } from "@/lib/tipos";
 
 export type ComponenteSalvo = {
@@ -26,6 +29,7 @@ export type CalculoSalvo = {
   kitNome: string;
   tipoLigacao: TipoLigacao;
   consumoMedioKwh: number;
+  valorFaturaMedio: number | null;
   tarifaKwh: number;
   geracaoEstimadaKwhMes: number;
   economiaMensal: number;
@@ -78,6 +82,7 @@ export function KitPersonalizado({
   parametros: Parametros | null;
 }) {
   const [resultado, acao, pendente] = useActionState(salvarKitPersonalizado, null);
+  const enviar = useEnvioSemReset(acao);
   const [editando, setEditando] = useState(!calculo);
   // Fecha o formulário assim que salva (sem useEffect, ajustando durante a renderização).
   const [ultimoResultado, setUltimoResultado] = useState(resultado);
@@ -86,27 +91,41 @@ export function KitPersonalizado({
     if (resultado?.ok) setEditando(false);
   }
 
-  const [linhas, setLinhas] = useState<LinhaComponente[]>(() =>
-    componentesSalvos.map((c) => ({
-      tipo: c.tipo,
-      descricao: c.descricao,
-      potenciaW: c.potenciaW != null ? numeroBr(c.potenciaW) : "",
-      quantidade: String(c.quantidade),
-    })),
-  );
-  const [estrutura, setEstrutura] = useState(estruturaTelhado ?? "");
-  const [tipoLigacao, setTipoLigacao] = useState<TipoLigacao>(calculo?.tipoLigacao ?? "trifasico");
-  const [consumoMedioKwh, setConsumoMedioKwh] = useState(() => {
-    if (calculo) return numeroBr(calculo.consumoMedioKwh);
-    return consumoMedioKwhPadrao != null ? numeroBr(consumoMedioKwhPadrao) : "";
-  });
-  const [valorFaturaMedio, setValorFaturaMedio] = useState(() =>
-    !calculo && valorFaturaMedioPadrao != null ? numeroBr(valorFaturaMedioPadrao) : "",
-  );
-  const [tarifaKwh, setTarifaKwh] = useState(calculo ? numeroBr(calculo.tarifaKwh) : "");
+  // Sempre a partir do que está gravado: ao abrir e no Cancelar.
+  const salvo = () =>
+    estadoSalvoDoKit({ componentesSalvos, calculo, estruturaTelhado, consumoMedioKwhPadrao, valorFaturaMedioPadrao });
+  const [linhas, setLinhas] = useState<LinhaComponente[]>(() => salvo().linhas);
+  const [estrutura, setEstrutura] = useState(() => salvo().estrutura);
+  const [tipoLigacao, setTipoLigacao] = useState<TipoLigacao>(() => salvo().tipoLigacao);
+  const [consumoMedioKwh, setConsumoMedioKwh] = useState(() => salvo().consumoMedioKwh);
+  // Ao reabrir, vem o valor da conta já salvo no cálculo (antes vinha vazio e se perdia ao salvar de novo).
+  const [valorFaturaMedio, setValorFaturaMedio] = useState(() => salvo().valorFaturaMedio);
+  const [tarifaKwh, setTarifaKwh] = useState(() => salvo().tarifaKwh);
+  const [confirmaRemocao, setConfirmaRemocao] = useState(false);
+  // Muda a cada Cancelar para recriar o campo de observações (não controlado) com o valor salvo.
+  const [versaoObservacoes, setVersaoObservacoes] = useState(0);
+
+  /**
+   * Cancelar: não grava nem apaga nada no banco; só descarta o que foi mexido na tela e volta ao
+   * que está salvo. Na primeira montagem (nada salvo), limpa os itens não gravados.
+   */
+  function cancelarEdicao() {
+    const s = salvo();
+    setLinhas(s.linhas);
+    setEstrutura(s.estrutura);
+    setTipoLigacao(s.tipoLigacao);
+    setConsumoMedioKwh(s.consumoMedioKwh);
+    setValorFaturaMedio(s.valorFaturaMedio);
+    setTarifaKwh(s.tarifaKwh);
+    setConfirmaRemocao(false);
+    setVersaoObservacoes((v) => v + 1);
+    if (calculo) setEditando(false);
+  }
 
   const componentes = useMemo(() => linhasParaComponentes(linhas), [linhas]);
   const potenciaKwp = potenciaKitPersonalizadoKwp(componentes);
+  // Tirou todos os itens de um kit salvo: isso é remover o kit (com cálculo, o servidor recusa).
+  const removendoKitSalvo = componentesSalvos.length > 0 && componentes.length === 0;
 
   // Consumo médio em kWh, vindo do campo direto ou calculado a partir da fatura + tarifa.
   const consumoMedioEstimado = useMemo(() => {
@@ -225,9 +244,14 @@ export function KitPersonalizado({
   }
 
   return (
-    <form action={acao} className="flex flex-col gap-3">
+    <form onSubmit={enviar} className="flex flex-col gap-3">
       <input type="hidden" name="negocioId" value={negocioId} />
       <input type="hidden" name="componentes" value={JSON.stringify(componentes)} />
+      {!calculo && componentesSalvos.length > 0 && (
+        <p className="rounded-md bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
+          Itens do kit salvos, ainda sem cálculo. Informe a tarifa para calcular geração, economia e payback.
+        </p>
+      )}
       {!padraoCliente && (
         <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
           Favor adicionar o padrão atual do cliente (em &quot;Dados do negócio&quot;) para conferir compatibilidade com o kit.
@@ -281,7 +305,6 @@ export function KitPersonalizado({
         rotulo="Tarifa (R$/kWh)"
         name="tarifaKwh"
         inputMode="decimal"
-        required
         placeholder="ex.: 0,95"
         value={tarifaKwh}
         onChange={(e) => setTarifaKwh(e.target.value)}
@@ -311,21 +334,40 @@ export function KitPersonalizado({
       <label className="flex flex-col gap-1 text-sm">
         <span className="font-medium text-zinc-700">Observações (opcional)</span>
         <textarea
+          key={versaoObservacoes}
           name="observacoes"
           rows={2}
           defaultValue={calculo?.observacoes ?? ""}
           className="rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-dourado focus:ring-2 focus:ring-dourado/20"
         />
       </label>
+      {removendoKitSalvo &&
+        (calculo ? (
+          <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">{MENSAGEM_REMOCAO_COM_CALCULO}</p>
+        ) : (
+          <label className="flex items-start gap-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            <input
+              type="checkbox"
+              name="confirmarRemocao"
+              value="sim"
+              checked={confirmaRemocao}
+              onChange={(e) => setConfirmaRemocao(e.target.checked)}
+              className="mt-1"
+            />
+            <span>
+              Confirmo a remoção do kit salvo ({componentesSalvos.length} {componentesSalvos.length === 1 ? "item" : "itens"}). Para
+              manter o kit, use Cancelar.
+            </span>
+          </label>
+        ))}
       <div className="flex items-center gap-2">
-        <Botao type="submit" disabled={pendente}>
-          {pendente ? "Calculando..." : "Salvar kit e calcular"}
+        <Botao type="submit" disabled={pendente || (removendoKitSalvo && (!!calculo || !confirmaRemocao))}>
+          {pendente ? "Salvando..." : removendoKitSalvo ? "Remover kit salvo" : numero(tarifaKwh) ? "Salvar kit e calcular" : "Salvar kit"}
         </Botao>
-        {calculo && (
-          <Botao type="button" variante="secundario" onClick={() => setEditando(false)}>
-            Cancelar
-          </Botao>
-        )}
+        {/* Sempre disponível, inclusive na primeira montagem. */}
+        <Botao type="button" variante="secundario" onClick={cancelarEdicao}>
+          Cancelar
+        </Botao>
       </div>
       <Mensagem resultado={resultado} />
     </form>
