@@ -277,8 +277,15 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
         </p>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
-        <div className="flex flex-col gap-4">
+      {/* Fechamento primeiro no DOM: no celular aparece logo após o cabeçalho; no desktop a grade o
+          coloca no topo da coluna direita. Uma única instância (sem cópia escondida por CSS). */}
+      <div className="grid gap-4 lg:grid-cols-[2fr_1fr] lg:grid-rows-[auto_1fr]">
+        <div className="lg:col-start-2 lg:row-start-1">
+          <Cartao titulo={cartao.titulo}>
+            {cartao.tipo === "marcos" ? <MarcosVenda marcos={cartao.marcos} obra={obraDoNegocio}>{fechamento}</MarcosVenda> : fechamento}
+          </Cartao>
+        </div>
+        <div className="flex flex-col gap-4 lg:col-start-1 lg:row-span-2 lg:row-start-1">
           <Cartao titulo="Dados do negócio">
             <EdicaoNegocio
               empresaId={negocio.empresa_id}
@@ -505,10 +512,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
             </ol>
           </Cartao>
         </div>
-        <div className="flex flex-col gap-4">
-          <Cartao titulo={cartao.titulo}>
-            {cartao.tipo === "marcos" ? <MarcosVenda marcos={cartao.marcos} obra={obraDoNegocio}>{fechamento}</MarcosVenda> : fechamento}
-          </Cartao>
+        <div className="flex flex-col gap-4 lg:col-start-2 lg:row-start-2">
           <Cartao titulo="Contato">
             <dl className="flex flex-col gap-2 text-sm">
               <div>

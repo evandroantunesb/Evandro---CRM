@@ -293,3 +293,55 @@ describe("ficha do negócio (fonte)", () => {
     expect(page).toContain("obra={obraDoNegocio}");
   });
 });
+
+describe("ficha do negócio: posição do cartão de fechamento", () => {
+  const page = fonte(...PASTA, "page.tsx");
+  const inicioGrade = page.indexOf('<div className="grid gap-4 lg:grid-cols-[2fr_1fr] lg:grid-rows-[auto_1fr]">');
+  const grade = page.slice(inicioGrade);
+  const pos = (trecho: string) => {
+    const i = grade.indexOf(trecho);
+    expect(i, trecho).toBeGreaterThanOrEqual(0);
+    return i;
+  };
+
+  it("celular: o cartão de fechamento é o primeiro item da grade, antes de todos os outros cartões", () => {
+    expect(inicioGrade).toBeGreaterThan(0);
+    const fechamento = pos("<Cartao titulo={cartao.titulo}>");
+    const demais = [
+      '<Cartao titulo="Dados do negócio">',
+      '<Cartao titulo="Kit personalizado">',
+      '<Cartao titulo="Qualificação SDR">',
+      '<Cartao titulo="Tarefas">',
+      '<Cartao titulo="Notas e linha do tempo">',
+      '<Cartao titulo="Contato">',
+      '<Cartao titulo="Etiquetas">',
+      "<Cartao titulo={`Arquivos",
+    ];
+    for (const c of demais) expect(fechamento, c).toBeLessThan(pos(c));
+    expect(grade.slice(0, fechamento).match(/<Cartao\b/g)).toBeNull();
+  });
+
+  it("só o fechamento sobe: Contato, Etiquetas e Arquivos continuam depois da coluna principal", () => {
+    const principalFim = pos('<Cartao titulo="Notas e linha do tempo">');
+    for (const c of ['<Cartao titulo="Contato">', '<Cartao titulo="Etiquetas">', "<Cartao titulo={`Arquivos"]) {
+      expect(pos(c), c).toBeGreaterThan(principalFim);
+    }
+  });
+
+  it("desktop: fechamento no topo da coluna direita, coluna principal à esquerda ocupando as duas linhas", () => {
+    expect(grade).toMatch(/<div className="lg:col-start-2 lg:row-start-1">\s*<Cartao titulo=\{cartao\.titulo\}>/);
+    expect(grade).toMatch(
+      /<div className="flex flex-col gap-4 lg:col-start-1 lg:row-span-2 lg:row-start-1">\s*<Cartao titulo="Dados do negócio">/,
+    );
+    expect(grade).toMatch(/<div className="flex flex-col gap-4 lg:col-start-2 lg:row-start-2">\s*<Cartao titulo="Contato">/);
+  });
+
+  it("uma única instância do cartão e das ações, sem versões escondidas por CSS", () => {
+    expect(page.match(/<Cartao titulo=\{cartao\.titulo\}>/g)).toHaveLength(1);
+    expect(page.match(/<MarcosVenda\b/g)).toHaveLength(1);
+    expect(page.match(/<Fechamento\b/g)).toHaveLength(1);
+    expect(page.match(/\{fechamento\}/g)).toHaveLength(1);
+    expect(page).not.toMatch(/\b(lg|md|sm|xl):hidden\b/);
+    expect(page).not.toMatch(/\bhidden (lg|md|sm|xl):(block|flex|grid)\b/);
+  });
+});
