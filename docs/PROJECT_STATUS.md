@@ -75,6 +75,8 @@ Membros fictícios: Lucas Martins, Mariana Costa, Rafael Almeida e Bruno Ferreir
 ## Outras pendências
 
 - Revisar PRs antigas/obsoletas antes de qualquer merge.
+- Teste instável no CI: `tests/travas-kit-sdr-db.test.ts` ("risco residual: deadlock entre excluir o negócio e apagar item") falhou uma vez no CI da PR #162 (`expected undefined to be '40P01'`, linha 508) e passou ao relançar o job com o mesmo código. Corrida entre transações sensível a timing; suspeita de flaky, não reproduzida. Teste não alterado; estabilizar em PR à parte (log da falha: run 37974098713, tentativa 1).
+- Guard de testes (PR #162): `pnpm test` aborta se o ambiente efetivo não for Supabase local. O `.env.local` de cada desenvolvedor precisa apontar para o Supabase local. Pendente: verificar/limpar dados de teste que uma execução acidental contra produção possa ter criado (exige autorização do Evandro).
 - Validar em navegador real as telas novas (gamificação gerencial/pessoal, tema escuro, Tarefas, Contatos, SDR, Loja).
 - Melhorar a UX geral fora da gamificação.
 - Consolidar Calculadora + Propostas: importar CSV real de equipamentos/preços e repetir o teste de referência de 1.500 kWh/mês (Cascavel/PR) com o engenheiro.
