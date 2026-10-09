@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { EVENTOS_GAMIFICACAO, EVENTOS_TETO_OBRIGATORIO, MARCOS_CONQUISTA } from "@/lib/gamificacao";
+import { EVENTOS_GAMIFICACAO, EVENTOS_TETO_OBRIGATORIO, MARCOS_CONQUISTA, eventoAceitaRegraNova } from "@/lib/gamificacao";
 import { mensagemErro } from "@/lib/erros";
 import { caminhoImagemRecompensaValido } from "@/lib/imagem-upload";
 import { exigirPapel } from "@/lib/sessao";
@@ -50,6 +50,10 @@ export async function criarRegra(_: ResultadoAcao, formData: FormData): Promise<
   const { atual } = await exigirPapel("admin");
   const dados = esquema.safeParse(Object.fromEntries(formData));
   if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
+  // Regra nova só para evento pontuável (o motor ignora os demais; regra antiga continua editável).
+  if (!eventoAceitaRegraNova(dados.data.eventoTipo)) {
+    return { ok: false, mensagem: "Esse evento não gera XP nem moedas. Escolha outro evento." };
+  }
 
   const supabase = await criarClienteServidor();
   const { error } = await supabase.from("gamification_rules").insert({
