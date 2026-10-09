@@ -119,3 +119,107 @@ describe("contrato com RLS real", () => {
     expect(await contrato(id)).toBeNull();
   });
 });
+
+/**
+ * Persistência real do status (bug: "Status atualizado." sem gravar). Cada caso relê do banco
+ * pelo serviço. O modelo é regravado aqui porque o último caso acima o deixa inválido.
+ */
+describe("status do contrato: gravação comprovada", () => {
+  let outroVendedor: Usuario;
+
+  beforeAll(async () => {
+    outroVendedor = await criarUsuario("ct-outro-vendedor");
+    const { data, error } = await servico
+      .from("empresa_membros")
+      .insert({ empresa_id: empresa, user_id: outroVendedor.id, papel: "vendedor", perfil_gamificacao: "closer" })
+      .select("id")
+      .single();
+    if (error) throw error;
+    membro[outroVendedor.id] = data!.id;
+    const { error: erroModelo } = await admin.cliente.from("modelos_contrato").upsert({ empresa_id: empresa, conteudo: MODELO });
+    if (erroModelo) throw erroModelo;
+  });
+
+  const assinatura = async (negocioId: string) =>
+    (await servico.from("contratos").select("status, responsavel_assinatura_id").eq("negocio_id", negocioId).single()).data!;
+
+  it("gerar → aguardando assinatura → assinado: relido do banco continua assinado, com responsável e evento", async () => {
+    const id = await negocio("Assinatura persistida");
+    expect((await gerar(id)).ok).toBe(true);
+    expect(await status(id, "aguardando_assinatura")).toEqual({ ok: true, mensagem: "Status atualizado." });
+    expect(await status(id, "assinado")).toEqual({ ok: true, mensagem: "Status atualizado." });
+
+    expect(await assinatura(id)).toEqual({ status: "assinado", responsavel_assinatura_id: membro[vendedor.id] });
+    const { data: eventos } = await servico
+      .from("eventos")
+      .select("tipo, ator_id, entidade, profile_at_event")
+      .eq("entidade_id", id)
+      .eq("tipo", "contrato.assinado");
+    expect(eventos).toEqual([{ tipo: "contrato.assinado", ator_id: vendedor.id, entidade: "negocio", profile_at_event: "closer" }]);
+  });
+
+  it("quem não tem acesso ao negócio recebe erro e o banco não muda", async () => {
+    const id = await negocio("Sem acesso");
+    expect((await gerar(id)).ok).toBe(true);
+    expect((await status(id, "aguardando_assinatura")).ok).toBe(true);
+
+    const r = await atualizarStatusContratoComCliente(outroVendedor.cliente as unknown as SupabaseServidor, {
+      membroId: membro[outroVendedor.id],
+      negocioId: id,
+      status: "assinado",
+    });
+    expect(r.ok).toBe(false);
+    expect(r.mensagem).not.toBe("Status atualizado.");
+    expect(await assinatura(id)).toEqual({ status: "aguardando_assinatura", responsavel_assinatura_id: null });
+    const { count } = await servico
+      .from("eventos")
+      .select("id", { count: "exact", head: true })
+      .eq("entidade_id", id)
+      .eq("tipo", "contrato.assinado");
+    expect(count).toBe(0);
+  });
+
+  it("negócio sem contrato: erro explícito, nunca sucesso", async () => {
+    const id = await negocio("Sem contrato");
+    const r = await status(id, "assinado");
+    expect(r).toEqual({ ok: false, mensagem: "Contrato não encontrado." });
+  });
+
+  /**
+   * Obra: os 3 sinais em ordens diferentes. Pagamento exige contrato assinado (confirmar_pagamento),
+   * então a assinatura nunca pode vir depois do pagamento; o que se testa aqui é a assinatura
+   * gravada pela função corrigida fazendo parte da sequência que cria a obra.
+   */
+  async function ganhar(id: string) {
+    const { error } = await vendedor.cliente.from("negocios").update({ status: "ganho" }).eq("id", id);
+    if (error) throw error;
+  }
+  async function confirmarPagamento(id: string) {
+    const { data: c } = await servico.from("contratos").select("id").eq("negocio_id", id).single();
+    const { error } = await admin.cliente.rpc("confirmar_pagamento", { p_contrato_id: c!.id });
+    if (error) throw error;
+  }
+  const obras = async (id: string) => (await servico.from("obras").select("id").eq("negocio_id", id)).data ?? [];
+
+  it("ganho → assinado (pela função) → pagamento confirmado: obra criada", async () => {
+    const id = await negocio("Obra ganho primeiro");
+    await ganhar(id);
+    expect((await gerar(id)).ok).toBe(true);
+    expect((await status(id, "aguardando_assinatura")).ok).toBe(true);
+    expect((await status(id, "assinado")).ok).toBe(true);
+    expect(await obras(id)).toEqual([]);
+    await confirmarPagamento(id);
+    expect(await obras(id)).toHaveLength(1);
+  });
+
+  it("assinado (pela função) → pagamento confirmado → ganho por último: obra criada", async () => {
+    const id = await negocio("Obra ganho por último");
+    expect((await gerar(id)).ok).toBe(true);
+    expect((await status(id, "aguardando_assinatura")).ok).toBe(true);
+    expect((await status(id, "assinado")).ok).toBe(true);
+    await confirmarPagamento(id);
+    expect(await obras(id)).toEqual([]);
+    await ganhar(id);
+    expect(await obras(id)).toHaveLength(1);
+  });
+});

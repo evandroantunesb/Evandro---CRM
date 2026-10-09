@@ -241,3 +241,95 @@ export async function carregarLinhasVenda(supabase: SupabaseServidor, empresaId:
     })
     .sort((a, b) => new Date(b.ultimaMovimentacao).getTime() - new Date(a.ultimaMovimentacao).getTime());
 }
+
+/*
+ * Fechamento da venda em 3 marcos (ficha do negócio). Só leitura: os marcos refletem o que já
+ * está gravado (status do negócio, status do contrato e `status_pagamento_contrato`). A única
+ * ação de escrita do cartão continua sendo o componente `Fechamento` (ganho/perdido/reabrir).
+ * Os marcos não dizem nada sobre a obra: a existência dela vem só da leitura de `obras` (RLS).
+ */
+export type EstadoMarco = "cumprido" | "pendente" | "bloqueado";
+export type Marco = { titulo: string; estado: EstadoMarco; rotulo: string; ancora: string | null };
+export type MarcosVenda = {
+  venda: Marco;
+  contrato: Marco;
+  pagamento: Marco;
+  concluidos: number;
+  concluida: boolean;
+  /** Texto factual de progresso; null para negócio perdido (sem contador). */
+  progresso: string | null;
+};
+
+export function marcosDaVenda(entrada: {
+  negocio: StatusNegocio;
+  contrato: SituacaoContrato;
+  /** Resultado de `status_pagamento_contrato`: null quando não há contrato assinado nem confirmação. */
+  pagamento: StatusPagamentoContrato | null;
+}): MarcosVenda {
+  const venda: Marco = {
+    titulo: "Venda ganha",
+    estado: entrada.negocio === "ganho" ? "cumprido" : "pendente",
+    rotulo: ROTULO_NEGOCIO[entrada.negocio],
+    ancora: null,
+  };
+  const contrato: Marco = {
+    titulo: "Contrato assinado",
+    estado: entrada.contrato === "assinado" ? "cumprido" : "pendente",
+    rotulo: ROTULO_SITUACAO_CONTRATO[entrada.contrato],
+    ancora: "#contrato",
+  };
+  // Estornado não conta como cumprido. Sem status de pagamento, o cartão Pagamento não existe.
+  const pagamento: Marco =
+    entrada.pagamento === null
+      ? { titulo: "Pagamento confirmado", estado: "bloqueado", rotulo: "Aguardando contrato assinado", ancora: null }
+      : {
+          titulo: "Pagamento confirmado",
+          estado: entrada.pagamento === "confirmado" ? "cumprido" : "pendente",
+          rotulo: ROTULO_PAGAMENTO[entrada.pagamento],
+          ancora: "#pagamento",
+        };
+  const concluidos = [venda, contrato, pagamento].filter((m) => m.estado === "cumprido").length;
+  return {
+    venda,
+    contrato,
+    pagamento,
+    concluidos,
+    concluida: concluidos === 3,
+    progresso: entrada.negocio === "perdido" ? null : `${concluidos} de 3 marcos concluídos`,
+  };
+}
+
+/**
+ * O que o cartão de fechamento recebe. Quem não pode ver contrato e pagamento (SDR) recebe só a
+ * situação comercial: os dados de contrato/pagamento nem entram no objeto.
+ */
+export type CartaoFechamento =
+  | { tipo: "situacao"; titulo: "Situação"; negocio: StatusNegocio }
+  | { tipo: "marcos"; titulo: "Fechamento da venda"; negocio: StatusNegocio; marcos: MarcosVenda };
+
+export function cartaoFechamento(
+  podeVerContratoEPagamento: boolean,
+  entrada: { negocio: StatusNegocio; contrato: SituacaoContrato; pagamento: StatusPagamentoContrato | null },
+): CartaoFechamento {
+  if (!podeVerContratoEPagamento) return { tipo: "situacao", titulo: "Situação", negocio: entrada.negocio };
+  return { tipo: "marcos", titulo: "Fechamento da venda", negocio: entrada.negocio, marcos: marcosDaVenda(entrada) };
+}
+
+/** Aviso exibido antes de reabrir. Só a saída de "ganho" tem efeitos sobre obra e pontos. */
+export function avisoReabertura(status: Exclude<StatusNegocio, "aberto">): { titulo: string; linhas: string[] } {
+  if (status === "perdido") {
+    return {
+      titulo: "Confirmar reabertura do negócio?",
+      linhas: ["Ao reabrir este negócio, ele voltará para o status Aberto."],
+    };
+  }
+  return {
+    titulo: "Confirmar reabertura da venda?",
+    linhas: [
+      "Ao reabrir este negócio, ele voltará para o status Aberto.",
+      "O contrato assinado, o pagamento confirmado e a obra, caso existam, não serão cancelados automaticamente.",
+      'Se já houver obra, ela receberá o alerta "Venda alterada", que não será removido automaticamente caso a venda seja ganha novamente.',
+      "Os pontos concedidos pela venda ganha serão estornados, incluindo os pontos do SDR de origem, quando aplicável.",
+    ],
+  };
+}

@@ -83,18 +83,34 @@ export async function gerarContratoComCliente(
   return { ok: true, mensagem: "Contrato pronto." };
 }
 
-/** Muda o status; enviar para assinatura ou marcar assinado só com o texto completo (contrato antigo pode ter sobra). */
+/**
+ * Muda o status; enviar para assinatura ou marcar assinado só com o texto completo (contrato antigo pode ter sobra).
+ * Só devolve sucesso com a gravação COMPROVADA: o UPDATE devolve a linha e ela precisa vir com o
+ * status pedido. Sem linha (sem acesso pela RLS ou contrato inexistente) ou com outro status, é erro —
+ * nunca "Status atualizado." sem o banco ter mudado.
+ */
 export async function atualizarStatusContratoComCliente(
   supabase: SupabaseServidor,
   { membroId, negocioId, status }: { membroId: string; negocioId: string; status: StatusContrato },
 ): Promise<NonNullable<ResultadoAcao>> {
-  if (status !== "rascunho") {
-    const { data: contrato } = await supabase.from("contratos").select("conteudo").eq("negocio_id", negocioId).maybeSingle();
-    if (contrato && !contratoProntoParaCliente(contrato.conteudo)) {
-      return { ok: false, mensagem: "O contrato tem campos sem resolver. Corrija o modelo e gere o contrato de novo." };
-    }
+  const { data: contrato, error: erroLeitura } = await supabase
+    .from("contratos")
+    .select("conteudo")
+    .eq("negocio_id", negocioId)
+    .maybeSingle();
+  if (erroLeitura) return { ok: false, mensagem: mensagemErro(erroLeitura, "Não foi possível ler o contrato.") };
+  if (!contrato) return { ok: false, mensagem: "Contrato não encontrado." };
+  if (status !== "rascunho" && !contratoProntoParaCliente(contrato.conteudo)) {
+    return { ok: false, mensagem: "O contrato tem campos sem resolver. Corrija o modelo e gere o contrato de novo." };
   }
-  const { error } = await supabase.from("contratos").update({ status, atualizado_por: membroId }).eq("negocio_id", negocioId);
+  const { data: gravados, error } = await supabase
+    .from("contratos")
+    .update({ status, atualizado_por: membroId })
+    .eq("negocio_id", negocioId)
+    .select("id, status");
   if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível atualizar o status.") };
+  if (!gravados || gravados.length !== 1 || gravados[0].status !== status) {
+    return { ok: false, mensagem: "Não foi possível salvar o status: sem permissão para este contrato ou contrato não encontrado." };
+  }
   return { ok: true, mensagem: "Status atualizado." };
 }

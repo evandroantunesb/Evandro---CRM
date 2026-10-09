@@ -36,6 +36,7 @@ const MATRIZ: Record<string, string[]> = {
   GAMIFICACAO: ["admin", "gestor", "vendedor", "sdr"],
   PARTICIPANTES_GAMIFICACAO: ["vendedor", "sdr"],
   OBRAS: ["admin", "gestor", "vendedor", "sdr", "operacao"],
+  VER_NEGOCIO_DA_OBRA: ["admin", "gestor", "vendedor"],
 };
 
 const listas = Object.entries(permissoes).filter(([, v]) => Array.isArray(v)) as [string, ListaPapeis][];
