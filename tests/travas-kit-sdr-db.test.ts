@@ -49,23 +49,38 @@ async function aguardarTrava(observador: Client, pid: number) {
 
 const pidDe = async (c: Client) => (await c.query("select pg_backend_pid() as pid")).rows[0].pid as number;
 
-type Resultado = { ok: true } | { ok: false; code?: string; message: string };
+type Resultado = { ok: true } | { ok: false; code?: string; message: string; detail?: string };
 
 /** Resultado de uma instrução sem rejeitar: sucesso ou o erro com o SQLSTATE (`code`). */
 const resultadoDe = (instrucao: Promise<unknown>): Promise<Resultado> =>
   instrucao.then(
     (): Resultado => ({ ok: true }),
-    (e: Error & { code?: string }): Resultado => ({ ok: false, code: e.code, message: e.message }),
+    (e: Error & { code?: string; detail?: string }): Resultado => ({ ok: false, code: e.code, message: e.message, detail: e.detail }),
   );
 
-/** Espera `bloqueado` estar bloqueado por `bloqueador` segundo o Postgres (pg_blocking_pids). */
-async function aguardarBloqueio(observador: Client, bloqueado: number, bloqueador: number) {
+/**
+ * Espera `bloqueado` estar bloqueado por `bloqueador` segundo o Postgres (pg_blocking_pids).
+ * `jaTerminou` cobre a vítima escolhida antes da observação (ela deixa de estar bloqueada); o
+ * ciclo, nesse caso, é provado pelo DETAIL do próprio erro 40P01 (ver `provaDoCiclo`).
+ */
+async function aguardarBloqueio(observador: Client, bloqueado: number, bloqueador: number, jaTerminou: () => boolean = () => false) {
   for (let i = 0; i < 100; i++) {
+    if (jaTerminou()) return true;
     const { rows } = await observador.query("select $2::int = any (pg_blocking_pids($1::int)) as bloqueia", [bloqueado, bloqueador]);
     if (rows[0]?.bloqueia) return true;
     await new Promise((ok) => setTimeout(ok, 50));
   }
   return false;
+}
+
+/**
+ * O DETAIL de um 40P01 é montado pelo Postgres a partir do ciclo de espera que ele detectou e cita
+ * o pid de cada processo envolvido ("Process N waits for …; blocked by process M."). Exigir os
+ * pids de X e de T2 prova que o ciclo foi entre as duas transações, sem depender do polling.
+ */
+function provaDoCiclo(r: Resultado, pidX: number, pidT2: number) {
+  const detalhe = !r.ok ? (r.detail ?? "") : "";
+  return [pidX, pidT2].every((pid) => new RegExp(`\\b${pid}\\b`).test(detalhe));
 }
 
 /** Estado das sessões, para a mensagem de erro quando o cenário não se comporta como esperado. */
@@ -520,13 +535,18 @@ describe("cálculo solar só é criado com kit", () => {
       await t2.query("begin");
       await t2.query("update public.kit_componentes set quantidade = 11 where id = $1", [a.id]); // T2 segura o item A
       await x.query("begin");
-      const exclusaoNegocio = resultadoDe(x.query("delete from public.negocios where id = $1", [negocioId]));
+      let negocioTerminou = false;
+      let itemTerminou = false;
+      const exclusaoNegocio = resultadoDe(x.query("delete from public.negocios where id = $1", [negocioId])).then((r) => ((negocioTerminou = true), r));
       // Aresta 1 do ciclo, provada pelo Postgres: X (negócio e, em cascata, itens) espera T2 (item A).
       expect(await aguardarBloqueio(observador, pidX, pidT2)).toBe(true);
-      const exclusaoItem = resultadoDe(t2.query("delete from public.kit_componentes where id = $1", [b.id]));
+      const exclusaoItem = resultadoDe(t2.query("delete from public.kit_componentes where id = $1", [b.id])).then((r) => ((itemTerminou = true), r));
       // Aresta 2: T2 (apagar o item B pede a trava do negócio) espera X. Com as duas arestas há ciclo
       // e o Postgres o desfaz em até deadlock_timeout, cancelando uma das transações com 40P01.
-      expect(await aguardarBloqueio(observador, pidT2, pidX)).toBe(true);
+      // Se uma das duas já foi escolhida como vítima antes desta observação (event loop parado por
+      // mais de deadlock_timeout), T2 não aparece mais bloqueada: o ciclo passa a ser provado pelo
+      // DETAIL do erro, exigido logo abaixo.
+      expect(await aguardarBloqueio(observador, pidT2, pidX, () => negocioTerminou || itemTerminou)).toBe(true);
 
       // Uma transação cancelada continua segurando as travas até o rollback; por isso só a vítima
       // termina antes (a outra só avança depois do rollback abaixo). Não vale aceitar qualquer fim.
@@ -536,9 +556,9 @@ describe("cálculo solar só é criado com kit", () => {
         exclusaoItem.then((r) => ({ quem: "item" as const, r })),
         limite,
       ]);
-      if (primeiro.quem === "nenhum" || primeiro.r.ok || primeiro.r.code !== "40P01") {
+      if (primeiro.quem === "nenhum" || primeiro.r.ok || primeiro.r.code !== "40P01" || !provaDoCiclo(primeiro.r, pidX, pidT2)) {
         throw new Error(
-          `Esperado: a primeira a terminar é a vítima do deadlock (40P01). Obtido: ${JSON.stringify(primeiro)}. Sessões: ${await diagnosticoSessoes(observador, [pidX, pidT2])}`,
+          `Esperado: a primeira a terminar é a vítima do deadlock (40P01) e o DETAIL cita os pids de X (${pidX}) e T2 (${pidT2}). Obtido: ${JSON.stringify(primeiro)}. Sessões: ${await diagnosticoSessoes(observador, [pidX, pidT2])}`,
         );
       }
 
