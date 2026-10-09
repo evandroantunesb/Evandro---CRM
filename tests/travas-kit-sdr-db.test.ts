@@ -49,6 +49,34 @@ async function aguardarTrava(observador: Client, pid: number) {
 
 const pidDe = async (c: Client) => (await c.query("select pg_backend_pid() as pid")).rows[0].pid as number;
 
+type Resultado = { ok: true } | { ok: false; code?: string; message: string };
+
+/** Resultado de uma instrução sem rejeitar: sucesso ou o erro com o SQLSTATE (`code`). */
+const resultadoDe = (instrucao: Promise<unknown>): Promise<Resultado> =>
+  instrucao.then(
+    (): Resultado => ({ ok: true }),
+    (e: Error & { code?: string }): Resultado => ({ ok: false, code: e.code, message: e.message }),
+  );
+
+/** Espera `bloqueado` estar bloqueado por `bloqueador` segundo o Postgres (pg_blocking_pids). */
+async function aguardarBloqueio(observador: Client, bloqueado: number, bloqueador: number) {
+  for (let i = 0; i < 100; i++) {
+    const { rows } = await observador.query("select $2::int = any (pg_blocking_pids($1::int)) as bloqueia", [bloqueado, bloqueador]);
+    if (rows[0]?.bloqueia) return true;
+    await new Promise((ok) => setTimeout(ok, 50));
+  }
+  return false;
+}
+
+/** Estado das sessões, para a mensagem de erro quando o cenário não se comporta como esperado. */
+async function diagnosticoSessoes(observador: Client, pids: number[]) {
+  const { rows } = await observador.query(
+    "select pid, state, wait_event_type, wait_event, pg_blocking_pids(pid) as bloqueada_por, left(query, 70) as consulta from pg_stat_activity where pid = any ($1::int[])",
+    [pids],
+  );
+  return JSON.stringify(rows);
+}
+
 let admin: Usuario;
 let gestor: Usuario;
 let vendedor: Usuario;
@@ -487,39 +515,53 @@ describe("cálculo solar só é criado com kit", () => {
     const t2 = await conectar();
     const observador = await conectar();
     try {
+      const pidX = await pidDe(x);
+      const pidT2 = await pidDe(t2);
       await t2.query("begin");
       await t2.query("update public.kit_componentes set quantidade = 11 where id = $1", [a.id]); // T2 segura o item A
       await x.query("begin");
-      const pidX = await pidDe(x);
-      const exclusaoNegocio = x.query("delete from public.negocios where id = $1", [negocioId]).then(
-        () => null,
-        (e: Error & { code?: string }) => e,
-      );
-      expect(await aguardarTrava(observador, pidX)).toBe(true); // X travou o negócio e espera o item A
-      const exclusaoItem = t2.query("delete from public.kit_componentes where id = $1", [b.id]).then(
-        () => null,
-        (e: Error & { code?: string }) => e,
-      ); // T2 espera o negócio: ciclo
+      const exclusaoNegocio = resultadoDe(x.query("delete from public.negocios where id = $1", [negocioId]));
+      // Aresta 1 do ciclo, provada pelo Postgres: X (negócio e, em cascata, itens) espera T2 (item A).
+      expect(await aguardarBloqueio(observador, pidX, pidT2)).toBe(true);
+      const exclusaoItem = resultadoDe(t2.query("delete from public.kit_componentes where id = $1", [b.id]));
+      // Aresta 2: T2 (apagar o item B pede a trava do negócio) espera X. Com as duas arestas há ciclo
+      // e o Postgres o desfaz em até deadlock_timeout, cancelando uma das transações com 40P01.
+      expect(await aguardarBloqueio(observador, pidT2, pidX)).toBe(true);
+
+      // Uma transação cancelada continua segurando as travas até o rollback; por isso só a vítima
+      // termina antes (a outra só avança depois do rollback abaixo). Não vale aceitar qualquer fim.
+      const limite = new Promise<{ quem: "nenhum" }>((ok) => setTimeout(() => ok({ quem: "nenhum" }), 15_000));
       const primeiro = await Promise.race([
-        exclusaoNegocio.then((e) => ({ quem: "negocio" as const, e })),
-        exclusaoItem.then((e) => ({ quem: "item" as const, e })),
+        exclusaoNegocio.then((r) => ({ quem: "negocio" as const, r })),
+        exclusaoItem.then((r) => ({ quem: "item" as const, r })),
+        limite,
       ]);
-      // A primeira a terminar é a vítima do deadlock: sempre com erro, nunca como concluída.
-      expect(primeiro.e?.code).toBe("40P01");
+      if (primeiro.quem === "nenhum" || primeiro.r.ok || primeiro.r.code !== "40P01") {
+        throw new Error(
+          `Esperado: a primeira a terminar é a vítima do deadlock (40P01). Obtido: ${JSON.stringify(primeiro)}. Sessões: ${await diagnosticoSessoes(observador, [pidX, pidT2])}`,
+        );
+      }
+
       if (primeiro.quem === "negocio") {
         await x.query("rollback");
-        expect(await exclusaoItem).toBeNull();
+        expect(await exclusaoItem).toEqual({ ok: true });
         await t2.query("commit");
         expect(await lerKit(negocioId)).toEqual([a]);
         expect(await temCalculo(negocioId)).toBe(true);
       } else {
         await t2.query("rollback");
-        expect(await exclusaoNegocio).toBeNull();
+        expect(await exclusaoNegocio).toEqual({ ok: true });
         await x.query("commit");
         expect(await lerKit(negocioId)).toEqual([]);
         expect(await temCalculo(negocioId)).toBe(false);
         expect((await servico.from("negocios").select("id").eq("id", negocioId).maybeSingle()).data).toBeNull();
       }
+
+      // Exatamente uma vítima (40P01) e uma operação concluída; nunca cálculo sem kit.
+      const resultados = [await exclusaoNegocio, await exclusaoItem];
+      expect(resultados.filter((r) => !r.ok && r.code === "40P01")).toHaveLength(1);
+      expect(resultados.filter((r) => r.ok)).toHaveLength(1);
+      expect((await lerKit(negocioId)).length === 0 && (await temCalculo(negocioId))).toBe(false);
     } finally {
       await Promise.all([x.end(), t2.end(), observador.end()]);
     }
