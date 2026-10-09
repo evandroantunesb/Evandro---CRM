@@ -14,6 +14,7 @@ import { descreverAtividade } from "@/lib/linha-do-tempo";
 import { exigirPapel } from "@/lib/sessao";
 import { ATRIBUIR_TAREFA_A_OUTROS, EDITAR_VALOR_NEGOCIO, ESCOLHER_RESPONSAVEL_NEGOCIO, NEGOCIOS, PROPOSTA_E_CONTRATO, RESPONSAVEL_COMERCIAL, pode } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
+import { cartaoFechamento } from "@/lib/venda";
 import {
   ROTULO_CATEGORIA_ANEXO,
   type CategoriaAnexo,
@@ -32,6 +33,7 @@ import { RegistrarArquivo } from "./registrar-arquivo";
 import { FeedbackHandoff } from "./feedback-handoff";
 import { HandoffAceite } from "./handoff-aceite";
 import { KitPersonalizado } from "./kit-personalizado";
+import { MarcosVenda } from "./marcos-venda";
 import { NovaNota } from "./nova-nota";
 import { Pagamento } from "./pagamento";
 import { Proposta } from "./proposta";
@@ -140,6 +142,25 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
     .limit(1)
     .maybeSingle();
 
+  // Obra gerada por esta venda (a RLS decide se a pessoa a enxerga).
+  const { data: obraDoNegocio } = await supabase.from("obras").select("id, numero").eq("negocio_id", negocio.id).maybeSingle();
+
+  // Fechamento em 3 marcos: quem não pode ver contrato/pagamento (SDR) recebe só a situação.
+  const cartao = cartaoFechamento(pode(atual.papel, PROPOSTA_E_CONTRATO), {
+    negocio: negocio.status,
+    contrato: contrato ? (contrato.status as StatusContrato) : "nao_gerado",
+    pagamento: (statusPagamento as StatusPagamentoContrato | null) ?? null,
+  });
+  // Única ação de escrita do cartão (ganho/perdido/reabrir).
+  const fechamento = (
+    <Fechamento
+      negocioId={negocio.id}
+      status={negocio.status}
+      motivos={config.motivos.filter((m) => m.ativo || m.id === negocio.motivo_perda_id)}
+      somenteLeitura={atual.papel === "sdr"}
+    />
+  );
+
   const contato = negocio.contatos as unknown as {
     id: string;
     nome: string;
@@ -219,6 +240,11 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
         {formatarDataHora(negocio.created_at)}
         {negocio.fechado_em && <> · Fechado em {formatarDataHora(negocio.fechado_em)}</>}
       </p>
+      {obraDoNegocio && (
+        <Link href={`/obras/${obraDoNegocio.id}`} className="w-fit text-sm text-zinc-600 underline hover:text-zinc-900">
+          Ver obra nº {obraDoNegocio.numero}
+        </Link>
+      )}
       {negocio.status === "perdido" && negocio.motivo_perda_id && (
         <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">
           Motivo da perda: {nomes.motivo(negocio.motivo_perda_id)}
@@ -251,8 +277,15 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
         </p>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
-        <div className="flex flex-col gap-4">
+      {/* Fechamento primeiro no DOM: no celular aparece logo após o cabeçalho; no desktop a grade o
+          coloca no topo da coluna direita. Uma única instância (sem cópia escondida por CSS). */}
+      <div className="grid gap-4 lg:grid-cols-[2fr_1fr] lg:grid-rows-[auto_1fr]">
+        <div className="lg:col-start-2 lg:row-start-1">
+          <Cartao titulo={cartao.titulo}>
+            {cartao.tipo === "marcos" ? <MarcosVenda marcos={cartao.marcos} obra={obraDoNegocio}>{fechamento}</MarcosVenda> : fechamento}
+          </Cartao>
+        </div>
+        <div className="flex flex-col gap-4 lg:col-start-1 lg:row-span-2 lg:row-start-1">
           <Cartao titulo="Dados do negócio">
             <EdicaoNegocio
               empresaId={negocio.empresa_id}
@@ -411,23 +444,27 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
             </Cartao>
           )}
           {pode(atual.papel, PROPOSTA_E_CONTRATO) && (
-            <Cartao titulo="Contrato">
-              <Contrato
-                negocioId={negocio.id}
-                siteUrl={env.siteUrl}
-                contrato={contrato ? { token: contrato.token, status: contrato.status as StatusContrato } : null}
-              />
-            </Cartao>
+            <div id="contrato" className="scroll-mt-4">
+              <Cartao titulo="Contrato">
+                <Contrato
+                  negocioId={negocio.id}
+                  siteUrl={env.siteUrl}
+                  contrato={contrato ? { token: contrato.token, status: contrato.status as StatusContrato } : null}
+                />
+              </Cartao>
+            </div>
           )}
           {pode(atual.papel, PROPOSTA_E_CONTRATO) && contrato && statusPagamento && (
-            <Cartao titulo="Pagamento">
-              <Pagamento
-                negocioId={negocio.id}
-                contratoId={contrato.id}
-                status={statusPagamento as StatusPagamentoContrato}
-                podeConfirmar={(souAdmin || atual.papel === "gestor") && contrato.responsavel_assinatura_id !== atual.membroId}
-              />
-            </Cartao>
+            <div id="pagamento" className="scroll-mt-4">
+              <Cartao titulo="Pagamento">
+                <Pagamento
+                  negocioId={negocio.id}
+                  contratoId={contrato.id}
+                  status={statusPagamento as StatusPagamentoContrato}
+                  podeConfirmar={(souAdmin || atual.papel === "gestor") && contrato.responsavel_assinatura_id !== atual.membroId}
+                />
+              </Cartao>
+            </div>
           )}
           <Cartao titulo="Tarefas">
             <div className="flex flex-col gap-3">
@@ -475,15 +512,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
             </ol>
           </Cartao>
         </div>
-        <div className="flex flex-col gap-4">
-          <Cartao titulo="Situação">
-            <Fechamento
-              negocioId={negocio.id}
-              status={negocio.status}
-              motivos={config.motivos.filter((m) => m.ativo || m.id === negocio.motivo_perda_id)}
-              somenteLeitura={atual.papel === "sdr"}
-            />
-          </Cartao>
+        <div className="flex flex-col gap-4 lg:col-start-2 lg:row-start-2">
           <Cartao titulo="Contato">
             <dl className="flex flex-col gap-2 text-sm">
               <div>

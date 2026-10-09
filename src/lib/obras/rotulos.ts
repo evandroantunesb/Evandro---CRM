@@ -97,3 +97,17 @@ export const ROTULO_ESTADO_SETOR: Record<EstadoSetor, string> = {
   parado: "Parado",
   concluido: "Concluído",
 };
+
+/** Os 2 marcos fixos da obra (mesma ordem de `MARCOS_OBRA` em derivados.ts). */
+export const ROTULO_MARCO_OBRA: Record<string, string> = { nf_cliente: "NF do cliente", garantia: "Garantia" };
+
+export const ROTULO_STATUS_MARCO_OBRA: Record<string, string> = { pendente: "Pendente", concluido: "Concluído", nao_se_aplica: "Não se aplica" };
+
+/** Função do participante da obra, para exibir ao lado do nome. */
+export const ROTULO_FUNCAO_PARTICIPANTE: Record<string, string> = {
+  vendedor: "Vendedor",
+  sdr: "SDR",
+  responsavel: "Responsável",
+  apoio: "Apoio",
+  substituto: "Substituto",
+};
