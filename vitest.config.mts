@@ -14,6 +14,8 @@ export default defineConfig({
   },
   test: {
     include: ["tests/**/*.test.ts"],
+    // Trava fail-closed: aborta tudo se o Supabase efetivo não for local.
+    globalSetup: ["./tests/global-setup.ts"],
     // Lê o .env.local (valores do Supabase local).
     env: loadEnv("development", process.cwd(), ""),
     testTimeout: 20000,
