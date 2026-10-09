@@ -141,6 +141,12 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
+  // Botões de aceite/devolução só para quem o banco deixa responder: destinatário, admin ou
+  // gestor de uma equipe ativa do destinatário (mesma regra de aceitar_handoff/devolver_handoff).
+  const { data: podeResponderHandoff } =
+    ultimoHandoff?.status === "pendente"
+      ? await supabase.rpc("pode_responder_handoff", { p_handoff_id: ultimoHandoff.id })
+      : { data: false };
 
   // Obra gerada por esta venda (a RLS decide se a pessoa a enxerga).
   const { data: obraDoNegocio } = await supabase.from("obras").select("id, numero").eq("negocio_id", negocio.id).maybeSingle();
@@ -388,7 +394,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
                       negocioId={negocio.id}
                       handoffId={ultimoHandoff.id}
                       deNome={ultimoHandoff.de_membro_id ? nomes.membro(ultimoHandoff.de_membro_id) : "SDR"}
-                      podeResponder={atual.membroId === ultimoHandoff.para_membro_id || souAdmin || atual.papel === "gestor"}
+                      podeResponder={!!podeResponderHandoff}
                     />
                   </Cartao>
                 );

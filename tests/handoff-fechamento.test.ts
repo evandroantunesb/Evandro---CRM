@@ -39,6 +39,14 @@ beforeAll(async () => {
     .select("id, user_id");
   for (const v of vinculos!) membro[v.user_id] = v.id;
 
+  // Gestor autorizado = gerencia uma equipe ativa do destinatário (closer).
+  const { data: eq } = await servico.from("equipes").insert({ empresa_id: empresa, nome: "Equipe do closer" }).select("id").single();
+  const { error: erroEquipe } = await servico.from("equipe_membros").insert([
+    { equipe_id: eq!.id, empresa_id: empresa, membro_id: membro[gestor.id], e_gestor: true },
+    { equipe_id: eq!.id, empresa_id: empresa, membro_id: membro[closer.id], e_gestor: false },
+  ]);
+  if (erroEquipe) throw erroEquipe;
+
   const { data: f } = await servico.from("funis").select("id").eq("empresa_id", empresa).single();
   funil = f!.id;
   const { data: et } = await servico.from("etapas").select("id").eq("funil_id", funil).order("ordem").limit(1).single();

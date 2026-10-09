@@ -13,18 +13,24 @@ import { exigirPapel } from "@/lib/sessao";
 import { GESTAO_COMERCIAL } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { LinhaParado } from "./linha-parado";
+import { OportunidadesPendentes, type OportunidadePendente } from "./oportunidades-pendentes";
 
 export default async function Painel() {
   const { atual } = await exigirPapel(...GESTAO_COMERCIAL);
   const config = await carregarConfiguracao(atual.empresaId);
-  const [indicadores, leadsADistribuir, tarefasAtrasadas, leadsParados, propostasParadas, leadsSemContato] = await Promise.all([
+  const [indicadores, leadsADistribuir, tarefasAtrasadas, leadsParados, propostasParadas, leadsSemContato, pendentes] = await Promise.all([
     carregarIndicadores(atual.empresaId, config),
     criarClienteServidor().then((supabase) => contarAtribuicoesPendentes(supabase, atual.empresaId)),
     carregarTarefasAtrasadasLista(atual.empresaId, config),
     carregarLeadsParadosPainel(atual.empresaId, config.diasConsideradoParado),
     carregarPropostasParadasPainel(atual.empresaId, config.diasConsideradoParado),
     carregarLeadsSemContatoPainel(atual.empresaId, config.horasConsideradoSemContato),
+    // Lista restrita (colunas definidas no banco): pendências que este gestor/admin pode responder.
+    criarClienteServidor().then((supabase) => supabase.rpc("oportunidades_pendentes_equipe", { p_empresa_id: atual.empresaId })),
   ]);
+  const oportunidadesPendentes: OportunidadePendente[] = pendentes.data ?? [];
+  // Falha na consulta não pode parecer "nenhuma pendência": o cartão avisa, sem detalhes internos.
+  if (pendentes.error) console.error("Painel: falha ao carregar oportunidades pendentes", pendentes.error.code);
   const vendedores = config.membros.filter((m) => m.ativo && m.papel === "vendedor");
   const agora = new Date();
 
@@ -49,6 +55,21 @@ export default async function Painel() {
           </span>
           <span className="shrink-0 font-medium text-dourado">Distribuir →</span>
         </Link>
+      )}
+
+      {pendentes.error && (
+        <Cartao titulo="Oportunidades aguardando aceite">
+          <p className="text-sm text-zinc-600">Não foi possível carregar as oportunidades aguardando aceite agora. Atualize a página em instantes.</p>
+        </Cartao>
+      )}
+
+      {oportunidadesPendentes.length > 0 && (
+        <Cartao titulo={`Oportunidades aguardando aceite (${oportunidadesPendentes.length})`}>
+          <p className="mb-2 text-sm text-zinc-600">
+            Enviadas pelo SDR a vendedores da sua equipe e ainda sem resposta. Você pode aceitar ou devolver em nome do vendedor.
+          </p>
+          <OportunidadesPendentes itens={oportunidadesPendentes} agoraMs={agora.getTime()} />
+        </Cartao>
       )}
 
       {leadsSemContato.length > 0 && (
