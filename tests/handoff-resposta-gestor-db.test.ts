@@ -8,6 +8,7 @@
  * oportunidades_pendentes_equipe: lista restrita do Painel (gestor/admin), colunas fixas,
  * sem dados pessoais/financeiros, isolada por empresa e equipe.
  */
+import { Client } from "pg";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { Json } from "@/lib/supabase/database.types";
 import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
@@ -27,6 +28,7 @@ const NOMES = [
   "gestorDuasEmpresas",
   "sdrOutra",
   "closerOutra",
+  "closerInativavel",
 ] as const;
 type Nome = (typeof NOMES)[number];
 
@@ -77,6 +79,7 @@ beforeAll(async () => {
     ["gestorDuasEmpresas", empresa, "gestor", true],
     ["sdrOutra", outra, "sdr", true],
     ["closerOutra", outra, "vendedor", true],
+    ["closerInativavel", empresa, "vendedor", true],
   ];
   const { data: vinculos, error } = await servico
     .from("empresa_membros")
@@ -102,7 +105,7 @@ beforeAll(async () => {
   if (erroB) throw erroB;
   void vinculoB;
 
-  await equipe(empresa, "Equipe do closer", true, "gestorDest", ["closer"]);
+  await equipe(empresa, "Equipe do closer", true, "gestorDest", ["closer", "closerInativavel"]);
   await equipe(empresa, "Equipe do SDR", true, "gestorSdr", ["sdr"]);
   await equipe(empresa, "Equipe antiga do closer", false, "gestorEquipeInativa", ["closer"]);
   await equipe(empresa, "Equipe do gestor inativo", true, "gestorInativo", ["closer"]);
@@ -127,7 +130,7 @@ beforeAll(async () => {
 /** Negócio do SDR com handoff pendente SDR → closer (aberto pelo próprio SDR, via RLS). */
 async function handoffPendente(
   titulo: string,
-  extra: { contatoId?: string; snapshot?: { [chave: string]: Json }; observacoes?: string; outraEmpresa?: boolean } = {},
+  extra: { contatoId?: string; snapshot?: { [chave: string]: Json }; observacoes?: string; outraEmpresa?: boolean; para?: Nome } = {},
 ) {
   const b = extra.outraEmpresa;
   const contatoId = extra.contatoId ?? (b ? contatoOutra : contato);
@@ -152,7 +155,7 @@ async function handoffPendente(
       negocio_id: negocio!.id,
       contato_id: contatoId,
       de_membro_id: b ? membro.sdrOutra : membro.sdr,
-      para_membro_id: b ? membro.closerOutra : membro.closer,
+      para_membro_id: extra.para ? membro[extra.para] : b ? membro.closerOutra : membro.closer,
       status_qualificacao: "qualificado",
       qualificacao_snapshot: extra.snapshot ?? {},
       observacoes: extra.observacoes ?? null,
@@ -307,7 +310,6 @@ describe("oportunidades_pendentes_equipe (lista restrita do Painel)", () => {
     "handoff_id",
     "negocio_id",
     "negocio_numero",
-    "negocio_titulo",
     "contato_nome",
     "contato_cidade",
     "contato_uf",
@@ -318,9 +320,7 @@ describe("oportunidades_pendentes_equipe (lista restrita do Painel)", () => {
     "status_qualificacao",
     "tipo_cliente",
     "possui_conta_energia",
-    "distribuidora",
     "imovel_proprio",
-    "objetivo",
     "prazo_instalacao",
     "busca_financiamento",
     "orcamento_outra_empresa",
@@ -356,7 +356,7 @@ describe("oportunidades_pendentes_equipe (lista restrita do Painel)", () => {
     expect(await listar("adminOutra", empresa)).toEqual([]);
   });
 
-  it("devolve só as colunas autorizadas, sem dados pessoais, financeiros nem textos livres", async () => {
+  it("devolve só as colunas autorizadas: sem dados pessoais, financeiros nem textos livres (título, objetivo, distribuidora)", async () => {
     const { data: c } = await servico
       .from("contatos")
       .insert({
@@ -371,21 +371,22 @@ describe("oportunidades_pendentes_equipe (lista restrita do Painel)", () => {
       })
       .select("id")
       .single();
-    const { handoffId } = await handoffPendente("Lista com dados", {
-      contatoId: c!.id,
-      snapshot: {
-        tipo_cliente: "residencial",
-        possui_conta_energia: true,
-        distribuidora: "Copel",
-        imovel_proprio: false,
-        objetivo: "Reduzir a conta",
+    const snapshot = {
+      tipo_cliente: "residencial",
+      possui_conta_energia: true,
+      distribuidora: "Distribuidora Livre Sigilosa",
+      imovel_proprio: false,
+      objetivo: "Objetivo Livre Sigiloso",
         prazo_instalacao: null,
         busca_financiamento: true,
         orcamento_outra_empresa: false,
         e_decisor: true,
         outro_decisor: false,
-        participantes_decisao: "Fulano Terceiro Secreto",
-      },
+      participantes_decisao: "Fulano Terceiro Secreto",
+    };
+    const { negocioId, handoffId } = await handoffPendente("Título Livre Sigiloso", {
+      contatoId: c!.id,
+      snapshot,
       observacoes: "Observação livre secreta",
     });
     const item = (await listar("gestorDest")).find((o) => o.handoff_id === handoffId)!;
@@ -395,11 +396,13 @@ describe("oportunidades_pendentes_equipe (lista restrita do Painel)", () => {
       contato_cidade: "Cascavel",
       contato_uf: "PR",
       telefone_informado: true,
+      negocio_id: negocioId,
+      sdr_nome: expect.any(String),
+      destinatario_nome: expect.any(String),
+      status_qualificacao: "qualificado",
       tipo_cliente: "residencial",
       possui_conta_energia: true,
-      distribuidora: "Copel",
       imovel_proprio: false,
-      objetivo: "Reduzir a conta",
       prazo_instalacao: null,
       busca_financiamento: true,
       orcamento_outra_empresa: false,
@@ -407,9 +410,28 @@ describe("oportunidades_pendentes_equipe (lista restrita do Painel)", () => {
       outro_decisor: false,
     });
     const texto = JSON.stringify(item);
-    for (const proibido of ["98888", "maria.secreta", "123.456.789", "Rua Escondida", "98765", "Fulano Terceiro", "Observação livre"]) {
+    for (const proibido of [
+      "98888",
+      "maria.secreta",
+      "123.456.789",
+      "Rua Escondida",
+      "98765",
+      "Fulano Terceiro",
+      "Observação livre",
+      "Título Livre Sigiloso",
+      "Objetivo Livre Sigiloso",
+      "Distribuidora Livre Sigilosa",
+    ]) {
       expect(texto, proibido).not.toContain(proibido);
     }
+    expect(item).not.toHaveProperty("negocio_titulo");
+    expect(item).not.toHaveProperty("objetivo");
+    expect(item).not.toHaveProperty("distribuidora");
+    // Só não saem pela lista restrita: continuam gravados no negócio e no handoff.
+    const { data: negocioGravado } = await servico.from("negocios").select("titulo").eq("id", negocioId).single();
+    const { data: handoffGravado } = await servico.from("handoffs").select("qualificacao_snapshot").eq("id", handoffId).single();
+    expect(negocioGravado!.titulo).toBe("Título Livre Sigiloso");
+    expect(handoffGravado!.qualificacao_snapshot).toMatchObject({ objetivo: snapshot.objetivo, distribuidora: snapshot.distribuidora });
   });
 
   it("depois do aceite ou da devolução a oportunidade deixa de ser listada; a consulta não altera nada", async () => {
@@ -476,4 +498,136 @@ describe("retorno das RPCs de aceite e devolução sem dados confidenciais", () 
       expect(gravado).toEqual({ qualificacao_snapshot: SNAPSHOT, observacoes: OBSERVACAO });
     });
   }
+});
+
+// Conexão direta só no banco local (nunca remoto/produção), para segurar uma desativação aberta.
+const URL_BANCO = process.env.SUPABASE_DB_URL ?? "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
+function urlBancoLocal() {
+  const host = new URL(URL_BANCO).hostname;
+  if (host !== "127.0.0.1" && host !== "localhost") throw new Error(`Teste direto no banco recusado: host "${host}" não é local.`);
+  return URL_BANCO;
+}
+
+describe("destinatário inativo", () => {
+  const INATIVO = "O vendedor destinatário está inativo";
+  const historico = async (negocioId: string) => {
+    const { count } = await servico.from("atividades").select("id", { count: "exact", head: true }).eq("negocio_id", negocioId);
+    return count;
+  };
+  const pendentes: Record<"corrida" | "admin" | "gestor" | "devAdmin" | "devGestor", { negocioId: string; handoffId: string }> =
+    {} as never;
+
+  beforeAll(async () => {
+    // Enviadas enquanto o destinatário ainda está ativo.
+    for (const k of ["corrida", "admin", "gestor", "devAdmin", "devGestor"] as const) {
+      pendentes[k] = await handoffPendente(`Destinatário inativo ${k}`, { para: "closerInativavel" });
+    }
+  });
+
+  it("desativado durante o aceite: o aceite espera a desativação e é recusado, sem alterar nada", async () => {
+    const { negocioId, handoffId } = pendentes.corrida;
+    const antes = { ...(await estado(handoffId, negocioId)), historico: await historico(negocioId) };
+    const banco = new Client({ connectionString: urlBancoLocal() });
+    await banco.connect();
+    try {
+      await banco.query("begin");
+      await banco.query("update public.empresa_membros set status = 'inativo' where id = $1", [membro.closerInativavel]);
+      let terminou = false;
+      const aceite = u.gestorDest.cliente.rpc("aceitar_handoff", { p_handoff_id: handoffId }).then((r) => {
+        terminou = true;
+        return r;
+      });
+      await new Promise((r) => setTimeout(r, 700));
+      expect(terminou, "o aceite precisa esperar a desativação em andamento").toBe(false);
+      await banco.query("commit");
+      const { error } = await aceite;
+      expect(error?.message).toContain(INATIVO);
+      expect(error?.hint).toBe("mensagem_usuario");
+    } finally {
+      await banco.query("rollback").catch(() => undefined);
+      await banco.end();
+    }
+    expect({ ...(await estado(handoffId, negocioId)), historico: await historico(negocioId) }).toEqual(antes);
+  });
+
+  describe("depois de desativado", () => {
+    beforeAll(async () => {
+      const { error } = await servico.from("empresa_membros").update({ status: "inativo" }).eq("id", membro.closerInativavel);
+      if (error) throw error;
+      const { data } = await servico.from("empresa_membros").select("ativo").eq("id", membro.closerInativavel).single();
+      expect(data!.ativo).toBe(false);
+    });
+
+    it.each([
+      ["admin", "admin"],
+      ["gestorDest", "gestor"],
+    ] as const)("%s não aceita: mensagem clara; responsável, histórico, eventos e notificações intactos", async (n, k) => {
+      const { negocioId, handoffId } = pendentes[k];
+      const notificacoes = async () =>
+        (await servico.from("notificacoes").select("id", { count: "exact", head: true }).ilike("link", `%${negocioId}`)).count;
+      const antes = { ...(await estado(handoffId, negocioId)), historico: await historico(negocioId), notificacoes: await notificacoes() };
+      expect(antes.handoff.status).toBe("pendente");
+      // Continua podendo responder (para devolver); só o aceite é recusado.
+      expect((await u[n].cliente.rpc("pode_responder_handoff", { p_handoff_id: handoffId })).data).toBe(true);
+
+      const { data, error } = await u[n].cliente.rpc("aceitar_handoff", { p_handoff_id: handoffId });
+      expect(data).toBeNull();
+      expect(error?.message).toContain(INATIVO);
+      expect(error?.message).toContain("Devolva ao SDR");
+      expect(error?.hint).toBe("mensagem_usuario");
+      const depois = { ...(await estado(handoffId, negocioId)), historico: await historico(negocioId), notificacoes: await notificacoes() };
+      expect(depois).toEqual(antes);
+      expect(depois.negocio).toEqual({ responsavel_id: membro.sdr, handoff_origem_id: null });
+    });
+
+    it.each([
+      ["admin", "devAdmin"],
+      ["gestorDest", "devGestor"],
+    ] as const)("%s devolve normalmente, com motivo obrigatório", async (n, k) => {
+      const { negocioId, handoffId } = pendentes[k];
+      const semMotivo = await u[n].cliente.rpc("devolver_handoff", { p_handoff_id: handoffId, p_motivo: " " });
+      expect(semMotivo.error?.message).toContain("Informe o motivo");
+      expect((await estado(handoffId, negocioId)).handoff.status).toBe("pendente");
+
+      const motivo = `Vendedor desligado ${n} ${sufixo}`;
+      const { data, error } = await u[n].cliente.rpc("devolver_handoff", { p_handoff_id: handoffId, p_motivo: motivo });
+      expect(error).toBeNull();
+      expect(data).toMatchObject({ status: "devolvido", respondido_por: membro[n], motivo_devolucao: motivo });
+      expect((await estado(handoffId, negocioId)).negocio).toEqual({ responsavel_id: membro.sdr, handoff_origem_id: null });
+      const { data: notificacao } = await servico
+        .from("notificacoes")
+        .select("id")
+        .eq("membro_id", membro.sdr)
+        .eq("tipo", "handoff_devolvido")
+        .like("mensagem", `%${motivo}`);
+      expect(notificacao).toHaveLength(1);
+    });
+
+    it("novo envio para o vendedor inativo é recusado pelo banco", async () => {
+      const { data: negocio, error } = await servico
+        .from("negocios")
+        .insert({ empresa_id: empresa, titulo: "Envio para inativo", contato_id: contato, funil_id: funil, etapa_id: etapaInicial, responsavel_id: membro.sdr })
+        .select("id")
+        .single();
+      if (error) throw error;
+      const envio = await u.sdr.cliente.from("handoffs").insert({
+        empresa_id: empresa,
+        negocio_id: negocio!.id,
+        contato_id: contato,
+        de_membro_id: membro.sdr,
+        para_membro_id: membro.closerInativavel,
+        status_qualificacao: "qualificado",
+        qualificacao_snapshot: {},
+      });
+      expect(envio.error?.message).toContain("O destinatário precisa ser um membro ativo");
+      const { count } = await servico.from("handoffs").select("id", { count: "exact", head: true }).eq("negocio_id", negocio!.id);
+      expect(count).toBe(0);
+    });
+
+    it("destinatário ativo segue aceitando normalmente", async () => {
+      const { negocioId, handoffId } = await handoffPendente("Destinatário ativo depois do inativo");
+      expect((await u.gestorDest.cliente.rpc("aceitar_handoff", { p_handoff_id: handoffId })).error).toBeNull();
+      expect((await estado(handoffId, negocioId)).negocio).toEqual({ responsavel_id: membro.closer, handoff_origem_id: handoffId });
+    });
+  });
 });

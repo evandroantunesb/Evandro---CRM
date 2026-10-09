@@ -3864,15 +3864,12 @@ export type Database = {
           contato_nome: string;
           contato_uf: string;
           destinatario_nome: string;
-          distribuidora: string;
           e_decisor: boolean;
           enviado_em: string;
           handoff_id: string;
           imovel_proprio: boolean;
           negocio_id: string;
           negocio_numero: number;
-          negocio_titulo: string;
-          objetivo: string;
           orcamento_outra_empresa: boolean;
           outro_decisor: boolean;
           possui_conta_energia: boolean;

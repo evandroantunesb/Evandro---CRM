@@ -5,10 +5,14 @@
 --   - admin ativo da empresa;
 --   - gestor ativo que gerencia uma equipe ativa da qual o destinatário faz parte.
 -- O gestor que acompanha só o SDR remetente (sem gerenciar o destinatário) não responde.
+-- Destinatário inativo (inclusive desativado entre o envio e o aceite): ninguém aceita por ele;
+-- quem pode responder só devolve (motivo obrigatório). Envio novo para inativo já é recusado
+-- por validar_handoff_empresa (e_membro_comercial exige membro ativo).
 --
 -- Mudanças nas duas funções: a checagem de permissão passa a usar pode_responder_handoff(),
 -- e o retorno sai sem qualificacao_snapshot e observacoes (sanitizado só na variável local;
--- nenhum consumidor usa esses campos). O resto é cópia literal das versões vigentes
+-- nenhum consumidor usa esses campos); aceitar_handoff também recusa destinatário inativo.
+-- O resto é cópia literal das versões vigentes
 -- (aceitar_handoff: 20261001220000_gamificacao_contrato_sdr; devolver_handoff:
 -- 20261001200000_gamificacao_handoff_fechamento) — histórico, notificações, eventos,
 -- perfil congelado, handoff_origem_id e troca de responsável ficam iguais.
@@ -72,6 +76,16 @@ begin
   end if;
   if v_handoff.status <> 'pendente' then
     raise exception 'Essa oportunidade já foi respondida.' using errcode = 'check_violation', hint = 'mensagem_usuario';
+  end if;
+  -- Destinatário precisa estar ativo no momento do aceite (pode ter sido desativado depois do
+  -- envio). FOR SHARE trava o vínculo até o fim da transação: uma desativação concorrente
+  -- espera este aceite terminar ou, se já gravada, é vista aqui e o aceite é recusado.
+  perform 1 from public.empresa_membros
+    where id = v_handoff.para_membro_id and empresa_id = v_handoff.empresa_id and ativo
+    for share;
+  if not found then
+    raise exception 'O vendedor destinatário está inativo e não pode receber a oportunidade. Devolva ao SDR informando o motivo.'
+      using errcode = 'check_violation', hint = 'mensagem_usuario';
   end if;
   v_por_delegacao := v_meu_membro_id <> v_handoff.para_membro_id;
 
@@ -170,15 +184,15 @@ $$;
 -- usuário pode responder (pode_responder_handoff: empresa ativa, vínculo ativo, papel e
 -- equipe ativa do destinatário), e só para admin ou gestor (o destinatário já vê na ficha).
 -- Fica de fora de propósito: valor e dados financeiros, telefone, e-mail, documento,
--- endereço, proposta, contrato, anexos, notas, tarefas, as observações livres do envio e
--- "quem participa da decisão" (texto livre com nomes de terceiros). Do contato, só nome,
--- cidade e UF; o telefone aparece apenas como "informado" (critério da qualificação).
+-- endereço, proposta, contrato, anexos, notas, tarefas e todo texto livre — título do
+-- negócio, objetivo, distribuidora, as observações do envio e "quem participa da decisão".
+-- Do negócio, só o número; do contato, só nome, cidade e UF; o telefone aparece apenas como
+-- "informado" (critério da qualificação). Os dados continuam gravados; só não saem aqui.
 create or replace function public.oportunidades_pendentes_equipe(p_empresa_id uuid)
 returns table (
   handoff_id uuid,
   negocio_id uuid,
   negocio_numero integer,
-  negocio_titulo text,
   contato_nome text,
   contato_cidade text,
   contato_uf text,
@@ -189,9 +203,7 @@ returns table (
   status_qualificacao text,
   tipo_cliente text,
   possui_conta_energia boolean,
-  distribuidora text,
   imovel_proprio boolean,
-  objetivo text,
   prazo_instalacao text,
   busca_financiamento boolean,
   orcamento_outra_empresa boolean,
@@ -204,7 +216,6 @@ as $$
     h.id,
     n.id,
     n.numero,
-    n.titulo,
     c.nome,
     c.cidade,
     c.uf,
@@ -215,9 +226,7 @@ as $$
     h.status_qualificacao,
     h.qualificacao_snapshot ->> 'tipo_cliente',
     (h.qualificacao_snapshot ->> 'possui_conta_energia')::boolean,
-    h.qualificacao_snapshot ->> 'distribuidora',
     (h.qualificacao_snapshot ->> 'imovel_proprio')::boolean,
-    h.qualificacao_snapshot ->> 'objetivo',
     h.qualificacao_snapshot ->> 'prazo_instalacao',
     (h.qualificacao_snapshot ->> 'busca_financiamento')::boolean,
     (h.qualificacao_snapshot ->> 'orcamento_outra_empresa')::boolean,

@@ -6,12 +6,15 @@ import { tempoDesde } from "@/lib/formatacao";
 import { aceitarHandoff, devolverHandoff } from "@/lib/acoes/negocios";
 import { ROTULO_PRAZO_INSTALACAO_QUALIF, ROTULO_TIPO_CLIENTE_QUALIF, type PrazoInstalacaoQualif, type TipoClienteQualif } from "@/lib/tipos";
 
-/** Uma linha de oportunidades_pendentes_equipe (só as colunas autorizadas pela função). */
+/**
+ * Uma linha de oportunidades_pendentes_equipe (só as colunas autorizadas pela função). Sem textos
+ * livres (título do negócio, objetivo, distribuidora, observações): quem decide aqui pode não ter
+ * acesso à ficha do negócio.
+ */
 export type OportunidadePendente = {
   handoff_id: string;
   negocio_id: string;
   negocio_numero: number;
-  negocio_titulo: string;
   contato_nome: string;
   contato_cidade: string | null;
   contato_uf: string | null;
@@ -22,9 +25,7 @@ export type OportunidadePendente = {
   status_qualificacao: string;
   tipo_cliente: string | null;
   possui_conta_energia: boolean | null;
-  distribuidora: string | null;
   imovel_proprio: boolean | null;
-  objetivo: string | null;
   prazo_instalacao: string | null;
   busca_financiamento: boolean | null;
   orcamento_outra_empresa: boolean | null;
@@ -58,9 +59,7 @@ function Item({ o, agoraMs }: { o: OportunidadePendente; agoraMs: number }) {
     <li className="flex flex-col gap-3 border-b border-zinc-100 py-3 last:border-0">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="flex min-w-0 flex-col">
-          <span className="text-sm font-medium text-zinc-900">
-            #{o.negocio_numero} · {o.negocio_titulo}
-          </span>
+          <span className="text-sm font-medium text-zinc-900">Negócio #{o.negocio_numero}</span>
           <span className="text-sm text-zinc-600">
             {o.contato_nome}
             {local && ` · ${local}`}
@@ -73,7 +72,6 @@ function Item({ o, agoraMs }: { o: OportunidadePendente; agoraMs: number }) {
       </div>
 
       <dl className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
-        <Info rotulo="Objetivo" valor={o.objetivo || "Não informado"} />
         <Info rotulo="Tipo de cliente" valor={o.tipo_cliente ? (ROTULO_TIPO_CLIENTE_QUALIF[o.tipo_cliente as TipoClienteQualif] ?? o.tipo_cliente) : "Não informado"} />
         <Info
           rotulo="Prazo para instalar"
@@ -83,7 +81,6 @@ function Item({ o, agoraMs }: { o: OportunidadePendente; agoraMs: number }) {
         <Info rotulo="Outro decisor?" valor={simNao(o.outro_decisor)} />
         <Info rotulo="Telefone informado" valor={o.telefone_informado ? "Sim" : "Não"} />
         <Info rotulo="Conta de energia" valor={simNao(o.possui_conta_energia)} />
-        <Info rotulo="Distribuidora" valor={o.distribuidora || "Não informado"} />
         <Info rotulo="Imóvel próprio" valor={simNao(o.imovel_proprio)} />
         <Info rotulo="Busca financiamento" valor={simNao(o.busca_financiamento)} />
         <Info rotulo="Orçamento de outra empresa" valor={simNao(o.orcamento_outra_empresa)} />

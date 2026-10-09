@@ -13,3 +13,15 @@ describe("Painel: oportunidades aguardando aceite", () => {
     expect(pagina).not.toMatch(/pendentes\.error\.message/);
   });
 });
+
+const componente = readFileSync(join(process.cwd(), "src", "app", "(app)", "painel", "oportunidades-pendentes.tsx"), "utf-8");
+
+describe("Painel: lista restrita sem textos livres", () => {
+  it("o cartão não usa título do negócio, objetivo nem distribuidora", () => {
+    for (const campo of ["negocio_titulo", "objetivo", "distribuidora"]) {
+      expect(componente).not.toMatch(new RegExp(`\\b${campo}\\b\\s*[:?]`));
+      expect(componente).not.toContain(`o.${campo}`);
+    }
+    expect(componente).toContain("Negócio #{o.negocio_numero}");
+  });
+});
