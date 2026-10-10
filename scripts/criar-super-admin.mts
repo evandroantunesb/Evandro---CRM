@@ -1,12 +1,16 @@
 /**
  * Cria (ou promove) o dono da plataforma.
  * Uso: pnpm super-admin <email> <senha> "<nome>"
- * Lê NEXT_PUBLIC_SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY do .env.local.
+ * Lê NEXT_PUBLIC_SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY do .env.local (precisa ser o Supabase LOCAL:
+ * recusa qualquer outro host antes de conectar).
  */
 import { createClient } from "@supabase/supabase-js";
 import { loadEnv } from "vite";
+import { exigirAmbienteLocal } from "./lib/ambiente-local.mjs";
 
 const env = loadEnv("development", process.cwd(), "");
+// Trava fail-closed: antes de qualquer conexão ou escrita, só aceita Supabase local (sem override).
+exigirAmbienteLocal(env, "pnpm super-admin");
 const [email, senha, nome = ""] = process.argv.slice(2);
 if (!email || !senha) {
   console.error('Uso: pnpm super-admin <email> <senha> "<nome>"');
