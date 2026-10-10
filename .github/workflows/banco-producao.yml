@@ -43,6 +43,10 @@ on:
 
 permissions: {}
 
+env:
+  # Project ref de produção (público: aparece na URL do Supabase usada pelo front-end).
+  PROJETO_PRODUCAO: wswpxdmgfdamvqhyztrm
+
 defaults:
   run:
     shell: bash
@@ -119,6 +123,11 @@ jobs:
           EXIGIR_MODO: sim
           VERIFICAR_CHECKOUT: sim
         run: bash .github/scripts/validar-disparo-producao.sh
+      - name: Conferir destino (projeto e URL do pooler, antes de conectar)
+        env:
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: node .github/scripts/validar-destino-producao.mjs banco "$PROJETO_PRODUCAO"
       - uses: supabase/setup-cli@45a513f8c64c0bc8e0e3dfe572b5c95be85f6359 # v3.0.1
         with:
           version: 2.120.0
@@ -180,6 +189,11 @@ jobs:
           EXIGIR_MODO: sim
           VERIFICAR_CHECKOUT: sim
         run: bash .github/scripts/validar-disparo-producao.sh
+      - name: Conferir destino (projeto e URL do pooler, antes de conectar)
+        env:
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: node .github/scripts/validar-destino-producao.mjs banco "$PROJETO_PRODUCAO"
       - uses: supabase/setup-cli@45a513f8c64c0bc8e0e3dfe572b5c95be85f6359 # v3.0.1
         with:
           version: 2.120.0

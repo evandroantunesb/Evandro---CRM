@@ -21,6 +21,10 @@ on:
 
 permissions: {}
 
+env:
+  # Project ref de produção (público: aparece na URL do Supabase usada pelo front-end).
+  PROJETO_PRODUCAO: wswpxdmgfdamvqhyztrm
+
 defaults:
   run:
     shell: bash
@@ -67,6 +71,11 @@ jobs:
           EXIGIR_MODO: nao
           VERIFICAR_CHECKOUT: sim
         run: bash .github/scripts/validar-disparo-producao.sh
+      - name: Conferir destino (projeto e chave, antes do seed)
+        env:
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY_PROD }}
+        run: node .github/scripts/validar-destino-producao.mjs seed "$PROJETO_PRODUCAO"
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
