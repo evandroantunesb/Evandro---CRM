@@ -42,14 +42,22 @@ Regras de trabalho (autorização, merges, produção, gamificação) estão no 
 
 | Comando | Uso |
 | --- | --- |
-| `pnpm dev` | servidor de desenvolvimento |
+| `pnpm dev` | servidor de desenvolvimento (recusa Supabase não local) |
 | `pnpm lint` | ESLint |
 | `pnpm typecheck` | `next typegen` + `tsc --noEmit` |
 | `pnpm test` | Vitest (suítes `*-db` e `rls` precisam de Supabase local/Docker) |
 | `pnpm build` | build de produção |
 | `pnpm db:reset` | recria o banco local a partir das migrations |
 | `pnpm db:types` | regenera `database.types.ts` (formata com `oxfmt`) |
-| `pnpm super-admin <email> <senha> "<nome>"` | cria/promove super-admin |
+| `pnpm super-admin <email> <senha> "<nome>"` | cria/promove super-admin (só no Supabase local; recusa outro host antes de conectar) |
+
+### Ambiente local e trava de segurança
+
+- **`.env.local` aponta exclusivamente para o Supabase local** (`pnpm exec supabase status -o env` mostra URL, anon key e service role). Nunca coloque credenciais remotas nele. Produção usa só as variáveis da Vercel e os secrets do GitHub.
+- **Trava fail-closed:** `pnpm dev`, `pnpm start`, `pnpm super-admin` e `pnpm test` recusam, antes de iniciar o app ou conectar, qualquer ambiente efetivo com URL Supabase ausente, inválida ou fora de `127.0.0.1`/`localhost`/`::1` (inclusive `SUPABASE_DB_URL` e qualquer valor que cite domínio remoto do Supabase). Também exigem que `NEXT_PUBLIC_SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY` sejam as chaves JWT do Supabase local (emissor `supabase-demo`, papéis `anon`/`service_role`, sem claim `ref`); chaves de projeto remoto e o formato `sb_…` são recusados, o que cobre também um túnel/proxy em host local. O ambiente é resolvido com a precedência real de cada ferramenta (processo > arquivos `.env*`; Next dev, `next start` e Vite/Vitest/super-admin têm ordens diferentes). Código: `scripts/lib/guard-supabase-local.mjs` (fonte única; `tests/guard-supabase-local.ts` só reexporta) e `scripts/lib/ambiente-local.mjs`.
+- **Limites da trava:** a checagem das chaves só lê o payload do JWT; **não verifica assinatura** e não protege contra um token forjado de propósito. A porta de `SUPABASE_DB_URL` não é validada (vem do `supabase/config.toml` e pode variar entre desenvolvedores), então um túnel local na porta do banco passaria; essa variável só é usada pelas suítes `*-db`.
+- **Não há override.** `pnpm build`, os comandos da Vercel, o CI e os workflows de produção não passam por essa trava. Se houver necessidade real de executar algo contra o remoto, não afrouxe a trava: proponha um fluxo separado, com autorização explícita do Evandro.
+- **Cuidado com** `vercel env pull` (pode reescrever o `.env.local` com valores de produção) e com arquivos como `.env.production.local` (o `next build`/`next start` os carregam sozinhos). Para guardar valores remotos fora do carregamento automático, use um nome que nenhuma ferramenta leia sozinha, como `.env.remoto`, e nunca o versione.
 
 Sem Docker (sessões na nuvem), valide com lint + typecheck + testes puros + build e deixe o CI ser a referência. Falha "rate limit exceeded" no `supabase/setup-cli` é limite do GitHub: relance o job.
 

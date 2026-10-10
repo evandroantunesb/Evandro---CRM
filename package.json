@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "node scripts/checar-ambiente-local.mjs dev && next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "node scripts/checar-ambiente-local.mjs start && next start",
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
