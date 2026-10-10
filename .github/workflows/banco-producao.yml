@@ -1,38 +1,233 @@
 name: Banco de produção
 
-# Aplica as migrations novas no Supabase de produção quando algo entra na main.
-# Precisa dos secrets SUPABASE_ACCESS_TOKEN, SUPABASE_DB_PASSWORD, SUPABASE_PROJECT_ID e
-# SUPABASE_DB_URL (connection string da Session pooler, porta 5432, com a senha já
-# percent-encoded — runners do GitHub Actions são IPv4-only e a conexão direta do Supabase
-# só resolve em IPv6 sem o add-on pago de IPv4).
+# Migrations em produção: SOMENTE por disparo manual, em dois disparos independentes.
+#   1. modo "conferir": supabase db push --include-all --dry-run (só mostra o conjunto pendente);
+#   2. modo "aplicar":  supabase db push --include-all (repete o dry-run e aplica em seguida).
+# "conferir" nunca dispara "aplicar". Nada roda em push.
+#
+# Cada disparo exige: ref main ou tag migracao-<nome>; a ref e o SHA completo (40) confirmados;
+# no modo aplicar, a confirmação aplicar-<7 primeiros caracteres do SHA>. A validação roda sem
+# credenciais (job "validar") e é repetida antes de qualquer etapa que recebe secrets.
+#
+# Os secrets ficam no environment producao-banco (aprovação obrigatória de evandroantunesb, sem
+# bypass de administrador, refs main e migracao-*): o job só os recebe depois da aprovação, e só as
+# etapas que conectam ao banco os recebem. Agentes nunca aprovam nem contornam essa aprovação.
+#
+# Atenção: --include-all aplica TODAS as migrations pendentes da ref no momento da execução, não
+# só a mais recente. O conjunto é o que o dry-run lista.
+#
+# SUPABASE_DB_URL é a connection string da Session pooler (porta 5432, senha percent-encoded):
+# runners do GitHub Actions são IPv4-only e a conexão direta do Supabase só resolve em IPv6.
 on:
-  push:
-    branches: [main]
-    paths: ["supabase/migrations/**"]
   workflow_dispatch:
+    inputs:
+      modo:
+        description: "conferir = só dry-run (nada é aplicado); aplicar = supabase db push --include-all"
+        type: choice
+        options: [conferir, aplicar]
+        default: conferir
+        required: true
+      ref_confirmada:
+        description: "Nome exato da ref selecionada em 'Use workflow from' (main ou migracao-...)"
+        type: string
+        required: true
+      sha:
+        description: "SHA completo (40 caracteres) do commit atual dessa ref"
+        type: string
+        required: true
+      confirmacao_aplicar:
+        description: "Só no modo aplicar: digite aplicar-<7 primeiros caracteres do SHA>. Vazio para conferir."
+        type: string
+        required: false
+        default: ""
 
-concurrency:
-  group: banco-producao
-  cancel-in-progress: false
+permissions: {}
+
+env:
+  # Project ref de produção (público: aparece na URL do Supabase usada pelo front-end).
+  PROJETO_PRODUCAO: wswpxdmgfdamvqhyztrm
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
-  migrations:
+  validar:
+    name: Validar disparo (sem credenciais)
     runs-on: ubuntu-latest
-    env:
-      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
-      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+    timeout-minutes: 5
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v7
-      - uses: supabase/setup-cli@v3
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          version: latest
-      - name: Conferir secrets
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Validar ref, SHA e parâmetros
+        env:
+          ENTRADA_MODO: ${{ inputs.modo }}
+          ENTRADA_REF: ${{ inputs.ref_confirmada }}
+          ENTRADA_SHA: ${{ inputs.sha }}
+          ENTRADA_CONFIRMACAO: ${{ inputs.confirmacao_aplicar }}
+          PERMITIR_TAG_MIGRACAO: sim
+          EXIGIR_MODO: sim
+          VERIFICAR_CHECKOUT: sim
+        run: bash .github/scripts/validar-disparo-producao.sh
+      - name: Resumo para o aprovador
+        env:
+          MODO: ${{ inputs.modo }}
         run: |
-          if [ -z "$SUPABASE_ACCESS_TOKEN" ] || [ -z "$SUPABASE_DB_PASSWORD" ] || [ -z "$SUPABASE_PROJECT_ID" ] || [ -z "$SUPABASE_DB_URL" ]; then
-            echo "::error::Configure os secrets SUPABASE_ACCESS_TOKEN, SUPABASE_DB_PASSWORD, SUPABASE_PROJECT_ID e SUPABASE_DB_URL no GitHub."
-            exit 1
-          fi
-      - run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
-      - run: supabase db push --db-url "$SUPABASE_DB_URL" --include-all
+          migracoes=$(git ls-files 'supabase/migrations/*.sql' | wc -l)
+          fora_da_main=$(git diff --name-only --diff-filter=AM origin/main...HEAD -- supabase/migrations)
+          {
+            echo "### Banco de produção — modo \`$MODO\`"
+            echo
+            echo "- Ref: \`$GITHUB_REF\`"
+            echo "- Commit: \`$GITHUB_SHA\`"
+            echo "- Migrations nesta ref: $migracoes"
+            echo
+            echo "**Migrations desta ref que não estão na main:**"
+            if [ -n "$fora_da_main" ]; then
+              while IFS= read -r m; do echo "- \`$m\`"; done <<< "$fora_da_main"
+            else
+              echo "- nenhuma"
+            fi
+            echo
+            echo "O conjunto que será aplicado é o que o dry-run do job seguinte listar: \`--include-all\`"
+            echo "inclui TODAS as migrations pendentes no banco, não só as listadas acima."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  conferir:
+    name: Conferir (dry-run)
+    needs: validar
+    if: inputs.modo == 'conferir'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: producao-banco
+    permissions:
+      contents: read
+    concurrency:
+      group: banco-producao
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Revalidar disparo (antes de qualquer credencial)
+        env:
+          ENTRADA_MODO: ${{ inputs.modo }}
+          ENTRADA_REF: ${{ inputs.ref_confirmada }}
+          ENTRADA_SHA: ${{ inputs.sha }}
+          ENTRADA_CONFIRMACAO: ${{ inputs.confirmacao_aplicar }}
+          PERMITIR_TAG_MIGRACAO: sim
+          EXIGIR_MODO: sim
+          VERIFICAR_CHECKOUT: sim
+        run: bash .github/scripts/validar-disparo-producao.sh
+      - name: Conferir destino (projeto e URL do pooler, antes de conectar)
+        env:
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: node .github/scripts/validar-destino-producao.mjs banco "$PROJETO_PRODUCAO"
+      - uses: supabase/setup-cli@45a513f8c64c0bc8e0e3dfe572b5c95be85f6359 # v3.0.1
+        with:
+          version: 2.120.0
+      - name: Vincular projeto
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+        run: |
+          for v in SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD SUPABASE_PROJECT_ID; do
+            [ -n "${!v}" ] || { echo "::error::secret $v ausente no environment producao-banco"; exit 1; }
+          done
+          supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Dry-run (nada é aplicado)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          [ -n "$SUPABASE_DB_URL" ] || { echo "::error::secret SUPABASE_DB_URL ausente no environment producao-banco"; exit 1; }
+          supabase db push --db-url "$SUPABASE_DB_URL" --include-all --dry-run 2>&1 | tee "$RUNNER_TEMP/dry-run.txt"
+          {
+            echo "### Dry-run — conjunto pendente nesta ref (nada foi aplicado)"
+            echo
+            lista=$(grep -oE '[0-9]{14}_[A-Za-z0-9_.-]+\.sql' "$RUNNER_TEMP/dry-run.txt" | sort -u || true)
+            if [ -n "$lista" ]; then
+              while IFS= read -r m; do echo "- \`$m\`"; done <<< "$lista"
+            else
+              echo "- nenhuma migration pendente listada"
+            fi
+            echo
+            echo "O modo aplicar usa \`--include-all\`: aplica todo o conjunto pendente no momento em que"
+            echo "rodar (repete este dry-run logo antes). Se a ref ou o banco mudarem, o conjunto muda."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  aplicar:
+    name: Aplicar migrations
+    needs: validar
+    if: inputs.modo == 'aplicar'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: producao-banco
+    permissions:
+      contents: read
+    concurrency:
+      group: banco-producao
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Revalidar disparo (antes de qualquer credencial)
+        env:
+          ENTRADA_MODO: ${{ inputs.modo }}
+          ENTRADA_REF: ${{ inputs.ref_confirmada }}
+          ENTRADA_SHA: ${{ inputs.sha }}
+          ENTRADA_CONFIRMACAO: ${{ inputs.confirmacao_aplicar }}
+          PERMITIR_TAG_MIGRACAO: sim
+          EXIGIR_MODO: sim
+          VERIFICAR_CHECKOUT: sim
+        run: bash .github/scripts/validar-disparo-producao.sh
+      - name: Conferir destino (projeto e URL do pooler, antes de conectar)
+        env:
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: node .github/scripts/validar-destino-producao.mjs banco "$PROJETO_PRODUCAO"
+      - uses: supabase/setup-cli@45a513f8c64c0bc8e0e3dfe572b5c95be85f6359 # v3.0.1
+        with:
+          version: 2.120.0
+      - name: Vincular projeto
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+        run: |
+          for v in SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD SUPABASE_PROJECT_ID; do
+            [ -n "${!v}" ] || { echo "::error::secret $v ausente no environment producao-banco"; exit 1; }
+          done
+          supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Dry-run imediatamente antes de aplicar
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          [ -n "$SUPABASE_DB_URL" ] || { echo "::error::secret SUPABASE_DB_URL ausente no environment producao-banco"; exit 1; }
+          supabase db push --db-url "$SUPABASE_DB_URL" --include-all --dry-run 2>&1 | tee "$RUNNER_TEMP/dry-run.txt"
+          {
+            echo "### Conjunto que será aplicado agora"
+            echo
+            lista=$(grep -oE '[0-9]{14}_[A-Za-z0-9_.-]+\.sql' "$RUNNER_TEMP/dry-run.txt" | sort -u || true)
+            if [ -n "$lista" ]; then
+              while IFS= read -r m; do echo "- \`$m\`"; done <<< "$lista"
+            else
+              echo "- nenhuma migration pendente listada"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Aplicar (supabase db push --include-all)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: supabase db push --db-url "$SUPABASE_DB_URL" --include-all

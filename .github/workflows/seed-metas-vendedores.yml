@@ -3,16 +3,82 @@ name: Popular metas comerciais dos vendedores
 # Só roda quando disparado manualmente — nunca em push/PR — porque grava
 # dados direto na produção (idempotente: vendedor que já tem meta ativa no
 # mês é pulado, então pode rodar mais de uma vez sem duplicar).
+#
+# Proteções: só a branch main, com a ref e o SHA completo confirmados (validados sem credenciais
+# antes da aprovação e de novo antes do seed); environment producao-seed com aprovação obrigatória
+# de evandroantunesb e sem bypass. Os secrets só existem nesse environment e só a etapa do seed os
+# recebe. Agentes nunca aprovam nem contornam essa aprovação.
 on:
   workflow_dispatch:
+    inputs:
+      ref_confirmada:
+        description: "Nome exato da ref selecionada em 'Use workflow from' (só main)"
+        type: string
+        required: true
+      sha:
+        description: "SHA completo (40 caracteres) do commit atual da main"
+        type: string
+        required: true
+
+permissions: {}
+
+env:
+  # Project ref de produção (público: aparece na URL do Supabase usada pelo front-end).
+  PROJETO_PRODUCAO: wswpxdmgfdamvqhyztrm
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
-  seed:
+  validar:
+    name: Validar disparo (sem credenciais)
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validar ref e SHA
+        env:
+          ENTRADA_REF: ${{ inputs.ref_confirmada }}
+          ENTRADA_SHA: ${{ inputs.sha }}
+          PERMITIR_TAG_MIGRACAO: nao
+          EXIGIR_MODO: nao
+          VERIFICAR_CHECKOUT: sim
+        run: bash .github/scripts/validar-disparo-producao.sh
+
+  seed:
+    needs: validar
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: producao-seed
+    permissions:
+      contents: read
+    concurrency:
+      group: seed-producao
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Revalidar disparo (antes de qualquer credencial)
+        env:
+          ENTRADA_REF: ${{ inputs.ref_confirmada }}
+          ENTRADA_SHA: ${{ inputs.sha }}
+          PERMITIR_TAG_MIGRACAO: nao
+          EXIGIR_MODO: nao
+          VERIFICAR_CHECKOUT: sim
+        run: bash .github/scripts/validar-disparo-producao.sh
+      - name: Conferir destino (projeto e chave, antes do seed)
+        env:
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY_PROD }}
+        run: node .github/scripts/validar-destino-producao.mjs seed "$PROJETO_PRODUCAO"
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           cache: pnpm
@@ -21,4 +87,10 @@ jobs:
         env:
           SUPABASE_URL: https://${{ secrets.SUPABASE_PROJECT_ID }}.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY_PROD }}
-        run: node scripts/seed-metas-vendedores.mjs
+          PROJETO_CONFIGURADO: ${{ secrets.SUPABASE_PROJECT_ID != '' }}
+        run: |
+          if [ "$PROJETO_CONFIGURADO" != "true" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "::error::secrets ausentes no environment producao-seed"
+            exit 1
+          fi
+          node scripts/seed-metas-vendedores.mjs
