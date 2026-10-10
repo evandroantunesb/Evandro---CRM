@@ -141,10 +141,12 @@ describe("contrato assinado credita o SDR de origem", () => {
     const negocioId = await criarNegocio("Negócio redirecionado", membro[sdr1.id]);
     const primeiroHandoff = await enviarEAceitar(negocioId, sdr1, closer);
 
-    // closer (responsável atual, único que vê o negócio pra criar outro handoff) reenvia pra
-    // outro closer — de_membro_id do 2º handoff é o próprio closer, igual ao fluxo real
-    // ("Enviar para vendas" usa negocio.responsavel_id como de_membro_id, não quem clica).
-    await enviarEAceitar(negocioId, closer, closer2);
+    // Segundo repasse (B1a: só o SDR responsável envia): o negócio volta para outro SDR,
+    // que o envia ao closer2. O 2º handoff aceito tem outro SDR como remetente e mesmo assim
+    // não pode roubar a origem gravada no 1º aceite.
+    const { error: erroResp } = await servico.from("negocios").update({ responsavel_id: membro[sdr2.id] }).eq("id", negocioId);
+    if (erroResp) throw erroResp;
+    await enviarEAceitar(negocioId, sdr2, closer2);
 
     const { data: negocio } = await servico.from("negocios").select("handoff_origem_id, responsavel_id").eq("id", negocioId).single();
     expect(negocio!.handoff_origem_id).toBe(primeiroHandoff.id);

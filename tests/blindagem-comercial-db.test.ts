@@ -22,10 +22,12 @@ let operacao: Usuario;
 let operacaoGestorEquipe: Usuario;
 let vendedorB: Usuario;
 let duplo: Usuario;
+let sdrB: Usuario;
 let empresa: string;
 let empresaB: string;
 const membro: Record<string, string> = {};
 let membroVendedorB: string;
+let membroSdrB: string;
 let duploEmA: string;
 let duploEmB: string;
 let negocio: string;
@@ -39,8 +41,8 @@ let tarefaDoVendedor: string;
 const VENCE = new Date(Date.now() + 86_400_000).toISOString();
 
 beforeAll(async () => {
-  [admin, gestor, vendedor, vendedor2, sdr, operacao, operacaoGestorEquipe, vendedorB, duplo] = await Promise.all(
-    ["bc-admin", "bc-gestor", "bc-vendedor", "bc-vendedor2", "bc-sdr", "bc-operacao", "bc-operacao-gestor", "bc-vendedor-b", "bc-duplo"].map(
+  [admin, gestor, vendedor, vendedor2, sdr, operacao, operacaoGestorEquipe, vendedorB, duplo, sdrB] = await Promise.all(
+    ["bc-admin", "bc-gestor", "bc-vendedor", "bc-vendedor2", "bc-sdr", "bc-operacao", "bc-operacao-gestor", "bc-vendedor-b", "bc-duplo", "bc-sdr-b"].map(
       criarUsuario,
     ),
   );
@@ -62,7 +64,7 @@ beforeAll(async () => {
   if (error) throw error;
   for (const v of vinculos!) membro[v.user_id] = v.id;
 
-  // Empresa B: um vendedor só dela e um usuário (`duplo`) vendedor nas duas.
+  // Empresa B: um vendedor e um SDR só dela e um usuário (`duplo`) vendedor nas duas.
   const { data: empB } = await servico.from("empresas").insert({ nome: `Blindagem B ${sufixo}` }).select("id").single();
   empresaB = empB!.id;
   const { data: vB } = await servico
@@ -70,9 +72,11 @@ beforeAll(async () => {
     .insert([
       { empresa_id: empresaB, user_id: vendedorB.id, papel: "vendedor", perfil_gamificacao: "closer" },
       { empresa_id: empresaB, user_id: duplo.id, papel: "vendedor", perfil_gamificacao: "closer" },
+      { empresa_id: empresaB, user_id: sdrB.id, papel: "sdr", perfil_gamificacao: "sdr" },
     ])
     .select("id, user_id");
   membroVendedorB = vB!.find((v) => v.user_id === vendedorB.id)!.id;
+  membroSdrB = vB!.find((v) => v.user_id === sdrB.id)!.id;
   duploEmB = vB!.find((v) => v.user_id === duplo.id)!.id;
   const { data: dA } = await servico
     .from("empresa_membros")
@@ -255,12 +259,12 @@ describe("responsável comercial", () => {
 });
 
 describe("handoff: integridade multiempresa", () => {
-  /** Negócio novo na empresa A, do vendedor, com contato próprio. */
+  /** Negócio novo na empresa A, do SDR (B1a: só o SDR responsável envia), com contato próprio. */
   async function negocioDoVendedor(titulo: string) {
     const { data: c } = await servico.from("contatos").insert({ empresa_id: empresa, nome: `Cliente ${titulo}` }).select("id").single();
     const { data, error } = await servico
       .from("negocios")
-      .insert({ empresa_id: empresa, titulo, contato_id: c!.id, funil_id: funilA, etapa_id: etapaA, responsavel_id: membro[vendedor.id] })
+      .insert({ empresa_id: empresa, titulo, contato_id: c!.id, funil_id: funilA, etapa_id: etapaA, responsavel_id: membro[sdr.id] })
       .select("id")
       .single();
     if (error) throw error;
@@ -274,11 +278,11 @@ describe("handoff: integridade multiempresa", () => {
 
   it("handoff normal continua funcionando", async () => {
     const { negocioId, contatoId } = await negocioDoVendedor("Handoff normal");
-    const { data, error } = await handoff(vendedor.cliente, {
+    const { data, error } = await handoff(sdr.cliente, {
       empresa_id: empresa,
       negocio_id: negocioId,
       contato_id: contatoId,
-      de_membro_id: membro[vendedor.id],
+      de_membro_id: membro[sdr.id],
       para_membro_id: membro[vendedor2.id],
     });
     expect(error).toBeNull();
@@ -287,11 +291,11 @@ describe("handoff: integridade multiempresa", () => {
 
   it("destinatário comercial de outra empresa é recusado", async () => {
     const { negocioId, contatoId } = await negocioDoVendedor("Destinatário B");
-    const { error } = await handoff(vendedor.cliente, {
+    const { error } = await handoff(sdr.cliente, {
       empresa_id: empresa,
       negocio_id: negocioId,
       contato_id: contatoId,
-      de_membro_id: membro[vendedor.id],
+      de_membro_id: membro[sdr.id],
       para_membro_id: membroVendedorB,
     });
     expect(error?.message).toContain("destinatário");
@@ -299,7 +303,7 @@ describe("handoff: integridade multiempresa", () => {
 
   it("remetente de outra empresa é recusado", async () => {
     const { negocioId, contatoId } = await negocioDoVendedor("Remetente B");
-    const { error } = await handoff(vendedor.cliente, {
+    const { error } = await handoff(sdr.cliente, {
       empresa_id: empresa,
       negocio_id: negocioId,
       contato_id: contatoId,
@@ -326,11 +330,11 @@ describe("handoff: integridade multiempresa", () => {
     const { negocioId } = await negocioDoVendedor("Contato errado");
     const { contatoId: outroContato } = await negocioDoVendedor("Outro contato");
     for (const contatoErrado of [outroContato, contatoB]) {
-      const { error } = await handoff(vendedor.cliente, {
+      const { error } = await handoff(sdr.cliente, {
         empresa_id: empresa,
         negocio_id: negocioId,
         contato_id: contatoErrado,
-        de_membro_id: membro[vendedor.id],
+        de_membro_id: membro[sdr.id],
         para_membro_id: membro[vendedor2.id],
       });
       expect(error).not.toBeNull();
@@ -339,20 +343,20 @@ describe("handoff: integridade multiempresa", () => {
     expect(count).toBe(0);
   });
 
-  /** Handoff legítimo na empresa B: vendedorB → duplo (membro das duas empresas). */
+  /** Handoff legítimo na empresa B: sdrB → duplo (membro das duas empresas). */
   async function handoffEmB(titulo: string) {
     const { data: cB } = await servico.from("contatos").insert({ empresa_id: empresaB, nome: `Cliente ${titulo}` }).select("id").single();
     const { data: fB } = await servico.from("funis").select("id").eq("empresa_id", empresaB).single();
     const { data: etB } = await servico.from("etapas").select("id").eq("funil_id", fB!.id).order("ordem").limit(1).single();
     const { data: nB, error: erroN } = await servico
       .from("negocios")
-      .insert({ empresa_id: empresaB, titulo, contato_id: cB!.id, funil_id: fB!.id, etapa_id: etB!.id, responsavel_id: membroVendedorB })
+      .insert({ empresa_id: empresaB, titulo, contato_id: cB!.id, funil_id: fB!.id, etapa_id: etB!.id, responsavel_id: membroSdrB })
       .select("id")
       .single();
     if (erroN) throw erroN;
-    const { data: hB, error: erroH } = await vendedorB.cliente
+    const { data: hB, error: erroH } = await sdrB.cliente
       .from("handoffs")
-      .insert({ empresa_id: empresaB, negocio_id: nB!.id, contato_id: cB!.id, de_membro_id: membroVendedorB, para_membro_id: duploEmB, status_qualificacao: "qualificado" })
+      .insert({ empresa_id: empresaB, negocio_id: nB!.id, contato_id: cB!.id, de_membro_id: membroSdrB, para_membro_id: duploEmB, status_qualificacao: "qualificado" })
       .select("id")
       .single();
     if (erroH) throw erroH;
@@ -404,11 +408,11 @@ describe("handoff: integridade multiempresa", () => {
 
   it("destinatário operacao continua recusado", async () => {
     const { negocioId, contatoId } = await negocioDoVendedor("Destinatário operação");
-    const { error } = await handoff(vendedor.cliente, {
+    const { error } = await handoff(sdr.cliente, {
       empresa_id: empresa,
       negocio_id: negocioId,
       contato_id: contatoId,
-      de_membro_id: membro[vendedor.id],
+      de_membro_id: membro[sdr.id],
       para_membro_id: membro[operacao.id],
     });
     expect(error?.message).toContain("destinatário");
