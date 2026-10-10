@@ -8,20 +8,26 @@ import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
+import { jwtDemo, jwtRemoto } from "./jwt-ficticio";
 
 const RAIZ = process.cwd();
 const CHECAR = join(RAIZ, "scripts", "checar-ambiente-local.mjs");
 const SUPER_ADMIN = join(RAIZ, "scripts", "criar-super-admin.mts");
+const AMBIENTE_LOCAL = join(RAIZ, "scripts", "lib", "ambiente-local.mjs");
 
 const LOCAL = "http://127.0.0.1:54321";
 const REMOTO = "https://exemplo-ficticio.supabase.co";
-const SEGREDO_ANON = "SEGREDO-ANON-123";
-const SEGREDO_SERVICE = "SEGREDO-SERVICE-456";
+// JWTs fictícios no formato do Supabase local; a "assinatura" é um marcador para provar que nada vaza.
+const SEGREDO_ANON = "SEGREDOANON123";
+const SEGREDO_SERVICE = "SEGREDOSERVICE456";
+const ANON_LOCAL = jwtDemo("anon", SEGREDO_ANON);
+const SERVICE_LOCAL = jwtDemo("service_role", SEGREDO_SERVICE);
 
 /** Conteúdo de um arquivo .env* com as três variáveis exigidas. */
-const arquivoEnv = (url: string) =>
-  `NEXT_PUBLIC_SUPABASE_URL=${url}\nNEXT_PUBLIC_SUPABASE_ANON_KEY=${SEGREDO_ANON}\nSUPABASE_SERVICE_ROLE_KEY=${SEGREDO_SERVICE}\n`;
+const arquivoEnv = (url: string, service = SERVICE_LOCAL) =>
+  `NEXT_PUBLIC_SUPABASE_URL=${url}\nNEXT_PUBLIC_SUPABASE_ANON_KEY=${ANON_LOCAL}\nSUPABASE_SERVICE_ROLE_KEY=${service}\n`;
 
 // O processo filho só herda o necessário para o Node rodar: nenhuma variável do Supabase do
 // ambiente de testes (que o Vitest injeta) vaza para dentro dos cenários.
@@ -40,7 +46,7 @@ function rodar(script: string, args: string[], arquivos: Record<string, string> 
   const dir = mkdtempSync(join(tmpdir(), "guard-ambiente-"));
   pastas.push(dir);
   for (const [nome, conteudo] of Object.entries(arquivos)) writeFileSync(join(dir, nome), conteudo);
-  const r = spawnSync(process.execPath, ["--disable-warning=MODULE_TYPELESS_PACKAGE_JSON", script, ...args], {
+  const r = spawnSync(process.execPath, [script, ...args], {
     cwd: dir,
     env: { ...BASE, ...processo } as NodeJS.ProcessEnv, // o Next exige NODE_ENV no tipo; o filho define o seu
     encoding: "utf8",
@@ -56,6 +62,7 @@ describe("host local, remoto e ausência de configuração", () => {
   it.each(["dev", "start", "super-admin"])("%s: .env.local local passa", (modo) => {
     const r = checar(modo, { ".env.local": arquivoEnv(LOCAL) });
     expect(r.codigo, r.saida).toBe(0);
+    expect(r.saida).not.toMatch(/MODULE_TYPELESS|Warning/);
   });
 
   it.each(["dev", "start", "super-admin"])("%s: .env.local remoto é recusado, sem vazar valores", (modo) => {
@@ -67,6 +74,15 @@ describe("host local, remoto e ausência de configuração", () => {
     expect(r.saida).not.toContain(SEGREDO_SERVICE);
   });
 
+  it.each(["dev", "start", "super-admin"])("%s: túnel/proxy em host local com chave remota é recusado, sem vazar a chave", (modo) => {
+    const remota = jwtRemoto("service_role", "SEGREDOREMOTO789");
+    const r = checar(modo, { ".env.local": arquivoEnv("http://127.0.0.1:9999", remota) });
+    expect(r.codigo).toBe(1);
+    expect(r.saida).toMatch(/SUPABASE_SERVICE_ROLE_KEY pertence a um projeto Supabase remoto/);
+    expect(r.saida).not.toContain("SEGREDOREMOTO789");
+    expect(r.saida).not.toContain(remota.split(".")[1]);
+  });
+
   it.each(["dev", "start", "super-admin"])("%s: sem nenhuma configuração é recusado", (modo) => {
     const r = checar(modo);
     expect(r.codigo).toBe(1);
@@ -74,7 +90,7 @@ describe("host local, remoto e ausência de configuração", () => {
   });
 
   it("recusa configuração incompleta (falta a service role) e URL inválida", () => {
-    const semService = `NEXT_PUBLIC_SUPABASE_URL=${LOCAL}\nNEXT_PUBLIC_SUPABASE_ANON_KEY=${SEGREDO_ANON}\n`;
+    const semService = `NEXT_PUBLIC_SUPABASE_URL=${LOCAL}\nNEXT_PUBLIC_SUPABASE_ANON_KEY=${ANON_LOCAL}\n`;
     expect(checar("dev", { ".env.local": semService }).codigo).toBe(1);
     expect(checar("dev", { ".env.local": arquivoEnv("nao-e-url") }).codigo).toBe(1);
   });
@@ -148,10 +164,53 @@ describe("pnpm super-admin recusa antes de qualquer conexão", () => {
     expect(r.saida).toMatch(/recusado/);
   });
 
-  it("a trava vem antes de createClient no código do script", () => {
+  it("valida e conecta com o MESMO objeto de ambiente; a trava vem antes de createClient", () => {
     const codigo = readFileSync(SUPER_ADMIN, "utf8");
-    expect(codigo.indexOf("exigirAmbienteLocal(")).toBeGreaterThan(-1);
-    expect(codigo.indexOf("exigirAmbienteLocal(")).toBeLessThan(codigo.indexOf("createClient("));
+    const carga = codigo.indexOf('const env = carregarAmbiente("super-admin");');
+    const trava = codigo.indexOf('exigirAmbienteLocal(env, "pnpm super-admin");');
+    const cliente = codigo.indexOf("createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY,");
+    expect(carga).toBeGreaterThan(-1);
+    expect(trava).toBeGreaterThan(carga);
+    expect(cliente).toBeGreaterThan(trava);
+    // Nenhuma outra fonte de configuração ou cliente no script.
+    expect(codigo).not.toMatch(/process\.env|loadEnv\(/);
+    expect(codigo.match(/createClient\(/g)).toHaveLength(1);
+  });
+
+  it("equivalência: o ambiente do super-admin é o loadEnv do Vite, com o processo prevalecendo", () => {
+    // Processo isolado compara, chave a chave, carregarAmbiente("super-admin") (o que o script usa
+    // para validar E conectar) com o carregamento original do script (loadEnv do Vite). Só imprime
+    // nomes de chaves divergentes, o host e um booleano.
+    const harness = [
+      'import { createRequire } from "node:module";',
+      "const { carregarAmbiente } = await import(process.env.AMBIENTE_LOCAL_URL);",
+      'const { loadEnv } = createRequire(process.env.RAIZ_PKG)("vite");',
+      'const a = carregarAmbiente("super-admin");',
+      'const b = loadEnv("development", process.cwd(), "");',
+      "const diferentes = [...new Set([...Object.keys(a), ...Object.keys(b)])].filter((k) => a[k] !== b[k]);",
+      "console.log(JSON.stringify({ diferentes, url: new URL(a.NEXT_PUBLIC_SUPABASE_URL).host, service: a.SUPABASE_SERVICE_ROLE_KEY === process.env.ESPERADO_SERVICE }));",
+    ].join("\n");
+    const arquivos = {
+      ".env": arquivoEnv("http://localhost:1111"),
+      ".env.local": arquivoEnv("http://localhost:2222"),
+      ".env.development": arquivoEnv("http://localhost:3333"),
+      ".env.development.local": "NEXT_PUBLIC_SUPABASE_URL=http://localhost:4444\n",
+      "equivalencia.mjs": harness,
+    };
+    const casos: [Record<string, string>, string][] = [
+      [{}, "localhost:4444"], // no Vite, .env.development.local é o arquivo de maior precedência
+      [{ NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:5555" }, "127.0.0.1:5555"], // o processo prevalece
+    ];
+    for (const [processo, host] of casos) {
+      const r = rodar("equivalencia.mjs", [], arquivos, {
+        ...processo,
+        AMBIENTE_LOCAL_URL: pathToFileURL(AMBIENTE_LOCAL).href,
+        RAIZ_PKG: join(RAIZ, "package.json"),
+        ESPERADO_SERVICE: SERVICE_LOCAL,
+      });
+      expect(r.codigo, r.saida).toBe(0);
+      expect(JSON.parse(r.saida)).toEqual({ diferentes: [], url: host, service: true });
+    }
   });
 });
 

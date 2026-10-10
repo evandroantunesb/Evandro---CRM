@@ -5,10 +5,11 @@
  * recusa qualquer outro host antes de conectar).
  */
 import { createClient } from "@supabase/supabase-js";
-import { loadEnv } from "vite";
-import { exigirAmbienteLocal } from "./lib/ambiente-local.mjs";
+import { carregarAmbiente, exigirAmbienteLocal } from "./lib/ambiente-local.mjs";
 
-const env = loadEnv("development", process.cwd(), "");
+// Mesmo objeto para validar e para conectar: arquivos .env* do modo "development" (precedência do
+// Vite) com as variáveis do processo prevalecendo.
+const env = carregarAmbiente("super-admin");
 // Trava fail-closed: antes de qualquer conexão ou escrita, só aceita Supabase local (sem override).
 exigirAmbienteLocal(env, "pnpm super-admin");
 const [email, senha, nome = ""] = process.argv.slice(2);

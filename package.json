@@ -3,15 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/checar-ambiente-local.mjs dev && next dev",
+    "dev": "node scripts/checar-ambiente-local.mjs dev && next dev",
     "build": "next build",
-    "start": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/checar-ambiente-local.mjs start && next start",
+    "start": "node scripts/checar-ambiente-local.mjs start && next start",
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "db:reset": "supabase db reset",
     "db:types": "supabase gen types typescript --local > src/lib/supabase/database.types.ts && oxfmt src/lib/supabase/database.types.ts",
-    "super-admin": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/criar-super-admin.mts"
+    "super-admin": "node scripts/criar-super-admin.mts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
