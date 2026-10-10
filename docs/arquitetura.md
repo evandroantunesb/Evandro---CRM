@@ -45,7 +45,7 @@ scripts/                criar-super-admin, seed-equipe-cascavel (legado), seed-m
 - Arquivo novo: `supabase/migrations/AAAAMMDDHHMMSS_nome.sql`. **Confira as migrations das PRs abertas antes de escolher o prefixo** — versões iguais quebram o `db push`.
 - `src/lib/supabase/database.types.ts` é **gerado** por `pnpm db:types` depois de mudar o banco. Nunca edite à mão — o CI compara byte a byte com a saída do gerador. O arquivo é grande: para consultar, busque a tabela pelo nome.
 - Excepcionalmente, com autorização explícita do Evandro, uma migration de PR pode ser aplicada em produção antes do merge; nesse intervalo produção fica à frente da `main`. Confira antes de escolher prefixo ou reaplicar; no merge, o `db push` não reaplica versão já registrada.
-- Produção: `banco-producao.yml` roda `supabase db push --include-all` a cada push na `main` que toque migrations (ou manualmente). O preview do Vercel usa o **mesmo** banco de produção: PR com migration nova dá erro no preview até ser aplicada.
+- Produção: `banco-producao.yml` só roda por disparo manual aprovado no environment `producao-banco` — primeiro o modo `conferir` (dry-run), depois, em outro disparo, o modo `aplicar` (`supabase db push --include-all`). Merge na `main` não aplica migration sozinho: depois do merge, dispare e aprove. O preview do Vercel usa o **mesmo** banco de produção: PR com migration nova dá erro no preview até ser aplicada.
 - Entrega que depende de tabela de PR não mesclada nasce da branch dessa PR (PR empilhada).
 
 ## Deploy e CI
