@@ -1,11 +1,21 @@
 /**
- * Eventos "atividade" (operacionais, repetíveis sem limite natural) que o fechamento de
- * antifraude de 2026-10-02 tornou estruturalmente inelegíveis para XP/moedas — ver
- * `20261002180000_gamificacao_antifraude_fechamento.sql`. O evento continua existindo e
+ * Eventos estruturalmente inelegíveis para XP/moedas: os de "atividade" (operacionais,
+ * repetíveis sem limite natural) desde o fechamento de antifraude de 2026-10-02
+ * (`20261002180000_gamificacao_antifraude_fechamento.sql`) e, desde a B1a
+ * (`20261010100000_handoff_pontuacao_aceite.sql`), o envio e a devolução de oportunidade —
+ * o repasse do SDR só pontua no aceite (`oportunidade_aceita`). O evento continua existindo e
  * nenhum histórico é apagado; só não é mais oferecido pra regra nova e o motor ignora
  * qualquer regra antiga desses tipos, mesmo que ainda esteja `ativa`.
  */
-export const EVENTOS_NAO_PONTUAVEIS = ["deal.created", "deal.stage_changed", "deal.owner_changed", "task.created", "note.created"] as const;
+export const EVENTOS_NAO_PONTUAVEIS = [
+  "deal.created",
+  "deal.stage_changed",
+  "deal.owner_changed",
+  "task.created",
+  "note.created",
+  "handoff.created",
+  "handoff.devolvido",
+] as const;
 
 /**
  * Eventos "atividade repetível" que continuam pontuáveis, mas só com teto configurado
@@ -37,9 +47,10 @@ export const EVENTOS_GAMIFICACAO = [
   // Mantido no catálogo só por compatibilidade histórica (evento já publicado no passado).
   { tipo: "deal.first_contact_done", rotulo: "SDR: primeiro contato realizado (legado, não usar)", campos: [], legado: true },
   { tipo: "deal.energy_bill_received", rotulo: "SDR: conta de energia recebida", campos: [] },
-  { tipo: "handoff.created", rotulo: "SDR: lead entregue para vendas", campos: [] },
-  { tipo: "oportunidade_aceita", rotulo: "SDR: oportunidade aceita pelo closer", campos: [] },
-  { tipo: "handoff.devolvido", rotulo: "Closer devolveu a oportunidade", campos: [] },
+  // B1a: envio e devolução ficam só como histórico; o repasse pontua no primeiro aceite.
+  { tipo: "handoff.created", rotulo: "SDR: lead entregue para vendas (só histórico, não pontua)", campos: [], naoPontuavel: true },
+  { tipo: "oportunidade_aceita", rotulo: "SDR: oportunidade aceita pelo closer (só o primeiro aceite do negócio)", campos: [] },
+  { tipo: "handoff.devolvido", rotulo: "Closer devolveu a oportunidade (só histórico, não pontua)", campos: [], naoPontuavel: true },
   { tipo: "handoff.won", rotulo: "SDR: lead entregue que virou venda", campos: ["valor"] },
   { tipo: "handoff.contrato_assinado", rotulo: "SDR: contrato assinado da oportunidade originada", campos: [] },
   { tipo: "pagamento.confirmado", rotulo: "Pagamento confirmado", campos: [] },
@@ -49,6 +60,16 @@ export const EVENTOS_GAMIFICACAO = [
 export const EVENTOS_GAMIFICACAO_SELECIONAVEIS = EVENTOS_GAMIFICACAO.filter(
   (e) => !("legado" in e && e.legado) && !("naoPontuavel" in e && e.naoPontuavel),
 );
+
+/** Se uma regra nova pode usar este evento (o motor nunca credita os demais). */
+export function eventoAceitaRegraNova(tipo: string) {
+  return EVENTOS_GAMIFICACAO_SELECIONAVEIS.some((e) => e.tipo === tipo);
+}
+
+/** Evento que o motor nunca credita (regra antiga desses tipos fica só como registro). */
+export function eventoNaoPontuavel(tipo: string) {
+  return (EVENTOS_NAO_PONTUAVEIS as readonly string[]).includes(tipo);
+}
 
 export type TipoEventoGamificacao = (typeof EVENTOS_GAMIFICACAO)[number]["tipo"];
 

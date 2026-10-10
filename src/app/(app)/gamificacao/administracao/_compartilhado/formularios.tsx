@@ -4,7 +4,7 @@ import { useActionState, useState } from "react";
 import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
 import { CabecalhoItemGf, StatusAtivoGf } from "../../_compartilhado/formulario-ui";
 import { BadgeGf, formatarNumeroGf } from "../../_compartilhado/ui";
-import { EVENTOS_TETO_OBRIGATORIO, MARCOS_CONQUISTA, ROTULO_MARCO_CONQUISTA, type MarcoConquista } from "@/lib/gamificacao";
+import { EVENTOS_TETO_OBRIGATORIO, MARCOS_CONQUISTA, ROTULO_MARCO_CONQUISTA, eventoNaoPontuavel, type MarcoConquista } from "@/lib/gamificacao";
 import {
   OPERADORES_CONDICAO,
   PERFIS_GAMIFICACAO,
@@ -135,6 +135,11 @@ export function LinhaRegra({ regra, eventos }: { regra: RegraSalva; eventos: rea
         <Campo rotulo="Moedas" name="moedas" type="number" step={1} defaultValue={regra.moedas} required />
         <SeletorPerfil defaultValue={regra.perfilAplicavel ?? ""} />
       </div>
+      {eventoNaoPontuavel(eventoTipo) && (
+        <p className="gf-t-aux">
+          Esse evento não gera mais XP nem moedas. A regra fica só como registro; lançamentos antigos não mudam.
+        </p>
+      )}
       <CondicaoTeto
         campos={campos}
         condicaoInicial={regra.condicao}

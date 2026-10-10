@@ -18,6 +18,7 @@ import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
 let sdr1: Usuario;
 let closer: Usuario;
 let closer2: Usuario;
+let sdr2: Usuario;
 let empresa: string;
 const membro: Record<string, string> = {};
 let funil: string;
@@ -25,7 +26,7 @@ let etapaInicial: string;
 let contato: string;
 
 beforeAll(async () => {
-  [sdr1, closer, closer2] = await Promise.all(["hwc-sdr1", "hwc-closer", "hwc-closer2"].map(criarUsuario));
+  [sdr1, closer, closer2, sdr2] = await Promise.all(["hwc-sdr1", "hwc-closer", "hwc-closer2", "hwc-sdr2"].map(criarUsuario));
   const { data: emp } = await servico.from("empresas").insert({ nome: `Handoff won causal ${sufixo}` }).select("id").single();
   empresa = emp!.id;
 
@@ -35,6 +36,7 @@ beforeAll(async () => {
       { empresa_id: empresa, user_id: sdr1.id, papel: "sdr", perfil_gamificacao: "sdr" },
       { empresa_id: empresa, user_id: closer.id, papel: "vendedor", perfil_gamificacao: "closer" },
       { empresa_id: empresa, user_id: closer2.id, papel: "vendedor", perfil_gamificacao: "closer" },
+      { empresa_id: empresa, user_id: sdr2.id, papel: "sdr", perfil_gamificacao: "sdr" },
     ])
     .select("id, user_id");
   for (const v of vinculos!) membro[v.user_id] = v.id;
@@ -98,10 +100,12 @@ describe("handoff.won usa a origem causal (handoff_origem_id), não o mais recen
     const negocioId = await criarNegocio("Negócio múltiplos handoffs", membro[sdr1.id]);
     const primeiroHandoff = await enviarEAceitar(negocioId, sdr1, closer);
 
-    // closer (responsável atual) reenvia pra closer2 — handoff mais recente por created_at,
-    // mas de_membro_id é o próprio closer (nem é SDR). A busca antiga ("order by created_at
-    // desc") pegaria esse handoff e creditaria o closer como se fosse o SDR de origem.
-    await enviarEAceitar(negocioId, closer, closer2);
+    // Handoff mais recente de outro remetente (B1a: só o SDR responsável envia): o negócio
+    // volta para o sdr2, que o envia ao closer2. A busca antiga ("order by created_at desc")
+    // pegaria esse handoff e creditaria o sdr2 em vez do SDR de origem.
+    const { error: erroResp } = await servico.from("negocios").update({ responsavel_id: membro[sdr2.id] }).eq("id", negocioId);
+    if (erroResp) throw erroResp;
+    await enviarEAceitar(negocioId, sdr2, closer2);
 
     const { data: negocio } = await servico.from("negocios").select("handoff_origem_id").eq("id", negocioId).single();
     expect(negocio!.handoff_origem_id).toBe(primeiroHandoff.id);
