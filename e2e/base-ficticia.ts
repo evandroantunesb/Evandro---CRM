@@ -50,11 +50,16 @@ async function noBancoLocal(sql: string, params: unknown[]) {
   }
 }
 
-/** Erro do Supabase (ou resposta vazia) interrompe a criação da base com o contexto. */
+/** Consulta que PRECISA devolver dados: erro ou resposta vazia interrompem a criação da base. */
 function ok<R extends { data: unknown; error: { message: string } | null }>(r: R, contexto: string): NonNullable<R["data"]> {
-  if (r.error) throw new Error(`${contexto}: ${r.error.message}`);
+  feito(r, contexto);
   if (r.data == null) throw new Error(`${contexto}: resposta vazia`);
   return r.data as NonNullable<R["data"]>;
+}
+
+/** Escrita sem retorno (RPC `returns void`, update sem select): `data` nulo é sucesso; só o erro conta. */
+function feito(r: { error: { message: string } | null }, contexto: string): void {
+  if (r.error) throw new Error(`${contexto}: ${r.error.message}`);
 }
 
 export async function criarBaseFicticia(): Promise<BaseFicticia> {
@@ -138,7 +143,7 @@ export async function criarBaseFicticia(): Promise<BaseFicticia> {
     ["execCompras", [{ setor: "compras", capacidade: "executar" }]],
   ];
   for (const [chave, s] of setores) {
-    ok(await clientes.admin.rpc("definir_setores_membro", { p_membro_id: usuarios[chave].membroId, p_setores: s as never }), `setores ${chave}`);
+    feito(await clientes.admin.rpc("definir_setores_membro", { p_membro_id: usuarios[chave].membroId, p_setores: s as never }), `setores ${chave}`);
   }
 
   // --- Obras pelo mecanismo real -------------------------------------------------
@@ -169,13 +174,13 @@ export async function criarBaseFicticia(): Promise<BaseFicticia> {
         .single(),
       "negócio",
     );
-    ok(await clientes[vendedor].from("negocios").update({ status: "ganho" }).eq("id", negocio.id), "ganho");
+    feito(await clientes[vendedor].from("negocios").update({ status: "ganho" }).eq("id", negocio.id), "ganho");
     const contrato = ok(
       await clientes[vendedor].from("contratos").insert({ empresa_id: emp, negocio_id: negocio.id, conteudo: "Contrato fictício (E2E)" }).select("id").single(),
       "contrato",
     );
-    ok(await clientes[vendedor].from("contratos").update({ status: "assinado" }).eq("id", contrato.id), "assinado");
-    ok(await clientes[confirmador].rpc("confirmar_pagamento", { p_contrato_id: contrato.id }), "pagamento");
+    feito(await clientes[vendedor].from("contratos").update({ status: "assinado" }).eq("id", contrato.id), "assinado");
+    feito(await clientes[confirmador].rpc("confirmar_pagamento", { p_contrato_id: contrato.id }), "pagamento");
     const obra = ok(await servico.from("obras").select("id").eq("negocio_id", negocio.id).single(), "obra");
     return obra.id;
   }
@@ -208,15 +213,15 @@ export async function criarBaseFicticia(): Promise<BaseFicticia> {
   // --- Estados pelas RPCs reais (como admin) --------------------------------------
   const admin = clientes.admin;
   const status = async (obra: string, setor: "compras" | "engenharia" | "operacional", novo: string) =>
-    ok(await admin.rpc("alterar_status_fluxo_obra", { p_obra_id: obra, p_setor: setor, p_status: novo }), `status ${setor}`);
+    feito(await admin.rpc("alterar_status_fluxo_obra", { p_obra_id: obra, p_setor: setor, p_status: novo }), `status ${setor}`);
   const parado = async (obra: string, setor: "compras" | "engenharia" | "operacional", motivo: string) =>
-    ok(await admin.rpc("marcar_parado_fluxo_obra", { p_obra_id: obra, p_setor: setor, p_parado: true, p_motivo: motivo }), "parado");
+    feito(await admin.rpc("marcar_parado_fluxo_obra", { p_obra_id: obra, p_setor: setor, p_parado: true, p_motivo: motivo }), "parado");
   const aguardando = async (obra: string, setor: "compras" | "engenharia" | "operacional", quem: "cliente" | "fornecedor" | "concessionaria") =>
-    ok(await admin.rpc("definir_aguardando_fluxo_obra", { p_obra_id: obra, p_setor: setor, p_aguardando: quem }), "aguardando");
+    feito(await admin.rpc("definir_aguardando_fluxo_obra", { p_obra_id: obra, p_setor: setor, p_aguardando: quem }), "aguardando");
   const marco = async (obra: string, qual: "nf_cliente" | "garantia", novo: "concluido" | "nao_se_aplica", motivo?: string) =>
-    ok(await admin.rpc("atualizar_marco_obra", { p_obra_id: obra, p_marco: qual, p_status: novo, ...(motivo ? { p_motivo: motivo } : {}) }), "marco");
+    feito(await admin.rpc("atualizar_marco_obra", { p_obra_id: obra, p_marco: qual, p_status: novo, ...(motivo ? { p_motivo: motivo } : {}) }), "marco");
   const atribuir = async (obra: string, chave: string, setor: "compras" | "engenharia" | "operacional", funcao: "responsavel" | "apoio", principal = false) =>
-    ok(
+    feito(
       await admin.rpc("atribuir_participante_obra", {
         p_obra_id: obra,
         p_membro_id: usuarios[chave].membroId,
