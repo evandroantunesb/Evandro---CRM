@@ -1,6 +1,6 @@
 import "server-only";
 import type { SupabaseServidor } from "@/lib/supabase/server";
-import { VER_NEGOCIO_DA_OBRA, pode } from "@/lib/permissoes";
+import { GERIR_OBRAS, VER_NEGOCIO_DA_OBRA, pode } from "@/lib/permissoes";
 import { ROTULO_TIPO_LIGACAO } from "@/lib/tipos";
 import { alertasObra, estadoSetor, MARCOS_OBRA, situacaoObra } from "./derivados";
 import { montarHistorico, type ItemHistoricoVM } from "./historico";
@@ -18,6 +18,15 @@ import {
   type SituacaoObra,
 } from "./rotulos";
 import { extrairDadosTecnicos, type DadosTecnicosVM } from "./tecnico";
+import {
+  bloqueioDaObra,
+  permissoesSetor,
+  podeAtualizarMarcos,
+  type EntradaAutorizacao,
+  type EstadoEscritaObra,
+  type PermissoesSetor,
+  type SetorDoMembro,
+} from "./gestao";
 
 /**
  * Leitura do detalhe de uma obra (somente leitura). Devolve um view model EXPLÍCITO, montado
@@ -98,6 +107,46 @@ export type ObraDetalheVM = {
   /** Só quem a RLS libera (admin, vendedor da venda, gestor da equipe). */
   valorVendido: number | null;
   historico: ItemHistoricoVM[];
+  /** Controles do modo Gestão; null para quem não tem nenhuma autorização de escrita (gestor, vendedor, SDR...). */
+  gestao: GestaoObraVM | null;
+};
+
+/** Participação operacional ativa, com o id que as RPCs de encerrar/substituir exigem. */
+export type ParticipanteGestaoVM = {
+  participanteId: string;
+  nome: string;
+  funcao: string;
+  funcaoRotulo: string;
+  principal: boolean;
+  /** É a própria pessoa (ninguém encerra a própria participação). */
+  proprio: boolean;
+};
+
+/** Quem pode ser atribuído ao setor. `detalhe` só quando o app consegue verificar (admin). */
+export type CandidatoParticipanteVM = { membroId: string; nome: string; detalhe: string | null };
+
+export type SetorGestaoVM = {
+  setor: SetorObra;
+  permissoes: PermissoesSetor;
+  /** Código de `aguardando` (para o seletor); null se não aguarda ninguém. */
+  aguardandoCodigo: string | null;
+  /** Só para quem gere participantes deste setor; vazio nos demais casos. */
+  participantes: ParticipanteGestaoVM[];
+  /** Só para quem gere participantes deste setor. */
+  candidatos: CandidatoParticipanteVM[];
+  /**
+   * true: os candidatos já são só `operacao` ativos com este setor (admin lê esses dados).
+   * false: o coordenador não lê setores nem papéis dos colegas (RLS); a lista traz os membros
+   * ativos e quem valida é a RPC.
+   */
+  candidatosVerificados: boolean;
+};
+
+export type GestaoObraVM = {
+  /** Motivo de a obra não aceitar alterações agora (cancelada/pausada); null se aceita. */
+  bloqueio: string | null;
+  setores: SetorGestaoVM[];
+  podeAtualizarMarcos: boolean;
 };
 
 /** Teto de eventos do histórico por carga. */
@@ -206,7 +255,12 @@ async function lerObraComercial(supabase: SupabaseServidor, empresaId: string, o
  */
 export async function carregarDetalheObra(
   supabase: SupabaseServidor,
-  { empresaId, papel, obraId }: { empresaId: string; papel: string | null | undefined; obraId: string },
+  {
+    empresaId,
+    papel,
+    obraId,
+    membroId = null,
+  }: { empresaId: string; papel: string | null | undefined; obraId: string; membroId?: string | null },
 ): Promise<ObraDetalheVM | null> {
   if (!UUID.test(obraId)) return null;
   const fonte = fonteDadosObras(papel);
@@ -219,7 +273,7 @@ export async function carregarDetalheObra(
   const [fluxosRes, marcosRes, participantesRes, historicoRes, identidadesRes, valorRes] = await Promise.all([
     supabase.from("obra_fluxos").select("setor, status, status_desde, parado, parado_motivo, aguardando").eq("obra_id", obraId).eq("empresa_id", empresaId),
     supabase.from("obra_marcos").select("marco, status, motivo").eq("obra_id", obraId).eq("empresa_id", empresaId),
-    supabase.from("obra_participantes").select("setor, membro_id, funcao, principal").eq("obra_id", obraId).eq("empresa_id", empresaId).is("fim", null),
+    supabase.from("obra_participantes").select("id, setor, membro_id, funcao, principal").eq("obra_id", obraId).eq("empresa_id", empresaId).is("fim", null),
     supabase
       .from("obra_historico")
       .select("setor, tipo, dados, autor_membro_id, created_at")
@@ -309,6 +363,16 @@ export async function carregarDetalheObra(
     negocioId: pode(papel, VER_NEGOCIO_DA_OBRA) ? obra.negocioId : null,
   };
 
+  const gestao = await montarGestao(supabase, {
+    empresaId,
+    papel,
+    membroId,
+    estado: { cancelada: Boolean(obra.canceladaEm), pausada: Boolean(obra.pausadaEm) },
+    fluxos,
+    participantes,
+    nomes,
+  });
+
   return {
     resumo,
     contatoCliente: obra.contato,
@@ -318,5 +382,136 @@ export async function carregarDetalheObra(
     tecnico: extrairDadosTecnicos(obra.snapshot),
     valorVendido: numeroOuNull(valorRes.data?.valor_vendido),
     historico: montarHistorico(historicoRes.data ?? [], nomes),
+    gestao,
+  };
+}
+
+type LinhaParticipanteDetalhe = { id: string; setor: string; membro_id: string; funcao: string; principal: boolean };
+
+/**
+ * Bloco do modo Gestão. Só papéis que podem escrever (admin, `operacao`) chegam a consultar algo
+ * a mais; os demais recebem null sem nenhuma chamada extra. Ids de participação e de membro só
+ * entram no VM do setor que a pessoa pode gerir.
+ */
+async function montarGestao(
+  supabase: SupabaseServidor,
+  entrada: {
+    empresaId: string;
+    papel: string | null | undefined;
+    membroId: string | null;
+    estado: EstadoEscritaObra;
+    fluxos: readonly { setor: string; aguardando: string | null }[];
+    participantes: readonly LinhaParticipanteDetalhe[];
+    nomes: ReadonlyMap<string, string>;
+  },
+): Promise<GestaoObraVM | null> {
+  const { empresaId, papel, membroId, estado, fluxos, participantes, nomes } = entrada;
+  if (!pode(papel, GERIR_OBRAS)) return null;
+  if (papel === "operacao" && !membroId) return null;
+
+  // `operacao` lê só as próprias linhas de membro_setores_obra (RLS); o admin não precisa delas.
+  let setoresDoMembro: SetorDoMembro[] = [];
+  if (papel === "operacao") {
+    const { data, error } = await supabase
+      .from("membro_setores_obra")
+      .select("setor, capacidade")
+      .eq("empresa_id", empresaId)
+      .eq("membro_id", membroId as string);
+    if (error) throw error;
+    setoresDoMembro = data ?? [];
+  }
+
+  const autorizacao: EntradaAutorizacao = {
+    papel,
+    setoresDoMembro,
+    setoresParticipando: participantes.filter((p) => membroId && p.membro_id === membroId).map((p) => p.setor),
+  };
+  const permissoes = SETORES_OBRA.map((setor) => ({ setor, permissoes: permissoesSetor(autorizacao, setor, estado) }));
+  if (permissoes.every((p) => p.permissoes.autorizacao === null)) return null;
+
+  const algumGerivel = permissoes.some((p) => p.permissoes.gerirParticipantes);
+  const candidatosPorSetor = algumGerivel ? await carregarCandidatos(supabase, { empresaId, papel, membroId, nomes }) : null;
+
+  const setores = permissoes.map(({ setor, permissoes: perm }): SetorGestaoVM => {
+    const fluxo = fluxos.find((f) => f.setor === setor);
+    const gerivel = perm.gerirParticipantes;
+    return {
+      setor,
+      permissoes: perm,
+      aguardandoCodigo: fluxo?.aguardando ?? null,
+      participantes: gerivel
+        ? participantes
+            .filter((p) => p.setor === setor)
+            .map((p) => ({
+              participanteId: p.id,
+              nome: nomes.get(p.membro_id) || "Usuário não identificado",
+              funcao: p.funcao,
+              funcaoRotulo: Object.hasOwn(ROTULO_FUNCAO_PARTICIPANTE, p.funcao) ? ROTULO_FUNCAO_PARTICIPANTE[p.funcao] : "Participante",
+              principal: p.principal === true,
+              proprio: Boolean(membroId) && p.membro_id === membroId,
+            }))
+            .sort((a, b) => Number(b.principal) - Number(a.principal))
+        : [],
+      candidatos: gerivel && candidatosPorSetor ? candidatosPorSetor.lista(setor) : [],
+      candidatosVerificados: gerivel && candidatosPorSetor ? candidatosPorSetor.verificados : false,
+    };
+  });
+
+  return { bloqueio: bloqueioDaObra(estado), setores, podeAtualizarMarcos: podeAtualizarMarcos(autorizacao, estado) };
+}
+
+const ROTULO_CAPACIDADE: Record<string, string> = { coordenar: "Coordena o setor", executar: "Executa no setor" };
+
+/**
+ * Candidatos a participante. Admin: só `operacao` ativos com o setor (lê vínculos e setores da
+ * empresa). Coordenador (`operacao`): a RLS não lhe mostra papéis nem setores dos colegas; a
+ * lista traz os membros ativos (mesma RPC de nomes já usada na tela), menos ele mesmo, e quem
+ * recusa alvo inválido é `atribuir_participante_obra`.
+ */
+async function carregarCandidatos(
+  supabase: SupabaseServidor,
+  {
+    empresaId,
+    papel,
+    membroId,
+    nomes,
+  }: { empresaId: string; papel: string | null | undefined; membroId: string | null; nomes: ReadonlyMap<string, string> },
+): Promise<{ verificados: boolean; lista: (setor: SetorObra) => CandidatoParticipanteVM[] }> {
+  const porNome = (a: CandidatoParticipanteVM, b: CandidatoParticipanteVM) => a.nome.localeCompare(b.nome, "pt-BR");
+
+  if (papel === "admin") return carregarCandidatosAdmin(supabase, empresaId, nomes, porNome);
+
+  const todos = [...nomes.entries()].filter(([id]) => id !== membroId).map(([id, nome]) => ({ membroId: id, nome, detalhe: null }));
+  todos.sort(porNome);
+  return { verificados: false, lista: () => todos };
+}
+
+/** Admin: lê vínculos e setores da empresa e lista só `operacao` ativos com o setor. */
+async function carregarCandidatosAdmin(
+  supabase: SupabaseServidor,
+  empresaId: string,
+  nomes: ReadonlyMap<string, string>,
+  porNome: (a: CandidatoParticipanteVM, b: CandidatoParticipanteVM) => number,
+): Promise<{ verificados: boolean; lista: (setor: SetorObra) => CandidatoParticipanteVM[] }> {
+  const [membrosRes, setoresRes] = await Promise.all([
+    supabase.from("empresa_membros").select("id").eq("empresa_id", empresaId).eq("papel", "operacao").eq("ativo", true),
+    supabase.from("membro_setores_obra").select("membro_id, setor, capacidade").eq("empresa_id", empresaId),
+  ]);
+  if (membrosRes.error) throw membrosRes.error;
+  if (setoresRes.error) throw setoresRes.error;
+  const ativos = new Set((membrosRes.data ?? []).map((m) => m.id));
+  const setores = (setoresRes.data ?? []).filter((s) => ativos.has(s.membro_id));
+
+  return {
+    verificados: true,
+    lista: (setor) =>
+      setores
+        .filter((s) => s.setor === setor)
+        .map((s) => ({
+          membroId: s.membro_id,
+          nome: nomes.get(s.membro_id) || "Usuário não identificado",
+          detalhe: ROTULO_CAPACIDADE[s.capacidade] ?? null,
+        }))
+        .sort(porNome),
   };
 }

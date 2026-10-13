@@ -175,7 +175,16 @@ export function calcularKpisObras(obras: readonly ObraListaVM[]): KpisObras {
  */
 export async function carregarObras(
   supabase: SupabaseServidor,
-  { empresaId, papel }: { empresaId: string; papel: string | null | undefined },
+  {
+    empresaId,
+    papel,
+    comResponsaveis = true,
+  }: {
+    empresaId: string;
+    papel: string | null | undefined;
+    /** false: pula participantes e nomes (a navegação entre obras não usa `principalNome`). */
+    comResponsaveis?: boolean;
+  },
 ): Promise<{ obras: ObraListaVM[]; kpis: KpisObras }> {
   const fonte = fonteDadosObras(papel);
   if (!fonte) return { obras: [], kpis: KPIS_OBRAS_ZERADOS };
@@ -195,17 +204,19 @@ export async function carregarObras(
       ),
     ),
     Promise.all(lotesDeIds.map((ids) => supabase.from("obra_marcos").select("obra_id, marco, status").eq("empresa_id", empresaId).in("obra_id", ids))),
-    Promise.all(
-      lotesDeIds.map((ids) =>
-        supabase
-          .from("obra_participantes")
-          .select("obra_id, setor, membro_id")
-          .eq("empresa_id", empresaId)
-          .in("obra_id", ids)
-          .eq("principal", true)
-          .is("fim", null),
-      ),
-    ),
+    comResponsaveis
+      ? Promise.all(
+          lotesDeIds.map((ids) =>
+            supabase
+              .from("obra_participantes")
+              .select("obra_id, setor, membro_id")
+              .eq("empresa_id", empresaId)
+              .in("obra_id", ids)
+              .eq("principal", true)
+              .is("fim", null),
+          ),
+        )
+      : Promise.resolve([]),
   ]);
   for (const r of [...fluxosRes, ...marcosRes, ...participantesRes]) if (r.error) throw r.error;
 

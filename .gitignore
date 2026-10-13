@@ -40,3 +40,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# testes de navegador (Playwright): estado da base fictícia, capturas e relatórios
+/e2e/.estado/
+/e2e-capturas/
+/e2e-relatorio/
+/e2e-resultados/
