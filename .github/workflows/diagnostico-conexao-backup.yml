@@ -1,0 +1,81 @@
+name: Diagnóstico conexão Supabase (somente leitura)
+
+# Diagnóstico MANUAL de autenticação do Session Pooler.
+# Nunca exporta dados, executa migrations ou faz qualquer escrita no PostgreSQL.
+on:
+  workflow_dispatch:
+    inputs:
+      confirmacao:
+        description: "Digite testar-conexao para validar autenticação com SELECT 1"
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  validar:
+    name: Validar origem sem secrets
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Restringir à main e exigir confirmação
+        env:
+          CONFIRMACAO: ${{ inputs.confirmacao }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REPOSITORY" != "evandroantunesb/Evandro---CRM" || "$GITHUB_REF" != "refs/heads/main" || "$CONFIRMACAO" != "testar-conexao" ]]; then
+            echo "::error::Diagnóstico permitido apenas em main com a confirmação correta"
+            exit 1
+          fi
+
+  diagnosticar:
+    name: Autenticação PostgreSQL (somente SELECT 1)
+    needs: validar
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: backup-producao
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Testar senha e Session Pooler sem imprimir credenciais
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_BACKUP_DB_URL }}
+          SUPABASE_PROJECT_ID: wswpxdmgfdamvqhyztrm
+          PGCONNECT_TIMEOUT: "15"
+        run: |
+          set -euo pipefail
+          if [[ -z "${SUPABASE_DB_URL:-}" ]]; then
+            echo "::error::Secret SUPABASE_BACKUP_DB_URL ausente no ambiente backup-producao"
+            exit 1
+          fi
+          node .github/scripts/validar-destino-producao.mjs banco wswpxdmgfdamvqhyztrm
+          command -v psql >/dev/null || {
+            echo "::error::Cliente psql não está instalado no runner; não foi feita conexão"
+            exit 1
+          }
+          erro="$(mktemp "$RUNNER_TEMP/pg-erro.XXXXXXXX")"
+          resultado="$(mktemp "$RUNNER_TEMP/pg-resultado.XXXXXXXX")"
+          trap 'rm -f "$erro" "$resultado"' EXIT
+          if PGOPTIONS="-c default_transaction_read_only=on" psql -X -q -t -A -v ON_ERROR_STOP=1 \
+            "$SUPABASE_DB_URL" -c 'SELECT 1;' >"$resultado" 2>"$erro"; then
+            if [[ "$(tr -d '[:space:]' < "$resultado")" != "1" ]]; then
+              echo "::error::O teste retornou um resultado inesperado"
+              exit 1
+            fi
+            echo "Autenticação PostgreSQL OK: SELECT 1 retornou 1. Nenhum dado de usuário foi consultado."
+            echo "### Diagnóstico aprovado: conexão PostgreSQL por Session Pooler OK" >> "$GITHUB_STEP_SUMMARY"
+          else
+            # Não imprimir erro bruto: algumas versões de cliente podem incluir detalhes de conexão.
+            if grep -qi 'password authentication failed' "$erro"; then
+              echo "::error::Falha de autenticação: senha, codificação na URL ou credenciais do pooler incompatíveis. Não redefina a senha antes de conferir o secret."
+            elif grep -qi 'tenant or user not found\|ENOTFOUND' "$erro"; then
+              echo "::error::Pooler não reconheceu o tenant/usuário; confira o endpoint copiado diretamente de Connect."
+            else
+              echo "::error::Conexão PostgreSQL falhou (não é possível classificar sem divulgar detalhes); confira o Session Pooler e o secret."
+            fi
+            exit 1
+          fi
