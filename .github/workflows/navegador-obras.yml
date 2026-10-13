@@ -3,8 +3,10 @@ name: Navegador (Obras)
 # Testes de navegador (Playwright) do módulo Obras contra o Supabase LOCAL do próprio runner,
 # com base 100% fictícia (e2e/base-ficticia.ts). Sem nenhum secret, sem environment, sem
 # deploy, sem acesso a Supabase remoto: a trava fail-closed (scripts/lib/guard-supabase-local.mjs)
-# roda no playwright.config.ts, no global-setup e no `pnpm start`.
-# Capturas de tela e relatório ficam como artefatos (retenção curta).
+# roda no playwright.config.ts, no global-setup e de novo quando o Playwright sobe o app
+# (webServer do playwright.config.ts). Este arquivo não sobe o app diretamente.
+# Capturas de tela e relatório ficam como artefatos (retenção curta). Em falha, as linhas de
+# erro viram anotações do job (só dados fictícios e do Supabase local).
 on:
   pull_request:
     paths:
@@ -56,7 +58,13 @@ jobs:
       - name: Instalar o Chromium do Playwright
         run: pnpm exec playwright install --with-deps chromium
       - name: Testes de navegador
-        run: pnpm exec playwright test
+        run: |
+          set -o pipefail
+          pnpm exec playwright test 2>&1 | tee e2e-saida.txt
+      - name: Erros como anotações
+        if: ${{ failure() }}
+        run: |
+          grep -nE "Error|error:|Erro|Timeout|✘" e2e-saida.txt | head -40 | cut -c1-900 | sed 's/^/::error title=playwright::/' || true
       - name: Publicar capturas de tela
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

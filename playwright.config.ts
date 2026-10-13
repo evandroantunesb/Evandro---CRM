@@ -25,6 +25,8 @@ export default defineConfig({
   timeout: 120_000,
   expect: { timeout: 15_000 },
   reporter: [
+    // No Actions, cada falha vira anotação no job (visível sem baixar artefatos).
+    ...(process.env.CI ? ([["github"]] as const) : []),
     ["list"],
     ["html", { open: "never", outputFolder: "e2e-relatorio" }],
     ["json", { outputFile: "e2e-relatorio/resultados.json" }],
