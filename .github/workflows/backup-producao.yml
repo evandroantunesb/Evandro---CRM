@@ -1,0 +1,84 @@
+name: Backup do banco de produção
+
+# Todo dia, gera um dump completo (schema + dados) do banco de produção,
+# comprime, criptografa e sobe pro repositório privado raion-crm-backups —
+# fora do Supabase, pra sobreviver mesmo se a conta/plataforma mudar.
+#
+# Precisa dos secrets SUPABASE_ACCESS_TOKEN, SUPABASE_DB_PASSWORD e
+# SUPABASE_PROJECT_ID (já configurados) mais dois novos:
+#   BACKUP_ENCRYPTION_KEY — senha usada pra criptografar o dump
+#   BACKUP_REPO_TOKEN     — fine-grained personal access token com
+#                            permissão de escrita só no repositório
+#                            evandroantunesb/raion-crm-backups
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: backup-producao
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+      BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
+      BACKUP_REPO_TOKEN: ${{ secrets.BACKUP_REPO_TOKEN }}
+    steps:
+      - name: Conferir secrets
+        run: |
+          faltando=()
+          [ -z "$SUPABASE_ACCESS_TOKEN" ] && faltando+=("SUPABASE_ACCESS_TOKEN")
+          [ -z "$SUPABASE_DB_PASSWORD" ] && faltando+=("SUPABASE_DB_PASSWORD")
+          [ -z "$SUPABASE_PROJECT_ID" ] && faltando+=("SUPABASE_PROJECT_ID")
+          [ -z "$BACKUP_ENCRYPTION_KEY" ] && faltando+=("BACKUP_ENCRYPTION_KEY")
+          [ -z "$BACKUP_REPO_TOKEN" ] && faltando+=("BACKUP_REPO_TOKEN")
+          if [ ${#faltando[@]} -gt 0 ]; then
+            echo "::error::Configure os secrets no GitHub: ${faltando[*]}"
+            exit 1
+          fi
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Gerar dump do banco (schema + dados)
+        run: |
+          supabase link --project-ref "$SUPABASE_PROJECT_ID"
+          supabase db dump --linked -f backup.sql
+
+      - name: Comprimir e criptografar
+        run: |
+          gzip backup.sql
+          openssl enc -aes-256-cbc -pbkdf2 -salt \
+            -in backup.sql.gz \
+            -out "backup-$(date -u +%Y-%m-%d).sql.gz.enc" \
+            -pass env:BACKUP_ENCRYPTION_KEY
+
+      - name: Subir pro repositório de backups
+        run: |
+          arquivo="backup-$(date -u +%Y-%m-%d).sql.gz.enc"
+          git clone --depth 1 "https://x-access-token:${BACKUP_REPO_TOKEN}@github.com/evandroantunesb/raion-crm-backups.git" repo-backups
+          mkdir -p repo-backups/dumps
+          mv "$arquivo" "repo-backups/dumps/$arquivo"
+          cd repo-backups
+          git config user.name "Backup automático"
+          git config user.email "backup@raioncrm.local"
+          git add "dumps/$arquivo"
+          git commit -m "Backup $(date -u +%Y-%m-%d)"
+          git push
+
+      - name: Manter só os últimos 30 backups
+        run: |
+          cd repo-backups/dumps
+          ls -1 | sort | head -n -30 | xargs -r rm --
+          cd ..
+          if ! git diff --quiet --exit-code -- dumps; then
+            git add dumps
+            git commit -m "Remover backups com mais de 30 dias"
+            git push
+          fi
