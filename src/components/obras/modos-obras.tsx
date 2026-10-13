@@ -7,7 +7,7 @@ import Link from "next/link";
  */
 export function ModosObras({ hrefGestao }: { hrefGestao: string }) {
   return (
-    <div role="group" aria-label="Modo de visualização" className="inline-flex w-fit rounded-lg border border-zinc-200 bg-white p-0.5 text-sm">
+    <div role="group" aria-label="Modo de visualização" className="inline-flex w-fit max-w-full flex-wrap rounded-lg border border-zinc-200 bg-white p-0.5 text-sm">
       <Link href={hrefGestao} aria-current="page" className="rounded-md bg-carvao px-3 py-1.5 font-medium text-offwhite">
         Gestão
       </Link>

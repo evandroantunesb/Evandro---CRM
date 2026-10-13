@@ -62,6 +62,13 @@ function FormStatus({ obraId, setor }: { obraId: string; setor: SetorDetalheVM }
   const opcoes = STATUS_POR_SETOR[setor.setor];
   const [escolhido, setEscolhido] = useState(setor.status ?? "");
   const [confirmando, setConfirmando] = useState(false);
+  // O status do servidor mudou (salvo aqui ou por outra pessoa): a escolha local volta a ele.
+  const [statusBase, setStatusBase] = useState(setor.status);
+  if (statusBase !== setor.status) {
+    setStatusBase(setor.status);
+    setEscolhido(setor.status ?? "");
+    setConfirmando(false);
+  }
   // Volta a uma etapa anterior: permitido e auditado pelo banco, mas pede um segundo clique.
   const retrocesso = setor.status != null && opcoes.indexOf(escolhido) < opcoes.indexOf(setor.status);
   const mudou = escolhido !== "" && escolhido !== setor.status;
@@ -162,6 +169,11 @@ function FormAguardando({ obraId, setor, aguardandoCodigo }: { obraId: string; s
   const [resultado, acao, pendente] = useActionState(definirAguardandoFluxoObra, null);
   const enviar = useEnvioSemReset(acao);
   const [escolhido, setEscolhido] = useState(aguardandoCodigo ?? "");
+  const [base, setBase] = useState(aguardandoCodigo);
+  if (base !== aguardandoCodigo) {
+    setBase(aguardandoCodigo);
+    setEscolhido(aguardandoCodigo ?? "");
+  }
 
   return (
     <Bloco titulo="Aguardando terceiros">
@@ -339,6 +351,11 @@ export function GestaoMarco({ obraId, marco }: { obraId: string; marco: MarcoDet
   const [resultado, acao, pendente] = useActionState(atualizarMarcoObra, null);
   const enviar = useEnvioSemReset(acao);
   const [status, setStatus] = useState(marco.status ?? "pendente");
+  const [base, setBase] = useState(marco.status);
+  if (base !== marco.status) {
+    setBase(marco.status);
+    setStatus(marco.status ?? "pendente");
+  }
   const mudou = status !== marco.status || status === "nao_se_aplica";
 
   return (

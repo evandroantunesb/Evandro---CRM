@@ -47,7 +47,7 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
   // A lista navegável é recalculada aqui, a cada obra: mesma empresa, mesma RLS, mesmos filtros.
   const [obra, lista] = await Promise.all([
     carregarDetalheObra(supabase, { empresaId: atual.empresaId, papel: atual.papel, obraId: id, membroId: atual.membroId }),
-    carregarObras(supabase, { empresaId: atual.empresaId, papel: atual.papel }),
+    carregarObras(supabase, { empresaId: atual.empresaId, papel: atual.papel, comResponsaveis: false }),
   ]);
   if (!obra) notFound();
   const navegacao = montarNavegacao(lista.obras, filtros, id);
@@ -116,7 +116,8 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
             const g = gestaoDoSetor(s.setor);
             return (
               <CartaoSetor key={s.setor} setor={s}>
-                {g && <GestaoSetor obraId={resumo.id} setor={s} gestao={g} />}
+                {/* key pela obra: ao navegar para outra obra, nenhum estado de formulário da anterior sobrevive. */}
+                {g && <GestaoSetor key={resumo.id} obraId={resumo.id} setor={s} gestao={g} />}
               </CartaoSetor>
             );
           })}
@@ -127,7 +128,7 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
         <ul className="flex flex-col gap-3 text-sm">
           {obra.marcos.map((m) => (
             <ItemMarco key={m.marco} marco={m}>
-              {gestao?.podeAtualizarMarcos && <GestaoMarco obraId={resumo.id} marco={m} />}
+              {gestao?.podeAtualizarMarcos && <GestaoMarco key={resumo.id} obraId={resumo.id} marco={m} />}
             </ItemMarco>
           ))}
         </ul>

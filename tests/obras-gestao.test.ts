@@ -5,6 +5,7 @@
  * tests/obras-escrita-db.test.ts, no Supabase local).
  */
 import { describe, expect, it } from "vitest";
+import { carregarObras } from "@/lib/obras/dados";
 import { carregarDetalheObra } from "@/lib/obras/detalhe";
 import { autorizacaoSetor, bloqueioDaObra, permissoesSetor, podeAtualizarMarcos, type EntradaAutorizacao } from "@/lib/obras/gestao";
 import { filtrosDeParams, hrefObra, montarNavegacao, queryDosFiltros, temFiltroAtivo } from "@/lib/obras/navegacao";
@@ -156,7 +157,10 @@ function criarFake(dados: { tabelas?: Record<string, Linha[]>; rpcs?: Record<str
       eq: (col: string, valor: unknown) => ((linhas = linhas.filter((l) => l[col] === valor)), q),
       in: (col: string, valores: unknown[]) => ((linhas = linhas.filter((l) => valores.includes(l[col]))), q),
       is: (col: string, valor: unknown) => ((linhas = linhas.filter((l) => (l[col] ?? null) === valor)), q),
-      order: () => q,
+      order: (col: string, { ascending = true }: { ascending?: boolean } = {}) => {
+        linhas = [...linhas].sort((x, y) => (Number(x[col]) - Number(y[col])) * (ascending ? 1 : -1));
+        return q;
+      },
       limit: () => q,
       maybeSingle: () => Promise.resolve({ data: linhas[0] ?? null, error: null }),
       then: (ok: (v: unknown) => unknown, falha?: (e: unknown) => unknown) => Promise.resolve({ data: linhas, error: null }).then(ok, falha),
@@ -236,6 +240,66 @@ function cenario(extra: { setoresMembro?: Linha[]; obra?: Linha; membros?: Linha
     },
   });
 }
+
+describe("navegação com 12 obras carregadas do jeito real (carregarObras + filtros)", () => {
+  const ids = Array.from({ length: 12 }, (_, i) => `o${String(i + 1).padStart(2, "0")}`);
+  const tabelas = {
+    obras: ids.map((id, i) => ({ ...linhaObra, id, numero: i + 1, cliente_nome: `Cliente ${i + 1}` })),
+    // Obras pares têm o Operacional parado.
+    obra_fluxos: ids.flatMap((id, i) =>
+      ["compras", "engenharia", "operacional"].map((setor) => ({
+        obra_id: id,
+        empresa_id: EMPRESA,
+        setor,
+        status: "a_iniciar",
+        parado: setor === "operacional" && i % 2 === 1,
+        aguardando: null,
+      })),
+    ),
+    obra_marcos: [],
+    obra_participantes: [{ obra_id: "o01", empresa_id: EMPRESA, setor: "compras", membro_id: "m-ana", principal: true, fim: null }],
+  };
+
+  it("percorre as 12 em ordem (número decrescente), do início ao fim", async () => {
+    const { cliente } = criarFake({ tabelas, rpcs: { identidade_membros: identidades } });
+    const { obras } = await carregarObras(cliente, { empresaId: EMPRESA, papel: "admin", comResponsaveis: false });
+    const visitadas: string[] = [];
+    let atual: string | null = "o12";
+    while (atual) {
+      const nav = montarNavegacao(obras, {}, atual);
+      expect(nav.posicao).toBe(visitadas.length + 1);
+      expect(nav.total).toBe(12);
+      visitadas.push(atual);
+      atual = nav.proximaId;
+    }
+    expect(visitadas).toEqual([...ids].reverse());
+  });
+
+  it("com filtro (setor Operacional parado): só as 6 pares, posição relativa à lista filtrada", async () => {
+    const { cliente } = criarFake({ tabelas, rpcs: { identidade_membros: identidades } });
+    const { obras } = await carregarObras(cliente, { empresaId: EMPRESA, papel: "admin", comResponsaveis: false });
+    const nav = montarNavegacao(obras, { setor: "operacional", estado: "parado" }, "o08");
+    expect(nav.itens.map((i) => i.id)).toEqual(["o12", "o10", "o08", "o06", "o04", "o02"]);
+    expect(nav).toMatchObject({ posicao: 3, total: 6, anteriorId: "o10", proximaId: "o06" });
+  });
+
+  it("comResponsaveis: false não consulta participantes nem nomes", async () => {
+    const { cliente, chamadas } = criarFake({ tabelas, rpcs: { identidade_membros: identidades } });
+    await carregarObras(cliente, { empresaId: EMPRESA, papel: "admin", comResponsaveis: false });
+    expect(chamadas).not.toContain("from:obra_participantes");
+    expect(chamadas).not.toContain("rpc:identidade_membros");
+    const completo = criarFake({ tabelas, rpcs: { identidade_membros: identidades } });
+    await carregarObras(completo.cliente, { empresaId: EMPRESA, papel: "admin" });
+    expect(completo.chamadas).toContain("from:obra_participantes");
+  });
+
+  it("obras de outra empresa nunca entram na navegação", async () => {
+    const comOutra = { ...tabelas, obras: [...tabelas.obras, { ...linhaObra, id: "x1", empresa_id: "emp-2", numero: 99 }] };
+    const { cliente } = criarFake({ tabelas: comOutra, rpcs: { identidade_membros: identidades } });
+    const { obras } = await carregarObras(cliente, { empresaId: EMPRESA, papel: "admin", comResponsaveis: false });
+    expect(montarNavegacao(obras, {}, "o01").itens.map((i) => i.id)).not.toContain("x1");
+  });
+});
 
 describe("carregarDetalheObra — bloco gestao", () => {
   it("gestor, vendedor e SDR: gestao nula e nenhuma consulta de setores/membros", async () => {
