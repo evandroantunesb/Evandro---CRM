@@ -1,0 +1,77 @@
+name: Navegador (Obras)
+
+# Testes de navegador (Playwright) do módulo Obras contra o Supabase LOCAL do próprio runner,
+# com base 100% fictícia (e2e/base-ficticia.ts). Sem nenhum secret, sem environment, sem
+# deploy, sem acesso a Supabase remoto: a trava fail-closed (scripts/lib/guard-supabase-local.mjs)
+# roda no playwright.config.ts, no global-setup e no `pnpm start`.
+# Capturas de tela e relatório ficam como artefatos (retenção curta).
+on:
+  pull_request:
+    paths:
+      - "src/app/(app)/obras/**"
+      - "src/components/obras/**"
+      - "src/lib/obras/**"
+      - "src/lib/acoes/obras.ts"
+      - "e2e/**"
+      - "playwright.config.ts"
+      - ".github/workflows/navegador-obras.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: navegador-obras-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  navegador:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: supabase/setup-cli@45a513f8c64c0bc8e0e3dfe572b5c95be85f6359 # v3.0.1
+        with:
+          version: 2.120.0
+      - name: Subir o Supabase local
+        run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor,postgres-meta,realtime
+      - name: Gerar .env.local (só valores do Supabase local)
+        run: |
+          supabase status -o env | grep -E '^(ANON_KEY|SERVICE_ROLE_KEY|API_URL)=' > /tmp/sb.env
+          . /tmp/sb.env
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
+          } > .env.local
+      - run: pnpm build
+      - name: Instalar o Chromium do Playwright
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Testes de navegador
+        run: pnpm exec playwright test
+      - name: Publicar capturas de tela
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: obras-capturas
+          path: e2e-capturas/
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Publicar relatório e falhas
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: obras-relatorio
+          path: |
+            e2e-relatorio/
+            e2e-resultados/
+          retention-days: 7
+          if-no-files-found: warn
