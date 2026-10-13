@@ -1,8 +1,10 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { ModosObras } from "@/components/obras/modos-obras";
 import { Botao, Selecao, Selo } from "@/components/ui";
 import { carregarObras, type KpisObras, type ObraListaVM, type SetorObraVM } from "@/lib/obras/dados";
 import { filtrarObras } from "@/lib/obras/derivados";
+import { filtrosDeParams, hrefObra, queryDosFiltros, temFiltroAtivo } from "@/lib/obras/navegacao";
 import {
   ALERTAS_OBRA,
   ESTADOS_SETOR,
@@ -24,8 +26,6 @@ type Tom = "neutro" | "negativo" | "atencao";
 const TOM_SITUACAO: Record<SituacaoObra, Tom> = { em_andamento: "neutro", concluida: "neutro", pausada: "atencao", cancelada: "negativo" };
 const TOM_ALERTA: Record<AlertaObra, Tom> = { estorno: "negativo", venda_alterada: "atencao", parado: "atencao", aguardando: "neutro" };
 
-const umDe = <T extends string>(valores: readonly T[], v: string): T | undefined => valores.find((x) => x === v);
-
 const formatarPotencia = (kwp: number | null) =>
   kwp == null ? "—" : `${new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 2 }).format(kwp)} kWp`;
 
@@ -34,25 +34,36 @@ const cidadeUf = (o: ObraListaVM) => [o.cidade, o.uf].filter(Boolean).join("/") 
 export default async function Obras({ searchParams }: PageProps<"/obras">) {
   // Lista positiva (OBRAS): os quatro papéis comerciais e `operacao`. A RLS decide o que cada um vê.
   const { atual } = await exigirPapel(...OBRAS);
-  const filtros = await searchParams;
-  const texto = (k: string) => (typeof filtros[k] === "string" ? (filtros[k] as string) : "");
+  const filtros = filtrosDeParams(await searchParams);
+  const query = queryDosFiltros(filtros);
 
   const supabase = await criarClienteServidor();
   const { obras, kpis } = await carregarObras(supabase, { empresaId: atual.empresaId, papel: atual.papel });
 
-  const busca = texto("q");
-  const situacao = umDe(SITUACOES_OBRA, texto("situacao"));
-  const alerta = umDe(ALERTAS_OBRA, texto("alerta"));
-  const setor = umDe(SETORES_OBRA, texto("setor"));
-  const estado = umDe(ESTADOS_SETOR, texto("estado"));
-  const visiveis = filtrarObras(obras, { busca, situacao, alerta, setor, estado });
-  const filtrando = Boolean(busca || situacao || alerta || estado);
+  const { busca = "", situacao, alerta, setor, estado } = filtros;
+  const visiveis = filtrarObras(obras, filtros);
+  const filtrando = temFiltroAtivo(filtros);
+  // Cada obra abre no modo Gestão levando os filtros: Anterior/Próxima percorrem esta mesma lista.
+  const hrefGestao = (id: string) => hrefObra("/obras", id, query);
 
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-4">
-      <div>
-        <h1 className="text-2xl font-semibold text-zinc-900 md:text-[28px]">Obras</h1>
-        <p className="text-sm text-zinc-500">Vendas já pagas e o andamento de cada setor da obra.</p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold text-zinc-900 md:text-[28px]">Obras</h1>
+          <p className="text-sm text-zinc-500">Vendas já pagas e o andamento de cada setor da obra.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <ModosObras hrefGestao={`/obras${query ? `?${query}` : ""}`} />
+          {visiveis.length > 0 && (
+            <Link
+              href={hrefGestao(visiveis[0].id)}
+              className="inline-flex min-h-9 items-center rounded-lg border border-zinc-200 bg-white px-3 text-sm font-medium text-carvao hover:border-dourado"
+            >
+              Percorrer {visiveis.length === 1 ? "a obra" : `as ${visiveis.length} obras`} ›
+            </Link>
+          )}
+        </div>
       </div>
 
       <Indicadores kpis={kpis} />
@@ -113,7 +124,7 @@ export default async function Obras({ searchParams }: PageProps<"/obras">) {
           {filtrando ? "Nenhuma obra com esses filtros." : "Nenhuma obra para mostrar."}
         </p>
       ) : (
-        <ListaObras obras={visiveis} />
+        <ListaObras obras={visiveis} hrefDe={hrefGestao} />
       )}
     </div>
   );
@@ -172,13 +183,13 @@ function CelulaSetor({ s }: { s: SetorObraVM }) {
 }
 
 /** Tabela só no desktop (rola na horizontal se não couber); no celular, um card por obra. */
-function ListaObras({ obras }: { obras: ObraListaVM[] }) {
+function ListaObras({ obras, hrefDe }: { obras: ObraListaVM[]; hrefDe: (id: string) => string }) {
   const cabecalho = ["Obra", "Cliente", "Cidade/UF", "Potência", ...SETORES_OBRA.map((s) => ROTULO_SETOR[s]), "Situação"];
   const celulas = (o: ObraListaVM): ReactNode[] => [
-    <Link key="n" href={`/obras/${o.id}`} className="font-medium text-zinc-900 underline-offset-2 hover:underline">
+    <Link key="n" href={hrefDe(o.id)} className="font-medium text-zinc-900 underline-offset-2 hover:underline">
       #{o.numero}
     </Link>,
-    <Link key="c" href={`/obras/${o.id}`} className="text-zinc-900 underline-offset-2 hover:underline">
+    <Link key="c" href={hrefDe(o.id)} className="text-zinc-900 underline-offset-2 hover:underline">
       {o.clienteNome}
     </Link>,
     <span key="u" className="text-zinc-700">{cidadeUf(o)}</span>,
@@ -219,7 +230,7 @@ function ListaObras({ obras }: { obras: ObraListaVM[] }) {
             <div className="flex flex-col gap-2">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <Link href={`/obras/${o.id}`} className="font-medium text-zinc-900 underline-offset-2 hover:underline">
+                  <Link href={hrefDe(o.id)} className="font-medium text-zinc-900 underline-offset-2 hover:underline">
                     #{o.numero} {o.clienteNome}
                   </Link>
                   <p className="text-xs text-zinc-500">

@@ -37,6 +37,8 @@ const MATRIZ: Record<string, string[]> = {
   PARTICIPANTES_GAMIFICACAO: ["vendedor", "sdr"],
   OBRAS: ["admin", "gestor", "vendedor", "sdr", "operacao"],
   VER_NEGOCIO_DA_OBRA: ["admin", "gestor", "vendedor"],
+  // Modo Gestão de Obras: espelha as RPCs da 3b-3. Gestor, vendedor e SDR só leem.
+  GERIR_OBRAS: ["admin", "operacao"],
 };
 
 const listas = Object.entries(permissoes).filter(([, v]) => Array.isArray(v)) as [string, ListaPapeis][];
