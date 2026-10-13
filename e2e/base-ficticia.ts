@@ -134,6 +134,16 @@ export async function criarBaseFicticia(): Promise<BaseFicticia> {
     if (u) u.membroId = l.id;
   }
 
+  // Equipe comercial: o gestor só enxerga vendas de quem é da equipe dele (pode_ver_responsavel).
+  const equipe = ok(await servico.from("equipes").insert({ empresa_id: empresaA, nome: "Equipe Fictícia Oeste" }).select("id").single(), "equipe");
+  feito(
+    await servico.from("equipe_membros").insert([
+      { equipe_id: equipe.id, empresa_id: empresaA, membro_id: usuarios.gestor.membroId, e_gestor: true },
+      { equipe_id: equipe.id, empresa_id: empresaA, membro_id: usuarios.vendedor.membroId, e_gestor: false },
+    ]),
+    "membros da equipe",
+  );
+
   // Setores (pelo admin, via RPC real).
   const setores: [string, unknown][] = [
     ["coordEng", [{ setor: "engenharia", capacidade: "coordenar" }]],

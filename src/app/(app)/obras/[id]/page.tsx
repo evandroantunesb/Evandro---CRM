@@ -111,7 +111,8 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
 
       <section className="flex flex-col gap-2">
         <h2 className="text-base font-semibold text-zinc-900">Setores</h2>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        {/* 3 colunas só a partir de 1280px: no tablet o menu lateral deixa ~430px para o conteúdo. */}
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3 [&>*]:min-w-0">
           {obra.setores.map((s) => {
             const g = gestaoDoSetor(s.setor);
             return (

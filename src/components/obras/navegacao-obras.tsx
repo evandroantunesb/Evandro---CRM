@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { hrefObra, type NavegacaoObra } from "@/lib/obras/navegacao";
 
 /**
@@ -29,6 +29,21 @@ export function NavegacaoObras({
   const href = (id: string) => hrefObra(base, id, query);
   const hrefLista = `/obras${query ? `?${query}` : ""}`;
 
+  // Seletor: com mouse/toque, escolher já navega. Pelo teclado, as setas do <select> nativo só
+  // mudam a escolha (não troca de obra a cada tecla) e o Enter confirma; sair do campo sem
+  // confirmar volta para a obra atual.
+  const valorAtual = posicao != null ? atualId : "";
+  const [escolha, setEscolha] = useState(valorAtual);
+  const [valorBase, setValorBase] = useState(valorAtual);
+  if (valorBase !== valorAtual) {
+    setValorBase(valorAtual);
+    setEscolha(valorAtual);
+  }
+  const viaTeclado = useRef(false);
+  const irPara = (id: string) => {
+    if (id && id !== atualId) router.push(href(id));
+  };
+
   useEffect(() => {
     const aoTeclar = (e: KeyboardEvent) => {
       if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
@@ -46,7 +61,7 @@ export function NavegacaoObras({
   const desativado = "inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-zinc-100 bg-zinc-50 px-3 text-sm text-zinc-400";
 
   return (
-    <nav aria-label="Navegação entre obras" className="flex flex-col gap-2 rounded-xl border border-zinc-200/80 bg-white p-2 sm:flex-row sm:items-center sm:justify-between">
+    <nav aria-label="Navegação entre obras" className="flex flex-col gap-2 rounded-xl border border-zinc-200/80 bg-white p-2 lg:flex-row lg:items-center lg:justify-between">
       <div className="flex items-center gap-2">
         {anteriorId ? (
           <Link href={href(anteriorId)} className={botao} aria-label="Obra anterior" rel="prev">
@@ -57,7 +72,7 @@ export function NavegacaoObras({
             ‹ <span className="ml-1 hidden sm:inline">Anterior</span>
           </span>
         )}
-        <p className="min-w-24 flex-1 text-center text-sm text-zinc-700 sm:flex-none" aria-live="polite">
+        <p className="min-w-24 flex-1 text-center text-sm text-zinc-700 lg:flex-none" aria-live="polite">
           {posicao != null ? (
             <>
               Obra <span className="font-semibold text-zinc-900">{posicao}</span> de {total}
@@ -76,13 +91,32 @@ export function NavegacaoObras({
           </span>
         )}
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex min-w-0 items-center gap-2">
         {total > 0 && (
           <select
             aria-label="Ir para a obra"
-            value={posicao != null ? atualId : ""}
-            onChange={(e) => e.target.value && router.push(href(e.target.value))}
-            className="min-h-11 w-full min-w-0 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-carvao outline-none focus:border-dourado focus:ring-2 focus:ring-dourado/20 sm:w-64"
+            aria-describedby="dica-ir-para-obra"
+            value={escolha}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                irPara(escolha);
+              } else {
+                viaTeclado.current = true;
+              }
+            }}
+            onPointerDown={() => {
+              viaTeclado.current = false;
+            }}
+            onChange={(e) => {
+              setEscolha(e.target.value);
+              if (!viaTeclado.current) irPara(e.target.value);
+            }}
+            onBlur={() => {
+              viaTeclado.current = false;
+              setEscolha(valorAtual);
+            }}
+            className="min-h-11 w-full min-w-0 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-carvao outline-none focus:border-dourado focus:ring-2 focus:ring-dourado/20 lg:w-64"
           >
             {posicao == null && (
               <option value="" disabled>
@@ -96,6 +130,9 @@ export function NavegacaoObras({
             ))}
           </select>
         )}
+        <span id="dica-ir-para-obra" className="sr-only">
+          Pelo teclado, escolha com as setas e pressione Enter para abrir a obra.
+        </span>
         <Link href={hrefLista} className="shrink-0 text-sm whitespace-nowrap text-zinc-600 underline hover:text-zinc-900">
           {rotuloLista}
         </Link>

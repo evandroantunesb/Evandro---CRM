@@ -7,6 +7,9 @@ import type { BaseFicticia } from "./base-ficticia";
 const nav = (page: Page) => page.getByRole("navigation", { name: "Navegação entre obras" });
 const seletor = (page: Page) => page.getByLabel("Ir para a obra");
 const idAtual = (page: Page) => new URL(page.url()).pathname.split("/").pop();
+/** Cartão de um setor (o <section> mais interno com aquele título). */
+const cartao = (page: Page, titulo: string) =>
+  page.locator("section").filter({ has: page.getByRole("heading", { name: titulo, exact: true }) }).last();
 
 // A base só existe depois do global-setup: lida no beforeAll, nunca no carregamento do arquivo.
 let usuarios: BaseFicticia["usuarios"];
@@ -65,12 +68,29 @@ test.describe("navegação entre obras", () => {
     await page.keyboard.press("ArrowLeft");
     await expect(nav(page)).toContainText("Obra 5 de 12");
 
-    // Com o foco no seletor, a seta é do seletor, não da navegação de páginas.
+    // Com o foco no seletor: as setas só mudam a escolha (não troca de obra a cada tecla)...
     await seletor(page).focus();
     const antes = idAtual(page);
+    await page.keyboard.press("ArrowDown");
     await page.keyboard.press("ArrowRight");
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(800);
     expect(idAtual(page)).toBe(antes);
+    const escolhida = await seletor(page).inputValue();
+    expect(escolhida).not.toBe(antes);
+    // ...e o Enter abre a obra escolhida.
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(new RegExp(escolhida));
+
+    // Num campo de texto, as setas movem o cursor e nunca navegam.
+    const eng = cartao(page, "Engenharia");
+    await eng.getByText("Atualizar Engenharia").click();
+    const motivo = eng.getByLabel("Motivo da parada");
+    await motivo.fill("texto");
+    const daqui = idAtual(page);
+    await motivo.press("ArrowLeft");
+    await motivo.press("ArrowRight");
+    await page.waitForTimeout(800);
+    expect(idAtual(page)).toBe(daqui);
   });
 
   test("filtros preservados; obra que sai do filtro fica 'fora da lista filtrada'", async ({ page }) => {
@@ -88,9 +108,10 @@ test.describe("navegação entre obras", () => {
     expect(await seletor(page).locator("option").count()).toBe(2);
 
     // Retomar a Engenharia da o03: ela deixa de bater com o filtro.
-    await page.getByText("Atualizar Engenharia").click();
-    await page.getByRole("button", { name: "Retomar setor" }).click();
-    await expect(page.getByText("Setor retomado.")).toBeVisible();
+    let eng = cartao(page, "Engenharia");
+    await eng.getByText("Atualizar Engenharia").click();
+    await eng.getByRole("button", { name: "Retomar setor" }).click();
+    await expect(eng.getByText("Setor retomado.")).toBeVisible();
     await expect(nav(page)).toContainText("Fora da lista filtrada (1)");
     await capturar(page, "desktop", "09-obra-fora-da-lista-filtrada");
     // Próxima leva de volta ao início da lista filtrada.
@@ -99,11 +120,13 @@ test.describe("navegação entre obras", () => {
     expect(idAtual(page)).toBe(obras.o09);
 
     // Restaura a parada (as próximas suítes contam com ela).
+    // Os 3 setores têm "Motivo da parada" no HTML (painéis fechados): sempre pelo cartão do setor.
     await page.goto(`/obras/${obras.o03}`);
-    await page.getByText("Atualizar Engenharia").click();
-    await page.getByLabel("Motivo da parada").fill("Documentação do cliente incompleta (fictício)");
-    await page.getByRole("button", { name: "Marcar como parado" }).click();
-    await expect(page.getByText("Setor marcado como parado.")).toBeVisible();
+    eng = cartao(page, "Engenharia");
+    await eng.getByText("Atualizar Engenharia").click();
+    await eng.getByLabel("Motivo da parada").fill("Documentação do cliente incompleta (fictício)");
+    await eng.getByRole("button", { name: "Marcar como parado" }).click();
+    await expect(eng.getByText("Setor marcado como parado.")).toBeVisible();
   });
 
   test("isolamento: nada da empresa B na lista nem na navegação; obra de B dá 404", async ({ page }) => {

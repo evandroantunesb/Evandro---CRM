@@ -38,7 +38,7 @@ export function GestaoSetor({ obraId, setor, gestao }: { obraId: string; setor: 
   const { alterarFluxo, gerirParticipantes } = gestao.permissoes;
   if (!alterarFluxo && !gerirParticipantes) return null;
   return (
-    <details className="group w-full rounded-lg border border-zinc-200 bg-zinc-50/60 text-sm">
+    <details className="group w-full min-w-0 rounded-lg border border-zinc-200 bg-zinc-50/60 text-sm [&_select]:w-full [&_select]:min-w-0">
       <summary className="cursor-pointer list-none px-3 py-2 font-medium text-zinc-800 select-none group-open:border-b group-open:border-zinc-200">
         <span className="inline-block transition-transform group-open:rotate-90">›</span> Atualizar {ROTULO_SETOR[setor.setor]}
       </summary>
