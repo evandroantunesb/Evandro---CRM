@@ -260,7 +260,15 @@ export async function carregarDetalheObra(
     papel,
     obraId,
     membroId = null,
-  }: { empresaId: string; papel: string | null | undefined; obraId: string; membroId?: string | null },
+    comGestao = true,
+  }: {
+    empresaId: string;
+    papel: string | null | undefined;
+    obraId: string;
+    membroId?: string | null;
+    /** false: telas só de leitura (Apresentação) não montam o bloco de gestão nem consultam candidatos. */
+    comGestao?: boolean;
+  },
 ): Promise<ObraDetalheVM | null> {
   if (!UUID.test(obraId)) return null;
   const fonte = fonteDadosObras(papel);
@@ -363,15 +371,17 @@ export async function carregarDetalheObra(
     negocioId: pode(papel, VER_NEGOCIO_DA_OBRA) ? obra.negocioId : null,
   };
 
-  const gestao = await montarGestao(supabase, {
-    empresaId,
-    papel,
-    membroId,
-    estado: { cancelada: Boolean(obra.canceladaEm), pausada: Boolean(obra.pausadaEm) },
-    fluxos,
-    participantes,
-    nomes,
-  });
+  const gestao = comGestao
+    ? await montarGestao(supabase, {
+        empresaId,
+        papel,
+        membroId,
+        estado: { cancelada: Boolean(obra.canceladaEm), pausada: Boolean(obra.pausadaEm) },
+        fluxos,
+        participantes,
+        nomes,
+      })
+    : null;
 
   return {
     resumo,

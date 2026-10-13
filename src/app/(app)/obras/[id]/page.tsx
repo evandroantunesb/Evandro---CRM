@@ -59,7 +59,7 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <ModosObras hrefGestao={hrefObra("/obras", id, query)} />
+        <ModosObras modo="gestao" hrefGestao={hrefObra("/obras", id, query)} hrefApresentacao={hrefObra("/obras/apresentacao", id, query)} />
         {temFiltroAtivo(filtros) && <span className="text-xs text-zinc-500">Navegando pela lista filtrada</span>}
       </div>
       <NavegacaoObras navegacao={navegacao} atualId={id} base="/obras" query={query} />
