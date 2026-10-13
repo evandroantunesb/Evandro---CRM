@@ -201,7 +201,7 @@ export async function criarBaseFicticia(): Promise<BaseFicticia> {
     ["Sítio Boa Vista (fictício)", "Cascavel"],
     ["Clínica Vida (fictícia)", "Foz do Iguaçu"],
     ["Padaria Pão Quente (fictícia)", "Cascavel"],
-    ["Residência Costa (fictícia)", "Marechal Cândido Rondon"],
+    ["Usina Solar Fazenda Modelo (fictícia)", "Toledo"],
     ["Oficina Motor Bom (fictícia)", "Toledo"],
     ["Escola Aprender (fictícia)", "Cascavel"],
     ["Granja Ovo Feliz (fictícia)", "Palotina"],
@@ -267,11 +267,14 @@ export async function criarBaseFicticia(): Promise<BaseFicticia> {
   await status(obras.o05, "operacional", "concluido");
   await marco(obras.o05, "nf_cliente", "concluido");
   await marco(obras.o05, "garantia", "nao_se_aplica", "Garantia direta do fabricante (fictício)");
-  // o06: instalação em andamento, NF concluída.
+  // o06: Usina Solar Fazenda Modelo — obra principal da Apresentação (instalação em andamento, NF concluída).
   await status(obras.o06, "compras", "faturado_fornecedor");
   await status(obras.o06, "engenharia", "aprovado");
   await status(obras.o06, "operacional", "em_instalacao");
   await marco(obras.o06, "nf_cliente", "concluido");
+  await atribuir(obras.o06, "execEng", "engenharia", "responsavel", true);
+  await atribuir(obras.o06, "execOp", "operacional", "responsavel", true);
+  await atribuir(obras.o06, "execCompras", "compras", "responsavel", true);
   // o07: será pausada (com participante, para testar gestão de participantes em pausa).
   await status(obras.o07, "engenharia", "projeto_em_elaboracao");
   await atribuir(obras.o07, "execEng", "engenharia", "apoio");
@@ -284,6 +287,9 @@ export async function criarBaseFicticia(): Promise<BaseFicticia> {
   await parado(obras.o09, "operacional", "Chuva forte na região (fictício)");
   // o10–o12: estado inicial, sem participantes.
 
+  // Potência (kWp): a base não cria cálculo solar; entra pelo dono do banco LOCAL, como pausa/cancelamento.
+  const potencias: [string, number][] = [["o06", 75], ["o01", 8.2], ["o02", 32.4], ["o03", 12.6], ["o04", 18], ["o05", 6.5], ["o09", 24.3], ["o12", 54]];
+  for (const [chave, kwp] of potencias) await noBancoLocal("update public.obras set potencia_kwp = $1 where id = $2", [kwp, obras[chave]]);
   await noBancoLocal("update public.obras set pausada_em = now(), pausa_motivo = 'Cliente pediu para aguardar (fictício)' where id = $1", [obras.o07]);
   await noBancoLocal("update public.obras set cancelada_em = now(), cancelamento_motivo = 'Desistência do cliente (fictício)' where id = $1", [obras.o08]);
 

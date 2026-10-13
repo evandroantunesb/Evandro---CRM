@@ -54,7 +54,7 @@ export default async function Obras({ searchParams }: PageProps<"/obras">) {
           <p className="text-sm text-zinc-500">Vendas já pagas e o andamento de cada setor da obra.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <ModosObras hrefGestao={`/obras${query ? `?${query}` : ""}`} />
+          <ModosObras modo="gestao" hrefGestao={`/obras${query ? `?${query}` : ""}`} hrefApresentacao={`/obras/apresentacao${query ? `?${query}` : ""}`} />
           {visiveis.length > 0 && (
             <Link
               href={hrefGestao(visiveis[0].id)}
