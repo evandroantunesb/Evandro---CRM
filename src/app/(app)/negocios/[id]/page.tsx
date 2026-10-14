@@ -13,7 +13,7 @@ import { env } from "@/lib/env";
 import { hojeEmSaoPaulo } from "@/lib/formatacao";
 import { descreverAtividade } from "@/lib/linha-do-tempo";
 import { exigirPapel } from "@/lib/sessao";
-import { ATRIBUIR_TAREFA_A_OUTROS, EDITAR_VALOR_NEGOCIO, ESCOLHER_RESPONSAVEL_NEGOCIO, NEGOCIOS, PROPOSTA_E_CONTRATO, RESPONSAVEL_COMERCIAL, pode } from "@/lib/permissoes";
+import { ATRIBUIR_TAREFA_A_OUTROS, EDITAR_VALOR_NEGOCIO, ESCOLHER_RESPONSAVEL_NEGOCIO, NEGOCIOS, PAGAMENTO_SOLO, PROPOSTA_E_CONTRATO, RESPONSAVEL_COMERCIAL, pode } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { cartaoFechamento } from "@/lib/venda";
 import {
@@ -498,7 +498,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
                       negocioId={negocio.id}
                       hoje={hojeEmSaoPaulo()}
                       situacao={situacaoPagamentoSolo}
-                      podeRetificar={souAdmin}
+                      podeRetificar={pode(atual.papel, PAGAMENTO_SOLO)}
                       registros={(registrosPagamento ?? []).map((r) => ({
                         id: r.id,
                         dataRecebimento: r.data_recebimento,

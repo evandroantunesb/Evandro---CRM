@@ -42,6 +42,12 @@ export const EDITAR_MODELO_CONTRATO = ["admin"] as const satisfies ListaPapeis;
 /** Confirmar ou estornar pagamento (a RPC no banco exige o mesmo). */
 export const CONFIRMAR_PAGAMENTO = ["admin", "gestor"] as const satisfies ListaPapeis;
 
+/**
+ * Registro manual de pagamento do Solo: registrar (só Solo com um único usuário ativo), estornar e
+ * corrigir (registro de origem Solo, inclusive após upgrade). As RPCs no banco exigem o mesmo.
+ */
+export const PAGAMENTO_SOLO = ["admin"] as const satisfies ListaPapeis;
+
 /** Calculadora solar, kit personalizado e catálogo de componentes. */
 export const CALCULADORA = ["admin", "gestor", "vendedor", "sdr"] as const satisfies ListaPapeis;
 

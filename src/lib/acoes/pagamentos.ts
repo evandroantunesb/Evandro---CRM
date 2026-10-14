@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { mensagemErro } from "@/lib/erros";
 import { exigirPapel } from "@/lib/sessao";
-import { NEGOCIOS } from "@/lib/permissoes";
+import { NEGOCIOS, PAGAMENTO_SOLO, pode } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import type { ResultadoAcao } from "@/lib/tipos";
 
@@ -27,13 +27,15 @@ const esquemaRegistrar = z.object({ negocioId: z.string().uuid(), dataRecebiment
 const esquemaEstornar = z.object({ negocioId: z.string().uuid(), motivo });
 const esquemaCorrigir = esquemaRegistrar.extend({ motivo });
 
-async function soAdmin(mensagem: string): Promise<ResultadoAcao | null> {
+/** Lista positiva (`PAGAMENTO_SOLO`): papel fora dela recebe a mensagem, nunca acesso por exclusão. */
+async function negarForaDaLista(mensagem: string): Promise<ResultadoAcao | null> {
   const { atual } = await exigirPapel(...NEGOCIOS);
-  return atual.papel === "admin" ? null : { ok: false, mensagem };
+  if (!pode(atual.papel, PAGAMENTO_SOLO)) return { ok: false, mensagem };
+  return null;
 }
 
 export async function registrarPagamento(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  const negado = await soAdmin("Só o administrador registra pagamento.");
+  const negado = await negarForaDaLista("Só o administrador registra pagamento.");
   if (negado) return negado;
   const dados = esquemaRegistrar.safeParse(Object.fromEntries(formData));
   if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
@@ -51,7 +53,7 @@ export async function registrarPagamento(_: ResultadoAcao, formData: FormData): 
 }
 
 export async function estornarRegistroPagamento(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  const negado = await soAdmin("Só o administrador estorna o registro de pagamento.");
+  const negado = await negarForaDaLista("Só o administrador estorna o registro de pagamento.");
   if (negado) return negado;
   const dados = esquemaEstornar.safeParse(Object.fromEntries(formData));
   if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
@@ -65,7 +67,7 @@ export async function estornarRegistroPagamento(_: ResultadoAcao, formData: Form
 }
 
 export async function corrigirRegistroPagamento(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  const negado = await soAdmin("Só o administrador corrige o registro de pagamento.");
+  const negado = await negarForaDaLista("Só o administrador corrige o registro de pagamento.");
   if (negado) return negado;
   const dados = esquemaCorrigir.safeParse(Object.fromEntries(formData));
   if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
