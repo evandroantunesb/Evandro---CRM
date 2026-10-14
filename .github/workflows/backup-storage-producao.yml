@@ -94,11 +94,12 @@ jobs:
           AWS_EC2_METADATA_DISABLED: "true"
           B2_BUCKET: ${{ vars.B2_BUCKET }}
           B2_ENDPOINT: ${{ vars.B2_ENDPOINT }}
+          HEALTHCHECKS_STORAGE_PING_URL: ${{ secrets.HEALTHCHECKS_STORAGE_PING_URL }}
           PGCONNECT_TIMEOUT: "30"
         run: |
           set -euo pipefail
           umask 077
-          for variavel in SUPABASE_DB_URL SUPABASE_SERVICE_ROLE_KEY AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_DEFAULT_REGION B2_BUCKET B2_ENDPOINT; do
+          for variavel in SUPABASE_DB_URL SUPABASE_SERVICE_ROLE_KEY AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_DEFAULT_REGION B2_BUCKET B2_ENDPOINT HEALTHCHECKS_STORAGE_PING_URL; do
             if [[ -z "${!variavel:-}" ]]; then
               echo "::error::Configuração ausente: $variavel (environment backup-producao)"
               exit 1
@@ -113,6 +114,11 @@ jobs:
           fi
           command -v psql >/dev/null || { echo "::error::psql não instalado"; exit 1; }
           command -v aws >/dev/null || { echo "::error::AWS CLI não instalado"; exit 1; }
+          # Aceitar apenas URL de ping do serviço aprovado, sem expor seu identificador.
+          if [[ ! "$HEALTHCHECKS_STORAGE_PING_URL" =~ ^https://hc-ping[.]com/[[:xdigit:]]{8}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{12}/?$ ]]; then
+            echo "::error::URL do monitor Healthchecks Storage ausente ou inválida"
+            exit 1
+          fi
           node --check .github/scripts/exportar-storage-producao.mjs
 
           # Verificação de permissão ANTES de ler os objetos da produção.
@@ -162,6 +168,18 @@ jobs:
           # Checksum publicado por último: sinaliza pacote completo.
           aws s3 cp "$pasta/sha256.txt" "s3://$B2_BUCKET/$chave/sha256.txt" \
             --sse AES256 --endpoint-url "$B2_ENDPOINT" --only-show-errors --no-progress
+
+          # Confirmar também o checksum no B2 antes de sinalizar sucesso.
+          tamanho_checksum_local="$(stat -c %s "$pasta/sha256.txt")"
+          tamanho_checksum_remoto="$(aws s3api head-object --bucket "$B2_BUCKET" --key "$chave/sha256.txt" \
+            --endpoint-url "$B2_ENDPOINT" --query ContentLength --output text)"
+          [[ "$tamanho_checksum_local" == "$tamanho_checksum_remoto" ]] || { echo "::error::Checksum no B2 com tamanho divergente"; exit 1; }
+
+          # O Healthchecks recebe ping APENAS após ambos os arquivos estarem publicados.
+          # Erro de comunicação torna o job falho e dispara o alerta via GitHub Issues.
+          curl --fail --silent --show-error --max-time 20 \
+            --retry 2 --retry-all-errors --retry-delay 2 \
+            --output /dev/null "$HEALTHCHECKS_STORAGE_PING_URL"
 
           {
             echo "### Backup dos bytes do Supabase Storage publicado no Backblaze B2"
