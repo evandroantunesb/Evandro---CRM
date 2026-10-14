@@ -26,7 +26,7 @@ async function criarEmpresa(nome: string, produto: "solo" | "pro" | null, vincul
   const { data: emp, error } = await servico.from("empresas").insert({ nome: `${nome} ${sufixo}` }).select("id").single();
   if (error) throw error;
   if (produto) {
-    const { error: erroPlano } = await servico.from("planos_empresa").insert({ empresa_id: emp!.id, produto } as never);
+    const { error: erroPlano } = await servico.from("planos_empresa").insert({ empresa_id: emp!.id, produto });
     if (erroPlano) throw erroPlano;
   }
   const { data: vs, error: erroV } = await servico
@@ -47,7 +47,8 @@ const membroDe = (e: Empresa, u: Usuario) => membro[`${e.id}:${u.id}`];
 async function criarNegocio(e: Empresa, titulo: string, responsavel: Usuario) {
   const { data, error } = await servico
     .from("negocios")
-    .insert({ empresa_id: e.id, titulo, contato_id: e.contato, funil_id: e.funil, etapa_id: e.etapa, responsavel_id: membroDe(e, responsavel) })
+    // Valor obrigatório: o banco recusa marcar ganho sem valor.
+    .insert({ empresa_id: e.id, titulo, contato_id: e.contato, funil_id: e.funil, etapa_id: e.etapa, responsavel_id: membroDe(e, responsavel), valor: 30000 })
     .select("id")
     .single();
   if (error) throw error;
@@ -71,20 +72,17 @@ async function marcar(e: Empresa, negocioId: string, status: "ganho" | "perdido"
   if (error) throw error;
 }
 
-// Os nomes novos ainda não estão no database.types.ts até regenerar; o cliente aceita qualquer RPC em runtime.
-type Rpc = (fn: string, args: Record<string, unknown>) => ReturnType<Usuario["cliente"]["rpc"]>;
-const rpc = (u: Usuario) => u.cliente.rpc.bind(u.cliente) as unknown as Rpc;
-const registrar = (u: Usuario, negocioId: string, extra: Record<string, unknown> = {}) =>
-  rpc(u)("registrar_pagamento_negocio", { p_negocio_id: negocioId, ...extra });
+const registrar = (u: Usuario, negocioId: string, extra: { p_data_recebimento?: string; p_observacao?: string } = {}) =>
+  u.cliente.rpc("registrar_pagamento_negocio", { p_negocio_id: negocioId, ...extra });
 
 async function registrosDo(negocioId: string) {
   const { data, error } = await servico
-    .from("registros_pagamento" as never)
+    .from("registros_pagamento")
     .select("*")
     .eq("negocio_id", negocioId)
     .order("registrado_em");
   if (error) throw error;
-  return data as unknown as Array<Record<string, unknown>>;
+  return data;
 }
 
 async function eventosPagamento(negocioId: string) {
@@ -108,8 +106,8 @@ describe("plano explícito", () => {
   it("empresa nova com linha de plano sem produto fica Pro", async () => {
     const { data: emp } = await servico.from("empresas").insert({ nome: `Padrão ${sufixo}` }).select("id").single();
     await servico.from("planos_empresa").insert({ empresa_id: emp!.id });
-    const { data } = await servico.from("planos_empresa").select("produto" as never).eq("empresa_id", emp!.id).single();
-    expect((data as unknown as { produto: string }).produto).toBe("pro");
+    const { data } = await servico.from("planos_empresa").select("produto").eq("empresa_id", emp!.id).single();
+    expect(data!.produto).toBe("pro");
   });
 });
 
@@ -118,7 +116,7 @@ describe("Solo: registrar pagamento sem segundo aprovador", () => {
     const negocioId = await criarNegocio(solo, "Sem contrato", soloAdmin);
     const { data, error } = await registrar(soloAdmin, negocioId);
     expect(error).toBeNull();
-    const reg = data as unknown as Record<string, unknown>;
+    const reg = data!;
     expect(reg.registrado_por_user_id).toBe(soloAdmin.id);
     expect(reg.registrado_por_membro_id).toBe(membroDe(solo, soloAdmin));
     expect(reg.data_recebimento).toBe(hojeSP());
@@ -131,7 +129,7 @@ describe("Solo: registrar pagamento sem segundo aprovador", () => {
 
   it("pode_registrar_pagamento_negocio: verdadeiro para o admin único do Solo", async () => {
     const negocioId = await criarNegocio(solo, "Pode registrar", soloAdmin);
-    const { data } = await rpc(soloAdmin)("pode_registrar_pagamento_negocio", { p_negocio_id: negocioId });
+    const { data } = await soloAdmin.cliente.rpc("pode_registrar_pagamento_negocio", { p_negocio_id: negocioId });
     expect(data).toBe(true);
   });
 
@@ -192,7 +190,7 @@ describe("Solo: registrar pagamento sem segundo aprovador", () => {
 
     const { data, error } = await registrar(soloAdmin, negocioId, { p_data_recebimento: "2026-09-30", p_observacao: "  Pix  " });
     expect(error).toBeNull();
-    const reg = data as unknown as Record<string, unknown>;
+    const reg = data!;
     expect(reg.data_recebimento).toBe("2026-09-30");
     expect(reg.observacao).toBe("Pix");
   });
@@ -227,12 +225,12 @@ describe("Solo: estorno e correção auditáveis", () => {
     const negocioId = await criarNegocio(solo, "Estorno", soloAdmin);
     await registrar(soloAdmin, negocioId);
 
-    const { error: semMotivo } = await rpc(soloAdmin)("estornar_registro_pagamento", { p_negocio_id: negocioId, p_motivo: " " });
+    const { error: semMotivo } = await soloAdmin.cliente.rpc("estornar_registro_pagamento", { p_negocio_id: negocioId, p_motivo: " " });
     expect(semMotivo?.message).toContain("motivo");
 
-    const { data, error } = await rpc(soloAdmin)("estornar_registro_pagamento", { p_negocio_id: negocioId, p_motivo: "Pix devolvido" });
+    const { data, error } = await soloAdmin.cliente.rpc("estornar_registro_pagamento", { p_negocio_id: negocioId, p_motivo: "Pix devolvido" });
     expect(error).toBeNull();
-    const reg = data as unknown as Record<string, unknown>;
+    const reg = data!;
     expect(reg.motivo_estorno).toBe("Pix devolvido");
     expect(reg.estornado_por_user_id).toBe(soloAdmin.id);
 
@@ -249,16 +247,16 @@ describe("Solo: estorno e correção auditáveis", () => {
   it("correção estorna o registro ativo e cria outro ligado por substitui_id, na mesma transação", async () => {
     const negocioId = await criarNegocio(solo, "Correção", soloAdmin);
     const { data: original } = await registrar(soloAdmin, negocioId);
-    const originalId = (original as unknown as { id: string }).id;
+    const originalId = original!.id;
 
-    const { data, error } = await rpc(soloAdmin)("corrigir_registro_pagamento", {
+    const { data, error } = await soloAdmin.cliente.rpc("corrigir_registro_pagamento", {
       p_negocio_id: negocioId,
       p_data_recebimento: "2026-10-01",
-      p_observacao: null,
+      p_observacao: "",
       p_motivo: "Data errada",
     });
     expect(error).toBeNull();
-    const novo = data as unknown as Record<string, unknown>;
+    const novo = data!;
     expect(novo.substitui_id).toBe(originalId);
     expect(novo.data_recebimento).toBe("2026-10-01");
 
@@ -275,7 +273,7 @@ describe("Solo: estorno e correção auditáveis", () => {
     const negocioId = await criarNegocio(solo, "Correção inválida", soloAdmin);
     await registrar(soloAdmin, negocioId);
     const amanha = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10);
-    const { error } = await rpc(soloAdmin)("corrigir_registro_pagamento", { p_negocio_id: negocioId, p_data_recebimento: amanha, p_observacao: null, p_motivo: "x" });
+    const { error } = await soloAdmin.cliente.rpc("corrigir_registro_pagamento", { p_negocio_id: negocioId, p_data_recebimento: amanha, p_observacao: "", p_motivo: "x" });
     expect(error).not.toBeNull();
     const regs = await registrosDo(negocioId);
     expect(regs).toHaveLength(1);
@@ -287,15 +285,15 @@ describe("Solo: estorno e correção auditáveis", () => {
     await registrar(soloAdmin, negocioId);
     const [reg] = await registrosDo(negocioId);
 
-    const { error: insAdmin } = await soloAdmin.cliente.from("registros_pagamento" as never).insert({
+    const { error: insAdmin } = await soloAdmin.cliente.from("registros_pagamento").insert({
       empresa_id: solo.id, negocio_id: negocioId, data_recebimento: hojeSP(),
       registrado_por_membro_id: membroDe(solo, soloAdmin), registrado_por_user_id: soloAdmin.id,
-    } as never);
+    });
     expect(insAdmin).not.toBeNull();
 
-    const { error: updServico } = await servico.from("registros_pagamento" as never).update({ data_recebimento: "2026-01-01" } as never).eq("id", reg.id as string);
+    const { error: updServico } = await servico.from("registros_pagamento").update({ data_recebimento: "2026-01-01" }).eq("id", reg.id);
     expect(updServico).not.toBeNull();
-    const { error: delServico } = await servico.from("registros_pagamento" as never).delete().eq("id", reg.id as string);
+    const { error: delServico } = await servico.from("registros_pagamento").delete().eq("id", reg.id);
     expect(delServico).not.toBeNull();
     expect(await registrosDo(negocioId)).toHaveLength(1);
   });
@@ -313,7 +311,7 @@ describe("Critério Solo: plano explícito + um único vínculo ativo", () => {
     const negocioId = await criarNegocio(pro, "Pro tenta registrar", proCloser);
     const { error } = await registrar(proAdmin, negocioId);
     expect(error?.message).toContain("plano Solo");
-    const { data } = await rpc(proAdmin)("pode_registrar_pagamento_negocio", { p_negocio_id: negocioId });
+    const { data } = await proAdmin.cliente.rpc("pode_registrar_pagamento_negocio", { p_negocio_id: negocioId });
     expect(data).toBe(false);
   });
 
@@ -342,13 +340,19 @@ describe("Critério Solo: plano explícito + um único vínculo ativo", () => {
     await registrar(soloAdmin, negocioId);
     const { error } = await registrar(proAdmin, negocioId);
     expect(error?.message).toContain("permissão");
-    const { data } = await proAdmin.cliente.from("registros_pagamento" as never).select("id").eq("negocio_id", negocioId);
+    const { data } = await proAdmin.cliente.from("registros_pagamento").select("id").eq("negocio_id", negocioId);
     expect(data).toEqual([]);
   });
 });
 
 describe("Pro intacto e um pagamento por negócio", () => {
-  it("Pro: gestor confirma o pagamento do closer como antes", async () => {
+  it("Pro: gestor da equipe confirma o pagamento do closer como antes", async () => {
+    // O gestor só vê o negócio de quem está na equipe dele (pode_ver_responsavel).
+    const { data: equipe } = await servico.from("equipes").insert({ empresa_id: pro.id, nome: `Equipe Pro ${sufixo}` }).select("id").single();
+    await servico.from("equipe_membros").insert([
+      { empresa_id: pro.id, equipe_id: equipe!.id, membro_id: membroDe(pro, proGestor), e_gestor: true },
+      { empresa_id: pro.id, equipe_id: equipe!.id, membro_id: membroDe(pro, proCloser), e_gestor: false },
+    ]);
     const negocioId = await criarNegocio(pro, "Pro fluxo", proCloser);
     const contratoId = await gerarContrato(pro, negocioId, proCloser);
     await assinar(contratoId, proCloser);
@@ -368,7 +372,7 @@ describe("Pro intacto e um pagamento por negócio", () => {
     await assinar(contratoId, admin);
 
     // Upgrade: plano Pro + novo gestor.
-    await servico.from("planos_empresa").update({ produto: "pro" } as never).eq("empresa_id", emp.id);
+    await servico.from("planos_empresa").update({ produto: "pro" }).eq("empresa_id", emp.id);
     const { data: g } = await servico.from("empresa_membros").insert({ empresa_id: emp.id, user_id: gestor.id, papel: "gestor" }).select("id").single();
     membro[`${emp.id}:${gestor.id}`] = g!.id;
 
@@ -377,7 +381,7 @@ describe("Pro intacto e um pagamento por negócio", () => {
     expect(reg.registrado_por_user_id).toBe(admin.id);
 
     // Admin pode estornar o registro depois do upgrade (corrigir um fato do Solo não é incompatível com o Pro).
-    const { error: erroEstorno } = await rpc(admin)("estornar_registro_pagamento", { p_negocio_id: negocioId, p_motivo: "Migrar para a confirmação do Pro" });
+    const { error: erroEstorno } = await admin.cliente.rpc("estornar_registro_pagamento", { p_negocio_id: negocioId, p_motivo: "Migrar para a confirmação do Pro" });
     expect(erroEstorno).toBeNull();
   });
 
@@ -387,7 +391,7 @@ describe("Pro intacto e um pagamento por negócio", () => {
     const negocioId = await criarNegocio(emp, "Registro antes", admin);
     await registrar(admin, negocioId);
     // Vira Pro com equipe; o closer assina como responsável e o admin tenta confirmar.
-    await servico.from("planos_empresa").update({ produto: "pro" } as never).eq("empresa_id", emp.id);
+    await servico.from("planos_empresa").update({ produto: "pro" }).eq("empresa_id", emp.id);
     const { data: vs } = await servico
       .from("empresa_membros")
       .insert([{ empresa_id: emp.id, user_id: gestor.id, papel: "gestor" }, { empresa_id: emp.id, user_id: closer.id, papel: "vendedor" }])
@@ -412,7 +416,7 @@ describe("Pro intacto e um pagamento por negócio", () => {
     expect(erroConf).toBeNull();
 
     // Downgrade: plano Solo e só o admin ativo.
-    await servico.from("planos_empresa").insert({ empresa_id: emp.id, produto: "solo" } as never);
+    await servico.from("planos_empresa").insert({ empresa_id: emp.id, produto: "solo" });
     await servico.from("empresa_membros").update({ status: "inativo" }).in("id", [membroDe(emp, gestor), membroDe(emp, closer)]);
 
     const { error } = await registrar(admin, negocioId);
