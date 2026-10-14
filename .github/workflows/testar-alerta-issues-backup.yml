@@ -1,0 +1,33 @@
+name: Testar notificacao de backup via GitHub Issues
+
+# Teste manual e isolado. Nao executa backups nem usa segredos de producao.
+on:
+  workflow_dispatch:
+    inputs:
+      confirmacao:
+        description: "Para criar uma Issue de teste, digite testar-notificacao"
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  teste_notificacao:
+    name: Emitir Issue de teste pelo github-actions[bot]
+    if: ${{ github.repository == 'evandroantunesb/Evandro---CRM' && github.ref == 'refs/heads/main' && inputs.confirmacao == 'testar-notificacao' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - name: Criar Issue identificada como teste (sem acesso ao Supabase/B2)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          titulo='[TESTE BOT] Raion CRM: notificacao de backup (nenhuma falha real)'
+          descricao='SIMULACAO CONTROLADA. Esta Issue foi criada pelo GitHub Actions exclusivamente para verificar o recebimento das notificacoes do repositório. Nenhum backup falhou, foi executado ou teve seus arquivos modificados. Nenhuma credencial do Supabase ou do Backblaze B2 foi usada. Este teste verifica a criacao de Issues pelo bot e o recebimento da notificacao; nao testa a deteccao automatica de falhas.'
+          url="$(gh api "repos/$GH_REPO/issues" --method POST -f "title=$titulo" -f "body=$descricao" --jq '.html_url')"
+          echo "Issue de teste criada: $url"
+          echo "Issue de teste: $url" >> "$GITHUB_STEP_SUMMARY"
