@@ -1,0 +1,76 @@
+name: Testar deteccao de falha e alerta dos backups (simulacao)
+
+# Workflow manual isolado. A falha no job 'backup' e proposital e NUNCA acessa producao.
+on:
+  workflow_dispatch:
+    inputs:
+      confirmacao:
+        description: "Para simular falha e testar o alerta, digite simular-falha-backup"
+        required: true
+        type: string
+      tipo:
+        description: "Tipo de backup a simular (nenhum backup real sera executado)"
+        required: true
+        type: choice
+        options:
+          - postgres
+          - storage
+        default: postgres
+
+permissions: {}
+
+jobs:
+  validar:
+    name: Validar autorizacao da simulacao (sem secrets)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      autorizado: ${{ steps.checar.outputs.autorizado }}
+    steps:
+      - id: checar
+        name: Conferir confirmacao, repositorio e branch
+        env:
+          CONFIRMACAO: ${{ inputs.confirmacao }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REPOSITORY" != "evandroantunesb/Evandro---CRM" || "$GITHUB_REF" != "refs/heads/main" || "$CONFIRMACAO" != "simular-falha-backup" ]]; then
+            echo "::error::Simulacao nao autorizada; nenhum backup executado"
+            exit 1
+          fi
+          echo 'autorizado=true' >> "$GITHUB_OUTPUT"
+
+  backup:
+    name: Job de falha SIMULADA (sem backup ou acesso a producao)
+    needs: validar
+    if: needs.validar.outputs.autorizado == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Gerar falha proposital apenas neste job de teste
+        run: |
+          echo '::notice::FALHA SIMULADA — nao houve acesso ao Supabase nem ao B2'
+          exit 1
+
+  alertar_falha:
+    name: Detectar falha simulada e criar Issue de teste
+    needs: [validar, backup]
+    if: ${{ always() && needs.validar.outputs.autorizado == 'true' && needs.backup.result == 'failure' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+      - name: Emitir alerta identificado como TESTE usando o script de producao
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          STATUS_VALIDACAO: ${{ needs.validar.result }}
+          STATUS_BACKUP: ${{ needs.backup.result }}
+          TIPO: ${{ inputs.tipo }}
+        run: node .github/scripts/alertar-falha-backup.mjs "$TIPO" teste

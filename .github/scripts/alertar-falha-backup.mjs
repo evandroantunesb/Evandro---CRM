@@ -5,10 +5,28 @@ const tituloPorTipo = {
   postgres: "[Backup Raion] Falha PostgreSQL",
   storage: "[Backup Raion] Falha Storage",
 };
-const [tipo] = process.argv.slice(2);
-const titulo = tituloPorTipo[tipo];
-if (!titulo || process.env.GITHUB_REPOSITORY !== projeto || process.env.GITHUB_SERVER_URL !== "https://github.com") {
+const [tipo, modo] = process.argv.slice(2);
+const simulacao = modo === "teste";
+const titulo = simulacao
+  ? `[TESTE BOT] Raion CRM: falha simulada ${tipo === "postgres" ? "PostgreSQL" : "Storage"} (nenhuma falha real)`
+  : tituloPorTipo[tipo];
+if (
+  !tituloPorTipo[tipo] ||
+  (modo && !simulacao) ||
+  process.env.GITHUB_REPOSITORY !== projeto ||
+  process.env.GITHUB_SERVER_URL !== "https://github.com"
+) {
   console.error("::error::Repositório ou tipo de alerta não autorizado");
+  process.exit(1);
+}
+// O modo de teste só pode rodar no workflow manual isolado, na main.
+if (simulacao && (
+  process.env.GITHUB_EVENT_NAME !== "workflow_dispatch" ||
+  process.env.GITHUB_REF !== "refs/heads/main" ||
+  process.env.GITHUB_WORKFLOW_REF !==
+    `${projeto}/.github/workflows/testar-falha-backup.yml@refs/heads/main`
+)) {
+  console.error("::error::Simulação permitida apenas no workflow de teste autorizado");
   process.exit(1);
 }
 const token = process.env.GITHUB_TOKEN;
@@ -28,7 +46,19 @@ if (!Number.isSafeInteger(tentativa) || tentativa < 1) {
 }
 const statusValidacao = process.env.STATUS_VALIDACAO === "failure" ? "falhou" : "concluída";
 const statusBackup = process.env.STATUS_BACKUP === "failure" ? "falhou" : "não concluído";
-const descricao = [
+const descricao = simulacao
+  ? [
+      "**TESTE CONTROLADO — NÃO HOUVE FALHA REAL DE BACKUP.**",
+      "",
+      "Uma falha foi provocada apenas no job de teste do GitHub Actions.",
+      "O job de alerta detectou essa falha e executou o MESMO script usado pelos backups.",
+      "Nenhuma conexão ao Supabase ou Backblaze B2 foi realizada nesta simulação.",
+      `- Tipo simulado: ${tipo === "postgres" ? "PostgreSQL" : "Supabase Storage"}`,
+      `- Execução de teste: https://github.com/${projeto}/actions/runs/${run}/attempts/${tentativa}`,
+      "",
+      "Não é necessário restaurar nem alterar os backups.",
+    ].join("\n")
+  : [
   "O GitHub Actions registrou uma falha no processo de backup do Raion CRM.",
   "",
   `- Tipo: ${tipo === "postgres" ? "PostgreSQL" : "Supabase Storage"}`,
