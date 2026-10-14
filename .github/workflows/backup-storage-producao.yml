@@ -1,0 +1,147 @@
+name: Backup arquivos Supabase Storage para B2 (manual)
+
+# Primeira validação: NUNCA agenda/push. Nenhuma alteração no Supabase ou no banco.
+on:
+  workflow_dispatch:
+    inputs:
+      confirmacao:
+        description: "Digite iniciar-backup-storage para exportar arquivos privados e enviar ao B2"
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: backup-storage-producao
+  cancel-in-progress: false
+
+jobs:
+  validar:
+    name: Validar autorização e branch (sem credenciais)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Validar origem e confirmação
+        env:
+          CONFIRMACAO: ${{ inputs.confirmacao }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REPOSITORY" != "evandroantunesb/Evandro---CRM" || "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "::error::Permitido apenas no repositório original e branch main"
+            exit 1
+          fi
+          if [[ "$CONFIRMACAO" != "iniciar-backup-storage" ]]; then
+            echo "::error::Confirmação inválida; nenhuma credencial foi acessada"
+            exit 1
+          fi
+
+  backup:
+    name: Exportar Storage privado e armazenar no Backblaze B2
+    needs: validar
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    environment: backup-producao
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+      - name: Validar fonte e destino, exportar bytes e publicar pacote
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_BACKUP_DB_URL }}
+          SUPABASE_URL: https://wswpxdmgfdamvqhyztrm.supabase.co
+          SUPABASE_PROJECT_ID: wswpxdmgfdamvqhyztrm
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.B2_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.B2_APPLICATION_KEY }}
+          AWS_DEFAULT_REGION: ${{ vars.B2_REGION }}
+          AWS_EC2_METADATA_DISABLED: "true"
+          B2_BUCKET: ${{ vars.B2_BUCKET }}
+          B2_ENDPOINT: ${{ vars.B2_ENDPOINT }}
+          PGCONNECT_TIMEOUT: "30"
+        run: |
+          set -euo pipefail
+          umask 077
+          for variavel in SUPABASE_DB_URL SUPABASE_SERVICE_ROLE_KEY AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_DEFAULT_REGION B2_BUCKET B2_ENDPOINT; do
+            if [[ -z "${!variavel:-}" ]]; then
+              echo "::error::Configuração ausente: $variavel (environment backup-producao)"
+              exit 1
+            fi
+          done
+          node .github/scripts/validar-destino-producao.mjs banco wswpxdmgfdamvqhyztrm
+          node .github/scripts/validar-destino-producao.mjs seed wswpxdmgfdamvqhyztrm
+
+          if [[ "$B2_BUCKET" != "raion-crm-backups" || "$B2_ENDPOINT" != "https://s3.us-east-005.backblazeb2.com" || "$AWS_DEFAULT_REGION" != "us-east-005" ]]; then
+            echo "::error::Destino Backblaze B2 diferente do bucket/região aprovados"
+            exit 1
+          fi
+          command -v psql >/dev/null || { echo "::error::psql não instalado"; exit 1; }
+          command -v aws >/dev/null || { echo "::error::AWS CLI não instalado"; exit 1; }
+          node --check .github/scripts/exportar-storage-producao.mjs
+
+          # Verificação de permissão ANTES de ler os objetos da produção.
+          aws s3api head-bucket --bucket "$B2_BUCKET" --endpoint-url "$B2_ENDPOINT" >/dev/null
+
+          pasta="$(mktemp -d "$RUNNER_TEMP/raion-storage-backup.XXXXXXXX")"
+          trap 'rm -rf "$pasta"' EXIT
+
+          # Inventário somente leitura, obtido direto das tabelas gerenciadas do Supabase.
+          # Cobre todos os buckets atuais, mesmo vazios, e caminhos em subpastas.
+          # Dados de nomes/caminhos nunca são impressos no log do job.
+          PGOPTIONS="-c default_transaction_read_only=on" psql -X -q -w -v ON_ERROR_STOP=1 \
+            "$SUPABASE_DB_URL" -c "
+            COPY (
+              SELECT row_to_json(linha)
+              FROM (
+                SELECT b.id AS bucket, b.public AS public,
+                       o.name AS path,
+                       o.metadata->>'size' AS metadata_size,
+                       o.metadata->>'mimetype' AS mime_type
+                  FROM storage.buckets b
+                  LEFT JOIN storage.objects o ON o.bucket_id = b.id
+                 ORDER BY b.id, o.name
+              ) linha
+            ) TO STDOUT
+            " > "$pasta/inventario.jsonl"
+
+          # Download por streaming e hash SHA-256 por objeto; aborta ao primeiro erro.
+          node .github/scripts/exportar-storage-producao.mjs "$pasta/inventario.jsonl" "$pasta"
+          read -r objetos bytes < "$pasta/resumo.txt"
+
+          # Inventário de produção fica fora do pacote; manifesto documenta paths/hashes.
+          tar -C "$pasta" -czf "$pasta/storage.tar.gz" manifest.json info.json objetos
+          (cd "$pasta" && sha256sum storage.tar.gz > sha256.txt && sha256sum -c sha256.txt)
+
+          data_utc="$(date -u +%Y%m%dT%H%M%SZ)"
+          chave="storage/$data_utc/run-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+
+          aws s3 cp "$pasta/storage.tar.gz" "s3://$B2_BUCKET/$chave/storage.tar.gz" \
+            --sse AES256 --endpoint-url "$B2_ENDPOINT" --only-show-errors --no-progress
+
+          tamanho_local="$(stat -c %s "$pasta/storage.tar.gz")"
+          tamanho_remoto="$(aws s3api head-object --bucket "$B2_BUCKET" --key "$chave/storage.tar.gz" \
+            --endpoint-url "$B2_ENDPOINT" --query ContentLength --output text)"
+          [[ "$tamanho_local" == "$tamanho_remoto" ]] || { echo "::error::Tamanho no B2 diferente do arquivo enviado"; exit 1; }
+
+          # Checksum publicado por último: sinaliza pacote completo.
+          aws s3 cp "$pasta/sha256.txt" "s3://$B2_BUCKET/$chave/sha256.txt" \
+            --sse AES256 --endpoint-url "$B2_ENDPOINT" --only-show-errors --no-progress
+
+          {
+            echo "### Backup dos bytes do Supabase Storage publicado no Backblaze B2"
+            echo
+            echo "- Projeto: `wswpxdmgfdamvqhyztrm`"
+            echo "- Prefixo: `$chave/`"
+            echo "- Objetos exportados: $objetos"
+            echo "- Bytes originais exportados: $bytes"
+            echo "- Bytes compactados no B2: $tamanho_local"
+            echo "- Manifesto inclui caminhos e checksums individuais, dentro de arquivo privado"
+            echo
+            echo "**Pendente:** baixar, validar SHA-256 e restaurar objetos em ambiente isolado."
+            echo "Um backup lógico do PostgreSQL é separado deste backup de bytes Storage."
+            echo "Não libera migrations ou execução automática."
+          } >> "$GITHUB_STEP_SUMMARY"
