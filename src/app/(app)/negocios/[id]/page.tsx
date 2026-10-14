@@ -518,6 +518,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
                       hoje={hojeEmSaoPaulo()}
                       situacao={situacaoPagamentoSolo}
                       podeRetificar={pode(atual.papel, PAGAMENTO_SOLO)}
+                      confirmacaoProAtiva={statusPagamento === "confirmado"}
                       registros={(registrosPagamento ?? []).map((r) => ({
                         id: r.id,
                         dataRecebimento: r.data_recebimento,

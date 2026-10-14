@@ -168,6 +168,54 @@ describe("cartão PagamentoSolo", () => {
     expect(h).toContain("Registro de pagamento estornado");
     expect(h).toContain("Marcar como pago");
   });
+
+  describe("Pro com histórico Solo estornado", () => {
+    const orientacaoConfirmar = "Confirmar pagamento";
+
+    it("confirmação Pro ativa: histórico neutro e completo, sem mensagem contraditória", () => {
+      const h = render({ situacao: "indisponivel", registros: [estornado], confirmacaoProAtiva: true });
+      expect(h).toContain("Histórico do registro Solo");
+      expect(h).toContain("Histórico de registros (1)");
+      expect(h).toContain("02/10/2026");
+      expect(h).toContain("registrado por Ana");
+      expect(h).toContain("Estornado por Ana");
+      expect(h).toContain("Data errada");
+      for (const contraditoria of ["Registro de pagamento estornado", orientacaoConfirmar, "Marcar como pago", "Pagamento não registrado", "mais de um"]) {
+        expect(h).not.toContain(contraditoria);
+      }
+    });
+
+    it("confirmação Pro ativa após downgrade (Solo permitido ou com vários usuários): sem formulário nem aviso", () => {
+      for (const situacao of ["permitido", "varios_usuarios"] as const) {
+        const h = render({ situacao, registros: [estornado], confirmacaoProAtiva: true });
+        expect(h).toContain("Histórico do registro Solo");
+        expect(h).not.toContain("Marcar como pago");
+        expect(h).not.toContain("mais de um");
+      }
+    });
+
+    it("confirmação Pro ativa sem histórico Solo: o cartão Solo não aparece", () => {
+      expect(render({ situacao: "permitido", registros: [], confirmacaoProAtiva: true })).toBe("");
+    });
+
+    // Regressão: Pro pendente ou com a confirmação estornada (os dois chegam como confirmacaoProAtiva = false).
+    it("Pro pendente ou estornado: mantém selo de estornado e orientação para confirmar", () => {
+      for (const props of [{}, { confirmacaoProAtiva: false }]) {
+        const h = render({ situacao: "indisponivel", registros: [estornado], ...props });
+        expect(h).toContain("Registro de pagamento estornado");
+        expect(h).toContain(orientacaoConfirmar);
+        expect(h).not.toContain("Histórico do registro Solo");
+        expect(h).not.toContain("Marcar como pago");
+      }
+    });
+
+    it("registro Solo ativo continua mostrando Pago/Recebido e as ações do admin", () => {
+      const h = render({ situacao: "indisponivel", registros: [ativo, estornado] });
+      expect(h).toContain("Pago/Recebido");
+      expect(h).toContain("Corrigir data ou observação");
+      expect(h).not.toContain("Histórico do registro Solo");
+    });
+  });
 });
 
 describe("ficha do negócio: ligação do cartão", () => {
@@ -177,6 +225,10 @@ describe("ficha do negócio: ligação do cartão", () => {
   it("dados de pagamento só para quem já vê contrato e pagamento (SDR fora)", () => {
     expect(page).toContain("const veContratoEPagamento = pode(atual.papel, PROPOSTA_E_CONTRATO);");
     expect(page).toMatch(/veContratoEPagamento\s*\?\s*await Promise\.all/);
+  });
+
+  it("o cartão Solo só recebe confirmação ativa quando o status do Pro é 'confirmado' (pendente/estornado não contam)", () => {
+    expect(page).toContain('confirmacaoProAtiva={statusPagamento === "confirmado"}');
   });
 
   it("um único cartão Pagamento com âncora, Solo e Pro no mesmo lugar", () => {

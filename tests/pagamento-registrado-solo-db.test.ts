@@ -385,6 +385,66 @@ describe("Pro intacto e um pagamento por negócio", () => {
     expect(erroEstorno).toBeNull();
   });
 
+  it("sequência completa: Solo → Pro → estorno do registro → outro admin confirma no Pro", async () => {
+    // Mesmo roteiro do teste manual: o admin original registra no Solo, assina como responsável,
+    // a empresa vira Pro com um segundo admin, o registro é estornado e o segundo admin confirma.
+    const [original, financeiro] = await Promise.all(["seq-original", "seq-financeiro"].map(criarUsuario));
+    const emp = await criarEmpresa("Sequência Solo-Pro", "solo", [{ u: original, papel: "admin" }]);
+    const negocioId = await criarNegocio(emp, "Venda Solo depois Pro", original);
+    expect((await registrar(original, negocioId)).error).toBeNull();
+    const contratoId = await gerarContrato(emp, negocioId, original);
+    await assinar(contratoId, original);
+
+    await servico.from("planos_empresa").update({ produto: "pro" }).eq("empresa_id", emp.id);
+    const { data: f } = await servico.from("empresa_membros").insert({ empresa_id: emp.id, user_id: financeiro.id, papel: "admin" }).select("id").single();
+    membro[`${emp.id}:${financeiro.id}`] = f!.id;
+
+    const { error: erroEstorno } = await original.cliente.rpc("estornar_registro_pagamento", { p_negocio_id: negocioId, p_motivo: "Migrar para a confirmação do Pro" });
+    expect(erroEstorno).toBeNull();
+    const status = async () => (await servico.rpc("status_pagamento_contrato", { p_contrato_id: contratoId })).data;
+    expect(await status()).toBe("pendente");
+
+    // Quem assinou como responsável não confirma o próprio pagamento.
+    const { error: autoconfirmacao } = await original.cliente.rpc("confirmar_pagamento", { p_contrato_id: contratoId });
+    expect(autoconfirmacao?.message).toContain("assinou como responsável");
+
+    const { error: erroConf } = await financeiro.cliente.rpc("confirmar_pagamento", { p_contrato_id: contratoId });
+    expect(erroConf).toBeNull();
+    expect(await status()).toBe("confirmado");
+
+    const { data: confs } = await servico.from("confirmacoes_pagamento").select("*").eq("negocio_id", negocioId);
+    expect(confs).toHaveLength(1);
+    expect(confs![0]).toMatchObject({
+      estornado_em: null,
+      confirmado_por_membro_id: membroDe(emp, financeiro),
+      confirmado_por_user_id: financeiro.id,
+      beneficiario_membro_id: membroDe(emp, original),
+      beneficiario_user_id: original.id,
+    });
+    const { data: eventos } = await servico.from("eventos").select("tipo, ator_id, beneficiario_id").eq("entidade_id", negocioId).like("tipo", "pagamento.%");
+    expect(eventos).toEqual([{ tipo: "pagamento.confirmado", ator_id: financeiro.id, beneficiario_id: original.id }]);
+
+    // Confirmar de novo não duplica nada.
+    const { error: duplicada } = await financeiro.cliente.rpc("confirmar_pagamento", { p_contrato_id: contratoId });
+    expect(duplicada?.message).toContain("já está confirmado");
+    expect(await eventosPagamento(negocioId)).toHaveLength(1);
+
+    // Histórico do Solo intacto: uma linha estornada, autor original, nenhuma ativa; registro novo segue fechado.
+    const regs = await registrosDo(negocioId);
+    expect(regs).toHaveLength(1);
+    expect(regs[0]).toMatchObject({ registrado_por_user_id: original.id, motivo_estorno: "Migrar para a confirmação do Pro" });
+    expect(regs[0].estornado_em).not.toBeNull();
+    expect((await registrar(financeiro, negocioId)).error?.message).toContain("plano Solo");
+    const { data: situacao } = await financeiro.cliente.rpc("situacao_registro_pagamento", { p_negocio_id: negocioId });
+    expect(situacao).toBe("indisponivel");
+
+    // Estorno da confirmação: status 'estornado', histórico Solo continua igual.
+    const { error: erroEstornoConf } = await financeiro.cliente.rpc("estornar_confirmacao_pagamento", { p_contrato_id: contratoId, p_motivo: "Teste de estorno" });
+    expect(erroEstornoConf).toBeNull();
+    expect(await status()).toBe("estornado");
+    expect(await registrosDo(negocioId)).toEqual(regs);
+  });
+
   it("confirmação do Pro recusa negócio com registro ativo (mensagem do registro)", async () => {
     const [admin, gestor, closer] = await Promise.all(["rc-admin", "rc-gestor", "rc-closer"].map(criarUsuario));
     const emp = await criarEmpresa("Recusa confirmação", "solo", [{ u: admin, papel: "admin" }]);

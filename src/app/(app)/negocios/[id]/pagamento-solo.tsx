@@ -33,6 +33,7 @@ export function PagamentoSolo({
   situacao,
   podeRetificar,
   registros,
+  confirmacaoProAtiva = false,
 }: {
   negocioId: string;
   /** Hoje no fuso de Brasília ("2026-10-14"): padrão e limite do campo de data. */
@@ -42,24 +43,31 @@ export function PagamentoSolo({
   podeRetificar: boolean;
   /** Mais recente primeiro. */
   registros: RegistroVisivel[];
+  /** Há confirmação ativa do Pro (`status_pagamento_contrato` = confirmado): o pagamento já está resolvido no contrato. */
+  confirmacaoProAtiva?: boolean;
 }) {
   const ativo = registros.find((r) => r.estornadoEm == null) ?? null;
   const historico = registros.filter((r) => r.estornadoEm != null);
+  // Pago pela confirmação do Pro: o registro Solo vira só histórico, sem ação nem orientação para pagar.
+  const soHistorico = confirmacaoProAtiva && !ativo;
   // A ação aberta vale só para o registro em que foi aberta: depois de corrigir/estornar, fecha sozinha.
   const [aberta, setAberta] = useState<{ tipo: "estornar" | "corrigir"; registroId: string } | null>(null);
   const modo = ativo && aberta?.registroId === ativo.id ? aberta.tipo : null;
+  if (soHistorico && historico.length === 0) return null;
 
   return (
     <div className="flex flex-col gap-3">
       {ativo ? (
         <RegistroAtivo registro={ativo} />
+      ) : soHistorico ? (
+        <Selo>Histórico do registro Solo</Selo>
       ) : (
         <Selo tom={historico.length ? "negativo" : "atencao"}>{historico.length ? "Registro de pagamento estornado" : "Pagamento não registrado"}</Selo>
       )}
 
-      {!ativo && situacao === "permitido" && <FormRegistrar negocioId={negocioId} hoje={hoje} />}
+      {!ativo && !soHistorico && situacao === "permitido" && <FormRegistrar negocioId={negocioId} hoje={hoje} />}
 
-      {!ativo && historico.length > 0 && situacao === "indisponivel" && (
+      {!ativo && !soHistorico && historico.length > 0 && situacao === "indisponivel" && (
         <p role="status" className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-700">
           O registro anterior foi estornado e continua no histórico. Não é possível registrar um novo recebimento pelo
           fluxo Solo nesta situação. No Pro, confira o <a href="#contrato" className="underline hover:text-zinc-900">contrato</a>:
@@ -68,7 +76,7 @@ export function PagamentoSolo({
         </p>
       )}
 
-      {!ativo && situacao === "varios_usuarios" && (
+      {!ativo && !soHistorico && situacao === "varios_usuarios" && (
         <p role="status" className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
           O registro direto de pagamento é do plano Solo com um único usuário ativo, e esta empresa tem mais de um. Use a
           confirmação de pagamento do contrato assinado. Nenhum acesso foi suspenso.
