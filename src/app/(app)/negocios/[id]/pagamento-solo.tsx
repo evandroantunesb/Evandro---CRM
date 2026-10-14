@@ -59,6 +59,15 @@ export function PagamentoSolo({
 
       {!ativo && situacao === "permitido" && <FormRegistrar negocioId={negocioId} hoje={hoje} />}
 
+      {!ativo && historico.length > 0 && situacao === "indisponivel" && (
+        <p role="status" className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-700">
+          O registro anterior foi estornado e continua no histórico. Não é possível registrar um novo recebimento pelo
+          fluxo Solo nesta situação. No Pro, confira o <a href="#contrato" className="underline hover:text-zinc-900">contrato</a>:
+          após a assinatura, um admin ou gestor diferente do responsável registrado na assinatura pode usar
+          <strong> Confirmar pagamento</strong> neste cartão.
+        </p>
+      )}
+
       {!ativo && situacao === "varios_usuarios" && (
         <p role="status" className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
           O registro direto de pagamento é do plano Solo com um único usuário ativo, e esta empresa tem mais de um. Use a
