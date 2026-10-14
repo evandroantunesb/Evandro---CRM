@@ -10,9 +10,11 @@
 
 ### A — Contratos e confirmação de venda no Solo
 
-- **Aprovado:** o plano Solo inclui contratos básicos e possibilidade de confirmar o pagamento/encerramento da venda.
-- Continua valendo o fluxo de venda contratada e as condições aprovadas de Pedido; não permitir que a ausência de Obras impeça indevidamente a criação de Pedido.
-- **Não aprovado por implicação:** retirar proteção antifraude da confirmação, autoconfirmar pagamento, alterar causalidade de gamificação ou chamar "confirmação de pagamento" de gateway financeiro. O que é "contrato básico" versus recurso avançado precisa de descrição objetiva.
+- **Aprovado:** o plano Solo inclui contratos básicos e todo o fluxo comercial em autonomia de **um único administrador**: criar/editar leads, fechar negócio como **ganho**, registrar manualmente **pago/recebido**, gerar proposta e gerar contrato, sem validação por segundo administrador ou aprovação adicional.
+- **Aprovado posteriormente, de modo explícito:** no **Solo**, o mesmo administrador que realizou a venda pode marcar **pago** diretamente, mesmo **antes de criar ou assinar contrato**. Marcar pago já é o registro da ação comercial; **não solicitar uma segunda confirmação do mesmo recebimento**. Ele pode gerar o contrato **quando precisar**, antes ou depois de marcar ganho/pago. As ações de marcar ganho, pago e gerar contrato **não têm ordem fixa** entre si.
+- A ação de marcar **pago** é um **registro manual** informado pelo administrador; não deve fingir conciliação bancária nem depender de atendente Raion. Preservar autoria, momento, histórico e correção/estorno auditável, sem exigir outra pessoa. A proteção de isolamento por empresa e RLS continua obrigatória.
+- **D1–D12 preservadas:** a geração automática do **Pedido** (e, se aplicável, da Obra) continua aguardando **negócio ganho + contrato assinado + pagamento registrado**, ainda que o pagamento tenha sido lançado antes da geração/assinatura do contrato. **Contrato gerado não é sinônimo de contrato assinado.** Não criar Pedido/Obra antecipadamente apenas por ganho+pago.
+- **Pro com equipe:** mantém separação de funções e validações por papel já estabelecidas; nenhuma permissão do Solo revoga controles do Pro. Não fabricar um segundo ator, duplicar confirmação ou produzir evento/pontuação artificial para acomodar o Solo. O significado de "contrato básico" frente a recursos avançados ainda precisa ser fechado.
 
 ### B — Calculadora solar: mesmo motor em Solo e Pro
 
@@ -39,7 +41,7 @@
 | --- | --- | --- | --- |
 | Usuários ativos | Exatamente 1 administrador, demais vínculos suspensos na empresa após downgrade | Múltiplos conforme contratação | D19 revisada |
 | Leads e propostas | Incluídos | Incluídos | D19 revisada |
-| Contratos básicos e confirmação de venda | Incluídos | Incluídos | Escolha A |
+| Contratos básicos e registro de venda/pagamento | Admin único pode marcar ganho e pago sem segundo aprovador, gerando contrato quando necessário | Papéis/validações por equipe | Escolha A e detalhamento Solo posterior |
 | Motor da calculadora solar | Mesmo motor técnico | Mesmo motor técnico | Escolha B |
 | Pedido depois da venda concluída | Criado quando os eventos contratuais/comerciais definidos ocorrerem | Idem | D1–D12; condicionado aos marcos do negócio, nunca à compra de Obras |
 | Novas Obras | Não disponíveis se o módulo não estiver habilitado | Dependem do módulo opcional habilitado e do escopo contratado | D3–D5, D19 |
@@ -58,7 +60,9 @@ A migration `supabase/migrations/20261001250000_gamificacao_pagamento_confirmado
 
 **Consequência:** a escolha A, **do modo como o código está**, não é plenamente executável neste cenário.
 
-**Pendente de solução aprovada:** desenhar um fluxo de confirmação do Solo com validação e auditoria adequadas, preservando antifraude, imutabilidade, beneficiário e sem gerar pontuação artificial. Separar corretamente "recebimento declarado" de "validação independente" se necessário. **Não** simplesmente remover a trava SQL, inventar segundo usuário nem liberar autoconfirmação no fluxo atual.
+**Decisão de produto posterior (resolvida):** no Solo, não haverá confirmação por outro administrador. O único admin pode marcar ganho/pago diretamente e gerar o contrato antes ou depois do lançamento, sem precisar de contrato assinado para **registrar pagamento**.
+
+**Pendência técnica real:** o modelo atual só confirma pagamento de **contrato já assinado**, exige beneficiário e ator diferentes e o vínculo é pelo **ID do contrato**. É necessário projetar um **registro manual de pagamento no nível do negócio para o Solo** (ou solução funcional equivalente), reconciliável com contrato gerado/assinado posteriormente e com o gatilho de Pedido/Obra. A ação do Solo não deve forjar evento `pagamento.confirmado` com ator e beneficiário iguais nem enfraquecer a constraint ou a proteção antifraude do Pro. Preservar estorno/correção, idempotência, histórico e auditoria, sem segunda aprovação humana.
 
 ### Bloqueio 2 — "Assumir" Obra como administrador × vínculo operacional
 
@@ -73,6 +77,8 @@ Na migration `supabase/migrations/20261008100000_obras_escrita_operacao.sql`, `a
 - **C × D5/D23:** a regra geral "histórico somente consulta/exportação" não bloqueia o trabalho necessário para terminar Obras existentes.
 - **C × D17/RLS/PII:** exportação requer escopo de dados autorizado, jamais um dump bruto de tabelas/snapshots com dados de outros setores/empresas.
 - **A × D20:** contratos básicos não dispensam autorização, justificativa e registro do acordo se o escopo mudar depois da assinatura.
+- **Solo × D1–D12:** marcar pago antes do contrato é permitido; gerar Pedido/Obra ainda exige os três marcos atuais (ganho, contrato **assinado**, pagamento registrado). Nenhum bloqueio comercial artificial antes dessa etapa.
+- **Solo × Pro/antifraude:** a dispensa de segunda aprovação é **específica do Solo**; a validação existente do Pro não deve ser eliminada indiscriminadamente.
 - **B × PR #101:** motor único não equivale a aprovação de migrations pendentes ou catálogo ainda não integrado.
 - **D × D19:** conservar só um admin ativo significa suspender acessos dos demais **na empresa**, sem apagar contas globais nem alterar vínculos em outras empresas.
 - **D21/D22:** simulador e aceite de downgrade devem refletir estes impactos reais e revalidá-los antes da efetivação.
@@ -80,7 +86,7 @@ Na migration `supabase/migrations/20261008100000_obras_escrita_operacao.sql`, `a
 ## 4. Pendências antes de autorizar implementação
 
 **Bloqueantes para implementação funcional Solo/Pro:**
-1. Resolver a confirmação de pagamento de uma venda cujo único admin é também o vendedor/beneficiário (antifraude e gamificação).
+1. **Implementar tecnicamente a decisão Solo já aprovada:** registrar ganho e pago independentemente de contrato, com único admin, sem dupla confirmação, mantendo integridade/auditoria, reconciliando com contrato assinado posteriormente, Pedido/Obra e sem eventos de gamificação artificiais. Não reutilizar a RPC atual sem revisão de suas pré-condições/constraints.
 2. Desenhar atribuição/continuidade de Obras do Solo quando responsável anterior for suspenso, sem violar RLS/participações.
 3. Definir o significado e alcance de **contrato básico**, incluindo funcionalidades e limites relativos ao Pro.
 4. Completar a matriz de demais recursos/limites/módulos para que o motor de entitlements e o aviso de perdas não trabalhem com suposições.
