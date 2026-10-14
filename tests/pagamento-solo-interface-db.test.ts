@@ -86,12 +86,12 @@ describe("visão de vendas lê o registro manual", () => {
     await soloAdmin.cliente.rpc("registrar_pagamento_negocio", { p_negocio_id: negocioId });
 
     const cliente = soloAdmin.cliente as unknown as SupabaseServidor;
-    const linha = (await carregarLinhasVenda(cliente, solo.id)).find((l) => l.negocioId === negocioId)!;
+    const linha = (await carregarLinhasVenda(cliente, solo.id)).linhas.find((l) => l.negocioId === negocioId)!;
     expect(linha.contrato).toBe("rascunho");
     expect(linha.pagamento).toBe("registrado");
 
     await soloAdmin.cliente.rpc("estornar_registro_pagamento", { p_negocio_id: negocioId, p_motivo: "teste" });
-    const depois = (await carregarLinhasVenda(cliente, solo.id)).find((l) => l.negocioId === negocioId)!;
+    const depois = (await carregarLinhasVenda(cliente, solo.id)).linhas.find((l) => l.negocioId === negocioId)!;
     expect(depois.pagamento).toBeNull();
   });
 });

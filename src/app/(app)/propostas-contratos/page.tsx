@@ -47,7 +47,7 @@ export default async function PropostasContratos({ searchParams }: PageProps<"/p
   const visao: VisaoVenda = umDe(VISOES_VENDA, texto("visao")) ?? "propostas";
 
   const supabase = await criarClienteServidor();
-  const [config, linhas, equipesRes] = await Promise.all([
+  const [config, { linhas, registroManualIndisponivel }, equipesRes] = await Promise.all([
     carregarConfiguracao(atual.empresaId),
     carregarLinhasVenda(supabase, atual.empresaId),
     veEquipe
@@ -111,6 +111,12 @@ export default async function PropostasContratos({ searchParams }: PageProps<"/p
           </Link>
         )}
       </div>
+
+      {registroManualIndisponivel && (
+        <p className="text-xs text-zinc-500" role="status">
+          Registro manual de pagamento temporariamente indisponível: a situação de pagamento mostra só as confirmações do contrato.
+        </p>
+      )}
 
       <nav className="flex gap-1 border-b border-zinc-200" aria-label="Visão">
         {VISOES_VENDA.map((v) => (

@@ -1,3 +1,4 @@
+import { avisarSchemaAusente, tabelaAusente } from "@/lib/schema-ausente";
 import type { SupabaseServidor } from "@/lib/supabase/server";
 import type { StatusContrato, StatusPagamentoContrato } from "@/lib/tipos";
 
@@ -186,7 +187,13 @@ function emLotes<T>(itens: readonly T[]): T[][] {
 }
 
 /** Monta as linhas a partir das tabelas existentes (todas sob RLS). Ordena por última movimentação. */
-export async function carregarLinhasVenda(supabase: SupabaseServidor, empresaId: string): Promise<LinhaVenda[]> {
+export type LinhasVenda = {
+  linhas: LinhaVenda[];
+  /** true quando `registros_pagamento` ainda não existe no banco: o pagamento do Pro segue normal, mas o registro manual não foi lido. */
+  registroManualIndisponivel: boolean;
+};
+
+export async function carregarLinhasVenda(supabase: SupabaseServidor, empresaId: string): Promise<LinhasVenda> {
   const [propostasRes, contratosRes] = await Promise.all([
     supabase.from("propostas").select("id, negocio_id, updated_at").eq("empresa_id", empresaId),
     supabase.from("contratos").select("id, negocio_id, status, updated_at").eq("empresa_id", empresaId),
@@ -197,7 +204,7 @@ export async function carregarLinhasVenda(supabase: SupabaseServidor, empresaId:
   const contratos = contratosRes.data ?? [];
 
   const negocioIds = [...new Set([...propostas.map((p) => p.negocio_id), ...contratos.map((c) => c.negocio_id)])];
-  if (negocioIds.length === 0) return [];
+  if (negocioIds.length === 0) return { linhas: [], registroManualIndisponivel: false };
   const propostaIds = propostas.map((p) => p.id);
   const contratoIds = contratos.map((c) => c.id);
 
@@ -220,7 +227,14 @@ export async function carregarLinhasVenda(supabase: SupabaseServidor, empresaId:
       ),
     ),
   ]);
-  for (const r of [...negocios, ...aberturas, ...confirmacoes, ...registros]) if (r.error) throw r.error;
+  for (const r of [...negocios, ...aberturas, ...confirmacoes]) if (r.error) throw r.error;
+  // Só "a tabela nova ainda não existe" vira fallback; qualquer outro erro continua estourando.
+  const erroRegistros = registros.find((r) => r.error)?.error;
+  const registroManualIndisponivel = !!erroRegistros && tabelaAusente(erroRegistros, "registros_pagamento");
+  if (erroRegistros) {
+    if (!registroManualIndisponivel) throw erroRegistros;
+    avisarSchemaAusente("registros_pagamento", erroRegistros);
+  }
 
   const propostaPorNegocio = new Map(propostas.map((p) => [p.negocio_id, p]));
   const contratoPorNegocio = new Map(contratos.map((c) => [c.negocio_id, c]));
@@ -237,7 +251,7 @@ export async function carregarLinhasVenda(supabase: SupabaseServidor, empresaId:
     confirmacoesPorContrato.set(c.contrato_id, [...(confirmacoesPorContrato.get(c.contrato_id) ?? []), c]);
   }
 
-  return negocios
+  const linhas = negocios
     .flatMap((r) => r.data ?? [])
     .map((n): LinhaVenda => {
       const proposta = propostaPorNegocio.get(n.id);
@@ -271,6 +285,7 @@ export async function carregarLinhasVenda(supabase: SupabaseServidor, empresaId:
       };
     })
     .sort((a, b) => new Date(b.ultimaMovimentacao).getTime() - new Date(a.ultimaMovimentacao).getTime());
+  return { linhas, registroManualIndisponivel };
 }
 
 /*

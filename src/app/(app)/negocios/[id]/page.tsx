@@ -14,6 +14,7 @@ import { hojeEmSaoPaulo } from "@/lib/formatacao";
 import { descreverAtividade } from "@/lib/linha-do-tempo";
 import { exigirPapel } from "@/lib/sessao";
 import { ATRIBUIR_TAREFA_A_OUTROS, EDITAR_VALOR_NEGOCIO, ESCOLHER_RESPONSAVEL_NEGOCIO, NEGOCIOS, PAGAMENTO_SOLO, PROPOSTA_E_CONTRATO, RESPONSAVEL_COMERCIAL, pode } from "@/lib/permissoes";
+import { avisarSchemaAusente, funcaoAusente, tabelaAusente } from "@/lib/schema-ausente";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { cartaoFechamento } from "@/lib/venda";
 import {
@@ -139,7 +140,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
   // Registro manual de pagamento do Solo (PR #186): por negócio, pode existir sem contrato. Só para
   // quem já vê contrato e pagamento; o SDR continua sem esses dados.
   const veContratoEPagamento = pode(atual.papel, PROPOSTA_E_CONTRATO);
-  const [{ data: registrosPagamento }, { data: situacaoRegistro }] = veContratoEPagamento
+  const [registrosRes, situacaoRes] = veContratoEPagamento
     ? await Promise.all([
         supabase
           .from("registros_pagamento")
@@ -148,8 +149,21 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
           .order("registrado_em", { ascending: false }),
         supabase.rpc("situacao_registro_pagamento", { p_negocio_id: id }),
       ])
-    : [{ data: null }, { data: null }];
-  const situacaoPagamentoSolo = (situacaoRegistro ?? "indisponivel") as SituacaoRegistro;
+    : [null, null];
+  // Só "tabela/função nova ainda não existe" vira fallback (preview antes da migration); qualquer outro
+  // erro estoura em vez de virar "nenhum pagamento".
+  const registroManualIndisponivel =
+    tabelaAusente(registrosRes?.error, "registros_pagamento") || funcaoAusente(situacaoRes?.error, "situacao_registro_pagamento");
+  for (const [res, ausente, objeto] of [
+    [registrosRes, tabelaAusente(registrosRes?.error, "registros_pagamento"), "registros_pagamento"],
+    [situacaoRes, funcaoAusente(situacaoRes?.error, "situacao_registro_pagamento"), "situacao_registro_pagamento"],
+  ] as const) {
+    if (!res?.error) continue;
+    if (!ausente) throw res.error;
+    avisarSchemaAusente(objeto, res.error);
+  }
+  const registrosPagamento = registrosRes?.data ?? null;
+  const situacaoPagamentoSolo = (registroManualIndisponivel ? "indisponivel" : (situacaoRes?.data ?? "indisponivel")) as SituacaoRegistro;
   const registroPagamentoAtivo = (registrosPagamento ?? []).some((r) => r.estornado_em == null);
   // Cartão do Solo: quando dá para registrar, quando o banco explica por que não dá, ou quando há histórico.
   const mostrarPagamentoSolo = veContratoEPagamento && ((registrosPagamento ?? []).length > 0 || situacaoPagamentoSolo !== "indisponivel");
@@ -493,6 +507,11 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
             <div id="pagamento" className="scroll-mt-4">
               <Cartao titulo="Pagamento">
                 <div className="flex flex-col gap-4">
+                  {registroManualIndisponivel && (
+                    <p className="text-xs text-zinc-500" role="status">
+                      Registro manual de pagamento temporariamente indisponível.
+                    </p>
+                  )}
                   {mostrarPagamentoSolo && (
                     <PagamentoSolo
                       negocioId={negocio.id}
