@@ -1,20 +1,22 @@
-name: Backup PostgreSQL para Backblaze B2 (manual)
+name: Backup PostgreSQL para Backblaze B2 (manual e diario)
 
-# Primeira fase: somente disparo manual na main.
-# NÃO executar automaticamente, nem em push/PR, até backup e RESTAURAÇÃO serem validados.
-# O workflow lê o banco e envia os dumps ao B2; não executa SQL de escrita.
+# O agendamento é ativado SOMENTE após aprovar a PR e habilitar 3 variáveis do repositório:
+# BACKUP_DIARIO_HABILITADO=true, BACKUP_RETENCAO_VERIFICADA=true e BACKUP_ALERTAS_VERIFICADOS=true.
+# O disparo manual continua exigindo confirmação; a leitura não altera produção.
 on:
+  schedule:
+    - cron: "23 3 * * *" # UTC; pode atrasar ou ser descartado pelo GitHub
   workflow_dispatch:
     inputs:
       confirmacao:
-        description: "Para exportar produção e enviar ao B2, digite iniciar-backup"
+        description: "Para executar o backup manual, digite iniciar-backup"
         required: true
         type: string
 
 permissions: {}
 
 concurrency:
-  group: backup-producao
+  group: backup-postgres-producao
   cancel-in-progress: false
 
 jobs:
@@ -22,24 +24,52 @@ jobs:
     name: Validar autorização e origem (sem secrets)
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    outputs:
+      autorizado: ${{ steps.permissao.outputs.autorizado }}
     steps:
-      - name: Conferir repository, branch e confirmação
+      - name: Conferir repositório, branch e modalidade de execução
+        id: permissao
         env:
           CONFIRMACAO: ${{ inputs.confirmacao }}
+          BACKUP_DIARIO_HABILITADO: ${{ vars.BACKUP_DIARIO_HABILITADO }}
+          RETENCAO_VERIFICADA: ${{ vars.BACKUP_RETENCAO_VERIFICADA }}
+          ALERTAS_VERIFICADOS: ${{ vars.BACKUP_ALERTAS_VERIFICADOS }}
         run: |
           set -euo pipefail
           if [[ "$GITHUB_REPOSITORY" != "evandroantunesb/Evandro---CRM" || "$GITHUB_REF" != "refs/heads/main" ]]; then
-            echo "::error::Backup permitido somente no repositório esperado e na branch main"
+            echo "::error::Backup permitido apenas no repositório aprovado e na branch main"
             exit 1
           fi
-          if [[ "$CONFIRMACAO" != "iniciar-backup" ]]; then
-            echo "::error::Confirmação inválida; nenhuma credencial foi acessada"
-            exit 1
-          fi
+
+          case "$GITHUB_EVENT_NAME" in
+            workflow_dispatch)
+              if [[ "$CONFIRMACAO" != "iniciar-backup" ]]; then
+                echo "::error::Confirmação manual inválida; nenhum secret foi acessado"
+                exit 1
+              fi
+              ;;
+            schedule)
+              if [[ "$BACKUP_DIARIO_HABILITADO" != "true" || "$RETENCAO_VERIFICADA" != "true" || "$ALERTAS_VERIFICADOS" != "true" ]]; then
+                echo "autorizado=false" >> "$GITHUB_OUTPUT"
+                {
+                  echo "### Backup diário não habilitado"
+                  echo "Execução agendada ignorada até confirmação explícita das três variáveis de segurança."
+                  echo "Nenhum acesso ao Supabase ou Backblaze foi realizado."
+                } >> "$GITHUB_STEP_SUMMARY"
+                exit 0
+              fi
+              ;;
+            *)
+              echo "::error::Evento de execução não autorizado"
+              exit 1
+              ;;
+          esac
+          echo "autorizado=true" >> "$GITHUB_OUTPUT"
 
   backup:
     name: Exportar PostgreSQL e armazenar no B2
     needs: validar
+    if: needs.validar.outputs.autorizado == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     environment: backup-producao
@@ -133,3 +163,26 @@ jobs:
             echo "baixar o arquivo, validar o hash e restaurar em banco isolado."
             echo "Escopo: dumps lógicos Supabase; objetos físicos do Storage não estão incluídos."
           } >> "$GITHUB_STEP_SUMMARY"
+
+  alertar_falha:
+    name: Registrar falha em Issues (sem credenciais do Supabase/B2)
+    needs: [validar, backup]
+    if: ${{ always() && ((needs.validar.outputs.autorizado == 'true' && needs.backup.result == 'failure') || (github.event_name == 'schedule' && needs.validar.result == 'failure')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+      - name: Criar ou atualizar alerta do backup
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          STATUS_VALIDACAO: ${{ needs.validar.result }}
+          STATUS_BACKUP: ${{ needs.backup.result }}
+        run: node .github/scripts/alertar-falha-backup.mjs postgres
