@@ -423,3 +423,126 @@ describe("Pro intacto e um pagamento por negócio", () => {
     expect(error?.message).toContain("já tem pagamento confirmado");
   });
 });
+
+describe("Retificação de registro Solo depois do upgrade (decisão da PR #186)", () => {
+  // Empresa que nasceu Solo, registrou pagamento e virou Pro com equipe.
+  async function cenarioUpgrade(nome: string) {
+    const [admin, gestor, vendedor] = await Promise.all([`${nome}-admin`, `${nome}-gestor`, `${nome}-vend`].map(criarUsuario));
+    const emp = await criarEmpresa(nome, "solo", [{ u: admin, papel: "admin" }]);
+    const negocioId = await criarNegocio(emp, `Venda ${nome}`, admin);
+    const { data: original } = await registrar(admin, negocioId, { p_data_recebimento: "2026-10-01" });
+    await servico.from("planos_empresa").update({ produto: "pro" }).eq("empresa_id", emp.id);
+    const { data: vs } = await servico
+      .from("empresa_membros")
+      .insert([{ empresa_id: emp.id, user_id: gestor.id, papel: "gestor" }, { empresa_id: emp.id, user_id: vendedor.id, papel: "vendedor" }])
+      .select("id, user_id");
+    for (const v of vs!) membro[`${emp.id}:${v.user_id}`] = v.id;
+    // Gestor vê o negócio pela equipe: a recusa dele tem de vir do papel, não da visibilidade.
+    const { data: equipe } = await servico.from("equipes").insert({ empresa_id: emp.id, nome: `Equipe ${nome}` }).select("id").single();
+    await servico.from("equipe_membros").insert([
+      { empresa_id: emp.id, equipe_id: equipe!.id, membro_id: membroDe(emp, gestor), e_gestor: true },
+      { empresa_id: emp.id, equipe_id: equipe!.id, membro_id: membroDe(emp, admin), e_gestor: false },
+    ]);
+    return { admin, gestor, vendedor, emp, negocioId, originalId: original!.id };
+  }
+
+  async function contarEventos(negocioId: string) {
+    const { count } = await servico.from("eventos").select("id", { count: "exact", head: true }).eq("entidade_id", negocioId);
+    return count ?? 0;
+  }
+
+  it("após upgrade, admin corrige data/observação: uma linha ativa, cadeia preservada, sem eventos", async () => {
+    const c = await cenarioUpgrade("ret-corrige");
+    const eventosAntes = await contarEventos(c.negocioId);
+    const { data, error } = await c.admin.cliente.rpc("corrigir_registro_pagamento", {
+      p_negocio_id: c.negocioId,
+      p_data_recebimento: "2026-09-28",
+      p_observacao: "Pix do dia 28",
+      p_motivo: "Data informada errada",
+    });
+    expect(error).toBeNull();
+    expect(data!.substitui_id).toBe(c.originalId);
+    expect(data!.data_recebimento).toBe("2026-09-28");
+    expect(data!.modalidade).toBe("solo_autonomo");
+    expect(data!.registrado_por_user_id).toBe(c.admin.id);
+
+    const regs = await registrosDo(c.negocioId);
+    expect(regs.filter((r) => r.estornado_em == null)).toHaveLength(1);
+    const original = regs.find((r) => r.id === c.originalId)!;
+    expect(original.motivo_estorno).toBe("Data informada errada");
+    expect(original.data_recebimento).toBe("2026-10-01");
+    expect(await contarEventos(c.negocioId)).toBe(eventosAntes);
+  });
+
+  it("após upgrade, admin estorna; depois não consegue registrar novo pagamento pelo caminho do Solo", async () => {
+    const c = await cenarioUpgrade("ret-estorna");
+    const eventosAntes = await contarEventos(c.negocioId);
+    const { error } = await c.admin.cliente.rpc("estornar_registro_pagamento", { p_negocio_id: c.negocioId, p_motivo: "Cliente desistiu" });
+    expect(error).toBeNull();
+    expect(await contarEventos(c.negocioId)).toBe(eventosAntes);
+
+    const { error: novo } = await registrar(c.admin, c.negocioId);
+    expect(novo?.message).toContain("plano Solo");
+    const { data: pode } = await c.admin.cliente.rpc("pode_registrar_pagamento_negocio", { p_negocio_id: c.negocioId });
+    expect(pode).toBe(false);
+  });
+
+  it("gestor e vendedor da empresa não estornam nem corrigem", async () => {
+    const c = await cenarioUpgrade("ret-papel");
+    for (const u of [c.gestor, c.vendedor]) {
+      const { error: e1 } = await u.cliente.rpc("estornar_registro_pagamento", { p_negocio_id: c.negocioId, p_motivo: "x" });
+      expect(e1?.message).toContain("administrador");
+      const { error: e2 } = await u.cliente.rpc("corrigir_registro_pagamento", { p_negocio_id: c.negocioId, p_data_recebimento: "2026-09-01", p_observacao: "", p_motivo: "x" });
+      expect(e2?.message).toContain("administrador");
+    }
+    expect((await registrosDo(c.negocioId)).filter((r) => r.estornado_em == null)).toHaveLength(1);
+  });
+
+  it("admin de outra empresa não estorna nem corrige", async () => {
+    const c = await cenarioUpgrade("ret-outra");
+    const { error: e1 } = await proAdmin.cliente.rpc("estornar_registro_pagamento", { p_negocio_id: c.negocioId, p_motivo: "x" });
+    expect(e1?.message).toContain("administrador");
+    const { error: e2 } = await proAdmin.cliente.rpc("corrigir_registro_pagamento", { p_negocio_id: c.negocioId, p_data_recebimento: "2026-09-01", p_observacao: "", p_motivo: "x" });
+    expect(e2?.message).toContain("administrador");
+  });
+
+  it("empresa Pro sem registro Solo anterior: correção e estorno recusados, nada é criado", async () => {
+    const negocioId = await criarNegocio(pro, "Pro sem registro", proCloser);
+    const { error: e1 } = await proAdmin.cliente.rpc("corrigir_registro_pagamento", { p_negocio_id: negocioId, p_data_recebimento: "2026-09-01", p_observacao: "", p_motivo: "x" });
+    expect(e1?.message).toContain("Não há pagamento registrado");
+    const { error: e2 } = await proAdmin.cliente.rpc("estornar_registro_pagamento", { p_negocio_id: negocioId, p_motivo: "x" });
+    expect(e2?.message).toContain("Não há pagamento registrado");
+    expect(await registrosDo(negocioId)).toEqual([]);
+  });
+
+  it("correções simultâneas: só uma vale, sem duplicata ativa", async () => {
+    const c = await cenarioUpgrade("ret-concorre");
+    const chamadas = ["2026-09-20", "2026-09-21", "2026-09-22"].map((d) =>
+      c.admin.cliente.rpc("corrigir_registro_pagamento", { p_negocio_id: c.negocioId, p_data_recebimento: d, p_observacao: "", p_motivo: `ajuste ${d}` }),
+    );
+    const resultados = await Promise.all(chamadas);
+    // Cada correção bem-sucedida estorna a ativa anterior; o que importa é nunca haver duas ativas.
+    expect(resultados.filter((r) => r.error == null).length).toBeGreaterThanOrEqual(1);
+    const regs = await registrosDo(c.negocioId);
+    expect(regs.filter((r) => r.estornado_em == null)).toHaveLength(1);
+    // Cadeia íntegra: toda linha nova substitui exatamente uma linha estornada.
+    const substituidos = regs.map((r) => r.substitui_id).filter(Boolean);
+    expect(new Set(substituidos).size).toBe(substituidos.length);
+  });
+
+  it("negócio que virou perdido depois do registro: correção permitida (retificação); registro novo segue bloqueado", async () => {
+    const negocioId = await criarNegocio(solo, "Perdido e corrigido", soloAdmin);
+    await registrar(soloAdmin, negocioId);
+    await marcar(solo, negocioId, "perdido", soloAdmin);
+
+    const { data, error } = await soloAdmin.cliente.rpc("corrigir_registro_pagamento", {
+      p_negocio_id: negocioId, p_data_recebimento: "2026-09-15", p_observacao: "", p_motivo: "Data errada",
+    });
+    expect(error).toBeNull();
+    expect(data!.data_recebimento).toBe("2026-09-15");
+
+    await soloAdmin.cliente.rpc("estornar_registro_pagamento", { p_negocio_id: negocioId, p_motivo: "Venda perdida" });
+    const { error: novo } = await registrar(soloAdmin, negocioId);
+    expect(novo?.message).toContain("perdido");
+  });
+});

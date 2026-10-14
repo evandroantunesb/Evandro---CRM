@@ -27,7 +27,10 @@
 -- - Negócio perdido não recebe registro novo; registro existente não some se o negócio
 --   mudar de status depois (só estorno/correção auditados o encerram).
 -- - Registro feito no Solo continua válido depois de upgrade para Pro, com autor e
---   histórico preservados.
+--   histórico preservados. Estorno e correção (retificação da cadeia de um registro de origem
+--   Solo) ficam com qualquer admin ativo da empresa, em qualquer plano; recebimento NOVO
+--   continua só no Solo autônomo (decisão do Evandro na PR #186). A correção vale também em
+--   negócio que virou perdido depois do registro.
 -- - NÃO liga Pedido/Obra nesta etapa: `garantir_obra` continua exigindo a confirmação do Pro.
 --   O registro passa a contar como marco de pagamento na P1 (Pedido + Obra condicional),
 --   junto com a trava de módulo (M1) e de escopo (E1). Assim nenhuma Obra nasce para Solo
@@ -201,7 +204,9 @@ begin
   if v_data > (now() at time zone 'America/Sao_Paulo')::date then
     raise exception 'A data do recebimento não pode ser futura.' using errcode = 'check_violation', hint = 'mensagem_usuario';
   end if;
-  if p_negocio.status = 'perdido' then
+  -- Perdido barra só recebimento NOVO; a retificação (p_substitui_id preenchido) corrige um
+  -- fato já registrado e é permitida (decisão do Evandro, 2026-10-14).
+  if p_substitui_id is null and p_negocio.status = 'perdido' then
     raise exception 'Negócio perdido: reabra o negócio antes de registrar o pagamento.' using errcode = 'check_violation', hint = 'mensagem_usuario';
   end if;
   if exists (
@@ -275,7 +280,8 @@ begin
   end if;
   select * into v_reg from public.registros_pagamento
     where negocio_id = p_negocio.id and estornado_em is null for update;
-  if not found then
+  -- Só a cadeia de um registro de origem Solo, da mesma empresa do negócio travado.
+  if not found or v_reg.empresa_id <> p_negocio.empresa_id or v_reg.modalidade <> 'solo_autonomo' then
     raise exception 'Não há pagamento registrado para este negócio.' using errcode = 'check_violation', hint = 'mensagem_usuario';
   end if;
 
@@ -292,11 +298,13 @@ begin
 end;
 $$;
 
--- Estornar: qualquer admin ativo que vê o negócio, em qualquer plano (registro feito no Solo
--- continua corrigível depois de upgrade). Não exige o Solo autônomo: desfazer um registro não
--- é a operação incompatível com o Pro.
-create or replace function public.estornar_registro_pagamento(p_negocio_id uuid, p_motivo text)
-returns public.registros_pagamento
+-- Retificação de histórico (estorno e correção): qualquer admin ativo da empresa do negócio,
+-- em qualquer plano — inclusive depois de upgrade Solo → Pro (decisão do Evandro na PR #186).
+-- Não exige o Solo autônomo, porque não inicia recebimento novo: só mexe na cadeia de um
+-- registro de origem Solo que já existe (conferida em `estornar_registro_pagamento_interno`).
+-- Recebimento novo continua só por `registrar_pagamento_negocio` (Solo autônomo).
+create or replace function public.travar_negocio_retificacao(p_negocio_id uuid)
+returns public.negocios
 language plpgsql security definer set search_path = ''
 as $$
 declare
@@ -304,20 +312,32 @@ declare
 begin
   select * into v_negocio from public.negocios where id = p_negocio_id for no key update;
   if not found or not public.pode_ver_negocio(p_negocio_id) or not public.tem_papel(v_negocio.empresa_id, '{admin}') then
-    raise exception 'Só o administrador pode estornar o registro de pagamento.' using errcode = 'insufficient_privilege', hint = 'mensagem_usuario';
+    raise exception 'Só o administrador pode estornar ou corrigir o registro de pagamento.' using errcode = 'insufficient_privilege', hint = 'mensagem_usuario';
   end if;
+  return v_negocio;
+end;
+$$;
+
+create or replace function public.estornar_registro_pagamento(p_negocio_id uuid, p_motivo text)
+returns public.registros_pagamento
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_negocio public.negocios := public.travar_negocio_retificacao(p_negocio_id);
+begin
   return public.estornar_registro_pagamento_interno(v_negocio, public.meu_membro_id(v_negocio.empresa_id), p_motivo, 'pagamento_registro_estornado');
 end;
 $$;
 
--- Corrigir (ex.: data errada): estorna o ativo e registra o novo na mesma transação, ligados
--- por `substitui_id`. Como cria um registro novo, exige o Solo autônomo.
+-- Corrigir (ex.: data errada): estorna o ativo e registra o substituto na mesma transação,
+-- ligados por `substitui_id`. É retificação, não recebimento novo: vale após upgrade e em
+-- negócio que virou perdido depois do registro.
 create or replace function public.corrigir_registro_pagamento(p_negocio_id uuid, p_data_recebimento date, p_observacao text, p_motivo text)
 returns public.registros_pagamento
 language plpgsql security definer set search_path = ''
 as $$
 declare
-  v_negocio public.negocios := public.travar_negocio_solo_autonomo(p_negocio_id);
+  v_negocio public.negocios := public.travar_negocio_retificacao(p_negocio_id);
   v_membro uuid := public.meu_membro_id(v_negocio.empresa_id);
   v_antigo public.registros_pagamento;
 begin
@@ -335,6 +355,7 @@ revoke all on function public.proteger_registro_pagamento() from public, anon, a
 revoke all on function public.recusar_confirmacao_com_registro() from public, anon, authenticated, service_role;
 revoke all on function public.inserir_registro_pagamento(public.negocios, uuid, date, text, uuid) from public, anon, authenticated, service_role;
 revoke all on function public.travar_negocio_solo_autonomo(uuid) from public, anon, authenticated, service_role;
+revoke all on function public.travar_negocio_retificacao(uuid) from public, anon, authenticated, service_role;
 revoke all on function public.estornar_registro_pagamento_interno(public.negocios, uuid, text, text) from public, anon, authenticated, service_role;
 
 revoke all on function public.pode_registrar_pagamento_negocio(uuid) from public, anon;

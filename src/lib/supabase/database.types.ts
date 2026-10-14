@@ -4205,6 +4205,55 @@ export type Database = {
         Args: { p_empresa_id: string; p_papeis: Database["public"]["Enums"]["papel_membro"][] };
         Returns: boolean;
       };
+      travar_negocio_retificacao: {
+        Args: { p_negocio_id: string };
+        Returns: {
+          consumo_medio_kwh: number | null;
+          contato_id: string;
+          created_at: string;
+          criado_por: string | null;
+          descricao: string | null;
+          empresa_id: string;
+          estrutura_telhado: string | null;
+          etapa_desde: string;
+          etapa_id: string;
+          fechado_em: string | null;
+          funil_id: string;
+          handoff_origem_id: string | null;
+          id: string;
+          motivo_perda_detalhe: string | null;
+          motivo_perda_id: string | null;
+          numero: number;
+          origem_id: string | null;
+          padrao_cliente: string | null;
+          qualif_busca_financiamento: boolean | null;
+          qualif_distribuidora: string | null;
+          qualif_e_decisor: boolean | null;
+          qualif_imovel_proprio: boolean | null;
+          qualif_objetivo: string | null;
+          qualif_observacoes: string | null;
+          qualif_orcamento_outra_empresa: boolean | null;
+          qualif_outro_decisor: boolean | null;
+          qualif_participantes_decisao: string | null;
+          qualif_possui_conta_energia: boolean | null;
+          qualif_prazo_instalacao: string | null;
+          qualif_tipo_cliente: string | null;
+          responsavel_id: string | null;
+          status: Database["public"]["Enums"]["status_negocio"];
+          tipo_telhado: string | null;
+          titulo: string;
+          unidade_consumidora: string | null;
+          updated_at: string;
+          valor: number | null;
+          valor_conta_energia: number | null;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "negocios";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       travar_negocio_solo_autonomo: {
         Args: { p_negocio_id: string };
         Returns: {
