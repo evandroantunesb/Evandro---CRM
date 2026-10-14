@@ -10,6 +10,7 @@ import { apagarAnexo } from "@/lib/acoes/anexos";
 import { alternarEtiqueta } from "@/lib/acoes/negocios";
 import { carregarConfiguracao, formatarDataHora, formatarMoeda } from "@/lib/crm";
 import { env } from "@/lib/env";
+import { hojeEmSaoPaulo } from "@/lib/formatacao";
 import { descreverAtividade } from "@/lib/linha-do-tempo";
 import { exigirPapel } from "@/lib/sessao";
 import { ATRIBUIR_TAREFA_A_OUTROS, EDITAR_VALOR_NEGOCIO, ESCOLHER_RESPONSAVEL_NEGOCIO, NEGOCIOS, PROPOSTA_E_CONTRATO, RESPONSAVEL_COMERCIAL, pode } from "@/lib/permissoes";
@@ -36,6 +37,7 @@ import { KitPersonalizado } from "./kit-personalizado";
 import { MarcosVenda } from "./marcos-venda";
 import { NovaNota } from "./nova-nota";
 import { Pagamento } from "./pagamento";
+import { PagamentoSolo, type SituacaoRegistro } from "./pagamento-solo";
 import { Proposta } from "./proposta";
 import { Qualificacao } from "./qualificacao";
 
@@ -134,6 +136,32 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
     ? await supabase.rpc("status_pagamento_contrato", { p_contrato_id: contrato.id })
     : { data: null };
 
+  // Registro manual de pagamento do Solo (PR #186): por negócio, pode existir sem contrato. Só para
+  // quem já vê contrato e pagamento; o SDR continua sem esses dados.
+  const veContratoEPagamento = pode(atual.papel, PROPOSTA_E_CONTRATO);
+  const [{ data: registrosPagamento }, { data: situacaoRegistro }] = veContratoEPagamento
+    ? await Promise.all([
+        supabase
+          .from("registros_pagamento")
+          .select("id, data_recebimento, observacao, registrado_por_membro_id, registrado_em, substitui_id, estornado_em, estornado_por_membro_id, motivo_estorno")
+          .eq("negocio_id", id)
+          .order("registrado_em", { ascending: false }),
+        supabase.rpc("situacao_registro_pagamento", { p_negocio_id: id }),
+      ])
+    : [{ data: null }, { data: null }];
+  const situacaoPagamentoSolo = (situacaoRegistro ?? "indisponivel") as SituacaoRegistro;
+  const registroPagamentoAtivo = (registrosPagamento ?? []).some((r) => r.estornado_em == null);
+  // Cartão do Solo: quando dá para registrar, quando o banco explica por que não dá, ou quando há histórico.
+  const mostrarPagamentoSolo = veContratoEPagamento && ((registrosPagamento ?? []).length > 0 || situacaoPagamentoSolo !== "indisponivel");
+  // Confirmação do Pro: não aparece com registro ativo (o banco recusaria) nem para o admin único do Solo
+  // diante de um contrato só "a confirmar" — no Solo, o caminho é o registro.
+  const mostrarPagamentoPro =
+    veContratoEPagamento &&
+    !!contrato &&
+    !!statusPagamento &&
+    !registroPagamentoAtivo &&
+    !(situacaoPagamentoSolo === "permitido" && statusPagamento === "pendente");
+
   const { data: ultimoHandoff } = await supabase
     .from("handoffs")
     .select("id, para_membro_id, de_membro_id, status, motivo_devolucao, created_at, handoffs_feedback(feedback, autor_id)")
@@ -156,6 +184,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
     negocio: negocio.status,
     contrato: contrato ? (contrato.status as StatusContrato) : "nao_gerado",
     pagamento: (statusPagamento as StatusPagamentoContrato | null) ?? null,
+    registro: mostrarPagamentoSolo ? { ativo: registroPagamentoAtivo, disponivel: situacaoPagamentoSolo === "permitido" } : undefined,
   });
   // Única ação de escrita do cartão (ganho/perdido/reabrir).
   const fechamento = (
@@ -460,15 +489,38 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
               </Cartao>
             </div>
           )}
-          {pode(atual.papel, PROPOSTA_E_CONTRATO) && contrato && statusPagamento && (
+          {(mostrarPagamentoSolo || mostrarPagamentoPro) && (
             <div id="pagamento" className="scroll-mt-4">
               <Cartao titulo="Pagamento">
-                <Pagamento
-                  negocioId={negocio.id}
-                  contratoId={contrato.id}
-                  status={statusPagamento as StatusPagamentoContrato}
-                  podeConfirmar={(souAdmin || atual.papel === "gestor") && contrato.responsavel_assinatura_id !== atual.membroId}
-                />
+                <div className="flex flex-col gap-4">
+                  {mostrarPagamentoSolo && (
+                    <PagamentoSolo
+                      negocioId={negocio.id}
+                      hoje={hojeEmSaoPaulo()}
+                      situacao={situacaoPagamentoSolo}
+                      podeRetificar={souAdmin}
+                      registros={(registrosPagamento ?? []).map((r) => ({
+                        id: r.id,
+                        dataRecebimento: r.data_recebimento,
+                        observacao: r.observacao,
+                        autor: nomes.membro(r.registrado_por_membro_id),
+                        registradoEm: r.registrado_em,
+                        substituiId: r.substitui_id,
+                        estornadoEm: r.estornado_em,
+                        estornadoPor: r.estornado_por_membro_id ? nomes.membro(r.estornado_por_membro_id) : null,
+                        motivoEstorno: r.motivo_estorno,
+                      }))}
+                    />
+                  )}
+                  {mostrarPagamentoPro && contrato && (
+                    <Pagamento
+                      negocioId={negocio.id}
+                      contratoId={contrato.id}
+                      status={statusPagamento as StatusPagamentoContrato}
+                      podeConfirmar={(souAdmin || atual.papel === "gestor") && contrato.responsavel_assinatura_id !== atual.membroId}
+                    />
+                  )}
+                </div>
               </Cartao>
             </div>
           )}

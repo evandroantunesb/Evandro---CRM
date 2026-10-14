@@ -39,6 +39,17 @@ export function formatarDataHora(iso: string) {
   });
 }
 
+/** Hoje no fuso de Brasília, no formato do campo de data ("2026-10-14"). */
+export function hojeEmSaoPaulo(agora = Date.now()) {
+  return new Date(agora).toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+}
+
+/** Data sem hora do banco ("2026-10-01") para "01/10/2026", sem passar por fuso horário. */
+export function formatarDataIso(data: string) {
+  const [ano, mes, dia] = data.split("-");
+  return `${dia}/${mes}/${ano}`;
+}
+
 /** Data e hora curtas para prazos: "hoje 14:00", "amanhã 09:30", "12/10 16:00". */
 export function formatarPrazo(iso: string, agora = Date.now()) {
   const fuso = "America/Sao_Paulo";
