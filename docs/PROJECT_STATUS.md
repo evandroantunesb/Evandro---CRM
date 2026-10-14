@@ -6,6 +6,17 @@ Referência: `main` em `b02e1b0` (merge da PR #165, trava de ambiente) · 77 mig
 
 Histórico: a migration da #139 foi aplicada em produção antes do merge, com autorização explícita; no merge, o workflow Banco de produção #57 retornou `Remote database is up to date` (nada reaplicado). Produção e `main` estão alinhadas. A migration da B1a (#161) também foi aplicada em produção antes do merge, com autorização explícita (`workflow_dispatch` na tag `b1a-migration-5137d22`); no merge, o workflow Banco de produção retornou `Remote database is up to date`.
 
+## Raion Solo — andamento em 2026-10-14
+
+**Nada disto está na `main`. Sem merge, sem migration em produção, sem deploy.** Fontes de decisão: handoff Solo/Pro, D21–D24 e matriz A–D, ainda na branch `docs/decisoes-d21-d24-downgrade-20261014`. D13–D20 não foram localizadas em nenhuma branch.
+
+- **PR #186** (`feature/solo-registro-pagamento`, rascunho, CI verde em `bab6a59`): núcleo no banco. `planos_empresa.produto` (`solo`/`pro`, padrão `pro`); `registros_pagamento` por negócio (insert-only, data do recebimento informada, nunca futura); RPCs `registrar_pagamento_negocio`, `estornar_registro_pagamento`, `corrigir_registro_pagamento`. Solo autônomo = plano `solo` + exatamente 1 vínculo ativo (admin). Registro novo só no Solo; estorno e correção valem para o admin da empresa em qualquer plano, inclusive após upgrade, e em negócio que virou perdido depois. Um pagamento por negócio: a confirmação do Pro e o registro do Solo se excluem por gatilho. Sem `eventos`/`point_ledger`. **Pedido/Obra não são ligados** (entram na P1, com M1 e E1).
+- **PR #188** (`feature/solo-interface-pagamento`, rascunho, empilhada sobre a #186, CI verde em `ef480a3`): cartão Pagamento na ficha do negócio (marcar como pago, estornar, corrigir), marcos da venda e visão de vendas com "registrado", linha do tempo, migration só de leitura `situacao_registro_pagamento`, permissão `PAGAMENTO_SOLO = ["admin"]`. Sem validação em navegador real.
+- **Risco de implantação:** a preview da Vercel usa o banco de produção. Sem as migrations `20261014120000` e `20261014130000` lá, `/propostas-contratos` falha ao ler `registros_pagamento` e o cartão Solo não aparece. Decisão pendente: página tolerante à tabela ausente ou merge só depois das migrations.
+- **Ordem de merge:** #186, aplicação autorizada das migrations, #188.
+- **Pendências comerciais não decididas:** significado de "contrato básico"; matriz completa de recursos e limites Solo/Pro; ciclo de cobrança do downgrade (D24); autoridade do gestor no downgrade (D22); como o admin assume Obras quando a equipe é suspensa; acesso a histórico de módulos indisponíveis.
+- **Demonstração de marketing:** `demonstracao/raion-crm-demonstracao.html` (dados fictícios, ver `demonstracao/LEIAME.md`).
+
 ## Handoff Pedido + Obra — decisões consolidadas em 2026-10-14
 
 **Fonte de decisões de produto aprovada pelo Evandro:** [ADR-PEDIDO-OBRA-MODULO-OPCIONAL-2026-10-14.md](ADR-PEDIDO-OBRA-MODULO-OPCIONAL-2026-10-14.md). **D1–D12 confirmadas; implementação ainda NÃO autorizada.** O Claude realizou somente análises de leitura; nenhum código, migration ou dado de produção foi alterado nesta rodada.
