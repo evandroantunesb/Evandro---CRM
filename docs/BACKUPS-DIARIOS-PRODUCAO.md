@@ -1,14 +1,14 @@
 # Raion CRM — agendamento diário protegido de backups
 
-**Estado desta mudança:** PR para revisão. **Nenhum agendamento foi habilitado**. O mero merge publica os cron jobs, mas eles **ignoram os backups agendados** enquanto as três variáveis de segurança não estiverem definidas como `true`.
+**Estado em 2026-10-14:** workflows e monitoramento externo implantados; o responsável autorizou a ativação diária e confirmou ter definido as três Repository variables como `true`. Esses valores não puderam ser relidos pela integração GitHub; **o primeiro ciclo automático por evento `schedule` ainda NÃO foi comprovado**. Execuções manuais e pings do Healthchecks foram testados.
 
-## Testes já realizados antes desta PR
+## Recuperação e testes já realizados
 
 - Backup lógico PostgreSQL exportado, baixado do Backblaze B2, SHA-256 validado e restaurado em Supabase local isolado. Testes adicionais: 172 usuários/perfis conciliados, 182 FKs sem órfãos, 59 tabelas protegidas por RLS, 153 políticas presentes, papel anônimo sem linhas em `empresas`/`perfis`.
 - Backup de bytes do Supabase Storage exportado, baixado do B2 e recuperado em Storage isolado (`public.ecr.aws/supabase/storage-api:v1.77.0`): 7/7 objetos acessados pela API com HTTP 200 e SHA-256 correto.
 - **Atenção:** os testes não demonstram recuperação integral de todos os serviços do Supabase, nem snapshot simultâneo entre PostgreSQL e Storage.
 
-## Fluxos e horários propostos
+## Fluxos e horários do agendamento diário
 
 | Workflow | Cron UTC | Cascavel/PR (UTC−3) | Duração máxima do job |
 |---|---|---|---|
@@ -19,58 +19,66 @@ O GitHub Actions pode atrasar ou até **descartar execuções agendadas**; cron 
 
 **Disparo manual preservado:** somente `workflow_dispatch` na `main` com `iniciar-backup` ou `iniciar-backup-storage`, independentemente das variáveis do agendamento. Sem gatilho em push ou pull_request. CI de PR não acessa secrets de produção.
 
-## Trava de habilitação
+## Trava de habilitação e controle de produção
 
-Antes de ativar uma rotina diária, é preciso primeiro revisar e mesclar a PR **com autorização**, e depois configurar **as três variáveis no nível do repositório**:
+Os workflows foram incorporados à `main` via PR #173. Uma execução de evento `schedule` só acessa a produção quando **todas** as três variáveis abaixo, no **nível do repositório**, forem exatamente `true`. O responsável confirmou a configuração em 14/10/2026; validar o efeito no primeiro ciclo agendado.
 
-GitHub → Settings → Secrets and variables → Actions → Variables:
-
-| Variável | Valor exigido | Critério para autorização |
+| Variável | Valor exigido | Evidência operacional |
 |---|---|---|
-| `BACKUP_DIARIO_HABILITADO` | `true` | Aprovação explícita do responsável |
-| `BACKUP_RETENCAO_VERIFICADA` | `true` | Política B2 inspecionada, retenção e recuperação histórica definidas |
-| `BACKUP_ALERTAS_VERIFICADOS` | `true` | GitHub Issues/Notificações testadas e responsável designado |
+| `BACKUP_DIARIO_HABILITADO` | `true` | Ativação diária explicitamente autorizada |
+| `BACKUP_RETENCAO_VERIFICADA` | `true` | Object Lock Compliance / 30 dias verificado em novos objetos dos dois tipos |
+| `BACKUP_ALERTAS_VERIFICADOS` | `true` | Simulação de falha + e-mails GitHub e Healthchecks validados |
 
-**Não defina essas variáveis durante a criação/revisão da PR.** Quando alguma delas estiver ausente ou com valor diferente de `true`, cada execução agendada terminará na etapa de autorização, com `backup` **skipped** e resumo "Backup diário não habilitado". Atenção: o workflow pode aparecer verde mesmo sem gerar backup; conferir os **jobs e os objetos novos no B2**, nunca apenas a cor do workflow.
+GitHub → Settings → Secrets and variables → Actions → **Variables** (Repository variables). A integração usada para documentação **não lê os valores atuais dessas variáveis**; não afirmar verificação independente.
 
-Depois de ativar, o job `backup` utiliza o mesmo environment protegido `backup-producao`. **Conferir previamente se o environment exige aprovação manual**: revisores obrigatórios podem impedir execuções realmente automáticas até aprovarem cada job.
+Se alguma delas não for `true`, o job `validar` pode encerrar **verde**, mas marcar `autorizado=false` e pular o job `backup`. **Nunca tomar a cor verde do workflow, sozinha, como prova de que houve backup.** Conferir jobs, B2 e ping.
 
-Desabilitar urgentemente sem alterar código: alterar `BACKUP_DIARIO_HABILITADO` para `false` (o agendamento pode continuar disparando, mas não acessará produção). Isto não cancela uma execução já iniciada; use GitHub Actions → Cancel run se necessário.
+O environment `backup-producao` foi conferido pelo responsável: **Selected branches and tags = apenas `main`**, nenhuma tag e `Required reviewers` desativado; os segredos de acesso à produção e pings ficam nesse environment. O backup manual continua permitido na `main` com confirmação `iniciar-backup` ou `iniciar-backup-storage` (não depende das três variáveis).
 
-## Retenção e imutabilidade Backblaze B2 — pendentes de configuração
+**Pausa emergencial:** mudar `BACKUP_DIARIO_HABILITADO=false` impede novos backups agendados; execução que já iniciou não é cancelada por essa mudança (cancelar manualmente no GitHub Actions se autorizado). Nenhuma alteração de environment, segredo, migração ou retenção é implícita nessa autorização.
 
-**Esta PR NÃO cria, altera nem apaga políticas do bucket, arquivos ou chaves de acesso.** Proposta para aprovar separadamente:
+## Retenção e imutabilidade Backblaze B2
 
-1. Retenção operacional de **no mínimo 30 dias de pontos de recuperação diários** para **ambos** os prefixos `postgres/` e `storage/`, avaliando também recuperação de incidentes descobertos tardiamente.
-2. Revisar no Backblaze B2 a configuração de **Lifecycle Rules** aplicável a chaves novas de backup (nomes únicos por execução). **Somente manter versões anteriores por 30 dias NÃO expira automaticamente objetos com nomes distintos**, portanto usar regra consistente para expiração dos objetos de backup, com testes antes de habilitar exclusão.
-3. Preferir bucket/Object Lock com retenção imutável e chave B2 de backup sem permissão de apagar objetos. Verificar suporte, duração, custos e regras do Backblaze; não presumir que SSE-AES256 fornece imutabilidade.
-4. **Não habilitar exclusão/expiração até confirmar** política no painel e garantir pelo menos um ponto restaurável por dia durante a janela desejada. Proceder com acesso administrativo separado.
-5. Os backups já criados não devem ser modificados nem removidos nesta PR.
+- Bucket `raion-crm-backups` nos prefixos `postgres/` e `storage/`. **Object Lock habilitado com retenção padrão de 30 dias em modo Compliance**.
+- Teste real com dois arquivos de cada tipo (`backup.tar.gz` + `sha256.txt` e `storage.tar.gz` + `sha256.txt`) confirmou a retenção de novos uploads: PostgreSQL [run 38500844122](https://github.com/evandroantunesb/Evandro---CRM/actions/runs/38500844122); Storage [run 38500063581](https://github.com/evandroantunesb/Evandro---CRM/actions/runs/38500063581). No primeiro teste a expiração foi 13/11/2026; verificar individualmente uploads posteriores.
+- **A retenção não protege retroativamente** versões anteriores à regra e **não apaga** os objetos ao expirar. Lifecycle mantém **todas as versões**, sem exclusão automática: monitorar custo e crescimento. Nunca alterar regra, apagar arquivos ou impor lifecycle sem análise de recuperação e autorização específica.
+- Os objetos são enviados com `--sse AES256`, que cifra no armazenamento, mas não substitui Object Lock. Cada upload usa prefixo exclusivo e checksum SHA-256.
 
-**Não marcar `BACKUP_RETENCAO_VERIFICADA=true` até essa revisão externa estar concluída.**
+**Limites:** 30 dias é tempo mínimo de bloqueio de exclusão de cada nova versão, **não** política automática de expiração ou garantia de 30 snapshots completos. PostgreSQL e Storage têm horários diferentes e não formam snapshot transacional; o dump lógico não é PITR nem cópia de todos os serviços da plataforma.
 
 ## Alertas de falha pelo GitHub Issues
 
-O job `alertar_falha` é executado após uma falha do backup autorizado ou falha de validação de execução agendada e usa apenas o `GITHUB_TOKEN` com permissão `issues:write`. O script `.github/scripts/alertar-falha-backup.mjs` cria a issue pública `[Backup Raion] Falha PostgreSQL` ou `[Backup Raion] Falha Storage`; se já houver issue aberta do mesmo tipo, adiciona um comentário com link para a execução. **Nunca inclui caminho/nome de arquivo, chaves ou detalhes sensíveis de produção**. Fechar a issue manualmente só após confirmar recuperação da rotina.
+O job `alertar_falha` usa `GITHUB_TOKEN` com `issues: write`, **sem credenciais do Supabase ou do B2**, para criar Issue pública `[Backup Raion] Falha PostgreSQL` ou `[Backup Raion] Falha Storage`, ou comentar na Issue aberta do mesmo tipo. Não inclui dados de clientes, nomes dos arquivos privados ou segredos. Só fechar a Issue após corrigir a falha e confirmar novo backup útil.
 
-Para que a issue seja um alerta recebido de verdade:
+**Validado:** o responsável ativou **Watch → Custom → Issues** e e-mail nas notificações; Issue produzida pelo `github-actions[bot]` foi recebida. O workflow manual isolado da PR #178 simulou falha: [run 38503323578](https://github.com/evandroantunesb/Evandro---CRM/actions/runs/38503323578), job de falha vermelho de propósito, job de alerta concluído com sucesso, e-mail recebido. Essa simulação não mexeu na produção.
 
-1. Garantir que **Issues** está habilitado e a permissão `issues:write` está disponível aos jobs da Actions.
-2. Uma pessoa responsável deve ativar **Watch → Custom → Issues** no repositório e conferir suas notificações GitHub/e-mail.
-3. **Testar o fluxo de falha de forma controlada e autorizada** antes de marcar `BACKUP_ALERTAS_VERIFICADOS=true`. CI verde não valida envio das notificações.
-4. Verificar separadamente alertas de workflows agendados que **não chegaram a rodar** (GitHub pode atrasar/omitir schedules) e falhas por interrupção do próprio GitHub Actions. O job de Issues, sozinho, não cobre esses casos. Recomenda-se monitor externo de "último backup concluído" a ser especificado em uma etapa futura.
-5. Os resumos de sucesso do Actions **não substituem** monitoramento de execução ou teste periódico de restore.
+**Limite:** se o GitHub Actions deixar de disparar um workflow agendado ou houver interrupção global, pode não haver job `alertar_falha`; o Healthchecks.io complementa essa cobertura.
 
-## Critérios para ativação (somente após aprovação separada)
+## Monitor externo — Healthchecks.io
 
-- [ ] PR revisada e CI aprovada.
-- [ ] Merge autorizado, sem executar produção na própria PR.
-- [ ] Repositório e environment mantidos restritos à `main`, credenciais em environment secrets.
-- [ ] Compatibilidade com revisores obrigatórios do environment conferida.
-- [ ] Retenção no B2 conferida e mecanismo antiexclusão avaliado.
-- [ ] Alertas recebidos e tratamento de falha definido/testado.
-- [ ] Monitoramento de **ausência de execuções** definido.
-- [ ] Responsável autoriza definir as três variáveis de ativação.
-- [ ] Após primeiro ciclo automático, verificar **ambos** os pares `tar.gz`/`sha256.txt` no Backblaze B2 e agendar restauração isolada periódica.
+Monitores criados: `Raion CRM - PostgreSQL` e `Raion CRM - Storage`. Ambos configurados em **Cron UTC idêntico ao respectivo workflow** e `Grace Time` de **3 horas**. Alertas de e-mail ativos em ambos e **envio de e-mail de teste recebido** pelo responsável.
+
+| Monitor | Cron UTC | Limite de atraso aproximado, em Cascavel | Secret no environment `backup-producao` |
+|---|---|---|---|
+| PostgreSQL | `23 3 * * *` | 03h23 | `HEALTHCHECKS_POSTGRES_PING_URL` |
+| Storage | `41 4 * * *` | 04h41 | `HEALTHCHECKS_STORAGE_PING_URL` |
+
+A PR #180 inseriu os pings de sucesso **somente depois** de publicar o arquivo principal e o `sha256.txt` no B2, com comparação de tamanho remoto dos dois. URL deve ter formato oficial `https://hc-ping.com/<uuid>`; jamais versionar, imprimir ou enviar os valores privados. Ping do PostgreSQL confirmado em [run manual 38540411558](https://github.com/evandroantunesb/Evandro---CRM/actions/runs/38540411558) às 06h13 de 14/10/2026 (Cascavel). O monitor Storage recebeu ping às 06h20 no mesmo dia, segundo captura enviada pelo responsável.
+
+Se a chamada ao Healthchecks falhar, o job de backup falha e pode abrir Issue **mesmo com os arquivos já publicados com sucesso no B2**. Nesse caso, conferir primeiro os objetos/checksums antes de repetir a exportação. Os pings não comprovam restauração, consistência de dados ou inviolabilidade futura; alertam sobre ausência de conclusão comunicada.
+
+## Situação de ativação e critérios para encerrar a validação
+
+- [x] Workflows mesclados na `main` com aprovação e CI; proteção de execução manual/agendada.
+- [x] Environment `backup-producao` restrito à `main`, sem revisores obrigatórios; segredos no environment.
+- [x] Recuperação isolada de PostgreSQL (172 usuários/perfis) e de Storage (7/7 objetos) demonstrada.
+- [x] Retenção B2 Object Lock Compliance 30 dias conferida em novos backups de ambos os tipos.
+- [x] Alertas GitHub Issues e falha simulada validados com e-mail.
+- [x] Dois monitores Healthchecks com pings reais e e-mail de teste recebido.
+- [x] Autorização para criar três variáveis `true` de agendamento; **configuração relatada pelo responsável**, sem leitura direta dos valores.
+- [ ] **Primeiro ciclo real `schedule`** em ambos os workflows: conferir que job `backup` rodou (não `skipped`), novos pares `tar.gz`/`sha256.txt` estão no B2, hashes/versões e Object Lock Compliance 30 dias aplicados, e pings dos monitores atualizados no horário.
+- [ ] Definir cadência para novas restaurações isoladas e governança de crescimento/custos do B2, **sem habilitar exclusão automática agora**.
+
+Após cada incidente ou ausência de ping: verificar GitHub Actions, **eventos `schedule`**, destino B2 e retenção individual, revisar Issue e só então resolver. Se houver diferença entre este documento e os arquivos de workflow, **o código da `main` é a fonte da verdade**.
 
 **Migrations de produção:** a inclusão do cron não constitui liberação de migrations, não é cópia completa da plataforma Supabase e não modifica automaticamente políticas de retenção/backups já existentes.

@@ -1,10 +1,25 @@
 # Estado do projeto — Raion CRM
 
-Documento vivo. **Última atualização: 2026-10-10 (horário de Brasília).** Código e GitHub prevalecem sobre este arquivo; ao divergir, corrija aqui. `docs/HANDOFF-CLAUDE-2026-10-06.md` é um retrato de 2026-10-05 e está desatualizado em vários pontos (principalmente a Base Demo).
+Documento vivo. **Atualização da infraestrutura de backups: 2026-10-14 (Brasília).** As demais seções comerciais são principalmente um retrato de 2026-10-10; verifique estados atuais no GitHub antes de agir. Código e GitHub prevalecem sobre este arquivo; ao divergir, corrija aqui. `docs/HANDOFF-CLAUDE-2026-10-06.md` é um retrato de 2026-10-05 e está desatualizado em vários pontos (principalmente a Base Demo).
 
 Referência: `main` em `b02e1b0` (merge da PR #165, trava de ambiente) · 77 migrations em `supabase/migrations/` (última `20261010100000_handoff_pontuacao_aceite.sql`).
 
 Histórico: a migration da #139 foi aplicada em produção antes do merge, com autorização explícita; no merge, o workflow Banco de produção #57 retornou `Remote database is up to date` (nada reaplicado). Produção e `main` estão alinhadas. A migration da B1a (#161) também foi aplicada em produção antes do merge, com autorização explícita (`workflow_dispatch` na tag `b1a-migration-5137d22`); no merge, o workflow Banco de produção retornou `Remote database is up to date`.
+
+## Backups e continuidade operacional — atualização de 2026-10-14
+
+**Situação:** rotinas **diárias habilitadas por autorização do Evandro em 2026-10-14**, segundo confirmação de que as três variáveis do repositório foram definidas como `true` (os valores **não puderam ser relidos via integração GitHub**). **Primeiro ciclo de evento `schedule` ainda NÃO validado**; isso deve ser conferido na madrugada seguinte. Documentação operacional detalhada: [BACKUPS-DIARIOS-PRODUCAO.md](BACKUPS-DIARIOS-PRODUCAO.md).
+
+- **PostgreSQL:** `.github/workflows/backup-producao.yml` — `23 3 * * *` UTC / **00h23 Cascavel (UTC−3)**. Backup lógico Supabase (`roles.sql`, `schema.sql`, `data.sql`, `info.txt`), compactado em `backup.tar.gz`, mais `sha256.txt`. Run manual posterior à integração Healthchecks: [38540411558](https://github.com/evandroantunesb/Evandro---CRM/actions/runs/38540411558), concluído com sucesso em 14/10/2026 às 06h13 de Cascavel.
+- **Storage físico:** `.github/workflows/backup-storage-producao.yml` — `41 4 * * *` UTC / **01h41 Cascavel**. Captura bytes de objetos privados, inventário/manifesto e SHA-256 por objeto; publica `storage.tar.gz` e `sha256.txt`. Run manual [38500063581](https://github.com/evandroantunesb/Evandro---CRM/actions/runs/38500063581) validou novo upload sob Object Lock; após integração Healthchecks, usuário confirmou primeiro ping do Storage às 06h20 de 14/10/2026 (a execução GitHub desse último teste não foi registrada aqui).
+- **Restauração isolada anteriormente comprovada:** dump restaurado num Supabase local completo, com 59 tabelas `public`, 172 pares Auth/perfis, 182 FKs sem órfãos, 59 tabelas com RLS e 153 políticas; objetos físicos do Storage restaurados em ambiente isolado, **7/7 HTTP 200 com SHA-256 válido**. Não é snapshot simultâneo, PITR, nem recuperação integral de toda a plataforma.
+- **Destino B2:** bucket privado `raion-crm-backups`, prefixos `postgres/` e `storage/`. Object Lock **Compliance, retenção padrão de 30 dias** conferida nos **dois arquivos** de novo backup de cada tipo (PostgreSQL: run [38500844122](https://github.com/evandroantunesb/Evandro---CRM/actions/runs/38500844122); Storage: run 38500063581). A regra vale para **novos objetos**, não retroativamente; **não apaga automaticamente** objetos após 30 dias. Lifecycle está em **manter todas as versões**; custos/crescimento e eventual política de expiração segura precisam de projeto separado, **sem deleção agora**.
+- **Alertas GitHub:** `.github/scripts/alertar-falha-backup.mjs` registra Issue em falha. Fluxo de falha simulada e notificação por e-mail validado em [run 38503323578](https://github.com/evandroantunesb/Evandro---CRM/actions/runs/38503323578) (job de falha proposital vermelho, job de alerta verde). Não houve falha de produção nesse teste.
+- **Monitoramento externo Healthchecks.io:** monitores `Raion CRM - PostgreSQL` e `Raion CRM - Storage`, mesmo cron UTC de cada backup e **grace de 3 horas**. Environment secrets `HEALTHCHECKS_POSTGRES_PING_URL` e `HEALTHCHECKS_STORAGE_PING_URL`; **nunca imprimir, colar ou versionar URLs de ping**. Ping somente após upload dos dois arquivos no B2 e confirmação de tamanho; pings manuais validados em ambos, e-mail de teste do Healthchecks recebido. Falhas no ping tornam o job vermelho e acionam o alerta GitHub, mesmo se os arquivos já tiverem sido publicados no B2.
+- **Controle de ativação:** variáveis de **repositório** `BACKUP_DIARIO_HABILITADO`, `BACKUP_RETENCAO_VERIFICADA`, `BACKUP_ALERTAS_VERIFICADOS`, todas relatadas como `true` pelo Evandro. Job de autorização permite execução agendada somente se as três forem literalmente `true`. Environment `backup-producao`: apenas branch `main`, sem required reviewers; secrets de produção no environment. Execuções manuais continuam exigindo confirmação exata. **Não alterar environments, credenciais, retenção nem variáveis sem nova autorização explícita.**
+- **PRs concluídas:** #172 (backup Storage), #173 (agendamento controlado), #174 (resumo do Storage), #176 (notificação bot), #178 (simulação de falha), #180 (Healthchecks). `CLAUDE.md` aponta para este status; ao retomar, consultar também a documentação operacional e o código da `main`.
+
+**PENDENTE antes de considerar a operação recorrente comprovada:** conferir as **duas primeiras execuções disparadas por `schedule`** (não apenas sinal verde do job de validação), os respectivos `tar.gz` + `sha256.txt` no B2, Object Lock Compliance/30 dias e os dois pings no Healthchecks; ajustar incidentes somente com aprovação. Agendar teste periódico de restauração e definir política de armazenamento/custos separadamente. Em emergência, `BACKUP_DIARIO_HABILITADO=false` pausa novos backups agendados (não cancela job já iniciado).
 
 ## Concluído / avançado
 
@@ -61,7 +76,7 @@ Membros fictícios: Lucas Martins, Mariana Costa, Rafael Almeida e Bruno Ferreir
 
 - Motor de dimensionamento real no wizard de 3 etapas + catálogo técnico de equipamentos.
 - **Continua fora da `main`.** 13 migrations pendentes (`20260930150000` … `20261001050000`), com prefixos anteriores a migrations já aplicadas (dependem do `--include-all`).
-- **Depende de backup de produção antes de avançar.** Não há backup automático (PR #62 parada por falta de secrets).
+- **Backups de produção:** novo fluxo de PostgreSQL/Storage foi implantado e ativado por variáveis em 2026-10-14 (ver seção acima), com primeiro ciclo agendado ainda pendente de confirmação. A PR #62 é um fluxo legado distinto; aplicar migrations da #101 continua exigindo autorização própria e revisão específica do risco.
 - Aplicar as migrations **antes** de o app subir: cadastro/edição de equipamento grava `status_tecnico`.
 - PR #101 divergente da `main`: a `main` possui 124 commits que não estão no head da #101, enquanto a #101 mantém 39 commits próprios desde a base comum. Conflito com a `main` em `PROGRESS.md`.
 
@@ -103,7 +118,7 @@ Membros fictícios: Lucas Martins, Mariana Costa, Rafael Almeida e Bruno Ferreir
 ## Próximas prioridades
 
 1. Base Demo (PR #132): revisar e mesclar o script com autorização (a demo já está em produção). Qualquer nova execução exige dry-run antes e autorização específica.
-2. Backup do banco de produção → aplicar as 13 migrations da PR #101 → revisar e mesclar com autorização.
+2. Confirmar o primeiro ciclo de backups agendados e, em etapa separada, reavaliar a aplicação das 13 migrations da PR #101 (somente com autorização específica, revisão técnica e backup recente verificado).
 3. Fechar/decidir as PRs remanescentes (#116, #118, #133, #135, #62, #68, #70, #71, #76).
 4. Consolidar Calculadora + Propostas (CSV real e teste de referência).
 5. Validação visual em navegador real e melhorias de UX.
