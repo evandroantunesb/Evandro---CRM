@@ -166,8 +166,8 @@ jobs:
           {
             echo "### Backup dos bytes do Supabase Storage publicado no Backblaze B2"
             echo
-            echo "- Projeto: `wswpxdmgfdamvqhyztrm`"
-            echo "- Prefixo: `$chave/`"
+            echo "- Projeto: wswpxdmgfdamvqhyztrm"
+            echo "- Prefixo: $chave/"
             echo "- Objetos exportados: $objetos"
             echo "- Bytes originais exportados: $bytes"
             echo "- Bytes compactados no B2: $tamanho_local"
