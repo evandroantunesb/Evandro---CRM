@@ -1,10 +1,20 @@
 # Estado do projeto — Raion CRM
 
-Documento vivo. **Atualização da infraestrutura de backups: 2026-10-14 (Brasília).** As demais seções comerciais são principalmente um retrato de 2026-10-10; verifique estados atuais no GitHub antes de agir. Código e GitHub prevalecem sobre este arquivo; ao divergir, corrija aqui. `docs/HANDOFF-CLAUDE-2026-10-06.md` é um retrato de 2026-10-05 e está desatualizado em vários pontos (principalmente a Base Demo).
+Documento vivo. **Atualizações de backups e arquitetura Pedido + Obra: 2026-10-14 (Brasília).** As demais seções comerciais são principalmente um retrato de 2026-10-10; verifique estados atuais no GitHub antes de agir. Código e GitHub prevalecem sobre este arquivo; ao divergir, corrija aqui. `docs/HANDOFF-CLAUDE-2026-10-06.md` é um retrato de 2026-10-05 e está desatualizado em vários pontos (principalmente a Base Demo).
 
 Referência: `main` em `b02e1b0` (merge da PR #165, trava de ambiente) · 77 migrations em `supabase/migrations/` (última `20261010100000_handoff_pontuacao_aceite.sql`).
 
 Histórico: a migration da #139 foi aplicada em produção antes do merge, com autorização explícita; no merge, o workflow Banco de produção #57 retornou `Remote database is up to date` (nada reaplicado). Produção e `main` estão alinhadas. A migration da B1a (#161) também foi aplicada em produção antes do merge, com autorização explícita (`workflow_dispatch` na tag `b1a-migration-5137d22`); no merge, o workflow Banco de produção retornou `Remote database is up to date`.
+
+## Handoff Pedido + Obra — decisões consolidadas em 2026-10-14
+
+**Fonte de decisões de produto aprovada pelo Evandro:** [ADR-PEDIDO-OBRA-MODULO-OPCIONAL-2026-10-14.md](ADR-PEDIDO-OBRA-MODULO-OPCIONAL-2026-10-14.md). **D1–D12 confirmadas; implementação ainda NÃO autorizada.** O Claude realizou somente análises de leitura; nenhum código, migration ou dado de produção foi alterado nesta rodada.
+
+**Regra:** venda ganha + contrato assinado + pagamento confirmado → Pedido sempre; Obra na mesma transação **somente** com módulo Obras habilitado e escopo contratado `com_execucao`. Módulo opcional por empresa no onboarding, empresas novas começam desligadas; empresas existentes preservam habilitação e histórico. Desativar impede **novas** Obras, mas mantém **edição** das existentes dentro das permissões atuais. Ativar posteriormente não gera Obras antigas automaticamente: admin escolhe Pedidos elegíveis. Gestão e Apresentação são duas vistas da mesma Obra. Acesso SDR ao andamento do Pedido sem finanças; separar custo estimado histórico, orçamento e custo real.
+
+**Próximos passos:** revisão técnica da ADR com Claude **Opus** (somente leitura), reconciliar PR #167/roadmap e definir P0 documental. Migrations M1/E1/P1, backfill e auditoria de produção exigem aprovação específica; primeira validação de backups agendados prevista para **15/10/2026 às 05h45 Cascavel**. A auditoria D10 foi aprovada como requisito, **não como autorização para executar acesso em produção**.
+
+**Migração de estação de trabalho:** no notebook, confirmar `git status`, branch, remotes e fazer `git fetch origin`; nunca apagar trabalho local. Só em worktree limpa e branch `main`, `git pull --ff-only origin main`. `CLAUDE.md` já aponta para este status. A ADR entra na `main` somente depois da revisão e do merge autorizado de sua PR.
 
 ## Backups e continuidade operacional — atualização de 2026-10-14
 
