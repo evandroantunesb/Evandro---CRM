@@ -4,8 +4,17 @@
  * não troca empresa/negócio, não cria contrato já assinado e não escolhe o beneficiário da assinatura;
  * o fluxo legítimo (rascunho -> upsert do texto -> assinatura por UPDATE -> confirmação) segue igual.
  */
+import { Client } from "pg";
 import { beforeAll, describe, expect, it } from "vitest";
 import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
+
+// Conexão direta só no banco local (nunca remoto/produção), para fabricar estado legado.
+const URL_BANCO = process.env.SUPABASE_DB_URL ?? "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
+function urlBancoLocal() {
+  const host = new URL(URL_BANCO).hostname;
+  if (host !== "127.0.0.1" && host !== "localhost") throw new Error(`Teste direto no banco recusado: host "${host}" não é local.`);
+  return URL_BANCO;
+}
 
 type Empresa = { id: string; funil: string; etapa: string; contato: string };
 
@@ -186,5 +195,93 @@ describe("isolamento entre empresas", () => {
     expect(upd.data ?? []).toHaveLength(0);
     const c = await contratoNoBanco(id);
     expect(c).toMatchObject({ empresa_id: A.id, negocio_id: n, conteudo: "Contrato de teste" });
+  });
+});
+
+describe("responsável e perfil da assinatura só pelo congelamento do banco", () => {
+  it("UPDATE dessas colunas pelo cliente é recusado em rascunho e depois de assinado; nada muda", async () => {
+    const n = await criarNegocio(A, "ic-colunas-update", gestorA);
+    const id = await rascunho(gestorA, A, n);
+    const tentativas = [{ responsavel_assinatura_id: m(A, vendedorA) }, { perfil_assinatura: "sdr" as const }];
+    for (const t of tentativas) expect((await gestorA.cliente.from("contratos").update(t).eq("id", id).select("id")).error).not.toBeNull();
+
+    expect((await gestorA.cliente.from("contratos").update({ status: "assinado" }).eq("id", id)).error).toBeNull();
+    const congelado = await contratoNoBanco(id);
+    for (const t of tentativas) expect((await gestorA.cliente.from("contratos").update(t).eq("id", id).select("id")).error).not.toBeNull();
+    expect(await contratoNoBanco(id)).toMatchObject({
+      responsavel_assinatura_id: congelado.responsavel_assinatura_id,
+      perfil_assinatura: congelado.perfil_assinatura,
+    });
+    // O gestor segue sem poder confirmar o que ele mesmo assinou como responsável.
+    expect((await gestorA.cliente.rpc("confirmar_pagamento", { p_contrato_id: id })).error).not.toBeNull();
+    expect((await eventosDo(n)).filter((e) => e.tipo === "pagamento.confirmado")).toHaveLength(0);
+  });
+
+  it("assinar enviando o responsável junto é recusado; assinar só com o status congela o responsável do negócio", async () => {
+    const n = await criarNegocio(A, "ic-assina-com-coluna", vendedorA);
+    const id = await rascunho(vendedorA, A, n);
+    const junto = await vendedorA.cliente.from("contratos").update({ status: "assinado", responsavel_assinatura_id: m(A, gestorA) }).eq("id", id);
+    expect(junto.error).not.toBeNull();
+    expect((await contratoNoBanco(id)).status).toBe("rascunho");
+
+    expect((await vendedorA.cliente.from("contratos").update({ status: "assinado" }).eq("id", id)).error).toBeNull();
+    expect(await contratoNoBanco(id)).toMatchObject({ status: "assinado", responsavel_assinatura_id: m(A, vendedorA), perfil_assinatura: "closer" });
+  });
+
+  it("reassinar (rascunho -> assinado de novo) mantém o responsável congelado da primeira assinatura", async () => {
+    const n = await criarNegocio(A, "ic-reassina", vendedorA);
+    const id = await rascunho(vendedorA, A, n);
+    expect((await vendedorA.cliente.from("contratos").update({ status: "assinado" }).eq("id", id)).error).toBeNull();
+    expect((await vendedorA.cliente.from("contratos").update({ status: "rascunho" }).eq("id", id)).error).toBeNull();
+    expect((await vendedorA.cliente.from("contratos").update({ status: "assinado" }).eq("id", id)).error).toBeNull();
+    expect((await contratoNoBanco(id)).responsavel_assinatura_id).toBe(m(A, vendedorA));
+  });
+});
+
+describe("confirmação e estorno usam a empresa do negócio", () => {
+  // Contrato legado com empresa divergente: fabricado só no banco de teste, com gatilhos e FKs
+  // desligados nesta transação (dado anterior à FK composta).
+  async function contratoLegadoDivergente(negocioId: string) {
+    const banco = new Client({ connectionString: urlBancoLocal() });
+    await banco.connect();
+    try {
+      await banco.query("begin");
+      await banco.query("set local session_replication_role = replica");
+      const { rows } = await banco.query(
+        `insert into public.contratos (empresa_id, negocio_id, conteudo, status, responsavel_assinatura_id, perfil_assinatura)
+         values ($1, $2, 'Contrato legado', 'assinado', $3, 'closer') returning id`,
+        [B.id, negocioId, m(A, vendedorA)],
+      );
+      await banco.query("commit");
+      return rows[0].id as string;
+    } finally {
+      await banco.end();
+    }
+  }
+
+  it("gestor só na empresa do contrato (divergente) não confirma; admin da empresa do negócio confirma e estorna, gravando a empresa do negócio", async () => {
+    const n = await criarNegocio(A, "ic-legado-divergente", vendedorA);
+    const id = await contratoLegadoDivergente(n);
+
+    // `multi` é gestor na B (empresa gravada no contrato), mas vendedor na A (empresa do negócio).
+    expect((await multi.cliente.rpc("confirmar_pagamento", { p_contrato_id: id })).error).not.toBeNull();
+
+    expect((await adminA.cliente.rpc("confirmar_pagamento", { p_contrato_id: id })).error).toBeNull();
+    const { data: conf } = await servico.from("confirmacoes_pagamento").select("empresa_id").eq("contrato_id", id).single();
+    expect(conf!.empresa_id).toBe(A.id);
+    const confirmado = (await servico.from("eventos").select("empresa_id").eq("entidade_id", n).eq("tipo", "pagamento.confirmado")).data!;
+    expect(confirmado).toEqual([{ empresa_id: A.id }]);
+
+    expect((await multi.cliente.rpc("estornar_confirmacao_pagamento", { p_contrato_id: id, p_motivo: "teste" })).error).not.toBeNull();
+    expect((await adminA.cliente.rpc("estornar_confirmacao_pagamento", { p_contrato_id: id, p_motivo: "Estorno de teste" })).error).toBeNull();
+    const estorno = (await servico.from("eventos").select("empresa_id").eq("entidade_id", n).eq("tipo", "pagamento.confirmacao_estornada")).data!;
+    expect(estorno).toEqual([{ empresa_id: A.id }]);
+  });
+
+  it("contrato legado divergente continua aceitando mudança de texto e status (a chave não muda)", async () => {
+    const n = await criarNegocio(A, "ic-legado-edita", vendedorA);
+    const id = await contratoLegadoDivergente(n);
+    expect((await servico.from("contratos").update({ conteudo: "Texto legado revisado" }).eq("id", id)).error).toBeNull();
+    expect((await contratoNoBanco(id)).empresa_id).toBe(B.id);
   });
 });
