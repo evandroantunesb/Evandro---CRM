@@ -3887,6 +3887,7 @@ export type Database = {
         Args: { p_contato_id: string; p_criado_por: string; p_empresa_id: string };
         Returns: boolean;
       };
+      pode_ver_financeiro_negocio: { Args: { p_negocio_id: string }; Returns: boolean };
       pode_ver_negocio: { Args: { p_negocio_id: string }; Returns: boolean };
       pode_ver_obra: { Args: { p_obra_id: string }; Returns: boolean };
       pode_ver_obra_operacao: { Args: { p_obra_id: string }; Returns: boolean };
@@ -3968,6 +3969,7 @@ export type Database = {
         Returns: Database["public"]["Enums"]["status_pagamento_contrato"];
       };
       tem_acesso_comercial: { Args: { p_empresa_id: string }; Returns: boolean };
+      tem_acesso_financeiro: { Args: { p_empresa_id: string }; Returns: boolean };
       tem_papel: {
         Args: { p_empresa_id: string; p_papeis: Database["public"]["Enums"]["papel_membro"][] };
         Returns: boolean;
