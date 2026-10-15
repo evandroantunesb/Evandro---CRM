@@ -65,3 +65,31 @@ join public.handoffs h on h.negocio_id = n.id and h.empresa_id = n.empresa_id an
 where n.handoff_origem_id is null
 group by n.id, n.empresa_id, n.status
 order by n.id;
+
+-- 5) Origem registrada diferente do PRIMEIRO repasse aceito do negócio. `aceitar_handoff()` só
+--    grava a origem no primeiro aceite (coalesce), então a origem esperada é o primeiro repasse
+--    aceito. Também lista quem recebeu bônus de SDR no negócio, para comparar com o SDR do
+--    primeiro repasse. Pode ter explicação legítima (reparo manual, dado anterior à B1a);
+--    conferir caso a caso pelo histórico (`atividades` 'handoff_aceito').
+with primeiro_aceito as (
+  select distinct on (h.negocio_id)
+    h.negocio_id, h.id as handoff_id, h.de_membro_id, h.respondido_em
+  from public.handoffs h
+  join public.negocios n on n.id = h.negocio_id and n.empresa_id = h.empresa_id
+  where h.status = 'aceito'
+  order by h.negocio_id, h.respondido_em nulls last, h.created_at, h.id
+)
+select
+  n.id                    as negocio_id,
+  n.empresa_id,
+  n.handoff_origem_id     as origem_registrada,
+  pa.handoff_id           as primeiro_repasse_aceito,
+  pa.de_membro_id         as sdr_do_primeiro_repasse,
+  (select array_agg(distinct e.beneficiario_id)
+     from public.eventos e
+     where e.entidade_id = n.id and e.tipo in ('handoff.won', 'handoff.contrato_assinado')) as beneficiarios_de_bonus_sdr
+from public.negocios n
+join primeiro_aceito pa on pa.negocio_id = n.id
+where n.handoff_origem_id is not null
+  and n.handoff_origem_id is distinct from pa.handoff_id
+order by n.id;

@@ -2,12 +2,10 @@
 --
 -- `handoff_origem_id` é a referência causal write-once que decide qual SDR recebe os bônus
 -- `handoff.won` (registrar_negocio) e `handoff.contrato_assinado` (registrar_contrato), e qual
--- SDR entra na Obra (garantir_obra). Só `aceitar_handoff()` deveria gravá-la, com
--- `coalesce(handoff_origem_id, v_handoff.id)`. Mas a coluna estava aberta à escrita pela API: o
--- privilégio de tabela de `authenticated` cobre todas as colunas e nenhum gatilho conferia o
--- valor (a FK só exige que o handoff exista).
+-- SDR entra na Obra (garantir_obra). Quem a grava é `aceitar_handoff()`, com
+-- `coalesce(handoff_origem_id, v_handoff.id)`; esta migration garante isso no banco.
 --
--- Regra nova, no banco:
+-- Regra, no banco:
 --   - Papel de API (qualquer papel fora da lista de privilegiados): não grava a coluna — nem no
 --     INSERT, nem trocando, nem anulando. Edição das demais colunas do negócio segue igual.
 --   - Qualquer papel, quando o valor muda para não nulo: o handoff precisa ser DESTE negócio,
@@ -15,8 +13,7 @@
 --     aceito antes de atualizar o negócio).
 --   - Valor já gravado só muda por papel privilegiado (reparo), ainda sujeito à regra acima.
 --
--- Por gatilho, não por REVOKE de coluna: enquanto houver privilégio de tabela, revogar a coluna
--- não tem efeito. Nenhum dado é alterado. A checagem só roda quando a coluna muda, então negócio
+-- Por gatilho, independente de grants de coluna. Nenhum dado é alterado. A checagem só roda quando a coluna muda, então negócio
 -- legado com valor inconsistente continua editável no resto (auditoria SELECT em
 -- docs/auditorias/handoff-origem-divergente.sql).
 
