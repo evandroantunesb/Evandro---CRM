@@ -4202,6 +4202,7 @@ export type Database = {
         Returns: Database["public"]["Enums"]["status_pagamento_contrato"];
       };
       tem_acesso_comercial: { Args: { p_empresa_id: string }; Returns: boolean };
+      tem_acesso_financeiro: { Args: { p_empresa_id: string }; Returns: boolean };
       tem_papel: {
         Args: { p_empresa_id: string; p_papeis: Database["public"]["Enums"]["papel_membro"][] };
         Returns: boolean;
