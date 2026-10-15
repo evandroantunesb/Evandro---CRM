@@ -1,6 +1,6 @@
 # Roadmap de produto — Raion CRM
 
-Visão consolidada do produto. **Última atualização: 2026-10-06.** Percentuais são estimativas aproximadas para orientar prioridade, não medições. Estado detalhado e PRs em `docs/PROJECT_STATUS.md`.
+Visão consolidada do produto. **Última atualização do escopo de Obras: 2026-10-13.** Os percentuais e demais estados da tabela são estimativas anteriores e precisam de revisão para refletir todas as entregas recentes. Percentuais são estimativas aproximadas para orientar prioridade, não medições. Estado detalhado e PRs em `docs/PROJECT_STATUS.md`.
 
 Legenda da coluna Situação: **produção** = mesclado na `main` e em produção · **branch** = implementado em PR ainda não mesclada (não está na `main` nem em produção) · **—** = roadmap, não iniciado ou só esboçado.
 
@@ -79,6 +79,51 @@ Etapas e registros previstos:
 - timeline/auditoria.
 
 Frentes paralelas: **Engenharia**, **Material**, **Instalação**, **Vistoria** e **Entrega**.
+
+
+### Obras — modos Gestão e Apresentação (escopo aprovado em 2026-10-13)
+
+**Objetivo:** acompanhar a mesma obra em modo operacional (**Gestão**) e modo executivo, limpo, para reunião diária (**Apresentação**). O mockup de Apresentação aprovado em conversa é referência conceitual: poucos elementos, menos cores, indicadores sucintos, cronograma Gantt estilo construtoras e resumo financeiro. Não representa dados reais nem funcionalidade já entregue.
+
+**Disponibilidade da obra e do relatório**
+- Ao concluir a venda com **negócio ganho, contrato assinado e pagamento confirmado**, a obra deve ficar disponível, junto com os dois modos de visualização, mesmo antes de haver orçamento, prazos e execução informados.
+- Auditar previamente o fluxo atual de geração de obra, Pedido e gatilhos de pagamento/contrato (incluindo a função garantir_obra); preservar idempotência e evitar obras duplicadas.
+- Dados inexistentes aparecem como **“a definir”**, **“não informado”** ou **“sem orçamento”** — nunca simular números como se fossem reais.
+
+**Listagem e navegação por várias obras**
+- Na listagem de Obras, oferecer entradas claras para **Gestão** e **Apresentação**, por obra e/ou como modo de abertura do conjunto filtrado.
+- Em **ambos os modos**, navegar sem voltar à listagem: botões **Anterior / Próxima**, indicador **“Obra X de N”**, seletor para saltar diretamente à obra.
+- Preservar filtros e ordenação da lista (status, equipe/responsável, pesquisa etc.), incluindo tratamento de obra removida ou sem acesso entre navegações.
+- No desktop: teclado e opção de tela cheia (principalmente na Apresentação). No celular: controles grandes e possibilidade de gesto horizontal sem atrapalhar o scroll.
+- Revalidar autorização no servidor a cada transição: nunca listar ou revelar dados de obras de outra empresa ou fora do escopo do usuário.
+
+**Modo Gestão — OPR 3**
+- Aproveitar o detalhe de Obras atual, com resumo, setores, participantes, marcos, dados técnicos permitidos e histórico.
+- Colocar operações próximas dos dados correspondentes usando **exclusivamente as RPCs já existentes**: alterar_status_fluxo_obra, marcar_parado_fluxo_obra, definir_aguardando_fluxo_obra, atualizar_marco_obra, atribuir_participante_obra e encerrar_participante_obra.
+- Respeitar rigorosamente a autorização das RPCs: admin, coordenador do setor e executor ativo conforme regras efetivas do banco; não conceder escrita ao gestor/vendedor/SDR por conveniência de interface.
+- Motivos obrigatórios quando exigidos pelo banco, confirmação de operações sensíveis, tratamento explícito de erro e atualização da página após sucesso; sem escrita direta nas tabelas.
+- Layout responsivo para desktop, tablet e celular.
+
+**Modo Apresentação — visão diária limpa**
+- Design claro, poucas cores, leitura rápida e sem controles de edição; versões desktop (idealmente 16:9/tela cheia), tablet e celular.
+- Cabeçalho: identificação, cliente, cidade/UF, responsável, status, prazo e dados técnicos essenciais, apenas conforme permissões.
+- KPIs concisos: **avanço físico**, **prazo/SLA**, **custo realizado versus previsto**, **pendências críticas** e **próxima entrega**.
+- **Cronograma visual tipo Gantt de construtora**: linhas por fase/atividade, escala de dias e semanas, barras de previsto x executado, destaque para hoje, marcos e atrasos. No celular, janela de período e rolagem horizontal controlada.
+- Áreas, responsáveis, próximos passos, pendências e histórico recente em espaço reduzido; nomes de fases devem corresponder ao modelo real de Obras, não às fases apenas ilustrativas do mockup.
+- **Custos por categoria:** no mínimo Material CA, Material CC, mão de obra, equipamentos/terceiros e logística quando aplicáveis; exibir estimado/orçado, realizado, desvio absoluto e percentual, com alerta discreto para estouro de custo.
+- **Resultado financeiro:** receita contratada/prevista, custo total orçado, custo realizado até a data, custo final projetado, margem líquida **estimada** (R$ e %) e variação diante da margem originalmente planejada. Para estimar o custo final, considerar gastos realizados + custos ainda esperados. A margem deve contemplar tributos, comissões e demais despesas pertinentes — **nunca calcular margem definitiva como receita menos o gasto parcial**.
+- Separar visualmente valor confirmado, orçado e projetado; se não houver informação suficiente, indicar que o cálculo está indisponível, sem criar valores artificiais.
+- **Segurança dos valores:** receitas, custos e margens só para perfis já autorizados ao dado financeiro. O modo Apresentação não é um atalho para elevar privilégios. Evitar enviar números protegidos nos DTOs/props/JSON para operação, vendedor ou SDR sem permissão, mesmo ocultando na interface.
+
+**Etapas e restrições de desenvolvimento**
+1. **OPR 3A — pode iniciar:** ações de Gestão sobre RPCs existentes e navegação sequencial de obras, com testes no Supabase local; sem migrations.
+2. **Apresentação V1 — pode iniciar localmente:** página responsiva, alternância de modos, navegação tipo slides, conteúdo real já disponível e estados vazios para métricas sem dados.
+3. **Gantt avançado/SLA/custos — exige levantamento:** identificar fontes, definir regras de evolução, prazos, categorias financeiras e permissões; entregar contrato de dados e PRD antes de migrations. Sem alteração de banco/produção enquanto backup não estiver aprovado e não houver autorização.
+4. **Entrada automática na operação:** validar a regra existente de criação da obra após três marcos comerciais, a disponibilidade imediata do relatório e a idempotência; mudança de trigger somente com aprovação específica.
+5. **Aceite:** navegar entre ao menos 10 obras visíveis, testar filtros, ausência de dados, permissões por empresa/papel, responsividade, uso em reunião e mensagens de erro. CI e testes locais antes da PR; merge/deploy com autorização separada.
+
+**Situação:** decisão de produto registrada; a tela de detalhe de Obras e as RPCs operacionais já estão na main. As novas interfaces de edição, modo Apresentação, cronograma executivo e controle de custos/margem ainda não estão implementados.
+
 
 ### Perfis futuros
 
