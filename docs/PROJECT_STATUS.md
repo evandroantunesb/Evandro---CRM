@@ -1,21 +1,31 @@
 # Estado do projeto — Raion CRM
 
-Documento vivo. **Atualizações de backups e arquitetura Pedido + Obra: 2026-10-14 (Brasília).** As demais seções comerciais são principalmente um retrato de 2026-10-10; verifique estados atuais no GitHub antes de agir. Código e GitHub prevalecem sobre este arquivo; ao divergir, corrija aqui. `docs/HANDOFF-CLAUDE-2026-10-06.md` é um retrato de 2026-10-05 e está desatualizado em vários pontos (principalmente a Base Demo).
+Documento vivo. **Atualizações de backups, arquitetura Pedido + Obra (2026-10-14) e andamento do Solo e da blindagem do SDR (2026-10-15).** As demais seções comerciais são principalmente um retrato de 2026-10-10; verifique estados atuais no GitHub antes de agir. Código e GitHub prevalecem sobre este arquivo; ao divergir, corrija aqui. `docs/HANDOFF-CLAUDE-2026-10-06.md` é um retrato de 2026-10-05 e está desatualizado em vários pontos (principalmente a Base Demo).
 
 Referência: `main` em `b02e1b0` (merge da PR #165, trava de ambiente) · 77 migrations em `supabase/migrations/` (última `20261010100000_handoff_pontuacao_aceite.sql`).
 
 Histórico: a migration da #139 foi aplicada em produção antes do merge, com autorização explícita; no merge, o workflow Banco de produção #57 retornou `Remote database is up to date` (nada reaplicado). Produção e `main` estão alinhadas. A migration da B1a (#161) também foi aplicada em produção antes do merge, com autorização explícita (`workflow_dispatch` na tag `b1a-migration-5137d22`); no merge, o workflow Banco de produção retornou `Remote database is up to date`.
 
-## Raion Solo — andamento em 2026-10-14
+## Raion Solo e blindagem do SDR — andamento em 2026-10-15
 
-**Nada disto está na `main`. Sem merge, sem migration em produção, sem deploy.** Fontes de decisão: handoff Solo/Pro, D21–D24 e matriz A–D, ainda na branch `docs/decisoes-d21-d24-downgrade-20261014`. D13–D20 não foram localizadas em nenhuma branch.
+**Nada disto está na `main`. Sem merge, sem migration em produção, sem deploy.** Todas as PRs abaixo estão em rascunho e com CI verde. Fontes de decisão: handoff Solo/Pro, D21–D24 e matriz A–D, ainda na branch `docs/decisoes-d21-d24-downgrade-20261014`. D13–D20 não foram localizadas em nenhuma branch.
 
-- **PR #186** (`feature/solo-registro-pagamento`, rascunho, CI verde em `bab6a59`): núcleo no banco. `planos_empresa.produto` (`solo`/`pro`, padrão `pro`); `registros_pagamento` por negócio (insert-only, data do recebimento informada, nunca futura); RPCs `registrar_pagamento_negocio`, `estornar_registro_pagamento`, `corrigir_registro_pagamento`. Solo autônomo = plano `solo` + exatamente 1 vínculo ativo (admin). Registro novo só no Solo; estorno e correção valem para o admin da empresa em qualquer plano, inclusive após upgrade, e em negócio que virou perdido depois. Um pagamento por negócio: a confirmação do Pro e o registro do Solo se excluem por gatilho. Sem `eventos`/`point_ledger`. **Pedido/Obra não são ligados** (entram na P1, com M1 e E1).
-- **PR #188** (`feature/solo-interface-pagamento`, rascunho, empilhada sobre a #186, CI verde em `ef480a3`): cartão Pagamento na ficha do negócio (marcar como pago, estornar, corrigir), marcos da venda e visão de vendas com "registrado", linha do tempo, migration só de leitura `situacao_registro_pagamento`, permissão `PAGAMENTO_SOLO = ["admin"]`. Sem validação em navegador real.
-- **Risco de implantação:** a preview da Vercel usa o banco de produção. Sem as migrations `20261014120000` e `20261014130000` lá, `/propostas-contratos` falha ao ler `registros_pagamento` e o cartão Solo não aparece. Decisão pendente: página tolerante à tabela ausente ou merge só depois das migrations.
-- **Ordem de merge:** #186, aplicação autorizada das migrations, #188.
-- **Pendências comerciais não decididas:** significado de "contrato básico"; matriz completa de recursos e limites Solo/Pro; ciclo de cobrança do downgrade (D24); autoridade do gestor no downgrade (D22); como o admin assume Obras quando a equipe é suspensa; acesso a histórico de módulos indisponíveis.
-- **Demonstração de marketing:** `demonstracao/raion-crm-demonstracao.html` (dados fictícios, ver `demonstracao/LEIAME.md`).
+**PRs (ordem de dependência):**
+- **#190** (`fix/contratos-confirmacoes-sdr`, base `main`, `d63a780`): **vulnerabilidade preexistente na `main`**, independente do Solo. O SDR que vê um negócio consegue, pela API, criar contrato, editar conteúdo e token, marcar "assinado" (o que dispara os gatilhos de Obra) e ler contratos, confirmações de pagamento e as atividades `pagamento_*`; a regra "SDR não gera contrato" existia só na interface. Migration `20261014100000_blindagem_contratos_confirmacoes.sql` (só autorização, nenhum dado alterado; reversão por recriar as 6 policies antigas). Reproduzida só no Supabase local. **É a mais urgente**: prevenir antes de qualquer lançamento do Solo.
+- **#186** (`feature/solo-registro-pagamento`, base `main`, `bab6a59`): núcleo do registro manual de pagamento no banco. `planos_empresa.produto` (`solo`/`pro`, padrão `pro`); `registros_pagamento` por negócio (insert-only, data do recebimento informada, nunca futura); RPCs `registrar_pagamento_negocio`, `estornar_registro_pagamento`, `corrigir_registro_pagamento`. Solo autônomo = plano `solo` + exatamente 1 vínculo ativo (admin). Registro novo só no Solo; estorno e correção valem para o admin da empresa em qualquer plano, inclusive após upgrade e em negócio perdido depois do registro. Um pagamento por negócio (a confirmação do Pro e o registro do Solo se excluem por gatilho). Sem `eventos`/`point_ledger`. **Pedido/Obra não são ligados** (entram na P1, com M1 e E1).
+- **#188** (`feature/solo-interface-pagamento`, base #186, `2a784fe`): interface na ficha do negócio (marcar como pago, estornar, corrigir), marcos e visão de vendas com "registrado", linha do tempo, migration só de leitura `situacao_registro_pagamento`, permissão `PAGAMENTO_SOLO = ["admin"]`. Inclui o **fallback estrito da preview** (aprovado por Evandro em 14/10): só os erros de objeto inexistente (`42P01`/`PGRST205` para tabela, `42883`/`PGRST202` para função) viram fallback; qualquer outro erro continua visível e cada fallback deixa `console.warn`. Também orienta a confirmação Pro após estorno de registro legado e mostra histórico neutro quando o Pro já confirmou. Sem validação em navegador real.
+- **#189** (`feature/rls-financeiro-sdr`, base #188, `0bd37bc`): o SDR deixa de ler os dados do registro manual (data, observação, motivos) e as atividades `pagamento_*`. Migration `20261014140000_rls_financeiro_sdr.sql` com `tem_acesso_financeiro(empresa_id)` (admin, gestor, vendedor); a função e a policy `ver atividades` são idênticas às da #190, então reaplicar não muda nada.
+
+**Ordem de merge sugerida (cada passo só com autorização específica):** #190 → #186 → #188 → #189. Migrations em ordem de prefixo: `20261014100000`, `…120000`, `…130000`, `…140000`.
+
+**Antes de qualquer migration em produção:**
+1. Conferir os backups agendados. No GitHub, os workflows `schedule` concluíram com sucesso em 14 e 15/10 (PostgreSQL #5 e #7; Storage #3 e #5). Continua pendente a conferência fora do GitHub, que esta sessão não consegue fazer: arquivos `tar.gz` + `sha256.txt` no B2, Object Lock Compliance de 30 dias e pings do Healthchecks.
+2. Workflow "Banco de produção" no modo `conferir` (o dry-run deve listar só as migrations esperadas), depois `aplicar`, ambos com aprovação do Evandro no environment `producao-banco`.
+3. Auditoria D10 (leitura de Obras em produção), com autorização específica.
+
+**Pendências comerciais não decididas:** significado de "contrato básico"; matriz completa de recursos e limites Solo/Pro; ciclo de cobrança do downgrade (D24); autoridade do gestor no downgrade (D22); como o admin assume Obras quando a equipe é suspensa; acesso a histórico de módulos indisponíveis; o que acontece com o Pedido quando uma venda sai de "ganho".
+
+**Demonstração de marketing:** `demonstracao/raion-crm-demonstracao.html` (dados fictícios, ver `demonstracao/LEIAME.md`).
 
 ## Handoff Pedido + Obra — decisões consolidadas em 2026-10-14
 
