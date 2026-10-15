@@ -1,12 +1,8 @@
 -- Contratos e confirmações de pagamento do Pro fora do alcance do SDR, no banco (revisão do
--- Evandro em 2026-10-14). Vulnerabilidade preexistente na main:
---   - o SDR que via o negócio criava contrato, editava o conteúdo, marcava "assinado" (com evento
---     `contrato.assinado` e gatilhos de Obra) e apagava o que tinha criado, direto pela API — a
---     regra "SDR não gera contrato" só existia na interface (`PROPOSTA_E_CONTRATO`);
---   - lia o conteúdo dos contratos e as confirmações de pagamento (quem confirmou, beneficiário,
---     motivo do estorno), também pela linha do tempo (atividades `pagamento_*`).
+-- Evandro em 2026-10-14). A regra "SDR não gera contrato" (`PROPOSTA_E_CONTRATO`) passa a valer
+-- também na RLS, para escrita e leitura de contratos, confirmações e atividades de pagamento.
 --
--- Regra nova: contrato, confirmação e atividade de pagamento exigem papel admin, gestor ou
+-- Regra: contrato, confirmação e atividade de pagamento exigem papel admin, gestor ou
 -- vendedor NA EMPRESA DO NEGÓCIO, além de ver o negócio. O papel é conferido pelo negócio (não
 -- pelo `empresa_id` da linha, que em `contratos` vem do cliente): quem é SDR na empresa do negócio
 -- e vendedor em outra não passa informando o `empresa_id` da outra.
