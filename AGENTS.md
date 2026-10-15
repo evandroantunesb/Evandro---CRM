@@ -12,6 +12,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 Regras de trabalho (autorização, merges, produção, gamificação) estão no `CLAUDE.md` e valem para qualquer agente. Estado atual: `docs/PROJECT_STATUS.md`. **Código e GitHub são a fonte da verdade**; documentação pode estar atrasada.
 
+**Escopo integral aprovado e obrigatório antes de qualquer trabalho:** [`docs/RAION_CRM_PLANO_MESTRE.md`](docs/RAION_CRM_PLANO_MESTRE.md). Identifique ID da frente (A01–G08), marco (M0–M15), aceite funcional e dependências; siga a regra completa em `CLAUDE.md`. Nada é descartado do inventário como "fora do escopo". Não iniciar outra frente sem autorização.
+
 ## Stack
 
 - **Next.js 16** (App Router — ver aviso acima) · **React 19** · **TypeScript** · **Tailwind 4**
