@@ -241,7 +241,7 @@ describe("responsável e perfil da assinatura só pelo congelamento do banco", (
 describe("confirmação e estorno usam a empresa do negócio", () => {
   // Contrato legado com empresa divergente: fabricado só no banco de teste, com gatilhos e FKs
   // desligados nesta transação (dado anterior à FK composta).
-  async function contratoLegadoDivergente(negocioId: string) {
+  async function contratoLegadoDivergente(negocioId: string, empresaDoContrato = B.id, responsavelCongelado = m(A, vendedorA)) {
     const banco = new Client({ connectionString: urlBancoLocal() });
     await banco.connect();
     try {
@@ -250,7 +250,7 @@ describe("confirmação e estorno usam a empresa do negócio", () => {
       const { rows } = await banco.query(
         `insert into public.contratos (empresa_id, negocio_id, conteudo, status, responsavel_assinatura_id, perfil_assinatura)
          values ($1, $2, 'Contrato legado', 'assinado', $3, 'closer') returning id`,
-        [B.id, negocioId, m(A, vendedorA)],
+        [empresaDoContrato, negocioId, responsavelCongelado],
       );
       await banco.query("commit");
       return rows[0].id as string;
@@ -276,6 +276,17 @@ describe("confirmação e estorno usam a empresa do negócio", () => {
     expect((await adminA.cliente.rpc("estornar_confirmacao_pagamento", { p_contrato_id: id, p_motivo: "Estorno de teste" })).error).toBeNull();
     const estorno = (await servico.from("eventos").select("empresa_id").eq("entidade_id", n).eq("tipo", "pagamento.confirmacao_estornada")).data!;
     expect(estorno).toEqual([{ empresa_id: A.id }]);
+  });
+
+  it("responsável congelado que não é membro da empresa do negócio: confirmação recusada, sem confirmação nem evento", async () => {
+    const n = await criarNegocio(A, "ic-legado-beneficiario-externo", vendedorA);
+    // Contrato da empresa certa (A), mas com o responsável congelado apontando para um vínculo da B.
+    const id = await contratoLegadoDivergente(n, A.id, m(B, multi));
+
+    const r = await adminA.cliente.rpc("confirmar_pagamento", { p_contrato_id: id });
+    expect(r.error?.message).toBe("Responsável da assinatura inválido para crédito.");
+    expect((await servico.from("confirmacoes_pagamento").select("id").eq("contrato_id", id)).data).toHaveLength(0);
+    expect((await eventosDo(n)).filter((e) => e.tipo === "pagamento.confirmado")).toHaveLength(0);
   });
 
   it("contrato legado divergente continua aceitando mudança de texto e status (a chave não muda)", async () => {

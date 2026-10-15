@@ -1,11 +1,13 @@
--- Auditoria SOMENTE LEITURA: contratos cuja empresa diverge da empresa real do negócio.
+-- Auditoria SOMENTE LEITURA de integridade de contratos e confirmações de pagamento.
 -- Só SELECT. Nada aqui altera dado, esquema ou permissão. Rodar pelo SQL Editor do Supabase (ou
 -- psql) com papel de leitura; não depende de nenhuma migration da PR.
 --
--- Contexto: até a migration 20261015100000_integridade_contratos.sql não havia FK composta, então
--- `contratos.empresa_id` podia divergir de `negocios.empresa_id`. A migration cria a FK como
--- NOT VALID (não varre o legado). Com a contagem 1 em zero e as consultas 2 e 3 vazias, é seguro
--- validar: alter table public.contratos validate constraint contratos_negocio_empresa_fk;
+-- Os resultados são INDÍCIOS para conferência caso a caso, não prova de fraude nem de erro: dado
+-- antigo pode ter explicação legítima (reparo manual, fluxo anterior, troca de responsável).
+--
+-- Validação da FK composta (migration 20261015100000, criada NOT VALID): com a contagem 1 em zero e
+-- as consultas 2 e 3 vazias, é seguro validar em migration própria:
+--   alter table public.contratos validate constraint contratos_negocio_empresa_fk;
 
 -- 1) CONTAGEM: contratos com empresa diferente da do negócio.
 select count(*) as contratos_divergentes
@@ -30,8 +32,7 @@ join public.negocios n on n.id = c.negocio_id
 where c.empresa_id is distinct from n.empresa_id
 order by c.updated_at desc;
 
--- 3) Beneficiário da assinatura de OUTRA empresa (valor que o cliente conseguia gravar no INSERT,
---    ver a migration): responsável congelado que não é membro da empresa do negócio.
+-- 3) Responsável congelado na assinatura que não é membro da empresa do negócio.
 select
   c.id as contrato_id,
   c.negocio_id,
@@ -45,11 +46,9 @@ left join public.empresa_membros m on m.id = c.responsavel_assinatura_id
 where c.responsavel_assinatura_id is not null
   and m.empresa_id is distinct from n.empresa_id;
 
--- 4) INDÍCIO: responsável congelado na assinatura diferente de quem o banco registrou no evento
---    `contrato.assinado` mais recente do negócio (`registrar_contrato` grava como ator o usuário
---    responsável no momento da assinatura). Diferente da consulta 5, aqui a troca posterior da
---    coluna congelada não tem fluxo legítimo na interface — mas dado antigo pode ter explicação
---    (reparo manual, contrato reassinado); conferir caso a caso.
+-- 4) Responsável congelado diferente de quem o banco registrou no evento `contrato.assinado` mais
+--    recente do negócio (`registrar_contrato` grava como ator o usuário responsável no momento da
+--    assinatura). Conferir caso a caso (reparo manual, contrato reassinado).
 select
   c.id                         as contrato_id,
   c.negocio_id,
@@ -75,8 +74,8 @@ where c.status = 'assinado'
 order by ev.created_at desc;
 
 -- 5) Contratos assinados cujo responsável congelado difere do responsável ATUAL do negócio.
---    INDÍCIO, NÃO é erro por si só (o negócio pode ter trocado de responsável depois da assinatura): é a
---    lista para conferir, caso a caso, se o beneficiário registrado é o closer que de fato assinou.
+--    Não é erro por si só: o negócio pode ter trocado de responsável depois da assinatura. É a
+--    lista para conferir se o beneficiário registrado é o closer que de fato assinou.
 select
   c.id as contrato_id,
   c.negocio_id,
@@ -89,4 +88,44 @@ from public.contratos c
 join public.negocios n on n.id = c.negocio_id
 where c.status = 'assinado'
   and c.responsavel_assinatura_id is distinct from n.responsavel_id
+order by c.updated_at desc;
+
+-- 6) Confirmações de pagamento cujo beneficiário não é membro da empresa do negócio, ou cuja
+--    `empresa_id` difere da empresa do negócio.
+select
+  p.id                      as confirmacao_id,
+  p.contrato_id,
+  p.negocio_id,
+  p.empresa_id              as empresa_da_confirmacao,
+  n.empresa_id              as empresa_do_negocio,
+  p.beneficiario_membro_id,
+  m.empresa_id              as empresa_do_beneficiario,
+  p.confirmado_em,
+  p.estornado_em
+from public.confirmacoes_pagamento p
+join public.negocios n on n.id = p.negocio_id
+left join public.empresa_membros m on m.id = p.beneficiario_membro_id
+where p.empresa_id is distinct from n.empresa_id
+   or m.empresa_id is distinct from n.empresa_id
+order by p.confirmado_em desc;
+
+-- 7) Contratos fora de 'assinado' com responsável da assinatura já preenchido e sem nenhum evento
+--    `contrato.assinado` no negócio. (Contrato reaberto depois de assinado mantém o valor, mas tem o
+--    evento; por isso ele não aparece aqui.)
+select
+  c.id as contrato_id,
+  c.negocio_id,
+  c.status,
+  c.responsavel_assinatura_id,
+  c.perfil_assinatura,
+  c.criado_por,
+  c.created_at,
+  c.updated_at
+from public.contratos c
+where c.status <> 'assinado'
+  and (c.responsavel_assinatura_id is not null or c.perfil_assinatura is not null)
+  and not exists (
+    select 1 from public.eventos e
+    where e.entidade_id = c.negocio_id and e.tipo = 'contrato.assinado'
+  )
 order by c.updated_at desc;

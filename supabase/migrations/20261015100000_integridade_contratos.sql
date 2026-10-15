@@ -1,20 +1,15 @@
--- Integridade de `contratos` na escrita direta pela API (reforço da PR #190; revisão do Evandro e
--- do Claude Opus em 2026-10-15). A #190 tirou o SDR de contratos; esta migration fecha o que o
--- papel financeiro (admin, gestor, vendedor) ainda conseguia gravar por fora do fluxo da interface:
+-- Integridade de `contratos` (complementa a PR #190; revisão do Evandro e do Claude Opus em
+-- 2026-10-15). Regras garantidas no banco para a escrita direta em `contratos`:
 --
---   1. `empresa_id` diferente da empresa real do negócio, no INSERT, e troca de `empresa_id` ou
---      `negocio_id` depois da criação. Não havia FK composta nem gatilho.
---   2. INSERT já com status `assinado`: pulava o gatilho que congela o responsável da assinatura e
---      o `trg_registrar_contrato` (eventos causais, Obra), que só rodam no UPDATE.
---   3. Responsável e perfil congelados na assinatura (`responsavel_assinatura_id`,
---      `perfil_assinatura`) graváveis pelo cliente, no INSERT e no UPDATE. Os REVOKE de coluna de
---      20261001250000/20261002140000 não têm efeito enquanto `authenticated` tem privilégio de
---      tabela; a proteção passa a ser por gatilho. O beneficiário de `confirmar_pagamento` é
---      essa coluna, então ela só pode nascer do congelamento feito pelo banco.
+--   1. O contrato é da empresa do negócio (FK composta) e não troca de empresa nem de negócio.
+--   2. A assinatura nasce do UPDATE de status: o contrato não é criado já assinado, para que o
+--      congelamento do responsável e os eventos causais (`trg_registrar_contrato`, Obra) rodem.
+--   3. Responsável e perfil da assinatura (`responsavel_assinatura_id`, `perfil_assinatura`) são
+--      gravados só pelo congelamento feito pelo banco. A proteção é por gatilho, independente de
+--      grants de coluna.
 --
--- Também: `confirmar_pagamento` e `estornar_confirmacao_pagamento` passam a conferir papel e
--- autoconfirmação pela empresa DO NEGÓCIO (não pelo `empresa_id` do contrato, que podia divergir em
--- dado legado), e TRUNCATE em `contratos` sai de `anon`/`authenticated`.
+-- Também: `confirmar_pagamento` e `estornar_confirmacao_pagamento` conferem papel, autoconfirmação
+-- e beneficiário pela empresa DO NEGÓCIO, e TRUNCATE em `contratos` sai de `anon`/`authenticated`.
 --
 -- Só autorização e integridade. Nenhum dado é alterado ou apagado. A restrição vale para todo papel
 -- fora da lista de privilegiados (`postgres`, `supabase_admin`, `service_role`): RPCs e gatilhos
@@ -129,8 +124,8 @@ revoke truncate on public.contratos from anon, authenticated;
 -- ---------------------------------------------------------------------------
 
 -- confirmar_pagamento(): idêntica à versão de 20261002140000_gamificacao_conquistas_marco_contagem.sql,
--- exceto que papel, membro do ator e `empresa_id` gravado (evento, confirmação, atividade) vêm da
--- empresa do negócio. Com contrato consistente, é o mesmo valor de antes.
+-- exceto que papel, membro do ator, `empresa_id` gravado (evento, confirmação, atividade) e o
+-- vínculo do beneficiário vêm da empresa do negócio. Com contrato consistente, é o mesmo de antes.
 create or replace function public.confirmar_pagamento(p_contrato_id uuid)
 returns public.confirmacoes_pagamento
 language plpgsql security definer set search_path = ''
@@ -177,7 +172,9 @@ begin
     raise exception 'Você não pode confirmar o pagamento de um contrato que assinou como responsável.' using errcode = 'insufficient_privilege', hint = 'mensagem_usuario';
   end if;
 
-  select user_id into v_benef_user from public.empresa_membros where id = v_contrato.responsavel_assinatura_id;
+  -- O beneficiário precisa ser membro da empresa do negócio (protege também dado legado).
+  select user_id into v_benef_user from public.empresa_membros
+    where id = v_contrato.responsavel_assinatura_id and empresa_id = v_empresa;
   if v_benef_user is null then
     raise exception 'Responsável da assinatura inválido para crédito.' using errcode = 'check_violation', hint = 'mensagem_usuario';
   end if;
