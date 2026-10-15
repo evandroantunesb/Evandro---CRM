@@ -16,6 +16,10 @@ name: Banco de produção
 # Atenção: --include-all aplica TODAS as migrations pendentes da ref no momento da execução, não
 # só a mais recente. O conjunto é o que o dry-run lista.
 #
+# Trava do modo aplicar: depois do dry-run, `.github/scripts/validar-conjunto-migrations.sh`
+# exige que o conjunto pendente seja EXATAMENTE o de MIGRATIONS_AUTORIZADAS (no job "aplicar").
+# Lista vazia, não interpretável, ou com migration a mais/diferente encerra o job antes de aplicar.
+#
 # SUPABASE_DB_URL é a connection string da Session pooler (porta 5432, senha percent-encoded):
 # runners do GitHub Actions são IPv4-only e a conexão direta do Supabase só resolve em IPv6.
 on:
@@ -225,6 +229,14 @@ jobs:
               echo "- nenhuma migration pendente listada"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
+      # Trava fail-closed: o conjunto do dry-run acima precisa ser exatamente o autorizado, senão o
+      # job termina aqui, antes da aplicação. Sem credenciais. Para autorizar outro conjunto, a lista
+      # abaixo muda por commit revisado (e uma nova tag), nunca por entrada do operador.
+      - name: Conferir que o conjunto pendente é exatamente o autorizado
+        env:
+          MIGRATIONS_AUTORIZADAS: |
+            20261015100000_integridade_contratos.sql
+        run: bash .github/scripts/validar-conjunto-migrations.sh "$RUNNER_TEMP/dry-run.txt"
       - name: Aplicar (supabase db push --include-all)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
