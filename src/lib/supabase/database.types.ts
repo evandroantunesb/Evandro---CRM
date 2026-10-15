@@ -784,6 +784,13 @@ export type Database = {
             referencedColumns: ["id"];
           },
           {
+            foreignKeyName: "contratos_negocio_empresa_fk";
+            columns: ["negocio_id", "empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "negocios";
+            referencedColumns: ["id", "empresa_id"];
+          },
+          {
             foreignKeyName: "contratos_negocio_id_fkey";
             columns: ["negocio_id"];
             isOneToOne: true;
