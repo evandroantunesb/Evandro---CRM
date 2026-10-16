@@ -17,7 +17,7 @@ import {
   potenciaKitPersonalizadoKwp,
   sugerirQuantidadeModulos,
 } from "@/lib/calculadora";
-import { formatarCep, formatarMascaraMoeda, formatarMoeda, formatarTelefoneBr } from "@/lib/formatacao";
+import { formatarCep, formatarMascaraMoeda, formatarMoeda, formatarNumeroBr, formatarTelefoneBr, lerNumeroBr } from "@/lib/formatacao";
 import { montarEndereco } from "@/lib/negocio-dados";
 import { criarClienteNavegador } from "@/lib/supabase/navegador";
 import { ROTULO_TIPO_LIGACAO, TIPOS_LIGACAO, type ResultadoAcao, type TipoLigacao } from "@/lib/tipos";
@@ -55,11 +55,10 @@ const ETAPAS_WIZARD = [
   { numero: 3, titulo: "Dados técnicos" },
 ] as const;
 
-/** Aceita "450", "450,5" e "1.234,56"; string vazia ou inválida vira null. */
+/** Mesmo conversor do servidor ("450", "1.200", "1.234,56"); vazio, inválido ou ambíguo vira null. */
 function numero(v: string): number | null {
-  if (!v.trim()) return null;
-  const n = Number(v.includes(",") ? v.replace(/\./g, "").replace(",", ".") : v);
-  return Number.isFinite(n) && n > 0 ? n : null;
+  const n = lerNumeroBr(v);
+  return n != null && Number.isFinite(n) && n > 0 ? n : null;
 }
 
 /** Estimativa ilustrativa (não é o motor de cálculo) só pra prévia mockada da Etapa 2. */
@@ -270,7 +269,8 @@ export function FormularioNegocio({
   const [ultimoPrecoSugerido, setUltimoPrecoSugerido] = useState<number | null>(null);
   if (precoSugerido !== ultimoPrecoSugerido) {
     setUltimoPrecoSugerido(precoSugerido);
-    if (precoSugerido != null && !valorTocado) setValor(String(precoSugerido));
+    // No padrão do campo ("28.431,25"): String() geraria "28431.25", que o conversor recusa.
+    if (precoSugerido != null && !valorTocado) setValor(formatarNumeroBr(precoSugerido));
   }
 
   const consumoMedioEstimado = useMemo(() => {
@@ -639,10 +639,11 @@ export function FormularioNegocio({
           <div className="grid gap-3 md:grid-cols-2">
             <Campo
               rotulo="Consumo médio mensal (kWh)"
-              inputMode="numeric"
+              inputMode="decimal"
               placeholder="ex.: 780"
               value={consumoMedioKwh}
-              onChange={(e) => setConsumoMedioKwh(e.target.value.replace(/\D/g, ""))}
+              // Mantém ponto e vírgula: apagá-los transformava "1.200,5" em 12005 sem aviso.
+              onChange={(e) => setConsumoMedioKwh(e.target.value.replace(/[^\d.,]/g, ""))}
             />
             <Campo
               rotulo="Ou valor médio da conta (R$)"

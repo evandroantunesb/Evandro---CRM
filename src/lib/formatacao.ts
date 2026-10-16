@@ -6,6 +6,31 @@ export function formatarMoeda(valor: number | null | undefined) {
   return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+/**
+ * Lê um número digitado no padrão brasileiro: ponto só como separador de milhar (em grupos de 3)
+ * e vírgula como decimal — "1200", "1.200", "1.200,50", "1200,50", "0,95", "12.345,6".
+ * Vazio vira null. Malformado ou ambíguo ("1.2", "1200.50", "1.20", "1,2,3", "R$ 10") vira NaN,
+ * para a validação recusar em vez de gravar outro valor (antes, "1.200" virava 1,2).
+ * Inverso exato de `formatarNumeroBr`. Fonte única para servidor e cliente.
+ */
+export function lerNumeroBr(texto: string | null | undefined): number | null {
+  const v = (texto ?? "").trim();
+  if (!v) return null;
+  if (!/^-?(\d+|\d{1,3}(\.\d{3})+)(,\d+)?$/.test(v)) return Number.NaN;
+  return Number(v.replace(/\./g, "").replace(",", "."));
+}
+
+/** Mensagem de validação para número fora do padrão de `lerNumeroBr`. */
+export const MENSAGEM_NUMERO_BR = "Número inválido: use ponto só para milhar e vírgula para decimais (ex.: 1.234,56).";
+
+/**
+ * Número gravado → texto para um campo editável, que `lerNumeroBr` lê de volta sem mudar o valor
+ * ("1.200", "1.200,5", "0,9512"). As casas cobrem as colunas do banco (até 4 decimais).
+ */
+export function formatarNumeroBr(valor: number) {
+  return valor.toLocaleString("pt-BR", { maximumFractionDigits: 6 });
+}
+
 /** Máscara de telefone brasileiro (fixo ou celular) a partir do que o usuário digita. */
 export function formatarTelefoneBr(valor: string) {
   const d = valor.replace(/\D/g, "").slice(0, 11);

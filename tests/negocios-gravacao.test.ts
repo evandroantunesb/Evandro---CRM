@@ -285,7 +285,8 @@ describe("regressões de tela", () => {
         tipoLigacao: "bifasico",
         consumoMedioKwh: (480.5).toLocaleString("pt-BR"),
         valorFaturaMedio: "300",
-        tarifaKwh: (0.9512).toLocaleString("pt-BR", { maximumFractionDigits: 2 }),
+        // M2-a: a tarifa reabre com todas as casas gravadas (antes "0,95", e salvar de novo mudava o valor).
+        tarifaKwh: "0,9512",
       });
     });
 

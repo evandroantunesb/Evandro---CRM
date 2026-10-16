@@ -5,6 +5,7 @@ import { arquivoMetaSchema } from "@/lib/anexos-servidor";
 import { componentesJsonSchema, nomeKitPersonalizado, potenciaKitPersonalizadoKwp, type ComponenteKit } from "@/lib/calculadora";
 import { montarLinhaCalculo } from "@/lib/calculo-servidor";
 import { mensagemErro } from "@/lib/erros";
+import { lerNumeroBr, MENSAGEM_NUMERO_BR } from "@/lib/formatacao";
 import {
   completarContato,
   MENSAGEM_CALCULO_NAO_CONFERIDO,
@@ -39,17 +40,14 @@ const valorObrigatorio = z
   .string({ error: "Informe o valor do negócio." })
   .trim()
   .min(1, "Informe o valor do negócio.")
-  .transform((v) => Number(v.includes(",") ? v.replace(/\./g, "").replace(",", ".") : v))
-  .pipe(z.number({ error: "Valor inválido" }).positive("Informe um valor maior que zero."));
+  .transform(lerNumeroBr)
+  .pipe(z.number({ error: `Valor do negócio: ${MENSAGEM_NUMERO_BR}` }).positive("Informe um valor maior que zero."));
 
 const numeroBrOpcional = z
   .string()
   .optional()
-  .transform((v) => {
-    if (!v || !v.trim()) return null;
-    return Number(v.includes(",") ? v.replace(/\./g, "").replace(",", ".") : v);
-  })
-  .pipe(z.number().positive().nullable());
+  .transform(lerNumeroBr)
+  .pipe(z.number({ error: MENSAGEM_NUMERO_BR }).positive("Informe um valor maior que zero.").nullable());
 
 const textoOpcional = (max?: number, mensagem?: string) =>
   (max ? z.string().trim().max(max, mensagem) : z.string().trim()).optional().transform((v) => (v ? v : null));
