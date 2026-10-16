@@ -235,7 +235,9 @@ jobs:
       - name: Conferir que o conjunto pendente é exatamente o autorizado
         env:
           MIGRATIONS_AUTORIZADAS: |
-            20261015110000_integridade_handoff_origem.sql
+            20261014120000_pagamento_registrado_solo.sql
+            20261014130000_situacao_registro_pagamento.sql
+            20261014140000_rls_financeiro_sdr.sql
         run: bash .github/scripts/validar-conjunto-migrations.sh "$RUNNER_TEMP/dry-run.txt"
       - name: Aplicar (supabase db push --include-all)
         env:
