@@ -2895,6 +2895,7 @@ export type Database = {
           empresa_id: string;
           limite_usuarios: number | null;
           modelo_cobranca: Database["public"]["Enums"]["modelo_cobranca"] | null;
+          produto: Database["public"]["Enums"]["produto_plano"];
           tipo: Database["public"]["Enums"]["tipo_plano"];
           updated_at: string;
           valor_fixo: number | null;
@@ -2907,6 +2908,7 @@ export type Database = {
           empresa_id: string;
           limite_usuarios?: number | null;
           modelo_cobranca?: Database["public"]["Enums"]["modelo_cobranca"] | null;
+          produto?: Database["public"]["Enums"]["produto_plano"];
           tipo?: Database["public"]["Enums"]["tipo_plano"];
           updated_at?: string;
           valor_fixo?: number | null;
@@ -2919,6 +2921,7 @@ export type Database = {
           empresa_id?: string;
           limite_usuarios?: number | null;
           modelo_cobranca?: Database["public"]["Enums"]["modelo_cobranca"] | null;
+          produto?: Database["public"]["Enums"]["produto_plano"];
           tipo?: Database["public"]["Enums"]["tipo_plano"];
           updated_at?: string;
           valor_fixo?: number | null;
@@ -3395,6 +3398,93 @@ export type Database = {
           },
         ];
       };
+      registros_pagamento: {
+        Row: {
+          data_recebimento: string;
+          empresa_id: string;
+          estornado_em: string | null;
+          estornado_por_membro_id: string | null;
+          estornado_por_user_id: string | null;
+          id: string;
+          modalidade: string;
+          motivo_estorno: string | null;
+          negocio_id: string;
+          observacao: string | null;
+          registrado_em: string;
+          registrado_por_membro_id: string;
+          registrado_por_user_id: string;
+          substitui_id: string | null;
+        };
+        Insert: {
+          data_recebimento: string;
+          empresa_id: string;
+          estornado_em?: string | null;
+          estornado_por_membro_id?: string | null;
+          estornado_por_user_id?: string | null;
+          id?: string;
+          modalidade?: string;
+          motivo_estorno?: string | null;
+          negocio_id: string;
+          observacao?: string | null;
+          registrado_em?: string;
+          registrado_por_membro_id: string;
+          registrado_por_user_id: string;
+          substitui_id?: string | null;
+        };
+        Update: {
+          data_recebimento?: string;
+          empresa_id?: string;
+          estornado_em?: string | null;
+          estornado_por_membro_id?: string | null;
+          estornado_por_user_id?: string | null;
+          id?: string;
+          modalidade?: string;
+          motivo_estorno?: string | null;
+          negocio_id?: string;
+          observacao?: string | null;
+          registrado_em?: string;
+          registrado_por_membro_id?: string;
+          registrado_por_user_id?: string;
+          substitui_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "registros_pagamento_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "registros_pagamento_estornado_por_membro_id_fkey";
+            columns: ["estornado_por_membro_id"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "registros_pagamento_negocio_id_fkey";
+            columns: ["negocio_id"];
+            isOneToOne: false;
+            referencedRelation: "negocios";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "registros_pagamento_registrado_por_membro_id_fkey";
+            columns: ["registrado_por_membro_id"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "registros_pagamento_substitui_id_fkey";
+            columns: ["substitui_id"];
+            isOneToOne: false;
+            referencedRelation: "registros_pagamento";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       resgates: {
         Row: {
           created_at: string;
@@ -3694,6 +3784,36 @@ export type Database = {
         };
         Returns: number;
       };
+      corrigir_registro_pagamento: {
+        Args: {
+          p_data_recebimento: string;
+          p_motivo: string;
+          p_negocio_id: string;
+          p_observacao: string;
+        };
+        Returns: {
+          data_recebimento: string;
+          empresa_id: string;
+          estornado_em: string | null;
+          estornado_por_membro_id: string | null;
+          estornado_por_user_id: string | null;
+          id: string;
+          modalidade: string;
+          motivo_estorno: string | null;
+          negocio_id: string;
+          observacao: string | null;
+          registrado_em: string;
+          registrado_por_membro_id: string;
+          registrado_por_user_id: string;
+          substitui_id: string | null;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "registros_pagamento";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       corrigir_valor_negocio: {
         Args: { p_motivo: string; p_negocio_id: string; p_novo_valor: number };
         Returns: {
@@ -3761,6 +3881,7 @@ export type Database = {
       e_membro_comercial: { Args: { p_empresa_id: string; p_membro_id: string }; Returns: boolean };
       e_plataforma_admin: { Args: Record<PropertyKey, never>; Returns: boolean };
       empresa_da_pasta_marca: { Args: { p_caminho: string }; Returns: string };
+      empresa_solo_autonoma: { Args: { p_empresa_id: string }; Returns: boolean };
       encerrar_participacoes_operacionais: {
         Args: {
           p_membro_id: string;
@@ -3808,6 +3929,61 @@ export type Database = {
         Args: { p_entidade_id: string; p_eventos_tipo: string[] };
         Returns: undefined;
       };
+      estornar_registro_pagamento: {
+        Args: { p_motivo: string; p_negocio_id: string };
+        Returns: {
+          data_recebimento: string;
+          empresa_id: string;
+          estornado_em: string | null;
+          estornado_por_membro_id: string | null;
+          estornado_por_user_id: string | null;
+          id: string;
+          modalidade: string;
+          motivo_estorno: string | null;
+          negocio_id: string;
+          observacao: string | null;
+          registrado_em: string;
+          registrado_por_membro_id: string;
+          registrado_por_user_id: string;
+          substitui_id: string | null;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "registros_pagamento";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      estornar_registro_pagamento_interno: {
+        Args: {
+          p_membro_id: string;
+          p_motivo: string;
+          p_negocio: Database["public"]["Tables"]["negocios"]["Row"];
+          p_tipo_atividade: string;
+        };
+        Returns: {
+          data_recebimento: string;
+          empresa_id: string;
+          estornado_em: string | null;
+          estornado_por_membro_id: string | null;
+          estornado_por_user_id: string | null;
+          id: string;
+          modalidade: string;
+          motivo_estorno: string | null;
+          negocio_id: string;
+          observacao: string | null;
+          registrado_em: string;
+          registrado_por_membro_id: string;
+          registrado_por_user_id: string;
+          substitui_id: string | null;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "registros_pagamento";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       expirar_atribuicoes_leads: { Args: Record<PropertyKey, never>; Returns: undefined };
       fechar_comissao: { Args: { p_comissao_id: string }; Returns: undefined };
       garantir_obra: { Args: { p_negocio_id: string }; Returns: string };
@@ -3821,6 +3997,37 @@ export type Database = {
       };
       incrementar_preenchimento_formulario: { Args: { p_id: string }; Returns: undefined };
       incrementar_visualizacao_formulario: { Args: { p_id: string }; Returns: undefined };
+      inserir_registro_pagamento: {
+        Args: {
+          p_data: string;
+          p_membro_id: string;
+          p_negocio: Database["public"]["Tables"]["negocios"]["Row"];
+          p_observacao: string;
+          p_substitui_id: string;
+        };
+        Returns: {
+          data_recebimento: string;
+          empresa_id: string;
+          estornado_em: string | null;
+          estornado_por_membro_id: string | null;
+          estornado_por_user_id: string | null;
+          id: string;
+          modalidade: string;
+          motivo_estorno: string | null;
+          negocio_id: string;
+          observacao: string | null;
+          registrado_em: string;
+          registrado_por_membro_id: string;
+          registrado_por_user_id: string;
+          substitui_id: string | null;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "registros_pagamento";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       marcar_parado_fluxo_obra: {
         Args: {
           p_motivo?: string;
@@ -3887,6 +4094,7 @@ export type Database = {
           tipo_cliente: string;
         }[];
       };
+      pode_registrar_pagamento_negocio: { Args: { p_negocio_id: string }; Returns: boolean };
       pode_responder_handoff: { Args: { p_handoff_id: string }; Returns: boolean };
       pode_ver_avatar: { Args: { p_pasta: string }; Returns: boolean };
       pode_ver_contato: { Args: { p_contato_id: string }; Returns: boolean };
@@ -3945,6 +4153,31 @@ export type Database = {
         };
         Returns: undefined;
       };
+      registrar_pagamento_negocio: {
+        Args: { p_data_recebimento?: string; p_negocio_id: string; p_observacao?: string };
+        Returns: {
+          data_recebimento: string;
+          empresa_id: string;
+          estornado_em: string | null;
+          estornado_por_membro_id: string | null;
+          estornado_por_user_id: string | null;
+          id: string;
+          modalidade: string;
+          motivo_estorno: string | null;
+          negocio_id: string;
+          observacao: string | null;
+          registrado_em: string;
+          registrado_por_membro_id: string;
+          registrado_por_user_id: string;
+          substitui_id: string | null;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "registros_pagamento";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       sequencia_produtiva_membro: {
         Args: { p_empresa_id: string };
         Returns: {
@@ -3981,6 +4214,104 @@ export type Database = {
         Args: { p_empresa_id: string; p_papeis: Database["public"]["Enums"]["papel_membro"][] };
         Returns: boolean;
       };
+      travar_negocio_retificacao: {
+        Args: { p_negocio_id: string };
+        Returns: {
+          consumo_medio_kwh: number | null;
+          contato_id: string;
+          created_at: string;
+          criado_por: string | null;
+          descricao: string | null;
+          empresa_id: string;
+          estrutura_telhado: string | null;
+          etapa_desde: string;
+          etapa_id: string;
+          fechado_em: string | null;
+          funil_id: string;
+          handoff_origem_id: string | null;
+          id: string;
+          motivo_perda_detalhe: string | null;
+          motivo_perda_id: string | null;
+          numero: number;
+          origem_id: string | null;
+          padrao_cliente: string | null;
+          qualif_busca_financiamento: boolean | null;
+          qualif_distribuidora: string | null;
+          qualif_e_decisor: boolean | null;
+          qualif_imovel_proprio: boolean | null;
+          qualif_objetivo: string | null;
+          qualif_observacoes: string | null;
+          qualif_orcamento_outra_empresa: boolean | null;
+          qualif_outro_decisor: boolean | null;
+          qualif_participantes_decisao: string | null;
+          qualif_possui_conta_energia: boolean | null;
+          qualif_prazo_instalacao: string | null;
+          qualif_tipo_cliente: string | null;
+          responsavel_id: string | null;
+          status: Database["public"]["Enums"]["status_negocio"];
+          tipo_telhado: string | null;
+          titulo: string;
+          unidade_consumidora: string | null;
+          updated_at: string;
+          valor: number | null;
+          valor_conta_energia: number | null;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "negocios";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      travar_negocio_solo_autonomo: {
+        Args: { p_negocio_id: string };
+        Returns: {
+          consumo_medio_kwh: number | null;
+          contato_id: string;
+          created_at: string;
+          criado_por: string | null;
+          descricao: string | null;
+          empresa_id: string;
+          estrutura_telhado: string | null;
+          etapa_desde: string;
+          etapa_id: string;
+          fechado_em: string | null;
+          funil_id: string;
+          handoff_origem_id: string | null;
+          id: string;
+          motivo_perda_detalhe: string | null;
+          motivo_perda_id: string | null;
+          numero: number;
+          origem_id: string | null;
+          padrao_cliente: string | null;
+          qualif_busca_financiamento: boolean | null;
+          qualif_distribuidora: string | null;
+          qualif_e_decisor: boolean | null;
+          qualif_imovel_proprio: boolean | null;
+          qualif_objetivo: string | null;
+          qualif_observacoes: string | null;
+          qualif_orcamento_outra_empresa: boolean | null;
+          qualif_outro_decisor: boolean | null;
+          qualif_participantes_decisao: string | null;
+          qualif_possui_conta_energia: boolean | null;
+          qualif_prazo_instalacao: string | null;
+          qualif_tipo_cliente: string | null;
+          responsavel_id: string | null;
+          status: Database["public"]["Enums"]["status_negocio"];
+          tipo_telhado: string | null;
+          titulo: string;
+          unidade_consumidora: string | null;
+          updated_at: string;
+          valor: number | null;
+          valor_conta_energia: number | null;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "negocios";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
     };
     Enums: {
       aguardando_obra:
@@ -3999,6 +4330,7 @@ export type Database = {
       papel_membro: "admin" | "gestor" | "vendedor" | "sdr" | "operacao";
       perfil_gamificacao: "sdr" | "closer" | "cs_farmer";
       periodo_limite_regra: "dia" | "mes";
+      produto_plano: "solo" | "pro";
       proposta_bloco_quebra: "auto" | "nova_pagina" | "pagina_exclusiva";
       proposta_modelo_capa: "foto" | "minimalista" | "tecnica";
       proposta_modelo_status: "rascunho" | "publicado" | "arquivado";
@@ -4163,6 +4495,7 @@ export const Constants = {
       papel_membro: ["admin", "gestor", "vendedor", "sdr", "operacao"],
       perfil_gamificacao: ["sdr", "closer", "cs_farmer"],
       periodo_limite_regra: ["dia", "mes"],
+      produto_plano: ["solo", "pro"],
       proposta_bloco_quebra: ["auto", "nova_pagina", "pagina_exclusiva"],
       proposta_modelo_capa: ["foto", "minimalista", "tecnica"],
       proposta_modelo_status: ["rascunho", "publicado", "arquivado"],
