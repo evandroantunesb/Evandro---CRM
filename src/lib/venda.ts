@@ -1,3 +1,4 @@
+import { avisarSchemaAusente, tabelaAusente } from "@/lib/schema-ausente";
 import type { SupabaseServidor } from "@/lib/supabase/server";
 import type { StatusContrato, StatusPagamentoContrato } from "@/lib/tipos";
 
@@ -23,10 +24,13 @@ export const ROTULO_SITUACAO_CONTRATO: Record<SituacaoContrato, string> = {
   aguardando_assinatura: "Aguardando assinatura",
   assinado: "Assinado",
 };
-export const ROTULO_PAGAMENTO: Record<StatusPagamentoContrato, string> = {
+/** Situação do pagamento na visão de vendas: confirmação do Pro ou registro manual do Solo (PR #186). */
+export type SituacaoPagamentoVenda = StatusPagamentoContrato | "registrado";
+export const ROTULO_PAGAMENTO: Record<SituacaoPagamentoVenda, string> = {
   pendente: "A confirmar",
   confirmado: "Confirmado",
   estornado: "Estornado",
+  registrado: "Registrado (manual)",
 };
 export const ROTULO_NEGOCIO: Record<StatusNegocio, string> = { aberto: "Em andamento", ganho: "Ganho", perdido: "Perdido" };
 
@@ -42,8 +46,8 @@ export type LinhaVenda = {
   propostaUltimaAbertura: string | null;
   propostaAberturas: number;
   contrato: SituacaoContrato;
-  /** null quando não há contrato assinado nem confirmação (mesma regra de `status_pagamento_contrato`). */
-  pagamento: StatusPagamentoContrato | null;
+  /** null quando não há contrato assinado, confirmação nem registro manual ativo. */
+  pagamento: SituacaoPagamentoVenda | null;
   ultimaMovimentacao: string;
 };
 
@@ -55,6 +59,22 @@ export function statusPagamento(contratoStatus: StatusContrato | null, confirmac
   if (confirmacoes.length > 0) return "estornado";
   if (contratoStatus === "assinado") return "pendente";
   return null;
+}
+
+/**
+ * Situação do pagamento na visão de vendas: a confirmação ativa do Pro manda; senão, um registro
+ * manual ativo do Solo vale como "registrado" (os dois nunca ficam ativos juntos — trava no banco);
+ * senão, a regra de `status_pagamento_contrato`.
+ */
+export function situacaoPagamentoVenda(
+  contratoStatus: StatusContrato | null,
+  confirmacoes: readonly Confirmacao[],
+  registros: readonly { estornado_em: string | null }[],
+): SituacaoPagamentoVenda | null {
+  const pro = statusPagamento(contratoStatus, confirmacoes);
+  if (pro === "confirmado") return pro;
+  if (registros.some((r) => r.estornado_em == null)) return "registrado";
+  return pro;
 }
 
 export function situacaoProposta(temProposta: boolean, aberturas: number): SituacaoProposta {
@@ -79,7 +99,7 @@ export type AtalhoVenda = keyof typeof ATALHOS_VENDA;
 export type FiltrosVenda = {
   busca?: string;
   contrato?: SituacaoContrato;
-  pagamento?: StatusPagamentoContrato | "sem";
+  pagamento?: SituacaoPagamentoVenda | "sem";
   negocio?: StatusNegocio;
   /** Responsáveis permitidos (filtro de responsável/equipe); undefined = todos. */
   responsaveis?: ReadonlySet<string>;
@@ -104,9 +124,9 @@ function atendeAtalho(l: LinhaVenda, atalho: AtalhoVenda): boolean {
     case "aguardando_assinatura":
       return l.contrato === "aguardando_assinatura";
     case "assinado_sem_pagamento":
-      return l.contrato === "assinado" && l.pagamento !== "confirmado";
+      return l.contrato === "assinado" && l.pagamento !== "confirmado" && l.pagamento !== "registrado";
     case "pago_nao_ganho":
-      return l.pagamento === "confirmado" && l.negocio !== "ganho";
+      return (l.pagamento === "confirmado" || l.pagamento === "registrado") && l.negocio !== "ganho";
   }
 }
 
@@ -167,7 +187,13 @@ function emLotes<T>(itens: readonly T[]): T[][] {
 }
 
 /** Monta as linhas a partir das tabelas existentes (todas sob RLS). Ordena por última movimentação. */
-export async function carregarLinhasVenda(supabase: SupabaseServidor, empresaId: string): Promise<LinhaVenda[]> {
+export type LinhasVenda = {
+  linhas: LinhaVenda[];
+  /** true quando `registros_pagamento` ainda não existe no banco: o pagamento do Pro segue normal, mas o registro manual não foi lido. */
+  registroManualIndisponivel: boolean;
+};
+
+export async function carregarLinhasVenda(supabase: SupabaseServidor, empresaId: string): Promise<LinhasVenda> {
   const [propostasRes, contratosRes] = await Promise.all([
     supabase.from("propostas").select("id, negocio_id, updated_at").eq("empresa_id", empresaId),
     supabase.from("contratos").select("id, negocio_id, status, updated_at").eq("empresa_id", empresaId),
@@ -178,11 +204,11 @@ export async function carregarLinhasVenda(supabase: SupabaseServidor, empresaId:
   const contratos = contratosRes.data ?? [];
 
   const negocioIds = [...new Set([...propostas.map((p) => p.negocio_id), ...contratos.map((c) => c.negocio_id)])];
-  if (negocioIds.length === 0) return [];
+  if (negocioIds.length === 0) return { linhas: [], registroManualIndisponivel: false };
   const propostaIds = propostas.map((p) => p.id);
   const contratoIds = contratos.map((c) => c.id);
 
-  const [negocios, aberturas, confirmacoes] = await Promise.all([
+  const [negocios, aberturas, confirmacoes, registros] = await Promise.all([
     Promise.all(
       emLotes(negocioIds).map((ids) =>
         supabase.from("negocios").select("id, numero, titulo, valor, status, responsavel_id, updated_at, contatos(nome)").in("id", ids),
@@ -194,8 +220,21 @@ export async function carregarLinhasVenda(supabase: SupabaseServidor, empresaId:
         supabase.from("confirmacoes_pagamento").select("contrato_id, confirmado_em, estornado_em").in("contrato_id", ids),
       ),
     ),
+    // Registro manual do Solo (por negócio, pode existir sem contrato). Mesma RLS de confirmações.
+    Promise.all(
+      emLotes(negocioIds).map((ids) =>
+        supabase.from("registros_pagamento").select("negocio_id, registrado_em, estornado_em").in("negocio_id", ids),
+      ),
+    ),
   ]);
   for (const r of [...negocios, ...aberturas, ...confirmacoes]) if (r.error) throw r.error;
+  // Só "a tabela nova ainda não existe" vira fallback; qualquer outro erro continua estourando.
+  const erroRegistros = registros.find((r) => r.error)?.error;
+  const registroManualIndisponivel = !!erroRegistros && tabelaAusente(erroRegistros, "registros_pagamento");
+  if (erroRegistros) {
+    if (!registroManualIndisponivel) throw erroRegistros;
+    avisarSchemaAusente("registros_pagamento", erroRegistros);
+  }
 
   const propostaPorNegocio = new Map(propostas.map((p) => [p.negocio_id, p]));
   const contratoPorNegocio = new Map(contratos.map((c) => [c.negocio_id, c]));
@@ -203,18 +242,23 @@ export async function carregarLinhasVenda(supabase: SupabaseServidor, empresaId:
   for (const a of aberturas.flatMap((r) => r.data ?? [])) {
     aberturasPorProposta.set(a.proposta_id, [...(aberturasPorProposta.get(a.proposta_id) ?? []), a.aberta_em]);
   }
+  const registrosPorNegocio = new Map<string, { registrado_em: string; estornado_em: string | null }[]>();
+  for (const r of registros.flatMap((x) => x.data ?? [])) {
+    registrosPorNegocio.set(r.negocio_id, [...(registrosPorNegocio.get(r.negocio_id) ?? []), r]);
+  }
   const confirmacoesPorContrato = new Map<string, Confirmacao[]>();
   for (const c of confirmacoes.flatMap((r) => r.data ?? [])) {
     confirmacoesPorContrato.set(c.contrato_id, [...(confirmacoesPorContrato.get(c.contrato_id) ?? []), c]);
   }
 
-  return negocios
+  const linhas = negocios
     .flatMap((r) => r.data ?? [])
     .map((n): LinhaVenda => {
       const proposta = propostaPorNegocio.get(n.id);
       const contrato = contratoPorNegocio.get(n.id);
       const abertas = proposta ? (aberturasPorProposta.get(proposta.id) ?? []) : [];
       const confs = contrato ? (confirmacoesPorContrato.get(contrato.id) ?? []) : [];
+      const regs = registrosPorNegocio.get(n.id) ?? [];
       const contratoStatus = (contrato?.status as StatusContrato | undefined) ?? null;
       const ultimaAbertura = abertas.length ? maisRecente(abertas) : null;
       return {
@@ -229,17 +273,19 @@ export async function carregarLinhasVenda(supabase: SupabaseServidor, empresaId:
         propostaUltimaAbertura: ultimaAbertura,
         propostaAberturas: abertas.length,
         contrato: contratoStatus ?? "nao_gerado",
-        pagamento: statusPagamento(contratoStatus, confs),
+        pagamento: situacaoPagamentoVenda(contratoStatus, confs, regs),
         ultimaMovimentacao: maisRecente([
           n.updated_at,
           proposta?.updated_at,
           ultimaAbertura,
           contrato?.updated_at,
           ...confs.flatMap((c) => [c.confirmado_em, c.estornado_em]),
+          ...regs.flatMap((r) => [r.registrado_em, r.estornado_em]),
         ]),
       };
     })
     .sort((a, b) => new Date(b.ultimaMovimentacao).getTime() - new Date(a.ultimaMovimentacao).getTime());
+  return { linhas, registroManualIndisponivel };
 }
 
 /*
@@ -260,11 +306,19 @@ export type MarcosVenda = {
   progresso: string | null;
 };
 
+/**
+ * Registro manual de pagamento do Solo (PR #186): por negócio, pode vir antes do contrato.
+ * `ativo` = há registro não estornado; `disponivel` = quem vê pode registrar agora (Solo autônomo).
+ */
+export type RegistroNoMarco = { ativo: boolean; disponivel: boolean };
+
 export function marcosDaVenda(entrada: {
   negocio: StatusNegocio;
   contrato: SituacaoContrato;
   /** Resultado de `status_pagamento_contrato`: null quando não há contrato assinado nem confirmação. */
   pagamento: StatusPagamentoContrato | null;
+  /** Ausente fora do Solo e sem histórico de registro: o marco segue só a confirmação do Pro. */
+  registro?: RegistroNoMarco;
 }): MarcosVenda {
   const venda: Marco = {
     titulo: "Venda ganha",
@@ -278,16 +332,20 @@ export function marcosDaVenda(entrada: {
     rotulo: ROTULO_SITUACAO_CONTRATO[entrada.contrato],
     ancora: "#contrato",
   };
-  // Estornado não conta como cumprido. Sem status de pagamento, o cartão Pagamento não existe.
-  const pagamento: Marco =
-    entrada.pagamento === null
-      ? { titulo: "Pagamento confirmado", estado: "bloqueado", rotulo: "Aguardando contrato assinado", ancora: null }
-      : {
-          titulo: "Pagamento confirmado",
-          estado: entrada.pagamento === "confirmado" ? "cumprido" : "pendente",
-          rotulo: ROTULO_PAGAMENTO[entrada.pagamento],
-          ancora: "#pagamento",
-        };
+  // Estornado não conta como cumprido. Sem status de pagamento, o cartão Pagamento não existe —
+  // exceto no Solo, em que o pagamento pode ser registrado antes do contrato.
+  const pagamento: Marco = entrada.registro?.ativo
+    ? { titulo: "Pagamento registrado", estado: "cumprido", rotulo: "Registrado manualmente", ancora: "#pagamento" }
+    : entrada.pagamento === null && entrada.registro?.disponivel
+      ? { titulo: "Pagamento registrado", estado: "pendente", rotulo: "Não registrado", ancora: "#pagamento" }
+      : entrada.pagamento === null
+        ? { titulo: "Pagamento confirmado", estado: "bloqueado", rotulo: "Aguardando contrato assinado", ancora: null }
+        : {
+            titulo: "Pagamento confirmado",
+            estado: entrada.pagamento === "confirmado" ? "cumprido" : "pendente",
+            rotulo: ROTULO_PAGAMENTO[entrada.pagamento],
+            ancora: "#pagamento",
+          };
   const concluidos = [venda, contrato, pagamento].filter((m) => m.estado === "cumprido").length;
   return {
     venda,
@@ -309,7 +367,7 @@ export type CartaoFechamento =
 
 export function cartaoFechamento(
   podeVerContratoEPagamento: boolean,
-  entrada: { negocio: StatusNegocio; contrato: SituacaoContrato; pagamento: StatusPagamentoContrato | null },
+  entrada: { negocio: StatusNegocio; contrato: SituacaoContrato; pagamento: StatusPagamentoContrato | null; registro?: RegistroNoMarco },
 ): CartaoFechamento {
   if (!podeVerContratoEPagamento) return { tipo: "situacao", titulo: "Situação", negocio: entrada.negocio };
   return { tipo: "marcos", titulo: "Fechamento da venda", negocio: entrada.negocio, marcos: marcosDaVenda(entrada) };

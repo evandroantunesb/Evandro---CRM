@@ -1,5 +1,6 @@
 import type { Json } from "@/lib/supabase/database.types";
 
+import { formatarDataIso } from "@/lib/formatacao";
 import { ROTULO_TIPO_TAREFA, type TipoTarefa } from "@/lib/tipos";
 
 type Nomes = {
@@ -55,6 +56,13 @@ export function descreverAtividade(tipo: string, dadosJson: Json, nomes: Nomes):
       return "Pagamento confirmado";
     case "pagamento_estornado":
       return `Confirmação de pagamento estornada${d.motivo ? `: ${d.motivo}` : ""}`;
+    // Registro manual do Solo (PR #186): o corrigido vem acompanhado de um novo "registrado".
+    case "pagamento_registrado":
+      return `Pagamento registrado manualmente${typeof d.data_recebimento === "string" ? ` (recebido em ${formatarDataIso(d.data_recebimento)})` : ""}`;
+    case "pagamento_registro_estornado":
+      return `Registro de pagamento estornado${d.motivo ? `: ${d.motivo}` : ""}`;
+    case "pagamento_registro_corrigido":
+      return `Registro de pagamento corrigido${d.motivo ? `: ${d.motivo}` : ""}`;
     default:
       return tipo;
   }

@@ -4185,6 +4185,7 @@ export type Database = {
           sequencia: number;
         }[];
       };
+      situacao_registro_pagamento: { Args: { p_negocio_id: string }; Returns: string };
       solicitar_resgate: {
         Args: { p_recompensa_id: string };
         Returns: {

@@ -5,7 +5,6 @@ import { carregarConfiguracao, formatarDataHora, formatarMoeda } from "@/lib/crm
 import { exigirPapel } from "@/lib/sessao";
 import { EDITAR_MODELO_CONTRATO, PROPOSTA_E_CONTRATO, pode } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import type { StatusPagamentoContrato } from "@/lib/tipos";
 import {
   ATALHOS_POR_VISAO,
   ATALHOS_VENDA,
@@ -21,6 +20,7 @@ import {
   responsaveisPermitidos,
   type LinhaVenda,
   type SituacaoContrato,
+  type SituacaoPagamentoVenda,
   type StatusNegocio,
   type VisaoVenda,
 } from "@/lib/venda";
@@ -33,7 +33,7 @@ const TOM_CONTRATO: Record<SituacaoContrato, Tom> = {
   aguardando_assinatura: "atencao",
   assinado: "positivo",
 };
-const TOM_PAGAMENTO: Record<StatusPagamentoContrato, Tom> = { pendente: "atencao", confirmado: "positivo", estornado: "negativo" };
+const TOM_PAGAMENTO: Record<SituacaoPagamentoVenda, Tom> = { pendente: "atencao", confirmado: "positivo", estornado: "negativo", registrado: "positivo" };
 const TOM_NEGOCIO: Record<StatusNegocio, Tom> = { aberto: "neutro", ganho: "positivo", perdido: "negativo" };
 
 const umDe = <T extends string>(valores: readonly T[], v: string): T | undefined => valores.find((x) => x === v);
@@ -47,7 +47,7 @@ export default async function PropostasContratos({ searchParams }: PageProps<"/p
   const visao: VisaoVenda = umDe(VISOES_VENDA, texto("visao")) ?? "propostas";
 
   const supabase = await criarClienteServidor();
-  const [config, linhas, equipesRes] = await Promise.all([
+  const [config, { linhas, registroManualIndisponivel }, equipesRes] = await Promise.all([
     carregarConfiguracao(atual.empresaId),
     carregarLinhasVenda(supabase, atual.empresaId),
     veEquipe
@@ -82,7 +82,7 @@ export default async function PropostasContratos({ searchParams }: PageProps<"/p
   const visiveis = linhasVisiveis(linhas, visao, {
     busca: texto("q"),
     contrato: umDe(Object.keys(ROTULO_SITUACAO_CONTRATO) as SituacaoContrato[], texto("contrato")),
-    pagamento: umDe([...(Object.keys(ROTULO_PAGAMENTO) as StatusPagamentoContrato[]), "sem" as const], texto("pagamento")),
+    pagamento: umDe([...(Object.keys(ROTULO_PAGAMENTO) as SituacaoPagamentoVenda[]), "sem" as const], texto("pagamento")),
     negocio: umDe(Object.keys(ROTULO_NEGOCIO) as StatusNegocio[], texto("negocio")),
     responsaveis: responsaveisPermitidos(responsavel || undefined, equipe?.membros),
     atalho,
@@ -111,6 +111,12 @@ export default async function PropostasContratos({ searchParams }: PageProps<"/p
           </Link>
         )}
       </div>
+
+      {registroManualIndisponivel && (
+        <p className="text-xs text-zinc-500" role="status">
+          Registro manual de pagamento temporariamente indisponível: a situação de pagamento mostra só as confirmações do contrato.
+        </p>
+      )}
 
       <nav className="flex gap-1 border-b border-zinc-200" aria-label="Visão">
         {VISOES_VENDA.map((v) => (
