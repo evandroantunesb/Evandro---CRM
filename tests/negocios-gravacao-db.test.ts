@@ -15,6 +15,9 @@ import {
   type Atual,
 } from "@/lib/negocios-gravacao";
 import { conferirArquivos } from "@/lib/anexos-servidor";
+import { linhasParaComponentes } from "@/components/kit-componentes";
+import { MENSAGEM_NUMERO_BR } from "@/lib/formatacao";
+import { estadoSalvoDoKit } from "@/lib/kit-formulario";
 import { MENSAGEM_CALCULO_NAO_CONFERIDO, MENSAGEM_REMOCAO_COM_CALCULO, MENSAGEM_REMOCAO_SEM_CONFIRMACAO } from "@/lib/negocio-dados";
 import type { SupabaseServidor } from "@/lib/supabase/server";
 import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
@@ -246,6 +249,53 @@ describe("kit", () => {
     const semTarifa = await salvarKitComCliente(cliente(vendedor), atual[vendedor.id], kitForm({ tarifaKwh: "", componentes: "[]" }));
     expect(semTarifa.ok).toBe(false);
     expect((await reabrir(vendedor, r.negocioId)).kit).toHaveLength(2);
+  });
+
+  it("números no padrão brasileiro: 1.200 kWh grava 1200; reabrir e salvar sem editar mantém tudo (M2-a)", async () => {
+    const r = await criar(vendedor, novoNegocio({ componentes: KIT, valor: "25.000" }));
+    expect((await reabrir(vendedor, r.negocioId)).negocio.valor).toBe(25000);
+
+    const calculo = async () => {
+      const { data } = await servico
+        .from("calculos_solares")
+        .select("consumo_medio_kwh, valor_fatura_medio, tarifa_kwh, kit_potencia_kwp, geracao_estimada_kwh_mes, kwh_faturado, custo_fio_b, conta_sem_solar, conta_com_solar, economia_mensal, payback_meses")
+        .eq("negocio_id", r.negocioId)
+        .single();
+      return data!;
+    };
+    const kitForm = (campos: Record<string, string>) =>
+      fd({ negocioId: r.negocioId, tipoLigacao: "trifasico", valorFaturaMedio: "", estruturaTelhado: "", componentes: KIT, observacoes: "", ...campos });
+
+    expect((await salvarKitComCliente(cliente(vendedor), atual[vendedor.id], kitForm({ consumoMedioKwh: "1.200", tarifaKwh: "0,9512" }))).ok).toBe(true);
+    const primeiro = await calculo();
+    expect(primeiro).toMatchObject({ consumo_medio_kwh: 1200, tarifa_kwh: 0.9512, kit_potencia_kwp: 5.5, geracao_estimada_kwh_mes: 660 });
+    expect(primeiro.economia_mensal).toBeGreaterThan(0);
+
+    // Reabre como a ficha (estadoSalvoDoKit) e salva de novo o que os campos mostram, sem editar.
+    const { data: itens } = await vendedor.cliente.from("kit_componentes").select("tipo, descricao, potencia_w, quantidade").eq("negocio_id", r.negocioId).order("ordem");
+    const estado = estadoSalvoDoKit({
+      componentesSalvos: itens!.map((i) => ({ tipo: i.tipo, descricao: i.descricao, potenciaW: i.potencia_w, quantidade: i.quantidade })),
+      calculo: { tipoLigacao: "trifasico", consumoMedioKwh: primeiro.consumo_medio_kwh, valorFaturaMedio: primeiro.valor_fatura_medio, tarifaKwh: primeiro.tarifa_kwh },
+      estruturaTelhado: null,
+      consumoMedioKwhPadrao: null,
+      valorFaturaMedioPadrao: null,
+    });
+    expect(estado.consumoMedioKwh).toBe("1.200");
+    const componentesReabertos = JSON.stringify(linhasParaComponentes(estado.linhas));
+    for (let i = 0; i < 2; i++) {
+      const salvo = await salvarKitComCliente(
+        cliente(vendedor),
+        atual[vendedor.id],
+        kitForm({ consumoMedioKwh: estado.consumoMedioKwh, valorFaturaMedio: estado.valorFaturaMedio, tarifaKwh: estado.tarifaKwh, componentes: componentesReabertos }),
+      );
+      expect(salvo.ok).toBe(true);
+      expect(await calculo()).toEqual(primeiro);
+    }
+
+    // Ambíguo ("1.2") é recusado com mensagem e nada muda.
+    const ambiguo = await salvarKitComCliente(cliente(vendedor), atual[vendedor.id], kitForm({ consumoMedioKwh: "1.2", tarifaKwh: "0,9512" }));
+    expect(ambiguo).toMatchObject({ ok: false, mensagem: MENSAGEM_NUMERO_BR });
+    expect(await calculo()).toEqual(primeiro);
   });
 
   it("falha ao gravar itens não apaga o kit anterior e não mostra sucesso", async () => {

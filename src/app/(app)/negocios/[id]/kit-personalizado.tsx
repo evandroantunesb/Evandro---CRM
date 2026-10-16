@@ -12,7 +12,7 @@ import {
   potenciaKitPersonalizadoKwp,
   sugerirQuantidadeModulos,
 } from "@/lib/calculadora";
-import { formatarMoeda } from "@/lib/formatacao";
+import { formatarMoeda, lerNumeroBr } from "@/lib/formatacao";
 import { estadoSalvoDoKit } from "@/lib/kit-formulario";
 import { MENSAGEM_REMOCAO_COM_CALCULO } from "@/lib/negocio-dados";
 import { ROTULO_TIPO_COMPONENTE_KIT, ROTULO_TIPO_LIGACAO, TIPOS_LIGACAO, type TipoComponenteKit, type TipoLigacao } from "@/lib/tipos";
@@ -53,11 +53,10 @@ function numeroBr(v: number) {
   return v.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
 }
 
-/** Aceita "450", "450,5"; vazio ou inválido vira null. */
+/** Mesmo conversor do servidor ("450", "1.200", "1.200,50"); vazio, inválido ou ambíguo vira null. */
 function numero(v: string): number | null {
-  if (!v.trim()) return null;
-  const n = Number(v.replace(",", "."));
-  return Number.isFinite(n) && n > 0 ? n : null;
+  const n = lerNumeroBr(v);
+  return n != null && Number.isFinite(n) && n > 0 ? n : null;
 }
 
 export function KitPersonalizado({

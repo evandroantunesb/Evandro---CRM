@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { mensagemErro } from "@/lib/erros";
+import { lerNumeroBr, MENSAGEM_NUMERO_BR } from "@/lib/formatacao";
 import { salvarKitComCliente } from "@/lib/negocios-gravacao";
 import { exigirPapel } from "@/lib/sessao";
 import { CALCULADORA } from "@/lib/permissoes";
@@ -11,14 +12,14 @@ import type { ResultadoAcao } from "@/lib/tipos";
 
 const CAMINHO_LISTAS = "/configuracoes/listas";
 
-/** Aceita "1.234,56", "1234,5" e "1234.5". */
+/** Padrão brasileiro ("1.234,56", "1234,5"); fora dele é recusado (ver `lerNumeroBr`). */
 const numeroBr = (mensagem: string) =>
   z
     .string()
     .trim()
     .min(1, mensagem)
-    .transform((v) => Number(v.includes(",") ? v.replace(/\./g, "").replace(",", ".") : v))
-    .pipe(z.number({ message: mensagem }).positive(mensagem));
+    .transform(lerNumeroBr)
+    .pipe(z.number({ message: `${mensagem}. ${MENSAGEM_NUMERO_BR}` }).positive(mensagem));
 
 /** Salva o kit personalizado pelo núcleo `salvarKitComCliente` (itens com ou sem tarifa; cálculo com tarifa). */
 export async function salvarKitPersonalizado(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
@@ -47,8 +48,8 @@ const precoKit = z
   .string()
   .trim()
   .min(1, "Informe o preço")
-  .transform((v) => Number(v.includes(",") ? v.replace(/\./g, "").replace(",", ".") : v))
-  .pipe(z.number({ message: "Preço inválido" }).nonnegative("Preço inválido"));
+  .transform(lerNumeroBr)
+  .pipe(z.number({ message: `Preço inválido. ${MENSAGEM_NUMERO_BR}` }).nonnegative("Preço inválido"));
 
 export async function criarKit(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
   const { atual } = await exigirPapel("admin");
@@ -102,16 +103,14 @@ export async function editarParametros(_: ResultadoAcao, formData: FormData): Pr
   const percentual = z
     .string()
     .trim()
-    .transform((v) => Number(v.replace(",", ".")) / 100)
-    .pipe(z.number().min(0, "Percentual inválido").max(1, "Percentual inválido"));
+    // Vazio continua valendo 0%, como antes.
+    .transform((v) => (lerNumeroBr(v) ?? 0) / 100)
+    .pipe(z.number({ message: `Percentual inválido. ${MENSAGEM_NUMERO_BR}` }).min(0, "Percentual inválido").max(1, "Percentual inválido"));
   const custoOpcional = z
     .string()
     .optional()
-    .transform((v) => {
-      if (!v || !v.trim()) return 0;
-      return Number(v.includes(",") ? v.replace(/\./g, "").replace(",", ".") : v);
-    })
-    .pipe(z.number({ message: "Custo inválido" }).nonnegative("Custo inválido"));
+    .transform((v) => lerNumeroBr(v) ?? 0)
+    .pipe(z.number({ message: `Custo inválido. ${MENSAGEM_NUMERO_BR}` }).nonnegative("Custo inválido"));
   const dados = z
     .object({
       produtividade_kwh_kwp_mes: numeroBr("Informe a produtividade"),

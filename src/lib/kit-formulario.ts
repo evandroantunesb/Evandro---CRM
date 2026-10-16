@@ -1,4 +1,5 @@
 import type { LinhaComponente } from "@/components/kit-componentes";
+import { formatarNumeroBr } from "@/lib/formatacao";
 import type { TipoComponenteKit, TipoLigacao } from "@/lib/tipos";
 
 /** O que está gravado do kit do negócio (itens, cálculo e dados do negócio usados no formulário). */
@@ -19,7 +20,9 @@ export type EstadoFormularioKit = {
   tarifaKwh: string;
 };
 
-const numeroBr = (v: number) => v.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+// Inverso exato de `lerNumeroBr`: reabrir e salvar sem editar não muda nenhum valor (antes, 1200
+// reabria como "1.200" e voltava como 1,2; a tarifa com 4 casas perdia as duas últimas).
+const numeroBr = formatarNumeroBr;
 
 /**
  * Estado do formulário do kit exatamente como está gravado. Usado ao abrir o cartão e no

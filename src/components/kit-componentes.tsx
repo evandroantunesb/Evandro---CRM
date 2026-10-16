@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { Botao, Campo } from "@/components/ui";
 import { buscarComponentesCatalogo } from "@/lib/acoes/opensolar";
+import { formatarNumeroBr, lerNumeroBr } from "@/lib/formatacao";
 import { ROTULO_TIPO_COMPONENTE_KIT, TIPOS_COMPONENTE_KIT, type TipoComponenteKit } from "@/lib/tipos";
 
 export type LinhaComponente = {
@@ -18,11 +19,10 @@ export function novaLinhaComponente(tipo: TipoComponenteKit): LinhaComponente {
   return { tipo, descricao: "", potenciaW: "", quantidade: "1" };
 }
 
-/** Aceita "550", "550,5"; vazio ou inválido vira null. */
+/** Padrão brasileiro ("550", "550,5", "1.200"); vazio, inválido ou ambíguo vira null. */
 function numero(v: string): number | null {
-  if (!v.trim()) return null;
-  const n = Number(v.replace(",", "."));
-  return Number.isFinite(n) && n > 0 ? n : null;
+  const n = lerNumeroBr(v);
+  return n != null && Number.isFinite(n) && n > 0 ? n : null;
 }
 
 /** Converte as linhas do editor para o formato salvo (só as com descrição preenchida). */
@@ -80,7 +80,7 @@ function CampoModeloComBusca({
                 onClick={() => {
                   onSelecionar(
                     r.descricao,
-                    r.potenciaW != null ? String(r.potenciaW) : "",
+                    r.potenciaW != null ? formatarNumeroBr(r.potenciaW) : "",
                     r.precoEstimadoBRL != null ? String(r.precoEstimadoBRL) : "",
                   );
                   setResultados([]);
