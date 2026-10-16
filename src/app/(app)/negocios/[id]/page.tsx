@@ -13,7 +13,7 @@ import { env } from "@/lib/env";
 import { hojeEmSaoPaulo } from "@/lib/formatacao";
 import { descreverAtividade } from "@/lib/linha-do-tempo";
 import { exigirPapel } from "@/lib/sessao";
-import { ATRIBUIR_TAREFA_A_OUTROS, EDITAR_VALOR_NEGOCIO, ESCOLHER_RESPONSAVEL_NEGOCIO, NEGOCIOS, PAGAMENTO_SOLO, PROPOSTA_E_CONTRATO, RESPONSAVEL_COMERCIAL, pode } from "@/lib/permissoes";
+import { ARQUIVAR_NEGOCIO, ATRIBUIR_TAREFA_A_OUTROS, EDITAR_VALOR_NEGOCIO, ESCOLHER_RESPONSAVEL_NEGOCIO, NEGOCIOS, PAGAMENTO_SOLO, PROPOSTA_E_CONTRATO, RESPONSAVEL_COMERCIAL, pode } from "@/lib/permissoes";
 import { avisarSchemaAusente, funcaoAusente, tabelaAusente } from "@/lib/schema-ausente";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { cartaoFechamento } from "@/lib/venda";
@@ -27,6 +27,7 @@ import {
   type TipoLigacao,
   type TipoTarefa,
 } from "@/lib/tipos";
+import { Arquivamento } from "./arquivamento";
 import { Contrato } from "./contrato";
 import { EdicaoNegocio } from "./edicao";
 import { EnviarAnexo } from "./enviar-anexo";
@@ -58,7 +59,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
     supabase
       .from("negocios")
       .select(
-        "id, empresa_id, numero, titulo, valor, descricao, status, funil_id, etapa_id, origem_id, responsavel_id, motivo_perda_id, motivo_perda_detalhe, fechado_em, created_at, updated_at, tipo_telhado, unidade_consumidora, padrao_cliente, estrutura_telhado, consumo_medio_kwh, valor_conta_energia, qualif_tipo_cliente, qualif_possui_conta_energia, qualif_distribuidora, qualif_imovel_proprio, qualif_objetivo, qualif_prazo_instalacao, qualif_busca_financiamento, qualif_orcamento_outra_empresa, qualif_e_decisor, qualif_outro_decisor, qualif_participantes_decisao, qualif_observacoes, contatos(id, nome, tipo, telefone, email, endereco, cidade, uf)",
+        "id, empresa_id, numero, titulo, valor, descricao, status, arquivado_em, arquivado_por, motivo_arquivamento, funil_id, etapa_id, origem_id, responsavel_id, motivo_perda_id, motivo_perda_detalhe, fechado_em, created_at, updated_at, tipo_telhado, unidade_consumidora, padrao_cliente, estrutura_telhado, consumo_medio_kwh, valor_conta_energia, qualif_tipo_cliente, qualif_possui_conta_energia, qualif_distribuidora, qualif_imovel_proprio, qualif_objetivo, qualif_prazo_instalacao, qualif_busca_financiamento, qualif_orcamento_outra_empresa, qualif_e_decisor, qualif_outro_decisor, qualif_participantes_decisao, qualif_observacoes, contatos(id, nome, tipo, telefone, email, endereco, cidade, uf)",
       )
       .eq("id", id)
       .maybeSingle(),
@@ -193,6 +194,11 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
   // Obra gerada por esta venda (a RLS decide se a pessoa a enxerga).
   const { data: obraDoNegocio } = await supabase.from("obras").select("id, numero").eq("negocio_id", negocio.id).maybeSingle();
 
+  // Arquivado (P1a-0): somente leitura no banco; a ficha esconde as ações que seriam recusadas.
+  const arquivado = negocio.arquivado_em != null;
+  const responsavelAtual = config.membros.find((m) => m.id === negocio.responsavel_id);
+  const responsavelInativo = negocio.responsavel_id != null && !responsavelAtual?.ativo;
+
   // Fechamento em 3 marcos: quem não pode ver contrato/pagamento (SDR) recebe só a situação.
   const cartao = cartaoFechamento(pode(atual.papel, PROPOSTA_E_CONTRATO), {
     negocio: negocio.status,
@@ -206,7 +212,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
       negocioId={negocio.id}
       status={negocio.status}
       motivos={config.motivos.filter((m) => m.ativo || m.id === negocio.motivo_perda_id)}
-      somenteLeitura={atual.papel === "sdr"}
+      somenteLeitura={atual.papel === "sdr" || arquivado}
     />
   );
 
@@ -261,6 +267,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
             {negocio.status === "ganho" ? "Ganho" : "Perdido"}
           </Selo>
         )}
+        {arquivado && <Selo>Arquivado</Selo>}
         {config.etiquetas
           .filter((e) => etiquetasMarcadas.has(e.id))
           .map((e) => (
@@ -272,7 +279,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
               {e.nome}
             </span>
           ))}
-        {negocio.status === "aberto" && (
+        {negocio.status === "aberto" && !arquivado && (
           <MoverEtapa
             negocioId={negocio.id}
             etapaAtualId={negocio.etapa_id}
@@ -300,6 +307,22 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
           {negocio.motivo_perda_detalhe && <> · {negocio.motivo_perda_detalhe}</>}
         </p>
       )}
+
+      <Arquivamento
+        negocioId={negocio.id}
+        arquivamento={
+          arquivado
+            ? {
+                quando: formatarDataHora(negocio.arquivado_em!),
+                autor: negocio.arquivado_por ? nomes.membro(negocio.arquivado_por) : null,
+                motivo: negocio.motivo_arquivamento ?? "",
+              }
+            : null
+        }
+        podeArquivar={pode(atual.papel, ARQUIVAR_NEGOCIO)}
+        responsavelInativo={responsavelInativo}
+        responsaveis={config.membros.filter((m) => m.ativo && pode(m.papel, RESPONSAVEL_COMERCIAL))}
+      />
 
       {avisos.length > 0 && (
         <div role="alert" className="flex flex-col gap-1 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
@@ -558,11 +581,13 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
                   podeApagar: souAdmin || t.criado_por === atual.membroId,
                 }))}
               />
+              {!arquivado && (
               <NovaTarefa
                 negocioId={negocio.id}
                 responsaveis={pode(atual.papel, ATRIBUIR_TAREFA_A_OUTROS) ? config.membros.filter((m) => m.ativo && pode(m.papel, RESPONSAVEL_COMERCIAL)) : []}
                 responsavelPadrao={negocio.responsavel_id}
               />
+              )}
             </div>
           </Cartao>
           <Cartao titulo="Notas e linha do tempo">
@@ -711,7 +736,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
                 </ul>
               </div>
             )}
-            <EnviarAnexo empresaId={atual.empresaId} negocioId={negocio.id} />
+            {!arquivado && <EnviarAnexo empresaId={atual.empresaId} negocioId={negocio.id} />}
           </Cartao>
         </div>
       </div>

@@ -21,6 +21,8 @@ const MATRIZ: Record<string, string[]> = {
   FECHAR_NEGOCIO: ["admin", "gestor", "vendedor"],
   EDITAR_VALOR_NEGOCIO: ["admin", "gestor", "vendedor"],
   ESCOLHER_RESPONSAVEL_NEGOCIO: ["admin", "gestor"],
+  // Arquivamento (P1a-0): espelha arquivar_negocio/desarquivar_negocio.
+  ARQUIVAR_NEGOCIO: ["admin", "gestor"],
   FILTRAR_NEGOCIOS_POR_RESPONSAVEL: ["admin", "gestor"],
   PROPOSTA_E_CONTRATO: ["admin", "gestor", "vendedor"],
   CONFIRMAR_PAGAMENTO: ["admin", "gestor"],
@@ -58,6 +60,7 @@ describe("listas de permissão", () => {
   it("SDR não tem poder de gestão", () => {
     for (const lista of [
       permissoes.ESCOLHER_RESPONSAVEL_NEGOCIO,
+      permissoes.ARQUIVAR_NEGOCIO,
       permissoes.FILTRAR_NEGOCIOS_POR_RESPONSAVEL,
       permissoes.VER_TAREFAS_DE_OUTROS,
       permissoes.ATRIBUIR_TAREFA_A_OUTROS,

@@ -14,6 +14,7 @@ type LinhaNegocio = {
   etapa_id: string;
   funil_id: string;
   responsavel_id: string | null;
+  arquivado_em: string | null;
 };
 
 export type IndicadorOrigem = { nome: string; total: number };
@@ -77,7 +78,7 @@ export async function carregarIndicadores(empresaId: string, config: Configuraca
   const [{ data: negocios }, { data: tarefasAtrasadas }] = await Promise.all([
     supabase
       .from("negocios")
-      .select("status, valor, origem_id, etapa_id, funil_id, responsavel_id")
+      .select("status, valor, origem_id, etapa_id, funil_id, responsavel_id, arquivado_em")
       .eq("empresa_id", empresaId)
       .limit(10000),
     supabase
@@ -103,7 +104,7 @@ export async function carregarIndicadores(empresaId: string, config: Configuraca
 
   const porEtapa = new Map<string, IndicadorEtapa>();
   for (const n of linhas) {
-    if (n.status !== "aberto") continue;
+    if (n.status !== "aberto" || n.arquivado_em) continue;
     const etapa = etapaPorId.get(n.etapa_id);
     const chave = `${n.funil_id}:${n.etapa_id}`;
     const atual = porEtapa.get(chave) ?? {
@@ -129,7 +130,7 @@ export async function carregarIndicadores(empresaId: string, config: Configuraca
 
   const porVendedor = new Map<string, IndicadorVendedor>();
   for (const n of linhas) {
-    if (!n.responsavel_id) continue;
+    if (!n.responsavel_id || (n.status === "aberto" && n.arquivado_em)) continue;
     const nome = nomeMembro.get(n.responsavel_id) ?? "Removido";
     const atual = porVendedor.get(n.responsavel_id) ?? {
       nome,

@@ -47,6 +47,13 @@ Histórico: a migration da #139 foi aplicada em produção antes do merge, com a
 
 ## Em andamento
 
+### P1a-0 — Arquivamento de negócio (PR draft, 2026-10-16)
+
+- **Migration `20261016200000_negocios_arquivamento.sql`** (1ª de 2; a P1a-1, versões imutáveis de proposta, fica para outra PR e exige esta). Arquivar/desarquivar (admin/gestor, motivo obrigatório, registro em `logs_auditoria`); arquivado é somente leitura por qualquer caminho (notas e etiquetas livres); arquivar recusa tarefa aberta (informa quantas), distribuição de lead ou repasse pendentes, contrato, pagamento, obra e responsável inativo. Concorrência: gatilhos travam o negócio em `FOR KEY SHARE` e serializam com o `FOR UPDATE` do arquivar (testado com duas sessões reais).
+- **App:** ação na ficha, filtro "Arquivados" na lista; arquivados fora do Kanban, do painel, dos indicadores de carteira e do desligamento com transferência.
+- **Ordem obrigatória:** a migration precisa estar aplicada em produção (fluxo `banco-producao.yml`, com aprovação do Evandro) **antes** do merge — o código já lê as colunas novas e o preview da Vercel usa o banco de produção. Nada aplicado até agora.
+- **Pacote de revisão** (fora do repositório): SQLs, suíte fail-closed e evidências em `revisao-P1-v8/` no ambiente local do Evandro.
+
 ### PR #132 — Base Demo
 
 **A "Raion Solar Demo" está criada, completa e validada em produção.** O script (`scripts/seed-base-demo.mjs`) continua na PR #132, ainda **não mesclada**.
