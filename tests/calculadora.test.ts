@@ -1,6 +1,14 @@
 /** Calculadora solar (modo comercial): geração, desconto de disponibilidade e Fio B, payback. */
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { calcular, custosInternosEstimados, potenciaKitPersonalizadoKwp, sugerirQuantidadeModulos } from "@/lib/calculadora";
+import {
+  calcular,
+  custosInternosEstimados,
+  dimensionarSistema,
+  POTENCIA_MODULO_REFERENCIA_W,
+  potenciaKitPersonalizadoKwp,
+  sugerirQuantidadeModulos,
+} from "@/lib/calculadora";
 
 describe("calcular", () => {
   it("desconta a disponibilidade mínima quando o kit cobre todo o consumo", () => {
@@ -143,5 +151,57 @@ describe("custosInternosEstimados", () => {
       comissaoPercentual: 0,
     });
     expect(r.total).toBe(10000);
+  });
+});
+
+describe("dimensionarSistema (fonte única do assistente e do kit)", () => {
+  it("cobre 100% do consumo com a produtividade configurada, sem fator oculto", () => {
+    // 1.200 kWh / 120 kWh/kWp/mês = 10 kWp. O assistente antigo multiplicava por 1,24 (12,4 kWp).
+    const d = dimensionarSistema(1200, 120, 500)!;
+    expect(d.potenciaNecessariaKwp).toBe(10);
+    expect(d.quantidadeModulos).toBe(20);
+    expect(d.potenciaInstaladaKwp).toBe(10);
+  });
+
+  it("arredonda os módulos para cima e informa a potência instalada", () => {
+    const d = dimensionarSistema(450, 120, 550)!;
+    expect(d.potenciaNecessariaKwp).toBe(3.75);
+    expect(d.quantidadeModulos).toBe(7); // 3.750 W / 550 W = 6,82
+    expect(d.potenciaInstaladaKwp).toBe(3.85);
+  });
+
+  it("não sobe um módulo por erro de ponto flutuante", () => {
+    // 1.200 / 120 * 1000 / 500 pode dar 20,000000000000004 sem o arredondamento interno.
+    expect(dimensionarSistema(0.1 * 12000, 120, 500)!.quantidadeModulos).toBe(20);
+    expect(dimensionarSistema(3600, 120, 600)!.quantidadeModulos).toBe(50);
+  });
+
+  it("consumo pequeno ainda pede ao menos um módulo", () => {
+    expect(dimensionarSistema(10, 120, 620)!.quantidadeModulos).toBe(1);
+  });
+
+  it("entrada inválida não dimensiona", () => {
+    expect(dimensionarSistema(0, 120, 620)).toBeNull();
+    expect(dimensionarSistema(450, 0, 620)).toBeNull();
+    expect(dimensionarSistema(450, 120, 0)).toBeNull();
+    expect(dimensionarSistema(Number.NaN, 120, 620)).toBeNull();
+    expect(dimensionarSistema(-1, 120, 620)).toBeNull();
+  });
+
+  it("o kit personalizado (sugerirQuantidadeModulos) e o assistente dão a mesma quantidade", () => {
+    for (const consumo of [150, 450, 1200, 3333]) {
+      for (const produtividade of [100, 120, 135]) {
+        for (const w of [550, POTENCIA_MODULO_REFERENCIA_W, 700]) {
+          expect(sugerirQuantidadeModulos(consumo, produtividade, w)).toBe(dimensionarSistema(consumo, produtividade, w)!.quantidadeModulos);
+        }
+      }
+    }
+  });
+
+  it("o assistente de novo negócio usa a função única, sem conta própria nem fator escondido", () => {
+    const fonte = readFileSync("src/app/(app)/negocios/novo/formulario.tsx", "utf8");
+    expect(fonte).toContain("dimensionarSistema(");
+    expect(fonte).not.toMatch(/\*\s*1[.,]24\b/);
+    expect(fonte).not.toContain("estimarSistemaMock");
   });
 });
