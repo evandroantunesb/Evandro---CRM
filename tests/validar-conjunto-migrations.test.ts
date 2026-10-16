@@ -8,9 +8,10 @@ import { afterAll, describe, expect, it } from "vitest";
 
 const SCRIPT = ".github/scripts/validar-conjunto-migrations.sh";
 const WORKFLOW = ".github/workflows/banco-producao.yml";
-const AUTORIZADA = "20261015100000_integridade_contratos.sql";
-// Migration da #190, já aplicada: se voltar a aparecer como pendente, não é a autorizada.
-const JA_APLICADA = "20261014100000_blindagem_contratos_confirmacoes.sql";
+const AUTORIZADA = "20261015110000_integridade_handoff_origem.sql";
+// Migrations da #191 e da #190, já aplicadas: se voltarem a aparecer como pendentes, não são a autorizada.
+const JA_APLICADA = "20261015100000_integridade_contratos.sql";
+const JA_APLICADAS = [JA_APLICADA, "20261014100000_blindagem_contratos_confirmacoes.sql"];
 // No Windows o `bash` do PATH pode ser o do WSL; o do Git for Windows lê os caminhos como estão.
 const BASH_WINDOWS = "C:\\Program Files\\Git\\bin\\bash.exe";
 const BASH = process.platform === "win32" && existsSync(BASH_WINDOWS) ? BASH_WINDOWS : "bash";
@@ -82,6 +83,13 @@ describe("conjunto diferente do autorizado: encerra com erro", () => {
   it("só uma migration diferente da autorizada", () => {
     const r = validar(dryRunCom(JA_APLICADA));
     expect(r.codigo).toBe(1);
+  });
+
+  it("migration anterior já aplicada, sozinha ou junto com a autorizada, não passa", () => {
+    for (const anterior of JA_APLICADAS) {
+      expect(validar(dryRunCom(anterior)).codigo, anterior).toBe(1);
+      expect(validar(dryRunCom(anterior, AUTORIZADA)).codigo, anterior).toBe(1);
+    }
   });
 
   it("falta uma das autorizadas (dois itens autorizados, um listado)", () => {
