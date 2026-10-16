@@ -79,6 +79,17 @@
 | D07 | Pagamento Solo | registro manual, correção, estorno, upgrade Solo→Pro, controle de permissões | PRs #186/#188/#189 pendentes |
 | D08 | Estado comercial e passagem operacional | fechamento da venda, elegibilidade de Pedido, escopo contratado, auditoria, não gerar operações por dado incoerente | PARCIAL / DEPENDE DE PEDIDO |
 
+
+#### Leitura inteligente de documentos pessoais — escopo futuro aprovado (16/10/2026)
+
+- **Vínculo:** M4 — Propostas e documentos comerciais, integrado ao cadastro de contatos/clientes (B02), aos anexos protegidos (B07), aos documentos configuráveis (D03) e à preparação de contratos (D04). **Status: PLANEJADO / BACKLOG FUTURO**; não iniciar a implementação durante a etapa atual da calculadora e das propostas.
+- **Entrada:** cliente ou operador poderá anexar **CNH, RG ou CIN** em PDF (com texto ou digitalizado) ou imagem/foto (por exemplo JPG/PNG). **Preenchimento manual permanece sempre disponível**, inclusive quando a leitura automática não funcionar.
+- **Extração assistida:** reaproveitar, quando implementado e autorizado, o serviço de leitura inteligente previsto para a conta de energia; identificar apenas os campos cadastrais necessários e efetivamente presentes (por exemplo nome completo, CPF, data de nascimento e número do documento), indicar campos ausentes/incertos e permitir conferência e correção antes de salvar ou utilizar em contratos. Não repetir preenchimentos já conferidos no CRM sem necessidade.
+- **Limites:** OCR/IA e extração de texto **não comprovam autenticidade documental nem identidade**; nunca indicar “documento validado” sem verificação específica. Não inventar dados e não preencher automaticamente campos de baixa confiança.
+- **Segurança e privacidade:** LGPD, minimização de dados, acesso por papel e empresa, Storage privado, controle de compartilhamento, logs adequados, retenção e exclusão. **Documentos pessoais reais não devem ser enviados a provedores externos de IA sem revisão jurídica/de privacidade e autorização específicas.**
+- **Aceite futuro:** fluxo PDF + foto + manual demonstrado com documentos sintéticos/anonimizados; reconhecimento auditável, confirmação humana e integração ao cadastro/contrato sem afetar registros anteriores. Planejar e autorizar arquitetura, custos e eventual migration antes de desenvolver.
+
+
 ### E. Gamificação, metas e incentivos
 
 | ID | Frente integral | Subescopo mínimo a acompanhar | Situação-base |
