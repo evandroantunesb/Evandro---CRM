@@ -784,6 +784,13 @@ export type Database = {
             referencedColumns: ["id"];
           },
           {
+            foreignKeyName: "contratos_negocio_empresa_fk";
+            columns: ["negocio_id", "empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "negocios";
+            referencedColumns: ["id", "empresa_id"];
+          },
+          {
             foreignKeyName: "contratos_negocio_id_fkey";
             columns: ["negocio_id"];
             isOneToOne: true;
@@ -4095,6 +4102,7 @@ export type Database = {
         Args: { p_contato_id: string; p_criado_por: string; p_empresa_id: string };
         Returns: boolean;
       };
+      pode_ver_financeiro_negocio: { Args: { p_negocio_id: string }; Returns: boolean };
       pode_ver_negocio: { Args: { p_negocio_id: string }; Returns: boolean };
       pode_ver_obra: { Args: { p_obra_id: string }; Returns: boolean };
       pode_ver_obra_operacao: { Args: { p_obra_id: string }; Returns: boolean };
