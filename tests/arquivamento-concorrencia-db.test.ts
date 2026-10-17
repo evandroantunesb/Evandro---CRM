@@ -341,6 +341,67 @@ describe("arquivamento × transferência de pendência por UPDATE (duas sessões
   });
 });
 
+// Sem disputa: o mesmo acesso direto, como DONO do banco (postgres), o papel que nem a RLS nem as concessões limitam.
+describe("dono do banco: arquivamento só pelas funções e arquivado sem 'toque'", () => {
+  async function arquivarComoAdmin(negocio: string) {
+    const c = await conectar();
+    try {
+      await iniciarComo(c, "admin");
+      await c.query("select public.arquivar_negocio($1, 'Teste do dono')", [negocio]);
+      await c.query("commit");
+    } finally {
+      await c.end();
+    }
+  }
+  async function auditoria(negocio: string) {
+    return (await um<{ n: number }>(observador, "select count(*)::int as n from public.logs_auditoria where entidade = 'negocios' and entidade_id = $1", [negocio])).n;
+  }
+
+  it("arquivar ou desarquivar direto nas colunas é recusado até para o dono (nada sem auditoria)", async () => {
+    const ativo = await novoNegocio();
+    expect(
+      await erroDe(observador.query("update public.negocios set arquivado_em = now(), motivo_arquivamento = 'direto' where id = $1", [ativo])),
+    ).toBe("Use arquivar ou desarquivar para mudar o arquivamento.");
+
+    const arquivado = await novoNegocio();
+    await arquivarComoAdmin(arquivado);
+    expect(
+      await erroDe(observador.query("update public.negocios set arquivado_em = null, motivo_arquivamento = null, arquivado_por = null where id = $1", [arquivado])),
+    ).toBe("Use arquivar ou desarquivar para mudar o arquivamento.");
+    expect(await auditoria(ativo)).toBe(0);
+    expect(await auditoria(arquivado)).toBe(1);
+    expect(await estado(arquivado)).toMatchObject({ arquivado: true });
+  });
+
+  it("dono não muda só o updated_at do arquivado; apagar o membro que arquivou continua anulando o autor", async () => {
+    const negocio = await novoNegocio();
+    const u = await um<{ id: string }>(
+      observador,
+      `insert into auth.users (id, instance_id, aud, role, email, created_at, updated_at)
+       values (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', $1, now(), now()) returning id`,
+      [`arq-conc-gestor-${sufixo}-${Math.random()}@teste.raion`],
+    );
+    const gestor = (await um<{ id: string }>(observador, "insert into public.empresa_membros (empresa_id, user_id, papel) values ($1, $2, 'gestor') returning id", [empresa, u.id])).id;
+    const c = await conectar();
+    try {
+      await c.query("begin");
+      await c.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: u.id, role: "authenticated" })]);
+      await c.query("set local role authenticated");
+      await c.query("select public.arquivar_negocio($1, 'Arquivado pelo gestor')", [negocio]);
+      await c.query("commit");
+    } finally {
+      await c.end();
+    }
+
+    expect(await erroDe(observador.query("update public.negocios set updated_at = now() - interval '1 day' where id = $1", [negocio]))).toBe(SOMENTE_LEITURA);
+    expect(await erroDe(observador.query("update public.negocios set titulo = titulo where id = $1", [negocio]))).toBe(SOMENTE_LEITURA);
+
+    expect(await erroDe(observador.query("delete from public.empresa_membros where id = $1", [gestor]))).toBeNull();
+    const n = await um<{ arquivado: boolean; autor: string | null }>(observador, "select arquivado_em is not null as arquivado, arquivado_por as autor from public.negocios where id = $1", [negocio]);
+    expect(n).toEqual({ arquivado: true, autor: null });
+  });
+});
+
 describe("arquivamento × edição do negócio (duas sessões)", () => {
   it("arquivamento primeiro: a edição concorrente espera e é recusada", async () => {
     const negocio = await novoNegocio();

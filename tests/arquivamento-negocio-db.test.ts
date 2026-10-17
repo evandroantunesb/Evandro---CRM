@@ -88,6 +88,39 @@ describe("arquivar e desarquivar pela API", () => {
     expect(error?.message).toBe("Use arquivar ou desarquivar para mudar o arquivamento.");
   });
 
+  it("negócio não nasce arquivado, nem por service_role (o arquivamento passa sempre pela auditoria)", async () => {
+    const { error } = await servico.from("negocios").insert({
+      empresa_id: empresa,
+      titulo: `Nasce arquivado ${sufixo}`,
+      contato_id: contato,
+      funil_id: funil,
+      etapa_id: etapa,
+      responsavel_id: membroVendedor,
+      arquivado_em: new Date().toISOString(),
+      motivo_arquivamento: "atalho",
+    });
+    expect(error?.message).toBe("Use arquivar ou desarquivar para mudar o arquivamento.");
+  });
+
+  it("service_role não muda só o updated_at do arquivado nem de filho dele, nem faz UPDATE sem mudança", async () => {
+    const negocio = await novoNegocio();
+    const { data: tarefa } = await servico
+      .from("tarefas")
+      .insert({ empresa_id: empresa, negocio_id: negocio, titulo: "Concluída", vence_em: new Date(Date.now() + 86_400_000).toISOString(), responsavel_id: membroVendedor })
+      .select("id")
+      .single();
+    await servico.from("tarefas").update({ concluida_em: new Date().toISOString(), resultado: "contato_realizado" }).eq("id", tarefa!.id);
+    expect((await admin.cliente.rpc("arquivar_negocio", { p_negocio_id: negocio, p_motivo: "updated_at" })).error).toBeNull();
+    const antes = (await servico.from("negocios").select("updated_at").eq("id", negocio).single()).data!.updated_at;
+
+    const ontem = new Date(Date.now() - 86_400_000).toISOString();
+    expect((await servico.from("negocios").update({ updated_at: ontem }).eq("id", negocio)).error?.message).toBe(SOMENTE_LEITURA);
+    expect((await servico.from("tarefas").update({ updated_at: ontem }).eq("id", tarefa!.id)).error?.message).toBe(SOMENTE_LEITURA);
+    // Sem mudança nenhuma: o gatilho *_updated_at (posterior) transformaria isto num "toque".
+    expect((await servico.from("tarefas").update({ titulo: "Concluída" }).eq("id", tarefa!.id)).error?.message).toBe(SOMENTE_LEITURA);
+    expect((await servico.from("negocios").select("updated_at").eq("id", negocio).single()).data!.updated_at).toBe(antes);
+  });
+
   it("tarefa aberta impede o arquivamento e a mensagem diz quantas; nada é concluído sozinho", async () => {
     const negocio = await novoNegocio();
     const vence = new Date(Date.now() + 86_400_000).toISOString();

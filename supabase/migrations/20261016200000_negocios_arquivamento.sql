@@ -8,7 +8,11 @@
 --  * 3 colunas anuláveis e 1 restrição de coerência em `negocios`; `arquivar_negocio` e `desarquivar_negocio`
 --    (admin ou gestor, motivo obrigatório), registradas na auditoria existente (`logs_auditoria`);
 --  * negócio arquivado fica SOMENTE LEITURA por qualquer caminho (API, service_role, funções do M1, dono), por
---    gatilhos em `negocios` e nas tabelas comerciais filhas; notas e etiquetas continuam editáveis;
+--    gatilhos em `negocios` e nas tabelas comerciais filhas, inclusive UPDATE só de updated_at; a única mudança
+--    aceita é o banco anular sozinho a referência a um registro apagado (ON DELETE SET NULL); notas e etiquetas
+--    continuam editáveis;
+--  * arquivar e desarquivar só pelas funções, para qualquer papel (inclusive o dono) e sem INSERT já arquivado:
+--    toda mudança de arquivamento passa pela auditoria;
 --  * arquivar recusa negócio que uma rotina do M1 ainda alteraria (distribuição de lead ou repasse pendentes;
 --    contrato, pagamento ou obra; responsável inativo) ou com tarefas abertas (informa quantas); essas
 --    pendências também não nascem nem entram depois no arquivado (troca de negocio_id, volta a pendente);
@@ -33,24 +37,39 @@ alter table public.negocios
     check ((arquivado_em is null and motivo_arquivamento is null and arquivado_por is null)
            or (arquivado_em is not null and length(btrim(coalesce(motivo_arquivamento, ''))) > 0));
 
--- As colunas de arquivamento só mudam pelas funções abaixo (que rodam como dono). Sem isto, quem pode editar
--- o negócio pela API (ex.: o vendedor responsável) arquivaria ou desarquivaria sem a regra de papel e motivo.
+-- As colunas de arquivamento só mudam por `arquivar_negocio` e `desarquivar_negocio`, que conferem papel, motivo e
+-- pendências e gravam a auditoria. Vale para QUALQUER papel, inclusive o dono: as duas funções marcam a transação
+-- com `raion.arquivamento_negocio` = id do negócio só durante o próprio UPDATE, e sem essa marca a mudança é
+-- recusada (um UPDATE direto do dono arquivaria ou desarquivaria sem auditoria). Negócio também não NASCE
+-- arquivado. Única exceção: o banco anular sozinho o autor quando o membro é apagado (ON DELETE SET NULL).
+-- Limite (o mesmo de todo gatilho): quem é dono pode desligar gatilhos ou forjar a marca de propósito.
 create or replace function public.negocios_proteger_arquivamento()
 returns trigger
 language plpgsql set search_path = ''
 as $$
 begin
-  if (new.arquivado_em, new.arquivado_por, new.motivo_arquivamento)
-     is distinct from (old.arquivado_em, old.arquivado_por, old.motivo_arquivamento)
-     and current_user in ('authenticated', 'anon', 'service_role') then
-    raise exception 'Use arquivar ou desarquivar para mudar o arquivamento.' using errcode = 'insufficient_privilege', hint = 'mensagem_usuario';
+  if tg_op = 'INSERT' then
+    if new.arquivado_em is null and new.arquivado_por is null and new.motivo_arquivamento is null then
+      return new;
+    end if;
+  elsif (new.arquivado_em, new.arquivado_por, new.motivo_arquivamento)
+        is not distinct from (old.arquivado_em, old.arquivado_por, old.motivo_arquivamento) then
+    return new;
+  elsif new.arquivado_em is not distinct from old.arquivado_em
+        and new.motivo_arquivamento is not distinct from old.motivo_arquivamento
+        and new.arquivado_por is null
+        and not exists (select 1 from public.empresa_membros where id = old.arquivado_por) then
+    return new;
+  elsif current_user not in ('authenticated', 'anon', 'service_role')
+        and current_setting('raion.arquivamento_negocio', true) = new.id::text then
+    return new;
   end if;
-  return new;
+  raise exception 'Use arquivar ou desarquivar para mudar o arquivamento.' using errcode = 'insufficient_privilege', hint = 'mensagem_usuario';
 end;
 $$;
 revoke all on function public.negocios_proteger_arquivamento() from public, anon, authenticated, service_role;
 create trigger negocios_proteger_arquivamento
-  before update of arquivado_em, arquivado_por, motivo_arquivamento on public.negocios
+  before insert or update of arquivado_em, arquivado_por, motivo_arquivamento on public.negocios
   for each row execute function public.negocios_proteger_arquivamento();
 
 -- Arquivar/desarquivar: admin ou gestor da empresa. Não apaga nada; ficha, versões e links continuam.
@@ -104,8 +123,11 @@ begin
     raise exception 'O responsável deste negócio não está ativo: reatribua antes de arquivar.' using errcode = 'check_violation', hint = 'mensagem_usuario';
   end if;
   v_membro := public.meu_membro_id(v_negocio.empresa_id);
+  -- Marca só para este UPDATE (negocios_proteger_arquivamento exige); desfeita em seguida.
+  perform set_config('raion.arquivamento_negocio', p_negocio_id::text, true);
   update public.negocios set arquivado_em = now(), arquivado_por = v_membro, motivo_arquivamento = v_motivo
    where id = p_negocio_id;
+  perform set_config('raion.arquivamento_negocio', '', true);
   -- Histórico na auditoria existente (sem FK: sobrevive à exclusão do membro). Não gera evento de gamificação.
   insert into public.logs_auditoria (empresa_id, user_id, acao, entidade, entidade_id, dados_antes, dados_depois)
   values (v_negocio.empresa_id, (select auth.uid()), 'arquivar', 'negocios', p_negocio_id::text,
@@ -151,8 +173,10 @@ begin
     raise exception 'O responsável deste negócio não está mais ativo: informe o novo responsável para desarquivar.' using errcode = 'check_violation', hint = 'mensagem_usuario';
   end if;
   v_membro := public.meu_membro_id(v_negocio.empresa_id);
+  perform set_config('raion.arquivamento_negocio', p_negocio_id::text, true);
   update public.negocios set arquivado_em = null, arquivado_por = null, motivo_arquivamento = null, responsavel_id = v_responsavel
    where id = p_negocio_id;
+  perform set_config('raion.arquivamento_negocio', '', true);
   insert into public.logs_auditoria (empresa_id, user_id, acao, entidade, entidade_id, dados_antes, dados_depois)
   values (v_negocio.empresa_id, (select auth.uid()), 'desarquivar', 'negocios', p_negocio_id::text,
           jsonb_build_object('arquivado_em', v_negocio.arquivado_em, 'arquivado_por', v_negocio.arquivado_por,
@@ -181,7 +205,9 @@ grant execute on function public.desarquivar_negocio(uuid, text, uuid) to authen
 -- Roda como dona (SECURITY DEFINER), como os gatilhos do M1: a RLS de quem chama não pode esconder o negócio
 -- arquivado nem o registro referenciado. A regra não depende de papel.
 -- Confere uma mudança de linha de negócio arquivado: fora `p_ignoradas`, nada muda; cada coluna 'col:tabela'
--- de `p_anulaveis` só pode mudar para nulo, e só quando o registro antigo não existe mais em public.<tabela>.
+-- de `p_anulaveis` só pode mudar para nulo, e só quando o registro antigo não existe mais em public.<tabela>; e
+-- PELO MENOS UMA foi anulada assim. Sem isso, um UPDATE só de updated_at (ou sem mudança, que o gatilho
+-- *_updated_at, posterior a este, transformaria num "toque") passaria na linha arquivada.
 create or replace function public.arquivado_so_anulacao_automatica(p_novo jsonb, p_velho jsonb, p_anulaveis text[], p_ignoradas text[])
 returns boolean
 language plpgsql stable security definer set search_path = ''
@@ -190,6 +216,7 @@ declare
   v_par text;
   v_col text;
   v_existe boolean;
+  v_anulou boolean := false;
 begin
   if (p_novo - p_ignoradas) is distinct from (p_velho - p_ignoradas) then
     return false;
@@ -205,9 +232,10 @@ begin
       if v_existe then
         return false;
       end if;
+      v_anulou := true;
     end if;
   end loop;
-  return true;
+  return v_anulou;
 end;
 $$;
 revoke all on function public.arquivado_so_anulacao_automatica(jsonb, jsonb, text[], text[]) from public, anon, authenticated, service_role;
