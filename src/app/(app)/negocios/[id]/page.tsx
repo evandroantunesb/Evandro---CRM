@@ -360,6 +360,9 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
         <div className="flex flex-col gap-4 lg:col-start-1 lg:row-span-2 lg:row-start-1">
           <Cartao titulo="Dados do negócio">
             <EdicaoNegocio
+              // Os campos usam defaultValue: desarquivar com novo responsável (ou arquivar) muda os dados por fora do
+              // editor, e sem remontar ele mostraria o responsável antigo e o gravaria no próximo "Salvar".
+              key={`${negocio.responsavel_id ?? ""}:${negocio.arquivado_em ?? ""}`}
               empresaId={negocio.empresa_id}
               negocio={{
                 id: negocio.id,

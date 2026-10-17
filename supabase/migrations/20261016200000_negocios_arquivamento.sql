@@ -10,7 +10,8 @@
 --  * negócio arquivado fica SOMENTE LEITURA por qualquer caminho (API, service_role, funções do M1, dono), por
 --    gatilhos em `negocios` e nas tabelas comerciais filhas; notas e etiquetas continuam editáveis;
 --  * arquivar recusa negócio que uma rotina do M1 ainda alteraria (distribuição de lead ou repasse pendentes;
---    contrato, pagamento ou obra; responsável inativo) ou com tarefas abertas (informa quantas);
+--    contrato, pagamento ou obra; responsável inativo) ou com tarefas abertas (informa quantas); essas
+--    pendências também não nascem nem entram depois no arquivado (troca de negocio_id, volta a pendente);
 --  * CONCORRÊNCIA: arquivar/desarquivar travam o negócio (FOR UPDATE); os gatilhos das tabelas filhas e das
 --    tabelas do M1 conferidas pelo arquivar travam o mesmo negócio em FOR KEY SHARE antes de ler o estado. A
 --    operação que chega depois espera a outra transação e revalida (testado com duas sessões reais).
@@ -290,18 +291,23 @@ create trigger handoffs_arquivado_somente_leitura before insert or update or del
   for each row execute function public.negocio_arquivado_bloquear_filho('de_membro_id:empresa_membros', 'respondido_por:empresa_membros');
 
 -- Pendências que o arquivar confere (distribuição de lead, contrato, pagamento, obra): não podem NASCER num
--- negócio arquivado nem durante o arquivamento (a trava acima serializa com ele). Só INSERT: como o arquivar recusa
--- negócio que já as tenha e a criação fica barrada, não existe linha dessas tabelas em negócio arquivado para
--- alterar; UPDATE e DELETE seguem só com as regras do M1.
-create trigger atribuicoes_leads_arquivado_somente_leitura before insert on public.atribuicoes_leads
-  for each row execute function public.negocio_arquivado_bloquear_filho();
-create trigger contratos_arquivado_somente_leitura before insert on public.contratos
-  for each row execute function public.negocio_arquivado_bloquear_filho();
+-- negócio arquivado nem durante o arquivamento (a trava acima serializa com ele), nem ENTRAR nele depois.
+--  * atribuicoes_leads, contratos e obras: INSERT e UPDATE. Sem o UPDATE, service_role e o dono transfeririam
+--    uma distribuição pendente ou um contrato para o arquivado (troca de negocio_id) e devolveriam a pendente
+--    uma distribuição já decidida do arquivado (as decididas continuam nele). As rotinas do M1 só alteram
+--    distribuição pendente e contrato/obra existentes, que o arquivar recusa: nada delas passa por aqui.
+--  * registros_pagamento e confirmacoes_pagamento: só INSERT. O UPDATE já não tem concessão para a API e o
+--    gatilho do M1 trava negocio_id e os demais dados para qualquer papel, inclusive o dono.
+--  * DELETE segue só com as regras do M1: apagar não cria pendência (o negócio arquivado não pode ser apagado).
+create trigger atribuicoes_leads_arquivado_somente_leitura before insert or update on public.atribuicoes_leads
+  for each row execute function public.negocio_arquivado_bloquear_filho('membro_final_id:empresa_membros', 'decidido_por:empresa_membros');
+create trigger contratos_arquivado_somente_leitura before insert or update on public.contratos
+  for each row execute function public.negocio_arquivado_bloquear_filho('criado_por:empresa_membros', 'atualizado_por:empresa_membros', 'responsavel_assinatura_id:empresa_membros');
 create trigger registros_pagamento_arquivado_somente_leitura before insert on public.registros_pagamento
   for each row execute function public.negocio_arquivado_bloquear_filho();
 create trigger confirmacoes_pagamento_arquivado_somente_leitura before insert on public.confirmacoes_pagamento
   for each row execute function public.negocio_arquivado_bloquear_filho();
-create trigger obras_arquivado_somente_leitura before insert on public.obras
+create trigger obras_arquivado_somente_leitura before insert or update on public.obras
   for each row execute function public.negocio_arquivado_bloquear_filho();
 
 reset lock_timeout;

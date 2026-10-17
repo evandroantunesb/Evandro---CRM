@@ -286,6 +286,61 @@ describe("arquivamento × contrato (duas sessões)", () => {
   });
 });
 
+describe("arquivamento × transferência de pendência por UPDATE (duas sessões)", () => {
+  // Como dono do banco (quem: null), o caminho mais amplo: troca o negocio_id de uma pendência de outro negócio.
+  async function distribuicaoPendente() {
+    const origem = await novoNegocio();
+    return (
+      await um<{ id: string }>(
+        observador,
+        "insert into public.atribuicoes_leads (empresa_id, negocio_id, membro_sugerido_id, expira_em) values ($1, $2, $3, now() + interval '1 hour') returning id",
+        [empresa, origem, membro.vendedor2],
+      )
+    ).id;
+  }
+  async function contratoDeOutro() {
+    const origem = await novoNegocio();
+    return (await um<{ id: string }>(observador, "insert into public.contratos (empresa_id, negocio_id, conteudo) values ($1, $2, 'Contrato a transferir') returning id", [empresa, origem])).id;
+  }
+  const transferir = (tabela: "atribuicoes_leads" | "contratos", id: string, negocio: string) => ({
+    quem: null,
+    sql: `update public.${tabela} set negocio_id = $1 where id = $2`,
+    params: [negocio, id],
+  });
+
+  it("arquivamento primeiro: a distribuição transferida no meio espera e é recusada", async () => {
+    const negocio = await novoNegocio();
+    const r = await disputa(ARQUIVAR(negocio), transferir("atribuicoes_leads", await distribuicaoPendente(), negocio));
+    expect(r.esperou).toBe(true);
+    expect(r.erroSegundo).toBe(SOMENTE_LEITURA);
+    expect(await estado(negocio)).toMatchObject({ arquivado: true, atribuicoes: 0 });
+  });
+
+  it("transferência da distribuição primeiro: o arquivamento espera e é recusado", async () => {
+    const negocio = await novoNegocio();
+    const r = await disputa(transferir("atribuicoes_leads", await distribuicaoPendente(), negocio), ARQUIVAR(negocio));
+    expect(r.esperou).toBe(true);
+    expect(r.erroSegundo).toBe("Há uma distribuição de lead pendente para este negócio: conclua antes de arquivar.");
+    expect(await estado(negocio)).toMatchObject({ arquivado: false, atribuicoes: 1 });
+  });
+
+  it("arquivamento primeiro: o contrato transferido no meio espera e é recusado", async () => {
+    const negocio = await novoNegocio();
+    const r = await disputa(ARQUIVAR(negocio), transferir("contratos", await contratoDeOutro(), negocio));
+    expect(r.esperou).toBe(true);
+    expect(r.erroSegundo).toBe(SOMENTE_LEITURA);
+    expect(await estado(negocio)).toMatchObject({ arquivado: true, contratos: 0 });
+  });
+
+  it("transferência do contrato primeiro: o arquivamento espera e é recusado", async () => {
+    const negocio = await novoNegocio();
+    const r = await disputa(transferir("contratos", await contratoDeOutro(), negocio), ARQUIVAR(negocio));
+    expect(r.esperou).toBe(true);
+    expect(r.erroSegundo).toBe("Negócio com contrato, pagamento ou obra não pode ser arquivado.");
+    expect(await estado(negocio)).toMatchObject({ arquivado: false, contratos: 1 });
+  });
+});
+
 describe("arquivamento × edição do negócio (duas sessões)", () => {
   it("arquivamento primeiro: a edição concorrente espera e é recusada", async () => {
     const negocio = await novoNegocio();

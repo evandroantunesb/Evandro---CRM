@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { useEnvioSemReset } from "@/components/envio-sem-reset";
 import { Botao, Mensagem, Selecao } from "@/components/ui";
 import { arquivarNegocio, desarquivarNegocio } from "@/lib/acoes/negocios";
 
@@ -26,6 +27,9 @@ export function Arquivamento({
 }) {
   const [resultadoArquivar, arquivar, arquivando] = useActionState(arquivarNegocio, null);
   const [resultadoDesarquivar, desarquivar, desarquivando] = useActionState(desarquivarNegocio, null);
+  // Sem o reset automático: uma recusa (ex.: tarefa aberta) não apaga o motivo nem o novo responsável escolhidos.
+  const enviarArquivar = useEnvioSemReset(arquivar);
+  const enviarDesarquivar = useEnvioSemReset(desarquivar);
   // Estados separados: depois de arquivar, a ficha volta já no aviso, com o desarquivamento fechado (e vice-versa).
   const [abrirArquivar, setAbrirArquivar] = useState(false);
   const [abrirDesarquivar, setAbrirDesarquivar] = useState(false);
@@ -42,7 +46,7 @@ export function Arquivamento({
         </p>
         {podeArquivar &&
           (abrirDesarquivar ? (
-            <form action={desarquivar} className="flex flex-col gap-2">
+            <form onSubmit={enviarDesarquivar} className="flex flex-col gap-2">
               <input type="hidden" name="negocioId" value={negocioId} />
               <textarea
                 name="motivo"
@@ -94,7 +98,7 @@ export function Arquivamento({
     );
   }
   return (
-    <form action={arquivar} className="flex flex-col gap-2 rounded-md border border-zinc-200 px-3 py-2">
+    <form onSubmit={enviarArquivar} className="flex flex-col gap-2 rounded-md border border-zinc-200 px-3 py-2">
       <input type="hidden" name="negocioId" value={negocioId} />
       <p className="text-sm text-zinc-700">
         O negócio sai das listas, do funil e do painel e fica somente leitura (notas e etiquetas continuam). Nada é

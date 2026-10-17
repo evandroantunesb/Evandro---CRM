@@ -1,7 +1,8 @@
 /**
  * Arquivamento de negócio pela API (20261016200000_negocios_arquivamento.sql): admin/gestor arquivam e desarquivam
  * com motivo, registrado em logs_auditoria; arquivado fica somente leitura pela API (notas continuam); tarefa aberta
- * impede o arquivamento informando quantas; o atalho direto nas colunas é recusado até para service_role.
+ * impede o arquivamento informando quantas; o atalho direto nas colunas é recusado até para service_role; distribuição
+ * de lead e contrato não entram no arquivado por UPDATE (volta a pendente, troca de negocio_id).
  * A disputa entre sessões está em `arquivamento-concorrencia-db.test.ts`.
  */
 import { beforeAll, describe, expect, it } from "vitest";
@@ -118,5 +119,66 @@ describe("arquivar e desarquivar pela API", () => {
       .eq("entidade_id", negocio)
       .order("id");
     expect(logs!.map((l) => l.acao)).toEqual(["arquivar", "desarquivar"]);
+  });
+});
+
+describe("vínculos do negócio arquivado", () => {
+  const amanha = () => new Date(Date.now() + 86_400_000).toISOString();
+
+  it("service_role não devolve a pendente a distribuição decidida do arquivado nem transfere distribuição ou contrato para ele", async () => {
+    const arquivado = await novoNegocio();
+    const ativo = await novoNegocio();
+    const { data: decidida } = await servico
+      .from("atribuicoes_leads")
+      .insert({ empresa_id: empresa, negocio_id: arquivado, membro_sugerido_id: membroVendedor, expira_em: amanha() })
+      .select("id")
+      .single();
+    expect((await admin.cliente.rpc("decidir_atribuicao_lead", { p_id: decidida!.id, p_membro_final_id: membroVendedor, p_automatico: false })).error).toBeNull();
+    expect((await admin.cliente.rpc("arquivar_negocio", { p_negocio_id: arquivado, p_motivo: "Vínculos" })).error).toBeNull();
+
+    const { error: devolver } = await servico
+      .from("atribuicoes_leads")
+      .update({ status: "pendente", membro_final_id: null, decidido_por: null, decidido_em: null, expira_em: amanha() })
+      .eq("id", decidida!.id);
+    expect(devolver?.message).toBe(SOMENTE_LEITURA);
+
+    const { data: pendente } = await servico
+      .from("atribuicoes_leads")
+      .insert({ empresa_id: empresa, negocio_id: ativo, membro_sugerido_id: membroVendedor, expira_em: amanha() })
+      .select("id")
+      .single();
+    const { error: transferirDistribuicao } = await servico.from("atribuicoes_leads").update({ negocio_id: arquivado }).eq("id", pendente!.id);
+    expect(transferirDistribuicao?.message).toBe(SOMENTE_LEITURA);
+
+    const { data: contrato, error: erroContrato } = await servico.from("contratos").insert({ empresa_id: empresa, negocio_id: ativo, conteudo: "Contrato" }).select("id").single();
+    expect(erroContrato).toBeNull();
+    const { error: transferirContrato } = await servico.from("contratos").update({ negocio_id: arquivado }).eq("id", contrato!.id);
+    expect(transferirContrato?.message).toBe(SOMENTE_LEITURA);
+
+    const [{ count: pendentes }, { count: contratos }, { data: atual }] = await Promise.all([
+      servico.from("atribuicoes_leads").select("id", { count: "exact", head: true }).eq("negocio_id", arquivado).eq("status", "pendente"),
+      servico.from("contratos").select("id", { count: "exact", head: true }).eq("negocio_id", arquivado),
+      servico.from("atribuicoes_leads").select("status").eq("id", decidida!.id).single(),
+    ]);
+    expect({ pendentes, contratos, status: atual!.status }).toEqual({ pendentes: 0, contratos: 0, status: "aprovada" });
+  });
+
+  it("membro apagado: o banco ainda anula sozinho a referência na distribuição decidida do arquivado", async () => {
+    const gestor = await criarUsuario("arq-gestor");
+    const { data: mg } = await servico.from("empresa_membros").insert({ empresa_id: empresa, user_id: gestor.id, papel: "gestor" }).select("id").single();
+    const negocio = await novoNegocio();
+    const { data: atribuicao } = await servico
+      .from("atribuicoes_leads")
+      .insert({ empresa_id: empresa, negocio_id: negocio, membro_sugerido_id: membroVendedor, expira_em: amanha() })
+      .select("id")
+      .single();
+    expect((await gestor.cliente.rpc("decidir_atribuicao_lead", { p_id: atribuicao!.id, p_membro_final_id: membroVendedor, p_automatico: false })).error).toBeNull();
+    expect((await admin.cliente.rpc("arquivar_negocio", { p_negocio_id: negocio, p_motivo: "Anulação automática" })).error).toBeNull();
+
+    expect((await servico.from("empresa_membros").delete().eq("id", mg!.id)).error).toBeNull();
+    const { data: a } = await servico.from("atribuicoes_leads").select("status, decidido_por").eq("id", atribuicao!.id).single();
+    expect(a).toEqual({ status: "aprovada", decidido_por: null });
+    const { data: n } = await servico.from("negocios").select("arquivado_em").eq("id", negocio).single();
+    expect(n!.arquivado_em).not.toBeNull();
   });
 });
