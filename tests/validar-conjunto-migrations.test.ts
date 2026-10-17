@@ -8,18 +8,21 @@ import { afterAll, describe, expect, it } from "vitest";
 
 const SCRIPT = ".github/scripts/validar-conjunto-migrations.sh";
 const WORKFLOW = ".github/workflows/banco-producao.yml";
-// Implantação conjunta das PRs #186, #188 e #189 (Solo): as três juntas, nenhuma a mais ou a menos.
-const AUTORIZADAS = [
+// Implantação da PR #198 (P1a-0, arquivamento de negócio): só esta migration, nenhuma a mais ou a menos.
+const AUTORIZADA = "20261016200000_negocios_arquivamento.sql";
+// Migrations já aplicadas (#192, #191, #190 e o conjunto Solo #186, #188 e #189): se voltarem a aparecer como
+// pendentes, não são autorizadas.
+const SOLO = [
   "20261014120000_pagamento_registrado_solo.sql",
   "20261014130000_situacao_registro_pagamento.sql",
   "20261014140000_rls_financeiro_sdr.sql",
 ];
-const LISTA = AUTORIZADAS.join("\n");
-// Migrations da #192, #191 e #190, já aplicadas: se voltarem a aparecer como pendentes, não são autorizadas.
+const JA_APLICADA = "20261015110000_integridade_handoff_origem.sql";
 const JA_APLICADAS = [
-  "20261015110000_integridade_handoff_origem.sql",
+  JA_APLICADA,
   "20261015100000_integridade_contratos.sql",
   "20261014100000_blindagem_contratos_confirmacoes.sql",
+  ...SOLO,
 ];
 // No Windows o `bash` do PATH pode ser o do WSL; o do Git for Windows lê os caminhos como estão.
 const BASH_WINDOWS = "C:\\Program Files\\Git\\bin\\bash.exe";
@@ -29,7 +32,7 @@ const pasta = mkdtempSync(join(tmpdir(), "conjunto-migrations-"));
 afterAll(() => rmSync(pasta, { recursive: true, force: true }));
 
 let contador = 0;
-function validar(saidaDryRun: string | null, autorizadas: string | null = LISTA) {
+function validar(saidaDryRun: string | null, autorizadas: string | null = AUTORIZADA) {
   const arquivo = join(pasta, `dry-run-${contador++}.txt`);
   if (saidaDryRun !== null) writeFileSync(arquivo, saidaDryRun);
   const env: NodeJS.ProcessEnv = { ...process.env };
@@ -56,14 +59,15 @@ function dryRunCom(...migrations: string[]) {
 }
 
 describe("conjunto exatamente igual ao autorizado", () => {
-  it("as três migrations autorizadas: passa", () => {
-    const r = validar(dryRunCom(...AUTORIZADAS));
+  it("uma migration, a autorizada: passa", () => {
+    const r = validar(dryRunCom(AUTORIZADA));
     expect(r.codigo).toBe(0);
     expect(r.saida).toContain("Conjunto confirmado");
   });
 
-  it("as mesmas três em outra ordem no dry-run e na lista: passa", () => {
-    const r = validar(dryRunCom(...[...AUTORIZADAS].reverse()), `${AUTORIZADAS[2]} ${AUTORIZADAS[0]}\n${AUTORIZADAS[1]}\n`);
+  it("vários itens autorizados, em qualquer ordem, e o dry-run lista os mesmos: passa", () => {
+    const outra = JA_APLICADA;
+    const r = validar(dryRunCom(outra, AUTORIZADA), `${AUTORIZADA}\n${outra}\n`);
     expect(r.codigo).toBe(0);
   });
 });
@@ -75,44 +79,52 @@ describe("conjunto diferente do autorizado: encerra com erro", () => {
     expect(r.saida).toContain("não interpretável");
   });
 
-  it("falta qualquer uma das três", () => {
-    for (const ausente of AUTORIZADAS) {
-      expect(validar(dryRunCom(...AUTORIZADAS.filter((m) => m !== ausente))).codigo, ausente).toBe(1);
-    }
-  });
-
-  it("só uma das três (implantação isolada)", () => {
-    for (const sozinha of AUTORIZADAS) {
-      expect(validar(dryRunCom(sozinha)).codigo, sozinha).toBe(1);
-    }
-  });
-
-  it("migration extra além das três", () => {
-    const r = validar(dryRunCom(...AUTORIZADAS, "20261016100000_nova_inesperada.sql"));
+  it("migration extra além da autorizada", () => {
+    const r = validar(dryRunCom("20261016100000_nova_inesperada.sql", AUTORIZADA));
     expect(r.codigo).toBe(1);
     expect(r.saida).toContain("20261016100000_nova_inesperada.sql");
   });
 
-  it("migration anterior já aplicada, sozinha ou junto com as três, não passa", () => {
+  it("várias migrations extras", () => {
+    expect(validar(dryRunCom(AUTORIZADA, ...SOLO)).codigo).toBe(1);
+  });
+
+  it("só uma migration diferente da autorizada (substituição)", () => {
+    expect(validar(dryRunCom(JA_APLICADA)).codigo).toBe(1);
+    expect(validar(dryRunCom("20261016100000_nova_inesperada.sql")).codigo).toBe(1);
+  });
+
+  it("migration anterior já aplicada (inclusive as três do Solo), sozinha ou junto com a autorizada, não passa", () => {
     for (const anterior of JA_APLICADAS) {
       expect(validar(dryRunCom(anterior)).codigo, anterior).toBe(1);
-      expect(validar(dryRunCom(...AUTORIZADAS, anterior)).codigo, anterior).toBe(1);
+      expect(validar(dryRunCom(anterior, AUTORIZADA)).codigo, anterior).toBe(1);
     }
   });
 
-  it("uma das três trocada por outra", () => {
-    const r = validar(dryRunCom(AUTORIZADAS[0], AUTORIZADAS[1], JA_APLICADAS[0]));
+  it("as três do Solo, já aplicadas, são recusadas pela lista atual e só passariam se alguém as autorizasse de novo", () => {
+    const r = validar(dryRunCom(...SOLO));
+    expect(r.codigo).toBe(1);
+    expect(r.saida).toContain(AUTORIZADA);
+    expect(validar(dryRunCom(...SOLO), SOLO.join("\n")).codigo).toBe(0);
+  });
+
+  it("falta uma das autorizadas (dois itens autorizados, um listado)", () => {
+    const outra = JA_APLICADA;
+    const r = validar(dryRunCom(AUTORIZADA), `${AUTORIZADA} ${outra}`);
     expect(r.codigo).toBe(1);
   });
 
-  it("nome parecido com um autorizado (sufixo ou prefixo a mais) não passa", () => {
-    const [a, ...resto] = AUTORIZADAS;
-    expect(validar(dryRunCom(a.replace(".sql", "_v2.sql"), ...resto)).codigo).toBe(1);
-    expect(validar(dryRunCom(`x${a}`, ...resto)).codigo).toBe(1);
+  it("migration autorizada listada em duplicidade no dry-run, com extra: não passa", () => {
+    expect(validar(dryRunCom(AUTORIZADA, AUTORIZADA, JA_APLICADA)).codigo).toBe(1);
+  });
+
+  it("nome parecido com o autorizado (sufixo ou prefixo a mais) não passa", () => {
+    expect(validar(dryRunCom(AUTORIZADA.replace(".sql", "_v2.sql"))).codigo).toBe(1);
+    expect(validar(dryRunCom(`x${AUTORIZADA}`)).codigo).toBe(1);
   });
 
   it("versão extra citada sem o nome do arquivo (não interpretável)", () => {
-    const r = validar(`${dryRunCom(...AUTORIZADAS)}\nversion 20261015120000 pending\n`);
+    const r = validar(`${dryRunCom(AUTORIZADA)}\nversion 20261015120000 pending\n`);
     expect(r.codigo).toBe(1);
     expect(r.saida).toContain("20261015120000");
   });
@@ -128,18 +140,18 @@ describe("entradas inválidas: encerra com erro antes de qualquer aplicação", 
   });
 
   it("lista autorizada ausente, vazia ou só espaços", () => {
-    expect(validar(dryRunCom(...AUTORIZADAS), null).codigo).toBe(1);
-    expect(validar(dryRunCom(...AUTORIZADAS), "").codigo).toBe(1);
-    expect(validar(dryRunCom(...AUTORIZADAS), " \n ").codigo).toBe(1);
+    expect(validar(dryRunCom(AUTORIZADA), null).codigo).toBe(1);
+    expect(validar(dryRunCom(AUTORIZADA), "").codigo).toBe(1);
+    expect(validar(dryRunCom(AUTORIZADA), " \n ").codigo).toBe(1);
   });
 
   it("item autorizado fora do formato ou repetido", () => {
-    expect(validar(dryRunCom(...AUTORIZADAS), `${LISTA}\nsolo.sql`).codigo).toBe(1);
-    expect(validar(dryRunCom(...AUTORIZADAS), `${LISTA}\n${AUTORIZADAS[0]}`).codigo).toBe(1);
+    expect(validar(dryRunCom(AUTORIZADA), `${AUTORIZADA}\narquivamento.sql`).codigo).toBe(1);
+    expect(validar(dryRunCom(AUTORIZADA), `${AUTORIZADA}\n${AUTORIZADA}`).codigo).toBe(1);
   });
 
   it("sem argumento", () => {
-    const r = spawnSync(BASH, [SCRIPT], { env: { ...process.env, MIGRATIONS_AUTORIZADAS: LISTA }, encoding: "utf8" });
+    const r = spawnSync(BASH, [SCRIPT], { env: { ...process.env, MIGRATIONS_AUTORIZADAS: AUTORIZADA }, encoding: "utf8" });
     expect(r.status).toBe(1);
   });
 });
@@ -160,7 +172,7 @@ describe("ligação no workflow", () => {
   it("a trava usa o arquivo do dry-run e a lista com só as migrations autorizadas, sem entrada do operador", () => {
     const trecho = aplicar.slice(aplicar.indexOf("name: Conferir que o conjunto"), aplicar.indexOf("name: Aplicar (supabase"));
     expect(trecho).toContain('bash .github/scripts/validar-conjunto-migrations.sh "$RUNNER_TEMP/dry-run.txt"');
-    expect(trecho.match(/\d{14}_[A-Za-z0-9_.-]+\.sql/g)).toEqual(AUTORIZADAS);
+    expect(trecho.match(/\d{14}_[A-Za-z0-9_.-]+\.sql/g)).toEqual([AUTORIZADA]);
     expect(trecho).not.toContain("inputs.");
     expect(trecho).not.toContain("secrets.");
     expect(trecho).not.toContain("continue-on-error");
