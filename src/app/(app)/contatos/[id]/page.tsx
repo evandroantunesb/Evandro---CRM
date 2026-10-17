@@ -26,7 +26,7 @@ export default async function DetalheContato({ params }: PageProps<"/contatos/[i
   // Só aparecem os negócios que o usuário pode ver (RLS).
   const { data: negocios } = await supabase
     .from("negocios")
-    .select("id, numero, titulo, valor, status, etapa_id, created_at")
+    .select("id, numero, titulo, valor, status, etapa_id, created_at, arquivado_em")
     .eq("contato_id", id)
     .order("created_at", { ascending: false });
   const etapas = new Map(config.etapas.map((e) => [e.id, e.nome]));
@@ -54,6 +54,7 @@ export default async function DetalheContato({ params }: PageProps<"/contatos/[i
               {n.status !== "aberto" && (
                 <Selo tom={n.status === "ganho" ? "positivo" : "negativo"}>{n.status === "ganho" ? "Ganho" : "Perdido"}</Selo>
               )}
+              {n.arquivado_em && <Selo>Arquivado</Selo>}
               <span className="ml-auto text-zinc-500">
                 {formatarMoeda(n.valor)} {formatarDataHora(n.created_at)}
               </span>

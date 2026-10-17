@@ -30,6 +30,9 @@ export const EDITAR_VALOR_NEGOCIO = ["admin", "gestor", "vendedor"] as const sat
 /** Escolher ou trocar o responsável de um negócio. Poder de gestão. */
 export const ESCOLHER_RESPONSAVEL_NEGOCIO = ["admin", "gestor"] as const satisfies ListaPapeis;
 
+/** Arquivar e desarquivar negócio (com motivo). Espelha `arquivar_negocio`/`desarquivar_negocio` no banco. */
+export const ARQUIVAR_NEGOCIO = ["admin", "gestor"] as const satisfies ListaPapeis;
+
 /** Filtrar a lista de negócios por responsável. Poder de gestão. */
 export const FILTRAR_NEGOCIOS_POR_RESPONSAVEL = ["admin", "gestor"] as const satisfies ListaPapeis;
 
