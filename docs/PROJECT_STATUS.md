@@ -6,6 +6,23 @@ Referência: `main` em `b02e1b0` (merge da PR #165, trava de ambiente) · 77 mig
 
 Histórico: a migration da #139 foi aplicada em produção antes do merge, com autorização explícita; no merge, o workflow Banco de produção #57 retornou `Remote database is up to date` (nada reaplicado). Produção e `main` estão alinhadas. A migration da B1a (#161) também foi aplicada em produção antes do merge, com autorização explícita (`workflow_dispatch` na tag `b1a-migration-5137d22`); no merge, o workflow Banco de produção retornou `Remote database is up to date`.
 
+## Plano Mestre v3.0 — M1 (Segurança e Pagamentos Solo/Pro) encerrado em 2026-10-16
+
+**Encerramento aprovado pelo Evandro em 2026-10-16, com ressalvas documentadas.** PRs #186, #188, #189 (merge commits; `main` em `63a5a80`), #190, #191 e #192 integradas, com CI e deploy de produção da Vercel aprovados. 83 migrations em produção; as três do M1 (`20261014120000_pagamento_registrado_solo`, `20261014130000_situacao_registro_pagamento`, `20261014140000_rls_financeiro_sdr`) foram aplicadas pelo workflow Banco de produção ([run 38878802083](https://github.com/evandroantunesb/Evandro---CRM/actions/runs/38878802083), tag `migracao-pr189-b13d465`).
+
+**Ressalvas:**
+- O aceite funcional foi feito em **ambiente local isolado** (Supabase local com as 83 migrations, base fictícia, interface real no Chrome em desktop e celular): seis cenários aprovados — registro Solo, correção/estorno, restrições do Solo, upgrade Solo→Pro, pagamento Pro e permissões/isolamento (SDR sem dados financeiros pela interface e pela API; outra empresa sem acesso).
+- A produção teve só verificação de **disponibilidade** (`/login` 200, rotas internas redirecionam ao login), **sem teste funcional ponta a ponta autenticado**.
+- Não representa aprovação comercial geral do Raion CRM.
+
+**Backlog do M1 (sem PR por enquanto):**
+1. Negócio perdido: a ficha oferece "Marcar como pago" e só recusa após o clique — esconder ou desabilitar o formulário (melhoria posterior).
+2. Pro: admin que é o responsável da assinatura vê "Só gestor ou admin pode confirmar o pagamento" — mensagem a corrigir (melhoria posterior).
+3. Pontos de gamificação do pagamento não testados no aceite (base fictícia sem regras de pontuação) — acompanhar no **M7**.
+4. Definição do plano Solo/Pro pela tela do super-admin não testada (no aceite foi feita no banco local) — acompanhar no **M12**.
+
+**Próximo marco:** M2 — Calculadora Solar (diagnóstico autorizado, sem alteração de código nesta etapa).
+
 ## Handoff Pedido + Obra — decisões consolidadas em 2026-10-14
 
 **Fonte de decisões de produto aprovada pelo Evandro:** [ADR-PEDIDO-OBRA-MODULO-OPCIONAL-2026-10-14.md](ADR-PEDIDO-OBRA-MODULO-OPCIONAL-2026-10-14.md). **D1–D12 confirmadas; implementação ainda NÃO autorizada.** O Claude realizou somente análises de leitura; nenhum código, migration ou dado de produção foi alterado nesta rodada.
