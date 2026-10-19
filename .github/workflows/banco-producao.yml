@@ -235,7 +235,7 @@ jobs:
       - name: Conferir que o conjunto pendente é exatamente o autorizado
         env:
           MIGRATIONS_AUTORIZADAS: |
-            20261016200000_negocios_arquivamento.sql
+            20261019120000_proposta_versoes.sql
         run: bash .github/scripts/validar-conjunto-migrations.sh "$RUNNER_TEMP/dry-run.txt"
       - name: Aplicar (supabase db push --include-all)
         env:
