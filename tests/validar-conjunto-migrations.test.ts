@@ -1,17 +1,18 @@
 // Trava do job "aplicar" do workflow `banco-producao.yml`: o conjunto pendente do dry-run precisa ser
 // exatamente o autorizado. Testa o script e a ligação dele no workflow. Não usa banco nem rede.
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 
 const SCRIPT = ".github/scripts/validar-conjunto-migrations.sh";
 const WORKFLOW = ".github/workflows/banco-producao.yml";
-// Implantação da PR #198 (P1a-0, arquivamento de negócio): só esta migration, nenhuma a mais ou a menos.
-const AUTORIZADA = "20261016200000_negocios_arquivamento.sql";
-// Migrations já aplicadas (#192, #191, #190 e o conjunto Solo #186, #188 e #189): se voltarem a aparecer como
-// pendentes, não são autorizadas.
+// Implantação da PR #199 (P1a-1, versões de proposta, emissão fechada): só esta migration, nenhuma a mais ou a menos.
+const AUTORIZADA = "20261019120000_proposta_versoes.sql";
+// Migrations já aplicadas (#198 P1a-0, #192, #191, #190 e o conjunto Solo #186, #188 e #189): se voltarem a aparecer
+// como pendentes, não são autorizadas.
+const P1A0 = "20261016200000_negocios_arquivamento.sql";
 const SOLO = [
   "20261014120000_pagamento_registrado_solo.sql",
   "20261014130000_situacao_registro_pagamento.sql",
@@ -19,6 +20,7 @@ const SOLO = [
 ];
 const JA_APLICADA = "20261015110000_integridade_handoff_origem.sql";
 const JA_APLICADAS = [
+  P1A0,
   JA_APLICADA,
   "20261015100000_integridade_contratos.sql",
   "20261014100000_blindagem_contratos_confirmacoes.sql",
@@ -57,6 +59,14 @@ function dryRunCom(...migrations: string[]) {
     "",
   ].join("\n");
 }
+
+describe("a migration autorizada existe e é a mais recente do repositório", () => {
+  it("o arquivo autorizado está em supabase/migrations e nenhuma migration é mais nova", () => {
+    const todas = readdirSync("supabase/migrations").filter((f) => f.endsWith(".sql")).sort();
+    expect(todas).toContain(AUTORIZADA);
+    expect(todas[todas.length - 1]).toBe(AUTORIZADA);
+  });
+});
 
 describe("conjunto exatamente igual ao autorizado", () => {
   it("uma migration, a autorizada: passa", () => {
