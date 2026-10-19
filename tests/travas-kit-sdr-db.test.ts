@@ -10,22 +10,13 @@
  *    etapa, sem alteração parcial. Os demais papéis e os fluxos de etapa/aceite seguem iguais.
  */
 import { Client } from "pg";
+import { urlBancoLocal } from "./banco-local";
 import { beforeAll, describe, expect, it } from "vitest";
 import { criarNegocioComCliente, salvarKitComCliente, type Atual } from "@/lib/negocios-gravacao";
 import type { SupabaseServidor } from "@/lib/supabase/server";
 import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
 import { comFalha } from "./falhas";
 
-const URL_BANCO = process.env.SUPABASE_DB_URL ?? "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
-
-// Trava: teste direto no Postgres só contra banco local, nunca remoto/produção.
-function urlBancoLocal() {
-  const host = new URL(URL_BANCO).hostname;
-  if (host !== "127.0.0.1" && host !== "localhost") {
-    throw new Error(`Teste direto no banco recusado: host "${host}" não é local.`);
-  }
-  return URL_BANCO;
-}
 
 async function conectar() {
   const banco = new Client({ connectionString: urlBancoLocal() });
