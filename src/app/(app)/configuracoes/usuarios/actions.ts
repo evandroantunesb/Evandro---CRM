@@ -83,14 +83,16 @@ export async function atualizarMembro(_: ResultadoAcao, formData: FormData): Pro
   const supabase = await criarClienteServidor();
 
   // Desligar com negócios em aberto passa pela transferência de carteira
-  // (desligarComTransferencia) — aqui é só uma trava de segurança.
+  // (desligarComTransferencia) — aqui é só uma trava de segurança. Arquivados ficam fora: são somente leitura e,
+  // ao desarquivar, o banco exige um novo responsável se este não estiver mais ativo.
   if (dados.data.status === "desligado") {
     const { count } = await supabase
       .from("negocios")
       .select("id", { count: "exact", head: true })
       .eq("empresa_id", atual.empresaId)
       .eq("responsavel_id", dados.data.membroId)
-      .eq("status", "aberto");
+      .eq("status", "aberto")
+      .is("arquivado_em", null);
     if (count && count > 0) {
       return { ok: false, mensagem: "Esse vendedor tem negócios em aberto — use a opção de desligar com transferência de carteira." };
     }
@@ -137,6 +139,7 @@ export async function carregarCarteiraAberta(membroId: string): Promise<Carteira
       .eq("empresa_id", atual.empresaId)
       .eq("responsavel_id", id.data)
       .eq("status", "aberto")
+      .is("arquivado_em", null)
       .order("numero"),
     supabase
       .from("empresa_membros")
@@ -182,7 +185,8 @@ export async function desligarComTransferencia(_: ResultadoAcao, formData: FormD
     .select("id")
     .eq("empresa_id", atual.empresaId)
     .eq("responsavel_id", dados.data.membroId)
-    .eq("status", "aberto");
+    .eq("status", "aberto")
+      .is("arquivado_em", null);
   const negocioIds = (negocios ?? []).map((n) => n.id);
 
   if (negocioIds.length > 0) {

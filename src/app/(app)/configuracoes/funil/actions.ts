@@ -107,7 +107,8 @@ export async function alternarEtapa(_: ResultadoAcao, formData: FormData): Promi
       .from("negocios")
       .select("id", { count: "exact", head: true })
       .eq("etapa_id", etapaId)
-      .eq("status", "aberto");
+      .eq("status", "aberto")
+      .is("arquivado_em", null);
     if (count) return { ok: false, mensagem: `Mova os ${count} negócios abertos desta etapa antes de desativar.` };
   }
 

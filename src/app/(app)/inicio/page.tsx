@@ -111,7 +111,13 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
     .lt("created_at", new Date(hojeInicio).toISOString());
   if (pessoal) consultaLeadsOntem = consultaLeadsOntem.eq("responsavel_id", atual.membroId);
 
-  let consultaNegociosAtivos = supabase.from("negocios").select("valor").eq("empresa_id", atual.empresaId).eq("status", "aberto").limit(10000);
+  let consultaNegociosAtivos = supabase
+    .from("negocios")
+    .select("valor")
+    .eq("empresa_id", atual.empresaId)
+    .eq("status", "aberto")
+    .is("arquivado_em", null)
+    .limit(10000);
   if (pessoal) consultaNegociosAtivos = consultaNegociosAtivos.eq("responsavel_id", atual.membroId);
 
   let consultaPropostasAbertas = supabase
@@ -119,6 +125,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
     .select("id, negocios!inner(valor, status, responsavel_id)")
     .eq("negocios.empresa_id", atual.empresaId)
     .eq("negocios.status", "aberto")
+    .is("negocios.arquivado_em", null)
     .limit(10000);
   if (pessoal) consultaPropostasAbertas = consultaPropostasAbertas.eq("negocios.responsavel_id", atual.membroId);
 
@@ -164,6 +171,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
     .select("etapa_id")
     .eq("empresa_id", atual.empresaId)
     .eq("status", "aberto")
+    .is("arquivado_em", null)
     .gte("created_at", mesAtual.inicioIso)
     .lt("created_at", mesAtual.fimExclusivoIso)
     .limit(10000);

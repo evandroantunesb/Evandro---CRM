@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { exigirPapel } from "@/lib/sessao";
 import { criarNegocioComCliente, editarNegocioComCliente, type ResultadoCriacao } from "@/lib/negocios-gravacao";
-import { FECHAR_NEGOCIO, NEGOCIOS, pode } from "@/lib/permissoes";
+import { ARQUIVAR_NEGOCIO, FECHAR_NEGOCIO, NEGOCIOS, pode } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { mensagemErro } from "@/lib/erros";
 import { calcularStatusQualificacao } from "@/lib/qualificacao";
@@ -141,6 +141,50 @@ export async function alternarEtiqueta(formData: FormData) {
   }
   revalidatePath("/negocios");
   revalidatePath(`/negocios/${negocioId}`);
+}
+
+const esquemaArquivamento = z.object({
+  negocioId: z.string().uuid(),
+  motivo: z.string().trim().min(1, "Informe o motivo."),
+  novoResponsavelId: z.string().uuid().optional().or(z.literal("").transform(() => undefined)),
+});
+
+/**
+ * Arquiva o negócio (admin ou gestor, motivo obrigatório). O banco confere papel e empresa, recusa negócio com
+ * tarefa aberta, distribuição de lead ou repasse pendentes, contrato, pagamento ou obra, e registra na auditoria.
+ * Arquivado fica somente leitura (notas e etiquetas continuam); some das listas, do funil e do painel.
+ */
+export async function arquivarNegocio(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  await exigirPapel(...ARQUIVAR_NEGOCIO);
+  const dados = esquemaArquivamento.safeParse(Object.fromEntries(formData));
+  if (!dados.success) return { ok: false, mensagem: dados.error.issues[0]?.message ?? "Dados inválidos." };
+
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.rpc("arquivar_negocio", { p_negocio_id: dados.data.negocioId, p_motivo: dados.data.motivo });
+  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível arquivar o negócio.") };
+
+  revalidatePath("/negocios");
+  revalidatePath(`/negocios/${dados.data.negocioId}`);
+  return { ok: true, mensagem: "Negócio arquivado." };
+}
+
+/** Desarquiva (admin ou gestor, motivo obrigatório). Se o responsável não está mais ativo, exige o novo. */
+export async function desarquivarNegocio(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  await exigirPapel(...ARQUIVAR_NEGOCIO);
+  const dados = esquemaArquivamento.safeParse(Object.fromEntries(formData));
+  if (!dados.success) return { ok: false, mensagem: dados.error.issues[0]?.message ?? "Dados inválidos." };
+
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.rpc("desarquivar_negocio", {
+    p_negocio_id: dados.data.negocioId,
+    p_motivo: dados.data.motivo,
+    ...(dados.data.novoResponsavelId ? { p_novo_responsavel: dados.data.novoResponsavelId } : {}),
+  });
+  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível desarquivar o negócio.") };
+
+  revalidatePath("/negocios");
+  revalidatePath(`/negocios/${dados.data.negocioId}`);
+  return { ok: true, mensagem: "Negócio desarquivado." };
 }
 
 export type Duplicado = { contatoId: string; nome: string; visivel: boolean; responsavel: string | null };
