@@ -114,6 +114,16 @@ describe("M1: --workdir chega ao CLI exatamente como informado (sem interpretaç
     expect(opcoes.cwd).toBe(raiz);
   });
 
+  it("M2: o CLI recebe o ambiente EXPLÍCITO informado (não um ambiente herdado por acaso)", () => {
+    const executar = vi.fn(() => ({ status: 0, stdout: SAIDA, stderr: "", error: undefined }));
+    const processo = { DOCKER_HOST: "unix:///var/run/docker.sock", OUTRA: "x" };
+    executarStatusSupabase("/repo", { binario: () => "/bin/supabase", executar: executar as never, processo });
+    const opcoes = (executar.mock.calls[0] as unknown as [string, string[], { env: unknown }])[2];
+    expect(opcoes.env).toBe(processo);
+    executarStatusSupabase("/repo", { binario: () => "/bin/supabase", executar: executar as never });
+    expect((executar.mock.calls[1] as unknown as [string, string[], { env: unknown }])[2].env).toBe(process.env);
+  });
+
   it("falha do processo, erro, saída vazia ou executável ausente interrompem sem repassar a saída", () => {
     const falhas = [
       { status: 1, stdout: "SEGREDO", stderr: "SEGREDO", error: undefined },

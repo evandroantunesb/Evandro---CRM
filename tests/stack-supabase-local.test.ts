@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { exigirStackLocal, lerStatusEnv, resolverStackLocal } from "../scripts/lib/stack-supabase-local.mjs";
 import { prepararBancoVerificado } from "./preparar-banco";
 import { jwtDemo } from "./jwt-ficticio";
@@ -7,6 +7,16 @@ import { jwtDemo } from "./jwt-ficticio";
 const SENHA = "SENHA-FICTICIA-QUE-NAO-PODE-VAZAR";
 const ASSINATURA_A = "ASSINATURAFICTICIAstackA";
 const ASSINATURA_B = "ASSINATURAFICTICIAstackB";
+
+// `exigirStackLocal` sem `processo` explícito lê o `process.env` real: isola as variáveis que decidem o
+// daemon do Docker para que o resultado não dependa da máquina de quem roda os testes.
+const VARIAVEIS_DOCKER = ["DOCKER_HOST", "DOCKER_CONTEXT", "DOCKER_CONFIG"];
+beforeEach(() => {
+  for (const nome of VARIAVEIS_DOCKER) vi.stubEnv(nome, "");
+});
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 /** Stack fictícia: portas e chaves próprias (a chave carrega uma assinatura marcadora). */
 function stack(portaApi: number, portaBanco: number, assinatura: string, senha = SENHA) {
@@ -182,9 +192,11 @@ describe("obtenção dos metadados e ordem da validação", () => {
   });
 
   it("caminho completo: stack idêntica devolve a URL verificada", () => {
-    const executarStatus = vi.fn(() => textoStatus(B));
+    const executarStatus = vi.fn((_raiz: string, _opcoes?: unknown) => textoStatus(B));
     expect(exigirStackLocal({ env: ambiente(B), raiz: "/repo", executarStatus, consultarDocker: dockerOk() }).urlBanco).toBe(B.DB_URL);
-    expect(executarStatus).toHaveBeenCalledWith("/repo");
+    // O CLI recebe a raiz e o ambiente explícito (o mesmo `processo` usado na checagem do Docker).
+    expect(executarStatus.mock.calls[0][0]).toBe("/repo");
+    expect(executarStatus.mock.calls[0]).toHaveLength(2);
   });
 });
 
@@ -273,5 +285,77 @@ describe("A1: o que o CLI reporta é conferido com o Docker", () => {
       exigirStackLocal({ env: { ...ambiente(A), SUPABASE_DB_URL: B.DB_URL }, raiz: "/repo", executarStatus: () => textoStatus(A), consultarDocker }),
     ).toThrow(/SUPABASE_DB_URL diverge/);
     expect(consultarDocker).not.toHaveBeenCalled();
+  });
+});
+
+describe("M1: o host literal verificado segue para a checagem do Docker", () => {
+  it("API e banco em 127.0.0.1 → consultarDocker recebe os hosts literais", () => {
+    const consultarDocker = vi.fn();
+    exigirStackLocal({ env: ambiente(A), raiz: "/repo", executarStatus: () => textoStatus(A), consultarDocker });
+    expect(consultarDocker).toHaveBeenCalledWith(expect.objectContaining({ apiHost: "127.0.0.1", dbHost: "127.0.0.1" }));
+  });
+
+  it("API e banco em [::1] → consultarDocker recebe o host IPv6 literal", () => {
+    const v6 = { ...A, API_URL: "http://[::1]:54321", DB_URL: `postgresql://postgres:${SENHA}@[::1]:54322/postgres` };
+    const consultarDocker = vi.fn();
+    exigirStackLocal({ env: ambiente(v6), raiz: "/repo", executarStatus: () => textoStatus(v6), consultarDocker });
+    expect(consultarDocker).toHaveBeenCalledWith(expect.objectContaining({ apiHost: "[::1]", dbHost: "[::1]" }));
+  });
+});
+
+describe("M2: o ambiente validado é o dos subprocessos (nenhum processo roda antes da prova)", () => {
+  it("DOCKER_HOST só em arquivo .env* (ausente no processo) → recusado ANTES de executar CLI ou Docker", () => {
+    const executarStatus = vi.fn(() => textoStatus(A));
+    const consultarDocker = vi.fn();
+    const env = { ...ambiente(A), DOCKER_HOST: "unix:///var/run/docker.sock" };
+    expect(() => exigirStackLocal({ env, raiz: "/repo", processo: {}, executarStatus, consultarDocker })).toThrow(/DOCKER_HOST difere/);
+    expect(executarStatus).not.toHaveBeenCalled();
+    expect(consultarDocker).not.toHaveBeenCalled();
+  });
+
+  it("DOCKER_CONTEXT só em arquivo, ou com valor diferente no processo → recusado antes de qualquer processo", () => {
+    const executarStatus = vi.fn(() => textoStatus(A));
+    const consultarDocker = vi.fn();
+    expect(() =>
+      exigirStackLocal({ env: { ...ambiente(A), DOCKER_CONTEXT: "default" }, raiz: "/repo", processo: {}, executarStatus, consultarDocker }),
+    ).toThrow(/DOCKER_CONTEXT difere/);
+    expect(() =>
+      exigirStackLocal({
+        env: { ...ambiente(A), DOCKER_CONTEXT: "default" },
+        raiz: "/repo",
+        processo: { DOCKER_CONTEXT: "remoto" },
+        executarStatus,
+        consultarDocker,
+      }),
+    ).toThrow(/DOCKER_CONTEXT difere/);
+    expect(executarStatus).not.toHaveBeenCalled();
+    expect(consultarDocker).not.toHaveBeenCalled();
+  });
+
+  it("DOCKER_HOST e DOCKER_CONTEXT ao mesmo tempo → ambíguo, recusado antes de qualquer processo", () => {
+    const executarStatus = vi.fn(() => textoStatus(A));
+    const proc = { DOCKER_HOST: "unix:///var/run/docker.sock", DOCKER_CONTEXT: "default" };
+    expect(() =>
+      exigirStackLocal({ env: { ...ambiente(A), ...proc }, raiz: "/repo", processo: proc, executarStatus, consultarDocker: vi.fn() }),
+    ).toThrow(/ao mesmo tempo/);
+    expect(executarStatus).not.toHaveBeenCalled();
+  });
+
+  it("variáveis iguais no ambiente validado e no processo passam; o CLI e o Docker recebem o mesmo `processo`", () => {
+    const proc = { DOCKER_HOST: "unix:///var/run/docker.sock" };
+    const executarStatus = vi.fn(() => textoStatus(A));
+    const consultarDocker = vi.fn();
+    exigirStackLocal({ env: { ...ambiente(A), ...proc }, raiz: "/repo", processo: proc, executarStatus, consultarDocker });
+    expect(executarStatus).toHaveBeenCalledWith("/repo", { processo: proc });
+    expect(consultarDocker).toHaveBeenCalledWith(expect.objectContaining({ processo: proc }));
+  });
+
+  it("pela trava global dos testes: DOCKER_HOST só no test.env/.env.local aborta sem entregar o banco", () => {
+    const provide = vi.fn();
+    const executarStatus = vi.fn(() => textoStatus(A));
+    const p = { config: { env: { ...ambiente(A), DOCKER_HOST: "unix:///var/run/docker.sock" }, root: "/repo" }, provide };
+    expect(() => prepararBancoVerificado(p, {}, { executarStatus, consultarDocker: dockerOk() })).toThrow(/Testes abortados antes de rodar/);
+    expect(executarStatus).not.toHaveBeenCalled();
+    expect(provide).not.toHaveBeenCalled();
   });
 });

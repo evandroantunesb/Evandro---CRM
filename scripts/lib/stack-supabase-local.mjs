@@ -31,7 +31,7 @@ import { spawnSync } from "node:child_process";
 import { readFileSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
-import { verificarStackNoDocker } from "./docker-stack-local.mjs";
+import { exigirAmbienteDockerCoerente, verificarStackNoDocker } from "./docker-stack-local.mjs";
 import { verificarAmbienteLocal } from "./guard-supabase-local.mjs";
 
 const HOSTS_LOCAIS = new Set(["127.0.0.1", "localhost", "[::1]"]);
@@ -135,7 +135,7 @@ function destinoBanco(nome, valor) {
  * Lança erro (sem valores) se algo estiver ausente, divergente ou não puder ser comprovado.
  * @param {Ambiente} env ambiente efetivo (o que os testes realmente enxergam)
  * @param {Record<string, string>} status saída já lida de `supabase status -o env`
- * @returns {{ urlBanco: string, apiUrl: string, apiPorta: string, dbPorta: string }}
+ * @returns {{ urlBanco: string, apiUrl: string, apiPorta: string, dbPorta: string, apiHost: string, dbHost: string }}
  */
 export function resolverStackLocal(env, status) {
   // Mantém todas as proteções existentes (remoto, chaves, domínios gerenciados).
@@ -189,6 +189,9 @@ export function resolverStackLocal(env, status) {
     apiUrl: status.API_URL.trim(),
     apiPorta: apiStatus.porta,
     dbPorta: bancoStatus.porta,
+    // Host literal das URLs verificadas: é nele que os testes conectam (o Docker precisa publicá-lo).
+    apiHost: apiStatus.host,
+    dbHost: bancoStatus.host,
   };
 }
 
@@ -260,13 +263,19 @@ export function resolverBinarioSupabase({
  * somente leitura). O executável é o binário real (sem shell: o caminho de `--workdir` chega ao CLI
  * exatamente como informado, com qualquer espaço ou metacaractere, sem ser interpretado). Nunca
  * inclui a saída do CLI nas mensagens de erro.
+ * O ambiente do processo é EXPLÍCITO (o mesmo `processo` que a trava comprovou e que o `docker` usa): o
+ * CLI fala com o Docker por `DOCKER_HOST`/`DOCKER_CONTEXT`, então não pode herdar outro ambiente.
  * @param {string} raiz diretório que contém `supabase/` (usado exatamente como informado)
- * @param {{ binario?: () => string, executar?: typeof spawnSync }} [o]
+ * @param {{ binario?: () => string, executar?: typeof spawnSync, processo?: Record<string, string | undefined> }} [o]
  * @returns {string} saída de `supabase status -o env`
  */
-export function executarStatusSupabase(raiz, { binario = () => resolverBinarioSupabase({ raiz }), executar = spawnSync } = {}) {
+export function executarStatusSupabase(
+  raiz,
+  { binario = () => resolverBinarioSupabase({ raiz }), executar = spawnSync, processo = process.env } = {},
+) {
   const r = executar(binario(), ["status", "-o", "env", "--workdir", raiz], {
     cwd: raiz,
+    env: processo,
     encoding: "utf8",
     timeout: 60_000,
     shell: false,
@@ -285,27 +294,42 @@ export function executarStatusSupabase(raiz, { binario = () => resolverBinarioSu
  * Ponto de entrada: obtém os metadados, comprova a stack (CLI + portas reais do Docker) e devolve a
  * URL de banco verificada.
  * @param {{ env: Ambiente, raiz: string,
- *           executarStatus?: (raiz: string) => string,
- *           consultarDocker?: (d: { raiz: string, apiPorta: string, dbPorta: string, env: Ambiente }) => unknown }} opcoes
+ *           processo?: Ambiente,
+ *           executarStatus?: (raiz: string, o?: { processo?: Ambiente }) => string,
+ *           consultarDocker?: (d: { raiz: string, apiPorta: string, dbPorta: string, apiHost: string, dbHost: string,
+ *                                   env: Ambiente, processo: Ambiente }) => unknown }} opcoes
+ *   `env`: ambiente validado (processo + arquivos `.env*`). `processo`: o que os subprocessos (CLI e
+ *   Docker) realmente herdam; é o ambiente explícito passado a eles.
  * @returns {{ urlBanco: string, apiUrl: string }}
  */
 export function exigirStackLocal({
   env,
   raiz,
+  processo = process.env,
   executarStatus = executarStatusSupabase,
   consultarDocker = verificarStackNoDocker,
 }) {
   // Valida o ambiente ANTES de executar qualquer processo: ambiente remoto nem chega ao CLI.
   verificarAmbienteLocal(env);
+  // O destino do Docker validado tem de ser o dos subprocessos (nenhum processo é executado antes disto).
+  exigirAmbienteDockerCoerente(env, processo);
   let texto;
   try {
-    texto = executarStatus(raiz);
+    texto = executarStatus(raiz, { processo });
   } catch (erro) {
     if (erro instanceof Error && erro.message.startsWith("Não foi possível obter")) throw erro;
     throw new Error("Não foi possível obter os metadados da stack local (`supabase status`). Nada foi executado.");
   }
   const stack = resolverStackLocal(env, lerStatusEnv(texto));
   // O CLI descreve a configuração; o Docker diz o que está de fato publicado.
-  consultarDocker({ raiz, apiPorta: stack.apiPorta, dbPorta: stack.dbPorta, env });
+  consultarDocker({
+    raiz,
+    apiPorta: stack.apiPorta,
+    dbPorta: stack.dbPorta,
+    apiHost: stack.apiHost,
+    dbHost: stack.dbHost,
+    env,
+    processo,
+  });
   return { urlBanco: stack.urlBanco, apiUrl: stack.apiUrl };
 }

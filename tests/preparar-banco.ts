@@ -36,7 +36,8 @@ export function prepararBancoVerificado(
     }
     const efetivo = ambienteEfetivo(processo, doConfig);
     verificarAmbienteLocal(efetivo);
-    const { urlBanco } = exigirStackLocal({ env: efetivo, raiz: projeto.config.root, ...dependencias });
+    // `processo` é o que o CLI e o Docker herdam: precisa coincidir com o ambiente validado (`efetivo`).
+    const { urlBanco } = exigirStackLocal({ env: efetivo, raiz: projeto.config.root, processo, ...dependencias });
     projeto.provide("urlBancoVerificada", urlBanco);
   } catch (erro) {
     const motivo = erro instanceof Error ? erro.message : String(erro);
