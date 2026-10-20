@@ -1,4 +1,6 @@
 import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   executarDocker,
@@ -123,6 +125,125 @@ describe("A1: portas reais do Docker x portas reportadas pelo CLI", () => {
     expect(() => verificar([...stack(), intrusoApi])).toThrow(/também publica a porta 54321/);
     const inofensivo = conteiner("outro_servico", "outro", { "80/tcp": [{ HostIp: "127.0.0.1", HostPort: "8080" }] });
     expect(() => verificar([...stack(), inofensivo])).not.toThrow();
+  });
+});
+
+describe("A1: política de loopback (o que o Docker realmente publica)", () => {
+  const publica = (ips: string[], porta: string) => ips.map((HostIp) => ({ HostIp, HostPort: porta }));
+  const comIps = (ipsKong: string[], ipsDb: string[]) => [
+    conteiner("supabase_kong_meu-projeto", "meu-projeto", { "8000/tcp": publica(ipsKong, "54321") }),
+    conteiner("supabase_db_meu-projeto", "meu-projeto", { "5432/tcp": publica(ipsDb, "54322") }),
+  ];
+
+  it("só IPv4 em 127.0.0.1 (o que default-network-opts produz) é aceito", () => {
+    expect(() => verificar(comIps(["127.0.0.1"], ["127.0.0.1"]))).not.toThrow();
+    expect(() => verificar(comIps(["::1"], ["::1"]))).not.toThrow();
+  });
+
+  it("0.0.0.0 (padrão do CLI sem default-network-opts) é recusado, com IP e correção na mensagem", () => {
+    // Caso real do CI no commit 81674c8: kong 8000/tcp publicado em 0.0.0.0 e ::.
+    const msg = recusa(() => verificar(comIps(["0.0.0.0", "::"], ["0.0.0.0", "::"])));
+    expect(msg).toContain('"supabase_kong_meu-projeto"');
+    expect(msg).toContain("8000/tcp fora do loopback");
+    expect(msg).toContain('"0.0.0.0"');
+    expect(msg).toContain("host_binding_ipv4");
+    expect(msg).toContain("recrie");
+    expect(() => verificar(comIps(["127.0.0.1"], ["0.0.0.0"]))).toThrow(/supabase_db_meu-projeto.*5432\/tcp fora do loopback/);
+  });
+
+  it(':: (todas as interfaces IPv6) é recusado, sozinho ou junto de 127.0.0.1', () => {
+    expect(() => verificar(comIps(["::"], ["127.0.0.1"]))).toThrow(/fora do loopback/);
+    expect(() => verificar(comIps(["127.0.0.1", "::"], ["127.0.0.1"]))).toThrow(/fora do loopback/);
+    expect(() => verificar(comIps(["127.0.0.1"], ["127.0.0.1", "::"]))).toThrow(/fora do loopback/);
+  });
+
+  it("IP ausente/vazio, IPv4-mapeado, localhost e IP de LAN são recusados (só a lista exata vale)", () => {
+    for (const ip of ["", "localhost", "::ffff:127.0.0.1", "127.0.0.2", "10.0.0.5", "192.168.0.10"]) {
+      expect(() => verificar(comIps([ip], ["127.0.0.1"]))).toThrow(/fora do loopback/);
+    }
+  });
+
+  it("porta divergente do CLI continua recusada mesmo com loopback correto", () => {
+    expect(() => verificar(comIps(["127.0.0.1"], ["127.0.0.1"]), "54321", "59999")).toThrow(/não é a que o Docker publica/);
+    expect(() => verificar(comIps(["127.0.0.1"], ["127.0.0.1"]), "59998", "54322")).toThrow(/não é a que o Docker publica/);
+  });
+
+  it("contêiner de outro projeto ou em rede diferente da supabase_network_<id> é recusado", () => {
+    const outroProjeto = conteiner("supabase_kong_meu-projeto", "impostor", { "8000/tcp": publica(["127.0.0.1"], "54321") });
+    expect(() => verificar([outroProjeto, db("meu-projeto", "54322")])).toThrow(/não pertence ao projeto/);
+    const redeAlheia = conteiner("supabase_kong_meu-projeto", "meu-projeto", { "8000/tcp": publica(["127.0.0.1"], "54321") }, {
+      NetworkSettings: { Ports: { "8000/tcp": publica(["127.0.0.1"], "54321") }, Networks: { supabase_network_outro: {} } },
+    });
+    expect(() => verificar([redeAlheia, db("meu-projeto", "54322")])).toThrow(/supabase_network_meu-projeto/);
+  });
+});
+
+describe("A1: Docker ausente ou inspeção com erro → recusado (fail-closed)", () => {
+  const lerConfig = () => 'project_id = "meu-projeto"\n';
+  const env = { DOCKER_HOST: "unix:///var/run/docker.sock" };
+  const consultar = (docker: (a: string[]) => string) =>
+    verificarStackNoDocker({ raiz: "/repo", apiPorta: "54321", dbPorta: "54322", env, docker, lerConfig });
+
+  it("`docker ps` falha (Docker parado/ausente)", () => {
+    expect(() =>
+      consultar(() => {
+        throw new Error("Não foi possível consultar o Docker (`docker`)");
+      }),
+    ).toThrow(/Não foi possível consultar o Docker/);
+  });
+
+  it("`docker inspect` falha depois de a listagem funcionar", () => {
+    const docker = (args: string[]) => {
+      if (args[0] === "ps") return "supabase_kong_meu-projeto\nsupabase_db_meu-projeto";
+      throw new Error("Não foi possível consultar o Docker (`docker`)");
+    };
+    // A falha da inspeção é capturada e vira recusa própria; em nenhum caso a verificação é pulada.
+    expect(() => consultar(docker)).toThrow(/Resposta inválida do Docker ao inspecionar/);
+  });
+
+  it("saída de `inspect` sem as portas (NetworkSettings.Ports ausente) é recusada, não presumida", () => {
+    const semPortas = [
+      conteiner("supabase_kong_meu-projeto", "meu-projeto", {}, { NetworkSettings: { Networks: { "supabase_network_meu-projeto": {} } } }),
+      db("meu-projeto", "54322"),
+    ];
+    const docker = (args: string[]) => (args[0] === "ps" ? "a\nb" : JSON.stringify(semPortas));
+    expect(() => consultar(docker)).toThrow(/não publica 8000\/tcp/);
+  });
+});
+
+describe("A1: workflows de teste preparam o Docker para publicar em loopback", () => {
+  const WORKFLOWS = [".github/workflows/ci.yml", ".github/workflows/navegador-obras.yml"];
+  const ler = (arquivo: string) => readFileSync(join(process.cwd(), arquivo), "utf8");
+
+  it.each(WORKFLOWS)("%s: default-network-opts vem ANTES do `supabase start`, é validado e a stack é conferida depois", (arquivo) => {
+    const texto = ler(arquivo);
+    const config = texto.indexOf("default-network-opts");
+    const inicio = texto.indexOf("run: supabase start");
+    const conferencia = texto.indexOf("Conferir as portas publicadas");
+    expect(config).toBeGreaterThan(-1);
+    expect(inicio).toBeGreaterThan(config);
+    expect(conferencia).toBeGreaterThan(inicio);
+    for (const trecho of [
+      "com.docker.network.bridge.host_binding_ipv4",
+      '"127.0.0.1"',
+      "dockerd --validate",
+      "systemctl restart docker",
+      "docker network inspect",
+      "supabase_kong_",
+      "supabase_db_",
+    ]) {
+      expect(texto, trecho).toContain(trecho);
+    }
+  });
+
+  it.each(WORKFLOWS)("%s: não há bypass (CI=true, variável de liberação) nem relaxamento da trava", (arquivo) => {
+    const texto = ler(arquivo);
+    expect(texto).not.toMatch(/\bCI\s*[:=]\s*"?true/i);
+    expect(texto).not.toMatch(/PERMITIR|BYPASS|SKIP_(DOCKER|GUARD)|IGNORAR_TRAVA/i);
+  });
+
+  it.each(WORKFLOWS)("%s: `ip` do daemon sozinho não é usado (só vale para a bridge padrão)", (arquivo) => {
+    expect(ler(arquivo)).not.toMatch(/\["ip"\]|"ip"\s*:/);
   });
 });
 

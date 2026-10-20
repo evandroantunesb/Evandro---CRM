@@ -103,10 +103,16 @@ function exigirContainerDoProjeto(c, nome, projeto) {
 function portaPublicada(c, nome, portaInterna) {
   const entradas = c.NetworkSettings?.Ports?.[portaInterna] ?? [];
   if (entradas.length === 0) throw new Error(`Contêiner "${nome}" não publica ${portaInterna} no host: recusado.`);
-  for (const e of entradas) {
-    if (!LOOPBACK.has(e.HostIp ?? "")) {
-      throw new Error(`Contêiner "${nome}" publica ${portaInterna} fora do loopback: recusado.`);
-    }
+  const fora = [...new Set(entradas.filter((e) => !LOOPBACK.has(e.HostIp ?? "")).map((e) => e.HostIp ?? ""))];
+  if (fora.length > 0) {
+    // O Supabase CLI publica com `-p <porta>:<porta-interna>` (sem IP): vale o padrão do Docker, que é
+    // 0.0.0.0/:: . Em rede bridge PERSONALIZADA (`supabase_network_<id>`) a opção `ip` do daemon não vale;
+    // o padrão vem de `default-network-opts` (host_binding_ipv4) e só afeta redes criadas depois dele.
+    throw new Error(
+      `Contêiner "${nome}" publica ${portaInterna} fora do loopback (HostIp ${fora.map((ip) => JSON.stringify(ip)).join(", ")}): recusado. ` +
+        'Configure o Docker para publicar redes bridge novas só em 127.0.0.1 ("default-network-opts" → bridge → ' +
+        '"com.docker.network.bridge.host_binding_ipv4") e recrie a rede e os contêineres da stack (ver AGENTS.md).',
+    );
   }
   const portas = new Set(entradas.map((e) => e.HostPort ?? ""));
   if (portas.size !== 1 || portas.has("")) {
