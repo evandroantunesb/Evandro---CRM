@@ -1,7 +1,16 @@
 /** Conversor único de números digitados no padrão brasileiro (M2-a) e a ida e volta com a reabertura do kit. */
 import { describe, expect, it } from "vitest";
-import { formatarNumeroBr, lerNumeroBr } from "@/lib/formatacao";
+import { formatarMascaraMoeda, formatarNumeroBr, lerNumeroBr } from "@/lib/formatacao";
 import { estadoSalvoDoKit } from "@/lib/kit-formulario";
+
+describe("máscara do valor do negócio", () => {
+  it("interpreta dígitos como centavos e mantém o valor que o servidor lê", () => {
+    expect(formatarMascaraMoeda("1000")).toBe("10,00");
+    expect(lerNumeroBr(formatarMascaraMoeda("1000"))).toBe(10);
+    expect(formatarMascaraMoeda("R$ 10.000,50")).toBe("10.000,50");
+    expect(lerNumeroBr(formatarMascaraMoeda("R$ 10.000,50"))).toBe(10000.5);
+  });
+});
 
 describe("lerNumeroBr", () => {
   it.each([
