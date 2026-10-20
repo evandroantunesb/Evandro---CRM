@@ -108,6 +108,12 @@ export async function criarBaseFicticia(): Promise<BaseFicticia> {
     "criar empresas",
   );
   const [empresaA, empresaB] = [empresas[0].id, empresas[1].id];
+  // A parte do Fio B na tarifa não tem valor padrão (dado da distribuidora): as duas empresas fictícias recebem um.
+  const parametros = ok(
+    await servico.from("parametros_calculadora").update({ parte_fio_b_tarifa: 1 }).in("empresa_id", [empresaA, empresaB]).select("empresa_id"),
+    "parâmetros da calculadora",
+  );
+  if (parametros.length !== 2) throw new Error(`parâmetros da calculadora: ${parametros.length} de 2 empresas atualizadas`);
 
   const closer = { papel: "vendedor", perfil_gamificacao: "closer" };
   const operacao = { papel: "operacao" };
