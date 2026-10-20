@@ -117,13 +117,6 @@ export async function editarParametros(_: ResultadoAcao, formData: FormData): Pr
     // Vazio continua valendo 0%, como antes.
     .transform((v) => (lerNumeroBr(v) ?? 0) / 100)
     .pipe(z.number({ message: `Percentual inválido. ${MENSAGEM_NUMERO_BR}` }).min(0, "Percentual inválido").max(1, "Percentual inválido"));
-  // Parte da tarifa que é Fio B: obrigatória (dado da distribuidora), de 0 (exclusive) a 100%.
-  const parteFioB = z
-    .string()
-    .trim()
-    .min(1, "Informe a parte do Fio B na tarifa")
-    .transform((v) => (lerNumeroBr(v) ?? Number.NaN) / 100)
-    .pipe(z.number({ message: `Parte do Fio B inválida. ${MENSAGEM_NUMERO_BR}` }).gt(0, "A parte do Fio B deve ser maior que zero").max(1, "A parte do Fio B não pode passar de 100%"));
   const custoOpcional = z
     .string()
     .optional()
@@ -133,7 +126,6 @@ export async function editarParametros(_: ResultadoAcao, formData: FormData): Pr
     .object({
       produtividade_kwh_kwp_mes: numeroBr("Informe a produtividade"),
       percentual_fio_b: percentual,
-      parte_fio_b_tarifa: parteFioB,
       disponibilidade_mono_kwh: numeroBr("Informe a disponibilidade monofásica"),
       disponibilidade_bi_kwh: numeroBr("Informe a disponibilidade bifásica"),
       disponibilidade_tri_kwh: numeroBr("Informe a disponibilidade trifásica"),

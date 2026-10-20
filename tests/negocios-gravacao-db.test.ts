@@ -39,7 +39,6 @@ beforeAll(async () => {
   [admin, vendedor, sdr] = await Promise.all(["ng-admin", "ng-vendedor", "ng-sdr"].map(criarUsuario));
   const { data: emp } = await servico.from("empresas").insert({ nome: `Gravação ${sufixo}` }).select("id").single();
   empresa = emp!.id;
-  await servico.from("parametros_calculadora").update({ parte_fio_b_tarifa: 1 }).eq("empresa_id", empresa);
   const { data: membros, error } = await servico
     .from("empresa_membros")
     .insert([
@@ -566,44 +565,5 @@ describe("preço do cálculo x valor do negócio", () => {
     const r = await criar(vendedor, novoNegocio());
     expect(await atualizarPrecoCalculoComCliente(cliente(vendedor), atual[vendedor.id], r.negocioId)).toMatchObject({ ok: false });
     expect((await servico.from("calculos_solares").select("id").eq("negocio_id", r.negocioId)).data).toHaveLength(0);
-  });
-});
-
-describe("Fio B: parte da tarifa", () => {
-  const kitForm = (negocioId: string) =>
-    fd({ negocioId, tipoLigacao: "trifasico", consumoMedioKwh: "700", valorFaturaMedio: "", tarifaKwh: "0,95", estruturaTelhado: "", componentes: KIT, observacoes: "" });
-  const definirParte = (parte: number | null) => servico.from("parametros_calculadora").update({ parte_fio_b_tarifa: parte }).eq("empresa_id", empresa);
-
-  it("sem a parte configurada o cálculo é recusado (sem valor padrão) e nada é gravado; configurada, vira retrato no cálculo", async () => {
-    const r = await criar(vendedor, novoNegocio());
-    try {
-      await definirParte(null);
-      const recusado = await salvarKitComCliente(cliente(vendedor), atual[vendedor.id], kitForm(r.negocioId));
-      expect(recusado.ok).toBe(false);
-      expect(recusado.mensagem).toContain("parte do Fio B");
-      expect((await servico.from("calculos_solares").select("id").eq("negocio_id", r.negocioId)).data).toHaveLength(0);
-      expect((await servico.from("kit_componentes").select("id").eq("negocio_id", r.negocioId)).data).toHaveLength(0);
-
-      await definirParte(0.3);
-      expect((await salvarKitComCliente(cliente(vendedor), atual[vendedor.id], kitForm(r.negocioId))).ok).toBe(true);
-      const { data: c } = await servico.from("calculos_solares").select("parte_fio_b_tarifa, percentual_fio_b, kwh_compensado, custo_fio_b").eq("negocio_id", r.negocioId).single();
-      expect(c!.parte_fio_b_tarifa).toBe(0.3);
-      // compensado x tarifa x parte x percentual do ano
-      expect(c!.custo_fio_b).toBe(Math.round(c!.kwh_compensado * 0.95 * 0.3 * c!.percentual_fio_b * 100) / 100);
-
-      // Mudar a configuração depois não mexe no cálculo salvo.
-      await definirParte(0.5);
-      expect((await servico.from("calculos_solares").select("parte_fio_b_tarifa").eq("negocio_id", r.negocioId).single()).data!.parte_fio_b_tarifa).toBe(0.3);
-    } finally {
-      await definirParte(1);
-    }
-  });
-
-  it("o banco recusa parte fora de 0 (exclusive) a 100%", async () => {
-    for (const invalida of [0, -0.1, 1.5]) {
-      const { error } = await definirParte(invalida);
-      expect(error, String(invalida)).not.toBeNull();
-    }
-    expect((await servico.from("parametros_calculadora").select("parte_fio_b_tarifa").eq("empresa_id", empresa).single()).data!.parte_fio_b_tarifa).toBe(1);
   });
 });
