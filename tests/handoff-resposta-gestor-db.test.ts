@@ -9,6 +9,7 @@
  * sem dados pessoais/financeiros, isolada por empresa e equipe.
  */
 import { Client } from "pg";
+import { urlBancoLocal } from "./banco-local";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { Json } from "@/lib/supabase/database.types";
 import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
@@ -500,13 +501,6 @@ describe("retorno das RPCs de aceite e devolução sem dados confidenciais", () 
   }
 });
 
-// Conexão direta só no banco local (nunca remoto/produção), para segurar uma desativação aberta.
-const URL_BANCO = process.env.SUPABASE_DB_URL ?? "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
-function urlBancoLocal() {
-  const host = new URL(URL_BANCO).hostname;
-  if (host !== "127.0.0.1" && host !== "localhost") throw new Error(`Teste direto no banco recusado: host "${host}" não é local.`);
-  return URL_BANCO;
-}
 
 describe("destinatário inativo", () => {
   const INATIVO = "O vendedor destinatário está inativo";

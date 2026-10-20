@@ -17,6 +17,16 @@ on:
       - "e2e/**"
       - "playwright.config.ts"
       - ".github/workflows/navegador-obras.yml"
+      # A trava e o servidor do e2e decidem em que stack o teste grava: mudar qualquer um deles precisa rodar os
+      # testes de navegador. Também entram o que o servidor constrói/inicia (next.config.ts, dependências) e o
+      # banco local que eles usam (supabase/**: migrations, seed e config.toml).
+      - "scripts/e2e-servidor.mjs"
+      - "scripts/checar-ambiente-local.mjs"
+      - "scripts/lib/**"
+      - "next.config.ts"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "supabase/**"
   workflow_dispatch:
 
 permissions:
@@ -43,8 +53,83 @@ jobs:
       - uses: supabase/setup-cli@45a513f8c64c0bc8e0e3dfe572b5c95be85f6359 # v3.0.1
         with:
           version: 2.120.0
+      # O Supabase CLI publica as portas sem IP (`-p <porta>:<porta-interna>`) numa rede bridge PERSONALIZADA
+      # (supabase_network_<id>). O padrão do Docker é 0.0.0.0/::, e a opção "ip" do daemon só vale para a bridge
+      # padrão. Para redes novas o padrão vem de "default-network-opts" (host_binding_ipv4), que só afeta redes
+      # criadas DEPOIS dele: por isso este passo vem ANTES do `supabase start`. Runner descartável do GitHub.
+      - name: Docker - publicar redes bridge novas só em 127.0.0.1
+        run: |
+          set -euo pipefail
+          if docker network ls --format '{{.Name}}' | grep -q '^supabase_network_'; then
+            echo "::error::Já existe uma rede supabase_network_* neste runner: ela manteria a publicação antiga."
+            exit 1
+          fi
+          conf=/etc/docker/daemon.json
+          novo="$(mktemp)"
+          if sudo test -s "$conf"; then base="$(sudo cat "$conf")"; else base='{}'; fi
+          printf '%s' "$base" | jq '.["default-network-opts"].bridge["com.docker.network.bridge.host_binding_ipv4"] = "127.0.0.1"' > "$novo"
+          jq -e '.["default-network-opts"].bridge["com.docker.network.bridge.host_binding_ipv4"] == "127.0.0.1"' "$novo" > /dev/null
+          sudo dockerd --validate --config-file="$novo"
+          sudo install -m 0644 -o root -g root "$novo" "$conf"
+          echo "daemon.json (chaves): $(jq -c 'keys' "$novo")"
+          sudo systemctl restart docker
+          for _ in $(seq 1 60); do
+            if docker info > /dev/null 2>&1; then break; fi
+            sleep 1
+          done
+          if ! docker info > /dev/null 2>&1; then
+            echo "::error::O Docker não voltou a responder em 60 s após a reinicialização."
+            exit 1
+          fi
+          # Prova do efeito: uma rede nova, criada sem opções, precisa nascer com o IP de publicação em loopback.
+          docker network create --driver bridge sonda-loopback > /dev/null
+          efetivo="$(docker network inspect sonda-loopback --format '{{index .Options "com.docker.network.bridge.host_binding_ipv4"}}')"
+          docker network rm sonda-loopback > /dev/null
+          if [ "$efetivo" != "127.0.0.1" ]; then
+            echo "::error::O Docker não aplicou default-network-opts a redes novas (host_binding_ipv4 efetivo: '${efetivo}')."
+            docker version --format 'Docker Engine {{.Server.Version}}'
+            exit 1
+          fi
+          echo "Rede nova nasce com host_binding_ipv4=127.0.0.1 (Docker Engine $(docker version --format '{{.Server.Version}}'))."
       - name: Subir o Supabase local
         run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor,postgres-meta,realtime
+      # Conferência explícita das portas reais antes de qualquer teste. Quem decide é a trava fail-closed
+      # (scripts/lib/docker-stack-local.mjs, em `scripts/e2e-servidor.mjs`); isto só falha cedo e mostra IP e porta.
+      - name: Conferir as portas publicadas (Kong e PostgreSQL só em loopback)
+        run: |
+          set -euo pipefail
+          projeto="$(awk -F'"' '/^\[/{exit} /^project_id[[:space:]]*=/{print $2; exit}' supabase/config.toml)"
+          if [ -z "$projeto" ]; then echo "::error::project_id ausente no supabase/config.toml"; exit 1; fi
+          rede="$(docker network inspect "supabase_network_${projeto}" --format '{{index .Options "com.docker.network.bridge.host_binding_ipv4"}}')"
+          if [ "$rede" != "127.0.0.1" ]; then
+            echo "::error::A rede supabase_network_${projeto} não herdou host_binding_ipv4=127.0.0.1 (efetivo: '${rede}')."
+            exit 1
+          fi
+          # O IP que o Docker precisa publicar é o do host LITERAL da URL que os testes usam (a do CLI): publicar
+          # só em ::1 não prova que 127.0.0.1:<porta> é este contêiner, e vice-versa. Nunca imprime as URLs.
+          eval "$(supabase status -o env | grep -E '^(API_URL|DB_URL)=')"
+          ip_da_url() {
+            local host
+            host="$(printf '%s' "$1" | sed -E 's#^[a-z]+://([^@/]*@)?(\[[^]]+\]|[^:/]+).*#\2#')"
+            case "$host" in
+              127.0.0.1) echo "127.0.0.1" ;;
+              "[::1]") echo "::1" ;;
+              *) echo "::error::O host da URL do Supabase local não é 127.0.0.1 nem [::1]: não há como comprovar o destino no Docker." >&2; return 1 ;;
+            esac
+          }
+          ip_api="$(ip_da_url "$API_URL")"
+          ip_db="$(ip_da_url "$DB_URL")"
+          conferir() {
+            local nome="$1" porta="$2" ip="$3" ligacoes
+            ligacoes="$(docker inspect "$nome" | jq -c --arg p "$porta" '.[0].NetworkSettings.Ports[$p]')"
+            if ! printf '%s' "$ligacoes" | jq -e --arg ip "$ip" 'type == "array" and length > 0 and all(.[]; .HostIp == "127.0.0.1" or .HostIp == "::1") and any(.[]; .HostIp == $ip)' > /dev/null; then
+              echo "::error::${nome} não publica ${porta} só em loopback incluindo ${ip} (endereço da URL do CLI): $(printf '%s' "$ligacoes" | jq -r 'if type == "array" then [.[] | "\(.HostIp):\(.HostPort)"] | join(", ") else "nenhuma publicação" end')"
+              exit 1
+            fi
+            echo "${nome} ${porta}: $(printf '%s' "$ligacoes" | jq -r '[.[] | "\(.HostIp):\(.HostPort)"] | join(", ")') (exigido: ${ip})"
+          }
+          conferir "supabase_kong_${projeto}" "8000/tcp" "$ip_api"
+          conferir "supabase_db_${projeto}" "5432/tcp" "$ip_db"
       - name: Gerar .env.local (só valores do Supabase local)
         run: |
           supabase status -o env | grep -E '^(ANON_KEY|SERVICE_ROLE_KEY|API_URL)=' > /tmp/sb.env

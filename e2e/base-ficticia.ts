@@ -38,7 +38,9 @@ function ambiente() {
 
 /** Postgres local (para pausa/cancelamento). Recusa qualquer host que não seja local. */
 async function noBancoLocal(sql: string, params: unknown[]) {
-  const urlBanco = process.env.SUPABASE_DB_URL ?? "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
+  // Definida só por e2e/global-setup.ts, depois de comprovar que o banco é o da mesma stack da API.
+  const urlBanco = process.env.SUPABASE_DB_URL;
+  if (!urlBanco) throw new Error("Banco não verificado: e2e/global-setup.ts não definiu a URL. Recusado.");
   const host = new URL(urlBanco).hostname;
   if (host !== "127.0.0.1" && host !== "localhost") throw new Error(`Banco recusado: host "${host}" não é local.`);
   const banco = new Client({ connectionString: urlBanco });

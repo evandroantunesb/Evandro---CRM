@@ -8,6 +8,7 @@
  * (status de Compras, participante da mesma empresa, substituição na mesma obra e setor).
  */
 import { Client } from "pg";
+import { urlBancoLocal } from "./banco-local";
 import { beforeAll, describe, expect, it } from "vitest";
 import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
 
@@ -380,18 +381,6 @@ describe("escrita direta bloqueada", () => {
   });
 });
 
-// Ninguém escreve nessas tabelas pela API (nem service_role), então as invariantes do banco
-// são conferidas com o dono do banco local, sempre dentro de uma transação desfeita no fim.
-const URL_BANCO = process.env.SUPABASE_DB_URL ?? "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
-
-// Trava: teste direto no Postgres só contra banco local, nunca remoto/produção.
-function urlBancoLocal() {
-  const host = new URL(URL_BANCO).hostname;
-  if (host !== "127.0.0.1" && host !== "localhost") {
-    throw new Error(`Teste direto no banco recusado: host "${host}" não é local.`);
-  }
-  return URL_BANCO;
-}
 
 async function noBanco(sql: string, params: unknown[]) {
   const banco = new Client({ connectionString: urlBancoLocal() });

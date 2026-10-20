@@ -13,14 +13,8 @@
  * O cenário é criado por SQL na própria conexão direta (só banco local), sem depender da API.
  */
 import { Client } from "pg";
+import { urlBancoLocal } from "./banco-local";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
-const URL_BANCO = process.env.SUPABASE_DB_URL ?? "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
-function urlBancoLocal() {
-  const host = new URL(URL_BANCO).hostname;
-  if (host !== "127.0.0.1" && host !== "localhost") throw new Error(`Teste direto no banco recusado: host "${host}" não é local.`);
-  return URL_BANCO;
-}
 
 const SOMENTE_LEITURA = "Negócio arquivado é somente leitura: desarquive antes de alterar.";
 const sufixo = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
