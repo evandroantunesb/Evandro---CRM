@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useMemo, useState } from "react";
-import { EditorComponentesKit, linhasParaComponentes, type LinhaComponente } from "@/components/kit-componentes";
+import { EditorComponentesKit, type LinhaComponente } from "@/components/kit-componentes";
 import { useEnvioSemReset } from "@/components/envio-sem-reset";
 import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
 import { salvarKitPersonalizado } from "@/lib/acoes/calculadora";
@@ -14,6 +14,7 @@ import {
 } from "@/lib/calculadora";
 import { formatarMoeda, lerNumeroBr } from "@/lib/formatacao";
 import { estadoSalvoDoKit } from "@/lib/kit-formulario";
+import { analisarLinhas, resumoProblemasKit } from "@/lib/kit-linhas";
 import { MENSAGEM_REMOCAO_COM_CALCULO } from "@/lib/negocio-dados";
 import { ROTULO_TIPO_COMPONENTE_KIT, ROTULO_TIPO_LIGACAO, TIPOS_LIGACAO, type TipoComponenteKit, type TipoLigacao } from "@/lib/tipos";
 
@@ -81,7 +82,9 @@ export function KitPersonalizado({
   parametros: Parametros | null;
 }) {
   const [resultado, acao, pendente] = useActionState(salvarKitPersonalizado, null);
-  const enviar = useEnvioSemReset(acao);
+  const enviarBase = useEnvioSemReset(acao);
+  // Só depois de uma tentativa de envio os problemas das linhas aparecem (linha recém-adicionada não "grita").
+  const [mostrarProblemas, setMostrarProblemas] = useState(false);
   const [editando, setEditando] = useState(!calculo);
   // Fecha o formulário assim que salva (sem useEffect, ajustando durante a renderização).
   const [ultimoResultado, setUltimoResultado] = useState(resultado);
@@ -117,14 +120,28 @@ export function KitPersonalizado({
     setValorFaturaMedio(s.valorFaturaMedio);
     setTarifaKwh(s.tarifaKwh);
     setConfirmaRemocao(false);
+    setMostrarProblemas(false);
     setVersaoObservacoes((v) => v + 1);
     if (calculo) setEditando(false);
   }
 
-  const componentes = useMemo(() => linhasParaComponentes(linhas), [linhas]);
+  // Mesma análise para a potência, o preço sugerido e o envio: a quantidade vista é a quantidade usada.
+  const { componentes, itens, problemas } = useMemo(() => analisarLinhas(linhas), [linhas]);
   const potenciaKwp = potenciaKitPersonalizadoKwp(componentes);
-  // Tirou todos os itens de um kit salvo: isso é remover o kit (com cálculo, o servidor recusa).
-  const removendoKitSalvo = componentesSalvos.length > 0 && componentes.length === 0;
+  // Remover o kit é uma ação explícita: tirar TODAS as linhas de um kit salvo (com cálculo, o servidor recusa).
+  // Linha sem descrição não conta: ela exige preenchimento ou remoção, nunca vira remoção do kit.
+  const removendoKitSalvo = componentesSalvos.length > 0 && linhas.length === 0;
+  const problemaKit = mostrarProblemas ? resumoProblemasKit(problemas, linhas) : null;
+
+  /** Bloqueia o envio enquanto houver linha inválida ou incompleta; o que foi digitado continua na tela. */
+  function enviar(evento: React.FormEvent<HTMLFormElement>) {
+    if (problemas.length > 0) {
+      evento.preventDefault();
+      setMostrarProblemas(true);
+      return;
+    }
+    enviarBase(evento);
+  }
 
   // Consumo médio em kWh, vindo do campo direto ou calculado a partir da fatura + tarifa.
   const consumoMedioEstimado = useMemo(() => {
@@ -148,15 +165,16 @@ export function KitPersonalizado({
   // só informativo aqui, já que o valor do negócio é editado em "Dados do negócio".
   const precoSugerido = useMemo(() => {
     if (!parametros) return null;
-    const somaComponentes = linhas.reduce((acc, l) => {
-      const precoUnitario = l.precoEstimadoUnitario ? Number(l.precoEstimadoUnitario) : NaN;
-      const quantidade = Number(l.quantidade) || 0;
-      return Number.isFinite(precoUnitario) ? acc + precoUnitario * quantidade : acc;
+    // Só linhas válidas, com a mesma quantidade que vai para o servidor ("1.200" = 1200 aqui também).
+    const somaComponentes = itens.reduce((acc, { indice, componente }) => {
+      const textoPreco = linhas[indice].precoEstimadoUnitario;
+      const precoUnitario = textoPreco ? Number(textoPreco) : NaN;
+      return Number.isFinite(precoUnitario) ? acc + precoUnitario * componente.quantidade : acc;
     }, 0);
     if (somaComponentes <= 0) return null;
     const quantidadeModulos = componentes.filter((c) => c.tipo === "modulo").reduce((acc, c) => acc + c.quantidade, 0);
     return custosInternosEstimados(somaComponentes, quantidadeModulos, potenciaKwp, parametros).total;
-  }, [linhas, componentes, potenciaKwp, parametros]);
+  }, [linhas, itens, componentes, potenciaKwp, parametros]);
 
   const previa = useMemo(() => {
     if (!parametros) return null;
@@ -256,7 +274,13 @@ export function KitPersonalizado({
           Favor adicionar o padrão atual do cliente (em &quot;Dados do negócio&quot;) para conferir compatibilidade com o kit.
         </p>
       )}
-      <EditorComponentesKit linhas={linhas} onChange={setLinhas} sugerirQuantidadeModulo={sugerirQuantidadeModulo} />
+      <EditorComponentesKit
+        linhas={linhas}
+        onChange={setLinhas}
+        sugerirQuantidadeModulo={sugerirQuantidadeModulo}
+        problemas={mostrarProblemas ? problemas : undefined}
+      />
+      {problemaKit && <Mensagem resultado={{ ok: false, mensagem: problemaKit }} />}
       {precoSugerido != null && (
         <p className="-mt-1 text-xs text-zinc-400">
           Preço sugerido (catálogo + custos internos, estimativa de teste): {formatarMoeda(precoSugerido)} — ajuste em

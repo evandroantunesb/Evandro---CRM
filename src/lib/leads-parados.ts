@@ -29,7 +29,8 @@ export async function carregarLeadsParados(
     .from("negocios")
     .select("id, numero, titulo, etapa_desde, responsavel_id, contatos(nome)")
     .eq("empresa_id", empresaId)
-    .eq("status", "aberto");
+    .eq("status", "aberto")
+    .is("arquivado_em", null);
   if (opcoes.responsavelId) consulta = consulta.eq("responsavel_id", opcoes.responsavelId);
   const { data: negocios } = await consulta.limit(2000);
   if (!negocios?.length) return [];

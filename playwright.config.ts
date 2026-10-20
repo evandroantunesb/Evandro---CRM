@@ -41,10 +41,13 @@ export default defineConfig({
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
-    command: `pnpm start --port ${PORTA}`,
+    // scripts/e2e-servidor.mjs: verifica a stack, apaga .next, reconstrói com o ambiente verificado
+    // e só então inicia o app (o bundle embute a URL da API no build). Por isso o timeout cobre o build.
+    command: `node scripts/e2e-servidor.mjs --port ${PORTA}`,
     url: `http://localhost:${PORTA}/login`,
+    // Nunca reaproveita um servidor já de pé: a identidade dele não seria comprovada.
     reuseExistingServer: false,
-    timeout: 180_000,
+    timeout: 900_000,
     // Demonstração da Apresentação (dados fictícios): só aqui, e o próprio app ainda exige
     // Supabase local para ligá-la (src/lib/obras/apresentacao/demo.ts).
     env: { RAION_DEMO_APRESENTACAO: "1" },

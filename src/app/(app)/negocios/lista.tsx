@@ -231,3 +231,53 @@ export function ListaFechados({
     </div>
   );
 }
+
+type LinhaArquivada = {
+  id: string;
+  arquivado_em: string | null;
+  motivo_arquivamento: string | null;
+};
+
+/** Lista de negócios arquivados (P1a-0): somente leitura, sem ações; o desarquivamento fica na ficha. */
+export function ListaArquivados({ cards, linhas }: { cards: Card[]; linhas: LinhaArquivada[] }) {
+  if (!cards.length) {
+    return <p className="text-sm text-zinc-600">Nenhum negócio arquivado com esses filtros.</p>;
+  }
+  const porId = new Map(linhas.map((l) => [l.id, l]));
+  return (
+    <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white">
+      <table className="w-full text-left text-sm">
+        <thead className="bg-zinc-50 text-zinc-600">
+          <tr>
+            <th className="px-3 py-2 font-medium">Cliente</th>
+            <th className="px-3 py-2 font-medium">Valor</th>
+            <th className="px-3 py-2 font-medium">Responsável</th>
+            <th className="px-3 py-2 font-medium">Motivo</th>
+            <th className="px-3 py-2 font-medium">Arquivado em</th>
+          </tr>
+        </thead>
+        <tbody>
+          {cards.map((c) => {
+            const l = porId.get(c.id)!;
+            return (
+              <tr key={c.id} className="border-t border-zinc-100">
+                <td className="px-3 py-2">
+                  <Link href={`/negocios/${c.id}`} className="font-medium text-amber-700 hover:underline">
+                    {c.contato}
+                  </Link>
+                  <span className="block text-xs text-zinc-500">
+                    #{c.numero} · {c.titulo}
+                  </span>
+                </td>
+                <td className="px-3 py-2">{c.valor || "Não informado"}</td>
+                <td className="px-3 py-2">{c.responsavel}</td>
+                <td className="px-3 py-2">{l.motivo_arquivamento}</td>
+                <td className="px-3 py-2 whitespace-nowrap">{l.arquivado_em ? formatarDataHora(l.arquivado_em) : ""}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}

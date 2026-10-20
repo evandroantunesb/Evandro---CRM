@@ -4,7 +4,8 @@ import { AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useId, useMemo, useRef, useState, useTransition } from "react";
 import { CampoArquivo } from "@/components/campo-arquivo";
-import { EditorComponentesKit, linhasParaComponentes, type LinhaComponente } from "@/components/kit-componentes";
+import { EditorComponentesKit, type LinhaComponente } from "@/components/kit-componentes";
+import { analisarLinhas, resumoProblemasKit } from "@/lib/kit-linhas";
 import { Botao, Campo, Mensagem, Selecao, Selo } from "@/components/ui";
 import { buscarContatos, criarNegocio, verificarDuplicado, type Duplicado } from "@/lib/acoes/negocios";
 import { registrarAnexo } from "@/lib/acoes/anexos";
@@ -247,21 +248,25 @@ export function FormularioNegocio({
   const [linhas, setLinhas] = useState<LinhaComponente[]>([]);
   const [estruturaTelhado, setEstruturaTelhado] = useState("");
 
-  const componentes = useMemo(() => linhasParaComponentes(linhas), [linhas]);
+  // Mesma análise para a potência, o preço sugerido e o envio: a quantidade vista é a quantidade usada.
+  const { componentes, itens, problemas: problemasKit } = useMemo(() => analisarLinhas(linhas), [linhas]);
+  // Só depois de uma tentativa de seguir/enviar os problemas das linhas aparecem.
+  const [mostrarProblemasKit, setMostrarProblemasKit] = useState(false);
   const potenciaKwp = potenciaKitPersonalizadoKwp(componentes);
 
   const precoSugerido = useMemo(() => {
-    const somaComponentes = linhas.reduce((acc, l) => {
-      const precoUnitario = l.precoEstimadoUnitario ? Number(l.precoEstimadoUnitario) : NaN;
-      const quantidade = Number(l.quantidade) || 0;
-      return Number.isFinite(precoUnitario) ? acc + precoUnitario * quantidade : acc;
+    // Só linhas válidas, com a mesma quantidade que vai para o servidor ("1.200" = 1200 aqui também).
+    const somaComponentes = itens.reduce((acc, { indice, componente }) => {
+      const textoPreco = linhas[indice].precoEstimadoUnitario;
+      const precoUnitario = textoPreco ? Number(textoPreco) : NaN;
+      return Number.isFinite(precoUnitario) ? acc + precoUnitario * componente.quantidade : acc;
     }, 0);
     if (somaComponentes <= 0) return null;
     if (!parametros) return Math.round(somaComponentes);
     const quantidadeModulos = componentes.filter((c) => c.tipo === "modulo").reduce((acc, c) => acc + c.quantidade, 0);
     const custos = custosInternosEstimados(somaComponentes, quantidadeModulos, potenciaKwp, parametros);
     return Math.round(custos.total);
-  }, [linhas, componentes, potenciaKwp, parametros]);
+  }, [linhas, itens, componentes, potenciaKwp, parametros]);
 
   const [valor, setValor] = useState("");
   const [valorTocado, setValorTocado] = useState(false);
@@ -409,12 +414,18 @@ export function FormularioNegocio({
         return { mensagem: "Informe o consumo médio mensal em kWh ou o valor médio da conta." };
       }
     }
+    // Kit: quantidade inválida ou linha incompleta bloqueia (nada é arredondado, trocado ou descartado).
+    if (etapa === 2) {
+      const problemaKit = resumoProblemasKit(problemasKit, linhas);
+      if (problemaKit) return { mensagem: problemaKit };
+    }
     return null;
   }
 
   /** Leva ao passo do problema, mostra a mensagem e põe o cursor no campo. */
   function mostrarProblema(etapa: 1 | 2 | 3, problema: { mensagem: string; campo?: HTMLElement }) {
     setEtapaAtual(etapa);
+    if (etapa === 2) setMostrarProblemasKit(true);
     setErroEtapa(problema.mensagem);
     if (problema.campo) setTimeout(() => problema.campo?.focus(), 0);
   }
@@ -432,6 +443,7 @@ export function FormularioNegocio({
    */
   function cancelarMontagem() {
     setLinhas([]);
+    setMostrarProblemasKit(false);
     setMostrarKit(false);
     if (!valorTocado) setValor("");
   }
@@ -769,7 +781,12 @@ export function FormularioNegocio({
         ) : (
           <fieldset className="flex flex-col gap-3">
             <legend className="mb-2 text-sm font-semibold text-zinc-900">Kit personalizado</legend>
-            <EditorComponentesKit linhas={linhas} onChange={setLinhas} sugerirQuantidadeModulo={sugerirQuantidadeModulo} />
+            <EditorComponentesKit
+              linhas={linhas}
+              onChange={setLinhas}
+              sugerirQuantidadeModulo={sugerirQuantidadeModulo}
+              problemas={mostrarProblemasKit ? problemasKit : undefined}
+            />
             <Botao type="button" variante="secundario" onClick={cancelarMontagem} className="self-start">
               Cancelar montagem
             </Botao>
