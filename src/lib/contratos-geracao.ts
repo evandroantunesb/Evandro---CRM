@@ -8,6 +8,7 @@ import {
   validarModeloContrato,
   type FontesContrato,
 } from "@/lib/contrato";
+import { MENSAGEM_PRECO_DESATUALIZADO, precoDoCalculoDesatualizado } from "@/lib/calculo-preco";
 import { mensagemErro } from "@/lib/erros";
 import { formatarMoeda } from "@/lib/formatacao";
 import type { SupabaseServidor } from "@/lib/supabase/server";
@@ -36,7 +37,7 @@ export async function gerarContratoComCliente(
         .maybeSingle(),
       supabase
         .from("calculos_solares")
-        .select("kit_nome, kit_potencia_kwp, tipo_ligacao, consumo_medio_kwh, geracao_estimada_kwh_mes")
+        .select("kit_nome, kit_potencia_kwp, kit_preco, tipo_ligacao, consumo_medio_kwh, geracao_estimada_kwh_mes")
         .eq("negocio_id", negocioId)
         .maybeSingle(),
       supabase.from("kit_componentes").select("descricao, quantidade, potencia_w").eq("negocio_id", negocioId).order("ordem"),
@@ -49,6 +50,10 @@ export async function gerarContratoComCliente(
   if (!negocio) return { ok: false, mensagem: "Negócio não encontrado." };
   if (existente && existente.status !== "rascunho") {
     return { ok: false, mensagem: "Este contrato já saiu do rascunho — o texto não muda mais automaticamente." };
+  }
+  // O contrato usa o valor atual do negócio e a proposta, o preço do cálculo: com os dois diferentes, não gera.
+  if (calculo && precoDoCalculoDesatualizado(calculo.kit_preco, negocio.valor)) {
+    return { ok: false, mensagem: MENSAGEM_PRECO_DESATUALIZADO };
   }
   // Modelo salvo antes da validação pode ter campo desconhecido: não gera.
   const validacao = validarModeloContrato(modelo.conteudo);

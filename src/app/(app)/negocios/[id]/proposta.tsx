@@ -21,12 +21,15 @@ export type ModeloDisponivel = { id: string; nome: string; padrao: boolean };
 export function Proposta({
   negocioId,
   temCalculo,
+  precoDesatualizado = false,
   proposta,
   siteUrl,
   modelos,
 }: {
   negocioId: string;
   temCalculo: boolean;
+  /** Valor do negócio diferente do preço do cálculo: a proposta mostra o preço antigo. */
+  precoDesatualizado?: boolean;
   proposta: PropostaSalva | null;
   siteUrl: string;
   modelos: ModeloDisponivel[];
@@ -45,6 +48,7 @@ export function Proposta({
       <form action={acaoGerar} className="flex flex-col gap-3">
         <input type="hidden" name="negocioId" value={negocioId} />
         <p className="text-sm text-zinc-600">Gere um link para enviar a proposta ao cliente, sem precisar de PDF.</p>
+        {precoDesatualizado && <AvisoPrecoDesatualizado />}
         {modelos.length > 0 && (
           <Selecao rotulo="Modelo de proposta" name="modeloId" defaultValue={padrao?.id ?? modelos[0]!.id}>
             {modelos.map((m) => (
@@ -68,6 +72,7 @@ export function Proposta({
 
   return (
     <div className="flex flex-col gap-3">
+      {precoDesatualizado && <AvisoPrecoDesatualizado />}
       <div className="flex flex-col gap-1">
         <span className="text-sm font-medium text-zinc-700">Link da proposta</span>
         <div className="flex flex-wrap gap-2">
@@ -136,5 +141,14 @@ export function Proposta({
         </p>
       )}
     </div>
+  );
+}
+
+function AvisoPrecoDesatualizado() {
+  return (
+    <p role="alert" className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900">
+      O valor do negócio mudou depois do cálculo: a proposta mostra o preço e o payback antigos. Use “Atualizar preço no cálculo”
+      em Kit personalizado.
+    </p>
   );
 }

@@ -11,6 +11,7 @@ import { alternarEtiqueta } from "@/lib/acoes/negocios";
 import { carregarConfiguracao, formatarDataHora, formatarMoeda } from "@/lib/crm";
 import { env } from "@/lib/env";
 import { hojeEmSaoPaulo } from "@/lib/formatacao";
+import { precoDoCalculoDesatualizado } from "@/lib/calculo-preco";
 import { descreverAtividade } from "@/lib/linha-do-tempo";
 import { exigirPapel } from "@/lib/sessao";
 import { ARQUIVAR_NEGOCIO, ATRIBUIR_TAREFA_A_OUTROS, EDITAR_VALOR_NEGOCIO, ESCOLHER_RESPONSAVEL_NEGOCIO, NEGOCIOS, PAGAMENTO_SOLO, PROPOSTA_E_CONTRATO, RESPONSAVEL_COMERCIAL, pode } from "@/lib/permissoes";
@@ -96,7 +97,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
       supabase
         .from("calculos_solares")
         .select(
-          "id, kit_nome, tipo_ligacao, consumo_medio_kwh, valor_fatura_medio, tarifa_kwh, geracao_estimada_kwh_mes, economia_mensal, payback_meses, observacoes",
+          "id, kit_nome, kit_preco, tipo_ligacao, consumo_medio_kwh, valor_fatura_medio, tarifa_kwh, geracao_estimada_kwh_mes, economia_mensal, payback_meses, observacoes",
         )
         .eq("negocio_id", id)
         .maybeSingle(),
@@ -196,6 +197,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
 
   // Arquivado (P1a-0): somente leitura no banco; a ficha esconde as ações que seriam recusadas.
   const arquivado = negocio.arquivado_em != null;
+  const precoDesatualizado = !!calculo && precoDoCalculoDesatualizado(calculo.kit_preco, negocio.valor);
   const responsavelAtual = config.membros.find((m) => m.id === negocio.responsavel_id);
   const responsavelInativo = negocio.responsavel_id != null && !responsavelAtual?.ativo;
 
@@ -411,11 +413,13 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
                     }
                   : null
               }
+              precoDesatualizado={precoDesatualizado}
               calculo={
                 calculo
                   ? {
                       id: calculo.id,
                       kitNome: calculo.kit_nome,
+                      kitPreco: calculo.kit_preco,
                       tipoLigacao: calculo.tipo_ligacao as TipoLigacao,
                       consumoMedioKwh: calculo.consumo_medio_kwh,
                       valorFaturaMedio: calculo.valor_fatura_medio,
@@ -501,6 +505,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
               <Proposta
                 negocioId={negocio.id}
                 temCalculo={!!calculo}
+                precoDesatualizado={precoDesatualizado}
                 siteUrl={env.siteUrl}
                 modelos={(modelosProposta ?? []).map((m) => ({ id: m.id, nome: m.nome, padrao: m.padrao }))}
                 proposta={
@@ -524,6 +529,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
                 <Contrato
                   negocioId={negocio.id}
                   siteUrl={env.siteUrl}
+                  precoDesatualizado={precoDesatualizado}
                   contrato={contrato ? { token: contrato.token, status: contrato.status as StatusContrato } : null}
                 />
               </Cartao>

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { ANEXOS_CRIACAO, problemaArquivo } from "@/lib/anexos-regras";
 import { arquivoMetaSchema } from "@/lib/anexos-servidor";
 import { componentesJsonSchema, nomeKitPersonalizado, potenciaKitPersonalizadoKwp, type ComponenteKit } from "@/lib/calculadora";
+import { paybackComPreco, precoDoCalculoDesatualizado } from "@/lib/calculo-preco";
 import { montarLinhaCalculo } from "@/lib/calculo-servidor";
 import { mensagemErro } from "@/lib/erros";
 import { lerNumeroBr, MENSAGEM_NUMERO_BR } from "@/lib/formatacao";
@@ -465,6 +466,38 @@ export async function salvarKitComCliente(
     negocioId: d.negocioId,
     mensagem: montado ? "Kit e cálculo salvos." : "Itens do kit salvos. Informe a tarifa para calcular geração e economia.",
   };
+}
+
+/**
+ * Ação explícita do vendedor: leva o valor atual do negócio ao cálculo salvo (preço do kit e payback).
+ * Só esses dois campos mudam; a economia não depende do preço. Nada é feito sozinho ao editar o valor,
+ * porque a proposta já enviada passaria a mostrar outro preço sem ninguém decidir isso.
+ */
+export async function atualizarPrecoCalculoComCliente(
+  supabase: SupabaseServidor,
+  atual: Atual,
+  negocioId: string,
+): Promise<NonNullable<ResultadoAcao> & { negocioId?: string }> {
+  const [{ data: negocio, error: erroNegocio }, { data: calculo, error: erroCalculo }] = await Promise.all([
+    supabase.from("negocios").select("valor").eq("id", negocioId).maybeSingle(),
+    supabase.from("calculos_solares").select("id, kit_preco, economia_mensal").eq("negocio_id", negocioId).maybeSingle(),
+  ]);
+  if (erroNegocio || erroCalculo) return { ok: false, mensagem: "Não foi possível conferir o cálculo. Nada foi alterado." };
+  if (!negocio) return { ok: false, mensagem: "Negócio não encontrado." };
+  if (!calculo) return { ok: false, mensagem: "Este negócio ainda não tem cálculo." };
+  if (!precoDoCalculoDesatualizado(calculo.kit_preco, negocio.valor)) return { ok: true, negocioId, mensagem: "O preço do cálculo já está em dia." };
+
+  const preco = negocio.valor ?? 0;
+  // Só grava se o cálculo continua com o preço lido (outra edição no meio não é sobrescrita em silêncio).
+  const { data, error } = await supabase
+    .from("calculos_solares")
+    .update({ kit_preco: preco, payback_meses: paybackComPreco(preco, calculo.economia_mensal), atualizado_por: atual.membroId })
+    .eq("id", calculo.id)
+    .eq("kit_preco", calculo.kit_preco)
+    .select("id");
+  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível atualizar o cálculo.") };
+  if (!data?.length) return { ok: false, mensagem: "O cálculo mudou enquanto você atualizava. Recarregue a página e tente de novo." };
+  return { ok: true, negocioId, mensagem: "Preço do cálculo atualizado." };
 }
 
 const esquemaContato = z.object({

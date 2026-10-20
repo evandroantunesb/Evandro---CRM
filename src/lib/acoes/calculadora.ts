@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { mensagemErro } from "@/lib/erros";
 import { lerNumeroBr, MENSAGEM_NUMERO_BR } from "@/lib/formatacao";
-import { salvarKitComCliente } from "@/lib/negocios-gravacao";
+import { atualizarPrecoCalculoComCliente, salvarKitComCliente } from "@/lib/negocios-gravacao";
 import { exigirPapel } from "@/lib/sessao";
 import { CALCULADORA } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
@@ -26,6 +26,17 @@ export async function salvarKitPersonalizado(_: ResultadoAcao, formData: FormDat
   const { atual } = await exigirPapel(...CALCULADORA);
   const supabase = await criarClienteServidor();
   const { negocioId, ...r } = await salvarKitComCliente(supabase, atual, formData);
+  if (negocioId) revalidatePath(`/negocios/${negocioId}`);
+  return r;
+}
+
+/** "Atualizar preço no cálculo": só o preço do kit e o payback, pelo valor atual do negócio. */
+export async function atualizarPrecoCalculo(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  const { atual } = await exigirPapel(...CALCULADORA);
+  const id = z.string().uuid().safeParse(formData.get("negocioId"));
+  if (!id.success) return { ok: false, mensagem: "Negócio inválido." };
+  const supabase = await criarClienteServidor();
+  const { negocioId, ...r } = await atualizarPrecoCalculoComCliente(supabase, atual, id.data);
   if (negocioId) revalidatePath(`/negocios/${negocioId}`);
   return r;
 }

@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { Botao, Mensagem, Selecao } from "@/components/ui";
 import { atualizarStatusContrato, gerarContrato } from "@/lib/acoes/contratos";
+import { MENSAGEM_PRECO_DESATUALIZADO } from "@/lib/calculo-preco";
 import { ROTULO_STATUS_CONTRATO, STATUS_CONTRATO, type StatusContrato } from "@/lib/tipos";
 
 export type ContratoSalvo = {
@@ -14,10 +15,13 @@ export function Contrato({
   negocioId,
   contrato,
   siteUrl,
+  precoDesatualizado = false,
 }: {
   negocioId: string;
   contrato: ContratoSalvo | null;
   siteUrl: string;
+  /** Valor do negócio diferente do preço do cálculo: o servidor não gera o contrato nesse estado. */
+  precoDesatualizado?: boolean;
 }) {
   const [resultadoGerar, acaoGerar, gerando] = useActionState(gerarContrato, null);
   const [resultadoStatus, acaoStatus] = useActionState(atualizarStatusContrato, null);
@@ -33,8 +37,13 @@ export function Contrato({
         )}
         <form action={acaoGerar} className="flex flex-col gap-2">
           <input type="hidden" name="negocioId" value={negocioId} />
+          {precoDesatualizado && (
+            <p role="alert" className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              {MENSAGEM_PRECO_DESATUALIZADO}
+            </p>
+          )}
           <Mensagem resultado={resultadoGerar} />
-          <Botao type="submit" disabled={gerando} className="self-start">
+          <Botao type="submit" disabled={gerando || precoDesatualizado} className="self-start">
             {gerando ? "Gerando..." : contrato ? "Gerar novamente" : "Gerar contrato"}
           </Botao>
         </form>
