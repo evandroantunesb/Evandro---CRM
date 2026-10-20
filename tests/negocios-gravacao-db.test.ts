@@ -11,6 +11,7 @@ import {
   criarNegocioComCliente,
   editarContatoComCliente,
   editarNegocioComCliente,
+  atualizarPrecoCalculoComCliente,
   salvarKitComCliente,
   type Atual,
 } from "@/lib/negocios-gravacao";
@@ -524,5 +525,45 @@ describe("etapa fora do formulário de edição", () => {
     const antes = await reabrir(vendedor, r.negocioId);
     await editarNegocioComCliente(cliente(vendedor), atual[vendedor.id], edicaoAtual(r.negocioId, antes.negocio, { etapa_id: etapaGanho }));
     expect((await reabrir(vendedor, r.negocioId)).negocio).toMatchObject({ etapa_id: etapaInicial, status: "aberto" });
+  });
+});
+
+describe("preço do cálculo x valor do negócio", () => {
+  async function negocioComCalculo() {
+    const r = await criar(vendedor, novoNegocio({ componentes: KIT, valor: "25.000,00", consumo_medio_kwh: "700", tipo_ligacao: "trifasico", tarifa_kwh: "0,95" }));
+    const { data: calculo } = await servico.from("calculos_solares").select("id, kit_preco, economia_mensal, payback_meses, geracao_estimada_kwh_mes").eq("negocio_id", r.negocioId).single();
+    expect(calculo).toMatchObject({ kit_preco: 25000 });
+    return { negocioId: r.negocioId, calculo: calculo! };
+  }
+  const lerCalculo = async (negocioId: string) =>
+    (await servico.from("calculos_solares").select("kit_preco, payback_meses, economia_mensal, geracao_estimada_kwh_mes").eq("negocio_id", negocioId).single()).data!;
+
+  it("editar o valor do negócio não mexe no cálculo; atualizar leva só preço e payback", async () => {
+    const { negocioId, calculo } = await negocioComCalculo();
+    const editado = await editarNegocioComCliente(
+      cliente(admin),
+      atual[admin.id],
+      fd({ negocioId, titulo: "Valor corrigido", valor: "28.000,00", consumo_medio_kwh: "700" }),
+    );
+    expect(editado.ok).toBe(true);
+    expect(await lerCalculo(negocioId)).toMatchObject({ kit_preco: 25000, payback_meses: calculo.payback_meses });
+
+    const r = await atualizarPrecoCalculoComCliente(cliente(vendedor), atual[vendedor.id], negocioId);
+    expect(r).toMatchObject({ ok: true, mensagem: "Preço do cálculo atualizado." });
+    const depois = await lerCalculo(negocioId);
+    expect(depois.kit_preco).toBe(28000);
+    expect(depois.payback_meses).toBe(Math.round((28000 / calculo.economia_mensal) * 10) / 10);
+    // Geração e economia continuam as do cálculo salvo.
+    expect(depois.economia_mensal).toBe(calculo.economia_mensal);
+    expect(depois.geracao_estimada_kwh_mes).toBe(calculo.geracao_estimada_kwh_mes);
+
+    // Sem divergência, repetir não muda nada.
+    expect(await atualizarPrecoCalculoComCliente(cliente(vendedor), atual[vendedor.id], negocioId)).toMatchObject({ ok: true, mensagem: "O preço do cálculo já está em dia." });
+  });
+
+  it("negócio sem cálculo: recusa sem criar nada", async () => {
+    const r = await criar(vendedor, novoNegocio());
+    expect(await atualizarPrecoCalculoComCliente(cliente(vendedor), atual[vendedor.id], r.negocioId)).toMatchObject({ ok: false });
+    expect((await servico.from("calculos_solares").select("id").eq("negocio_id", r.negocioId)).data).toHaveLength(0);
   });
 });

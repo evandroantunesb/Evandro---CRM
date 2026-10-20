@@ -110,6 +110,46 @@ describe("contrato com RLS real", () => {
     }
   });
 
+  it("cálculo com preço diferente do valor atual do negócio bloqueia a geração até atualizar o preço", async () => {
+    const id = await negocio("Preço antigo");
+    const calculo = {
+      empresa_id: empresa,
+      negocio_id: id,
+      kit_nome: "Kit 5 kWp",
+      kit_potencia_kwp: 5,
+      kit_preco: 25000,
+      tipo_ligacao: "bifasico" as const,
+      consumo_medio_kwh: 500,
+      tarifa_kwh: 0.9,
+      produtividade_kwh_kwp_mes: 120,
+      percentual_fio_b: 0.45,
+      disponibilidade_kwh: 50,
+      geracao_estimada_kwh_mes: 600,
+      kwh_faturado: 50,
+      kwh_compensado: 450,
+      custo_fio_b: 182.25,
+      conta_sem_solar: 450,
+      conta_com_solar: 227.25,
+      economia_mensal: 222.75,
+      payback_meses: 112.2,
+    };
+    const { error } = await servico.from("calculos_solares").insert(calculo);
+    if (error) throw error;
+    // Em dia: gera.
+    expect((await gerar(id)).ok).toBe(true);
+    await servico.from("contratos").delete().eq("negocio_id", id);
+
+    await servico.from("negocios").update({ valor: 28000 }).eq("id", id);
+    const r = await gerar(id);
+    expect(r.ok).toBe(false);
+    expect(r.mensagem).toContain("Atualizar preço no cálculo");
+    expect(await contrato(id)).toBeNull();
+
+    await servico.from("calculos_solares").update({ kit_preco: 28000, payback_meses: 125.7 }).eq("negocio_id", id);
+    expect((await gerar(id)).ok).toBe(true);
+    expect((await contrato(id))!.conteudo).toContain("28.000");
+  });
+
   it("modelo antigo inválido (salvo antes da validação) não gera contrato", async () => {
     const id = await negocio("Modelo antigo");
     await servico.from("modelos_contrato").update({ conteudo: "Cliente {{cliente_nom}}" }).eq("empresa_id", empresa);

@@ -4,7 +4,7 @@ import { useActionState, useMemo, useState } from "react";
 import { EditorComponentesKit, type LinhaComponente } from "@/components/kit-componentes";
 import { useEnvioSemReset } from "@/components/envio-sem-reset";
 import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
-import { salvarKitPersonalizado } from "@/lib/acoes/calculadora";
+import { atualizarPrecoCalculo, salvarKitPersonalizado } from "@/lib/acoes/calculadora";
 import {
   calcular,
   custosInternosEstimados,
@@ -28,6 +28,7 @@ export type ComponenteSalvo = {
 export type CalculoSalvo = {
   id: string;
   kitNome: string;
+  kitPreco: number;
   tipoLigacao: TipoLigacao;
   consumoMedioKwh: number;
   valorFaturaMedio: number | null;
@@ -70,6 +71,7 @@ export function KitPersonalizado({
   componentesSalvos,
   calculo,
   parametros,
+  precoDesatualizado = false,
 }: {
   negocioId: string;
   negocioValor: number | null;
@@ -80,8 +82,11 @@ export function KitPersonalizado({
   componentesSalvos: ComponenteSalvo[];
   calculo: CalculoSalvo | null;
   parametros: Parametros | null;
+  /** O valor do negócio mudou depois do cálculo salvo (ver `precoDoCalculoDesatualizado`). */
+  precoDesatualizado?: boolean;
 }) {
   const [resultado, acao, pendente] = useActionState(salvarKitPersonalizado, null);
+  const [resultadoPreco, acaoPreco, atualizandoPreco] = useActionState(atualizarPrecoCalculo, null);
   const enviarBase = useEnvioSemReset(acao);
   // Só depois de uma tentativa de envio os problemas das linhas aparecem (linha recém-adicionada não "grita").
   const [mostrarProblemas, setMostrarProblemas] = useState(false);
@@ -207,6 +212,19 @@ export function KitPersonalizado({
             Favor adicionar o padrão atual do cliente (em &quot;Dados do negócio&quot;) para conferir compatibilidade com o kit.
           </p>
         )}
+        {precoDesatualizado && (
+          <form action={acaoPreco} role="alert" className="flex flex-col gap-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            <input type="hidden" name="negocioId" value={negocioId} />
+            <p>
+              O valor do negócio ({negocioValor != null ? formatarMoeda(negocioValor) : "sem valor"}) é diferente do preço usado neste
+              cálculo ({formatarMoeda(calculo.kitPreco)}). A proposta continua mostrando o preço e o payback antigos.
+            </p>
+            <Botao type="submit" variante="secundario" disabled={atualizandoPreco} className="self-start">
+              {atualizandoPreco ? "Atualizando..." : "Atualizar preço no cálculo"}
+            </Botao>
+          </form>
+        )}
+        <Mensagem resultado={resultadoPreco} />
         <dl className="grid grid-cols-2 gap-3 text-sm">
           <div>
             <dt className="text-zinc-500">Kit</dt>
