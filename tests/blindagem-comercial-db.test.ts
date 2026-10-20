@@ -10,6 +10,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { Client } from "pg";
+import { urlBancoLocal } from "./banco-local";
 import { beforeAll, describe, expect, it } from "vitest";
 import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
 
@@ -466,13 +467,6 @@ describe("reatribuição de tarefa", () => {
   });
 });
 
-// Definição de função conferida direto no banco local (nunca remoto/produção).
-const URL_BANCO = process.env.SUPABASE_DB_URL ?? "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
-function urlBancoLocal() {
-  const host = new URL(URL_BANCO).hostname;
-  if (host !== "127.0.0.1" && host !== "localhost") throw new Error(`Teste direto no banco recusado: host "${host}" não é local.`);
-  return URL_BANCO;
-}
 
 describe("ranking da gamificação", () => {
   it("usa lista positiva de quem compete e só responde a quem tem acesso comercial", async () => {

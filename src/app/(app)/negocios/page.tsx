@@ -15,7 +15,7 @@ import { FILTRAR_NEGOCIOS_POR_RESPONSAVEL, NEGOCIOS, pode } from "@/lib/permisso
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { Indicadores, type Indicador } from "./indicadores";
 import { Kanban, type Card } from "./kanban";
-import { ListaFechados, ListaNegocios } from "./lista";
+import { ListaArquivados, ListaFechados, ListaNegocios } from "./lista";
 import { VisaoToggle } from "./visao-toggle";
 
 function dataLimite(diasAtras: number) {
@@ -37,7 +37,8 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
   if (!funil) return <p className="text-sm text-zinc-600">Nenhum funil ativo. Peça ao admin para criar um.</p>;
 
   const colunas = config.etapas.filter((e) => e.funilId === funil.id && e.ativa);
-  const status = (["aberto", "ganho", "perdido"] as const).find((s) => s === texto("status")) ?? "aberto";
+  // "arquivado" (P1a-0): só os arquivados, de qualquer situação. Nas demais visões eles ficam de fora.
+  const status = (["aberto", "ganho", "perdido", "arquivado"] as const).find((s) => s === texto("status")) ?? "aberto";
   const etiqueta = config.etiquetas.find((e) => e.id === texto("etiqueta"));
   const etapaFiltro = colunas.find((e) => e.id === texto("etapa"));
   const valorMin = texto("valorMin") ? Number(texto("valorMin")) : null;
@@ -48,17 +49,22 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
   const visao = (["kanban", "lista"] as const).find((v) => v === texto("visao")) ?? ((await cookies()).get(COOKIE_VISAO_NEGOCIOS)?.value as "kanban" | "lista" | undefined) ?? "kanban";
 
   const supabase = await criarClienteServidor();
-  let consulta = supabase
+  const consultaBase = supabase
     .from("negocios")
     .select(
       `id, numero, titulo, valor, etapa_id, etapa_desde, updated_at, origem_id, responsavel_id, fechado_em, motivo_perda_id,
-       contatos!inner(nome, telefone, email), negocio_etiquetas${etiqueta ? "!inner" : ""}(etiqueta_id)`,
+       arquivado_em, motivo_arquivamento, contatos!inner(nome, telefone, email), negocio_etiquetas${etiqueta ? "!inner" : ""}(etiqueta_id)`,
     )
     .eq("empresa_id", atual.empresaId)
-    .eq("funil_id", funil.id)
-    .eq("status", status)
-    .order(status === "aberto" ? "etapa_desde" : "fechado_em", { ascending: false })
-    .limit(500);
+    .eq("funil_id", funil.id);
+  let consulta = (
+    status === "arquivado"
+      ? consultaBase.not("arquivado_em", "is", null).order("arquivado_em", { ascending: false })
+      : consultaBase
+          .eq("status", status)
+          .is("arquivado_em", null)
+          .order(status === "aberto" ? "etapa_desde" : "fechado_em", { ascending: false })
+  ).limit(500);
   if (texto("responsavel")) consulta = consulta.eq("responsavel_id", texto("responsavel"));
   if (texto("origem")) consulta = consulta.eq("origem_id", texto("origem"));
   if (etiqueta) consulta = consulta.eq("negocio_etiquetas.etiqueta_id", etiqueta.id);
@@ -255,6 +261,7 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
             <option value="aberto">Em andamento</option>
             <option value="ganho">Ganhos</option>
             <option value="perdido">Perdidos</option>
+            <option value="arquivado">Arquivados</option>
           </Selecao>
           {config.etiquetas.length > 0 && (
             <Selecao name="etiqueta" defaultValue={etiqueta?.id ?? ""} aria-label="Etiqueta">
@@ -327,7 +334,9 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
         )}
       </form>
       {status === "aberto" && <Indicadores itens={indicadores} />}
-      {status === "aberto" ? (
+      {status === "arquivado" ? (
+        <ListaArquivados cards={cards} linhas={data ?? []} />
+      ) : status === "aberto" ? (
         visao === "kanban" ? (
           <Kanban
             key={cards.map((c) => c.id + c.etapaId).join()}
@@ -359,6 +368,8 @@ type LinhaNegocio = {
   responsavel_id: string | null;
   fechado_em: string | null;
   motivo_perda_id: string | null;
+  arquivado_em: string | null;
+  motivo_arquivamento: string | null;
   contatos: unknown;
   negocio_etiquetas: { etiqueta_id: string }[];
 };

@@ -4,37 +4,20 @@ import { useState, useTransition } from "react";
 import { Botao, Campo } from "@/components/ui";
 import { buscarComponentesCatalogo } from "@/lib/acoes/opensolar";
 import { formatarNumeroBr, lerNumeroBr } from "@/lib/formatacao";
+import type { CampoLinha, LinhaComponente, ProblemaLinha } from "@/lib/kit-linhas";
 import { ROTULO_TIPO_COMPONENTE_KIT, TIPOS_COMPONENTE_KIT, type TipoComponenteKit } from "@/lib/tipos";
 
-export type LinhaComponente = {
-  tipo: TipoComponenteKit;
-  descricao: string;
-  potenciaW: string;
-  quantidade: string;
-  /** Preço de referência (teste) vindo do catálogo ao selecionar — nunca é salvo, só usado pra sugerir o valor do negócio. */
-  precoEstimadoUnitario?: string;
-};
+// A validação das linhas vive em `@/lib/kit-linhas` (pura, testável); o editor só a exibe.
+export { linhasParaComponentes, type LinhaComponente } from "@/lib/kit-linhas";
 
 export function novaLinhaComponente(tipo: TipoComponenteKit): LinhaComponente {
   return { tipo, descricao: "", potenciaW: "", quantidade: "1" };
 }
 
-/** Padrão brasileiro ("550", "550,5", "1.200"); vazio, inválido ou ambíguo vira null. */
+/** Padrão brasileiro ("550", "550,5", "1.200"); vazio, inválido ou ambíguo vira null. Só para a sugestão de quantidade. */
 function numero(v: string): number | null {
   const n = lerNumeroBr(v);
   return n != null && Number.isFinite(n) && n > 0 ? n : null;
-}
-
-/** Converte as linhas do editor para o formato salvo (só as com descrição preenchida). */
-export function linhasParaComponentes(linhas: LinhaComponente[]) {
-  return linhas
-    .filter((l) => l.descricao.trim())
-    .map((l) => ({
-      tipo: l.tipo,
-      descricao: l.descricao.trim(),
-      potenciaW: numero(l.potenciaW),
-      quantidade: Math.max(1, Math.round(numero(l.quantidade) ?? 1)),
-    }));
 }
 
 /**
@@ -46,12 +29,14 @@ function CampoModeloComBusca({
   tipo,
   valor,
   placeholder,
+  invalido,
   onChangeTexto,
   onSelecionar,
 }: {
   tipo: TipoComponenteKit;
   valor: string;
   placeholder: string;
+  invalido?: boolean;
   onChangeTexto: (v: string) => void;
   onSelecionar: (descricao: string, potenciaW: string, precoEstimadoUnitario: string) => void;
 }) {
@@ -70,7 +55,13 @@ function CampoModeloComBusca({
 
   return (
     <div className="relative">
-      <Campo rotulo="Modelo / descrição" value={valor} onChange={(e) => pesquisar(e.target.value)} placeholder={placeholder} />
+      <Campo
+        rotulo="Modelo / descrição"
+        value={valor}
+        onChange={(e) => pesquisar(e.target.value)}
+        placeholder={placeholder}
+        aria-invalid={invalido || undefined}
+      />
       {resultados.length > 0 && (
         <ul className="absolute z-10 mt-1 w-full rounded-md border border-zinc-200 bg-white text-sm shadow-md">
           {resultados.map((r) => (
@@ -106,12 +97,16 @@ export function EditorComponentesKit({
   linhas,
   onChange,
   sugerirQuantidadeModulo,
+  problemas = [],
 }: {
   linhas: LinhaComponente[];
   onChange: (linhas: LinhaComponente[]) => void;
   /** Dado o consumo já informado no formulário, sugere quantos módulos de uma potência cobririam ele. */
   sugerirQuantidadeModulo?: (potenciaW: number) => number | null;
+  /** Problemas das linhas (de `analisarLinhas`) a exibir; o pai só os passa depois de uma tentativa de envio. */
+  problemas?: ProblemaLinha[];
 }) {
+  const doCampo = (indice: number, campo: CampoLinha) => problemas.some((p) => p.indice === indice && p.campo === campo);
   function adicionar(tipo: TipoComponenteKit) {
     onChange([...linhas, novaLinhaComponente(tipo)]);
   }
@@ -166,6 +161,7 @@ export function EditorComponentesKit({
                   tipo={tipo}
                   valor={l.descricao}
                   placeholder={tipo === "modulo" ? "Ex.: Canadian 550 W" : "Ex.: Growatt 5 kW"}
+                  invalido={doCampo(i, "descricao")}
                   onChangeTexto={(v) => atualizar(i, { descricao: v })}
                   onSelecionar={(descricao, potenciaW, precoEstimadoUnitario) =>
                     atualizar(i, { descricao, potenciaW, precoEstimadoUnitario })
@@ -177,16 +173,25 @@ export function EditorComponentesKit({
                   value={l.potenciaW}
                   onChange={(e) => atualizar(i, { potenciaW: e.target.value })}
                   placeholder="Opcional"
+                  aria-invalid={doCampo(i, "potenciaW") || undefined}
                 />
                 <Campo
                   rotulo="Qtd."
                   inputMode="numeric"
                   value={l.quantidade}
                   onChange={(e) => atualizar(i, { quantidade: e.target.value })}
+                  aria-invalid={doCampo(i, "quantidade") || undefined}
                 />
                 <Botao type="button" variante="secundario" onClick={() => remover(i)}>
                   Remover
                 </Botao>
+                {problemas
+                  .filter((p) => p.indice === i)
+                  .map((p) => (
+                    <p key={p.campo} role="alert" className="col-span-full text-xs text-red-700">
+                      {p.mensagem}
+                    </p>
+                  ))}
               </div>
             ))}
           </div>

@@ -1,10 +1,11 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, XCircle } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useId, useMemo, useRef, useState, useTransition } from "react";
 import { CampoArquivo } from "@/components/campo-arquivo";
-import { EditorComponentesKit, linhasParaComponentes, type LinhaComponente } from "@/components/kit-componentes";
+import { EditorComponentesKit, type LinhaComponente } from "@/components/kit-componentes";
+import { analisarLinhas, resumoProblemasKit } from "@/lib/kit-linhas";
 import { Botao, Campo, Mensagem, Selecao, Selo } from "@/components/ui";
 import { buscarContatos, criarNegocio, verificarDuplicado, type Duplicado } from "@/lib/acoes/negocios";
 import { registrarAnexo } from "@/lib/acoes/anexos";
@@ -240,25 +241,28 @@ export function FormularioNegocio({
 
   // Kit personalizado (dentro da Etapa 2, escondido até o vendedor pedir).
   const [mostrarKit, setMostrarKit] = useState(false);
-  const [mostrarAlertasExemplo, setMostrarAlertasExemplo] = useState(false);
   const [linhas, setLinhas] = useState<LinhaComponente[]>([]);
   const [estruturaTelhado, setEstruturaTelhado] = useState("");
 
-  const componentes = useMemo(() => linhasParaComponentes(linhas), [linhas]);
+  // Mesma análise para a potência, o preço sugerido e o envio: a quantidade vista é a quantidade usada.
+  const { componentes, itens, problemas: problemasKit } = useMemo(() => analisarLinhas(linhas), [linhas]);
+  // Só depois de uma tentativa de seguir/enviar os problemas das linhas aparecem.
+  const [mostrarProblemasKit, setMostrarProblemasKit] = useState(false);
   const potenciaKwp = potenciaKitPersonalizadoKwp(componentes);
 
   const precoSugerido = useMemo(() => {
-    const somaComponentes = linhas.reduce((acc, l) => {
-      const precoUnitario = l.precoEstimadoUnitario ? Number(l.precoEstimadoUnitario) : NaN;
-      const quantidade = Number(l.quantidade) || 0;
-      return Number.isFinite(precoUnitario) ? acc + precoUnitario * quantidade : acc;
+    // Só linhas válidas, com a mesma quantidade que vai para o servidor ("1.200" = 1200 aqui também).
+    const somaComponentes = itens.reduce((acc, { indice, componente }) => {
+      const textoPreco = linhas[indice].precoEstimadoUnitario;
+      const precoUnitario = textoPreco ? Number(textoPreco) : NaN;
+      return Number.isFinite(precoUnitario) ? acc + precoUnitario * componente.quantidade : acc;
     }, 0);
     if (somaComponentes <= 0) return null;
     if (!parametros) return Math.round(somaComponentes);
     const quantidadeModulos = componentes.filter((c) => c.tipo === "modulo").reduce((acc, c) => acc + c.quantidade, 0);
     const custos = custosInternosEstimados(somaComponentes, quantidadeModulos, potenciaKwp, parametros);
     return Math.round(custos.total);
-  }, [linhas, componentes, potenciaKwp, parametros]);
+  }, [linhas, itens, componentes, potenciaKwp, parametros]);
 
   const [valor, setValor] = useState("");
   const [valorTocado, setValorTocado] = useState(false);
@@ -410,12 +414,18 @@ export function FormularioNegocio({
         return { mensagem: "Informe o consumo médio mensal em kWh ou o valor médio da conta." };
       }
     }
+    // Kit: quantidade inválida ou linha incompleta bloqueia (nada é arredondado, trocado ou descartado).
+    if (etapa === 2) {
+      const problemaKit = resumoProblemasKit(problemasKit, linhas);
+      if (problemaKit) return { mensagem: problemaKit };
+    }
     return null;
   }
 
   /** Leva ao passo do problema, mostra a mensagem e põe o cursor no campo. */
   function mostrarProblema(etapa: 1 | 2 | 3, problema: { mensagem: string; campo?: HTMLElement }) {
     setEtapaAtual(etapa);
+    if (etapa === 2) setMostrarProblemasKit(true);
     setErroEtapa(problema.mensagem);
     if (problema.campo) setTimeout(() => problema.campo?.focus(), 0);
   }
@@ -433,6 +443,7 @@ export function FormularioNegocio({
    */
   function cancelarMontagem() {
     setLinhas([]);
+    setMostrarProblemasKit(false);
     setMostrarKit(false);
     if (!valorTocado) setValor("");
   }
@@ -723,7 +734,7 @@ export function FormularioNegocio({
                 </div>
                 <div>
                   <dt className="text-zinc-500">Inversor</dt>
-                  <dd className="font-medium text-zinc-900">exemplo de catálogo</dd>
+                  <dd className="font-medium text-zinc-900">a definir (sem catálogo de equipamentos)</dd>
                 </div>
                 <div>
                   <dt className="text-zinc-500">Geração / economia / payback</dt>
@@ -737,35 +748,14 @@ export function FormularioNegocio({
             </div>
           )}
 
-          <div className="flex flex-col gap-2">
-            <div className="flex items-start gap-2 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-800">
-              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>Combinação compatível · MPPT validado · Voc validado</span>
-            </div>
-            {!mostrarAlertasExemplo ? (
-              <button
-                type="button"
-                className="self-start text-xs font-medium text-amber-700 hover:underline"
-                onClick={() => setMostrarAlertasExemplo(true)}
-              >
-                Ver outros exemplos de alerta técnico
-              </button>
-            ) : (
-              <>
-                <div className="flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                  <span>
-                    Overload acima do recomendado (110%) — limite automático: 30% <em className="text-amber-600">(exemplo)</em>
-                  </span>
-                </div>
-                <div className="flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
-                  <XCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                  <span>
-                    Combinação incompatível — motivo: faixa MPPT inválida <em className="text-red-600">(exemplo)</em>
-                  </span>
-                </div>
-              </>
-            )}
+          {/* Não há conferência de módulo, inversor, tensão ou faixa MPPT neste assistente: o aviso diz isso, sem
+              nenhum "validado" ou "compatível" até existir uma validação de verdade (catálogo com ficha técnica). */}
+          <div role="status" className="flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              Compatibilidade técnica não verificada. O Raion ainda não confere módulo, inversor, tensão e faixa MPPT: confirme
+              com a engenharia antes de fechar o kit.
+            </span>
           </div>
         </fieldset>
 
@@ -795,7 +785,12 @@ export function FormularioNegocio({
         ) : (
           <fieldset className="flex flex-col gap-3">
             <legend className="mb-2 text-sm font-semibold text-zinc-900">Kit personalizado</legend>
-            <EditorComponentesKit linhas={linhas} onChange={setLinhas} sugerirQuantidadeModulo={sugerirQuantidadeModulo} />
+            <EditorComponentesKit
+              linhas={linhas}
+              onChange={setLinhas}
+              sugerirQuantidadeModulo={sugerirQuantidadeModulo}
+              problemas={mostrarProblemasKit ? problemasKit : undefined}
+            />
             <Botao type="button" variante="secundario" onClick={cancelarMontagem} className="self-start">
               Cancelar montagem
             </Botao>

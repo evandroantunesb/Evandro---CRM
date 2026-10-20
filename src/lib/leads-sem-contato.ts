@@ -30,6 +30,7 @@ export async function carregarLeadsSemContato(
     .select("id, numero, titulo, created_at, responsavel_id, contatos(nome)")
     .eq("empresa_id", empresaId)
     .eq("status", "aberto")
+    .is("arquivado_em", null)
     .in("etapa_id", idsEtapasIniciais);
   if (opcoes.responsavelId) consulta = consulta.eq("responsavel_id", opcoes.responsavelId);
   const { data: negocios } = await consulta.limit(2000);

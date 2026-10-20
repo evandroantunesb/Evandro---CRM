@@ -15,6 +15,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Client } from "pg";
+import { urlBancoLocal } from "./banco-local";
 import { beforeAll, describe, expect, it } from "vitest";
 import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
 
@@ -416,13 +417,6 @@ describe("pontuação do repasse", () => {
   });
 });
 
-// Conexão direta só no banco local (nunca remoto/produção), para segurar uma transação aberta.
-const URL_BANCO = process.env.SUPABASE_DB_URL ?? "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
-function urlBancoLocal() {
-  const host = new URL(URL_BANCO).hostname;
-  if (host !== "127.0.0.1" && host !== "localhost") throw new Error(`Teste direto no banco recusado: host "${host}" não é local.`);
-  return URL_BANCO;
-}
 
 describe("concorrência do envio", () => {
   it("troca de responsável em andamento: o envio espera e é recusado se o SDR deixou de ser o responsável", async () => {

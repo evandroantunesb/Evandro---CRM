@@ -2023,6 +2023,8 @@ export type Database = {
       };
       negocios: {
         Row: {
+          arquivado_em: string | null;
+          arquivado_por: string | null;
           consumo_medio_kwh: number | null;
           contato_id: string;
           created_at: string;
@@ -2036,6 +2038,7 @@ export type Database = {
           funil_id: string;
           handoff_origem_id: string | null;
           id: string;
+          motivo_arquivamento: string | null;
           motivo_perda_detalhe: string | null;
           motivo_perda_id: string | null;
           numero: number;
@@ -2063,6 +2066,8 @@ export type Database = {
           valor_conta_energia: number | null;
         };
         Insert: {
+          arquivado_em?: string | null;
+          arquivado_por?: string | null;
           consumo_medio_kwh?: number | null;
           contato_id: string;
           created_at?: string;
@@ -2076,6 +2081,7 @@ export type Database = {
           funil_id: string;
           handoff_origem_id?: string | null;
           id?: string;
+          motivo_arquivamento?: string | null;
           motivo_perda_detalhe?: string | null;
           motivo_perda_id?: string | null;
           numero?: number;
@@ -2103,6 +2109,8 @@ export type Database = {
           valor_conta_energia?: number | null;
         };
         Update: {
+          arquivado_em?: string | null;
+          arquivado_por?: string | null;
           consumo_medio_kwh?: number | null;
           contato_id?: string;
           created_at?: string;
@@ -2116,6 +2124,7 @@ export type Database = {
           funil_id?: string;
           handoff_origem_id?: string | null;
           id?: string;
+          motivo_arquivamento?: string | null;
           motivo_perda_detalhe?: string | null;
           motivo_perda_id?: string | null;
           numero?: number;
@@ -2143,6 +2152,13 @@ export type Database = {
           valor_conta_energia?: number | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "negocios_arquivado_por_fkey";
+            columns: ["arquivado_por"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "negocios_contato_id_fkey";
             columns: ["contato_id"];
@@ -3670,6 +3686,11 @@ export type Database = {
         Args: { p_id: string; p_membro_final_id?: string };
         Returns: undefined;
       };
+      arquivado_so_anulacao_automatica: {
+        Args: { p_anulaveis: string[]; p_ignoradas: string[]; p_novo: Json; p_velho: Json };
+        Returns: boolean;
+      };
+      arquivar_negocio: { Args: { p_motivo: string; p_negocio_id: string }; Returns: undefined };
       atribuir_participante_obra: {
         Args: {
           p_funcao?: Database["public"]["Enums"]["funcao_participante_obra"];
@@ -3849,6 +3870,10 @@ export type Database = {
       };
       definir_setores_membro: {
         Args: { p_membro_id: string; p_setores: Json };
+        Returns: undefined;
+      };
+      desarquivar_negocio: {
+        Args: { p_motivo: string; p_negocio_id: string; p_novo_responsavel?: string };
         Returns: undefined;
       };
       devolver_handoff: {
@@ -4218,6 +4243,8 @@ export type Database = {
       travar_negocio_retificacao: {
         Args: { p_negocio_id: string };
         Returns: {
+          arquivado_em: string | null;
+          arquivado_por: string | null;
           consumo_medio_kwh: number | null;
           contato_id: string;
           created_at: string;
@@ -4231,6 +4258,7 @@ export type Database = {
           funil_id: string;
           handoff_origem_id: string | null;
           id: string;
+          motivo_arquivamento: string | null;
           motivo_perda_detalhe: string | null;
           motivo_perda_id: string | null;
           numero: number;
@@ -4267,6 +4295,8 @@ export type Database = {
       travar_negocio_solo_autonomo: {
         Args: { p_negocio_id: string };
         Returns: {
+          arquivado_em: string | null;
+          arquivado_por: string | null;
           consumo_medio_kwh: number | null;
           contato_id: string;
           created_at: string;
@@ -4280,6 +4310,7 @@ export type Database = {
           funil_id: string;
           handoff_origem_id: string | null;
           id: string;
+          motivo_arquivamento: string | null;
           motivo_perda_detalhe: string | null;
           motivo_perda_id: string | null;
           numero: number;
