@@ -8,10 +8,7 @@ export type EntradaCalculo = {
   consumoMedioKwh: number;
   tarifaKwh: number;
   produtividadeKwhKwpMes: number;
-  /** Percentual do Fio B cobrado no ano (Lei 14.300), aplicado só sobre a parte Fio B da tarifa. */
   percentualFioB: number;
-  /** Fração da tarifa (0 a 1) que é Fio B na distribuidora. */
-  parteFioBTarifa: number;
   disponibilidadeKwh: number;
 };
 
@@ -42,7 +39,7 @@ function arredondar(valor: number, casas: number) {
  * resultado como uma estimativa comercial, não um projeto de engenharia.
  */
 export function calcular(entrada: EntradaCalculo): ResultadoCalculo {
-  const { potenciaKwp, consumoMedioKwh, tarifaKwh, produtividadeKwhKwpMes, percentualFioB, parteFioBTarifa, disponibilidadeKwh } =
+  const { potenciaKwp, consumoMedioKwh, tarifaKwh, produtividadeKwhKwpMes, percentualFioB, disponibilidadeKwh } =
     entrada;
 
   const geracaoEstimadaKwhMes = potenciaKwp * produtividadeKwhKwpMes;
@@ -53,7 +50,7 @@ export function calcular(entrada: EntradaCalculo): ResultadoCalculo {
   kwhFaturado = Math.min(kwhFaturado, consumoMedioKwh);
   const kwhCompensado = Math.max(consumoMedioKwh - kwhFaturado, 0);
 
-  const custoFioB = kwhCompensado * tarifaKwh * parteFioBTarifa * percentualFioB;
+  const custoFioB = kwhCompensado * tarifaKwh * percentualFioB;
   const contaSemSolar = consumoMedioKwh * tarifaKwh;
   const contaComSolar = kwhFaturado * tarifaKwh + custoFioB;
   const economiaMensal = contaSemSolar - contaComSolar;

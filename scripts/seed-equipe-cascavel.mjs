@@ -34,12 +34,12 @@ function arredondar(valor, casas) {
 }
 
 /** Mesma fórmula de src/lib/calculadora.ts calcular() — mantida em sincronia manualmente. */
-function calcular({ potenciaKwp, precoKit, consumoMedioKwh, tarifaKwh, produtividadeKwhKwpMes, percentualFioB, parteFioBTarifa, disponibilidadeKwh }) {
+function calcular({ potenciaKwp, precoKit, consumoMedioKwh, tarifaKwh, produtividadeKwhKwpMes, percentualFioB, disponibilidadeKwh }) {
   const geracaoEstimadaKwhMes = potenciaKwp * produtividadeKwhKwpMes;
   let kwhFaturado = Math.max(consumoMedioKwh - geracaoEstimadaKwhMes, disponibilidadeKwh);
   kwhFaturado = Math.min(kwhFaturado, consumoMedioKwh);
   const kwhCompensado = Math.max(consumoMedioKwh - kwhFaturado, 0);
-  const custoFioB = kwhCompensado * tarifaKwh * parteFioBTarifa * percentualFioB;
+  const custoFioB = kwhCompensado * tarifaKwh * percentualFioB;
   const contaSemSolar = consumoMedioKwh * tarifaKwh;
   const contaComSolar = kwhFaturado * tarifaKwh + custoFioB;
   const economiaMensal = contaSemSolar - contaComSolar;
@@ -189,8 +189,6 @@ async function carregarEtapas(empresaId) {
 async function carregarParametrosCalculadora(empresaId) {
   const { data, error } = await db.from("parametros_calculadora").select("*").eq("empresa_id", empresaId).single();
   if (error) throw error;
-  // Sem valor padrão: a parte do Fio B na tarifa é dado da distribuidora (Configurações › Calculadora).
-  if (data.parte_fio_b_tarifa == null) throw new Error("Informe a parte do Fio B na tarifa em Configurações › Calculadora antes de rodar este seed.");
   return data;
 }
 
@@ -279,7 +277,6 @@ async function garantirNegocioComProposta(empresaId, { titulo, contato, negocio,
       tarifaKwh: kit.tarifaKwh,
       produtividadeKwhKwpMes: kit.parametros.produtividade_kwh_kwp_mes,
       percentualFioB: kit.parametros.percentual_fio_b,
-      parteFioBTarifa: kit.parametros.parte_fio_b_tarifa,
       disponibilidadeKwh: kit.parametros[disponibilidadeCol],
     });
 
@@ -310,7 +307,6 @@ async function garantirNegocioComProposta(empresaId, { titulo, contato, negocio,
       tarifa_kwh: kit.tarifaKwh,
       produtividade_kwh_kwp_mes: kit.parametros.produtividade_kwh_kwp_mes,
       percentual_fio_b: kit.parametros.percentual_fio_b,
-      parte_fio_b_tarifa: kit.parametros.parte_fio_b_tarifa,
       disponibilidade_kwh: kit.parametros[disponibilidadeCol],
       geracao_estimada_kwh_mes: calculo.geracaoEstimadaKwhMes,
       kwh_faturado: calculo.kwhFaturado,

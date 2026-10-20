@@ -46,7 +46,6 @@ beforeAll(async () => {
   vendedor = await criarUsuario("na-vendedor");
   const { data: emp } = await servico.from("empresas").insert({ nome: `Ações ${sufixo}` }).select("id").single();
   empresa = emp!.id;
-  await servico.from("parametros_calculadora").update({ parte_fio_b_tarifa: 1 }).eq("empresa_id", empresa);
   const { data: m, error } = await servico
     .from("empresa_membros")
     .insert({ empresa_id: empresa, user_id: vendedor.id, papel: "vendedor", perfil_gamificacao: "closer" })
