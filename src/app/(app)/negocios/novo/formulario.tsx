@@ -20,7 +20,7 @@ import {
   potenciaKitPersonalizadoKwp,
   sugerirQuantidadeModulos,
 } from "@/lib/calculadora";
-import { formatarCep, formatarMascaraMoeda, formatarMoeda, formatarNumeroBr, formatarTelefoneBr, lerNumeroBr } from "@/lib/formatacao";
+import { formatarCep, formatarMascaraMoeda, formatarMoeda, formatarTelefoneBr, lerNumeroBr } from "@/lib/formatacao";
 import { montarEndereco } from "@/lib/negocio-dados";
 import { criarClienteNavegador } from "@/lib/supabase/navegador";
 import { ROTULO_TIPO_LIGACAO, TIPOS_LIGACAO, type ResultadoAcao, type TipoLigacao } from "@/lib/tipos";
@@ -94,57 +94,41 @@ function IndicadorEtapas({ atual }: { atual: 1 | 2 | 3 }) {
   );
 }
 
-/** Card de documento com "leitura automática" simulada: não há OCR real, só a estrutura visual. */
-function CardDocumentoInteligente({
+/** A escolha fica no input até salvar; o arquivo só é enviado depois da criação do negócio. */
+function CardDocumento({
   titulo,
-  legenda,
-  campos,
   name,
   accept,
+  arquivo,
+  inputRef,
+  onArquivoChange,
 }: {
   titulo: string;
-  legenda: string;
-  campos: string[];
   name: string;
   accept?: string;
+  arquivo: File | null;
+  inputRef: React.RefObject<HTMLInputElement | null>;
+  onArquivoChange: (arquivo: File | null) => void;
 }) {
   const id = useId();
-  const [processado, setProcessado] = useState(false);
-  const [nomeArquivo, setNomeArquivo] = useState("");
 
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-dashed border-zinc-300 p-3">
       <label htmlFor={id} className="flex cursor-pointer flex-col gap-1">
         <span className="text-sm font-medium text-zinc-800">{titulo}</span>
-        {!processado && <span className="text-xs text-zinc-500">{legenda}</span>}
+        <span className="text-xs text-zinc-500">{arquivo ? "Toque para substituir o arquivo" : "Toque para escolher o arquivo"}</span>
       </label>
-      {processado && (
-        <div className="flex flex-col gap-1 rounded-md bg-green-50 px-3 py-2">
-          <p className="text-sm font-medium text-green-800">Documento processado</p>
-          <ul className="text-xs text-green-700">
-            {campos.map((c) => (
-              <li key={c}>{c}</li>
-            ))}
-          </ul>
-          <div className="flex items-center gap-2 pt-1">
-            <button type="button" className="text-xs font-medium text-amber-700 hover:underline" onClick={() => setProcessado(false)}>
-              Revisar dados
-            </button>
-            <span className="truncate text-xs text-zinc-400">· {nomeArquivo}</span>
-          </div>
-        </div>
-      )}
+      {arquivo && <p className="break-all text-xs text-green-800">Selecionado para envio: {arquivo.name}</p>}
       <input
         id={id}
+        ref={inputRef}
         type="file"
         name={name}
         accept={accept}
         className="hidden"
         onChange={(e) => {
           const arquivo = e.target.files?.[0];
-          if (!arquivo) return;
-          setNomeArquivo(arquivo.name);
-          setProcessado(true);
+          if (arquivo) onArquivoChange(arquivo);
         }}
       />
     </div>
@@ -265,12 +249,31 @@ export function FormularioNegocio({
   }, [linhas, itens, componentes, potenciaKwp, parametros]);
 
   const [valor, setValor] = useState("");
+  const [cnhSelecionada, setCnhSelecionada] = useState<File | null>(null);
+  const [faturaSelecionada, setFaturaSelecionada] = useState<File | null>(null);
+  const inputCnh = useRef<HTMLInputElement>(null);
+  const inputFatura = useRef<HTMLInputElement>(null);
   const [valorTocado, setValorTocado] = useState(false);
   const [ultimoPrecoSugerido, setUltimoPrecoSugerido] = useState<number | null>(null);
   if (precoSugerido !== ultimoPrecoSugerido) {
     setUltimoPrecoSugerido(precoSugerido);
-    // No padrão do campo ("28.431,25"): String() geraria "28431.25", que o conversor recusa.
-    if (precoSugerido != null && !valorTocado) setValor(formatarNumeroBr(precoSugerido));
+    // A sugestão já entra com centavos; o mesmo texto é lido pelo servidor sem o prefixo visual R$.
+    if (precoSugerido != null && !valorTocado) setValor(precoSugerido.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+  }
+
+  function removerDocumento(input: React.RefObject<HTMLInputElement | null>, atualizar: (arquivo: File | null) => void) {
+    if (input.current) input.current.value = "";
+    atualizar(null);
+  }
+
+  function abrirDocumentoSelecionado(arquivo: File) {
+    const url = URL.createObjectURL(arquivo);
+    const link = document.createElement("a");
+    link.href = url;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
   }
 
   const consumoMedioEstimado = useMemo(() => {
@@ -668,21 +671,23 @@ export function FormularioNegocio({
         </fieldset>
 
         <fieldset className="flex flex-col gap-3">
-          <legend className="mb-2 text-sm font-semibold text-zinc-900">Documentos inteligentes (opcional)</legend>
+          <legend className="mb-2 text-sm font-semibold text-zinc-900">Documentos (opcional)</legend>
           <div className="grid gap-3 md:grid-cols-2">
-            <CardDocumentoInteligente
+            <CardDocumento
               titulo="📄 Anexar CNH"
-              legenda="Preencher cadastro automaticamente"
               name="anexo_cnh_contato"
               accept="image/*,.pdf"
-              campos={["Nome encontrado", "CPF encontrado", "Data de nascimento encontrada"]}
+              arquivo={cnhSelecionada}
+              inputRef={inputCnh}
+              onArquivoChange={setCnhSelecionada}
             />
-            <CardDocumentoInteligente
+            <CardDocumento
               titulo="⚡ Anexar conta de energia"
-              legenda="Preencher dados automaticamente"
               name="anexo_fatura_gerador"
               accept="image/*,.pdf"
-              campos={["Distribuidora", "Unidade consumidora", "Endereço", "Consumo médio"]}
+              arquivo={faturaSelecionada}
+              inputRef={inputFatura}
+              onArquivoChange={setFaturaSelecionada}
             />
           </div>
         </fieldset>
@@ -760,16 +765,23 @@ export function FormularioNegocio({
         </fieldset>
 
         <div className="flex flex-col gap-1">
-          <Campo
-            rotulo="Valor do negócio (R$)"
-            inputMode="decimal"
-            required
-            value={valor}
-            onChange={(e) => {
-              setValor(e.target.value);
-              setValorTocado(true);
-            }}
-          />
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-medium text-zinc-700">Valor do negócio (R$)</span>
+            <span className="flex items-center rounded-lg border border-zinc-200 bg-white px-3 focus-within:border-dourado focus-within:ring-2 focus-within:ring-dourado/20">
+              <span aria-hidden="true" className="text-zinc-500">R$</span>
+              <input
+                inputMode="numeric"
+                required
+                value={valor}
+                onChange={(e) => {
+                  setValor(formatarMascaraMoeda(e.target.value));
+                  setValorTocado(true);
+                }}
+                className="w-full bg-transparent px-2 py-2 text-carvao outline-none placeholder:text-zinc-400"
+                placeholder="0,00"
+              />
+            </span>
+          </label>
           {!valorTocado && precoSugerido != null && (
             <p className="text-xs text-zinc-400">
               Preenchido com preço de referência do catálogo + custos internos configurados (estimativa, não é cotação real)
@@ -890,10 +902,27 @@ export function FormularioNegocio({
 
         <fieldset className="grid gap-3 md:grid-cols-2">
           <legend className="mb-2 text-sm font-semibold text-zinc-900">Documentos</legend>
-          <p className="text-xs text-zinc-400 md:col-span-2">
-            CNH e conta de energia já enviados na Etapa 1 aparecem aqui como anexos do negócio.{" "}
-            <Selo tom="neutro">opcional</Selo>
-          </p>
+          <div className="flex flex-col gap-2 md:col-span-2">
+            <p className="text-xs text-zinc-500">Arquivos escolhidos na Etapa 1 serão enviados ao salvar o negócio. <Selo tom="neutro">opcional</Selo></p>
+            {([
+              { rotulo: "CNH", arquivo: cnhSelecionada, input: inputCnh, atualizar: setCnhSelecionada },
+              { rotulo: "Conta de energia", arquivo: faturaSelecionada, input: inputFatura, atualizar: setFaturaSelecionada },
+            ] as const).map(({ rotulo, arquivo, input, atualizar }) => (
+              <div key={rotulo} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                <span className="font-medium text-zinc-700">{rotulo}:</span>
+                <span className="max-w-full break-all text-zinc-600">{arquivo ? `${arquivo.name} (selecionado para envio)` : "não selecionado"}</span>
+                {arquivo && (
+                  <button type="button" className="text-amber-700 hover:underline" onClick={() => abrirDocumentoSelecionado(arquivo)}>Ver</button>
+                )}
+                <button type="button" className="text-amber-700 hover:underline" onClick={() => input.current?.click()}>
+                  {arquivo ? "Substituir" : "Anexar"}
+                </button>
+                {arquivo && (
+                  <button type="button" className="text-red-700 hover:underline" onClick={() => removerDocumento(input, atualizar)}>Remover</button>
+                )}
+              </div>
+            ))}
+          </div>
           <CampoArquivo rotulo="Fotos" name="anexo_geral" accept="image/*" multiple />
           <CampoArquivo rotulo="Outros documentos" name="anexo_geral" multiple />
         </fieldset>
