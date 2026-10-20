@@ -125,19 +125,48 @@ export const componentesJsonSchema = z
     }
   });
 
+/** Módulo de referência da prévia do assistente de novo negócio, enquanto o vendedor não escolheu um. */
+export const POTENCIA_MODULO_REFERENCIA_W = 620;
+
+export type Dimensionamento = {
+  /** Potência que cobre 100% do consumo médio com a produtividade da empresa. */
+  potenciaNecessariaKwp: number;
+  quantidadeModulos: number;
+  /** Potência efetivamente instalada: módulos × potência do módulo. */
+  potenciaInstaladaKwp: number;
+};
+
 /**
- * Sugere quantos módulos de uma dada potência cobririam o consumo informado
- * (100% de compensação, modo comercial). Sugestão de partida pro vendedor —
- * não considera Fio B/disponibilidade nem espaço de telhado.
+ * Fonte única do dimensionamento (assistente de novo negócio e kit personalizado).
+ * Cobre 100% do consumo médio com a produtividade configurada da empresa (kWh/kWp/mês) e
+ * arredonda os módulos para cima. Sem fator oculto: perdas e sazonalidade já estão na
+ * produtividade. Estimativa comercial de partida — não considera Fio B, disponibilidade nem
+ * espaço de telhado.
  */
+export function dimensionarSistema(
+  consumoMedioKwh: number,
+  produtividadeKwhKwpMes: number,
+  potenciaModuloW: number,
+): Dimensionamento | null {
+  if (!(consumoMedioKwh > 0) || !(produtividadeKwhKwpMes > 0) || !(potenciaModuloW > 0)) return null;
+  const potenciaNecessariaKwp = consumoMedioKwh / produtividadeKwhKwpMes;
+  // O arredondamento a 6 casas evita que 20,000000000000004 vire 21 módulos.
+  const modulosExatos = Number(((potenciaNecessariaKwp * 1000) / potenciaModuloW).toFixed(6));
+  const quantidadeModulos = Math.max(1, Math.ceil(modulosExatos));
+  return {
+    potenciaNecessariaKwp: arredondar(potenciaNecessariaKwp, 2),
+    quantidadeModulos,
+    potenciaInstaladaKwp: arredondar((quantidadeModulos * potenciaModuloW) / 1000, 2),
+  };
+}
+
+/** Quantos módulos de uma dada potência cobrem o consumo informado (mesma conta de `dimensionarSistema`). */
 export function sugerirQuantidadeModulos(
   consumoMedioKwh: number,
   produtividadeKwhKwpMes: number,
   potenciaModuloW: number,
 ): number | null {
-  if (consumoMedioKwh <= 0 || produtividadeKwhKwpMes <= 0 || potenciaModuloW <= 0) return null;
-  const potenciaNecessariaKwp = consumoMedioKwh / produtividadeKwhKwpMes;
-  return Math.max(1, Math.ceil((potenciaNecessariaKwp * 1000) / potenciaModuloW));
+  return dimensionarSistema(consumoMedioKwh, produtividadeKwhKwpMes, potenciaModuloW)?.quantidadeModulos ?? null;
 }
 
 export type ParametrosCustosInternos = {

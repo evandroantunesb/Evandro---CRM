@@ -15,6 +15,8 @@ import {
   calcular,
   custosInternosEstimados,
   DISPONIBILIDADE_PADRAO_CAMEL,
+  dimensionarSistema,
+  POTENCIA_MODULO_REFERENCIA_W,
   potenciaKitPersonalizadoKwp,
   sugerirQuantidadeModulos,
 } from "@/lib/calculadora";
@@ -60,12 +62,6 @@ const ETAPAS_WIZARD = [
 function numero(v: string): number | null {
   const n = lerNumeroBr(v);
   return n != null && Number.isFinite(n) && n > 0 ? n : null;
-}
-
-/** Estimativa ilustrativa (não é o motor de cálculo) só pra prévia mockada da Etapa 2. */
-function estimarSistemaMockKwp(consumoMedioKwh: number | null, produtividadeKwhKwpMes: number) {
-  if (!consumoMedioKwh || !produtividadeKwhKwpMes) return null;
-  return Number(((consumoMedioKwh / produtividadeKwhKwpMes) * 1.24).toFixed(2));
 }
 
 function IndicadorEtapas({ atual }: { atual: 1 | 2 | 3 }) {
@@ -286,8 +282,12 @@ export function FormularioNegocio({
     return null;
   }, [consumoMedioKwh, valorFaturaMedio, tarifaKwh]);
 
-  const sistemaMockKwp = useMemo(
-    () => estimarSistemaMockKwp(consumoMedioEstimado, parametros?.produtividadeKwhKwpMes ?? 120),
+  // Mesma conta do kit personalizado (`dimensionarSistema`), com o módulo de referência da prévia.
+  const sistemaRecomendado = useMemo(
+    () =>
+      consumoMedioEstimado
+        ? dimensionarSistema(consumoMedioEstimado, parametros?.produtividadeKwhKwpMes ?? 120, POTENCIA_MODULO_REFERENCIA_W)
+        : null,
     [consumoMedioEstimado, parametros],
   );
 
@@ -712,21 +712,25 @@ export function FormularioNegocio({
             </div>
             <div>
               <dt className="text-zinc-500">Sistema recomendado</dt>
-              <dd className="font-medium text-zinc-900">{sistemaMockKwp ? `${sistemaMockKwp.toLocaleString("pt-BR")} kWp` : "—"}</dd>
+              <dd className="font-medium text-zinc-900">
+                {sistemaRecomendado ? `${sistemaRecomendado.potenciaInstaladaKwp.toLocaleString("pt-BR")} kWp` : "—"}
+              </dd>
             </div>
           </dl>
 
-          {sistemaMockKwp && (
+          {sistemaRecomendado && (
             <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4">
               <p className="mb-2 text-sm font-semibold text-zinc-900">Kit recomendado (estimativa)</p>
               <dl className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
                 <div>
                   <dt className="text-zinc-500">Potência</dt>
-                  <dd className="font-medium text-zinc-900">{sistemaMockKwp.toLocaleString("pt-BR")} kWp</dd>
+                  <dd className="font-medium text-zinc-900">{sistemaRecomendado.potenciaInstaladaKwp.toLocaleString("pt-BR")} kWp</dd>
                 </div>
                 <div>
                   <dt className="text-zinc-500">Módulos</dt>
-                  <dd className="font-medium text-zinc-900">{Math.max(1, Math.round((sistemaMockKwp * 1000) / 620))} × 620 W</dd>
+                  <dd className="font-medium text-zinc-900">
+                    {sistemaRecomendado.quantidadeModulos} × {POTENCIA_MODULO_REFERENCIA_W} W
+                  </dd>
                 </div>
                 <div>
                   <dt className="text-zinc-500">Inversor</dt>
