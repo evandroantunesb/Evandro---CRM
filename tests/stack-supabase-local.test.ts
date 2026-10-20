@@ -1,17 +1,7 @@
-import { spawnSync } from "node:child_process";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  executarStatusSupabase,
-  exigirStackLocal,
-  lerStatusEnv,
-  normalizarRaizCli,
-  resolverStackLocal,
-} from "../scripts/lib/stack-supabase-local.mjs";
+import { describe, expect, it, vi } from "vitest";
+import { exigirStackLocal, lerStatusEnv, resolverStackLocal } from "../scripts/lib/stack-supabase-local.mjs";
 import { prepararBancoVerificado } from "./preparar-banco";
 import { jwtDemo } from "./jwt-ficticio";
-
-// Nenhum processo real é criado: o spawn é simulado (só os argumentos são inspecionados).
-vi.mock("node:child_process", () => ({ spawnSync: vi.fn() }));
 
 // Testes puros: fixtures fictícias, nenhuma conexão, nenhum processo do CLI (o status é injetado).
 const SENHA = "SENHA-FICTICIA-QUE-NAO-PODE-VAZAR";
@@ -44,6 +34,9 @@ const textoStatus = (s: Record<string, string>) =>
   Object.entries(s)
     .map(([k, v]) => `${k}="${v}"`)
     .join("\n");
+
+/** Docker simulado que confirma a stack (a verificação real do Docker tem testes próprios). */
+const dockerOk = () => vi.fn();
 
 const SEGREDOS = [SENHA, ASSINATURA_A, ASSINATURA_B, A.ANON_KEY, A.SERVICE_ROLE_KEY, B.ANON_KEY, B.SERVICE_ROLE_KEY, A.DB_URL, B.DB_URL];
 
@@ -159,7 +152,7 @@ describe("obtenção dos metadados e ordem da validação", () => {
     });
     let msg = "";
     try {
-      exigirStackLocal({ env: ambiente(A), raiz: "/repo", executarStatus });
+      exigirStackLocal({ env: ambiente(A), raiz: "/repo", executarStatus, consultarDocker: dockerOk() });
     } catch (e) {
       msg = (e as Error).message;
     }
@@ -169,9 +162,9 @@ describe("obtenção dos metadados e ordem da validação", () => {
   });
 
   it("saída vazia ou sem as chaves necessárias interrompe", () => {
-    expect(() => exigirStackLocal({ env: ambiente(A), raiz: "/repo", executarStatus: () => "" })).toThrow(/incompletos/);
+    expect(() => exigirStackLocal({ env: ambiente(A), raiz: "/repo", executarStatus: () => "", consultarDocker: dockerOk() })).toThrow(/incompletos/);
     expect(() =>
-      exigirStackLocal({ env: ambiente(A), raiz: "/repo", executarStatus: () => 'API_URL="http://127.0.0.1:54321"' }),
+      exigirStackLocal({ env: ambiente(A), raiz: "/repo", executarStatus: () => 'API_URL="http://127.0.0.1:54321"', consultarDocker: dockerOk() }),
     ).toThrow(/incompletos/);
   });
 
@@ -182,6 +175,7 @@ describe("obtenção dos metadados e ordem da validação", () => {
         env: { ...ambiente(A), NEXT_PUBLIC_SUPABASE_URL: "https://abcdefgh.supabase.co" },
         raiz: "/repo",
         executarStatus,
+        consultarDocker: dockerOk(),
       }),
     ).toThrow();
     expect(executarStatus).not.toHaveBeenCalled();
@@ -189,7 +183,7 @@ describe("obtenção dos metadados e ordem da validação", () => {
 
   it("caminho completo: stack idêntica devolve a URL verificada", () => {
     const executarStatus = vi.fn(() => textoStatus(B));
-    expect(exigirStackLocal({ env: ambiente(B), raiz: "/repo", executarStatus }).urlBanco).toBe(B.DB_URL);
+    expect(exigirStackLocal({ env: ambiente(B), raiz: "/repo", executarStatus, consultarDocker: dockerOk() }).urlBanco).toBe(B.DB_URL);
     expect(executarStatus).toHaveBeenCalledWith("/repo");
   });
 });
@@ -199,21 +193,24 @@ describe("trava global dos testes (prepararBancoVerificado)", () => {
 
   it("só entrega o banco às suítes depois de comprovar a stack", () => {
     const p = projeto(ambiente(B));
-    prepararBancoVerificado(p, {}, () => textoStatus(B));
+    prepararBancoVerificado(p, {}, { executarStatus: () => textoStatus(B), consultarDocker: dockerOk() });
     expect(p.provide).toHaveBeenCalledWith("urlBancoVerificada", B.DB_URL);
   });
 
   it("stack divergente: aborta, nada é entregue (nenhuma suíte chega a escrever)", () => {
     const p = projeto({ ...ambiente(A), SUPABASE_DB_URL: B.DB_URL });
-    expect(() => prepararBancoVerificado(p, {}, () => textoStatus(A))).toThrow(/Testes abortados antes de rodar/);
+    expect(() => prepararBancoVerificado(p, {}, { executarStatus: () => textoStatus(A), consultarDocker: dockerOk() })).toThrow(/Testes abortados antes de rodar/);
     expect(p.provide).not.toHaveBeenCalled();
   });
 
   it("falha no status: aborta sem entregar nada", () => {
     const p = projeto(ambiente(A));
     expect(() =>
-      prepararBancoVerificado(p, {}, () => {
-        throw new Error("sem docker");
+      prepararBancoVerificado(p, {}, {
+        executarStatus: () => {
+          throw new Error("sem docker");
+        },
+        consultarDocker: dockerOk(),
       }),
     ).toThrow(/Testes abortados antes de rodar/);
     expect(p.provide).not.toHaveBeenCalled();
@@ -222,21 +219,21 @@ describe("trava global dos testes (prepararBancoVerificado)", () => {
   it("precedência incorreta: processo e test.env divergentes são recusados sem consultar o CLI", () => {
     const p = projeto(ambiente(A));
     const executarStatus = vi.fn(() => textoStatus(A));
-    expect(() => prepararBancoVerificado(p, { SUPABASE_DB_URL: B.DB_URL }, executarStatus)).toThrow(/precedência ambígua/);
+    expect(() => prepararBancoVerificado(p, { SUPABASE_DB_URL: B.DB_URL }, { executarStatus, consultarDocker: dockerOk() })).toThrow(/precedência ambígua/);
     expect(executarStatus).not.toHaveBeenCalled();
     expect(p.provide).not.toHaveBeenCalled();
   });
 
   it("variável PG* no processo é recusada mesmo com o resto correto", () => {
     const p = projeto(ambiente(A));
-    expect(() => prepararBancoVerificado(p, { PGPORT: "55422" }, () => textoStatus(A))).toThrow(/PGPORT/);
+    expect(() => prepararBancoVerificado(p, { PGPORT: "55422" }, { executarStatus: () => textoStatus(A), consultarDocker: dockerOk() })).toThrow(/PGPORT/);
     expect(p.provide).not.toHaveBeenCalled();
   });
 
   it("a mensagem final não revela segredos", () => {
     const p = projeto({ ...ambiente(A), SUPABASE_DB_URL: B.DB_URL });
     try {
-      prepararBancoVerificado(p, {}, () => textoStatus(A));
+      prepararBancoVerificado(p, {}, { executarStatus: () => textoStatus(A), consultarDocker: dockerOk() });
     } catch (e) {
       for (const segredo of SEGREDOS) expect((e as Error).message).not.toContain(segredo);
       return;
@@ -245,72 +242,36 @@ describe("trava global dos testes (prepararBancoVerificado)", () => {
   });
 });
 
-describe("caminho de --workdir do supabase status (Windows x Linux)", () => {
-  const plataformaReal = process.platform;
-  afterEach(() => {
-    Object.defineProperty(process, "platform", { value: plataformaReal });
-    vi.mocked(spawnSync).mockReset();
-  });
-  const comPlataforma = (p: string) => Object.defineProperty(process, "platform", { value: p });
-  const BS = String.fromCharCode(92); // barra invertida, sem escapes em string
-  const paraWin = (...partes: string[]) => partes.join(BS);
-  const RAIZ_WIN = paraWin("E:", "raion-crm", "wt-testes-stack");
-  const saidaOk = { status: 0, stdout: textoStatus(A), stderr: "", error: undefined } as never;
+describe("A1: o que o CLI reporta é conferido com o Docker", () => {
+  const projeto = (env: Record<string, string> = {}) => ({ config: { env, root: "/repo" }, provide: vi.fn() });
 
-  it("Windows: barras invertidas viram \"/\" (o shim .cmd do CLI as consumiria)", () => {
-    expect(normalizarRaizCli(RAIZ_WIN, "win32")).toBe("E:/raion-crm/wt-testes-stack");
+  it("o Docker é consultado com as portas reportadas pelo status (nunca portas presumidas)", () => {
+    const consultarDocker = vi.fn();
+    exigirStackLocal({ env: ambiente(B), raiz: "/repo", executarStatus: () => textoStatus(B), consultarDocker });
+    expect(consultarDocker).toHaveBeenCalledWith(expect.objectContaining({ raiz: "/repo", apiPorta: "55421", dbPorta: "55422" }));
   });
 
-  it("Windows: caminho já normalizado, misto e de rede permanece válido e idempotente", () => {
-    expect(normalizarRaizCli("E:/raion-crm/wt-testes-stack", "win32")).toBe("E:/raion-crm/wt-testes-stack");
-    expect(normalizarRaizCli("E:/raion-crm" + BS + "wt", "win32")).toBe("E:/raion-crm/wt");
-    expect(normalizarRaizCli(BS + BS + paraWin("servidor", "pasta", "repo"), "win32")).toBe("//servidor/pasta/repo");
-    const uma = normalizarRaizCli(paraWin("E:", "a", "b"), "win32");
-    expect(normalizarRaizCli(uma, "win32")).toBe(uma);
-  });
-
-  it("Linux/macOS: o caminho não é alterado (barra invertida é caractere válido de nome)", () => {
-    expect(normalizarRaizCli("/home/runner/work/repo", "linux")).toBe("/home/runner/work/repo");
-    const estranho = "/tmp/pasta" + BS + "estranha";
-    expect(normalizarRaizCli(estranho, "linux")).toBe(estranho);
-    expect(normalizarRaizCli("/Users/dev/repo", "darwin")).toBe("/Users/dev/repo");
-  });
-
-  it("executarStatusSupabase no Windows envia --workdir normalizado, com shell e só argumentos fixos", () => {
-    comPlataforma("win32");
-    vi.mocked(spawnSync).mockReturnValue(saidaOk);
-    expect(executarStatusSupabase(RAIZ_WIN)).toBe(textoStatus(A));
-    const [cmd, args, opcoes] = vi.mocked(spawnSync).mock.calls[0] as unknown as [string, string[], { shell: boolean; cwd: string }];
-    expect(cmd).toBe("pnpm");
-    expect(args).toEqual(["exec", "supabase", "status", "-o", "env", "--workdir", "E:/raion-crm/wt-testes-stack"]);
-    expect(opcoes.shell).toBe(true);
-    expect(opcoes.cwd).toBe(RAIZ_WIN);
-  });
-
-  it("executarStatusSupabase no Linux mantém o caminho e não usa shell", () => {
-    comPlataforma("linux");
-    vi.mocked(spawnSync).mockReturnValue(saidaOk);
-    executarStatusSupabase("/home/runner/work/repo");
-    const [, args, opcoes] = vi.mocked(spawnSync).mock.calls[0] as unknown as [string, string[], { shell: boolean }];
-    expect(args.at(-1)).toBe("/home/runner/work/repo");
-    expect(opcoes.shell).toBe(false);
-  });
-
-  it("falha do processo (status != 0, erro ou saída vazia) interrompe sem repassar a saída", () => {
-    for (const falha of [
-      { status: 1, stdout: textoStatus(A), stderr: "x", error: undefined },
-      { status: null, stdout: "", stderr: "", error: new Error("ENOENT") },
-      { status: 0, stdout: "", stderr: "", error: undefined },
-    ]) {
-      vi.mocked(spawnSync).mockReturnValue(falha as never);
-      let msg = "";
-      try {
-        executarStatusSupabase("/repo");
-      } catch (e) {
-        msg = (e as Error).message;
-      }
-      expect(msg).toMatch(/Não foi possível obter os metadados/);
-      expect(msg).not.toContain(A.SERVICE_ROLE_KEY);
+  it("divergência entre CLI e Docker interrompe e nada é entregue às suítes", () => {
+    const p = projeto(ambiente(A));
+    const consultarDocker = vi.fn(() => {
+      throw new Error("A porta do banco reportada pelo supabase status (54322) não é a que o Docker publica: recusado.");
+    });
+    let msg = "";
+    try {
+      prepararBancoVerificado(p, {}, { executarStatus: () => textoStatus(A), consultarDocker });
+    } catch (e) {
+      msg = (e as Error).message;
     }
+    expect(msg).toContain("Testes abortados antes de rodar");
+    expect(msg).toContain("não é a que o Docker publica");
+    expect(p.provide).not.toHaveBeenCalled();
+  });
+
+  it("o Docker só é consultado depois de o status bater com o ambiente", () => {
+    const consultarDocker = vi.fn();
+    expect(() =>
+      exigirStackLocal({ env: { ...ambiente(A), SUPABASE_DB_URL: B.DB_URL }, raiz: "/repo", executarStatus: () => textoStatus(A), consultarDocker }),
+    ).toThrow(/SUPABASE_DB_URL diverge/);
+    expect(consultarDocker).not.toHaveBeenCalled();
   });
 });

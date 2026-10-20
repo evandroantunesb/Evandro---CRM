@@ -10,6 +10,9 @@ const VARIAVEIS_CONEXAO = [
   "SUPABASE_DB_URL",
 ];
 
+// Só os testes injetam: em produção (global-setup) valem o CLI e o Docker reais.
+type Dependencias = Pick<Parameters<typeof exigirStackLocal>[0], "executarStatus" | "consultarDocker">;
+
 type Projeto = { config: { env?: Record<string, unknown>; root: string }; provide(chave: "urlBancoVerificada", valor: string): void };
 
 /**
@@ -22,7 +25,7 @@ type Projeto = { config: { env?: Record<string, unknown>; root: string }; provid
 export function prepararBancoVerificado(
   projeto: Projeto,
   processo: Record<string, string | undefined> = process.env,
-  executarStatus?: (raiz: string) => string,
+  dependencias: Dependencias = {},
 ) {
   try {
     const doConfig = (projeto.config.env ?? {}) as Record<string, string | undefined>;
@@ -33,7 +36,7 @@ export function prepararBancoVerificado(
     }
     const efetivo = ambienteEfetivo(processo, doConfig);
     verificarAmbienteLocal(efetivo);
-    const { urlBanco } = exigirStackLocal({ env: efetivo, raiz: projeto.config.root, executarStatus });
+    const { urlBanco } = exigirStackLocal({ env: efetivo, raiz: projeto.config.root, ...dependencias });
     projeto.provide("urlBancoVerificada", urlBanco);
   } catch (erro) {
     const motivo = erro instanceof Error ? erro.message : String(erro);

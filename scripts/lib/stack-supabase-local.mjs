@@ -16,16 +16,22 @@
  * - Se `SUPABASE_DB_URL` não existir, o destino do banco é o `DB_URL` do CLI (nunca um padrão fixo).
  * - Variáveis `PG*` (que o driver usa para completar/sobrepor conexão) são recusadas.
  * - Falha ao obter os metadados (CLI ausente, Docker parado, stack parada, saída incompleta) aborta.
+ * - O que o CLI reporta (configuração) é conferido com o que o DOCKER publica de fato
+ *   (./docker-stack-local.mjs): contêineres do projeto, rótulos, rede, saúde e portas reais.
+ * - O CLI é executado pelo binário real, sem shell e sem o shim (ver `resolverBinarioSupabase`).
  * - Sem bypass: não existe variável, flag ou modo que pule a verificação.
  *
  * Nunca imprime valores: as mensagens citam só nomes de variáveis. Funções puras (recebem o
- * ambiente e o texto do status); só `executarStatusSupabase` toca o sistema (processo do CLI).
+ * ambiente e o texto do status); só `executarStatusSupabase` e o módulo do Docker tocam o sistema.
  *
- * Limite conhecido (AGENTS.md): a identidade vem do relato do CLI sobre a configuração do projeto
- * (project_id e portas do config.toml) e da saúde dos contêineres; não há consulta de volta ao
- * banco para provar que a API aponta para ele.
+ * Limite conhecido (AGENTS.md): não há consulta de volta ao banco para provar que a API aponta
+ * para ele, nem checagem de processos fora do Docker que escutem as mesmas portas.
  */
 import { spawnSync } from "node:child_process";
+import { readFileSync, statSync } from "node:fs";
+import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
+import { verificarStackNoDocker } from "./docker-stack-local.mjs";
 import { verificarAmbienteLocal } from "./guard-supabase-local.mjs";
 
 const HOSTS_LOCAIS = new Set(["127.0.0.1", "localhost", "[::1]"]);
@@ -129,7 +135,7 @@ function destinoBanco(nome, valor) {
  * Lança erro (sem valores) se algo estiver ausente, divergente ou não puder ser comprovado.
  * @param {Ambiente} env ambiente efetivo (o que os testes realmente enxergam)
  * @param {Record<string, string>} status saída já lida de `supabase status -o env`
- * @returns {{ urlBanco: string }}
+ * @returns {{ urlBanco: string, apiUrl: string, apiPorta: string, dbPorta: string }}
  */
 export function resolverStackLocal(env, status) {
   // Mantém todas as proteções existentes (remoto, chaves, domínios gerenciados).
@@ -178,35 +184,92 @@ export function resolverStackLocal(env, status) {
     }
   }
   // Sem SUPABASE_DB_URL: usa SEMPRE o banco que o CLI reporta (nunca um padrão fixo).
-  return { urlBanco: status.DB_URL.trim() };
+  return {
+    urlBanco: status.DB_URL.trim(),
+    apiUrl: status.API_URL.trim(),
+    apiPorta: apiStatus.porta,
+    dbPorta: bancoStatus.porta,
+  };
 }
 
+// Pacotes de binário por plataforma/arquitetura, na mesma ordem de preferência do shim do pacote
+// `supabase` (dist/supabase.js). Só o primeiro que resolver e passar nas conferências é usado.
+const PACOTES_CLI = {
+  darwin: { arm64: ["darwin-arm64"], x64: ["darwin-x64"] },
+  linux: { arm64: ["linux-arm64", "linux-arm64-musl"], x64: ["linux-x64", "linux-x64-musl"] },
+  win32: { arm64: ["windows-arm64"], x64: ["windows-x64"] },
+};
+
 /**
- * Caminho de `--workdir` como o CLI o recebe. No Windows o shim .cmd do CLI consome as barras
- * invertidas (`E:\raion-crm\x` chega como `E:aion-crmx`), então só lá elas viram "/", que o Windows
- * aceita. No Linux/macOS a barra invertida é caractere válido de nome: o caminho não é alterado.
- * @param {string} raiz
- * @param {string} [plataforma]
- * @returns {string}
+ * Localiza o executável REAL do Supabase CLI instalado, sem passar pelo shim (`.cmd`/`dist/supabase.js`)
+ * e sem shell. O pacote `supabase` instalado resolve `@supabase/cli-<plataforma>` a partir do próprio
+ * diretório (o pnpm não o eleva à raiz); fazemos o mesmo e conferimos que o pacote tem o nome e a
+ * versão esperados e que `bin/supabase[.exe]` é um arquivo. `SUPABASE_CLI_BINARY_OVERRIDE`, que o shim
+ * honra, é IGNORADO de propósito: uma variável de ambiente não pode trocar o executável da trava.
+ * O pacote `supabase` é procurado a partir de `raiz` (o projeto), nunca de `import.meta`: o Playwright
+ * carrega este módulo por um transpilador CJS, onde `import.meta` não existe.
+ * @param {{ raiz?: string, plataforma?: string, arquitetura?: string,
+ *           resolver?: (id: string, deOnde: string | null) => string,
+ *           ler?: (caminho: string) => string,
+ *           ehArquivo?: (caminho: string) => boolean }} [o]
+ * @returns {string} caminho absoluto do executável
  */
-export function normalizarRaizCli(raiz, plataforma = process.platform) {
-  return plataforma === "win32" ? raiz.replaceAll("\\", "/") : raiz;
+export function resolverBinarioSupabase({
+  raiz = process.cwd(),
+  plataforma = process.platform,
+  arquitetura = process.arch,
+  resolver = (id, deOnde) => createRequire(deOnde ?? join(raiz, "package.json")).resolve(id),
+  ler = (c) => readFileSync(c, "utf8"),
+  ehArquivo = (c) => {
+    try {
+      return statSync(c).isFile();
+    } catch {
+      return false;
+    }
+  },
+} = {}) {
+  const sufixos = /** @type {Record<string, Record<string, string[]>>} */ (PACOTES_CLI)[plataforma]?.[arquitetura];
+  if (!sufixos) throw new Error(`Plataforma sem binário do Supabase CLI conhecido (${plataforma}/${arquitetura}).`);
+  let pkgPrincipal;
+  let versao;
+  try {
+    pkgPrincipal = resolver("supabase/package.json", null);
+    versao = JSON.parse(ler(pkgPrincipal)).version;
+  } catch {
+    throw new Error("Pacote `supabase` (CLI do projeto) não encontrado: rode `pnpm install`.");
+  }
+  if (typeof versao !== "string" || !versao) throw new Error("Versão do pacote `supabase` ilegível.");
+  const extensao = plataforma === "win32" ? ".exe" : "";
+  for (const sufixo of sufixos) {
+    let pkg;
+    try {
+      pkg = resolver(`@supabase/cli-${sufixo}/package.json`, pkgPrincipal);
+      const meta = JSON.parse(ler(pkg));
+      if (meta.name !== `@supabase/cli-${sufixo}` || meta.version !== versao) continue;
+    } catch {
+      continue;
+    }
+    const binario = join(dirname(pkg), "bin", `supabase${extensao}`);
+    if (ehArquivo(binario)) return binario;
+  }
+  throw new Error("Binário do Supabase CLI não encontrado para esta plataforma: rode `pnpm install`.");
 }
 
 /**
  * Consulta o Supabase CLI do projeto. Única parte com efeito no sistema (executa o processo do CLI,
- * somente leitura). Nunca inclui a saída do CLI nas mensagens de erro.
+ * somente leitura). O executável é o binário real (sem shell: o caminho de `--workdir` chega ao CLI
+ * exatamente como informado, com qualquer espaço ou metacaractere, sem ser interpretado). Nunca
+ * inclui a saída do CLI nas mensagens de erro.
  * @param {string} raiz diretório que contém `supabase/` (usado exatamente como informado)
+ * @param {{ binario?: () => string, executar?: typeof spawnSync }} [o]
  * @returns {string} saída de `supabase status -o env`
  */
-export function executarStatusSupabase(raiz) {
-  // Argumentos fixos (sem entrada externa): shell só no Windows, onde pnpm é um .cmd.
-  const raizCli = normalizarRaizCli(raiz);
-  const r =spawnSync("pnpm", ["exec", "supabase", "status", "-o", "env", "--workdir", raizCli], {
+export function executarStatusSupabase(raiz, { binario = () => resolverBinarioSupabase({ raiz }), executar = spawnSync } = {}) {
+  const r = executar(binario(), ["status", "-o", "env", "--workdir", raiz], {
     cwd: raiz,
     encoding: "utf8",
     timeout: 60_000,
-    shell: process.platform === "win32",
+    shell: false,
     windowsHide: true,
   });
   if (r.error || r.status !== 0 || !r.stdout) {
@@ -219,11 +282,19 @@ export function executarStatusSupabase(raiz) {
 }
 
 /**
- * Ponto de entrada: obtém os metadados, comprova a stack e devolve a URL de banco verificada.
- * @param {{ env: Ambiente, raiz: string, executarStatus?: (raiz: string) => string }} opcoes
- * @returns {{ urlBanco: string }}
+ * Ponto de entrada: obtém os metadados, comprova a stack (CLI + portas reais do Docker) e devolve a
+ * URL de banco verificada.
+ * @param {{ env: Ambiente, raiz: string,
+ *           executarStatus?: (raiz: string) => string,
+ *           consultarDocker?: (d: { raiz: string, apiPorta: string, dbPorta: string, env: Ambiente }) => unknown }} opcoes
+ * @returns {{ urlBanco: string, apiUrl: string }}
  */
-export function exigirStackLocal({ env, raiz, executarStatus = executarStatusSupabase }) {
+export function exigirStackLocal({
+  env,
+  raiz,
+  executarStatus = executarStatusSupabase,
+  consultarDocker = verificarStackNoDocker,
+}) {
   // Valida o ambiente ANTES de executar qualquer processo: ambiente remoto nem chega ao CLI.
   verificarAmbienteLocal(env);
   let texto;
@@ -233,5 +304,8 @@ export function exigirStackLocal({ env, raiz, executarStatus = executarStatusSup
     if (erro instanceof Error && erro.message.startsWith("Não foi possível obter")) throw erro;
     throw new Error("Não foi possível obter os metadados da stack local (`supabase status`). Nada foi executado.");
   }
-  return resolverStackLocal(env, lerStatusEnv(texto));
+  const stack = resolverStackLocal(env, lerStatusEnv(texto));
+  // O CLI descreve a configuração; o Docker diz o que está de fato publicado.
+  consultarDocker({ raiz, apiPorta: stack.apiPorta, dbPorta: stack.dbPorta, env });
+  return { urlBanco: stack.urlBanco, apiUrl: stack.apiUrl };
 }

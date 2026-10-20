@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 const RAIZ = process.cwd();
 const ISENTOS = new Set(["banco-local.ts", "preparar-banco.ts", "global-setup.ts"]);
 // Testes das próprias travas citam variáveis/portas como dados de teste.
-const TESTES_DAS_TRAVAS = /^(guard-|stack-supabase-local|banco-local-uso)/;
+const TESTES_DAS_TRAVAS = /^(guard-|stack-supabase-local|docker-stack-local|cli-supabase-sem-shell|bundle-servido|banco-local-uso)/;
 
 const semComentarios = (texto: string) => texto.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 
@@ -45,7 +45,9 @@ describe("conexões diretas com o Postgres passam só pela trava global", () => 
     const iStack = setup.indexOf("exigirStackLocal(");
     expect(iTrava).toBeGreaterThanOrEqual(0);
     expect(iStack).toBeGreaterThan(iTrava);
-    expect(iStack).toBeLessThan(setup.indexOf("criarBaseFicticia()"));
+    const iBundle = setup.indexOf("exigirBundleServido(");
+    expect(iBundle).toBeGreaterThan(iStack);
+    expect(iBundle).toBeLessThan(setup.indexOf("criarBaseFicticia()"));
   });
 });
 
@@ -60,5 +62,33 @@ describe("a trava roda antes de qualquer suíte", () => {
     const ordem = ["verificarAmbienteLocal(efetivo)", "exigirStackLocal(", "projeto.provide("].map((t) => codigo.indexOf(t));
     expect(ordem.every((i) => i >= 0)).toBe(true);
     expect([...ordem].sort((a, b) => a - b)).toEqual(ordem);
+  });
+});
+
+describe("M2: o app do e2e é construído e servido pela trava", () => {
+  const ler = (arquivo: string) => readFileSync(join(RAIZ, arquivo), "utf8");
+  const ordem = (codigo: string, trechos: string[]) => {
+    const indices = trechos.map((x) => codigo.indexOf(x));
+    expect(indices.every((i) => i >= 0), `trechos ausentes: ${trechos.filter((_, i) => indices[i] < 0).join(", ")}`).toBe(true);
+    expect([...indices].sort((x, y) => x - y)).toEqual(indices);
+  };
+
+  it("o webServer do Playwright é scripts/e2e-servidor.mjs e nunca reaproveita um servidor existente", () => {
+    const cfg = semComentarios(ler("playwright.config.ts"));
+    expect(cfg).toContain("command: `node scripts/e2e-servidor.mjs --port");
+    expect(cfg).toContain("reuseExistingServer: false");
+    expect(cfg).not.toContain("pnpm start");
+  });
+
+  it("e2e-servidor: verifica a stack, apaga .next, reconstrói, grava o marcador e só então inicia o app", () => {
+    ordem(semComentarios(ler("scripts/e2e-servidor.mjs")), [
+      "verificarAmbienteLocal(efetivo)",
+      "exigirStackLocal(",
+      "rmSync(join(raiz, \".next\")",
+      '"build"',
+      "montarMarcador({",
+      "checar-ambiente-local.mjs",
+      '"start"',
+    ]);
   });
 });
