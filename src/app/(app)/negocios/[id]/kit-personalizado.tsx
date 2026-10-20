@@ -42,6 +42,7 @@ export type CalculoSalvo = {
 type Parametros = {
   produtividadeKwhKwpMes: number;
   percentualFioB: number;
+  parteFioBTarifa: number | null;
   disponibilidadeMonoKwh: number;
   disponibilidadeBiKwh: number;
   disponibilidadeTriKwh: number;
@@ -182,7 +183,7 @@ export function KitPersonalizado({
   }, [linhas, itens, componentes, potenciaKwp, parametros]);
 
   const previa = useMemo(() => {
-    if (!parametros) return null;
+    if (!parametros || parametros.parteFioBTarifa == null) return null;
     const tarifa = numero(tarifaKwh);
     const consumo = numero(consumoMedioKwh);
     const fatura = numero(valorFaturaMedio);
@@ -196,6 +197,7 @@ export function KitPersonalizado({
       tarifaKwh: tarifa,
       produtividadeKwhKwpMes: parametros.produtividadeKwhKwpMes,
       percentualFioB: parametros.percentualFioB,
+      parteFioBTarifa: parametros.parteFioBTarifa,
       disponibilidadeKwh: parametros[DISPONIBILIDADE_PADRAO_CAMEL[tipoLigacao]],
     });
   }, [parametros, tarifaKwh, consumoMedioKwh, valorFaturaMedio, potenciaKwp, negocioValor, tipoLigacao]);
@@ -350,6 +352,11 @@ export function KitPersonalizado({
         value={tarifaKwh}
         onChange={(e) => setTarifaKwh(e.target.value)}
       />
+      {parametros.parteFioBTarifa == null && (
+        <p role="status" className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          Parte do Fio B na tarifa não configurada: o cálculo só sai depois que o admin informar esse número em Configurações › Calculadora.
+        </p>
+      )}
       {previa && (
         <dl className="grid grid-cols-2 gap-3 rounded-lg bg-amber-50 px-4 py-3 text-sm md:grid-cols-4">
           <div>

@@ -27,7 +27,7 @@ describe("paybackComPreco", () => {
     expect(paybackComPreco(28000, -10)).toBeNull();
   });
   it("bate exatamente com o payback que a calculadora daria com o preço novo", () => {
-    const base = { potenciaKwp: 6.6, tipoLigacao: "bifasico" as const, consumoMedioKwh: 700, tarifaKwh: 0.95, produtividadeKwhKwpMes: 120, percentualFioB: 0.45, disponibilidadeKwh: 50 };
+    const base = { potenciaKwp: 6.6, tipoLigacao: "bifasico" as const, consumoMedioKwh: 700, tarifaKwh: 0.95, produtividadeKwhKwpMes: 120, percentualFioB: 0.45, parteFioBTarifa: 0.3, disponibilidadeKwh: 50 };
     const antigo = calcular({ ...base, precoKit: 25000 });
     for (const preco of [28000, 19999.99, 41234.5]) {
       expect(paybackComPreco(preco, antigo.economiaMensal)).toBe(calcular({ ...base, precoKit: preco }).paybackMeses);

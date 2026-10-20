@@ -36,6 +36,7 @@ export default async function ConfigCalculadora() {
             parametros={{
               produtividadeKwhKwpMes: parametros.produtividade_kwh_kwp_mes,
               percentualFioB: parametros.percentual_fio_b,
+              parteFioBTarifa: parametros.parte_fio_b_tarifa,
               disponibilidadeMonoKwh: parametros.disponibilidade_mono_kwh,
               disponibilidadeBiKwh: parametros.disponibilidade_bi_kwh,
               disponibilidadeTriKwh: parametros.disponibilidade_tri_kwh,

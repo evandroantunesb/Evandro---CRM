@@ -10,6 +10,39 @@ import {
   sugerirQuantidadeModulos,
 } from "@/lib/calculadora";
 
+describe("Fio B: percentual do ano sobre a parte Fio B da tarifa", () => {
+  const base = {
+    potenciaKwp: 5,
+    precoKit: 20000,
+    tipoLigacao: "trifasico" as const,
+    consumoMedioKwh: 400,
+    tarifaKwh: 0.9,
+    produtividadeKwhKwpMes: 120,
+    percentualFioB: 0.6,
+    disponibilidadeKwh: 100,
+  };
+
+  it("o percentual incide só sobre a parte Fio B da tarifa (30% da tarifa x 60% do ano)", () => {
+    const r = calcular({ ...base, parteFioBTarifa: 0.3 });
+    // 300 kWh compensados x R$ 0,90 x 0,3 x 0,6
+    expect(r.custoFioB).toBe(48.6);
+    expect(r.contaComSolar).toBe(138.6);
+    expect(r.economiaMensal).toBe(221.4);
+    expect(r.paybackMeses).toBe(90.3);
+  });
+
+  it("parte 100% reproduz o cálculo antigo (percentual sobre a tarifa inteira)", () => {
+    expect(calcular({ ...base, parteFioBTarifa: 1 }).custoFioB).toBe(162);
+  });
+
+  it("o custo do Fio B é proporcional à parte informada e a economia só sobe quando ela diminui", () => {
+    const economia = [1, 0.5, 0.25].map((parteFioBTarifa) => calcular({ ...base, parteFioBTarifa }).economiaMensal);
+    expect(economia[0]).toBeLessThan(economia[1]);
+    expect(economia[1]).toBeLessThan(economia[2]);
+    expect(calcular({ ...base, parteFioBTarifa: 0.5 }).custoFioB).toBe(81);
+  });
+});
+
 describe("calcular", () => {
   it("desconta a disponibilidade mínima quando o kit cobre todo o consumo", () => {
     const r = calcular({
@@ -20,6 +53,7 @@ describe("calcular", () => {
       tarifaKwh: 0.9,
       produtividadeKwhKwpMes: 120,
       percentualFioB: 0.6,
+      parteFioBTarifa: 1,
       disponibilidadeKwh: 100,
     });
     expect(r.geracaoEstimadaKwhMes).toBe(600);
@@ -41,6 +75,7 @@ describe("calcular", () => {
       tarifaKwh: 0.9,
       produtividadeKwhKwpMes: 120,
       percentualFioB: 0.6,
+      parteFioBTarifa: 1,
       disponibilidadeKwh: 100,
     });
     expect(r.geracaoEstimadaKwhMes).toBe(360);
@@ -60,6 +95,7 @@ describe("calcular", () => {
       tarifaKwh: 0.9,
       produtividadeKwhKwpMes: 120,
       percentualFioB: 0.6,
+      parteFioBTarifa: 1,
       disponibilidadeKwh: 100,
     });
     expect(r.geracaoEstimadaKwhMes).toBe(0);
@@ -79,6 +115,7 @@ describe("calcular", () => {
       tarifaKwh: 0.9,
       produtividadeKwhKwpMes: 120,
       percentualFioB: 0.6,
+      parteFioBTarifa: 1,
       disponibilidadeKwh: 100,
     });
     expect(r.kwhFaturado).toBe(50);

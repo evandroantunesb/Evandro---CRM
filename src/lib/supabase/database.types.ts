@@ -236,6 +236,7 @@ export type Database = {
           kwh_faturado: number;
           negocio_id: string;
           observacoes: string | null;
+          parte_fio_b_tarifa: number | null;
           payback_meses: number | null;
           percentual_fio_b: number;
           produtividade_kwh_kwp_mes: number;
@@ -265,6 +266,7 @@ export type Database = {
           kwh_faturado: number;
           negocio_id: string;
           observacoes?: string | null;
+          parte_fio_b_tarifa?: number | null;
           payback_meses?: number | null;
           percentual_fio_b: number;
           produtividade_kwh_kwp_mes: number;
@@ -294,6 +296,7 @@ export type Database = {
           kwh_faturado?: number;
           negocio_id?: string;
           observacoes?: string | null;
+          parte_fio_b_tarifa?: number | null;
           payback_meses?: number | null;
           percentual_fio_b?: number;
           produtividade_kwh_kwp_mes?: number;
@@ -2769,6 +2772,7 @@ export type Database = {
           disponibilidade_mono_kwh: number;
           disponibilidade_tri_kwh: number;
           empresa_id: string;
+          parte_fio_b_tarifa: number | null;
           percentual_fio_b: number;
           produtividade_kwh_kwp_mes: number;
           updated_at: string;
@@ -2782,6 +2786,7 @@ export type Database = {
           disponibilidade_mono_kwh?: number;
           disponibilidade_tri_kwh?: number;
           empresa_id: string;
+          parte_fio_b_tarifa?: number | null;
           percentual_fio_b?: number;
           produtividade_kwh_kwp_mes?: number;
           updated_at?: string;
@@ -2795,6 +2800,7 @@ export type Database = {
           disponibilidade_mono_kwh?: number;
           disponibilidade_tri_kwh?: number;
           empresa_id?: string;
+          parte_fio_b_tarifa?: number | null;
           percentual_fio_b?: number;
           produtividade_kwh_kwp_mes?: number;
           updated_at?: string;

@@ -68,6 +68,7 @@ export function FormularioParametros({
   parametros: {
     produtividadeKwhKwpMes: number;
     percentualFioB: number;
+    parteFioBTarifa: number | null;
     disponibilidadeMonoKwh: number;
     disponibilidadeBiKwh: number;
     disponibilidadeTriKwh: number;
@@ -88,12 +89,24 @@ export function FormularioParametros({
         required
       />
       <Campo
-        rotulo="Percentual do Fio B cobrado sobre a energia compensada (%)"
+        rotulo="Percentual do Fio B cobrado no ano, Lei 14.300 (%)"
         name="percentual_fio_b"
         inputMode="decimal"
         defaultValue={String(parametros.percentualFioB * 100).replace(".", ",")}
         required
       />
+      <Campo
+        rotulo="Parte do Fio B na tarifa da distribuidora (%)"
+        name="parte_fio_b_tarifa"
+        inputMode="decimal"
+        defaultValue={parametros.parteFioBTarifa != null ? String(parametros.parteFioBTarifa * 100).replace(".", ",") : ""}
+        placeholder="Obrigatório: veja na tarifa da distribuidora"
+        required
+      />
+      <p className="text-xs text-zinc-500">
+        O percentual do ano (15% em 2023 até 100% em 2029, pela lei) incide só sobre a componente Fio B da TUSD, não sobre a tarifa
+        inteira. Informe quanto da tarifa é Fio B na sua distribuidora; sem esse número a calculadora não calcula.
+      </p>
       <div className="grid grid-cols-3 gap-2">
         <Campo
           rotulo="Disponibilidade monofásico (kWh)"

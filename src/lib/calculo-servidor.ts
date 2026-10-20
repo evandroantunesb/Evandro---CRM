@@ -42,6 +42,9 @@ export async function montarLinhaCalculo(
     .eq("empresa_id", empresaId)
     .maybeSingle();
   if (!parametros) return { ok: false, mensagem: "Parâmetros da calculadora não configurados." };
+  if (parametros.parte_fio_b_tarifa == null) {
+    return { ok: false, mensagem: "Informe a parte do Fio B na tarifa em Configurações › Calculadora (peça ao admin) antes de calcular." };
+  }
 
   const disponibilidadeKwh = parametros[DISPONIBILIDADE_PADRAO[entrada.tipoLigacao]] as number;
   const resultado = calcular({
@@ -52,6 +55,7 @@ export async function montarLinhaCalculo(
     tarifaKwh: entrada.tarifaKwh,
     produtividadeKwhKwpMes: parametros.produtividade_kwh_kwp_mes,
     percentualFioB: parametros.percentual_fio_b,
+    parteFioBTarifa: parametros.parte_fio_b_tarifa,
     disponibilidadeKwh,
   });
 
@@ -69,6 +73,7 @@ export async function montarLinhaCalculo(
       tarifa_kwh: entrada.tarifaKwh,
       produtividade_kwh_kwp_mes: parametros.produtividade_kwh_kwp_mes,
       percentual_fio_b: parametros.percentual_fio_b,
+      parte_fio_b_tarifa: parametros.parte_fio_b_tarifa,
       disponibilidade_kwh: disponibilidadeKwh,
       geracao_estimada_kwh_mes: resultado.geracaoEstimadaKwhMes,
       kwh_faturado: resultado.kwhFaturado,

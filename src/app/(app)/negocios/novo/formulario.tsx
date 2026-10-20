@@ -38,6 +38,7 @@ type ContatoEncontrado = {
 type Parametros = {
   produtividadeKwhKwpMes: number;
   percentualFioB: number;
+  parteFioBTarifa: number | null;
   disponibilidadeMonoKwh: number;
   disponibilidadeBiKwh: number;
   disponibilidadeTriKwh: number;
@@ -302,7 +303,7 @@ export function FormularioNegocio({
     const consumo = numero(consumoMedioKwh);
     const fatura = numero(valorFaturaMedio);
     const precoKit = numero(valor);
-    if (!parametros || potenciaKwp <= 0 || !tarifa || (!consumo && !fatura)) return null;
+    if (!parametros || parametros.parteFioBTarifa == null || potenciaKwp <= 0 || !tarifa || (!consumo && !fatura)) return null;
     const consumoMedioFinal = consumo ?? fatura! / tarifa;
     return calcular({
       potenciaKwp,
@@ -312,6 +313,7 @@ export function FormularioNegocio({
       tarifaKwh: tarifa,
       produtividadeKwhKwpMes: parametros.produtividadeKwhKwpMes,
       percentualFioB: parametros.percentualFioB,
+      parteFioBTarifa: parametros.parteFioBTarifa,
       disponibilidadeKwh: parametros[DISPONIBILIDADE_PADRAO_CAMEL[tipoLigacao]],
     });
   }, [parametros, tipoLigacao, consumoMedioKwh, valorFaturaMedio, tarifaKwh, potenciaKwp, valor]);
@@ -794,6 +796,11 @@ export function FormularioNegocio({
             <Botao type="button" variante="secundario" onClick={cancelarMontagem} className="self-start">
               Cancelar montagem
             </Botao>
+            {parametros && parametros.parteFioBTarifa == null && (
+              <p role="status" className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                Parte do Fio B na tarifa não configurada: o cálculo só sai depois que o admin informar esse número em Configurações › Calculadora.
+              </p>
+            )}
             {previa && (
               <>
                 <dl className="grid grid-cols-2 gap-3 rounded-lg bg-amber-50 px-4 py-3 text-sm md:grid-cols-4">
