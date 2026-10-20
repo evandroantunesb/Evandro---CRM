@@ -303,7 +303,8 @@ describe("regressões de tela", () => {
 
   it("ficha: remover kit salvo pede confirmação; com cálculo, a tela explica a recusa", () => {
     const kit = fonte("src", "app", "(app)", "negocios", "[id]", "kit-personalizado.tsx");
-    expect(kit).toContain("const removendoKitSalvo = componentesSalvos.length > 0 && componentes.length === 0;");
+    // Remover o kit é explícito: tirar TODAS as linhas. Linha sem descrição não vira remoção (exige preencher ou remover).
+    expect(kit).toContain("const removendoKitSalvo = componentesSalvos.length > 0 && linhas.length === 0;");
     expect(kit).toContain('name="confirmarRemocao"');
     expect(kit).toContain("disabled={pendente || (removendoKitSalvo && (!!calculo || !confirmaRemocao))}");
     expect(kit).toContain("{MENSAGEM_REMOCAO_COM_CALCULO}");
