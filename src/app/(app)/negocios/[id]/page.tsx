@@ -12,6 +12,7 @@ import { carregarConfiguracao, formatarDataHora, formatarMoeda } from "@/lib/crm
 import { env } from "@/lib/env";
 import { hojeEmSaoPaulo } from "@/lib/formatacao";
 import { precoDoCalculoDesatualizado } from "@/lib/calculo-preco";
+import { consumoDoCalculoEhEstimado } from "@/lib/consumo-estimado";
 import { descreverAtividade } from "@/lib/linha-do-tempo";
 import { exigirPapel } from "@/lib/sessao";
 import { ARQUIVAR_NEGOCIO, ATRIBUIR_TAREFA_A_OUTROS, EDITAR_VALOR_NEGOCIO, ESCOLHER_RESPONSAVEL_NEGOCIO, NEGOCIOS, PAGAMENTO_SOLO, PROPOSTA_E_CONTRATO, RESPONSAVEL_COMERCIAL, pode } from "@/lib/permissoes";
@@ -414,6 +415,9 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
                   : null
               }
               precoDesatualizado={precoDesatualizado}
+              consumoEstimado={
+                !!calculo && consumoDoCalculoEhEstimado({ consumoNegocioKwh: negocio.consumo_medio_kwh, valorFaturaCalculo: calculo.valor_fatura_medio })
+              }
               calculo={
                 calculo
                   ? {

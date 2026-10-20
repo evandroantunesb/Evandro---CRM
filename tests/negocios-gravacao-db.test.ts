@@ -567,3 +567,40 @@ describe("preço do cálculo x valor do negócio", () => {
     expect((await servico.from("calculos_solares").select("id").eq("negocio_id", r.negocioId)).data).toHaveLength(0);
   });
 });
+
+describe("consumo estimado pelo assistente x tarifa base", () => {
+  it("o servidor recalcula o consumo pela tarifa efetiva (mesmo com a tarifa base diferente); o negócio não guarda consumo informado nem a efetiva", async () => {
+    // Conta de R$ 650 ÷ tarifa efetiva R$ 0,95 = 684,21 kWh (Etapa 2). Tarifa base do cálculo financeiro: R$ 0,80.
+    const r = await criar(
+      vendedor,
+      novoNegocio({ componentes: KIT, valor_fatura_medio: "650,00", tarifa_efetiva_kwh: "0,95", tarifa_kwh: "0,80", tipo_ligacao: "trifasico" }),
+    );
+    expect(r.avisos).toEqual([]);
+    const { data: calculo } = await servico.from("calculos_solares").select("consumo_medio_kwh, tarifa_kwh, valor_fatura_medio").eq("negocio_id", r.negocioId).single();
+    expect(calculo).toMatchObject({ consumo_medio_kwh: 684.21, tarifa_kwh: 0.8, valor_fatura_medio: 650 });
+    // O consumo estimado não vira "consumo informado" do negócio.
+    const { data: negocio } = await servico.from("negocios").select("consumo_medio_kwh").eq("id", r.negocioId).single();
+    expect(negocio!.consumo_medio_kwh).toBeNull();
+
+    // Um "consumo estimado" enviado por fora é ignorado: só a conta e a efetiva contam.
+    const forjado = await criar(
+      vendedor,
+      novoNegocio({ componentes: KIT, valor_fatura_medio: "650,00", tarifa_efetiva_kwh: "0,95", consumo_estimado_kwh: "9999", tarifa_kwh: "0,80", tipo_ligacao: "trifasico" }),
+    );
+    expect((await servico.from("calculos_solares").select("consumo_medio_kwh").eq("negocio_id", forjado.negocioId).single()).data!.consumo_medio_kwh).toBe(684.21);
+
+    // Consumo informado direto vence a estimativa.
+    const direto = await criar(
+      vendedor,
+      novoNegocio({ componentes: KIT, consumo_medio_kwh: "780", valor_fatura_medio: "650,00", tarifa_efetiva_kwh: "0,95", tarifa_kwh: "0,95", tipo_ligacao: "trifasico" }),
+    );
+    expect((await servico.from("calculos_solares").select("consumo_medio_kwh").eq("negocio_id", direto.negocioId).single()).data!.consumo_medio_kwh).toBe(780);
+  });
+
+  it("valor da conta sem tarifa efetiva não é convertido pela tarifa base: o negócio é criado, o cálculo não, com aviso", async () => {
+    const r = await criar(vendedor, novoNegocio({ componentes: KIT, valor_fatura_medio: "650,00", tarifa_kwh: "0,80", tipo_ligacao: "trifasico" }));
+    expect(r.avisos).toContain("calculo");
+    expect((await servico.from("calculos_solares").select("id").eq("negocio_id", r.negocioId)).data).toHaveLength(0);
+    expect((await servico.from("kit_componentes").select("id").eq("negocio_id", r.negocioId)).data).toHaveLength(2);
+  });
+});

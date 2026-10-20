@@ -4,6 +4,7 @@ import { ANEXOS_CRIACAO, problemaArquivo } from "@/lib/anexos-regras";
 import { arquivoMetaSchema } from "@/lib/anexos-servidor";
 import { componentesJsonSchema, nomeKitPersonalizado, potenciaKitPersonalizadoKwp, type ComponenteKit } from "@/lib/calculadora";
 import { paybackComPreco, precoDoCalculoDesatualizado } from "@/lib/calculo-preco";
+import { consumoParaCriacao } from "@/lib/consumo-estimado";
 import { montarLinhaCalculo } from "@/lib/calculo-servidor";
 import { mensagemErro } from "@/lib/erros";
 import { lerNumeroBr, MENSAGEM_NUMERO_BR } from "@/lib/formatacao";
@@ -105,6 +106,9 @@ const esquemaNovo = z.object({
   // Calculadora solar: roda no backend a partir do kit personalizado, quando há tarifa.
   tipo_ligacao: z.enum(TIPOS_LIGACAO).optional(),
   consumo_medio_kwh: numeroBrOpcional,
+  // Tarifa EFETIVA estimada (Etapa 1 do assistente): só serve para o servidor RECALCULAR o consumo estimado a partir
+  // do valor da conta (`consumoParaCriacao`). Não é a tarifa do cálculo financeiro (`tarifa_kwh`) e não é gravada.
+  tarifa_efetiva_kwh: numeroBrOpcional,
   valor_fatura_medio: numeroBrOpcional,
   tarifa_kwh: numeroBrOpcional,
   componentes: componentesJsonSchema,
@@ -232,15 +236,20 @@ export async function criarNegocioComCliente(supabase: SupabaseServidor, atual: 
     if (erroKit) {
       avisos.push("kit");
     } else if (d.tipo_ligacao && d.tarifa_kwh != null) {
-      const montado = await montarLinhaCalculo(supabase, atual.empresaId, {
-        kitNome: nomeKitPersonalizado(d.componentes),
-        potenciaKwp: potenciaKitPersonalizadoKwp(d.componentes),
-        precoKit: d.valor ?? 0,
-        tipoLigacao: d.tipo_ligacao,
-        consumoMedioKwh: d.consumo_medio_kwh,
-        valorFaturaMedio: d.valor_fatura_medio,
-        tarifaKwh: d.tarifa_kwh,
-      });
+      // Consumo do cálculo: kWh informado, ou estimado AQUI (valor da conta ÷ tarifa efetiva). Nunca derivado da tarifa
+      // base (`tarifa_kwh`), e nunca de um "consumo estimado" vindo do navegador.
+      const consumo = consumoParaCriacao({ consumoKwh: d.consumo_medio_kwh, valorConta: d.valor_fatura_medio, tarifaEfetiva: d.tarifa_efetiva_kwh });
+      const montado = consumo.ok
+        ? await montarLinhaCalculo(supabase, atual.empresaId, {
+            kitNome: nomeKitPersonalizado(d.componentes),
+            potenciaKwp: potenciaKitPersonalizadoKwp(d.componentes),
+            precoKit: d.valor ?? 0,
+            tipoLigacao: d.tipo_ligacao,
+            consumoMedioKwh: consumo.kwh,
+            valorFaturaMedio: d.valor_fatura_medio,
+            tarifaKwh: d.tarifa_kwh,
+          })
+        : ({ ok: false } as const);
       const erroCalculo = montado.ok
         ? (
             await supabase
