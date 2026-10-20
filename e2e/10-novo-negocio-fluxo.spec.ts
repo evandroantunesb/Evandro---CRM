@@ -101,6 +101,8 @@ test.describe("novo negócio: fluxo de cálculo", () => {
     await entrarComo(page, base.usuarios.vendedor, base.senha);
     await preencherEtapa1(page, "Cliente ligação (fictício)", "45900000025", { consumo: "780" });
     await avancar(page);
+    // O valor do negócio é obrigatório na Etapa 2, com ou sem kit.
+    await page.getByRole("textbox", { name: /^Valor do negócio/ }).fill("30000");
     await page.getByRole("button", { name: "Continuar sem kit" }).click();
 
     const ligacao = page.getByRole("combobox", { name: "Tipo de ligação" });
@@ -121,6 +123,8 @@ test.describe("novo negócio: fluxo de cálculo", () => {
     await expect(page.getByText("684,21 kWh")).toBeVisible();
     const referencia = page.getByText(/× 620 W/).first();
     const modulos = await referencia.textContent();
+    // O valor do negócio é obrigatório na Etapa 2, com ou sem kit.
+    await page.getByRole("textbox", { name: /^Valor do negócio/ }).fill("30000");
     await page.getByRole("button", { name: "Continuar sem kit" }).click();
 
     // Etapa 3: tarifa base bem diferente da efetiva.

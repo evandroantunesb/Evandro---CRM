@@ -32,7 +32,7 @@ test.describe("compatibilidade técnica não verificada", () => {
     await entrarComo(page, base.usuarios.vendedor, base.senha);
     await irParaEtapa2(page, "Cliente E0 compatibilidade (fictício)", "45900000010");
 
-    await expect(page.getByText("Sistema recomendado", { exact: true })).toBeVisible();
+    await expect(page.getByText("Sistema de referência", { exact: true })).toBeVisible();
     await expect(page.getByRole("status").filter({ hasText: "Compatibilidade técnica não verificada" })).toBeVisible();
 
     for (const proibido of [/MPPT validado/i, /Voc validado/i, /Combinação compatível/i, /Combinação incompatível/i, /Overload acima/i, /\(exemplo\)/i]) {
