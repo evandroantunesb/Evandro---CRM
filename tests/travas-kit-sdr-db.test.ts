@@ -90,6 +90,7 @@ beforeAll(async () => {
   [admin, gestor, vendedor, sdr] = await Promise.all(["tv-admin", "tv-gestor", "tv-vendedor", "tv-sdr"].map(criarUsuario));
   const { data: emp } = await servico.from("empresas").insert({ nome: `Travas ${sufixo}` }).select("id").single();
   empresa = emp!.id;
+  await servico.from("parametros_calculadora").update({ parte_fio_b_tarifa: 1 }).eq("empresa_id", empresa);
   const { data: membros, error } = await servico
     .from("empresa_membros")
     .insert([
