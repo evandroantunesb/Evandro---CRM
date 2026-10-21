@@ -8,8 +8,9 @@ import { afterAll, describe, expect, it } from "vitest";
 
 const SCRIPT = ".github/scripts/validar-conjunto-migrations.sh";
 const WORKFLOW = ".github/workflows/banco-producao.yml";
-// Implantação da PR #198 (P1a-0, arquivamento de negócio): só esta migration, nenhuma a mais ou a menos.
-const AUTORIZADA = "20261016200000_negocios_arquivamento.sql";
+// Implantação da PR #210 (colunas consumo_estimado_kwh e tarifa_efetiva_kwh em negocios): só esta migration,
+// nenhuma a mais ou a menos.
+const AUTORIZADA = "20261021100000_negocio_consumo_estimado.sql";
 // Migrations já aplicadas (#192, #191, #190 e o conjunto Solo #186, #188 e #189): se voltarem a aparecer como
 // pendentes, não são autorizadas.
 const SOLO = [
