@@ -20,6 +20,7 @@ import {
   potenciaKitPersonalizadoKwp,
   sugerirQuantidadeModulos,
 } from "@/lib/calculadora";
+import { consumoDaEtapa1 } from "@/lib/consumo-estimado";
 import { formatarCep, formatarMascaraMoeda, formatarMoeda, formatarTelefoneBr, lerNumeroBr } from "@/lib/formatacao";
 import { montarEndereco } from "@/lib/negocio-dados";
 import { criarClienteNavegador } from "@/lib/supabase/navegador";
@@ -91,6 +92,40 @@ function IndicadorEtapas({ atual }: { atual: 1 | 2 | 3 }) {
         </li>
       ))}
     </ol>
+  );
+}
+
+const ID_TARIFA_EFETIVA_ETAPA_1 = "tarifa-efetiva-etapa-1";
+
+/**
+ * Aviso compacto: uma linha sempre visível e o texto completo ao clicar, tocar ou usar Enter/Espaço
+ * (botão nativo; Esc fecha). Não há conferência de módulo, inversor, tensão ou faixa MPPT neste
+ * assistente: o aviso diz isso, sem nenhum "validado" ou "compatível" até existir uma validação de
+ * verdade (catálogo com ficha técnica).
+ */
+function AvisoCompatibilidade() {
+  const [aberto, setAberto] = useState(false);
+  const idDetalhe = useId();
+  return (
+    <div role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+      <button
+        type="button"
+        aria-expanded={aberto}
+        aria-controls={idDetalhe}
+        onClick={() => setAberto((v) => !v)}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") setAberto(false);
+        }}
+        className="flex w-full items-center gap-2 text-left font-medium"
+      >
+        <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
+        <span>Compatibilidade técnica não verificada</span>
+        <span className="ml-auto underline">{aberto ? "ocultar" : "ver detalhes"}</span>
+      </button>
+      <p id={idDetalhe} hidden={!aberto} className="mt-1 pl-6">
+        O Raion ainda não confere módulo, inversor, tensão e faixa MPPT: confirme com a engenharia antes de fechar o kit.
+      </p>
+    </div>
   );
 }
 
@@ -218,6 +253,10 @@ export function FormularioNegocio({
   // Consumo (Etapa 1): kWh direto ou valor da conta (com máscara), nunca os dois exigidos.
   const [consumoMedioKwh, setConsumoMedioKwh] = useState("");
   const [valorFaturaMedio, setValorFaturaMedio] = useState("");
+  // Duas tarifas SEM estado compartilhado:
+  // - tarifaEfetivaKwh (Etapa 1, "Tarifa efetiva estimada"): só converte o valor da conta em kWh estimados;
+  // - tarifaKwh (Etapa 3, "Tarifa base (TE + TUSD)"): só entra no cálculo financeiro (economia e payback).
+  const [tarifaEfetivaKwh, setTarifaEfetivaKwh] = useState("");
   const [tarifaKwh, setTarifaKwh] = useState("");
 
   // Dados técnicos (Etapa 3, movidos pra fora do primeiro contato).
@@ -276,14 +315,19 @@ export function FormularioNegocio({
     window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
   }
 
-  const consumoMedioEstimado = useMemo(() => {
-    const tarifa = numero(tarifaKwh);
-    const consumo = numero(consumoMedioKwh);
-    const fatura = numero(valorFaturaMedio);
-    if (consumo) return consumo;
-    if (fatura && tarifa) return fatura / tarifa;
-    return null;
-  }, [consumoMedioKwh, valorFaturaMedio, tarifaKwh]);
+  // Consumo em kWh informado direto: dimensiona sem tarifa. Só com o valor da conta (R$), o consumo é uma
+  // ESTIMATIVA (valor da conta ÷ tarifa efetiva estimada). Depende só da tarifa EFETIVA: alterar a tarifa base
+  // da Etapa 3 não muda o consumo estimado nem o dimensionamento.
+  const consumoDireto = numero(consumoMedioKwh);
+  const faturaInformada = numero(valorFaturaMedio);
+  const tarifaEfetivaInformada = numero(tarifaEfetivaKwh);
+  const precisaTarifaNaEtapa1 = consumoDireto == null && faturaInformada != null;
+  const consumoEtapa1 = useMemo(
+    () => consumoDaEtapa1({ consumoKwh: consumoDireto, valorConta: faturaInformada, tarifaEfetiva: tarifaEfetivaInformada }),
+    [consumoDireto, faturaInformada, tarifaEfetivaInformada],
+  );
+  const consumoConvertido = consumoEtapa1?.origem === "estimado";
+  const consumoMedioEstimado = consumoEtapa1?.kwh ?? null;
 
   // Mesma conta do kit personalizado (`dimensionarSistema`), com o módulo de referência da prévia.
   const sistemaRecomendado = useMemo(
@@ -300,24 +344,22 @@ export function FormularioNegocio({
       sugerirQuantidadeModulos(consumoMedioEstimado, parametros.produtividadeKwhKwpMes, potenciaW);
   }, [parametros, consumoMedioEstimado]);
 
+  // Prévia financeira: consumo da Etapa 1 (já mostrado no resumo) × tarifa BASE da Etapa 3.
   const previa = useMemo(() => {
-    const tarifa = numero(tarifaKwh);
-    const consumo = numero(consumoMedioKwh);
-    const fatura = numero(valorFaturaMedio);
+    const tarifaBase = numero(tarifaKwh);
     const precoKit = numero(valor);
-    if (!parametros || potenciaKwp <= 0 || !tarifa || (!consumo && !fatura)) return null;
-    const consumoMedioFinal = consumo ?? fatura! / tarifa;
+    if (!parametros || potenciaKwp <= 0 || !tarifaBase || !consumoMedioEstimado) return null;
     return calcular({
       potenciaKwp,
       precoKit: precoKit ?? 0,
       tipoLigacao,
-      consumoMedioKwh: consumoMedioFinal,
-      tarifaKwh: tarifa,
+      consumoMedioKwh: consumoMedioEstimado,
+      tarifaKwh: tarifaBase,
       produtividadeKwhKwpMes: parametros.produtividadeKwhKwpMes,
       percentualFioB: parametros.percentualFioB,
       disponibilidadeKwh: parametros[DISPONIBILIDADE_PADRAO_CAMEL[tipoLigacao]],
     });
-  }, [parametros, tipoLigacao, consumoMedioKwh, valorFaturaMedio, tarifaKwh, potenciaKwp, valor]);
+  }, [parametros, tipoLigacao, consumoMedioEstimado, tarifaKwh, potenciaKwp, valor]);
 
   /**
    * Envio sem o reset automático (nada do que foi digitado se perde se o servidor recusar).
@@ -416,6 +458,13 @@ export function FormularioNegocio({
       if (numero(consumoMedioKwh) == null && numero(valorFaturaMedio) == null) {
         return { mensagem: "Informe o consumo médio mensal em kWh ou o valor médio da conta." };
       }
+      // Só o valor da conta: sem a tarifa efetiva o consumo (e o dimensionamento) não existe.
+      if (precisaTarifaNaEtapa1 && tarifaEfetivaInformada == null) {
+        return {
+          mensagem: "Informe a tarifa efetiva estimada (R$/kWh): sem o consumo em kWh, ela é usada para estimar o consumo a partir do valor da conta.",
+          campo: document.getElementById(ID_TARIFA_EFETIVA_ETAPA_1) ?? undefined,
+        };
+      }
     }
     // Kit: quantidade inválida ou linha incompleta bloqueia (nada é arredondado, trocado ou descartado).
     if (etapa === 2) {
@@ -471,7 +520,11 @@ export function FormularioNegocio({
       <input type="hidden" name="valor" value={valor} />
       <input type="hidden" name="consumo_medio_kwh" value={consumoMedioKwh} />
       <input type="hidden" name="valor_fatura_medio" value={valorFaturaMedio} />
+      {/* Tarifa BASE (Etapa 3): cálculo financeiro do kit; salva em calculos_solares.tarifa_kwh. */}
       <input type="hidden" name="tarifa_kwh" value={tarifaKwh} />
+      {/* Tarifa EFETIVA (Etapa 1): enviada só quando o consumo foi estimado pela conta. O servidor recalcula o consumo
+          (valor da conta ÷ tarifa efetiva) em vez de confiar num número vindo daqui; não é gravada nem vira tarifa base. */}
+      {consumoEtapa1?.origem === "estimado" && <input type="hidden" name="tarifa_efetiva_kwh" value={tarifaEfetivaKwh} />}
       <input type="hidden" name="estrutura_telhado" value={estruturaTelhado} />
       {contato && <input type="hidden" name="contato_id" value={contato.id} />}
 
@@ -667,7 +720,26 @@ export function FormularioNegocio({
               onChange={(e) => setValorFaturaMedio(formatarMascaraMoeda(e.target.value))}
             />
           </div>
-          <p className="text-xs text-zinc-400">Informe uma das duas opções — a outra pode ficar em branco.</p>
+          <p className="text-xs text-zinc-400">
+            Informe uma das duas opções — a outra pode ficar em branco. Com o consumo em kWh não é preciso informar tarifa para dimensionar.
+          </p>
+          {precisaTarifaNaEtapa1 && (
+            <div className="flex flex-col gap-1 rounded-lg border border-amber-200 bg-amber-50/60 p-3">
+              <Campo
+                id={ID_TARIFA_EFETIVA_ETAPA_1}
+                rotulo="Tarifa efetiva estimada (R$/kWh)*"
+                inputMode="decimal"
+                placeholder="ex.: 0,95"
+                value={tarifaEfetivaKwh}
+                onChange={(e) => setTarifaEfetivaKwh(e.target.value)}
+              />
+              <p className="text-xs text-zinc-600">
+                Valor da conta ÷ kWh faturados, com impostos (aparece na fatura de energia). Serve só para estimar o consumo e o
+                dimensionamento; não é a tarifa do cálculo financeiro (Etapa 3). Para um dimensionamento mais fiel, informe o
+                consumo em kWh.
+              </p>
+            </div>
+          )}
         </fieldset>
 
         <fieldset className="flex flex-col gap-3">
@@ -706,17 +778,25 @@ export function FormularioNegocio({
           <legend className="mb-2 text-sm font-semibold text-zinc-900">Resumo do sistema</legend>
           <dl className="grid grid-cols-2 gap-3 rounded-lg bg-zinc-50 px-4 py-3 text-sm md:grid-cols-3">
             <div>
-              <dt className="text-zinc-500">Consumo mensal</dt>
+              <dt className="text-zinc-500">Consumo mensal{consumoConvertido ? " (estimado)" : ""}</dt>
               <dd className="font-medium text-zinc-900">
-                {consumoMedioEstimado ? `${consumoMedioEstimado.toLocaleString("pt-BR")} kWh` : "—"}
+                {consumoMedioEstimado ? `${consumoMedioEstimado.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} kWh` : "—"}
               </dd>
+              {consumoEtapa1?.origem === "estimado" && (
+                <dd className="text-xs text-zinc-500">
+                  {formatarMoeda(consumoEtapa1.valorConta)} ÷ {formatarMoeda(consumoEtapa1.tarifaEfetiva)}/kWh (tarifa efetiva estimada)
+                </dd>
+              )}
             </div>
             <div>
-              <dt className="text-zinc-500">Produtividade</dt>
-              <dd className="font-medium text-zinc-900">{parametros?.produtividadeKwhKwpMes ?? 120} kWh/kWp/mês</dd>
+              <dt className="text-zinc-500">Tarifa efetiva (consumo)</dt>
+              <dd className="font-medium text-zinc-900">
+                {consumoConvertido && tarifaEfetivaInformada != null ? `${formatarMoeda(tarifaEfetivaInformada)}/kWh` : "não usada"}
+              </dd>
+              {!consumoConvertido && <dd className="text-xs text-zinc-500">o consumo foi informado em kWh</dd>}
             </div>
             <div>
-              <dt className="text-zinc-500">Sistema recomendado</dt>
+              <dt className="text-zinc-500">Sistema de referência</dt>
               <dd className="font-medium text-zinc-900">
                 {sistemaRecomendado ? `${sistemaRecomendado.potenciaInstaladaKwp.toLocaleString("pt-BR")} kWp` : "—"}
               </dd>
@@ -725,70 +805,64 @@ export function FormularioNegocio({
 
           {sistemaRecomendado && (
             <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4">
-              <p className="mb-2 text-sm font-semibold text-zinc-900">Kit recomendado (estimativa)</p>
-              <dl className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
+              <p className="mb-2 text-sm font-semibold text-zinc-900">Dimensionamento de referência (estimativa)</p>
+              <dl className="grid grid-cols-2 gap-3 text-sm">
                 <div>
                   <dt className="text-zinc-500">Potência</dt>
                   <dd className="font-medium text-zinc-900">{sistemaRecomendado.potenciaInstaladaKwp.toLocaleString("pt-BR")} kWp</dd>
                 </div>
                 <div>
-                  <dt className="text-zinc-500">Módulos</dt>
+                  <dt className="text-zinc-500">Módulos de referência</dt>
                   <dd className="font-medium text-zinc-900">
                     {sistemaRecomendado.quantidadeModulos} × {POTENCIA_MODULO_REFERENCIA_W} W
                   </dd>
                 </div>
-                <div>
-                  <dt className="text-zinc-500">Inversor</dt>
-                  <dd className="font-medium text-zinc-900">a definir (sem catálogo de equipamentos)</dd>
-                </div>
-                <div>
-                  <dt className="text-zinc-500">Geração / economia / payback</dt>
-                  <dd className="font-medium text-zinc-900">a calcular</dd>
-                </div>
               </dl>
               <p className="mt-2 text-xs text-zinc-500">
-                Estimativa ilustrativa: não é salva no negócio. Para salvar um kit, monte-o manualmente; os números reais
-                aparecem depois de informar a tarifa, na Etapa 3.
+                Estimativa ilustrativa: não é salva no negócio. O assistente não consulta kits prontos nem catálogo de equipamentos —
+                ele só calcula essa potência a partir do consumo, e isso não indica se existe ou não um kit para ela. Para salvar um
+                kit, monte-o manualmente logo abaixo.
               </p>
             </div>
           )}
 
-          {/* Não há conferência de módulo, inversor, tensão ou faixa MPPT neste assistente: o aviso diz isso, sem
-              nenhum "validado" ou "compatível" até existir uma validação de verdade (catálogo com ficha técnica). */}
-          <div role="status" className="flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>
-              Compatibilidade técnica não verificada. O Raion ainda não confere módulo, inversor, tensão e faixa MPPT: confirme
-              com a engenharia antes de fechar o kit.
-            </span>
-          </div>
-        </fieldset>
+          <details className="rounded-lg border border-zinc-200 px-3 py-2 text-sm">
+            <summary className="cursor-pointer font-medium text-zinc-700">Detalhes do cálculo</summary>
+            <dl className="mt-2 flex flex-col gap-1 text-xs text-zinc-600">
+              <div>
+                <dt className="inline font-medium">Consumo: </dt>
+                <dd className="inline">
+                  {consumoConvertido
+                    ? "estimado a partir do valor da conta e da tarifa efetiva estimada (Etapa 1)."
+                    : consumoDireto
+                      ? "informado em kWh."
+                      : "ainda não informado."}
+                </dd>
+              </div>
+              <div>
+                <dt className="inline font-medium">Produtividade (premissa): </dt>
+                <dd className="inline">
+                  {parametros
+                    ? `${parametros.produtividadeKwhKwpMes.toLocaleString("pt-BR")} kWh/kWp/mês, da configuração da calculadora da empresa.`
+                    : "120 kWh/kWp/mês (padrão: a empresa ainda não configurou a calculadora)."}
+                </dd>
+              </div>
+              <div>
+                <dt className="inline font-medium">Módulo de referência: </dt>
+                <dd className="inline">{POTENCIA_MODULO_REFERENCIA_W} W (só para o dimensionamento de referência).</dd>
+              </div>
+              <div>
+                <dt className="inline font-medium">Conta: </dt>
+                <dd className="inline">
+                  potência = consumo ÷ produtividade, com os módulos arredondados para cima. Não considera Fio B, disponibilidade
+                  nem espaço de telhado.
+                </dd>
+              </div>
+            </dl>
+          </details>
 
-        <div className="flex flex-col gap-1">
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-zinc-700">Valor do negócio (R$)</span>
-            <span className="flex items-center rounded-lg border border-zinc-200 bg-white px-3 focus-within:border-dourado focus-within:ring-2 focus-within:ring-dourado/20">
-              <span aria-hidden="true" className="text-zinc-500">R$</span>
-              <input
-                inputMode="numeric"
-                required
-                value={valor}
-                onChange={(e) => {
-                  setValor(formatarMascaraMoeda(e.target.value));
-                  setValorTocado(true);
-                }}
-                className="w-full bg-transparent px-2 py-2 text-carvao outline-none placeholder:text-zinc-400"
-                placeholder="0,00"
-              />
-            </span>
-          </label>
-          {!valorTocado && precoSugerido != null && (
-            <p className="text-xs text-zinc-400">
-              Preenchido com preço de referência do catálogo + custos internos configurados (estimativa, não é cotação real)
-              — ajuste se precisar.
-            </p>
-          )}
-        </div>
+          <AvisoCompatibilidade />
+        </fieldset>
 
         {!mostrarKit ? (
           <Botao type="button" variante="secundario" onClick={() => setMostrarKit(true)} className="self-start">
@@ -839,6 +913,32 @@ export function FormularioNegocio({
           </fieldset>
         )}
 
+        <div className="flex flex-col gap-1">
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-medium text-zinc-700">Valor do negócio (R$)</span>
+            <span className="flex items-center rounded-lg border border-zinc-200 bg-white px-3 focus-within:border-dourado focus-within:ring-2 focus-within:ring-dourado/20">
+              <span aria-hidden="true" className="text-zinc-500">R$</span>
+              <input
+                inputMode="numeric"
+                required
+                value={valor}
+                onChange={(e) => {
+                  setValor(formatarMascaraMoeda(e.target.value));
+                  setValorTocado(true);
+                }}
+                className="w-full bg-transparent px-2 py-2 text-carvao outline-none placeholder:text-zinc-400"
+                placeholder="0,00"
+              />
+            </span>
+          </label>
+          {!valorTocado && precoSugerido != null && (
+            <p className="text-xs text-zinc-400">
+              Preenchido com preço de referência do catálogo + custos internos configurados (estimativa, não é cotação real)
+              — ajuste se precisar.
+            </p>
+          )}
+        </div>
+
         {erroEtapa && <Mensagem resultado={{ ok: false, mensagem: erroEtapa }} />}
         <div className="flex justify-between">
           <Botao type="button" variante="secundario" onClick={voltar} className="gap-1">
@@ -858,17 +958,15 @@ export function FormularioNegocio({
           <Campo rotulo="Unidade consumidora" name="unidade_consumidora" placeholder="Opcional" />
           <Campo rotulo="Distribuidora" placeholder="Preenchida automaticamente em breve" disabled />
           <Campo
-            rotulo="Tarifa ANEEL (R$/kWh)"
+            rotulo="Tarifa base (TE + TUSD) (R$/kWh)"
             inputMode="decimal"
             placeholder="ex.: 0,95"
             value={tarifaKwh}
-            disabled={!componentes.length}
             onChange={(e) => setTarifaKwh(e.target.value)}
           />
           <Selecao
             rotulo="Tipo de ligação"
             value={tipoLigacao}
-            disabled={!componentes.length}
             onChange={(e) => setTipoLigacao(e.target.value as TipoLigacao)}
           >
             {TIPOS_LIGACAO.map((t) => (
@@ -877,11 +975,10 @@ export function FormularioNegocio({
               </option>
             ))}
           </Selecao>
-          {!componentes.length && (
-            <p className="text-xs text-zinc-400 md:col-span-2">
-              Tarifa e tipo de ligação são usados no cálculo do kit: monte o kit na etapa 2 para informá-los.
-            </p>
-          )}
+          <p className="text-xs text-zinc-400 md:col-span-2">
+            A tarifa base (TE + TUSD) e o tipo de ligação valem para o cálculo financeiro do kit (economia e payback) e só entram
+            nele se houver um kit montado na etapa 2. Alterá-los não muda o consumo estimado nem o dimensionamento.
+          </p>
         </fieldset>
 
         <fieldset className="grid gap-3 md:grid-cols-2">

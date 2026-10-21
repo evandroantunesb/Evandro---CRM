@@ -37,7 +37,7 @@ test.describe("dimensionamento sem fator oculto", () => {
     await preencherEtapa1EAvancar(page, "Cliente M2-b dimensionamento (fictício)", "45900000000", "1.200");
 
     // 1.200 / 120 = 10 kWp → 10.000 W / 620 W = 16,13 → 17 módulos → 10,54 kWp instalados.
-    await expect(page.getByText("Sistema recomendado", { exact: true })).toBeVisible();
+    await expect(page.getByText("Sistema de referência", { exact: true })).toBeVisible();
     await expect(page.getByText("17 × 620 W")).toBeVisible();
     await expect(page.getByText("10,54 kWp").first()).toBeVisible();
     await expect(page.getByText(/12,4\d* kWp/)).toHaveCount(0);

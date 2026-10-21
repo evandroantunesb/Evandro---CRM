@@ -72,6 +72,7 @@ export function KitPersonalizado({
   calculo,
   parametros,
   precoDesatualizado = false,
+  consumoEstimado = false,
 }: {
   negocioId: string;
   negocioValor: number | null;
@@ -84,6 +85,8 @@ export function KitPersonalizado({
   parametros: Parametros | null;
   /** O valor do negócio mudou depois do cálculo salvo (ver `precoDoCalculoDesatualizado`). */
   precoDesatualizado?: boolean;
+  /** O consumo do cálculo salvo foi estimado a partir da fatura, não informado em kWh (ver `consumoDoCalculoEhEstimado`). */
+  consumoEstimado?: boolean;
 }) {
   const [resultado, acao, pendente] = useActionState(salvarKitPersonalizado, null);
   const [resultadoPreco, acaoPreco, atualizandoPreco] = useActionState(atualizarPrecoCalculo, null);
@@ -239,8 +242,9 @@ export function KitPersonalizado({
             <dd>{numeroBr(calculo.geracaoEstimadaKwhMes)} kWh/mês</dd>
           </div>
           <div>
-            <dt className="text-zinc-500">Consumo médio</dt>
+            <dt className="text-zinc-500">{consumoEstimado ? "Consumo médio (estimado pela fatura)" : "Consumo médio"}</dt>
             <dd>{numeroBr(calculo.consumoMedioKwh)} kWh/mês</dd>
+            {consumoEstimado && <dd className="text-xs text-zinc-500">não foi informado em kWh</dd>}
           </div>
           <div>
             <dt className="text-zinc-500">Economia estimada</dt>
@@ -333,6 +337,12 @@ export function KitPersonalizado({
         value={consumoMedioKwh}
         onChange={(e) => setConsumoMedioKwh(e.target.value)}
       />
+      {consumoEstimado && calculo && (
+        <p role="status" className="-mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          Este consumo foi estimado a partir do valor da fatura; não foi informado em kWh pelo cliente. Para um dimensionamento e
+          uma economia mais fiéis, informe o consumo em kWh que consta na conta de energia.
+        </p>
+      )}
       <p className="-mt-2 text-xs text-zinc-400">Sem o consumo em kWh? Preencha o valor médio da fatura abaixo em vez disso.</p>
       <Campo
         rotulo="Valor médio da fatura (R$, opcional)"
