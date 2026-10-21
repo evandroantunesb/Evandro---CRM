@@ -46,3 +46,7 @@ next-env.d.ts
 /e2e-capturas/
 /e2e-relatorio/
 /e2e-resultados/
+
+# Time Aurora: estado local (checkpoints em .aurora/checkpoints/ são versionados)
+.aurora/logs/
+.aurora/tmp/
