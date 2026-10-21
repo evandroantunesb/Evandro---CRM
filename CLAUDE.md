@@ -42,6 +42,7 @@ Este arquivo contém só regras duráveis. Estado atual em `docs/PROJECT_STATUS.
 - Leitura direcionada: busque antes de abrir e leia só o trecho necessário. Não leia `node_modules/` (exceto `node_modules/next/dist/docs/`), `.next/`, lockfile ou arquivos gerados sem necessidade.
 - Um agente resolve a maioria das tarefas; agentes paralelos só com escopo fechado e sem sobreposição.
 - O modelo é escolhido pelo Evandro; nunca diga que trocou de modelo sem ter trocado. Sonnet é o padrão (tarefas bem definidas, interface, scripts, testes, documentação). Opus só quando risco ou complexidade justificar: arquitetura, migrations delicadas, banco de produção, RLS/permissões, gamificação/metas/comissões, impacto em vários módulos, revisão de PR grande, bug difícil. Recomende Opus dizendo por quê.
+- **Time Aurora** (`.claude/agents/`: `kevin-frontend`, `jay-backend`, `kara-qa`, todos `sonnet`): a sessão principal (Nora, Team Leader) coordena e integra; os agentes não criam agentes. Antes de acionar o time, leia `.claude/AURORA.md` (papéis, registro de tarefa, um responsável por arquivo, worktree próprio, limites de Git e autorização). A configuração do time e os checkpoints de retomada (`.aurora/checkpoints/`, sem segredos) são versionados; na outra máquina, siga a seção "Retomada em outra máquina" de `.claude/AURORA.md`.
 - Mantenha a mesma thread na mesma funcionalidade; não crie thread nova sem autorização. Antes de trocar, atualize `docs/PROJECT_STATUS.md` para que a próxima sessão continue só com o repositório.
 
 ## Documentação
