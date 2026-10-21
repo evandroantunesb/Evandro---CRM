@@ -24,6 +24,9 @@ import type { SupabaseServidor } from "@/lib/supabase/server";
 import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
 import { comFalha } from "./falhas";
 
+const colunas = async (negocioId: string) =>
+  (await servico.from("negocios").select("consumo_medio_kwh, consumo_estimado_kwh, tarifa_efetiva_kwh").eq("id", negocioId).single()).data!;
+
 let admin: Usuario;
 let vendedor: Usuario;
 let sdr: Usuario;
@@ -234,7 +237,7 @@ describe("kit", () => {
     expect(f.calculo).toBeNull();
 
     const kitForm = (extra: Record<string, string> = {}) =>
-      fd({ negocioId: r.negocioId, tipoLigacao: "trifasico", consumoMedioKwh: "", valorFaturaMedio: "300,00", tarifaKwh: "0,95", estruturaTelhado: "gancho", componentes: KIT, observacoes: "", ...extra });
+      fd({ negocioId: r.negocioId, tipoLigacao: "trifasico", consumoMedioKwh: "450", valorFaturaMedio: "300,00", tarifaKwh: "0,95", estruturaTelhado: "gancho", componentes: KIT, observacoes: "", ...extra });
     expect(await salvarKitComCliente(cliente(vendedor), atual[vendedor.id], kitForm())).toMatchObject({ ok: true, mensagem: "Kit e cálculo salvos." });
     f = await reabrir(vendedor, r.negocioId);
     expect(f.calculo).toMatchObject({ tarifa_kwh: 0.95, valor_fatura_medio: 300, kit_potencia_kwp: 5.5 });
@@ -278,7 +281,8 @@ describe("kit", () => {
       componentesSalvos: itens!.map((i) => ({ tipo: i.tipo, descricao: i.descricao, potenciaW: i.potencia_w, quantidade: i.quantidade })),
       calculo: { tipoLigacao: "trifasico", consumoMedioKwh: primeiro.consumo_medio_kwh, valorFaturaMedio: primeiro.valor_fatura_medio, tarifaKwh: primeiro.tarifa_kwh },
       estruturaTelhado: null,
-      consumoMedioKwhPadrao: null,
+      // Salvar o kit grava o kWh informado em negocios.consumo_medio_kwh: é o que a ficha relê.
+      consumoMedioKwhPadrao: (await colunas(r.negocioId)).consumo_medio_kwh,
       valorFaturaMedioPadrao: null,
     });
     expect(estado.consumoMedioKwh).toBe("1.200");
@@ -568,39 +572,136 @@ describe("preço do cálculo x valor do negócio", () => {
   });
 });
 
-describe("consumo estimado pelo assistente x tarifa base", () => {
-  it("o servidor recalcula o consumo pela tarifa efetiva (mesmo com a tarifa base diferente); o negócio não guarda consumo informado nem a efetiva", async () => {
-    // Conta de R$ 650 ÷ tarifa efetiva R$ 0,95 = 684,21 kWh (Etapa 2). Tarifa base do cálculo financeiro: R$ 0,80.
+describe("consumo estimado x informado: colunas próprias, sem converter a fatura pela tarifa base", () => {
+  const consumoDoCalculo = async (negocioId: string) =>
+    (await servico.from("calculos_solares").select("consumo_medio_kwh, tarifa_kwh").eq("negocio_id", negocioId).maybeSingle()).data;
+  const kitForm = (negocioId: string, extra: Record<string, string> = {}) =>
+    fd({ negocioId, tipoLigacao: "trifasico", consumoMedioKwh: "", valorFaturaMedio: "650,00", tarifaEfetivaKwh: "", tarifaKwh: "", estruturaTelhado: "", componentes: KIT, observacoes: "", ...extra });
+
+  it("criação: conta + efetiva gravam a estimativa nas colunas novas; consumo_medio_kwh fica vazio; a base não participa", async () => {
     const r = await criar(
       vendedor,
       novoNegocio({ componentes: KIT, valor_fatura_medio: "650,00", tarifa_efetiva_kwh: "0,95", tarifa_kwh: "0,80", tipo_ligacao: "trifasico" }),
     );
     expect(r.avisos).toEqual([]);
-    const { data: calculo } = await servico.from("calculos_solares").select("consumo_medio_kwh, tarifa_kwh, valor_fatura_medio").eq("negocio_id", r.negocioId).single();
-    expect(calculo).toMatchObject({ consumo_medio_kwh: 684.21, tarifa_kwh: 0.8, valor_fatura_medio: 650 });
-    // O consumo estimado não vira "consumo informado" do negócio.
-    const { data: negocio } = await servico.from("negocios").select("consumo_medio_kwh").eq("id", r.negocioId).single();
-    expect(negocio!.consumo_medio_kwh).toBeNull();
+    expect(await colunas(r.negocioId)).toEqual({ consumo_medio_kwh: null, consumo_estimado_kwh: 684.21, tarifa_efetiva_kwh: 0.95 });
+    expect(await consumoDoCalculo(r.negocioId)).toEqual({ consumo_medio_kwh: 684.21, tarifa_kwh: 0.8 });
+  });
 
-    // Um "consumo estimado" enviado por fora é ignorado: só a conta e a efetiva contam.
+  it("criação: o servidor recalcula; um consumo estimado forjado é ignorado; kWh informado vence e não deixa estimativa", async () => {
     const forjado = await criar(
       vendedor,
       novoNegocio({ componentes: KIT, valor_fatura_medio: "650,00", tarifa_efetiva_kwh: "0,95", consumo_estimado_kwh: "9999", tarifa_kwh: "0,80", tipo_ligacao: "trifasico" }),
     );
-    expect((await servico.from("calculos_solares").select("consumo_medio_kwh").eq("negocio_id", forjado.negocioId).single()).data!.consumo_medio_kwh).toBe(684.21);
+    expect(await colunas(forjado.negocioId)).toMatchObject({ consumo_estimado_kwh: 684.21 });
+    expect((await consumoDoCalculo(forjado.negocioId))!.consumo_medio_kwh).toBe(684.21);
 
-    // Consumo informado direto vence a estimativa.
     const direto = await criar(
       vendedor,
       novoNegocio({ componentes: KIT, consumo_medio_kwh: "780", valor_fatura_medio: "650,00", tarifa_efetiva_kwh: "0,95", tarifa_kwh: "0,95", tipo_ligacao: "trifasico" }),
     );
-    expect((await servico.from("calculos_solares").select("consumo_medio_kwh").eq("negocio_id", direto.negocioId).single()).data!.consumo_medio_kwh).toBe(780);
+    expect(await colunas(direto.negocioId)).toEqual({ consumo_medio_kwh: 780, consumo_estimado_kwh: null, tarifa_efetiva_kwh: null });
+    expect((await consumoDoCalculo(direto.negocioId))!.consumo_medio_kwh).toBe(780);
   });
 
-  it("valor da conta sem tarifa efetiva não é convertido pela tarifa base: o negócio é criado, o cálculo não, com aviso", async () => {
+  it("criação: conta sem tarifa efetiva não é convertida pela base — negócio e kit criados, sem estimativa e sem cálculo, com aviso", async () => {
     const r = await criar(vendedor, novoNegocio({ componentes: KIT, valor_fatura_medio: "650,00", tarifa_kwh: "0,80", tipo_ligacao: "trifasico" }));
     expect(r.avisos).toContain("calculo");
-    expect((await servico.from("calculos_solares").select("id").eq("negocio_id", r.negocioId)).data).toHaveLength(0);
+    expect(await colunas(r.negocioId)).toEqual({ consumo_medio_kwh: null, consumo_estimado_kwh: null, tarifa_efetiva_kwh: null });
+    expect(await consumoDoCalculo(r.negocioId)).toBeNull();
     expect((await servico.from("kit_componentes").select("id").eq("negocio_id", r.negocioId)).data).toHaveLength(2);
+  });
+
+  it("kit sem cálculo (sem tarifa base): a estimativa fica gravada e volta ao reabrir", async () => {
+    // Antes a estimativa e a tarifa efetiva se perdiam aqui.
+    const r = await criar(vendedor, novoNegocio({ componentes: KIT, valor_fatura_medio: "650,00", tarifa_efetiva_kwh: "0,95" }));
+    expect(await consumoDoCalculo(r.negocioId)).toBeNull();
+    expect(await colunas(r.negocioId)).toEqual({ consumo_medio_kwh: null, consumo_estimado_kwh: 684.21, tarifa_efetiva_kwh: 0.95 });
+    const f = await reabrir(vendedor, r.negocioId);
+    const { data: n } = await vendedor.cliente.from("negocios").select("consumo_estimado_kwh, tarifa_efetiva_kwh, consumo_medio_kwh, valor_conta_energia").eq("id", r.negocioId).single();
+    const estado = estadoSalvoDoKit({
+      componentesSalvos: f.kit.map((k) => ({ tipo: k.tipo, descricao: k.descricao, potenciaW: k.potencia_w, quantidade: k.quantidade })),
+      calculo: null,
+      estruturaTelhado: null,
+      consumoMedioKwhPadrao: n!.consumo_medio_kwh,
+      valorFaturaMedioPadrao: n!.valor_conta_energia,
+      consumoEstimadoKwhPadrao: n!.consumo_estimado_kwh,
+      tarifaEfetivaKwhPadrao: n!.tarifa_efetiva_kwh,
+    });
+    expect(estado).toMatchObject({ consumoMedioKwh: "", valorFaturaMedio: "650", tarifaEfetivaKwh: "0,95", tarifaKwh: "" });
+  });
+
+  it("editar o kit: fatura sem efetiva é recusada; estimar por cima de um kWh informado é bloqueado; só após limpar o kWh em Dados do negócio", async () => {
+    const r = await criar(vendedor, novoNegocio({ componentes: KIT, consumo_medio_kwh: "450" }));
+    const antes = await colunas(r.negocioId);
+
+    // Fatura sem consumo e sem efetiva, mesmo com a base informada: não converte pela base.
+    const recusado = await salvarKitComCliente(cliente(vendedor), atual[vendedor.id], kitForm(r.negocioId, { tarifaKwh: "0,80" }));
+    expect(recusado.ok).toBe(false);
+    expect(recusado.mensagem).toContain("tarifa efetiva");
+    expect(await consumoDoCalculo(r.negocioId)).toBeNull();
+    expect(await colunas(r.negocioId)).toEqual(antes);
+
+    // Com a efetiva, mas o negócio tem kWh informado: bloqueado, nada é apagado.
+    const troca = await salvarKitComCliente(cliente(vendedor), atual[vendedor.id], kitForm(r.negocioId, { tarifaEfetivaKwh: "0,95" }));
+    expect(troca.ok).toBe(false);
+    expect(troca.mensagem).toContain("Dados do negócio");
+    expect(await colunas(r.negocioId)).toEqual(antes);
+    expect(await consumoDoCalculo(r.negocioId)).toBeNull();
+
+    // Ação explícita: limpar o kWh informado em "Dados do negócio".
+    expect((await editarNegocioComCliente(cliente(vendedor), atual[vendedor.id], fd({ negocioId: r.negocioId, titulo: "Negócio editado", valor: "25.000,00", consumo_medio_kwh: "" }))).ok).toBe(true);
+    expect(await colunas(r.negocioId)).toEqual({ consumo_medio_kwh: null, consumo_estimado_kwh: null, tarifa_efetiva_kwh: null });
+
+    // Agora a estimativa, sem base: só itens + estimativa no negócio.
+    expect((await salvarKitComCliente(cliente(vendedor), atual[vendedor.id], kitForm(r.negocioId, { tarifaEfetivaKwh: "0,95" }))).ok).toBe(true);
+    expect(await consumoDoCalculo(r.negocioId)).toBeNull();
+    expect(await colunas(r.negocioId)).toEqual({ consumo_medio_kwh: null, consumo_estimado_kwh: 684.21, tarifa_efetiva_kwh: 0.95 });
+
+    // Com a base diferente da efetiva: o cálculo parte de 684,21, não de 650 ÷ 0,80.
+    expect((await salvarKitComCliente(cliente(vendedor), atual[vendedor.id], kitForm(r.negocioId, { tarifaEfetivaKwh: "0,95", tarifaKwh: "0,80" }))).ok).toBe(true);
+    expect(await consumoDoCalculo(r.negocioId)).toEqual({ consumo_medio_kwh: 684.21, tarifa_kwh: 0.8 });
+
+    // Informar kWh no formulário (estimativa -> informado) descarta a estimativa.
+    expect((await salvarKitComCliente(cliente(vendedor), atual[vendedor.id], kitForm(r.negocioId, { consumoMedioKwh: "720", tarifaKwh: "0,80" }))).ok).toBe(true);
+    expect(await colunas(r.negocioId)).toEqual({ consumo_medio_kwh: 720, consumo_estimado_kwh: null, tarifa_efetiva_kwh: null });
+    expect((await consumoDoCalculo(r.negocioId))!.consumo_medio_kwh).toBe(720);
+  });
+
+  it("negócio antigo (cálculo sem origem registrada): recalcular só com kWh ou efetiva informados; nunca pela fatura ÷ base", async () => {
+    // Simula um negócio de antes das colunas: cálculo salvo com fatura, consumo derivado, negócio sem kWh nem estimativa.
+    const r = await criar(vendedor, novoNegocio({ componentes: KIT, consumo_medio_kwh: "450", tarifa_kwh: "0,95", tipo_ligacao: "trifasico" }));
+    await servico.from("negocios").update({ consumo_medio_kwh: null }).eq("id", r.negocioId);
+    expect(await colunas(r.negocioId)).toEqual({ consumo_medio_kwh: null, consumo_estimado_kwh: null, tarifa_efetiva_kwh: null });
+    const semDado = await salvarKitComCliente(cliente(vendedor), atual[vendedor.id], kitForm(r.negocioId, { tarifaKwh: "0,95" }));
+    expect(semDado.ok).toBe(false);
+    expect(semDado.mensagem).toContain("tarifa efetiva");
+    expect((await consumoDoCalculo(r.negocioId))!.consumo_medio_kwh).toBe(450);
+  });
+
+  it("'Dados do negócio': informar kWh descarta a estimativa; limpar o campo não mexe nela", async () => {
+    const r = await criar(vendedor, novoNegocio({ componentes: KIT, valor_fatura_medio: "650,00", tarifa_efetiva_kwh: "0,95" }));
+    const editar = (consumo: string) =>
+      editarNegocioComCliente(cliente(vendedor), atual[vendedor.id], fd({ negocioId: r.negocioId, titulo: "Negócio editado", valor: "25.000,00", consumo_medio_kwh: consumo }));
+    expect((await editar("")).ok).toBe(true);
+    expect(await colunas(r.negocioId)).toEqual({ consumo_medio_kwh: null, consumo_estimado_kwh: 684.21, tarifa_efetiva_kwh: 0.95 });
+    expect((await editar("700")).ok).toBe(true);
+    expect(await colunas(r.negocioId)).toEqual({ consumo_medio_kwh: 700, consumo_estimado_kwh: null, tarifa_efetiva_kwh: null });
+  });
+
+  it("o banco mantém a regra mesmo fora do app: estimativa sem efetiva, informado + estimado e valores não positivos são recusados", async () => {
+    const r = await criar(vendedor, novoNegocio());
+    const tentar = (campos: { consumo_medio_kwh?: number | null; consumo_estimado_kwh?: number | null; tarifa_efetiva_kwh?: number | null }) => servico.from("negocios").update(campos).eq("id", r.negocioId);
+    for (const [nome, campos] of [
+      ["estimativa sem efetiva", { consumo_estimado_kwh: 100 }],
+      ["efetiva sem estimativa", { tarifa_efetiva_kwh: 0.9 }],
+      ["estimativa zero", { consumo_estimado_kwh: 0, tarifa_efetiva_kwh: 0.9 }],
+      ["efetiva zero", { consumo_estimado_kwh: 100, tarifa_efetiva_kwh: 0 }],
+      ["informado + estimado", { consumo_medio_kwh: 500, consumo_estimado_kwh: 100, tarifa_efetiva_kwh: 0.9 }],
+    ] as const) {
+      expect((await tentar(campos)).error, nome).not.toBeNull();
+    }
+    expect((await colunas(r.negocioId)).consumo_estimado_kwh).toBeNull();
+    expect((await tentar({ consumo_estimado_kwh: 100, tarifa_efetiva_kwh: 0.9 })).error).toBeNull();
   });
 });

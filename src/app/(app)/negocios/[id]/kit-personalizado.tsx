@@ -12,6 +12,7 @@ import {
   potenciaKitPersonalizadoKwp,
   sugerirQuantidadeModulos,
 } from "@/lib/calculadora";
+import { consumoDaEtapa1, consumoSalvoDoNegocio, MENSAGEM_ORIGEM_DESCONHECIDA } from "@/lib/consumo-estimado";
 import { formatarMoeda, lerNumeroBr } from "@/lib/formatacao";
 import { estadoSalvoDoKit } from "@/lib/kit-formulario";
 import { analisarLinhas, resumoProblemasKit } from "@/lib/kit-linhas";
@@ -72,7 +73,8 @@ export function KitPersonalizado({
   calculo,
   parametros,
   precoDesatualizado = false,
-  consumoEstimado = false,
+  consumoEstimadoKwhPadrao = null,
+  tarifaEfetivaKwhPadrao = null,
 }: {
   negocioId: string;
   negocioValor: number | null;
@@ -85,8 +87,9 @@ export function KitPersonalizado({
   parametros: Parametros | null;
   /** O valor do negócio mudou depois do cálculo salvo (ver `precoDoCalculoDesatualizado`). */
   precoDesatualizado?: boolean;
-  /** O consumo do cálculo salvo foi estimado a partir da fatura, não informado em kWh (ver `consumoDoCalculoEhEstimado`). */
-  consumoEstimado?: boolean;
+  /** Estimativa registrada no negócio (colunas novas); nulas em negócios antigos. */
+  consumoEstimadoKwhPadrao?: number | null;
+  tarifaEfetivaKwhPadrao?: number | null;
 }) {
   const [resultado, acao, pendente] = useActionState(salvarKitPersonalizado, null);
   const [resultadoPreco, acaoPreco, atualizandoPreco] = useActionState(atualizarPrecoCalculo, null);
@@ -103,13 +106,32 @@ export function KitPersonalizado({
 
   // Sempre a partir do que está gravado: ao abrir e no Cancelar.
   const salvo = () =>
-    estadoSalvoDoKit({ componentesSalvos, calculo, estruturaTelhado, consumoMedioKwhPadrao, valorFaturaMedioPadrao });
+    estadoSalvoDoKit({
+      componentesSalvos,
+      calculo,
+      estruturaTelhado,
+      consumoMedioKwhPadrao,
+      valorFaturaMedioPadrao,
+      consumoEstimadoKwhPadrao,
+      tarifaEfetivaKwhPadrao,
+    });
+  // Origem do consumo gravado: informado em kWh ou estimado pela fatura (nunca apresentado como informado).
+  const consumoSalvo = consumoSalvoDoNegocio({
+    consumoMedioKwh: consumoMedioKwhPadrao,
+    consumoEstimadoKwh: consumoEstimadoKwhPadrao,
+    tarifaEfetivaKwh: tarifaEfetivaKwhPadrao,
+    calculo,
+  });
+  const consumoEstimado = consumoSalvo?.origem === "estimado";
+  const consumoSemOrigem = consumoSalvo?.origem === "desconhecida";
   const [linhas, setLinhas] = useState<LinhaComponente[]>(() => salvo().linhas);
   const [estrutura, setEstrutura] = useState(() => salvo().estrutura);
   const [tipoLigacao, setTipoLigacao] = useState<TipoLigacao>(() => salvo().tipoLigacao);
   const [consumoMedioKwh, setConsumoMedioKwh] = useState(() => salvo().consumoMedioKwh);
   // Ao reabrir, vem o valor da conta já salvo no cálculo (antes vinha vazio e se perdia ao salvar de novo).
   const [valorFaturaMedio, setValorFaturaMedio] = useState(() => salvo().valorFaturaMedio);
+  // Duas tarifas separadas: a EFETIVA só estima o consumo a partir da fatura; a BASE (TE + TUSD) só entra na economia.
+  const [tarifaEfetivaKwh, setTarifaEfetivaKwh] = useState(() => salvo().tarifaEfetivaKwh);
   const [tarifaKwh, setTarifaKwh] = useState(() => salvo().tarifaKwh);
   const [confirmaRemocao, setConfirmaRemocao] = useState(false);
   // Muda a cada Cancelar para recriar o campo de observações (não controlado) com o valor salvo.
@@ -126,6 +148,7 @@ export function KitPersonalizado({
     setTipoLigacao(s.tipoLigacao);
     setConsumoMedioKwh(s.consumoMedioKwh);
     setValorFaturaMedio(s.valorFaturaMedio);
+    setTarifaEfetivaKwh(s.tarifaEfetivaKwh);
     setTarifaKwh(s.tarifaKwh);
     setConfirmaRemocao(false);
     setMostrarProblemas(false);
@@ -151,15 +174,14 @@ export function KitPersonalizado({
     enviarBase(evento);
   }
 
-  // Consumo médio em kWh, vindo do campo direto ou calculado a partir da fatura + tarifa.
-  const consumoMedioEstimado = useMemo(() => {
-    const tarifa = numero(tarifaKwh);
-    const consumo = numero(consumoMedioKwh);
-    const fatura = numero(valorFaturaMedio);
-    if (consumo) return consumo;
-    if (fatura && tarifa) return fatura / tarifa;
-    return null;
-  }, [consumoMedioKwh, valorFaturaMedio, tarifaKwh]);
+  // Consumo médio em kWh: o informado, ou a estimativa fatura ÷ tarifa EFETIVA. A tarifa base não participa.
+  const consumoForm = useMemo(
+    () => consumoDaEtapa1({ consumoKwh: numero(consumoMedioKwh), valorConta: numero(valorFaturaMedio), tarifaEfetiva: numero(tarifaEfetivaKwh) }),
+    [consumoMedioKwh, valorFaturaMedio, tarifaEfetivaKwh],
+  );
+  const consumoMedioEstimado = consumoForm?.kwh ?? null;
+  // Fatura sem kWh: a tarifa efetiva é necessária para estimar o consumo.
+  const precisaTarifaEfetiva = numero(consumoMedioKwh) == null && numero(valorFaturaMedio) != null;
 
   // Sugere a quantidade de módulos pro consumo já informado, assim que o
   // vendedor escolhe (ou digita) a potência de um módulo.
@@ -186,22 +208,19 @@ export function KitPersonalizado({
 
   const previa = useMemo(() => {
     if (!parametros) return null;
-    const tarifa = numero(tarifaKwh);
-    const consumo = numero(consumoMedioKwh);
-    const fatura = numero(valorFaturaMedio);
-    if (potenciaKwp <= 0 || !tarifa || (!consumo && !fatura)) return null;
-    const consumoMedioFinal = consumo ?? fatura! / tarifa;
+    const tarifaBase = numero(tarifaKwh);
+    if (potenciaKwp <= 0 || !tarifaBase || !consumoMedioEstimado) return null;
     return calcular({
       potenciaKwp,
       precoKit: negocioValor ?? 0,
       tipoLigacao,
-      consumoMedioKwh: consumoMedioFinal,
-      tarifaKwh: tarifa,
+      consumoMedioKwh: consumoMedioEstimado,
+      tarifaKwh: tarifaBase,
       produtividadeKwhKwpMes: parametros.produtividadeKwhKwpMes,
       percentualFioB: parametros.percentualFioB,
       disponibilidadeKwh: parametros[DISPONIBILIDADE_PADRAO_CAMEL[tipoLigacao]],
     });
-  }, [parametros, tarifaKwh, consumoMedioKwh, valorFaturaMedio, potenciaKwp, negocioValor, tipoLigacao]);
+  }, [parametros, tarifaKwh, consumoMedioEstimado, potenciaKwp, negocioValor, tipoLigacao]);
 
   if (!parametros) {
     return <p className="text-sm text-zinc-600">Parâmetros da calculadora não configurados para a empresa.</p>;
@@ -242,9 +261,17 @@ export function KitPersonalizado({
             <dd>{numeroBr(calculo.geracaoEstimadaKwhMes)} kWh/mês</dd>
           </div>
           <div>
-            <dt className="text-zinc-500">{consumoEstimado ? "Consumo médio (estimado pela fatura)" : "Consumo médio"}</dt>
+            <dt className="text-zinc-500">
+              {consumoEstimado ? "Consumo médio (estimado pela fatura)" : consumoSemOrigem ? "Consumo médio (origem não registrada)" : "Consumo médio"}
+            </dt>
             <dd>{numeroBr(calculo.consumoMedioKwh)} kWh/mês</dd>
-            {consumoEstimado && <dd className="text-xs text-zinc-500">não foi informado em kWh</dd>}
+            {consumoSemOrigem && <dd className="text-xs text-zinc-500">não se sabe se foi informado em kWh ou estimado pela fatura</dd>}
+            {consumoEstimado && (
+              <dd className="text-xs text-zinc-500">
+                não foi informado em kWh
+                {consumoSalvo?.origem === "estimado" ? ` · tarifa efetiva ${formatarMoeda(consumoSalvo.tarifaEfetiva)}/kWh` : ""}
+              </dd>
+            )}
           </div>
           <div>
             <dt className="text-zinc-500">Economia estimada</dt>
@@ -337,10 +364,15 @@ export function KitPersonalizado({
         value={consumoMedioKwh}
         onChange={(e) => setConsumoMedioKwh(e.target.value)}
       />
-      {consumoEstimado && calculo && (
+      {consumoSemOrigem && (
         <p role="status" className="-mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
-          Este consumo foi estimado a partir do valor da fatura; não foi informado em kWh pelo cliente. Para um dimensionamento e
-          uma economia mais fiéis, informe o consumo em kWh que consta na conta de energia.
+          {MENSAGEM_ORIGEM_DESCONHECIDA}
+        </p>
+      )}
+      {consumoEstimado && (
+        <p role="status" className="-mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          O consumo gravado foi estimado a partir do valor da fatura e da tarifa efetiva; não foi informado em kWh pelo cliente.
+          Para um dimensionamento e uma economia mais fiéis, informe o consumo em kWh que consta na conta de energia.
         </p>
       )}
       <p className="-mt-2 text-xs text-zinc-400">Sem o consumo em kWh? Preencha o valor médio da fatura abaixo em vez disso.</p>
@@ -352,8 +384,26 @@ export function KitPersonalizado({
         value={valorFaturaMedio}
         onChange={(e) => setValorFaturaMedio(e.target.value)}
       />
+      {precisaTarifaEfetiva && (
+        <>
+          <Campo
+            rotulo="Tarifa efetiva estimada (R$/kWh)*"
+            name="tarifaEfetivaKwh"
+            inputMode="decimal"
+            placeholder="ex.: 0,95"
+            value={tarifaEfetivaKwh}
+            onChange={(e) => setTarifaEfetivaKwh(e.target.value)}
+          />
+          <p className="-mt-2 text-xs text-zinc-500">
+            {consumoForm?.origem === "estimado"
+              ? `Consumo estimado: ${numeroBr(consumoForm.kwh)} kWh/mês (fatura ÷ tarifa efetiva). `
+              : "Sem o consumo em kWh, o consumo é estimado como valor da fatura ÷ tarifa efetiva. "}
+            Não é a tarifa do cálculo financeiro abaixo; para mais fidelidade, informe o consumo em kWh.
+          </p>
+        </>
+      )}
       <Campo
-        rotulo="Tarifa (R$/kWh)"
+        rotulo="Tarifa base (TE + TUSD) (R$/kWh)"
         name="tarifaKwh"
         inputMode="decimal"
         placeholder="ex.: 0,95"

@@ -79,7 +79,8 @@ describe("formatarNumeroBr ↔ lerNumeroBr (reabrir e salvar sem editar)", () =>
       componentesSalvos: [{ tipo: "modulo", descricao: "Módulo 550 W", potenciaW: 550, quantidade: 10 }],
       calculo,
       estruturaTelhado: null,
-      consumoMedioKwhPadrao: null,
+      // Salvar o kit grava o kWh informado no negócio: é o que a ficha relê.
+      consumoMedioKwhPadrao: 1200,
       valorFaturaMedioPadrao: null,
     });
     expect(estado.consumoMedioKwh).toBe("1.200");

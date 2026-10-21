@@ -46,7 +46,7 @@ async function montarKit(page: Page, consumo: string, tarifa: string) {
   await page.getByLabel("Potência (W)").last().fill("550");
   await page.getByLabel("Qtd.").last().fill("10");
   await page.getByLabel("Consumo médio (kWh/mês)").fill(consumo);
-  await page.getByLabel("Tarifa (R$/kWh)").fill(tarifa);
+  await page.getByLabel("Tarifa base (TE + TUSD) (R$/kWh)").fill(tarifa);
 }
 
 async function salvar(page: Page) {
@@ -72,7 +72,7 @@ test.describe("calculadora: números no padrão brasileiro", () => {
       await page.reload();
       await page.getByRole("button", { name: "Editar kit / recalcular" }).click();
       await expect(page.getByLabel("Consumo médio (kWh/mês)")).toHaveValue("1.200");
-      await expect(page.getByLabel("Tarifa (R$/kWh)")).toHaveValue("0,95");
+      await expect(page.getByLabel("Tarifa base (TE + TUSD) (R$/kWh)")).toHaveValue("0,95");
       await salvar(page);
       expect(await n.calculo()).toEqual(primeiro);
     }

@@ -2025,6 +2025,7 @@ export type Database = {
         Row: {
           arquivado_em: string | null;
           arquivado_por: string | null;
+          consumo_estimado_kwh: number | null;
           consumo_medio_kwh: number | null;
           contato_id: string;
           created_at: string;
@@ -2058,6 +2059,7 @@ export type Database = {
           qualif_tipo_cliente: string | null;
           responsavel_id: string | null;
           status: Database["public"]["Enums"]["status_negocio"];
+          tarifa_efetiva_kwh: number | null;
           tipo_telhado: string | null;
           titulo: string;
           unidade_consumidora: string | null;
@@ -2068,6 +2070,7 @@ export type Database = {
         Insert: {
           arquivado_em?: string | null;
           arquivado_por?: string | null;
+          consumo_estimado_kwh?: number | null;
           consumo_medio_kwh?: number | null;
           contato_id: string;
           created_at?: string;
@@ -2101,6 +2104,7 @@ export type Database = {
           qualif_tipo_cliente?: string | null;
           responsavel_id?: string | null;
           status?: Database["public"]["Enums"]["status_negocio"];
+          tarifa_efetiva_kwh?: number | null;
           tipo_telhado?: string | null;
           titulo: string;
           unidade_consumidora?: string | null;
@@ -2111,6 +2115,7 @@ export type Database = {
         Update: {
           arquivado_em?: string | null;
           arquivado_por?: string | null;
+          consumo_estimado_kwh?: number | null;
           consumo_medio_kwh?: number | null;
           contato_id?: string;
           created_at?: string;
@@ -2144,6 +2149,7 @@ export type Database = {
           qualif_tipo_cliente?: string | null;
           responsavel_id?: string | null;
           status?: Database["public"]["Enums"]["status_negocio"];
+          tarifa_efetiva_kwh?: number | null;
           tipo_telhado?: string | null;
           titulo?: string;
           unidade_consumidora?: string | null;
@@ -4245,6 +4251,7 @@ export type Database = {
         Returns: {
           arquivado_em: string | null;
           arquivado_por: string | null;
+          consumo_estimado_kwh: number | null;
           consumo_medio_kwh: number | null;
           contato_id: string;
           created_at: string;
@@ -4278,6 +4285,7 @@ export type Database = {
           qualif_tipo_cliente: string | null;
           responsavel_id: string | null;
           status: Database["public"]["Enums"]["status_negocio"];
+          tarifa_efetiva_kwh: number | null;
           tipo_telhado: string | null;
           titulo: string;
           unidade_consumidora: string | null;
@@ -4297,6 +4305,7 @@ export type Database = {
         Returns: {
           arquivado_em: string | null;
           arquivado_por: string | null;
+          consumo_estimado_kwh: number | null;
           consumo_medio_kwh: number | null;
           contato_id: string;
           created_at: string;
@@ -4330,6 +4339,7 @@ export type Database = {
           qualif_tipo_cliente: string | null;
           responsavel_id: string | null;
           status: Database["public"]["Enums"]["status_negocio"];
+          tarifa_efetiva_kwh: number | null;
           tipo_telhado: string | null;
           titulo: string;
           unidade_consumidora: string | null;

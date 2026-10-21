@@ -28,13 +28,15 @@ export async function montarLinhaCalculo(
     tarifaKwh: number;
   },
 ): Promise<{ ok: true; linha: LinhaCalculo } | { ok: false; mensagem: string }> {
-  if (entrada.consumoMedioKwh == null && entrada.valorFaturaMedio == null) {
-    return { ok: false, mensagem: "Informe o consumo médio ou o valor médio da fatura." };
+  // O consumo chega resolvido (`resolverConsumo`): kWh informado ou estimado pela tarifa EFETIVA. Nunca é derivado
+  // aqui da fatura pela tarifa base (TE + TUSD).
+  if (entrada.consumoMedioKwh == null) {
+    return { ok: false, mensagem: "Informe o consumo médio ou o valor médio da fatura (com a tarifa efetiva estimada)." };
   }
   if (entrada.potenciaKwp <= 0) {
     return { ok: false, mensagem: "Informe ao menos um módulo com potência para calcular." };
   }
-  const consumoMedioKwh = entrada.consumoMedioKwh ?? entrada.valorFaturaMedio! / entrada.tarifaKwh;
+  const consumoMedioKwh = entrada.consumoMedioKwh;
 
   const { data: parametros } = await supabase
     .from("parametros_calculadora")

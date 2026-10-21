@@ -2,7 +2,13 @@
 // ilustrativo, tipo de ligação sempre editável, produtividade só nos detalhes e aviso de compatibilidade acessível.
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { consumoDaEtapa1, consumoDoCalculoEhEstimado, consumoParaCriacao, estimarConsumoPelaConta } from "@/lib/consumo-estimado";
+import {
+  colunasDeConsumo,
+  consumoDaEtapa1,
+  consumoSalvoDoNegocio,
+  estimarConsumoPelaConta,
+  resolverConsumo,
+} from "@/lib/consumo-estimado";
 import { estadoSalvoDoKit } from "@/lib/kit-formulario";
 
 const formulario = readFileSync("src/app/(app)/negocios/novo/formulario.tsx", "utf8").replace(/\r\n/g, "\n");
@@ -144,63 +150,130 @@ describe("novo negócio: tarifa efetiva (Etapa 1) separada da tarifa base (Etapa
   });
 });
 
-describe("servidor: consumo recalculado a partir da tarifa efetiva", () => {
+describe("servidor: consumo recalculado e gravado nas colunas próprias", () => {
   const servidor = readFileSync("src/lib/negocios-gravacao.ts", "utf8").replace(/\r\n/g, "\n");
+  const calculoServidor = readFileSync("src/lib/calculo-servidor.ts", "utf8").replace(/\r\n/g, "\n");
 
-  it("a criação recalcula o consumo (kWh informado, ou conta ÷ efetiva) e não aceita consumo estimado do navegador", () => {
+  it("criação e salvar kit usam a mesma resolução; o navegador não manda consumo estimado", () => {
     expect(servidor).toContain("tarifa_efetiva_kwh: numeroBrOpcional,");
-    expect(servidor).not.toContain("consumo_estimado_kwh");
-    expect(servidor).toContain("consumoParaCriacao({ consumoKwh: d.consumo_medio_kwh, valorConta: d.valor_fatura_medio, tarifaEfetiva: d.tarifa_efetiva_kwh })");
-    expect(servidor).toContain("consumoMedioKwh: consumo.kwh,");
-    // O negócio guarda só o kWh digitado; a tarifa efetiva não é gravada.
-    expect(servidor).toContain("consumo_medio_kwh: d.consumo_medio_kwh,");
-    expect(servidor).not.toMatch(/tarifa_efetiva_kwh:\s*d\./);
+    expect(servidor).toContain("tarifaEfetivaKwh: numeroBrOpcional,");
+    expect(servidor).not.toContain("consumo_estimado_kwh: numeroBrOpcional");
+    expect(servidor).toContain("resolverConsumo({ consumoKwh: d.consumo_medio_kwh, valorConta: d.valor_fatura_medio, tarifaEfetiva: d.tarifa_efetiva_kwh })");
+    expect(servidor).toContain("resolverConsumo({ consumoKwh: d.consumoMedioKwh, valorConta: d.valorFaturaMedio, tarifaEfetiva: d.tarifaEfetivaKwh })");
   });
 
-  it("conta sem tarifa efetiva não cai na tarifa base: o cálculo não é feito", () => {
-    expect(consumoParaCriacao({ consumoKwh: null, valorConta: 650, tarifaEfetiva: null })).toEqual({ ok: false, motivo: "falta_tarifa_efetiva" });
-    expect(consumoParaCriacao({ consumoKwh: null, valorConta: 650, tarifaEfetiva: 0 })).toEqual({ ok: false, motivo: "falta_tarifa_efetiva" });
-    expect(consumoParaCriacao({ consumoKwh: null, valorConta: null, tarifaEfetiva: 0.95 })).toEqual({ ok: false, motivo: "sem_consumo" });
+  it("criação: kWh informado em consumo_medio_kwh; estimativa e efetiva nas colunas novas", () => {
+    expect(servidor).toContain("consumo_medio_kwh: d.consumo_medio_kwh,\n      ...estimativa,");
+    expect(servidor).toContain("{ consumo_estimado_kwh: consumo.kwh, tarifa_efetiva_kwh: d.tarifa_efetiva_kwh }");
   });
 
-  it("estima do valor da conta e da efetiva (a mesma função da tela); kWh informado vence", () => {
-    expect(consumoParaCriacao({ consumoKwh: null, valorConta: 650, tarifaEfetiva: 0.95 })).toEqual({ ok: true, kwh: 684.21, origem: "estimado" });
-    expect(consumoParaCriacao({ consumoKwh: 780, valorConta: 650, tarifaEfetiva: 0.95 })).toEqual({ ok: true, kwh: 780, origem: "informado" });
-    // Tela e servidor chegam ao mesmo número.
+  it("salvar kit: o consumo resolvido vai para o negócio; conta sem tarifa efetiva é recusada, sem usar a base", () => {
+    expect(servidor).toContain("...(colunasDeConsumo(consumo, d.tarifaEfetivaKwh) ?? {})");
+    expect(servidor).toContain('consumo.motivo === "falta_tarifa_efetiva"');
+    expect(servidor).toContain("consumoMedioKwh: consumo.ok ? consumo.kwh : null,");
+  });
+
+  it("editar 'Dados do negócio': informar kWh descarta a estimativa", () => {
+    expect(servidor).toContain("...(d.consumo_medio_kwh != null ? { consumo_estimado_kwh: null, tarifa_efetiva_kwh: null } : {}),");
+  });
+
+  it("nenhum caminho converte a fatura pela tarifa base", () => {
+    // O cálculo exige o consumo já resolvido; a divisão fatura ÷ tarifa só existe em `estimarConsumoPelaConta`.
+    expect(calculoServidor).toContain("if (entrada.consumoMedioKwh == null) {");
+    expect(calculoServidor).not.toMatch(/valorFaturaMedio!?\s*\/\s*entrada\.tarifaKwh/);
+    const kit = readFileSync("src/app/(app)/negocios/[id]/kit-personalizado.tsx", "utf8");
+    expect(kit).not.toMatch(/fatura!?\s*\/\s*tarifa\b/);
+  });
+
+  it("resolverConsumo: conta sem efetiva não cai na tarifa base; kWh informado vence", () => {
+    expect(resolverConsumo({ consumoKwh: null, valorConta: 650, tarifaEfetiva: null })).toEqual({ ok: false, motivo: "falta_tarifa_efetiva" });
+    expect(resolverConsumo({ consumoKwh: null, valorConta: 650, tarifaEfetiva: 0 })).toEqual({ ok: false, motivo: "falta_tarifa_efetiva" });
+    expect(resolverConsumo({ consumoKwh: null, valorConta: null, tarifaEfetiva: 0.95 })).toEqual({ ok: false, motivo: "sem_consumo" });
+    expect(resolverConsumo({ consumoKwh: null, valorConta: 650, tarifaEfetiva: 0.95 })).toEqual({ ok: true, kwh: 684.21, origem: "estimado" });
+    expect(resolverConsumo({ consumoKwh: 780, valorConta: 650, tarifaEfetiva: 0.95 })).toEqual({ ok: true, kwh: 780, origem: "informado" });
     expect(consumoDaEtapa1({ consumoKwh: null, valorConta: 650, tarifaEfetiva: 0.95 })?.kwh).toBe(684.21);
+  });
+
+  it("salvar o kit com estimativa não apaga um kWh informado: a troca é bloqueada até ação explícita em Dados do negócio", () => {
+    expect(servidor).toContain('consumo.ok && consumo.origem === "estimado" && negocio.consumo_medio_kwh != null');
+    expect(servidor).toContain("MENSAGEM_TROCA_INFORMADO_POR_ESTIMADO");
+    expect(servidor).toContain('supabase.from("negocios").select("valor, consumo_medio_kwh")');
+  });
+
+  it("colunasDeConsumo: informado descarta a estimativa; estimado deixa consumo_medio_kwh vazio", () => {
+    expect(colunasDeConsumo({ ok: true, kwh: 780, origem: "informado" }, 0.95)).toEqual({ consumo_medio_kwh: 780, consumo_estimado_kwh: null, tarifa_efetiva_kwh: null });
+    expect(colunasDeConsumo({ ok: true, kwh: 684.21, origem: "estimado" }, 0.95)).toEqual({ consumo_medio_kwh: null, consumo_estimado_kwh: 684.21, tarifa_efetiva_kwh: 0.95 });
+    expect(colunasDeConsumo({ ok: false, motivo: "sem_consumo" }, null)).toBeNull();
   });
 });
 
-describe("reabrir: consumo estimado x consumo informado", () => {
-  it("consumo do cálculo vindo da fatura (negócio sem kWh informado) é tratado como estimado", () => {
-    expect(consumoDoCalculoEhEstimado({ consumoNegocioKwh: null, valorFaturaCalculo: 650 })).toBe(true);
-    // kWh informado no cadastro do negócio: não é estimado.
-    expect(consumoDoCalculoEhEstimado({ consumoNegocioKwh: 780, valorFaturaCalculo: 650 })).toBe(false);
-    expect(consumoDoCalculoEhEstimado({ consumoNegocioKwh: 780, valorFaturaCalculo: null })).toBe(false);
-    expect(consumoDoCalculoEhEstimado({ consumoNegocioKwh: null, valorFaturaCalculo: null })).toBe(false);
+describe("reabrir: origem do consumo vem das colunas gravadas", () => {
+  const calculo = { consumoMedioKwh: 684.21 };
+
+  it("estimativa registrada é a fonte da verdade (kit com ou sem cálculo)", () => {
+    const base = { consumoMedioKwh: null, consumoEstimadoKwh: 684.21, tarifaEfetivaKwh: 0.95 };
+    expect(consumoSalvoDoNegocio({ ...base, calculo: null })).toEqual({ origem: "estimado", kwh: 684.21, tarifaEfetiva: 0.95 });
+    // A tarifa base do cálculo pode ser outra: a origem não depende dela.
+    expect(consumoSalvoDoNegocio({ ...base, calculo: { consumoMedioKwh: 684.21 } })).toEqual({ origem: "estimado", kwh: 684.21, tarifaEfetiva: 0.95 });
   });
 
-  it("a ficha e o formulário do kit mostram 'estimado' e não 'informado em kWh'", () => {
-    const kit = readFileSync("src/app/(app)/negocios/[id]/kit-personalizado.tsx", "utf8").replace(/\r\n/g, "\n");
-    expect(kit).toContain('consumoEstimado ? "Consumo médio (estimado pela fatura)" : "Consumo médio"');
-    expect(kit).toContain("não foi informado em kWh");
-    expect(kit).toContain("Este consumo foi estimado a partir do valor da fatura; não foi informado em kWh pelo cliente.");
-    const pagina = readFileSync("src/app/(app)/negocios/[id]/page.tsx", "utf8").replace(/\r\n/g, "\n");
-    expect(pagina).toContain("consumoDoCalculoEhEstimado({ consumoNegocioKwh: negocio.consumo_medio_kwh, valorFaturaCalculo: calculo.valor_fatura_medio })");
+  it("kWh informado no negócio é informado, mesmo com fatura no cálculo", () => {
+    expect(consumoSalvoDoNegocio({ consumoMedioKwh: 780, consumoEstimadoKwh: null, tarifaEfetivaKwh: null, calculo: { consumoMedioKwh: 780 } })).toEqual({ origem: "informado", kwh: 780 });
   });
 
-  it("kit salvo sem cálculo (sem tarifa base): a estimativa NÃO volta ao reabrir — só a fatura fica", () => {
-    // Negócio criado com valor da conta, tarifa efetiva e kit, mas sem tarifa base: nada além de
-    // `negocios.valor_conta_energia` é gravado, então a tarifa efetiva e o consumo estimado se perdem.
+  it("negócio antigo: a origem é DESCONHECIDA, mesmo quando o consumo é igual a fatura ÷ tarifa", () => {
+    const antigo = { consumoMedioKwh: null, consumoEstimadoKwh: null, tarifaEfetivaKwh: null };
+    // Igualdade com fatura ÷ tarifa base não prova nada: não é usada para deduzir a origem.
+    expect(consumoSalvoDoNegocio({ ...antigo, calculo })).toEqual({ origem: "desconhecida", kwhNoCalculo: 684.21 });
+    expect(consumoSalvoDoNegocio({ ...antigo, calculo: { consumoMedioKwh: 1200 } })).toEqual({ origem: "desconhecida", kwhNoCalculo: 1200 });
+    expect(consumoSalvoDoNegocio({ ...antigo, calculo: null })).toBeNull();
+    expect(readFileSync("src/lib/consumo-estimado.ts", "utf8")).not.toContain("consumoDerivadoDaFatura");
+  });
+
+  it("origem desconhecida: o campo de kWh não é preenchido com o consumo do cálculo; pede kWh ou efetiva antes de recalcular", () => {
     const estado = estadoSalvoDoKit({
       componentesSalvos: [{ tipo: "modulo", descricao: "Módulo 620 W", potenciaW: 620, quantidade: 10 }],
-      calculo: null,
+      calculo: { tipoLigacao: "trifasico", consumoMedioKwh: 684.21, valorFaturaMedio: 650, tarifaKwh: 0.95 },
       estruturaTelhado: null,
       consumoMedioKwhPadrao: null,
       valorFaturaMedioPadrao: 650,
     });
-    expect(estado.consumoMedioKwh).toBe("");
-    expect(estado.valorFaturaMedio).toBe("650");
-    expect(estado.tarifaKwh).toBe("");
+    expect(estado).toMatchObject({ consumoMedioKwh: "", tarifaEfetivaKwh: "", valorFaturaMedio: "650", tarifaKwh: "0,95" });
+    const kit = readFileSync("src/app/(app)/negocios/[id]/kit-personalizado.tsx", "utf8");
+    expect(kit).toContain("MENSAGEM_ORIGEM_DESCONHECIDA");
+    expect(kit).toContain("Consumo médio (origem não registrada)");
+  });
+
+  it("o formulário do kit reabre com a efetiva no campo próprio e o campo de kWh vazio quando o consumo é estimado", () => {
+    const base = {
+      componentesSalvos: [{ tipo: "modulo" as const, descricao: "Módulo 620 W", potenciaW: 620, quantidade: 10 }],
+      estruturaTelhado: null,
+      consumoMedioKwhPadrao: null,
+      valorFaturaMedioPadrao: 650,
+      consumoEstimadoKwhPadrao: 684.21,
+      tarifaEfetivaKwhPadrao: 0.95,
+    };
+    // Kit SEM cálculo (sem tarifa base): a estimativa volta.
+    const semCalculo = estadoSalvoDoKit({ ...base, calculo: null });
+    expect(semCalculo).toMatchObject({ consumoMedioKwh: "", valorFaturaMedio: "650", tarifaEfetivaKwh: "0,95", tarifaKwh: "" });
+    // Kit COM cálculo: a tarifa base fica no campo da base, a efetiva no seu; kWh continua vazio.
+    const comCalculo = estadoSalvoDoKit({ ...base, calculo: { tipoLigacao: "trifasico", consumoMedioKwh: 684.21, valorFaturaMedio: 650, tarifaKwh: 0.8 } });
+    expect(comCalculo).toMatchObject({ consumoMedioKwh: "", tarifaEfetivaKwh: "0,95", tarifaKwh: "0,8" });
+    // kWh informado: nada de efetiva.
+    const informado = estadoSalvoDoKit({ ...base, consumoMedioKwhPadrao: 780, consumoEstimadoKwhPadrao: null, tarifaEfetivaKwhPadrao: null, calculo: null });
+    expect(informado).toMatchObject({ consumoMedioKwh: "780", tarifaEfetivaKwh: "" });
+  });
+
+  it("a ficha lê as colunas novas e o formulário do kit mostra o consumo como estimado, nunca como informado", () => {
+    const pagina = readFileSync("src/app/(app)/negocios/[id]/page.tsx", "utf8").replace(/\r\n/g, "\n");
+    expect(pagina).toContain("consumo_estimado_kwh, tarifa_efetiva_kwh");
+    expect(pagina).toContain("consumoEstimadoKwhPadrao={negocio.consumo_estimado_kwh}");
+    expect(pagina).toContain("tarifaEfetivaKwhPadrao={negocio.tarifa_efetiva_kwh}");
+    const kit = readFileSync("src/app/(app)/negocios/[id]/kit-personalizado.tsx", "utf8").replace(/\r\n/g, "\n");
+    expect(kit).toContain('"Consumo médio (estimado pela fatura)"');
+    expect(kit).toContain('"Consumo médio (origem não registrada)"');
+    expect(kit).toContain("O consumo gravado foi estimado a partir do valor da fatura e da tarifa efetiva; não foi informado em kWh pelo cliente.");
+    expect(kit).toContain('rotulo="Tarifa efetiva estimada (R$/kWh)*"');
+    expect(kit).toContain('rotulo="Tarifa base (TE + TUSD) (R$/kWh)"');
   });
 });

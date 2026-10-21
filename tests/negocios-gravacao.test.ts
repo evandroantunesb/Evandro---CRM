@@ -244,7 +244,7 @@ describe("regressões de tela", () => {
     for (const campo of ["setLinhas(s.linhas)", "setEstrutura(s.estrutura)", "setTipoLigacao(s.tipoLigacao)", "setTarifaKwh(s.tarifaKwh)"]) {
       expect(cancelar).toContain(campo);
     }
-    expect(kit).toContain("estadoSalvoDoKit({ componentesSalvos, calculo, estruturaTelhado, consumoMedioKwhPadrao, valorFaturaMedioPadrao })");
+    expect(kit).toMatch(/estadoSalvoDoKit\(\{\s*componentesSalvos,\s*calculo,\s*estruturaTelhado,\s*consumoMedioKwhPadrao,\s*valorFaturaMedioPadrao,/);
     // Cancelar sempre visível, inclusive na primeira montagem (sem condição em volta do botão).
     const botao = kit.indexOf('<Botao type="button" variante="secundario" onClick={cancelarEdicao}>');
     expect(botao).toBeGreaterThan(-1);
@@ -261,6 +261,7 @@ describe("regressões de tela", () => {
         tipoLigacao: "trifasico",
         consumoMedioKwh: "450",
         valorFaturaMedio: "320",
+        tarifaEfetivaKwh: "",
         tarifaKwh: "",
       });
     });
@@ -285,6 +286,7 @@ describe("regressões de tela", () => {
         tipoLigacao: "bifasico",
         consumoMedioKwh: (480.5).toLocaleString("pt-BR"),
         valorFaturaMedio: "300",
+        tarifaEfetivaKwh: "",
         // M2-a: a tarifa reabre com todas as casas gravadas (antes "0,95", e salvar de novo mudava o valor).
         tarifaKwh: "0,9512",
       });

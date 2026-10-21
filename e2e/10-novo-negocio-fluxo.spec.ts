@@ -165,7 +165,7 @@ test.describe("novo negócio: fluxo de cálculo", () => {
     await expect(page.getByText("não foi informado em kWh")).toBeVisible();
 
     await page.getByRole("button", { name: /Editar kit/ }).click();
-    await expect(page.getByText(/Este consumo foi estimado a partir do valor da fatura; não foi informado em kWh pelo cliente\./)).toBeVisible();
+    await expect(page.getByText(/O consumo gravado foi estimado a partir do valor da fatura e da tarifa efetiva; não foi informado em kWh pelo cliente\./)).toBeVisible();
   });
 
   test("produtividade fica nos detalhes do cálculo, fora do resumo", async ({ page }) => {

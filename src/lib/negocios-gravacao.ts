@@ -4,7 +4,7 @@ import { ANEXOS_CRIACAO, problemaArquivo } from "@/lib/anexos-regras";
 import { arquivoMetaSchema } from "@/lib/anexos-servidor";
 import { componentesJsonSchema, nomeKitPersonalizado, potenciaKitPersonalizadoKwp, type ComponenteKit } from "@/lib/calculadora";
 import { paybackComPreco, precoDoCalculoDesatualizado } from "@/lib/calculo-preco";
-import { consumoParaCriacao } from "@/lib/consumo-estimado";
+import { colunasDeConsumo, MENSAGEM_FALTA_TARIFA_EFETIVA, MENSAGEM_TROCA_INFORMADO_POR_ESTIMADO, resolverConsumo } from "@/lib/consumo-estimado";
 import { montarLinhaCalculo } from "@/lib/calculo-servidor";
 import { mensagemErro } from "@/lib/erros";
 import { lerNumeroBr, MENSAGEM_NUMERO_BR } from "@/lib/formatacao";
@@ -107,7 +107,8 @@ const esquemaNovo = z.object({
   tipo_ligacao: z.enum(TIPOS_LIGACAO).optional(),
   consumo_medio_kwh: numeroBrOpcional,
   // Tarifa EFETIVA estimada (Etapa 1 do assistente): só serve para o servidor RECALCULAR o consumo estimado a partir
-  // do valor da conta (`consumoParaCriacao`). Não é a tarifa do cálculo financeiro (`tarifa_kwh`) e não é gravada.
+  // do valor da conta (`resolverConsumo`). Gravada em `negocios.tarifa_efetiva_kwh` junto da estimativa; não é a tarifa do
+  // cálculo financeiro (`tarifa_kwh`).
   tarifa_efetiva_kwh: numeroBrOpcional,
   valor_fatura_medio: numeroBrOpcional,
   tarifa_kwh: numeroBrOpcional,
@@ -199,6 +200,12 @@ export async function criarNegocioComCliente(supabase: SupabaseServidor, atual: 
     etapaId = etapaInicial.id;
   }
 
+  // Consumo: kWh informado, ou estimado AQUI (valor da conta ÷ tarifa efetiva), recalculado no servidor. Nunca pela
+  // tarifa base e nunca por um "consumo estimado" vindo do navegador. Informado vai em `consumo_medio_kwh`; a
+  // estimativa e a tarifa efetiva vão nas colunas próprias (e `consumo_medio_kwh` fica vazio).
+  const consumo = resolverConsumo({ consumoKwh: d.consumo_medio_kwh, valorConta: d.valor_fatura_medio, tarifaEfetiva: d.tarifa_efetiva_kwh });
+  const estimativa = consumo.ok && consumo.origem === "estimado" ? { consumo_estimado_kwh: consumo.kwh, tarifa_efetiva_kwh: d.tarifa_efetiva_kwh } : { consumo_estimado_kwh: null, tarifa_efetiva_kwh: null };
+
   const { data: negocio, error } = await supabase
     .from("negocios")
     .insert({
@@ -217,6 +224,7 @@ export async function criarNegocioComCliente(supabase: SupabaseServidor, atual: 
       tipo_telhado: d.tipo_telhado || null,
       estrutura_telhado: d.estrutura_telhado || null,
       consumo_medio_kwh: d.consumo_medio_kwh,
+      ...estimativa,
       valor_conta_energia: d.valor_fatura_medio,
     })
     .select("id")
@@ -236,9 +244,6 @@ export async function criarNegocioComCliente(supabase: SupabaseServidor, atual: 
     if (erroKit) {
       avisos.push("kit");
     } else if (d.tipo_ligacao && d.tarifa_kwh != null) {
-      // Consumo do cálculo: kWh informado, ou estimado AQUI (valor da conta ÷ tarifa efetiva). Nunca derivado da tarifa
-      // base (`tarifa_kwh`), e nunca de um "consumo estimado" vindo do navegador.
-      const consumo = consumoParaCriacao({ consumoKwh: d.consumo_medio_kwh, valorConta: d.valor_fatura_medio, tarifaEfetiva: d.tarifa_efetiva_kwh });
       const montado = consumo.ok
         ? await montarLinhaCalculo(supabase, atual.empresaId, {
             kitNome: nomeKitPersonalizado(d.componentes),
@@ -300,6 +305,8 @@ export async function editarNegocioComCliente(
       padrao_cliente: d.padrao_cliente || null,
       tipo_telhado: d.tipo_telhado || null,
       consumo_medio_kwh: d.consumo_medio_kwh,
+      // Informar kWh descarta a estimativa (o banco não aceita informado e estimado juntos); limpar o campo não mexe nela.
+      ...(d.consumo_medio_kwh != null ? { consumo_estimado_kwh: null, tarifa_efetiva_kwh: null } : {}),
       valor_conta_energia: d.valor_conta_energia,
       // SDR não pode alterar o valor financeiro do negócio (spec RAION_SDR_REGRAS_PERMISSOES §39) — só na criação.
       ...(pode(atual.papel, EDITAR_VALOR_NEGOCIO) ? { valor: d.valor } : {}),
@@ -317,6 +324,8 @@ const esquemaKit = z.object({
   tipoLigacao: z.enum(TIPOS_LIGACAO),
   consumoMedioKwh: numeroBrOpcional,
   valorFaturaMedio: numeroBrOpcional,
+  // Tarifa EFETIVA estimada: só converte a fatura em kWh quando não há consumo informado. Distinta de `tarifaKwh` (base, TE + TUSD).
+  tarifaEfetivaKwh: numeroBrOpcional,
   tarifaKwh: numeroBrOpcional,
   estruturaTelhado: z.string().trim().max(120).optional(),
   componentes: componentesJsonSchema,
@@ -382,7 +391,7 @@ export async function salvarKitComCliente(
   const d = dados.data;
 
   const [{ data: negocio }, { data: calculoAtual, error: erroCalculo }, { data: itensAntigos, error: erroAntigos }] = await Promise.all([
-    supabase.from("negocios").select("valor").eq("id", d.negocioId).maybeSingle(),
+    supabase.from("negocios").select("valor, consumo_medio_kwh").eq("id", d.negocioId).maybeSingle(),
     supabase.from("calculos_solares").select("id").eq("negocio_id", d.negocioId).maybeSingle(),
     supabase
       .from("kit_componentes")
@@ -400,14 +409,21 @@ export async function salvarKitComCliente(
     if (d.confirmarRemocao !== "sim") return { ok: false, mensagem: MENSAGEM_REMOCAO_SEM_CONFIRMACAO };
   }
 
+  // Consumo: informado, ou estimado pela fatura e pela tarifa EFETIVA (recalculado aqui). Nunca fatura ÷ tarifa base.
+  const consumo = resolverConsumo({ consumoKwh: d.consumoMedioKwh, valorConta: d.valorFaturaMedio, tarifaEfetiva: d.tarifaEfetivaKwh });
+  // Um kWh informado não é apagado ao salvar uma estimativa pelo kit: a troca exige ação explícita em "Dados do negócio".
+  if (consumo.ok && consumo.origem === "estimado" && negocio.consumo_medio_kwh != null) {
+    return { ok: false, mensagem: `${MENSAGEM_TROCA_INFORMADO_POR_ESTIMADO} Nada foi alterado.` };
+  }
   let montado: Awaited<ReturnType<typeof montarLinhaCalculo>> | null = null;
   if (d.tarifaKwh != null) {
+    if (!consumo.ok && consumo.motivo === "falta_tarifa_efetiva") return { ok: false, mensagem: `${MENSAGEM_FALTA_TARIFA_EFETIVA} Nada foi alterado.` };
     montado = await montarLinhaCalculo(supabase, atual.empresaId, {
       kitNome: nomeKitPersonalizado(d.componentes),
       potenciaKwp: potenciaKitPersonalizadoKwp(d.componentes),
       precoKit: negocio.valor ?? 0,
       tipoLigacao: d.tipoLigacao,
-      consumoMedioKwh: d.consumoMedioKwh,
+      consumoMedioKwh: consumo.ok ? consumo.kwh : null,
       valorFaturaMedio: d.valorFaturaMedio,
       tarifaKwh: d.tarifaKwh,
     });
@@ -459,14 +475,15 @@ export async function salvarKitComCliente(
 
   const { data: estrutura, error: erroEstrutura } = await supabase
     .from("negocios")
-    .update({ estrutura_telhado: d.estruturaTelhado || null })
+    // O consumo resolvido também vai para o negócio (mesmas colunas da criação), para reabrir sem cálculo e sem inferência.
+    .update({ estrutura_telhado: d.estruturaTelhado || null, ...(colunasDeConsumo(consumo, d.tarifaEfetivaKwh) ?? {}) })
     .eq("id", d.negocioId)
     .select("id");
   if (erroEstrutura || !estrutura?.length) {
     return {
       ok: false,
       negocioId: d.negocioId,
-      mensagem: `${montado ? "Kit e cálculo salvos" : "Itens do kit salvos"}, mas a estrutura do telhado não foi gravada. Salve de novo.`,
+      mensagem: `${montado ? "Kit e cálculo salvos" : "Itens do kit salvos"}, mas a estrutura do telhado e o consumo do negócio não foram gravados. Salve de novo.`,
     };
   }
 

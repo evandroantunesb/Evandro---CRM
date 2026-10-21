@@ -1,4 +1,5 @@
 import type { LinhaComponente } from "@/components/kit-componentes";
+import { consumoSalvoDoNegocio } from "@/lib/consumo-estimado";
 import { formatarNumeroBr } from "@/lib/formatacao";
 import type { TipoComponenteKit, TipoLigacao } from "@/lib/tipos";
 
@@ -9,6 +10,9 @@ export type KitSalvo = {
   estruturaTelhado: string | null;
   consumoMedioKwhPadrao: number | null;
   valorFaturaMedioPadrao: number | null;
+  /** Estimativa registrada no negócio (colunas `consumo_estimado_kwh` e `tarifa_efetiva_kwh`); nulas em negócios antigos. */
+  consumoEstimadoKwhPadrao?: number | null;
+  tarifaEfetivaKwhPadrao?: number | null;
 };
 
 export type EstadoFormularioKit = {
@@ -17,6 +21,8 @@ export type EstadoFormularioKit = {
   tipoLigacao: TipoLigacao;
   consumoMedioKwh: string;
   valorFaturaMedio: string;
+  /** Tarifa EFETIVA (estima o consumo); separada da tarifa base `tarifaKwh`. */
+  tarifaEfetivaKwh: string;
   tarifaKwh: string;
 };
 
@@ -31,7 +37,18 @@ const numeroBr = formatarNumeroBr;
  */
 export function estadoSalvoDoKit(k: KitSalvo): EstadoFormularioKit {
   const fatura = k.calculo ? k.calculo.valorFaturaMedio : k.valorFaturaMedioPadrao;
-  const consumo = k.calculo ? k.calculo.consumoMedioKwh : k.consumoMedioKwhPadrao;
+  // Consumo estimado NÃO volta como kWh informado: o campo de kWh fica vazio e a tarifa efetiva volta no campo próprio.
+  // Origem desconhecida (kit anterior ao registro) também não volta como kWh informado: o usuário informa o kWh da
+  // fatura ou a tarifa efetiva antes de recalcular.
+  const salvoConsumo = consumoSalvoDoNegocio({
+    consumoMedioKwh: k.consumoMedioKwhPadrao,
+    consumoEstimadoKwh: k.consumoEstimadoKwhPadrao ?? null,
+    tarifaEfetivaKwh: k.tarifaEfetivaKwhPadrao ?? null,
+    calculo: k.calculo,
+  });
+  const estimado = salvoConsumo?.origem === "estimado" ? salvoConsumo : null;
+  const semOrigem = salvoConsumo?.origem === "desconhecida";
+  const consumo = estimado || semOrigem ? null : k.calculo ? k.calculo.consumoMedioKwh : k.consumoMedioKwhPadrao;
   return {
     linhas: k.componentesSalvos.map((c) => ({
       tipo: c.tipo,
@@ -43,6 +60,7 @@ export function estadoSalvoDoKit(k: KitSalvo): EstadoFormularioKit {
     tipoLigacao: k.calculo?.tipoLigacao ?? "trifasico",
     consumoMedioKwh: consumo != null ? numeroBr(consumo) : "",
     valorFaturaMedio: fatura != null ? numeroBr(fatura) : "",
+    tarifaEfetivaKwh: estimado ? numeroBr(estimado.tarifaEfetiva) : "",
     tarifaKwh: k.calculo ? numeroBr(k.calculo.tarifaKwh) : "",
   };
 }
