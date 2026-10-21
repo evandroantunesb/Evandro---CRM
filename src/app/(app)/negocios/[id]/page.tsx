@@ -13,6 +13,7 @@ import { env } from "@/lib/env";
 import { hojeEmSaoPaulo } from "@/lib/formatacao";
 import { precoDoCalculoDesatualizado } from "@/lib/calculo-preco";
 import { descreverAtividade } from "@/lib/linha-do-tempo";
+import { calcularStatusQualificacao } from "@/lib/qualificacao";
 import { exigirPapel } from "@/lib/sessao";
 import { ARQUIVAR_NEGOCIO, ATRIBUIR_TAREFA_A_OUTROS, EDITAR_VALOR_NEGOCIO, ESCOLHER_RESPONSAVEL_NEGOCIO, NEGOCIOS, PAGAMENTO_SOLO, PROPOSTA_E_CONTRATO, RESPONSAVEL_COMERCIAL, pode } from "@/lib/permissoes";
 import { avisarSchemaAusente, funcaoAusente, tabelaAusente } from "@/lib/schema-ausente";
@@ -254,6 +255,86 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
     ...(notas ?? []).map((n) => ({ chave: `n${n.id}`, quando: n.created_at, nota: n, texto: n.texto })),
   ].sort((a, b) => b.quando.localeCompare(a.quando));
   const whatsapp = contato.telefone?.replace(/\D/g, "");
+  const statusQualificacao = calcularStatusQualificacao(!!contato.telefone, negocio.qualif_objetivo, negocio.qualif_e_decisor);
+  const temKit = Boolean(calculo || componentes?.length);
+
+  const cartaoDados = (
+    <Cartao titulo="Dados do negócio">
+      <EdicaoNegocio
+        // Os campos usam defaultValue: desarquivar com novo responsável (ou arquivar) muda os dados por fora do
+        // editor, e sem remontar ele mostraria o responsável antigo e o gravaria no próximo "Salvar".
+        key={`${negocio.responsavel_id ?? ""}:${negocio.arquivado_em ?? ""}`}
+        empresaId={negocio.empresa_id}
+        negocio={{
+          id: negocio.id,
+          titulo: negocio.titulo,
+          origemId: negocio.origem_id,
+          responsavelId: negocio.responsavel_id,
+          valor: negocio.valor,
+          descricao: negocio.descricao,
+          tipoTelhado: negocio.tipo_telhado,
+          unidadeConsumidora: negocio.unidade_consumidora,
+          padraoCliente: negocio.padrao_cliente,
+          consumoMedioKwh: negocio.consumo_medio_kwh,
+          valorContaEnergia: negocio.valor_conta_energia,
+        }}
+        origens={config.origens.filter((o) => o.ativa || o.id === negocio.origem_id)}
+        responsaveis={pode(atual.papel, ESCOLHER_RESPONSAVEL_NEGOCIO) ? config.membros.filter((m) => m.ativo && pode(m.papel, RESPONSAVEL_COMERCIAL)) : []}
+        podeEditarValor={pode(atual.papel, EDITAR_VALOR_NEGOCIO)}
+      />
+    </Cartao>
+  );
+  const cartaoKit = (
+    <Cartao titulo="Kit personalizado">
+      <KitPersonalizado
+        negocioId={negocio.id}
+        negocioValor={negocio.valor}
+        estruturaTelhado={negocio.estrutura_telhado}
+        padraoCliente={negocio.padrao_cliente}
+        consumoMedioKwhPadrao={negocio.consumo_medio_kwh}
+        valorFaturaMedioPadrao={negocio.valor_conta_energia}
+        componentesSalvos={(componentes ?? []).map((c) => ({
+          tipo: c.tipo as TipoComponenteKit,
+          descricao: c.descricao,
+          potenciaW: c.potencia_w,
+          quantidade: c.quantidade,
+        }))}
+        parametros={
+          parametros
+            ? {
+                produtividadeKwhKwpMes: parametros.produtividade_kwh_kwp_mes,
+                percentualFioB: parametros.percentual_fio_b,
+                disponibilidadeMonoKwh: parametros.disponibilidade_mono_kwh,
+                disponibilidadeBiKwh: parametros.disponibilidade_bi_kwh,
+                disponibilidadeTriKwh: parametros.disponibilidade_tri_kwh,
+                custoInstalacaoPorModulo: parametros.custo_instalacao_por_modulo,
+                custoMaterialCaPorKwp: parametros.custo_material_ca_por_kwp,
+                custoEngenharia: parametros.custo_engenharia,
+                comissaoPercentual: parametros.comissao_percentual,
+              }
+            : null
+        }
+        precoDesatualizado={precoDesatualizado}
+        calculo={
+          calculo
+            ? {
+                id: calculo.id,
+                kitNome: calculo.kit_nome,
+                kitPreco: calculo.kit_preco,
+                tipoLigacao: calculo.tipo_ligacao as TipoLigacao,
+                consumoMedioKwh: calculo.consumo_medio_kwh,
+                valorFaturaMedio: calculo.valor_fatura_medio,
+                tarifaKwh: calculo.tarifa_kwh,
+                geracaoEstimadaKwhMes: calculo.geracao_estimada_kwh_mes,
+                economiaMensal: calculo.economia_mensal,
+                paybackMeses: calculo.payback_meses,
+                observacoes: calculo.observacoes,
+              }
+            : null
+        }
+      />
+    </Cartao>
+  );
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-4">
@@ -360,99 +441,52 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
           </Cartao>
         </div>
         <div className="flex flex-col gap-4 lg:col-start-1 lg:row-span-2 lg:row-start-1">
-          <Cartao titulo="Dados do negócio">
-            <EdicaoNegocio
-              // Os campos usam defaultValue: desarquivar com novo responsável (ou arquivar) muda os dados por fora do
-              // editor, e sem remontar ele mostraria o responsável antigo e o gravaria no próximo "Salvar".
-              key={`${negocio.responsavel_id ?? ""}:${negocio.arquivado_em ?? ""}`}
-              empresaId={negocio.empresa_id}
-              negocio={{
-                id: negocio.id,
-                titulo: negocio.titulo,
-                origemId: negocio.origem_id,
-                responsavelId: negocio.responsavel_id,
-                valor: negocio.valor,
-                descricao: negocio.descricao,
-                tipoTelhado: negocio.tipo_telhado,
-                unidadeConsumidora: negocio.unidade_consumidora,
-                padraoCliente: negocio.padrao_cliente,
-                consumoMedioKwh: negocio.consumo_medio_kwh,
-                valorContaEnergia: negocio.valor_conta_energia,
-              }}
-              origens={config.origens.filter((o) => o.ativa || o.id === negocio.origem_id)}
-              responsaveis={pode(atual.papel, ESCOLHER_RESPONSAVEL_NEGOCIO) ? config.membros.filter((m) => m.ativo && pode(m.papel, RESPONSAVEL_COMERCIAL)) : []}
-              podeEditarValor={pode(atual.papel, EDITAR_VALOR_NEGOCIO)}
-            />
-          </Cartao>
-          <Cartao titulo="Kit personalizado">
-            <KitPersonalizado
-              negocioId={negocio.id}
-              negocioValor={negocio.valor}
-              estruturaTelhado={negocio.estrutura_telhado}
-              padraoCliente={negocio.padrao_cliente}
-              consumoMedioKwhPadrao={negocio.consumo_medio_kwh}
-              valorFaturaMedioPadrao={negocio.valor_conta_energia}
-              componentesSalvos={(componentes ?? []).map((c) => ({
-                tipo: c.tipo as TipoComponenteKit,
-                descricao: c.descricao,
-                potenciaW: c.potencia_w,
-                quantidade: c.quantidade,
-              }))}
-              parametros={
-                parametros
-                  ? {
-                      produtividadeKwhKwpMes: parametros.produtividade_kwh_kwp_mes,
-                      percentualFioB: parametros.percentual_fio_b,
-                      disponibilidadeMonoKwh: parametros.disponibilidade_mono_kwh,
-                      disponibilidadeBiKwh: parametros.disponibilidade_bi_kwh,
-                      disponibilidadeTriKwh: parametros.disponibilidade_tri_kwh,
-                      custoInstalacaoPorModulo: parametros.custo_instalacao_por_modulo,
-                      custoMaterialCaPorKwp: parametros.custo_material_ca_por_kwp,
-                      custoEngenharia: parametros.custo_engenharia,
-                      comissaoPercentual: parametros.comissao_percentual,
-                    }
-                  : null
-              }
-              precoDesatualizado={precoDesatualizado}
-              calculo={
-                calculo
-                  ? {
-                      id: calculo.id,
-                      kitNome: calculo.kit_nome,
-                      kitPreco: calculo.kit_preco,
-                      tipoLigacao: calculo.tipo_ligacao as TipoLigacao,
-                      consumoMedioKwh: calculo.consumo_medio_kwh,
-                      valorFaturaMedio: calculo.valor_fatura_medio,
-                      tarifaKwh: calculo.tarifa_kwh,
-                      geracaoEstimadaKwhMes: calculo.geracao_estimada_kwh_mes,
-                      economiaMensal: calculo.economia_mensal,
-                      paybackMeses: calculo.payback_meses,
-                      observacoes: calculo.observacoes,
-                    }
-                  : null
-              }
-            />
-          </Cartao>
-          <Cartao titulo="Qualificação SDR">
-            <Qualificacao
-              negocio={{
-                id: negocio.id,
-                qualifTipoCliente: negocio.qualif_tipo_cliente,
-                qualifPossuiContaEnergia: negocio.qualif_possui_conta_energia,
-                qualifDistribuidora: negocio.qualif_distribuidora,
-                qualifImovelProprio: negocio.qualif_imovel_proprio,
-                qualifObjetivo: negocio.qualif_objetivo,
-                qualifPrazoInstalacao: negocio.qualif_prazo_instalacao,
-                qualifBuscaFinanciamento: negocio.qualif_busca_financiamento,
-                qualifOrcamentoOutraEmpresa: negocio.qualif_orcamento_outra_empresa,
-                qualifEDecisor: negocio.qualif_e_decisor,
-                qualifOutroDecisor: negocio.qualif_outro_decisor,
-                qualifParticipantesDecisao: negocio.qualif_participantes_decisao,
-                qualifObservacoes: negocio.qualif_observacoes,
-              }}
-              telefoneContato={contato.telefone}
-              vendedores={config.membros.filter((m) => m.ativo && m.papel === "vendedor")}
-            />
+          {temKit ? (
+            <>
+              {cartaoKit}
+              {cartaoDados}
+            </>
+          ) : (
+            <>
+              {cartaoDados}
+              {cartaoKit}
+            </>
+          )}
+          <Cartao>
+            <details className="group">
+              <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 [&::-webkit-details-marker]:hidden">
+                <h2 className="text-base font-semibold text-zinc-900">Qualificação SDR</h2>
+                <span className="flex flex-wrap items-center gap-2">
+                  <Selo tom={statusQualificacao.tom}>{statusQualificacao.rotulo}</Selo>
+                  <span className="text-xs text-zinc-500">
+                    {statusQualificacao.atendidos} de {statusQualificacao.total} critérios
+                  </span>
+                  <span className="text-xs font-medium text-zinc-700 group-open:hidden">Expandir</span>
+                  <span className="hidden text-xs font-medium text-zinc-700 group-open:inline">Recolher</span>
+                </span>
+              </summary>
+              <div className="mt-4">
+                <Qualificacao
+                  negocio={{
+                    id: negocio.id,
+                    qualifTipoCliente: negocio.qualif_tipo_cliente,
+                    qualifPossuiContaEnergia: negocio.qualif_possui_conta_energia,
+                    qualifDistribuidora: negocio.qualif_distribuidora,
+                    qualifImovelProprio: negocio.qualif_imovel_proprio,
+                    qualifObjetivo: negocio.qualif_objetivo,
+                    qualifPrazoInstalacao: negocio.qualif_prazo_instalacao,
+                    qualifBuscaFinanciamento: negocio.qualif_busca_financiamento,
+                    qualifOrcamentoOutraEmpresa: negocio.qualif_orcamento_outra_empresa,
+                    qualifEDecisor: negocio.qualif_e_decisor,
+                    qualifOutroDecisor: negocio.qualif_outro_decisor,
+                    qualifParticipantesDecisao: negocio.qualif_participantes_decisao,
+                    qualifObservacoes: negocio.qualif_observacoes,
+                  }}
+                  telefoneContato={contato.telefone}
+                  vendedores={config.membros.filter((m) => m.ativo && m.papel === "vendedor")}
+                />
+              </div>
+            </details>
           </Cartao>
           {ultimoHandoff &&
             (souAdmin ||
