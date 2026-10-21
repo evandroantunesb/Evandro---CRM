@@ -1,5 +1,5 @@
 import "server-only";
-import { linhaDeCalculo, problemaDaEntrada, type LinhaCalculo } from "@/lib/calculo-reproduzivel";
+import { linhaDeCalculo, problemaDaEntrada, type LinhaCalculo, type ResultadoLinha } from "@/lib/calculo-reproduzivel";
 import type { SupabaseServidor } from "@/lib/supabase/server";
 import type { TipoLigacao } from "@/lib/tipos";
 
@@ -23,7 +23,7 @@ export async function montarLinhaCalculo(
     valorFaturaMedio: number | null;
     tarifaKwh: number;
   },
-): Promise<{ ok: true; linha: LinhaCalculo } | { ok: false; mensagem: string }> {
+): Promise<ResultadoLinha> {
   // Entrada inválida responde antes de consultar os parâmetros (como antes).
   const problema = problemaDaEntrada(entrada);
   if (problema) return { ok: false, mensagem: problema };

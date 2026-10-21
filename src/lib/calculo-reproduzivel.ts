@@ -48,7 +48,15 @@ export type ParametrosCalculo = {
   disponibilidade_tri_kwh: number;
 };
 
-export type ResultadoLinha = { ok: true; linha: LinhaCalculo } | { ok: false; mensagem: string };
+/**
+ * `incompleta: true` = estimativa financeira incompleta (não é entrada inválida): o consumo só existe como valor da
+ * conta em R$, sem consumo em kWh nem tarifa efetiva confiável. O cálculo financeiro não é gerado; quem chama pode
+ * salvar negócio e kit e repassar `mensagem` como aviso.
+ */
+export type ResultadoLinha = { ok: true; linha: LinhaCalculo } | { ok: false; mensagem: string; incompleta?: true };
+
+export const MENSAGEM_ESTIMATIVA_INCOMPLETA =
+  "Estimativa financeira incompleta: informe o consumo em kWh ou a tarifa efetiva da conta.";
 
 /** Validações da entrada (antes de consultar parâmetros). `null` = entrada aceita. */
 export function problemaDaEntrada(entrada: Pick<EntradaLinhaCalculo, "consumoMedioKwh" | "valorFaturaMedio" | "potenciaKwp">): string | null {
@@ -64,7 +72,7 @@ export function problemaDaEntrada(entrada: Pick<EntradaLinhaCalculo, "consumoMed
 /**
  * Monta a linha de `calculos_solares` sem Supabase. `parametros` nulo = empresa sem parâmetros configurados.
  * Tarifa (4 casas), potência, preço e fatura (2 casas) são normalizados por `valorComoPersistido` ANTES de `calcular`
- * e gravados já normalizados. O consumo (informado, ou fatura persistida ÷ tarifa persistida) passa por
+ * e gravados já normalizados. O consumo (só o informado em kWh; conta em R$ sem kWh = estimativa incompleta) passa por
  * `consumoComoPersistido` e é gravado em `consumo_medio_kwh`. Potência ou tarifa que viram <= 0 após a normalização
  * devolvem erro (o banco exige > 0).
  */
@@ -82,7 +90,11 @@ export function linhaDeCalculo(empresaId: string, entrada: EntradaLinhaCalculo, 
   if (!(precoKit >= 0)) return { ok: false, mensagem: MENSAGEM_PRECO };
   const valorFaturaMedio = entrada.valorFaturaMedio == null ? null : valorComoPersistido(entrada.valorFaturaMedio, CASAS_FATURA);
 
-  const consumoMedioKwh = consumoComoPersistido(entrada.consumoMedioKwh ?? valorFaturaMedio! / tarifaKwh);
+  // Conta em R$ sem consumo em kWh: dividir pela tarifa BASE misturaria tarifa efetiva com tarifa base.
+  // Não há tarifa efetiva confiável nesta entrada, então o cálculo financeiro não é gerado.
+  if (entrada.consumoMedioKwh == null) return { ok: false, mensagem: MENSAGEM_ESTIMATIVA_INCOMPLETA, incompleta: true };
+
+  const consumoMedioKwh = consumoComoPersistido(entrada.consumoMedioKwh);
   if (!Number.isFinite(consumoMedioKwh) || consumoMedioKwh <= 0) return { ok: false, mensagem: MENSAGEM_CONSUMO };
 
   if (!parametros) return { ok: false, mensagem: "Parâmetros da calculadora não configurados." };

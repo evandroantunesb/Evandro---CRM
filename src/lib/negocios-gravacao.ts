@@ -402,7 +402,7 @@ export async function salvarKitComCliente(
       valorFaturaMedio: d.valorFaturaMedio,
       tarifaKwh: d.tarifaKwh,
     });
-    if (!montado.ok) return { ok: false, mensagem: `${montado.mensagem} Nada foi alterado.` };
+    if (!montado.ok && !montado.incompleta) return { ok: false, mensagem: `${montado.mensagem} Nada foi alterado.` };
   } else if (calculoAtual) {
     return { ok: false, mensagem: "Informe a tarifa para recalcular — sem ela o cálculo salvo ficaria desatualizado. Nada foi alterado." };
   }
@@ -457,7 +457,16 @@ export async function salvarKitComCliente(
     return {
       ok: false,
       negocioId: d.negocioId,
-      mensagem: `${montado ? "Kit e cálculo salvos" : "Itens do kit salvos"}, mas a estrutura do telhado não foi gravada. Salve de novo.`,
+      mensagem: `${montado?.ok ? "Kit e cálculo salvos" : "Itens do kit salvos"}, mas a estrutura do telhado não foi gravada. Salve de novo.`,
+    };
+  }
+
+  // Estimativa incompleta: itens salvos, cálculo NÃO gerado e o cálculo anterior (se houver) fica como estava.
+  if (montado && !montado.ok) {
+    return {
+      ok: true,
+      negocioId: d.negocioId,
+      mensagem: `Itens do kit salvos. ${montado.mensagem}${calculoAtual ? " O cálculo anterior foi mantido e pode estar desatualizado." : ""}`,
     };
   }
 
