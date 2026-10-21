@@ -40,7 +40,7 @@ Ver o relatório de revisão (RELATORIO-REVISAO.md do pacote). Resumo: typecheck
 ## Nota final da rodada (2026-10-21, troca de computador)
 - Remoto conferido: aurora/m2-integracao = 58100d3abb8a8525716445374e8b3378e6e25ea2, igual ao local e head do PR #213 (Draft). wt-m2-int limpa, sem nada sem commit. wip/consumo-estimado-persistencia = 4b4e506e9d704e09ff56e6d5dcdaaecdafa41f1c no remoto. A main não mudou nesta rodada.
 - Retomada no notebook: `git fetch` e fast-forward em aurora/m2-integracao (já em dia, 58100d3). Neste notebook foi preciso `safe.directory` para o repositório e para R:/wt-m2-int (dono do disco R: diferente do usuário).
-- CI "verificar" do push novo: estava pendente na última checagem em outro ambiente; não conferido no notebook (gh sem login). Conferir antes de qualquer outra decisão.
+- CI do PR #213 no push 07459d9 (conferido no notebook com gh, login feito em 2026-10-21): verificar pass (3m57s), Vercel pass, Vercel Preview Comments pass. O CI do push 58100d3 estava pendente na última checagem em outro ambiente.
 - Banco descartável aurora-m2-q1 parado; volumes mantidos. Stacks evandro---crm e restore-* não foram tocados. Não versionados e fora do notebook: logs (.aurora/logs), scripts de .aurora/tmp e o db.env do banco descartável; para testes de banco é preciso recriar o stack local.
 - As 2 falhas de CRLF em tests/negocios-gravacao.test.ts são só do Windows e preexistentes.
 
