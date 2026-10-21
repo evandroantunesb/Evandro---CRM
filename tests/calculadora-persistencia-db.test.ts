@@ -336,17 +336,17 @@ describe("cálculo reproduzível a partir dos dados salvos", () => {
   const CASOS: Caso[] = [
     { nome: "tarifa 0,90 e consumo 1500,005", consumo: 1500.005, fatura: null, tarifa: 0.9, potencia: 10, tipo: "bifasico", consumoGravado: 1500.01, contaSemSolarGravada: 1350.01 },
     { nome: "tarifa 0,90 e consumo 800,125", consumo: 800.125, fatura: null, tarifa: 0.9, potencia: 5, tipo: "monofasico", consumoGravado: 800.13, contaSemSolarGravada: 720.12 },
-    { nome: "tarifa 0,95 e fatura 1055,55 (consumo 1111,11)", consumo: null, fatura: 1055.55, tarifa: 0.95, potencia: 8, tipo: "trifasico", consumoGravado: 1111.11, contaSemSolarGravada: 1055.55 },
+    { nome: "tarifa 0,95, consumo informado 1111,11 e fatura 1055,55", consumo: 1111.11, fatura: 1055.55, tarifa: 0.95, potencia: 8, tipo: "trifasico", consumoGravado: 1111.11, contaSemSolarGravada: 1055.55 },
     { nome: "consumo 1200,555", consumo: 1200.555, fatura: null, tarifa: 0.9, potencia: 10, tipo: "bifasico", consumoGravado: 1200.56 },
     { nome: "consumo 1200,554", consumo: 1200.554, fatura: null, tarifa: 0.9, potencia: 10, tipo: "bifasico", consumoGravado: 1200.55 },
     { nome: "consumo 2 casas já exato", consumo: 1234.56, fatura: null, tarifa: 1.0123, potencia: 7.5, tipo: "bifasico", consumoGravado: 1234.56 },
-    { nome: "fatura 1000 e tarifa 0,90 (consumo 1111,11)", consumo: null, fatura: 1000, tarifa: 0.9, potencia: 10, tipo: "trifasico", consumoGravado: 1111.11 },
+    { nome: "consumo informado 1111,11, fatura 1000 e tarifa 0,90", consumo: 1111.11, fatura: 1000, tarifa: 0.9, potencia: 10, tipo: "trifasico", consumoGravado: 1111.11 },
     { nome: "sistema cobre todo o consumo (consumo 300,005)", consumo: 300.005, fatura: null, tarifa: 0.9, potencia: 10, tipo: "monofasico", consumoGravado: 300.01 },
     // M2-Q2: tarifa/potência/preço/fatura com casas excedentes (preço 20000,005 -> 20000,01; potência 5,505 -> 5,51)
     { nome: "tarifa 0,123456 e consumo 800 (tarifa gravada 0,1235)", consumo: 800, fatura: null, tarifa: 0.123456, potencia: 10, tipo: "bifasico", consumoGravado: 800, tarifaGravada: 0.1235 },
     { nome: "tarifa 0,95231 e consumo 800 (tarifa gravada 0,9523)", consumo: 800, fatura: null, tarifa: 0.95231, potencia: 10, tipo: "bifasico", consumoGravado: 800, tarifaGravada: 0.9523 },
-    { nome: "fatura 1000 e tarifa 0,95231 (consumo 1050,09)", consumo: null, fatura: 1000, tarifa: 0.95231, potencia: 10, tipo: "bifasico", consumoGravado: 1050.09, tarifaGravada: 0.9523, faturaGravada: 1000 },
-    { nome: "potência 5,505, preço 20000,005 e fatura 1000,005 com tarifa 0,5", consumo: null, fatura: 1000.005, tarifa: 0.5, potencia: 5.505, precoKit: 20000.005, tipo: "bifasico", consumoGravado: 2000.02, tarifaGravada: 0.5, faturaGravada: 1000.01, potenciaGravada: 5.51, precoGravado: 20000.01 },
+    { nome: "consumo informado 1050,09, fatura 1000 e tarifa 0,95231", consumo: 1050.09, fatura: 1000, tarifa: 0.95231, potencia: 10, tipo: "bifasico", consumoGravado: 1050.09, tarifaGravada: 0.9523, faturaGravada: 1000 },
+    { nome: "potência 5,505, preço 20000,005, consumo informado 2000,02 e fatura 1000,005 com tarifa 0,5", consumo: 2000.02, fatura: 1000.005, tarifa: 0.5, potencia: 5.505, precoKit: 20000.005, tipo: "bifasico", consumoGravado: 2000.02, tarifaGravada: 0.5, faturaGravada: 1000.01, potenciaGravada: 5.51, precoGravado: 20000.01 },
   ];
 
   function pegarResultados(l: {

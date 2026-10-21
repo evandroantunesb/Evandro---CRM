@@ -10,7 +10,12 @@
  */
 import { describe, expect, it } from "vitest";
 import { calcular, dimensionarSistema, sugerirQuantidadeModulos } from "@/lib/calculadora";
-import { consumoComoPersistido, entradaDaLinha, linhaDeCalculo } from "@/lib/calculo-reproduzivel";
+import {
+  MENSAGEM_ESTIMATIVA_INCOMPLETA,
+  consumoComoPersistido,
+  entradaDaLinha,
+  linhaDeCalculo,
+} from "@/lib/calculo-reproduzivel";
 
 const EMPRESA = "00000000-0000-0000-0000-0000000000aa";
 
@@ -97,11 +102,12 @@ describe("linhaDeCalculo: consumo e reprodução", () => {
     expect(calcular(entradaDaLinha(linha))).toEqual(resultadosGravados(linha));
   });
 
-  it("consumo estimado por fatura / tarifa: 1000 / 0,90 grava 1111,11", () => {
-    const linha = montar({ consumoMedioKwh: null, valorFaturaMedio: 1000 });
-    expect(linha.consumo_medio_kwh).toBe(1111.11);
-    expect(calcular(entradaDaLinha(linha))).toEqual(resultadosGravados(linha));
-    expect(entradaDaLinha(linha).consumoMedioKwh).toBe(1111.11);
+  // ALTERADO (requisito aprovado pelo Evandro): antes derivava consumo = fatura / tarifa base (1111,11);
+  // agora conta em R$ sem kWh e sem tarifa efetiva = estimativa incompleta, sem derivar consumo.
+  it("conta em R$ sem consumo em kWh: estimativa incompleta, nao deriva consumo de fatura / tarifa base", () => {
+    const r = linhaDeCalculo(EMPRESA, { ...ENTRADA_BASE, consumoMedioKwh: null, valorFaturaMedio: 1000 }, PARAMETROS);
+    expect(r).toEqual({ ok: false, incompleta: true, mensagem: MENSAGEM_ESTIMATIVA_INCOMPLETA });
+    expect(r).not.toHaveProperty("linha");
   });
 
   it("consumo já com 2 casas permanece inalterado", () => {
@@ -190,9 +196,11 @@ describe("D2: linhaDeCalculo normaliza as entradas persistidas e grava normaliza
     expect(calcular(entradaDaLinha(linha))).toEqual(resultadosGravados(linha));
   });
 
-  it("fatura 1000 com tarifa 0,95231: consumo 1050,09 (= 1000 / 0,9523 normalizado), fatura gravada 1000", () => {
-    // 1000 / 0,9523 = 1050,0892... -> 1050,09 (2 casas). Com a tarifa BRUTA daria 1050,08 (1000 / 0,95231 = 1050,078...).
-    const linha = montar({ consumoMedioKwh: null, valorFaturaMedio: 1000, tarifaKwh: 0.95231 });
+  // ALTERADO (requisito aprovado pelo Evandro): o consumo nao e mais derivado de fatura / tarifa base.
+  // Antes: consumo null + fatura 1000 + tarifa 0,95231 => consumo 1050,09. Agora o consumo e o INFORMADO (1050,09 aqui
+  // so como valor de teste); a tarifa continua normalizada e a fatura gravada 1000.
+  it("fatura 1000 com tarifa 0,95231 e consumo informado: tarifa normalizada 0,9523, fatura 1000, consumo intocado", () => {
+    const linha = montar({ consumoMedioKwh: 1050.09, valorFaturaMedio: 1000, tarifaKwh: 0.95231 });
     expect(linha.tarifa_kwh).toBe(0.9523);
     expect(linha.consumo_medio_kwh).toBe(1050.09);
     expect(linha.valor_fatura_medio).toBe(1000);
@@ -200,20 +208,34 @@ describe("D2: linhaDeCalculo normaliza as entradas persistidas e grava normaliza
     expect(calcular(entradaDaLinha(linha))).toEqual(resultadosGravados(linha));
   });
 
-  it("fatura com casas excedentes é gravada normalizada e o consumo parte da fatura persistida", () => {
-    // 1000,005 -> 1000,01; tarifa 0,5: 1000,01 / 0,5 = 2000,02 (a fatura bruta daria 1000,005 / 0,5 = 2000,01).
-    const linha = montar({ consumoMedioKwh: null, valorFaturaMedio: 1000.005, tarifaKwh: 0.5 });
+  // ALTERADO: antes, consumo null + fatura 1000,005 + tarifa 0,5 => fatura 1000,01 e consumo 2000,02 (derivado).
+  // Agora, com consumo informado, a fatura continua gravada normalizada e o consumo nao e derivado dela.
+  it("fatura com casas excedentes é gravada normalizada; consumo informado não parte da fatura", () => {
+    const linha = montar({ consumoMedioKwh: 1500, valorFaturaMedio: 1000.005, tarifaKwh: 0.5 });
     expect(linha.valor_fatura_medio).toBe(1000.01);
-    expect(linha.consumo_medio_kwh).toBe(2000.02);
+    expect(linha.consumo_medio_kwh).toBe(1500);
     expect(calcular(entradaDaLinha(linha))).toEqual(resultadosGravados(linha));
   });
 
-  it("fatura 999,995 -> 1000 e consumo a partir de 1000 (não de 999,995)", () => {
-    // tarifa 0,7: 1000 / 0,7 = 1428,5714... -> 1428,57; 999,995 / 0,7 = 1428,5642... -> 1428,56.
-    const linha = montar({ consumoMedioKwh: null, valorFaturaMedio: 999.995, tarifaKwh: 0.7 });
+  // ALTERADO: antes, consumo null + fatura 999,995 + tarifa 0,7 => fatura 1000 e consumo 1428,57 (derivado).
+  it("fatura 999,995 -> 1000 gravada; consumo informado não é derivado da fatura", () => {
+    const linha = montar({ consumoMedioKwh: 1300, valorFaturaMedio: 999.995, tarifaKwh: 0.7 });
     expect(linha.valor_fatura_medio).toBe(1000);
-    expect(linha.consumo_medio_kwh).toBe(1428.57);
+    expect(linha.consumo_medio_kwh).toBe(1300);
     expect(calcular(entradaDaLinha(linha))).toEqual(resultadosGravados(linha));
+  });
+
+  it.each([
+    [1000, 0.95231],
+    [1000.005, 0.5],
+    [999.995, 0.7],
+  ])("fatura %s e tarifa %s sem consumo em kWh: estimativa incompleta (nunca consumo derivado)", (fatura, tarifa) => {
+    const r = linhaDeCalculo(
+      EMPRESA,
+      { ...ENTRADA_BASE, consumoMedioKwh: null, valorFaturaMedio: fatura, tarifaKwh: tarifa },
+      PARAMETROS,
+    );
+    expect(r).toEqual({ ok: false, incompleta: true, mensagem: MENSAGEM_ESTIMATIVA_INCOMPLETA });
   });
 
   it("valor_fatura_medio nulo continua nulo", () => {
@@ -312,8 +334,22 @@ describe("linhaDeCalculo: validações e ordem dos erros", () => {
     expect(mensagem({ consumoMedioKwh: 0 })).toBe(ERRO_CONSUMO);
   });
 
-  it("fatura 0,004 com tarifa 1 (fatura persistida 0, consumo 0) devolve o erro de consumo", () => {
-    expect(mensagem({ consumoMedioKwh: null, valorFaturaMedio: 0.004, tarifaKwh: 1 })).toBe(ERRO_CONSUMO);
+  // ALTERADO: antes devolvia ERRO_CONSUMO (consumo derivado = 0). Sem derivacao, conta em R$ sem kWh e
+  // estimativa incompleta, mesmo com fatura que normaliza para 0.
+  it("fatura 0,004 com tarifa 1 sem consumo em kWh devolve estimativa incompleta (não mais o erro de consumo)", () => {
+    const r = linhaDeCalculo(
+      EMPRESA,
+      { ...ENTRADA_BASE, consumoMedioKwh: null, valorFaturaMedio: 0.004, tarifaKwh: 1 },
+      PARAMETROS,
+    );
+    expect(r).toEqual({ ok: false, incompleta: true, mensagem: MENSAGEM_ESTIMATIVA_INCOMPLETA });
+    expect(mensagem({ consumoMedioKwh: null, valorFaturaMedio: 0.004, tarifaKwh: 1 })).not.toBe(ERRO_CONSUMO);
+  });
+
+  it("estimativa incompleta não é erro de entrada: só aparece com entrada válida (potência, tarifa e preço ok)", () => {
+    expect(mensagem({ consumoMedioKwh: null, valorFaturaMedio: 1000, potenciaKwp: 0 })).toBe(ERRO_POTENCIA);
+    expect(mensagem({ consumoMedioKwh: null, valorFaturaMedio: 1000, tarifaKwh: 0 })).toBe(ERRO_TARIFA);
+    expect(mensagem({ consumoMedioKwh: null, valorFaturaMedio: 1000, precoKit: -1 })).toBe(ERRO_PRECO);
   });
 
   it("parâmetros nulos com entrada válida devolvem o erro de parâmetros", () => {
