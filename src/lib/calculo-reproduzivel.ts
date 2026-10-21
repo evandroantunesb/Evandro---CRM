@@ -1,11 +1,12 @@
 /**
  * Cálculo solar reproduzível a partir do que fica gravado (funções puras, sem Supabase e sem "server-only").
  *
- * O consumo usado em `calcular` é o MESMO que será persistido em `calculos_solares.consumo_medio_kwh`
- * (numeric(10,2)). Assim, refazer o cálculo a partir da linha salva reproduz os resultados salvos.
+ * As entradas usadas em `calcular` (consumo, tarifa, potência, preço, fatura) são as MESMAS que serão persistidas
+ * em `calculos_solares`, na escala das colunas. Assim, refazer o cálculo a partir da linha salva reproduz os resultados salvos.
  * As fórmulas de `calcular` não são tocadas aqui.
  */
 import { calcular, DISPONIBILIDADE_PADRAO, type EntradaCalculo } from "@/lib/calculadora";
+import { consumoComoPersistido, valorComoPersistido } from "@/lib/consumo-persistido";
 import type { Database } from "@/lib/supabase/database.types";
 import type { TipoLigacao } from "@/lib/tipos";
 
@@ -14,35 +15,19 @@ export type LinhaCalculo = Omit<
   "negocio_id" | "observacoes" | "atualizado_por" | "criado_por"
 >;
 
-/** Escala de `calculos_solares.consumo_medio_kwh` (e de `negocios.consumo_medio_kwh`): numeric(10, 2). */
-const CASAS_CONSUMO = 2;
+// Contrato anterior preservado: a implementação mora em `consumo-persistido` (sem dependências).
+export { consumoComoPersistido, valorComoPersistido };
 
-/**
- * Consumo como o Postgres o gravará em numeric(10,2): 2 casas, arredondamento half away from zero sobre o valor
- * DECIMAL do número (a representação mais curta que identifica o double, que é o texto enviado ao banco).
- * Não usa `Math.round(x * 100)`: 1.005 * 100 = 100.49999999999999, mas o banco grava 1,01 para 1.005.
- *
- * Idempotente. Entrada não finita (NaN, ±Infinity) é devolvida como veio, sem mascarar: a validação/erro
- * continua a cargo de quem chama (hoje, o próprio banco rejeita). Não valida o limite de 10 dígitos da coluna.
- */
-export function consumoComoPersistido(kwh: number): number {
-  if (!Number.isFinite(kwh)) return kwh;
-  const negativo = kwh < 0;
-  let texto = Math.abs(kwh).toString();
-  if (/e/i.test(texto)) {
-    // Notação científica: valores < 1e-6 ou >= 1e21. Expande em decimal fixo (o excedente de casas é arredondado abaixo).
-    if (Math.abs(kwh) >= 1) return kwh; // inteiro grande: já não tem casas fracionárias
-    texto = Math.abs(kwh).toFixed(20);
-  }
-  const [inteiro, fracao = ""] = texto.split(".");
-  if (fracao.length <= CASAS_CONSUMO) return kwh;
-  const mantida = fracao.slice(0, CASAS_CONSUMO);
-  const sobe = fracao.charCodeAt(CASAS_CONSUMO) >= 53; // dígito seguinte >= '5' => afasta de zero
-  // Centésimos como inteiro exato (a coluna tem 10 dígitos, muito abaixo de 2^53).
-  const centesimos = Number(inteiro + mantida) + (sobe ? 1 : 0);
-  const valor = Number(centesimos) / 10 ** CASAS_CONSUMO;
-  return negativo && valor !== 0 ? -valor : valor;
-}
+/** Escalas de `calculos_solares` (migration 20260926000100_calculadora.sql). */
+const CASAS_TARIFA = 4; // tarifa_kwh numeric(8,4)
+const CASAS_POTENCIA = 2; // kit_potencia_kwp numeric(6,2)
+const CASAS_PRECO = 2; // kit_preco numeric(12,2)
+const CASAS_FATURA = 2; // valor_fatura_medio numeric(12,2)
+
+const MENSAGEM_POTENCIA = "Informe ao menos um módulo com potência para calcular.";
+const MENSAGEM_TARIFA = "Informe uma tarifa maior que zero (o banco guarda 4 casas).";
+const MENSAGEM_PRECO = "Informe um preço do kit válido (maior ou igual a zero).";
+const MENSAGEM_CONSUMO = "Informe um consumo maior que zero (o banco guarda 2 casas).";
 
 export type EntradaLinhaCalculo = {
   kitNome: string;
@@ -71,29 +56,44 @@ export function problemaDaEntrada(entrada: Pick<EntradaLinhaCalculo, "consumoMed
     return "Informe o consumo médio ou o valor médio da fatura.";
   }
   if (entrada.potenciaKwp <= 0) {
-    return "Informe ao menos um módulo com potência para calcular.";
+    return MENSAGEM_POTENCIA;
   }
   return null;
 }
 
 /**
  * Monta a linha de `calculos_solares` sem Supabase. `parametros` nulo = empresa sem parâmetros configurados.
- * O consumo (informado, ou fatura ÷ tarifa) é normalizado por `consumoComoPersistido` ANTES de `calcular`, e esse
- * mesmo valor é gravado em `consumo_medio_kwh`.
+ * Tarifa (4 casas), potência, preço e fatura (2 casas) são normalizados por `valorComoPersistido` ANTES de `calcular`
+ * e gravados já normalizados. O consumo (informado, ou fatura persistida ÷ tarifa persistida) passa por
+ * `consumoComoPersistido` e é gravado em `consumo_medio_kwh`. Potência ou tarifa que viram <= 0 após a normalização
+ * devolvem erro (o banco exige > 0).
  */
 export function linhaDeCalculo(empresaId: string, entrada: EntradaLinhaCalculo, parametros: ParametrosCalculo | null): ResultadoLinha {
   const problema = problemaDaEntrada(entrada);
   if (problema) return { ok: false, mensagem: problema };
+
+  // Cada entrada persistida é normalizada para a escala da coluna ANTES de calcular; o valor normalizado é o
+  // usado no cálculo e o gravado na linha (refazer dos dados salvos reproduz o resultado).
+  const potenciaKwp = valorComoPersistido(entrada.potenciaKwp, CASAS_POTENCIA);
+  if (!(potenciaKwp > 0)) return { ok: false, mensagem: MENSAGEM_POTENCIA };
+  const tarifaKwh = valorComoPersistido(entrada.tarifaKwh, CASAS_TARIFA);
+  if (!(tarifaKwh > 0)) return { ok: false, mensagem: MENSAGEM_TARIFA };
+  const precoKit = valorComoPersistido(entrada.precoKit, CASAS_PRECO);
+  if (!(precoKit >= 0)) return { ok: false, mensagem: MENSAGEM_PRECO };
+  const valorFaturaMedio = entrada.valorFaturaMedio == null ? null : valorComoPersistido(entrada.valorFaturaMedio, CASAS_FATURA);
+
+  const consumoMedioKwh = consumoComoPersistido(entrada.consumoMedioKwh ?? valorFaturaMedio! / tarifaKwh);
+  if (!Number.isFinite(consumoMedioKwh) || consumoMedioKwh <= 0) return { ok: false, mensagem: MENSAGEM_CONSUMO };
+
   if (!parametros) return { ok: false, mensagem: "Parâmetros da calculadora não configurados." };
 
-  const consumoMedioKwh = consumoComoPersistido(entrada.consumoMedioKwh ?? entrada.valorFaturaMedio! / entrada.tarifaKwh);
   const disponibilidadeKwh = parametros[DISPONIBILIDADE_PADRAO[entrada.tipoLigacao]];
   const resultado = calcular({
-    potenciaKwp: entrada.potenciaKwp,
-    precoKit: entrada.precoKit,
+    potenciaKwp,
+    precoKit,
     tipoLigacao: entrada.tipoLigacao,
     consumoMedioKwh,
-    tarifaKwh: entrada.tarifaKwh,
+    tarifaKwh,
     produtividadeKwhKwpMes: parametros.produtividade_kwh_kwp_mes,
     percentualFioB: parametros.percentual_fio_b,
     disponibilidadeKwh,
@@ -105,12 +105,12 @@ export function linhaDeCalculo(empresaId: string, entrada: EntradaLinhaCalculo, 
       empresa_id: empresaId,
       kit_id: null,
       kit_nome: entrada.kitNome,
-      kit_potencia_kwp: entrada.potenciaKwp,
-      kit_preco: entrada.precoKit,
+      kit_potencia_kwp: potenciaKwp,
+      kit_preco: precoKit,
       tipo_ligacao: entrada.tipoLigacao,
       consumo_medio_kwh: consumoMedioKwh,
-      valor_fatura_medio: entrada.valorFaturaMedio,
-      tarifa_kwh: entrada.tarifaKwh,
+      valor_fatura_medio: valorFaturaMedio,
+      tarifa_kwh: tarifaKwh,
       produtividade_kwh_kwp_mes: parametros.produtividade_kwh_kwp_mes,
       percentual_fio_b: parametros.percentual_fio_b,
       disponibilidade_kwh: disponibilidadeKwh,
@@ -123,7 +123,7 @@ export function linhaDeCalculo(empresaId: string, entrada: EntradaLinhaCalculo, 
       economia_mensal: resultado.economiaMensal,
       // Sem preço do kit (negócio sem valor definido), o payback não tem
       // significado — fica em aberto em vez de mostrar "0 meses".
-      payback_meses: entrada.precoKit > 0 ? resultado.paybackMeses : null,
+      payback_meses: precoKit > 0 ? resultado.paybackMeses : null,
     },
   };
 }

@@ -13,6 +13,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { calcular } from "@/lib/calculadora";
 import { consumoComoPersistido, entradaDaLinha, linhaDeCalculo, type ParametrosCalculo } from "@/lib/calculo-reproduzivel";
+import { valorComoPersistido } from "@/lib/consumo-persistido";
 import { lerNumeroBr } from "@/lib/formatacao";
 import { percentualParaCampo } from "@/lib/percentual-exibicao";
 import type { Database } from "@/lib/supabase/database.types";
@@ -222,6 +223,83 @@ describe("consumo: consumoComoPersistido bate com o Postgres real", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// 3) M2-Q2: novas colunas normalizadas (tarifa, potência, preço, fatura)
+// ---------------------------------------------------------------------------
+
+type InsertCalculo = Database["public"]["Tables"]["calculos_solares"]["Insert"];
+
+/** Insere em calculos_solares com valores BRUTOS nas colunas escolhidas (resto fixo e válido). */
+async function inserirCalculoBruto(sobrescrever: Partial<InsertCalculo>) {
+  const negocio = await novoNegocio();
+  await montarKit(negocio);
+  const linha: InsertCalculo = {
+    empresa_id: empresa,
+    negocio_id: negocio,
+    kit_nome: "Kit 10 kWp",
+    kit_potencia_kwp: 10,
+    kit_preco: 30000,
+    tipo_ligacao: "bifasico",
+    consumo_medio_kwh: 1200,
+    tarifa_kwh: 0.9,
+    produtividade_kwh_kwp_mes: 120,
+    percentual_fio_b: 0.45,
+    disponibilidade_kwh: 50,
+    geracao_estimada_kwh_mes: 1200,
+    kwh_faturado: 50,
+    kwh_compensado: 0,
+    custo_fio_b: 0,
+    conta_sem_solar: 1,
+    conta_com_solar: 1,
+    economia_mensal: 0,
+    ...sobrescrever,
+  };
+  const { error } = await servico.from("calculos_solares").insert(linha);
+  return { negocio, error };
+}
+
+describe("M2-Q2: valorComoPersistido bate com o Postgres real nas colunas de calculos_solares", () => {
+  it.each([0.123456, 0.95231, 0.00005, 1.23455])("tarifa_kwh numeric(8,4): bruto %s", async (bruto) => {
+    const { negocio, error } = await inserirCalculoBruto({ tarifa_kwh: bruto });
+    expect(error).toBeNull();
+    const { data } = await servico.from("calculos_solares").select("tarifa_kwh").eq("negocio_id", negocio).single();
+    expect(data!.tarifa_kwh).toBe(valorComoPersistido(bruto, 4));
+  });
+
+  it.each([5.505, 6.1, 0.005])("kit_potencia_kwp numeric(6,2): bruto %s", async (bruto) => {
+    const { negocio, error } = await inserirCalculoBruto({ kit_potencia_kwp: bruto });
+    expect(error).toBeNull();
+    const { data } = await servico.from("calculos_solares").select("kit_potencia_kwp").eq("negocio_id", negocio).single();
+    expect(data!.kit_potencia_kwp).toBe(valorComoPersistido(bruto, 2));
+  });
+
+  it.each([20000.005, 19999.995])("kit_preco numeric(12,2): bruto %s", async (bruto) => {
+    const { negocio, error } = await inserirCalculoBruto({ kit_preco: bruto });
+    expect(error).toBeNull();
+    const { data } = await servico.from("calculos_solares").select("kit_preco").eq("negocio_id", negocio).single();
+    expect(data!.kit_preco).toBe(valorComoPersistido(bruto, 2));
+  });
+
+  it.each([1000.005, 999.995])("valor_fatura_medio numeric(12,2): bruto %s", async (bruto) => {
+    const { negocio, error } = await inserirCalculoBruto({ valor_fatura_medio: bruto });
+    expect(error).toBeNull();
+    const { data } = await servico.from("calculos_solares").select("valor_fatura_medio").eq("negocio_id", negocio).single();
+    expect(data!.valor_fatura_medio).toBe(valorComoPersistido(bruto, 2));
+  });
+
+  it("o banco rejeita (23514) tarifa bruta 0,00004 (normaliza para 0) e o helper também prevê 0", async () => {
+    expect(valorComoPersistido(0.00004, 4)).toBe(0);
+    const { error } = await inserirCalculoBruto({ tarifa_kwh: 0.00004 });
+    expect(error?.code).toBe("23514");
+  });
+
+  it("o banco rejeita (23514) potência bruta 0,004 (normaliza para 0) e o helper também prevê 0", async () => {
+    expect(valorComoPersistido(0.004, 2)).toBe(0);
+    const { error } = await inserirCalculoBruto({ kit_potencia_kwp: 0.004 });
+    expect(error?.code).toBe("23514");
+  });
+});
+
 describe("cálculo reproduzível a partir dos dados salvos", () => {
   let parametros: ParametrosCalculo;
 
@@ -249,6 +327,11 @@ describe("cálculo reproduzível a partir dos dados salvos", () => {
     tipo: "monofasico" | "bifasico" | "trifasico";
     consumoGravado: number;
     contaSemSolarGravada?: number;
+    precoKit?: number;
+    tarifaGravada?: number;
+    faturaGravada?: number;
+    potenciaGravada?: number;
+    precoGravado?: number;
   };
   const CASOS: Caso[] = [
     { nome: "tarifa 0,90 e consumo 1500,005", consumo: 1500.005, fatura: null, tarifa: 0.9, potencia: 10, tipo: "bifasico", consumoGravado: 1500.01, contaSemSolarGravada: 1350.01 },
@@ -259,6 +342,11 @@ describe("cálculo reproduzível a partir dos dados salvos", () => {
     { nome: "consumo 2 casas já exato", consumo: 1234.56, fatura: null, tarifa: 1.0123, potencia: 7.5, tipo: "bifasico", consumoGravado: 1234.56 },
     { nome: "fatura 1000 e tarifa 0,90 (consumo 1111,11)", consumo: null, fatura: 1000, tarifa: 0.9, potencia: 10, tipo: "trifasico", consumoGravado: 1111.11 },
     { nome: "sistema cobre todo o consumo (consumo 300,005)", consumo: 300.005, fatura: null, tarifa: 0.9, potencia: 10, tipo: "monofasico", consumoGravado: 300.01 },
+    // M2-Q2: tarifa/potência/preço/fatura com casas excedentes (preço 20000,005 -> 20000,01; potência 5,505 -> 5,51)
+    { nome: "tarifa 0,123456 e consumo 800 (tarifa gravada 0,1235)", consumo: 800, fatura: null, tarifa: 0.123456, potencia: 10, tipo: "bifasico", consumoGravado: 800, tarifaGravada: 0.1235 },
+    { nome: "tarifa 0,95231 e consumo 800 (tarifa gravada 0,9523)", consumo: 800, fatura: null, tarifa: 0.95231, potencia: 10, tipo: "bifasico", consumoGravado: 800, tarifaGravada: 0.9523 },
+    { nome: "fatura 1000 e tarifa 0,95231 (consumo 1050,09)", consumo: null, fatura: 1000, tarifa: 0.95231, potencia: 10, tipo: "bifasico", consumoGravado: 1050.09, tarifaGravada: 0.9523, faturaGravada: 1000 },
+    { nome: "potência 5,505, preço 20000,005 e fatura 1000,005 com tarifa 0,5", consumo: null, fatura: 1000.005, tarifa: 0.5, potencia: 5.505, precoKit: 20000.005, tipo: "bifasico", consumoGravado: 2000.02, tarifaGravada: 0.5, faturaGravada: 1000.01, potenciaGravada: 5.51, precoGravado: 20000.01 },
   ];
 
   function pegarResultados(l: {
@@ -289,7 +377,7 @@ describe("cálculo reproduzível a partir dos dados salvos", () => {
     const entrada = {
       kitNome: "Kit teste",
       potenciaKwp: caso.potencia,
-      precoKit: 30000,
+      precoKit: caso.precoKit ?? 30000,
       tipoLigacao: caso.tipo,
       consumoMedioKwh: caso.consumo,
       valorFaturaMedio: caso.fatura,
@@ -306,6 +394,10 @@ describe("cálculo reproduzível a partir dos dados salvos", () => {
     expect(lida!.consumo_medio_kwh).toBe(caso.consumoGravado);
     expect(lida!.consumo_medio_kwh).toBe(r.linha.consumo_medio_kwh);
     if (caso.contaSemSolarGravada !== undefined) expect(lida!.conta_sem_solar).toBe(caso.contaSemSolarGravada);
+    if (caso.tarifaGravada !== undefined) expect(lida!.tarifa_kwh).toBe(caso.tarifaGravada);
+    if (caso.faturaGravada !== undefined) expect(lida!.valor_fatura_medio).toBe(caso.faturaGravada);
+    if (caso.potenciaGravada !== undefined) expect(lida!.kit_potencia_kwp).toBe(caso.potenciaGravada);
+    if (caso.precoGravado !== undefined) expect(lida!.kit_preco).toBe(caso.precoGravado);
     for (const [campo, valor] of Object.entries(r.linha)) {
       expect(lida![campo as keyof typeof lida], campo).toEqual(valor);
     }
