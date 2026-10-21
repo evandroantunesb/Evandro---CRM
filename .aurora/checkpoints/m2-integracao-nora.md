@@ -34,6 +34,15 @@ Ver o relatório de revisão (RELATORIO-REVISAO.md do pacote). Resumo: typecheck
 - Conflito conhecido a resolver quando a branch wip/consumo-estimado-persistencia for unida: calculo-servidor.ts (regra "consumo obrigatório, sem fatura ÷ tarifa" deve ir para `problemaDaEntrada`/`linhaDeCalculo`).
 - 2 testes "regressões de tela" de tests/negocios-gravacao.test.ts falham no Windows (CRLF) também na main: preexistente; o CI (Linux) é a referência.
 - Troca de computador: pronta somente depois que o SHA da branch aurora/m2-integracao for verificado no remoto (conferência feita por Nora após o push). Os worktrees dos agentes (wt-m2-f1, -b1, -q1) têm só cópias já integradas.
+- Decisão do Evandro: #209 e o PR da persistência (wip/consumo-estimado-persistencia), que conflita com a extração do Jay.
+- Do Evandro: e2e/visual e aceitação funcional da calculadora.
+
+## Nota final da rodada (2026-10-21, troca de computador)
+- Remoto conferido: aurora/m2-integracao = 58100d3abb8a8525716445374e8b3378e6e25ea2, igual ao local e head do PR #213 (Draft). wt-m2-int limpa, sem nada sem commit. wip/consumo-estimado-persistencia = 4b4e506e9d704e09ff56e6d5dcdaaecdafa41f1c no remoto. A main não mudou nesta rodada.
+- Retomada no notebook: `git fetch` e fast-forward em aurora/m2-integracao (já em dia, 58100d3). Neste notebook foi preciso `safe.directory` para o repositório e para R:/wt-m2-int (dono do disco R: diferente do usuário).
+- CI "verificar" do push novo: estava pendente na última checagem em outro ambiente; não conferido no notebook (gh sem login). Conferir antes de qualquer outra decisão.
+- Banco descartável aurora-m2-q1 parado; volumes mantidos. Stacks evandro---crm e restore-* não foram tocados. Não versionados e fora do notebook: logs (.aurora/logs), scripts de .aurora/tmp e o db.env do banco descartável; para testes de banco é preciso recriar o stack local.
+- As 2 falhas de CRLF em tests/negocios-gravacao.test.ts são só do Windows e preexistentes.
 
 ## Próximo passo exato
 Revisão do Evandro na PR em Draft. Nada de merge sem autorização específica. Decisões pendentes: A1 (módulos), conflito com a wip, achados 1–7 do Jay, aplicar a migration 20261021100000 em produção (workflow com confirmação aplicar-16b49d8, ação do Evandro).
