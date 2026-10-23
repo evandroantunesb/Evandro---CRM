@@ -7,7 +7,7 @@ describe("consumo informado ou estimado pela fatura", () => {
   });
 
   it("arredonda a conta e a tarifa como o banco antes de estimar kWh", () => {
-    expect(resolverConsumo(null, 450.005, 0.95005)).toEqual({ origem: "estimado", kwh: 473.65, tarifaEfetiva: 0.9501 });
+    expect(resolverConsumo(null, 450.005, 0.95005)).toEqual({ origem: "estimado", kwh: 473.64, tarifaEfetiva: 0.9501 });
   });
 
   it("não converte só pela conta: falta tarifa efetiva separada da tarifa base", () => {
