@@ -43,3 +43,33 @@ Próximo passo: Nora verifica typecheck/lint em cópia limpa; Kara escreve teste
   - Verificar: tests/negocios-gravacao*.test.ts, negocios-acoes-db.test.ts (grep só achou fatura junto de consumo informado; provável sem impacto).
 - Também sem teste: salvarKitComCliente com incompleta (kit salvo, sem upsert, aviso, cálculo anterior mantido).
 - Não rodado: typecheck/lint/vitest (sem node_modules).
+
+## M2-B3 (integração, 2026-10-21) — conta SEM solar com piso
+- src/lib/fio-b-hipotese.ts: `contaSemSolar = max(C, D) × T`; novo campo `paybackDisponivel` (economiaMensal > 0); cabeçalho atualizado. Fórmula com solar mantida (piso sobre o faturamento total, incl. K×N).
+- Contrato final: .aurora/contratos/m2-p0-conta-solar.md.
+- Resultados: typecheck ok; lint 0 erros (3 warnings preexistentes); vitest fio-b-hipotese + estimativa-financeira: 128 passam, 1 falha (tests/fio-b-hipotese.test.ts:66, "consumo < custo de disponibilidade" espera contaSemSolar 20 = C×T; agora 30 = piso). Teste de Kara a atualizar (não editado por mim).
+- Não rodado: suítes -db, build; texto oficial do art. 655-I (baseei-me no checkpoint de Nora).
+- Sem commit/push.
+- Decisão de Nora (21/10): economiaMensal = arredondar2(arredondar2(sem) − arredondar2(com)); contas iguais exibidas => economia 0 e payback indisponível (resposta à dúvida 2 do Jay).
+
+## M2-B4 (2026-10-21) - vigencia do calculo salvo
+- Novo src/lib/calculo-vigencia.ts (calculoDesatualizado, potenciaDoKitKwp, mensagens); pdf-dados.ts com flag desatualizado (overloads, tipo DadosSistemaPropostaDesatualizado); gerarLinkProposta recusa calculo desatualizado.
+- Contrato: .aurora/contratos/m2-p0-calculo-vigencia.md (regra, falsos positivos, tabela de consumidores, o que o Kevin ajusta).
+- Resultados: typecheck ok; vitest (fio-b-hipotese, estimativa-financeira, calculo-reproduzivel) 233 passam; propostas-pdf-dados 2 passam; lint: 2 erros so em .aurora/tmp/arred-compara*.ts (scratch, nao meu) + 3 warnings preexistentes.
+- Nao rodado: suites -db, build. Sem commit/push.
+- Pendencias: contratos-geracao e atualizarPrecoCalculoComCliente nao tratam vigencia; falso positivo do consumo do formulario do kit (ver contrato).
+
+## M2-B5 (2026-10-21) - decisoes de Nora sobre vigencia
+- calculoDesatualizado agora SO compara potencia do kit atual (2 casas) x kit_potencia_kwp; assinatura sem consumoMedioKwhNegocio e sem consumo_medio_kwh. Chamadores ajustados (gerarLinkProposta; pdf-dados so teve comentario).
+- Novas constantes: MENSAGEM_CONTRATO_CALCULO_DESATUALIZADO, MENSAGEM_PRECO_CALCULO_DESATUALIZADO; mensagens existentes sem "ou o consumo".
+- Guarda em gerarContratoComCliente (apos a guarda de preco, antes de gerar/gravar) e em atualizarPrecoCalculoComCliente (antes de qualquer update).
+- Resultados: typecheck ok; lint 0 erros (3 warnings preexistentes); vitest puro 3 arquivos, 164 passam. Nao rodado: suites -db, build. Sem commit/push.
+
+## M2-B8 (2026-10-21) - implementacao da solucao minima do diagnostico B7
+Objetivo: motor sem formula (estimativa sempre incompleta), gravacao, vigencia com `legado`/`naoVerificavel`, proposta bloqueada, contratos de texto. Branch aurora/m2-p0-integracao, base 2780a53, sem commit.
+Concluido (src/lib): calculadora.ts (uniao `calcular`, `fecharEconomia`, cobranca antiga removida), estimativa-financeira.ts (`avaliarEstimativa`, `formula_nao_validada`, mensagens), calculo-reproduzivel.ts (`ResultadoLinha` com pendencias), calculo-servidor.ts (comentario), negocios-gravacao.ts, calculo-vigencia.ts, acoes/propostas.ts, contratos-geracao.ts, propostas/pdf-dados.ts, propostas/pdf-tipos.ts (anulaveis), NOVO propostas/emissao-preservada.ts. Contratos: NOVO m2-p0-motor-estimativa.md; corrigidos m2-p0-arredondamento-economia.md e m2-p0-calculo-vigencia.md.
+Decisoes: ver as 9 de Nora (checkpoint m2-p0-fio-b-nora.md). Escolhas minhas: `formula_nao_validada` sempre na lista; motivo extra `parametros_financeiros` (separa do `parametros`=produtividade para o contrato ignorar); `legado` primeiro na prioridade; `calculoDesatualizado` leniente (compat de src/app, devolve true para legado).
+Resultados: typecheck FALHA so em src/app (kit-personalizado.tsx, formulario.tsx), src/lib/propostas/pdf.tsx, src/lib/pdf-proposta.tsx e tests (calculadora, calculo-preco); eslint dos arquivos alterados sem avisos; vitest puro (5 arquivos): estimativa-financeira e fio-b-hipotese passam; calculadora (4), calculo-reproduzivel (26) e calculo-vigencia (6) falham por mudanca de requisito (motor incompleto/legado).
+Nao rodado: suites -db, build, e2e. Sem commit/push.
+Proximo passo: Kevin troca os usos em src/app e renderers; Kara reescreve os testes listados no relatorio.
+
