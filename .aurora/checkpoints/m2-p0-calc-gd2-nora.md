@@ -290,3 +290,15 @@ Decisão do Evandro: rodada da calculadora GD II **encerrada: implementação e 
 
 - Só a `20261023240000_calculos_solares_revogar_escrita_direta` + as asserções de segurança restauradas (`calculo-gravacao-confiavel-db`, `calculadora-db`, `travas-kit-sdr-db`, idênticas às do pacote) + lista autorizada com um único item e testes da trava.
 - Pré-requisitos antes de aplicar em produção: lote 1 (#214) aplicado e **confirmação de que o app novo (PR B) atende a produção**; a versão anterior do app grava direto com o cliente do usuário e deixaria de salvar o cálculo. Reversão de emergência (reabre a brecha): `reverter-20261023240000.sql` no pacote, contingência e não padrão.
+
+## PR C — diferença em relação ao pacote original (23/10/2026)
+
+- `20261023240000` passa a revogar também `references` e `trigger` de `anon` e `authenticated` (pacote: só `insert, update, truncate`).
+  Motivo: vinham só dos privilégios padrão do Supabase; nenhuma FK aponta para `calculos_solares`, os gatilhos são do `postgres`
+  (executá-los não exige TRIGGER) e o app não roda DDL com esses papéis. SELECT, DELETE, policies "ver cálculo"/"apagar cálculo",
+  os 7 gatilhos e a gravação pelo `service_role` ficam iguais. `MAINTAIN` (PG 17) não foi alterado.
+- Teste novo em `calculo-gravacao-confiavel-db`: privilégios efetivos (`has_table_privilege`) e PUBLIC sem nada.
+- Ensaio no banco restaurado de produção (isolado, sem portas; lote 1 já aplicado): INSERT, UPDATE, UPSERT, TRUNCATE, criar FK e criar
+  trigger recusados (42501); SELECT e DELETE do admin ok, com histórico `apagado` e autoria; RPC de autorização ok (anon recusado);
+  UPDATE do servidor ok com `updated_at`; `exige_kit` recusa até o servidor; 49 cálculos com o mesmo hash. Tudo em transações revertidas.
+- A reversão de emergência do pacote (`reverter-20261023240000.sql`) não precisa devolver `references`/`trigger`: o app antigo não os usa.

@@ -9,7 +9,9 @@
  *  - mesmo o caminho privilegiado não grava `completo` com referência tarifária divergente da tabela oficial;
  *  - sem a chave do servidor, nada é gravado (nem o kit) e a recusa é clara;
  *  - apagar deixa a linha inteira no histórico com a autoria (migration 20261023230000), e só quem pode apaga;
- *  - trigger e motor concordam no percentual legal e no piso do art. 291 para todo ano e ligação suportados.
+ *  - trigger e motor concordam no percentual legal e no piso do art. 291 para todo ano e ligação suportados;
+ *  - privilégios efetivos: `anon`/`authenticated` só com SELECT e DELETE (sem INSERT, UPDATE, TRUNCATE, REFERENCES nem
+ *    TRIGGER), PUBLIC sem nada e `service_role` mantém a gravação do servidor.
  */
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { MENSAGEM_GRAVACAO_INDISPONIVEL } from "@/lib/calculo-gravacao";
@@ -19,6 +21,7 @@ import { TIPOS_LIGACAO } from "@/lib/tipos";
 import type { SupabaseServidor } from "@/lib/supabase/server";
 import type { TablesInsert, TablesUpdate } from "@/lib/supabase/database.types";
 import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
+import { novoClienteBanco } from "./banco-local";
 
 let vendedor: Usuario, colega: Usuario, operacao: Usuario, fora: Usuario, admin: Usuario;
 let empresa: string, outraEmpresa: string, funil: string, etapa: string;
@@ -194,6 +197,36 @@ describe("vendedor autenticado não grava financeiro direto (PostgREST)", () => 
   it("o trigger de histórico não é RPC exposta", async () => {
     const { error } = await vendedor.cliente.rpc("calculos_solares_arquivar_historico" as never);
     expect(error).not.toBeNull();
+  });
+});
+
+describe("privilégios efetivos em calculos_solares (inclui herança; PUBLIC à parte)", () => {
+  const PRIVILEGIOS = ["SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER"] as const;
+
+  it("anon e authenticated só leem e apagam; service_role grava; PUBLIC não tem nada", async () => {
+    const banco = novoClienteBanco();
+    await banco.connect();
+    try {
+      const efetivos: Record<string, Record<string, boolean>> = {};
+      for (const papel of ["anon", "authenticated", "service_role"]) {
+        efetivos[papel] = {};
+        for (const p of PRIVILEGIOS) {
+          const { rows } = await banco.query("select has_table_privilege($1, 'public.calculos_solares', $2) as tem", [papel, p]);
+          efetivos[papel][p] = rows[0].tem;
+        }
+      }
+      const soLerEApagar = { SELECT: true, INSERT: false, UPDATE: false, DELETE: true, TRUNCATE: false, REFERENCES: false, TRIGGER: false };
+      expect(efetivos.anon).toEqual(soLerEApagar);
+      expect(efetivos.authenticated).toEqual(soLerEApagar);
+      expect(efetivos.service_role).toMatchObject({ SELECT: true, INSERT: true, UPDATE: true, DELETE: true });
+
+      const { rows: publico } = await banco.query(
+        "select count(*)::int as n from (select (aclexplode(relacl)).grantee from pg_class where oid = 'public.calculos_solares'::regclass) a where a.grantee = 0",
+      );
+      expect(publico[0].n).toBe(0);
+    } finally {
+      await banco.end();
+    }
   });
 });
 
