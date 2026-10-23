@@ -35,6 +35,7 @@ const { criarNegocio, editarNegocio } = await import("@/lib/acoes/negocios");
 const { enviarArquivos } = await import("@/lib/anexos-navegador");
 const { ANEXOS_CRIACAO, nomeSeguro, prepararEnvioCriacao } = await import("@/lib/anexos-regras");
 const { conferirArquivos } = await import("@/lib/anexos-servidor");
+const { mensagemEstimativaIncompleta, pendenciasDaEntrada } = await import("@/lib/calculo-reproduzivel");
 const { criarUsuario, servico, sufixo } = await import("./ajuda");
 
 let vendedor: Usuario;
@@ -374,7 +375,16 @@ describe("ficha pela tela", () => {
       observacoes: "",
     }))
       kit.append(k, v);
-    expect(await salvarKitPersonalizado(null, kit)).toEqual({ ok: true, mensagem: "Kit e cálculo salvos." });
+    // ANTES: "Kit e cálculo salvos." e a linha de cálculo era criada. AGORA: estimativa incompleta; itens e resultado
+    // técnico salvos (linha `incompleto`, sem parte financeira).
+    const pendencias = pendenciasDaEntrada({ consumoMedioKwh: 450, valorFaturaMedio: 320, tarifaKwh: 0.95 });
+    expect(await salvarKitPersonalizado(null, kit)).toEqual({ ok: true, pendencias, mensagem: `Kit e resultado técnico salvos. ${mensagemEstimativaIncompleta(pendencias)}` });
+    const { data: tecnico } = await vendedor.cliente
+      .from("calculos_solares")
+      .select("estado_financeiro, economia_mensal, payback_meses, geracao_estimada_kwh_mes")
+      .eq("negocio_id", r.negocioId)
+      .single();
+    expect(tecnico).toEqual({ estado_financeiro: "incompleto", economia_mensal: null, payback_meses: null, geracao_estimada_kwh_mes: 660 });
 
     const { data: n } = await vendedor.cliente
       .from("negocios")
@@ -401,10 +411,11 @@ describe("ficha pela tela", () => {
 
     const [{ data: c }, { data: calc }, lista] = await Promise.all([
       vendedor.cliente.from("contatos").select("nome, documento, endereco, cidade, uf").eq("id", n!.contato_id).single(),
-      vendedor.cliente.from("calculos_solares").select("valor_fatura_medio, tarifa_kwh").eq("negocio_id", r.negocioId).single(),
+      vendedor.cliente.from("calculos_solares").select("valor_fatura_medio, tarifa_kwh").eq("negocio_id", r.negocioId).maybeSingle(),
       registros(r.negocioId),
     ]);
     expect(c).toEqual({ nome: "Cliente editado", documento: "123.456.789-09", endereco: "Rua Nova, 1", cidade: "Cascavel", uf: "PR" });
+    // Reabrir: o resultado técnico salvo traz a fatura e a tarifa enviadas (sem parte financeira, conferido acima).
     expect(calc).toEqual({ valor_fatura_medio: 320, tarifa_kwh: 0.95 });
     expect(lista.map((a) => [a.nome, a.categoria])).toEqual([["fatura.pdf", "fatura_gerador"]]);
     expect((await conferir(r.negocioId)).semRegistro).toEqual([]);

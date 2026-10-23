@@ -155,9 +155,21 @@ async function criarNegocio(u: Usuario, extra: Record<string, string> = {}) {
   return r.negocioId;
 }
 
-/** Negócio do vendedor com kit de 2 itens e cálculo solar salvo (pelo fluxo do app). */
+/**
+ * Negócio do vendedor com kit de 2 itens e uma linha de cálculo LEGADA (fórmula antiga, não validada) como fixture.
+ * Criar com consumo e tarifa grava o resultado técnico INCOMPLETO (sem parte financeira); a fixture o substitui pela
+ * linha legada. A trava do kit independe de como a linha nasceu.
+ */
 async function negocioComCalculo(u: Usuario = vendedor) {
   const negocioId = await criarNegocio(u, { componentes: KIT, consumo_medio_kwh: "450", tarifa_kwh: "0,95" });
+  const { data: criado } = await servico.from("calculos_solares").select("estado_financeiro").eq("negocio_id", negocioId).single();
+  expect(criado?.estado_financeiro).toBe("incompleto"); // criar grava só o resultado técnico
+  // Com autor registrado (como o app gravava): a RLS de exclusão do cálculo libera o próprio autor.
+  const { error } = await servico.from("calculos_solares").upsert(
+    { ...linhaCalculo(negocioId), estado_financeiro: "legado", pendencias: null, criado_por: atual[u.id].membroId, atualizado_por: atual[u.id].membroId },
+    { onConflict: "negocio_id" },
+  );
+  expect(error).toBeNull();
   const { data: calculo } = await servico.from("calculos_solares").select("id").eq("negocio_id", negocioId).single();
   expect(calculo).not.toBeNull();
   return negocioId;
@@ -255,11 +267,14 @@ describe("kit com cálculo solar nunca fica vazio", () => {
     }
   });
 
-  it("restauração após falha no cálculo devolve o kit anterior com a trava ligada", async () => {
+  // ANTES ("restauração após falha no cálculo devolve o kit anterior com a trava ligada"): a tarifa 100000 fazia o banco
+  // recusar a linha e o app restaurava o kit. AGORA a linha legada nunca é substituída por um resultado incompleto, então
+  // nenhuma linha é gravada; a restauração por falha na troca dos itens continua coberta pelo teste seguinte. Aqui: com
+  // a mesma entrada o app troca os itens (a trava deixa: novos antes dos antigos) e a linha legada segue intacta.
+  it("tarifa acima do limite da coluna com linha legada: o banco recusa a linha nova, o kit volta e a legada fica intocada", async () => {
     const negocioId = await negocioComCalculo();
-    const antes = await lerKit(negocioId);
+    const { data: linhaAntes } = await servico.from("calculos_solares").select("*").eq("negocio_id", negocioId).single();
     const novo = JSON.stringify([{ tipo: "modulo", descricao: "Módulo 600 W", potenciaW: 600, quantidade: 8 }]);
-    // Tarifa acima do limite da coluna: itens trocados, cálculo recusado → restaura (reinserir antes de apagar).
     const r = await salvarKitComCliente(
       cliente(vendedor),
       atual[vendedor.id],
@@ -267,8 +282,10 @@ describe("kit com cálculo solar nunca fica vazio", () => {
     );
     expect(r.ok).toBe(false);
     expect(r.mensagem).toContain("Nada foi alterado");
-    expect(await lerKit(negocioId)).toEqual(antes);
-    expect(await temCalculo(negocioId)).toBe(true);
+    expect((await lerKit(negocioId)).map((k) => k.descricao)).not.toEqual(["Módulo 600 W"]);
+    const { data: linhaDepois } = await servico.from("calculos_solares").select("*").eq("negocio_id", negocioId).single();
+    expect(linhaDepois).toEqual(linhaAntes);
+    expect((await servico.from("calculos_solares_historico").select("id").eq("negocio_id", negocioId)).data).toEqual([]);
   });
 
   it("falha parcial com cálculo: exclusão falha → restaura; restauração falha → avisa; reenvio corrige", async () => {
@@ -420,34 +437,34 @@ describe("cálculo solar só é criado com kit", () => {
     expect(await temCalculo(negocioId)).toBe(false);
   });
 
-  it("R3: criar cálculo direto em negócio sem kit é recusado (vendedor e serviço)", async () => {
+  it("R3: criar cálculo direto em negócio sem kit é recusado (pela trava do kit; a recusa do vendedor por falta de privilégio fica para a PR C)", async () => {
     const negocioId = await criarNegocio(vendedor);
-    for (const c of [vendedor.cliente, servico]) {
-      const { error } = await c.from("calculos_solares").insert(linhaCalculo(negocioId));
-      expect(error?.message).toContain(MENSAGEM_CALCULO);
-      expect(error?.hint).toBe("mensagem_usuario");
-    }
+    const { error } = await servico.from("calculos_solares").insert(linhaCalculo(negocioId));
+    expect(error?.message).toContain(MENSAGEM_CALCULO);
+    expect(error?.hint).toBe("mensagem_usuario");
     expect(await temCalculo(negocioId)).toBe(false);
   });
 
   it("levar um cálculo para negócio sem kit é recusado; o cálculo fica onde estava", async () => {
     const comCalculo = await negocioComCalculo();
     const semKit = await criarNegocio(vendedor);
-    const { error } = await vendedor.cliente.from("calculos_solares").update({ negocio_id: semKit }).eq("negocio_id", comCalculo);
+    const { error } = await servico.from("calculos_solares").update({ negocio_id: semKit }).eq("negocio_id", comCalculo);
     expect(error?.message).toContain(MENSAGEM_CALCULO);
     expect(await temCalculo(comCalculo)).toBe(true);
     expect(await temCalculo(semKit)).toBe(false);
   });
 
-  it("criação normal com kit: direto pelo Supabase e pelo cadastro do app", async () => {
+  it("criação normal com kit: pelo serviço e pelo cadastro do app", async () => {
     const negocioId = await criarNegocio(vendedor, { componentes: KIT_UM });
-    const { error } = await vendedor.cliente.from("calculos_solares").insert(linhaCalculo(negocioId));
+    const { error } = await servico.from("calculos_solares").insert(linhaCalculo(negocioId));
     expect(error).toBeNull();
     expect(await temCalculo(negocioId)).toBe(true);
     expect(await temCalculo(await negocioComCalculo())).toBe(true);
   });
 
-  it("recálculo de cálculo existente: pelo app, por upsert e por update direto", async () => {
+  // ANTES: "recálculo de cálculo existente: pelo app, ..." (o app regravava a tarifa 1,05). AGORA o app não substitui a
+  // linha legada por um resultado incompleto: a tarifa da linha legada fica em 0,95; upsert e update diretos seguem valendo.
+  it("cálculo existente: o app grava as novas entradas (1,05) e a legada (0,95) vai para o histórico (upsert e update direto do vendedor recusados: PR C)", async () => {
     const negocioId = await negocioComCalculo();
     const r = await salvarKitComCliente(
       cliente(vendedor),
@@ -456,12 +473,10 @@ describe("cálculo solar só é criado com kit", () => {
     );
     expect(r.ok).toBe(true);
     expect(await tarifaSalva(negocioId)).toBeCloseTo(1.05);
-    const { error: erroUpsert } = await vendedor.cliente.from("calculos_solares").upsert(linhaCalculo(negocioId, 1.1), { onConflict: "negocio_id" });
-    expect(erroUpsert).toBeNull();
-    expect(await tarifaSalva(negocioId)).toBeCloseTo(1.1);
-    const { error: erroUpdate } = await vendedor.cliente.from("calculos_solares").update({ tarifa_kwh: 1.2 }).eq("negocio_id", negocioId);
-    expect(erroUpdate).toBeNull();
-    expect(await tarifaSalva(negocioId)).toBeCloseTo(1.2);
+    const { data: hist } = await servico.from("calculos_solares_historico").select("motivo, linha").eq("negocio_id", negocioId);
+    expect(hist).toHaveLength(1);
+    expect(hist![0]).toMatchObject({ motivo: "desatualizado_por_entradas", linha: { estado_financeiro: "legado", tarifa_kwh: 0.95 } });
+    expect(await tarifaSalva(negocioId)).toBeCloseTo(1.05);
   });
 
   it("cálculo antigo sem itens (calculadora de catálogo): continua como está e pode ser recalculado ou apagado", async () => {
@@ -483,8 +498,9 @@ describe("cálculo solar só é criado com kit", () => {
     expect(await temCalculo(recalcular)).toBe(true);
     expect(await lerKit(recalcular)).toEqual([]);
 
-    expect((await vendedor.cliente.from("calculos_solares").update({ tarifa_kwh: 1.15 }).eq("negocio_id", recalcular)).error).toBeNull();
-    expect((await vendedor.cliente.from("calculos_solares").upsert(linhaCalculo(recalcular, 1.25), { onConflict: "negocio_id" })).error).toBeNull();
+    // O kit ausente não trava a linha antiga (a recusa do vendedor, 42501, fica para a PR C).
+    expect((await servico.from("calculos_solares").update({ tarifa_kwh: 1.15 }).eq("negocio_id", recalcular)).error).toBeNull();
+    expect((await servico.from("calculos_solares").upsert(linhaCalculo(recalcular, 1.25), { onConflict: "negocio_id" })).error).toBeNull();
     expect(await tarifaSalva(recalcular)).toBeCloseTo(1.25);
     expect(await lerKit(recalcular)).toEqual([]); // nada corrigido sozinho
 

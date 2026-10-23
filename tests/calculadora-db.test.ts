@@ -105,7 +105,7 @@ describe("cálculo do negócio", () => {
       .from("kit_componentes")
       .insert({ empresa_id: empresa, negocio_id: negocio, tipo: "modulo", descricao: "Módulo 550 W", potencia_w: 550, quantidade: 11, ordem: 0 });
     expect(erroKit).toBeNull();
-    const { error } = await vendedor1.cliente.from("calculos_solares").insert({
+    const { error } = await servico.from("calculos_solares").insert({
       empresa_id: empresa,
       negocio_id: negocio,
       kit_id: kit,
@@ -130,7 +130,7 @@ describe("cálculo do negócio", () => {
     expect(error).toBeNull();
 
     // Recalcular substitui o cálculo existente em vez de duplicar (unique em negocio_id).
-    const { error: erroDuplicado } = await vendedor1.cliente.from("calculos_solares").insert({
+    const { error: erroDuplicado } = await servico.from("calculos_solares").insert({
       empresa_id: empresa,
       negocio_id: negocio,
       kit_id: kit,
