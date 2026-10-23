@@ -1,5 +1,11 @@
 # Estado do projeto — Raion CRM
 
+## Calculadora GD II — revisão de 2026-10-23
+
+`main` em `3ee53b8`: cálculo GD II já integrado (#214–#216), limitado ao enquadramento Copel B1 residencial e ao período oficial disponível (2026/27). Sem economia financeira comprovada, a proposta com economia continua bloqueada; payback segue indisponível. A antiga PR draft #209 conflita com a linha atual e não deve ser mesclada integralmente.
+
+Branch `fix/consumo-efetivo-separado` em revisão: o consumo estimado pela fatura usa uma tarifa efetiva informada separadamente da tarifa base TE + TUSD; registra a origem nas colunas já existentes `negocios.consumo_estimado_kwh` e `tarifa_efetiva_kwh`, preserva a estimativa ao reabrir e recalcular o kit e compara esse consumo na vigência. Nenhuma migration nova. Lint, typecheck e build com variáveis locais fictícias passaram; testes de banco exigem stack local verificada e ficam para a CI. Merge e produção dependem da revisão e autorização do Evandro para a PR específica.
+
 Documento vivo. **Atualizações de backups e arquitetura Pedido + Obra: 2026-10-14 (Brasília).** As demais seções comerciais são principalmente um retrato de 2026-10-10; verifique estados atuais no GitHub antes de agir. Código e GitHub prevalecem sobre este arquivo; ao divergir, corrija aqui. `docs/HANDOFF-CLAUDE-2026-10-06.md` é um retrato de 2026-10-05 e está desatualizado em vários pontos (principalmente a Base Demo).
 
 Referência: `main` em `b02e1b0` (merge da PR #165, trava de ambiente) · 77 migrations em `supabase/migrations/` (última `20261010100000_handoff_pontuacao_aceite.sql`).

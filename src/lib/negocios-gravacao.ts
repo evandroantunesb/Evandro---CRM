@@ -4,6 +4,7 @@ import { ANEXOS_CRIACAO, problemaArquivo } from "@/lib/anexos-regras";
 import { arquivoMetaSchema } from "@/lib/anexos-servidor";
 import { componentesJsonSchema, nomeKitPersonalizado, potenciaKitPersonalizadoKwp, type ComponenteKit } from "@/lib/calculadora";
 import { precoDoCalculoDesatualizado } from "@/lib/calculo-preco";
+import { resolverConsumo } from "@/lib/consumo-estimado";
 import {
   CASAS_TARIFA,
   consumoComoPersistido,
@@ -115,6 +116,7 @@ const esquemaNovo = z.object({
   // Calculadora solar: roda no backend a partir do kit personalizado, quando há tarifa.
   tipo_ligacao: z.enum(TIPOS_LIGACAO).optional(),
   consumo_medio_kwh: numeroBrOpcional,
+  tarifa_efetiva_kwh: numeroBrOpcional,
   valor_fatura_medio: numeroBrOpcional,
   tarifa_kwh: numeroBrOpcional,
   componentes: componentesJsonSchema,
@@ -212,6 +214,7 @@ export async function criarNegocioComCliente(supabase: SupabaseServidor, atual: 
     etapaId = etapaInicial.id;
   }
 
+  const consumoCriacao = resolverConsumo(d.consumo_medio_kwh, d.valor_fatura_medio, d.tarifa_efetiva_kwh);
   const { data: negocio, error } = await supabase
     .from("negocios")
     .insert({
@@ -229,7 +232,9 @@ export async function criarNegocioComCliente(supabase: SupabaseServidor, atual: 
       padrao_cliente: d.padrao_cliente || null,
       tipo_telhado: d.tipo_telhado || null,
       estrutura_telhado: d.estrutura_telhado || null,
-      consumo_medio_kwh: d.consumo_medio_kwh,
+      consumo_medio_kwh: consumoCriacao.origem === "informado" ? consumoCriacao.kwh : null,
+      consumo_estimado_kwh: consumoCriacao.origem === "estimado" ? consumoCriacao.kwh : null,
+      tarifa_efetiva_kwh: consumoCriacao.tarifaEfetiva,
       valor_conta_energia: d.valor_fatura_medio,
     })
     .select("id")
@@ -257,7 +262,7 @@ export async function criarNegocioComCliente(supabase: SupabaseServidor, atual: 
         potenciaKwp: potenciaKitPersonalizadoKwp(d.componentes),
         precoKit: d.valor ?? 0,
         tipoLigacao: d.tipo_ligacao,
-        consumoMedioKwh: d.consumo_medio_kwh,
+        consumoMedioKwh: consumoCriacao.kwh,
         valorFaturaMedio: d.valor_fatura_medio,
         tarifaKwh: d.tarifa_kwh,
         tarifaBaseTributaria: null,
@@ -299,6 +304,7 @@ const esquemaEdicao = z.object({
   padrao_cliente: z.string().trim().max(60).optional(),
   tipo_telhado: z.string().trim().max(60).optional(),
   consumo_medio_kwh: numeroBrOpcional,
+  tarifa_efetiva_kwh: numeroBrOpcional,
   valor_conta_energia: numeroBrOpcional,
 });
 
@@ -312,6 +318,8 @@ export async function editarNegocioComCliente(
   if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
   const d = dados.data;
 
+  const consumoEdicao = resolverConsumo(d.consumo_medio_kwh, d.valor_conta_energia, d.tarifa_efetiva_kwh);
+
   const { data, error } = await supabase
     .from("negocios")
     .update({
@@ -321,7 +329,9 @@ export async function editarNegocioComCliente(
       unidade_consumidora: d.unidade_consumidora || null,
       padrao_cliente: d.padrao_cliente || null,
       tipo_telhado: d.tipo_telhado || null,
-      consumo_medio_kwh: d.consumo_medio_kwh,
+      consumo_medio_kwh: consumoEdicao.origem === "informado" ? consumoEdicao.kwh : null,
+      consumo_estimado_kwh: consumoEdicao.origem === "estimado" ? consumoEdicao.kwh : null,
+      tarifa_efetiva_kwh: consumoEdicao.tarifaEfetiva,
       valor_conta_energia: d.valor_conta_energia,
       // SDR não pode alterar o valor financeiro do negócio (spec RAION_SDR_REGRAS_PERMISSOES §39) — só na criação.
       ...(pode(atual.papel, EDITAR_VALOR_NEGOCIO) ? { valor: d.valor } : {}),
@@ -411,7 +421,7 @@ export async function salvarKitComCliente(
   const [{ data: negocio }, { data: calculoAtual, error: erroCalculo }, { data: itensAntigos, error: erroAntigos }] = await Promise.all([
     supabase
       .from("negocios")
-      .select("valor, consumo_medio_kwh, valor_conta_energia, qualif_tipo_cliente, qualif_distribuidora")
+      .select("valor, consumo_medio_kwh, consumo_estimado_kwh, tarifa_efetiva_kwh, valor_conta_energia, qualif_tipo_cliente, qualif_distribuidora")
       .eq("id", d.negocioId)
       .maybeSingle(),
     supabase
@@ -434,8 +444,9 @@ export async function salvarKitComCliente(
   if (erroCalculo) return { ok: false, mensagem: MENSAGEM_CALCULO_NAO_CONFERIDO };
   // kWh e fatura vazios no kit não apagam o que já está no negócio: vale o gravado (estimativa, pendências e gravação).
   // Só "Dados do negócio" limpa esses campos.
-  const consumoMedioKwh = d.consumoMedioKwh ?? negocio.consumo_medio_kwh;
   const valorFaturaMedio = d.valorFaturaMedio ?? negocio.valor_conta_energia;
+  const consumoDoKit = resolverConsumo(d.consumoMedioKwh ?? negocio.consumo_medio_kwh, valorFaturaMedio, negocio.tarifa_efetiva_kwh);
+  const consumoMedioKwh = consumoDoKit.kwh ?? negocio.consumo_estimado_kwh;
 
   // Lista vazia com kit salvo = remover o kit: nunca com cálculo associado e sempre com confirmação.
   if (!d.componentes.length && itensAntigos.length) {
@@ -525,7 +536,9 @@ export async function salvarKitComCliente(
     .from("negocios")
     .update({
       estrutura_telhado: d.estruturaTelhado || null,
-      consumo_medio_kwh: consumoMedioKwh,
+      consumo_medio_kwh: consumoDoKit.origem === "informado" ? consumoDoKit.kwh : null,
+      consumo_estimado_kwh: consumoDoKit.origem === "estimado" ? consumoDoKit.kwh : consumoDoKit.origem === "ausente" ? negocio.consumo_estimado_kwh : null,
+      tarifa_efetiva_kwh: consumoDoKit.origem === "informado" ? null : negocio.tarifa_efetiva_kwh,
       valor_conta_energia: valorFaturaMedio,
     })
     .eq("id", d.negocioId)

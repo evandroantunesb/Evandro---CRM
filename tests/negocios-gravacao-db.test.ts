@@ -101,7 +101,7 @@ async function reabrir(u: Usuario, negocioId: string) {
     c
       .from("negocios")
       .select(
-        "titulo, valor, descricao, status, etapa_id, unidade_consumidora, padrao_cliente, tipo_telhado, estrutura_telhado, consumo_medio_kwh, valor_conta_energia, contatos(id, nome, endereco, cidade, uf, documento)",
+        "titulo, valor, descricao, status, etapa_id, unidade_consumidora, padrao_cliente, tipo_telhado, estrutura_telhado, consumo_medio_kwh, consumo_estimado_kwh, tarifa_efetiva_kwh, valor_conta_energia, contatos(id, nome, endereco, cidade, uf, documento)",
       )
       .eq("id", negocioId)
       .single(),
@@ -194,12 +194,48 @@ function edicaoAtual(negocioId: string, n: Awaited<ReturnType<typeof reabrir>>["
     padrao_cliente: n.padrao_cliente ?? "",
     tipo_telhado: n.tipo_telhado ?? "",
     consumo_medio_kwh: n.consumo_medio_kwh != null ? String(n.consumo_medio_kwh).replace(".", ",") : "",
+    tarifa_efetiva_kwh: n.tarifa_efetiva_kwh != null ? String(n.tarifa_efetiva_kwh).replace(".", ",") : "",
     valor_conta_energia: n.valor_conta_energia != null ? String(n.valor_conta_energia).replace(".", ",") : "",
     ...mudar,
   });
 }
 
 describe("ciclo completo com contato novo", () => {
+  it("separa tarifa efetiva da base: cria estimativa, reabre, recalcula e troca por kWh informado", async () => {
+    const r = await criar(vendedor, novoNegocio({
+      consumo_medio_kwh: "", valor_fatura_medio: "450,00", tarifa_efetiva_kwh: "0,9000",
+      tarifa_kwh: "0,76802", componentes: KIT,
+    }));
+    let f = await reabrir(vendedor, r.negocioId);
+    expect(f.negocio).toMatchObject({ consumo_medio_kwh: null, consumo_estimado_kwh: 500, tarifa_efetiva_kwh: 0.9, valor_conta_energia: 450 });
+    expect(await linhaGravada(r.negocioId)).toMatchObject({ consumo_medio_kwh: 500, tarifa_kwh: 0.76802, estado_financeiro: "incompleto" });
+
+    const kit = fd({ negocioId: r.negocioId, tipoLigacao: "trifasico", consumoMedioKwh: "", valorFaturaMedio: "",
+      tarifaKwh: "0,76802", tarifaBaseTributaria: "sem_tributos", estruturaTelhado: "", componentes: KIT, observacoes: "" });
+    expect((await salvarKitComCliente(cliente(vendedor), atual[vendedor.id], kit)).ok).toBe(true);
+    f = await reabrir(vendedor, r.negocioId);
+    expect(f.negocio).toMatchObject({ consumo_medio_kwh: null, consumo_estimado_kwh: 500, tarifa_efetiva_kwh: 0.9 });
+
+    expect((await editarNegocioComCliente(cliente(vendedor), atual[vendedor.id], edicaoAtual(r.negocioId, f.negocio, {
+      valor_conta_energia: "459,00",
+    }))).ok).toBe(true);
+    f = await reabrir(vendedor, r.negocioId);
+    expect(f.negocio).toMatchObject({ consumo_medio_kwh: null, consumo_estimado_kwh: 510, tarifa_efetiva_kwh: 0.9 });
+    expect((await salvarKitComCliente(cliente(vendedor), atual[vendedor.id], kit)).ok).toBe(true);
+    expect(await linhaGravada(r.negocioId)).toMatchObject({ consumo_medio_kwh: 510, tarifa_kwh: 0.76802 });
+
+    const kitComKwh = fd({ negocioId: r.negocioId, tipoLigacao: "trifasico", consumoMedioKwh: "505", valorFaturaMedio: "",
+      tarifaKwh: "0,76802", tarifaBaseTributaria: "sem_tributos", estruturaTelhado: "", componentes: KIT, observacoes: "" });
+    expect((await salvarKitComCliente(cliente(vendedor), atual[vendedor.id], kitComKwh)).ok).toBe(true);
+    f = await reabrir(vendedor, r.negocioId);
+    expect(f.negocio).toMatchObject({ consumo_medio_kwh: 505, consumo_estimado_kwh: null, tarifa_efetiva_kwh: null });
+
+    expect((await editarNegocioComCliente(cliente(vendedor), atual[vendedor.id], edicaoAtual(r.negocioId, f.negocio, {
+      consumo_medio_kwh: "506",
+    }))).ok).toBe(true);
+    f = await reabrir(vendedor, r.negocioId);
+    expect(f.negocio).toMatchObject({ consumo_medio_kwh: 506, consumo_estimado_kwh: null, tarifa_efetiva_kwh: null });
+  });
   it("criar → reabrir → editar negócio e contato → reabrir preserva tudo", async () => {
     const r = await criar(
       vendedor,

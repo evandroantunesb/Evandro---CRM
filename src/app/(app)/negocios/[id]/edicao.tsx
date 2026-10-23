@@ -34,6 +34,8 @@ export function EdicaoNegocio({
     unidadeConsumidora: string | null;
     padraoCliente: string | null;
     consumoMedioKwh: number | null;
+    consumoEstimadoKwh: number | null;
+    tarifaEfetivaKwh: number | null;
     valorContaEnergia: number | null;
   };
   origens: Opcao[];
@@ -60,7 +62,10 @@ export function EdicaoNegocio({
     if (problema) return setResultado({ ok: false, mensagem: `${problema} Escolha outro arquivo.` });
     iniciar(async () => {
       const r = await editarNegocio(null, formulario);
-      if (!r?.ok || !fatura) return setResultado(r);
+      if (!r?.ok || !fatura) {
+        if (r?.ok) router.refresh();
+        return setResultado(r);
+      }
       const [falha] = await enviarArquivos(criarClienteNavegador(), registrarAnexo, { empresaId, negocioId: negocio.id }, [
         { arquivo: fatura, categoria: "fatura_gerador" },
       ]);
@@ -116,6 +121,19 @@ export function EdicaoNegocio({
         placeholder="ex.: 450"
         defaultValue={negocio.consumoMedioKwh != null ? String(negocio.consumoMedioKwh).replace(".", ",") : ""}
       />
+      <Campo
+        rotulo="Tarifa efetiva da conta (R$/kWh, para estimar consumo)"
+        name="tarifa_efetiva_kwh"
+        inputMode="decimal"
+        placeholder="ex.: 0,9500"
+        defaultValue={negocio.tarifaEfetivaKwh != null ? String(negocio.tarifaEfetivaKwh).replace(".", ",") : ""}
+      />
+      {negocio.consumoEstimadoKwh != null && (
+        <p role="status" className="text-xs text-amber-800 md:col-span-2">
+          Consumo estimado pela conta: {negocio.consumoEstimadoKwh.toLocaleString("pt-BR")} kWh/mês. Informar os kWh reais
+          substitui a estimativa; alterar a conta ou a tarifa efetiva recalcula a estimativa ao salvar.
+        </p>
+      )}
       <Campo rotulo="Unidade consumidora" name="unidade_consumidora" defaultValue={negocio.unidadeConsumidora ?? ""} />
       <Campo rotulo="Padrão do cliente" name="padrao_cliente" defaultValue={negocio.padraoCliente ?? ""} />
       <Campo
