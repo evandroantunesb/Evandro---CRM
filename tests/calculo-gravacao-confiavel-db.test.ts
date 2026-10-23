@@ -10,8 +10,8 @@
  *  - sem a chave do servidor, nada é gravado (nem o kit) e a recusa é clara;
  *  - apagar deixa a linha inteira no histórico com a autoria (migration 20261023230000), e só quem pode apaga;
  *  - trigger e motor concordam no percentual legal e no piso do art. 291 para todo ano e ligação suportados;
- *  - privilégios efetivos: `anon`/`authenticated` só com SELECT e DELETE (sem INSERT, UPDATE, TRUNCATE, REFERENCES nem
- *    TRIGGER), PUBLIC sem nada e `service_role` mantém a gravação do servidor.
+ *  - privilégios efetivos (os oito de tabela do PG 17): `anon`/`authenticated` só com SELECT e DELETE (sem INSERT, UPDATE,
+ *    TRUNCATE, REFERENCES, TRIGGER nem MAINTAIN), PUBLIC sem nada e `service_role` mantém a gravação do servidor.
  */
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { MENSAGEM_GRAVACAO_INDISPONIVEL } from "@/lib/calculo-gravacao";
@@ -201,7 +201,8 @@ describe("vendedor autenticado não grava financeiro direto (PostgREST)", () => 
 });
 
 describe("privilégios efetivos em calculos_solares (inclui herança; PUBLIC à parte)", () => {
-  const PRIVILEGIOS = ["SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER"] as const;
+  // Os oito privilégios de tabela do PG 17 (MAINTAIN é novo nele).
+  const PRIVILEGIOS = ["SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER", "MAINTAIN"] as const;
 
   it("anon e authenticated só leem e apagam; service_role grava; PUBLIC não tem nada", async () => {
     const banco = novoClienteBanco();
@@ -215,10 +216,20 @@ describe("privilégios efetivos em calculos_solares (inclui herança; PUBLIC à 
           efetivos[papel][p] = rows[0].tem;
         }
       }
-      const soLerEApagar = { SELECT: true, INSERT: false, UPDATE: false, DELETE: true, TRUNCATE: false, REFERENCES: false, TRIGGER: false };
+      const soLerEApagar = {
+        SELECT: true,
+        INSERT: false,
+        UPDATE: false,
+        DELETE: true,
+        TRUNCATE: false,
+        REFERENCES: false,
+        TRIGGER: false,
+        MAINTAIN: false,
+      };
       expect(efetivos.anon).toEqual(soLerEApagar);
       expect(efetivos.authenticated).toEqual(soLerEApagar);
-      expect(efetivos.service_role).toMatchObject({ SELECT: true, INSERT: true, UPDATE: true, DELETE: true });
+      // A gravação do servidor não muda: service_role mantém os oito.
+      expect(efetivos.service_role).toEqual(Object.fromEntries(PRIVILEGIOS.map((p) => [p, true])));
 
       const { rows: publico } = await banco.query(
         "select count(*)::int as n from (select (aclexplode(relacl)).grantee from pg_class where oid = 'public.calculos_solares'::regclass) a where a.grantee = 0",

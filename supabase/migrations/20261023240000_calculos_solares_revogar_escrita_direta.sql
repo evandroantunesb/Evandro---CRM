@@ -10,9 +10,10 @@
 -- Reversão de emergência (reabre a brecha): .aurora/revisao/calc-gd2/integracao/reverter-20261023240000.sql.
 --
 -- SELECT e DELETE continuam como estavam (DELETE grava histórico com autoria: migration 20261023230000).
--- REFERENCES e TRIGGER também saem: vinham só dos privilégios padrão do Supabase, nenhuma FK aponta para esta tabela, os
--- gatilhos são do `postgres` (executá-los não exige o privilégio TRIGGER) e o app não roda DDL com esses papéis.
+-- REFERENCES, TRIGGER e MAINTAIN (PG 17) também saem: vinham só dos privilégios padrão do Supabase, nenhuma FK aponta
+-- para esta tabela, os gatilhos são do `postgres` (executá-los não exige o privilégio TRIGGER) e o app não roda DDL nem
+-- manutenção (VACUUM, ANALYZE, REINDEX, CLUSTER, LOCK TABLE) com esses papéis. Ficam só SELECT e DELETE.
 
 drop policy "criar cálculo" on public.calculos_solares;
 drop policy "editar cálculo" on public.calculos_solares;
-revoke insert, update, truncate, references, trigger on public.calculos_solares from anon, authenticated;
+revoke insert, update, truncate, references, trigger, maintain on public.calculos_solares from anon, authenticated;

@@ -293,12 +293,15 @@ Decisão do Evandro: rodada da calculadora GD II **encerrada: implementação e 
 
 ## PR C — diferença em relação ao pacote original (23/10/2026)
 
-- `20261023240000` passa a revogar também `references` e `trigger` de `anon` e `authenticated` (pacote: só `insert, update, truncate`).
+- `20261023240000` passa a revogar também `references`, `trigger` e `maintain` de `anon` e `authenticated` (pacote: só `insert, update, truncate`). Ficam só SELECT e DELETE (os oito privilégios de tabela do PG 17 conferidos).
   Motivo: vinham só dos privilégios padrão do Supabase; nenhuma FK aponta para `calculos_solares`, os gatilhos são do `postgres`
   (executá-los não exige TRIGGER) e o app não roda DDL com esses papéis. SELECT, DELETE, policies "ver cálculo"/"apagar cálculo",
-  os 7 gatilhos e a gravação pelo `service_role` ficam iguais. `MAINTAIN` (PG 17) não foi alterado.
+  os 7 gatilhos e a gravação pelo `service_role` (os oito privilégios) ficam iguais. Privilégios padrão e outras tabelas não mudam.
 - Teste novo em `calculo-gravacao-confiavel-db`: privilégios efetivos (`has_table_privilege`) e PUBLIC sem nada.
 - Ensaio no banco restaurado de produção (isolado, sem portas; lote 1 já aplicado): INSERT, UPDATE, UPSERT, TRUNCATE, criar FK e criar
   trigger recusados (42501); SELECT e DELETE do admin ok, com histórico `apagado` e autoria; RPC de autorização ok (anon recusado);
   UPDATE do servidor ok com `updated_at`; `exige_kit` recusa até o servidor; 49 cálculos com o mesmo hash. Tudo em transações revertidas.
 - A reversão de emergência do pacote (`reverter-20261023240000.sql`) não precisa devolver `references`/`trigger`: o app antigo não os usa.
+- Delta `maintain` aplicado só no banco restaurado isolado: ACL `anon=rd`, `authenticated=rd`; REINDEX recusado (42501) e ANALYZE pulado
+  para os dois; `service_role` mantém. LOCK TABLE continua possível para eles porque o PG 17 o aceita também com DELETE (preservado de
+  propósito); pelo PostgREST não há como emitir LOCK. 49 cálculos com o mesmo hash; roteiro revertido repetido sem diferença.
