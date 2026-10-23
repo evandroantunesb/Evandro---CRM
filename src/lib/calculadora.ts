@@ -1,5 +1,15 @@
 import { z } from "zod";
 import { consumoComoPersistido } from "@/lib/consumo-persistido";
+import { avaliarEstimativa, type Pendencia } from "@/lib/estimativa-financeira";
+import { calcularFioBGd2, METODO_GD2_PISO_V1 } from "@/lib/fio-b-gd2";
+import {
+  disponibilidadeArt291,
+  rotuloEnquadramento,
+  tarifaOficialRsKwh,
+  type BaseTributaria,
+  type CodigoRessalva,
+  type ContextoEstimativa,
+} from "@/lib/tarifa-gd";
 import { TIPOS_COMPONENTE_KIT, type TipoLigacao } from "@/lib/tipos";
 
 export type EntradaCalculo = {
@@ -7,23 +17,60 @@ export type EntradaCalculo = {
   precoKit: number;
   tipoLigacao: TipoLigacao;
   consumoMedioKwh: number;
+  /** Tarifa base (TE + TUSD) usada como T, editável pelo vendedor; só completa com a base tributária declarada. */
   tarifaKwh: number;
   produtividadeKwhKwpMes: number;
-  percentualFioB: number;
-  disponibilidadeKwh: number;
+  /** Sem efeito no motor (o percentual da empresa não é o percentual legal). Mantido por compatibilidade. */
+  percentualFioB?: number;
+  /** Sem efeito no motor (o piso vem da ligação, REN 1.000, art. 291). Mantido por compatibilidade. */
+  disponibilidadeKwh?: number;
+  /** Contexto regulatório do negócio (data, enquadramento, tarifa oficial) e base declarada da tarifa. Ausente = pendências. */
+  dadosEstimativa?: { contexto: ContextoEstimativa | null; tarifaBaseTributaria: BaseTributaria | null };
 };
 
-export type ResultadoCalculo = {
+/** O que o cálculo completo usou: gravado com a linha para reproduzir e auditar (contrato, seções 1, 2, 4 e 5). */
+export type RetratoEstimativa = {
+  metodo: typeof METODO_GD2_PISO_V1;
+  dataReferencia: string;
+  enquadramento: string;
+  tarifaGdId: string;
+  distribuidora: string;
+  ato: string;
+  tarifaOficialRsKwh: number;
+  tarifaOrigem: "oficial_aneel" | "informada_vendedor";
+  tarifaBaseTributaria: BaseTributaria;
+  fioBRsMwh: number;
+  fioBBaseTributaria: BaseTributaria;
+  percentualLegalFioB: number;
+  /** N = percentual × Fio B / 1000, sem arredondar (R$/kWh). */
+  custoEnergiaCompensadaRsKwh: number;
+  vigenciaInicio: string;
+  vigenciaFim: string;
+  disponibilidadeKwh: number;
+  autoconsumoKwh: number;
+  ressalvas: CodigoRessalva[];
+};
+
+/** Campos do resultado financeiro (ramo "completa"). Payback é sempre nulo no P0 (contrato, seção 4). */
+export type CamposCalculoCompleto = {
   geracaoEstimadaKwhMes: number;
   kwhFaturado: number;
   kwhCompensado: number;
+  kwhNaoCompensado: number;
   custoFioB: number;
   contaSemSolar: number;
   contaComSolar: number;
   economiaMensal: number;
-  /** Nulo quando o sistema não gera economia (kit pequeno demais ou tarifa muito baixa). */
-  paybackMeses: number | null;
+  paybackMeses: null;
 };
+
+/** Resultado do motor: `completa` só sem nenhuma pendência; dado ou regra pendente nunca vira número. */
+export type ResultadoCalculo =
+  | ({ estado: "completa"; retrato: RetratoEstimativa } & CamposCalculoCompleto)
+  | { estado: "incompleta"; pendencias: Pendencia[]; potenciaKwp: number; geracaoEstimadaKwhMes: number };
+
+export type ResultadoCalculoIncompleto = Extract<ResultadoCalculo, { estado: "incompleta" }>;
+export type ResultadoCalculoCompleto = Extract<ResultadoCalculo, { estado: "completa" }>;
 
 function arredondar(valor: number, casas: number) {
   const fator = 10 ** casas;
@@ -31,40 +78,109 @@ function arredondar(valor: number, casas: number) {
 }
 
 /**
- * Calculadora solar — modo comercial.
+ * Aritmética de arredondamento APROVADA pelo Evandro em 21/10/2026: a economia é a diferença entre as DUAS CONTAS JÁ
+ * ARREDONDADAS em centavos (os números exibidos fecham: conta hoje − conta com sistema = economia). `calcularFioBGd2`
+ * aplica a mesma regra; o payback daqui não é usado no P0 (indisponível).
+ * Ver .aurora/contratos/m2-p0-arredondamento-economia.md.
+ */
+export function fecharEconomia(
+  contaSemSolar: number,
+  contaComSolar: number,
+  precoKit: number,
+): { contaSemSolar: number; contaComSolar: number; economiaMensal: number; paybackMeses: number | null } {
+  const contaSemSolarArred = arredondar(contaSemSolar, 2);
+  const contaComSolarArred = arredondar(contaComSolar, 2);
+  const economiaMensal = arredondar(contaSemSolarArred - contaComSolarArred, 2);
+  return {
+    contaSemSolar: contaSemSolarArred,
+    contaComSolar: contaComSolarArred,
+    economiaMensal,
+    paybackMeses: economiaMensal > 0 ? arredondar(precoKit / economiaMensal, 1) : null,
+  };
+}
+
+/** Ressalvas fixas de todo resultado completo; as condicionais entram em `calcular`. */
+const RESSALVAS_FIXAS: CodigoRessalva[] = ["autoconsumo_zero", "media_mensal", "modalidade_convencional", "gd2_sistema_novo", "sem_tributos"];
+
+/**
+ * Calculadora solar — modo comercial (motor).
  *
- * Estimativa simplificada (sem simulação horária/pvlib): usa uma produtividade
- * média (kWh por kWp por mês) e desconta da conta o custo de disponibilidade
- * mínimo e o Fio B (Lei 14.300) sobre a energia compensada. Não considera
- * banco de créditos entre meses nem sazonalidade — o vendedor deve tratar o
- * resultado como uma estimativa comercial, não um projeto de engenharia.
+ * Sem pendências (enquadramento, tarifa oficial vigente, percentual legal do ano, consumo, tarifa e base tributária),
+ * calcula pela regra aceita (`calcularFioBGd2`): T = tarifa informada; D pela ligação (art. 291); N = percentual legal
+ * do ANO da data × TUSD Fio B da linha VIGENTE na data; C = consumo; E = geração (autoconsumo zero, declarado).
+ * Precisão: G, N e as contas usam valores sem arredondar; só o resultado é arredondado (2 casas). Payback: nulo.
+ * Com qualquer pendência devolve `incompleta` (geração e pendências, nunca conta, economia nem payback).
  */
 export function calcular(entrada: EntradaCalculo): ResultadoCalculo {
-  const { potenciaKwp, consumoMedioKwh, tarifaKwh, produtividadeKwhKwpMes, percentualFioB, disponibilidadeKwh } =
-    entrada;
+  const d = entrada.dadosEstimativa;
+  const avaliacao = avaliarEstimativa({
+    contexto: d?.contexto ?? null,
+    tarifaBaseRsKwh: entrada.tarifaKwh,
+    tarifaBaseBaseTributaria: d?.tarifaBaseTributaria ?? null,
+    consumoMedioKwh: entrada.consumoMedioKwh,
+    consumoOrigem: "informado",
+    tarifaEfetivaContaRsKwh: null,
+  });
+  const geracaoKwh = entrada.potenciaKwp * entrada.produtividadeKwhKwpMes;
+  const incompleta = (pendencias: Pendencia[]): ResultadoCalculo => ({
+    estado: "incompleta",
+    pendencias,
+    potenciaKwp: entrada.potenciaKwp,
+    geracaoEstimadaKwhMes: arredondar(geracaoKwh, 2),
+  });
+  const dados = avaliacao.dados;
+  const D = disponibilidadeArt291(entrada.tipoLigacao);
+  if (avaliacao.pendencias.length || !dados || D == null || !d?.tarifaBaseTributaria) return incompleta(avaliacao.pendencias);
 
-  const geracaoEstimadaKwhMes = potenciaKwp * produtividadeKwhKwpMes;
+  const N = (dados.percentualLegal * dados.tarifa.fioBRsMwh) / 1000;
+  const r = calcularFioBGd2({
+    consumoTotalKwh: entrada.consumoMedioKwh,
+    geracaoTotalKwh: geracaoKwh,
+    tarifaCheiaRsKwh: entrada.tarifaKwh,
+    custoDisponibilidadeKwh: D,
+    custoEnergiaCompensadaRsKwh: N,
+  });
+  // Entradas já validadas acima; aqui só sobra o que a fórmula recusa (ex.: T <= N).
+  if (!r.ok) return incompleta([{ codigo: "tarifa_abaixo_do_fio_b", mensagem: r.motivo }]);
 
-  // A concessionária sempre cobra pelo menos o custo de disponibilidade (em
-  // kWh), mesmo quando a geração cobre todo o consumo.
-  let kwhFaturado = Math.max(consumoMedioKwh - geracaoEstimadaKwhMes, disponibilidadeKwh);
-  kwhFaturado = Math.min(kwhFaturado, consumoMedioKwh);
-  const kwhCompensado = Math.max(consumoMedioKwh - kwhFaturado, 0);
-
-  const custoFioB = kwhCompensado * tarifaKwh * percentualFioB;
-  const contaSemSolar = consumoMedioKwh * tarifaKwh;
-  const contaComSolar = kwhFaturado * tarifaKwh + custoFioB;
-  const economiaMensal = contaSemSolar - contaComSolar;
+  const tarifaOficial = tarifaOficialRsKwh(dados.tarifa);
+  const ressalvas: CodigoRessalva[] = [...RESSALVAS_FIXAS];
+  if (entrada.tipoLigacao === "bifasico") ressalvas.push("bifasico_tres_condutores");
+  if (r.energiaDisponivelNaoCompensadaKwh > 0) ressalvas.push("creditos_nao_valorados");
+  if (dados.tarifa.pendenciasFonte.includes("tabela4_nao_conferida")) ressalvas.push("tabela4_nao_conferida");
+  ressalvas.push("payback_indisponivel");
 
   return {
-    geracaoEstimadaKwhMes: arredondar(geracaoEstimadaKwhMes, 2),
-    kwhFaturado: arredondar(kwhFaturado, 2),
-    kwhCompensado: arredondar(kwhCompensado, 2),
-    custoFioB: arredondar(custoFioB, 2),
-    contaSemSolar: arredondar(contaSemSolar, 2),
-    contaComSolar: arredondar(contaComSolar, 2),
-    economiaMensal: arredondar(economiaMensal, 2),
-    paybackMeses: economiaMensal > 0 ? arredondar(entrada.precoKit / economiaMensal, 1) : null,
+    estado: "completa",
+    geracaoEstimadaKwhMes: arredondar(geracaoKwh, 2),
+    kwhFaturado: r.energiaFaturadaTarifaCheiaKwh,
+    kwhCompensado: r.energiaCompensadaKwh,
+    kwhNaoCompensado: r.energiaDisponivelNaoCompensadaKwh,
+    custoFioB: r.custoEnergiaCompensada,
+    contaSemSolar: r.contaSemSolar,
+    contaComSolar: r.contaComSolar,
+    economiaMensal: r.economiaMensal,
+    paybackMeses: null,
+    retrato: {
+      metodo: r.metodo,
+      dataReferencia: dados.dataReferencia,
+      enquadramento: rotuloEnquadramento(dados.enquadramento),
+      tarifaGdId: dados.tarifa.id,
+      distribuidora: dados.tarifa.distribuidora,
+      ato: dados.tarifa.ato,
+      tarifaOficialRsKwh: tarifaOficial,
+      tarifaOrigem: arredondar(entrada.tarifaKwh, 5) === tarifaOficial ? "oficial_aneel" : "informada_vendedor",
+      tarifaBaseTributaria: d.tarifaBaseTributaria,
+      fioBRsMwh: dados.tarifa.fioBRsMwh,
+      fioBBaseTributaria: dados.tarifa.baseTributaria,
+      percentualLegalFioB: dados.percentualLegal,
+      custoEnergiaCompensadaRsKwh: N,
+      vigenciaInicio: dados.tarifa.vigenciaInicio,
+      vigenciaFim: dados.tarifa.vigenciaFim,
+      disponibilidadeKwh: D,
+      autoconsumoKwh: 0,
+      ressalvas,
+    },
   };
 }
 

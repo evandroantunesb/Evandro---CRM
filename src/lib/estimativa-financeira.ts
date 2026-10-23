@@ -1,110 +1,96 @@
 /**
- * Contrato do estado "estimativa financeira incompleta" da calculadora solar (puro, sem I/O, sem "server-only").
- * NÃO contém fórmula de economia nem de Fio B. Regra de ouro: informação ausente NUNCA vira zero,
- * tarifa padrão nem percentual inventado.
+ * Pendências da estimativa financeira GD II (puro, sem I/O, sem "server-only"). Regra de ouro: informação ausente NUNCA
+ * vira zero, tarifa padrão nem percentual inventado; qualquer pendência = estimativa incompleta.
+ * Contrato aceito: .aurora/contratos/m2-p0-decisao-fio-b-copel.md. Os dados regulatórios vêm de `tarifa-gd.ts`.
  */
+import { formatarDataIso, hojeEmSaoPaulo } from "@/lib/formatacao";
+import {
+  enquadramentoDoTipoCliente,
+  percentualLegalFioB,
+  resolverTarifa,
+  type BaseTributaria,
+  type ContextoEstimativa,
+  type Enquadramento,
+  type TarifaGd,
+} from "@/lib/tarifa-gd";
 
-/** Recorte P0 (decisão do Evandro): qualquer outro enquadramento é "não suportado", sem enquadramento automático. */
-export const RECORTE_P0 = { classe: "B1", modalidade: "convencional", gd: "GD_II", anoReferencia: 2026 } as const;
-
-export type EnquadramentoEntrada = {
-  classe: string | null;
-  modalidade: string | null;
-  gd: string | null;
-  anoReferencia: number | null;
-};
-
-export type OrigemParametro = "oficial_aneel" | "manual_justificado";
-export type BaseTributaria = "com_tributos" | "sem_tributos";
-
-export type ParametrosFioB = {
-  fioBRsKwh: number | null;
-  baseTributaria: BaseTributaria | null;
-  origem: OrigemParametro | null;
-  distribuidora: string | null;
-  fonte: string | null;
-  vigenciaInicio: string | null; // AAAA-MM-DD
-  vigenciaFim: string | null;
-  justificativa: string | null;
-};
+export type { BaseTributaria };
 
 export type CodigoPendencia =
-  | "enquadramento_nao_suportado"
   | "enquadramento_ausente"
+  | "enquadramento_nao_suportado"
   | "distribuidora_ausente"
+  | "distribuidora_sem_tarifa"
+  | "fio_b_vigencia_fora"
+  | "tarifa_vigente_ambigua"
+  | "percentual_legal_indisponivel"
   | "tarifa_base_ausente"
   | "consumo_ausente"
   | "consumo_estimado_pela_tarifa_base"
-  | "fio_b_ausente"
-  | "fio_b_origem_ausente"
-  | "fio_b_manual_sem_justificativa"
-  | "fio_b_vigencia_ausente"
-  | "fio_b_vigencia_fora"
+  | "base_tributaria_ausente"
   | "base_tributaria_divergente"
-  | "percentual_legal_indisponivel";
+  | "tarifa_abaixo_do_fio_b";
 
 export type Pendencia = { codigo: CodigoPendencia; mensagem: string };
 
 export type EntradaEstimativa = {
-  enquadramento: EnquadramentoEntrada;
+  contexto: ContextoEstimativa | null;
   tarifaBaseRsKwh: number | null;
   tarifaBaseBaseTributaria: BaseTributaria | null;
   consumoMedioKwh: number | null;
   consumoOrigem: "informado" | "estimado_conta" | null;
   tarifaEfetivaContaRsKwh: number | null;
-  parametrosFioB: ParametrosFioB | null;
-  dataReferencia: string; // AAAA-MM-DD
 };
 
-export type EstimativaFinanceira =
-  | { estado: "incompleta"; pendencias: Pendencia[]; geracaoEstimadaKwhMes: number | null; potenciaKwp: number | null }
-  | { estado: "completa" /* campos de economia serão definidos após aprovação da fórmula */ };
+/** Dados regulatórios resolvidos (só existem sem nenhuma pendência). */
+export type DadosRegulatorios = { enquadramento: Enquadramento; tarifa: TarifaGd; percentualLegal: number; dataReferencia: string };
 
-/** Percentual legal da parcela do Fio B: GD II em 2026 = 60%. Qualquer outro enquadramento = null. O vendedor nunca informa. */
-export function percentualLegalFioB(enq: EnquadramentoEntrada): number | null {
-  return enq.gd === RECORTE_P0.gd && enq.anoReferencia === RECORTE_P0.anoReferencia ? 0.6 : null;
-}
+export type AvaliacaoEstimativa = { pendencias: Pendencia[]; dados: DadosRegulatorios | null };
 
 /** Número finito e positivo; NaN/Infinity/null/undefined contam como ausentes. */
 function positivo(v: number | null | undefined): v is number {
   return typeof v === "number" && Number.isFinite(v) && v > 0;
 }
 
-function textoPreenchido(v: string | null | undefined): boolean {
-  return typeof v === "string" && v.trim().length > 0;
-}
-
-/** Acumula TODAS as pendências aplicáveis, em ordem estável. */
-export function avaliarCompletude(e: EntradaEstimativa): { completa: true } | { completa: false; pendencias: Pendencia[] } {
+/**
+ * Acumula TODAS as pendências aplicáveis, em ordem estável, e devolve os dados regulatórios quando nada falta.
+ * A comparação T > N (tarifa acima do custo da energia compensada) é feita aqui, com os dados resolvidos.
+ */
+export function avaliarEstimativa(e: EntradaEstimativa): AvaliacaoEstimativa {
   const p: Pendencia[] = [];
   const add = (codigo: CodigoPendencia, mensagem: string) => p.push({ codigo, mensagem });
-  const enq = e.enquadramento;
-  const fio = e.parametrosFioB;
+  const ctx = e.contexto;
+  const dataReferencia = ctx?.dataReferencia ?? hojeIso();
 
-  // Enquadramento
-  const ausente =
-    !textoPreenchido(enq.classe) ||
-    !textoPreenchido(enq.modalidade) ||
-    !textoPreenchido(enq.gd) ||
-    typeof enq.anoReferencia !== "number" ||
-    !Number.isFinite(enq.anoReferencia);
-  if (ausente) {
-    add("enquadramento_ausente", "Informe o enquadramento (classe, modalidade, GD e ano de referência) para estimar a economia.");
-  } else if (
-    enq.classe !== RECORTE_P0.classe ||
-    enq.modalidade !== RECORTE_P0.modalidade ||
-    enq.gd !== RECORTE_P0.gd ||
-    enq.anoReferencia !== RECORTE_P0.anoReferencia
-  ) {
-    add("enquadramento_nao_suportado", "Enquadramento não suportado: por ora só B1 residencial convencional, GD II, ano de 2026.");
-    add("percentual_legal_indisponivel", "O percentual legal do Fio B não está disponível para este enquadramento.");
+  const enq = enquadramentoDoTipoCliente(ctx?.tipoCliente);
+  if (enq.situacao === "ausente") {
+    add("enquadramento_ausente", "Informe o tipo de cliente na Qualificação SDR (a estimativa cobre cliente residencial).");
+  } else if (enq.situacao === "nao_suportado") {
+    add("enquadramento_nao_suportado", "Enquadramento sem regra validada: a estimativa cobre só cliente residencial (B1 convencional, GD II).");
   }
 
-  if (!textoPreenchido(fio?.distribuidora)) add("distribuidora_ausente", "Informe a distribuidora de energia.");
+  const tarifa =
+    enq.situacao === "ok" ? resolverTarifa(ctx?.tarifas ?? [], ctx?.distribuidoraInformada, enq.enquadramento, dataReferencia) : null;
+  if (tarifa?.situacao === "distribuidora_ausente" || (!tarifa && !ctx?.distribuidoraInformada?.trim())) {
+    add("distribuidora_ausente", "Informe a distribuidora de energia na Qualificação SDR.");
+  } else if (tarifa?.situacao === "sem_tarifa") {
+    add("distribuidora_sem_tarifa", `Não há tarifa oficial cadastrada para a distribuidora informada (“${tarifa.distribuidoraInformada}”).`);
+  } else if (tarifa?.situacao === "fora_da_vigencia") {
+    add("fio_b_vigencia_fora", `Sem tarifa vigente da ${tarifa.distribuidora} para ${formatarDataIso(dataReferencia)}.`);
+  } else if (tarifa?.situacao === "ambigua") {
+    add("tarifa_vigente_ambigua", `Há mais de uma tarifa oficial vigente da ${tarifa.distribuidora} nesta data.`);
+  }
 
-  if (!positivo(e.tarifaBaseRsKwh)) add("tarifa_base_ausente", "Informe a tarifa base da distribuidora (R$/kWh).");
+  const percentual = percentualLegalFioB(dataReferencia);
+  if (percentual == null) {
+    add(
+      "percentual_legal_indisponivel",
+      `O percentual legal do Fio B para ${dataReferencia.slice(0, 4)} não está na regra aceita (2026: 60%; 2027: 75%).`,
+    );
+  }
+
+  if (!positivo(e.tarifaBaseRsKwh)) add("tarifa_base_ausente", "Informe a tarifa (R$/kWh).");
   if (!positivo(e.consumoMedioKwh)) add("consumo_ausente", "Informe o consumo médio em kWh.");
-
   if (e.consumoOrigem === "estimado_conta" && !positivo(e.tarifaEfetivaContaRsKwh)) {
     add(
       "consumo_estimado_pela_tarifa_base",
@@ -112,27 +98,52 @@ export function avaliarCompletude(e: EntradaEstimativa): { completa: true } | { 
     );
   }
 
-  // Fio B
-  if (!fio || !positivo(fio.fioBRsKwh)) {
-    add("fio_b_ausente", "Informe o valor do Fio B (R$/kWh) da distribuidora.");
-  }
-  if (fio) {
-    if (fio.origem == null) {
-      add("fio_b_origem_ausente", "Informe a origem do valor do Fio B (oficial ANEEL ou manual justificado).");
-    } else if (fio.origem === "manual_justificado" && (!textoPreenchido(fio.justificativa) || !textoPreenchido(fio.fonte))) {
-      add("fio_b_manual_sem_justificativa", "Fio B manual exige justificativa e fonte.");
-    }
-    if (!textoPreenchido(fio.vigenciaInicio) || !textoPreenchido(fio.vigenciaFim)) {
-      add("fio_b_vigencia_ausente", "Informe o início e o fim da vigência do Fio B.");
-    } else if (e.dataReferencia < fio.vigenciaInicio! || e.dataReferencia > fio.vigenciaFim!) {
-      add("fio_b_vigencia_fora", "A data de referência está fora da vigência informada do Fio B.");
-    }
+  // Base tributária: declarada e igual à do Fio B oficial (sem conversão automática).
+  if (e.tarifaBaseBaseTributaria == null) {
+    add("base_tributaria_ausente", "Declare se a tarifa informada inclui tributos.");
+  } else if (tarifa?.situacao === "ok" && tarifa.tarifa.baseTributaria !== e.tarifaBaseBaseTributaria) {
+    add(
+      "base_tributaria_divergente",
+      "A tarifa informada inclui tributos e o Fio B oficial não: use a tarifa sem tributos (a conversão não é feita automaticamente).",
+    );
   }
 
-  // Base tributária: Fio B ausente ou diferente da tarifa base
-  if (!fio || fio.baseTributaria == null || e.tarifaBaseBaseTributaria == null || fio.baseTributaria !== e.tarifaBaseBaseTributaria) {
-    add("base_tributaria_divergente", "O Fio B e a tarifa base precisam estar na mesma base tributária (com ou sem tributos).");
+  let dados: DadosRegulatorios | null = null;
+  if (enq.situacao === "ok" && tarifa?.situacao === "ok" && percentual != null) {
+    const n = (percentual * tarifa.tarifa.fioBRsMwh) / 1000;
+    if (positivo(e.tarifaBaseRsKwh) && !(e.tarifaBaseRsKwh > n)) {
+      add("tarifa_abaixo_do_fio_b", "A tarifa informada precisa ser maior que o custo da energia compensada (Fio B × percentual legal).");
+    }
+    dados = { enquadramento: enq.enquadramento, tarifa: tarifa.tarifa, percentualLegal: percentual, dataReferencia };
   }
 
-  return p.length ? { completa: false, pendencias: p } : { completa: true };
+  return { pendencias: p, dados: p.length ? null : dados };
+}
+
+/** Data de hoje em America/Sao_Paulo (AAAA-MM-DD): referência da vigência e do percentual legal. */
+export function hojeIso(): string {
+  return hojeEmSaoPaulo();
+}
+
+/** Pendências quando NENHUM dado da estimativa está disponível. */
+export function pendenciasSemDados(): Pendencia[] {
+  return avaliarEstimativa({
+    contexto: null,
+    tarifaBaseRsKwh: null,
+    tarifaBaseBaseTributaria: null,
+    consumoMedioKwh: null,
+    consumoOrigem: null,
+    tarifaEfetivaContaRsKwh: null,
+  }).pendencias;
+}
+
+/** Lista as pendências em uma frase só, sem o ponto final de cada item. */
+export function listaDePendencias(pendencias: Pendencia[]): string {
+  return pendencias.map((p) => p.mensagem.replace(/\.\s*$/, "")).join("; ");
+}
+
+/** Mensagem exata de proposta bloqueada. `extra` (ex.: "o cálculo salvo usa a fórmula antiga") vem antes da lista. */
+export function mensagemPropostaIncompleta(pendencias: Pendencia[], extra?: string): string {
+  const itens = [extra, listaDePendencias(pendencias)].filter(Boolean).join("; ");
+  return `A estimativa financeira está incompleta: ${itens}. A proposta fica disponível quando os dados forem validados.`;
 }

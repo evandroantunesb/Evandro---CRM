@@ -1,28 +1,31 @@
 /**
- * HIPÓTESE EM TESTE — não usar em cálculo comercial; economia não validada.
- *
- * Módulo isolado e NÃO ligado a nada (nenhuma tela, ação, calculo-servidor, proposta ou PDF pode chamá-lo).
- * Escopo da hipótese: B1 convencional, GD II, 2026, sem banco de créditos.
+ * Fórmula da conta GD II com piso (regra ACEITA pelo Evandro; contrato .aurora/contratos/m2-p0-decisao-fio-b-copel.md,
+ * seções 3 e 7). Puro, sem I/O. Quem chama resolve T, D e N (ver `calculadora.ts`, ramo `completa`).
  *
  * Entradas (kWh, R$/kWh):
- *   C = consumo da rede = consumo total − autoconsumo instantâneo
- *   E = energia disponível para compensação = geração − autoconsumo instantâneo (injetada)
- *   T = tarifa cheia; D = custo de disponibilidade (kWh)
- *   N = custo unitário da energia compensada = TUSD Fio B × 0,60, JÁ resolvido pelo chamador e na MESMA base
- *       tributária de T. Este módulo não aplica fator tributário (tratamento tributário do Fio B é pendência legal).
+ *   C = consumo da rede = consumo total − autoconsumo simultâneo
+ *   E = energia disponível para compensação = geração − autoconsumo simultâneo (injetada)
+ *   T = tarifa base (TE + TUSD); D = custo de disponibilidade (kWh, REN 1.000, art. 291)
+ *   N = custo unitário da energia compensada = percentual legal × TUSD Fio B, na MESMA base tributária de T.
  * Fórmulas:
  *   K = min(E, C, max(0, ((C − D) × T) / (T − N)))
- *   conta com solar = max(D × T, (C − K) × T + K × N);  conta sem solar = C × T
- * Arredondamento: só no resultado final; monetário e energia em 2 casas, meio para longe de zero
- * (como o numeric do Postgres). Cálculos intermediários usam o valor sem arredondar.
+ *   conta SEM solar = max(consumo total, D) × T          (piso sobre todo o consumo; sem solar não há autoconsumo)
+ *   conta COM solar = max(D × T, (C − K) × T + K × N)    (piso sobre o faturamento TOTAL; REN 1.000, art. 655-I, §2º, I)
+ * O piso vale para toda unidade GD II (interpretação oficial da ANEEL no voto da REN 1.059/2023, itens 204–210).
+ * Parcelas representadas: só energia (TE + TUSD) a T; ficam fora iluminação pública, bandeiras e tributos que T não
+ * inclua. É estimativa, não a fatura.
+ * Economia = sem − com, calculada sobre as contas JÁ arredondadas (aritmética aprovada em 21/10/2026; ver
+ * .aurora/contratos/m2-p0-arredondamento-economia.md). Nenhuma fórmula de payback aqui (indisponível no P0).
+ * Arredondamento: só no resultado final; monetário e energia em 2 casas, meio para longe de zero (como o numeric do
+ * Postgres). Cálculos intermediários usam o valor sem arredondar.
  */
 
-export const METODO_FIO_B_HIPOTESE = "fio_b_hipotese_gd2_2026_v0" as const;
+export const METODO_GD2_PISO_V1 = "gd2_piso_655i_v1" as const;
 
-export type EntradaFioBHipotese = {
+export type EntradaFioBGd2 = {
   consumoTotalKwh: number;
   geracaoTotalKwh: number;
-  /** Padrão 0 (premissa conservadora). */
+  /** Padrão 0: hipótese declarada (o CRM não tem esse dado). */
   autoconsumoInstantaneoKwh?: number;
   tarifaCheiaRsKwh: number;
   custoDisponibilidadeKwh: number;
@@ -30,35 +33,41 @@ export type EntradaFioBHipotese = {
   custoEnergiaCompensadaRsKwh: number;
 };
 
-export type ResultadoFioBHipotese =
+export type ResultadoFioBGd2 =
   | {
       ok: true;
-      metodo: typeof METODO_FIO_B_HIPOTESE;
-      premissas: { autoconsumoInstantaneo: "zero_conservador" | "informado"; bancoDeCreditos: false };
+      metodo: typeof METODO_GD2_PISO_V1;
+      premissas: { autoconsumoInstantaneo: "zero_declarado" | "informado"; bancoDeCreditos: false };
       geracaoTotalKwh: number;
       autoconsumoInstantaneoKwh: number;
       energiaInjetadaKwh: number;
       energiaDisponivelCompensacaoKwh: number; // E
       energiaCompensadaKwh: number; // K
-      /** E − K: identificada separadamente; não é tratada como compensada nem como descartada (sem banco de créditos). */
+      /** E − K: injetado e não compensado no ciclo (crédito na distribuidora, não valorado). */
       energiaDisponivelNaoCompensadaKwh: number;
       consumoDaRedeKwh: number; // C
+      /** C − K: energia faturada a T. */
+      energiaFaturadaTarifaCheiaKwh: number;
+      /** K × N: custo da energia compensada (R$). */
+      custoEnergiaCompensada: number;
       contaSemSolar: number;
       contaComSolar: number;
       economiaMensal: number;
+      /** true somente se economiaMensal > 0 (após arredondamento). */
+      paybackDisponivel: boolean;
     }
   | { ok: false; motivo: string };
 
 /** Meio para longe de zero em 2 casas; `toPrecision(15)` remove o ruído binário (ex.: 1.005 -> 1.01). */
-function arredondar2(v: number): number {
+export function arredondar2(v: number): number {
   const escalado = Number((Math.abs(v) * 100).toPrecision(15));
   const r = Math.round(escalado) / 100;
   return v < 0 && r !== 0 ? -r : r;
 }
 
-const erro = (motivo: string): ResultadoFioBHipotese => ({ ok: false, motivo });
+const erro = (motivo: string): ResultadoFioBGd2 => ({ ok: false, motivo });
 
-export function calcularFioBHipotese(entrada: EntradaFioBHipotese): ResultadoFioBHipotese {
+export function calcularFioBGd2(entrada: EntradaFioBGd2): ResultadoFioBGd2 {
   const autoconsumo = entrada.autoconsumoInstantaneoKwh ?? 0;
   const { consumoTotalKwh, geracaoTotalKwh, tarifaCheiaRsKwh: T, custoDisponibilidadeKwh: D, custoEnergiaCompensadaRsKwh: N } = entrada;
 
@@ -77,13 +86,13 @@ export function calcularFioBHipotese(entrada: EntradaFioBHipotese): ResultadoFio
   const E = geracaoTotalKwh - autoconsumo;
 
   const K = Math.min(E, C, Math.max(0, ((C - D) * T) / (T - N)));
-  const contaSemSolar = C * T;
+  const contaSemSolar = Math.max(consumoTotalKwh, D) * T;
   const contaComSolar = Math.max(D * T, (C - K) * T + K * N);
 
   const resultado = {
     contaSemSolar: arredondar2(contaSemSolar),
     contaComSolar: arredondar2(contaComSolar),
-    economiaMensal: arredondar2(contaSemSolar - contaComSolar),
+    economiaMensal: arredondar2(arredondar2(contaSemSolar) - arredondar2(contaComSolar)),
   };
   if (![resultado.contaSemSolar, resultado.contaComSolar, resultado.economiaMensal, K].every(Number.isFinite)) {
     return erro("O cálculo não produziu um resultado finito.");
@@ -91,8 +100,8 @@ export function calcularFioBHipotese(entrada: EntradaFioBHipotese): ResultadoFio
 
   return {
     ok: true,
-    metodo: METODO_FIO_B_HIPOTESE,
-    premissas: { autoconsumoInstantaneo: entrada.autoconsumoInstantaneoKwh ? "informado" : "zero_conservador", bancoDeCreditos: false },
+    metodo: METODO_GD2_PISO_V1,
+    premissas: { autoconsumoInstantaneo: entrada.autoconsumoInstantaneoKwh ? "informado" : "zero_declarado", bancoDeCreditos: false },
     geracaoTotalKwh: arredondar2(geracaoTotalKwh),
     autoconsumoInstantaneoKwh: arredondar2(autoconsumo),
     energiaInjetadaKwh: arredondar2(E),
@@ -100,6 +109,9 @@ export function calcularFioBHipotese(entrada: EntradaFioBHipotese): ResultadoFio
     energiaCompensadaKwh: arredondar2(K),
     energiaDisponivelNaoCompensadaKwh: arredondar2(E - K),
     consumoDaRedeKwh: arredondar2(C),
+    energiaFaturadaTarifaCheiaKwh: arredondar2(C - K),
+    custoEnergiaCompensada: arredondar2(K * N),
     ...resultado,
+    paybackDisponivel: resultado.economiaMensal > 0,
   };
 }

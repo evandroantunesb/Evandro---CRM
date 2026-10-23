@@ -32,14 +32,15 @@ export type DadosPropostaPdf = {
   mensagem: string | null;
   modoPreco: ModoPreco;
   kitNome: string;
-  kitPotenciaKwp: number;
+  /** Campos de resultado nulos = sem dado confiável: a linha (ou o cartão) é omitida; nunca vira zero. */
+  kitPotenciaKwp: number | null;
   tipoLigacao: TipoLigacao;
-  geracaoEstimadaKwhMes: number;
-  contaSemSolar: number;
-  contaComSolar: number;
-  economiaMensal: number;
+  geracaoEstimadaKwhMes: number | null;
+  contaSemSolar: number | null;
+  contaComSolar: number | null;
+  economiaMensal: number | null;
   paybackMeses: number | null;
-  kitPreco: number;
+  kitPreco: number | null;
 };
 
 function numeroBr(v: number) {
@@ -50,6 +51,10 @@ function numeroBr(v: number) {
 export function PropostaPdfDocument({ dados }: { dados: DadosPropostaPdf }) {
   const logo = path.join(process.cwd(), "public", "marca", "logo-escuro.png");
   const comPreco = dados.modoPreco !== "sem_preco";
+  const mostraAvista = dados.kitPreco != null && (dados.modoPreco === "avista" || dados.modoPreco === "completo");
+  const mostraParcelado = dados.modoPreco === "parcelado" || dados.modoPreco === "completo";
+  const temEconomia =
+    dados.contaSemSolar != null || dados.contaComSolar != null || dados.economiaMensal != null || (comPreco && dados.paybackMeses != null);
 
   return (
     <Document title={`Proposta - ${dados.clienteNome}`}>
@@ -69,60 +74,72 @@ export function PropostaPdfDocument({ dados }: { dados: DadosPropostaPdf }) {
               <Text style={estilos.rotulo}>Kit</Text>
               <Text style={estilos.valor}>{dados.kitNome}</Text>
             </View>
-            <View style={estilos.coluna}>
-              <Text style={estilos.rotulo}>Potência</Text>
-              <Text style={estilos.valor}>{numeroBr(dados.kitPotenciaKwp)} kWp</Text>
-            </View>
+            {dados.kitPotenciaKwp != null && (
+              <View style={estilos.coluna}>
+                <Text style={estilos.rotulo}>Potência</Text>
+                <Text style={estilos.valor}>{numeroBr(dados.kitPotenciaKwp)} kWp</Text>
+              </View>
+            )}
           </View>
           <View style={estilos.linha}>
             <View style={estilos.coluna}>
               <Text style={estilos.rotulo}>Ligação</Text>
               <Text style={estilos.valor}>{ROTULO_TIPO_LIGACAO[dados.tipoLigacao]}</Text>
             </View>
-            <View style={estilos.coluna}>
-              <Text style={estilos.rotulo}>Geração estimada</Text>
-              <Text style={estilos.valor}>{numeroBr(dados.geracaoEstimadaKwhMes)} kWh/mês</Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={estilos.cartao}>
-          <Text style={estilos.cartaoTitulo}>Sua economia</Text>
-          <View style={estilos.linha}>
-            <View style={estilos.coluna}>
-              <Text style={estilos.rotulo}>Conta hoje</Text>
-              <Text style={estilos.valor}>{formatarMoeda(dados.contaSemSolar)}/mês</Text>
-            </View>
-            <View style={estilos.coluna}>
-              <Text style={estilos.rotulo}>Conta com o sistema</Text>
-              <Text style={estilos.valor}>{formatarMoeda(dados.contaComSolar)}/mês</Text>
-            </View>
-          </View>
-          <View style={estilos.linha}>
-            <View style={estilos.coluna}>
-              <Text style={estilos.rotulo}>Economia estimada</Text>
-              <Text style={estilos.valorVerde}>{formatarMoeda(dados.economiaMensal)}/mês</Text>
-            </View>
-            {comPreco && dados.paybackMeses != null && (
+            {dados.geracaoEstimadaKwhMes != null && (
               <View style={estilos.coluna}>
-                <Text style={estilos.rotulo}>Retorno do investimento</Text>
-                <Text style={estilos.valor}>{numeroBr(dados.paybackMeses)} meses</Text>
+                <Text style={estilos.rotulo}>Geração estimada</Text>
+                <Text style={estilos.valor}>{numeroBr(dados.geracaoEstimadaKwhMes)} kWh/mês</Text>
               </View>
             )}
           </View>
         </View>
 
-        {comPreco && (
+        {temEconomia && (
+          <View style={estilos.cartao}>
+            <Text style={estilos.cartaoTitulo}>Sua economia</Text>
+            <View style={estilos.linha}>
+              {dados.contaSemSolar != null && (
+                <View style={estilos.coluna}>
+                  <Text style={estilos.rotulo}>Conta hoje</Text>
+                  <Text style={estilos.valor}>{formatarMoeda(dados.contaSemSolar)}/mês</Text>
+                </View>
+              )}
+              {dados.contaComSolar != null && (
+                <View style={estilos.coluna}>
+                  <Text style={estilos.rotulo}>Conta com o sistema</Text>
+                  <Text style={estilos.valor}>{formatarMoeda(dados.contaComSolar)}/mês</Text>
+                </View>
+              )}
+            </View>
+            <View style={estilos.linha}>
+              {dados.economiaMensal != null && (
+                <View style={estilos.coluna}>
+                  <Text style={estilos.rotulo}>Economia estimada</Text>
+                  <Text style={estilos.valorVerde}>{formatarMoeda(dados.economiaMensal)}/mês</Text>
+                </View>
+              )}
+              {comPreco && dados.paybackMeses != null && (
+                <View style={estilos.coluna}>
+                  <Text style={estilos.rotulo}>Retorno do investimento</Text>
+                  <Text style={estilos.valor}>{numeroBr(dados.paybackMeses)} meses</Text>
+                </View>
+              )}
+            </View>
+          </View>
+        )}
+
+        {comPreco && (mostraAvista || mostraParcelado) && (
           <View style={estilos.cartao}>
             <Text style={estilos.cartaoTitulo}>Investimento</Text>
             <View style={estilos.linha}>
-              {(dados.modoPreco === "avista" || dados.modoPreco === "completo") && (
+              {mostraAvista && dados.kitPreco != null && (
                 <View style={estilos.coluna}>
                   <Text style={estilos.rotulo}>À vista</Text>
                   <Text style={estilos.valor}>{formatarMoeda(dados.kitPreco)}</Text>
                 </View>
               )}
-              {(dados.modoPreco === "parcelado" || dados.modoPreco === "completo") && (
+              {mostraParcelado && (
                 <View style={estilos.coluna}>
                   <Text style={estilos.rotulo}>Parcelado</Text>
                   <Text style={estilos.valor}>Consulte condições com o vendedor</Text>
