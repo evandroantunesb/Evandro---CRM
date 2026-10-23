@@ -55,5 +55,16 @@ export async function clienteDe(usuario: UsuarioE2E, senha: string) {
   return cliente;
 }
 
+/**
+ * Cliente LOCAL com a service role, só para FIXTURES que o app não cria mais (ex.: linha legada de `calculos_solares`,
+ * que o cliente autenticado não grava desde a migration 20261023220000). A chave vem do ambiente já validado como
+ * local pela trava do playwright.config.ts.
+ */
+export function clienteServico() {
+  return createClient<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+    auth: { persistSession: false },
+  });
+}
+
 /** Texto do indicador "Obra X de N". */
 export const indicador = (page: Page) => page.getByRole("navigation", { name: "Navegação entre obras" }).locator("p[aria-live]");

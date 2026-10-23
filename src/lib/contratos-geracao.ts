@@ -8,6 +8,7 @@ import {
   validarModeloContrato,
   type FontesContrato,
 } from "@/lib/contrato";
+import { calculoEhIncompleto, calculoEhLegado, carregarVigencia, mensagemDeRecusa, motivosDaAcao } from "@/lib/calculo-vigencia";
 import { MENSAGEM_PRECO_DESATUALIZADO, precoDoCalculoDesatualizado } from "@/lib/calculo-preco";
 import { mensagemErro } from "@/lib/erros";
 import { formatarMoeda } from "@/lib/formatacao";
@@ -37,10 +38,10 @@ export async function gerarContratoComCliente(
         .maybeSingle(),
       supabase
         .from("calculos_solares")
-        .select("kit_nome, kit_potencia_kwp, kit_preco, tipo_ligacao, consumo_medio_kwh, geracao_estimada_kwh_mes")
+        .select("kit_nome, kit_potencia_kwp, kit_preco, tipo_ligacao, consumo_medio_kwh, geracao_estimada_kwh_mes, estado_financeiro")
         .eq("negocio_id", negocioId)
         .maybeSingle(),
-      supabase.from("kit_componentes").select("descricao, quantidade, potencia_w").eq("negocio_id", negocioId).order("ordem"),
+      supabase.from("kit_componentes").select("tipo, descricao, quantidade, potencia_w").eq("negocio_id", negocioId).order("ordem"),
       supabase.from("empresas").select("nome, cnpj").eq("id", empresaId).maybeSingle(),
       supabase.from("contratos").select("id, status").eq("negocio_id", negocioId).maybeSingle(),
       // Nome do vendedor responsável (só nome; nunca e-mail ou telefone).
@@ -52,8 +53,21 @@ export async function gerarContratoComCliente(
     return { ok: false, mensagem: "Este contrato já saiu do rascunho — o texto não muda mais automaticamente." };
   }
   // O contrato usa o valor atual do negócio e a proposta, o preço do cálculo: com os dois diferentes, não gera.
-  if (calculo && precoDoCalculoDesatualizado(calculo.kit_preco, negocio.valor)) {
+  // Com cálculo legado (fórmula antiga) a proposta não mostra preço nenhum e "Atualizar preço" é recusado: a guarda
+  // não protege nada e só travaria o contrato, que segue usando o valor atual do negócio (decisão de Nora, M2-B8).
+  // O mesmo vale para o resultado técnico incompleto (sem parte financeira, nunca entra em proposta).
+  const legado = !!calculo && (calculoEhLegado(calculo) || calculoEhIncompleto(calculo));
+  if (calculo && !legado && precoDoCalculoDesatualizado(calculo.kit_preco, negocio.valor)) {
     return { ok: false, mensagem: MENSAGEM_PRECO_DESATUALIZADO };
+  }
+  // Potência, consumo e geração do contrato vêm do cálculo: só gera se o que os determina continua valendo (kit,
+  // preço, produtividade, consumo/fatura). `legado` (fórmula financeira antiga) e os parâmetros financeiros NÃO
+  // afetam o contrato e são ignorados. Falha ao conferir nunca vale como vigente.
+  if (calculo) {
+    const lido = await carregarVigencia(supabase, negocioId);
+    if (!lido.ok) return { ok: false, mensagem: "Não foi possível conferir o cálculo. Tente de novo." };
+    const motivos = lido.calculo ? motivosDaAcao(lido.vigencia.motivos, "contrato").filter((m) => !(legado && m === "preco")) : [];
+    if (motivos.length) return { ok: false, mensagem: mensagemDeRecusa(motivos, "contrato") };
   }
   // Modelo salvo antes da validação pode ter campo desconhecido: não gera.
   const validacao = validarModeloContrato(modelo.conteudo);

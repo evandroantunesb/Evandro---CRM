@@ -48,7 +48,8 @@ beforeAll(async () => {
     .from("kit_componentes")
     .insert({ empresa_id: empresa, negocio_id: negocio, tipo: "modulo", descricao: "Módulo 550 W", potencia_w: 550, quantidade: 8, ordem: 0 });
   if (erroKit) throw erroKit;
-  const { data: calc, error } = await vendedor1.cliente
+  // Fixture legada pelo serviço: o cliente autenticado não grava `calculos_solares` (migration 20261023220000).
+  const { data: calc, error } = await servico
     .from("calculos_solares")
     .insert({
       empresa_id: empresa,

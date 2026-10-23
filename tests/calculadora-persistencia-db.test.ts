@@ -4,9 +4,10 @@
  * 1) Percentuais (parametros_calculadora.percentual_fio_b numeric(4,3), comissao_percentual numeric(5,4)):
  *    grava `lerNumeroBr(texto)/100` (mesma regra de editarParametros), lê, formata com `percentualParaCampo`,
  *    reenvia o texto SEM editar e exige valor persistido idêntico e texto exibido idêntico, sem resíduo.
- * 2) Consumo: `consumoComoPersistido` bate com o que o banco grava (negocios e calculos_solares, numeric(10,2));
- *    a linha de `linhaDeCalculo` gravada e relida é reproduzida exatamente por `calcular(entradaDaLinha(...))`;
- *    refazer a linha a partir da linha lida devolve a mesma linha.
+ * 2) Consumo: `consumoComoPersistido` bate com o que o banco grava (negocios e calculos_solares, numeric(10,2)).
+ * 3) M2-Q6 (motor sem fórmula validada): `linhaDeCalculo` não gera mais linha; as verificações de escala das colunas
+ *    de `calculos_solares` usam LINHAS LEGADAS inseridas diretamente (fixture) e relidas; o motor atual não as
+ *    reproduz (devolve estimativa incompleta) e não toca nelas.
  *
  * Cada teste cria o próprio cenário (empresa com sufixo único); nada depende de dados prévios.
  */
@@ -259,9 +260,6 @@ async function inserirCalculoBruto(sobrescrever: Partial<InsertCalculo>) {
 }
 
 describe("M2-Q2: valorComoPersistido bate com o Postgres real nas colunas de calculos_solares", () => {
-  // A migration 20261023210000 (lote 1) muda tarifa_kwh para numeric(9,5). Diferença temporária: o app desta versão
-  // continua normalizando a tarifa em 4 casas (CASAS_TARIFA = 4) antes de gravar; o banco aceita 5. Como 4 casas cabem
-  // em 5, o que o app grava é guardado sem mudança. O app passa a 5 casas na PR B.
   it.each([0.123456, 0.951234, 0.000005, 1.234565])("tarifa_kwh numeric(9,5): bruto %s", async (bruto) => {
     const { negocio, error } = await inserirCalculoBruto({ tarifa_kwh: bruto });
     expect(error).toBeNull();
@@ -290,7 +288,7 @@ describe("M2-Q2: valorComoPersistido bate com o Postgres real nas colunas de cal
     expect(data!.valor_fatura_medio).toBe(valorComoPersistido(bruto, 2));
   });
 
-  it("o banco rejeita (23514) tarifa bruta 0,000004 (normaliza para 0 em 5 casas) e o helper também prevê 0", async () => {
+  it("o banco rejeita (23514) tarifa bruta 0,000004 (normaliza para 0) e o helper também prevê 0", async () => {
     expect(valorComoPersistido(0.000004, 5)).toBe(0);
     const { error } = await inserirCalculoBruto({ tarifa_kwh: 0.000004 });
     expect(error?.code).toBe("23514");
@@ -303,7 +301,7 @@ describe("M2-Q2: valorComoPersistido bate com o Postgres real nas colunas de cal
   });
 });
 
-describe("cálculo reproduzível a partir dos dados salvos", () => {
+describe("linhas legadas (fórmula antiga, não validada): escala das colunas e motor atual", () => {
   let parametros: ParametrosCalculo;
 
   beforeAll(async () => {
@@ -323,7 +321,7 @@ describe("cálculo reproduzível a partir dos dados salvos", () => {
 
   type Caso = {
     nome: string;
-    consumo: number | null;
+    consumo: number;
     fatura: number | null;
     tarifa: number;
     potencia: number;
@@ -339,79 +337,85 @@ describe("cálculo reproduzível a partir dos dados salvos", () => {
   const CASOS: Caso[] = [
     { nome: "tarifa 0,90 e consumo 1500,005", consumo: 1500.005, fatura: null, tarifa: 0.9, potencia: 10, tipo: "bifasico", consumoGravado: 1500.01, contaSemSolarGravada: 1350.01 },
     { nome: "tarifa 0,90 e consumo 800,125", consumo: 800.125, fatura: null, tarifa: 0.9, potencia: 5, tipo: "monofasico", consumoGravado: 800.13, contaSemSolarGravada: 720.12 },
-    { nome: "tarifa 0,95 e fatura 1055,55 (consumo 1111,11)", consumo: null, fatura: 1055.55, tarifa: 0.95, potencia: 8, tipo: "trifasico", consumoGravado: 1111.11, contaSemSolarGravada: 1055.55 },
+    { nome: "tarifa 0,95, consumo informado 1111,11 e fatura 1055,55", consumo: 1111.11, fatura: 1055.55, tarifa: 0.95, potencia: 8, tipo: "trifasico", consumoGravado: 1111.11, contaSemSolarGravada: 1055.55 },
     { nome: "consumo 1200,555", consumo: 1200.555, fatura: null, tarifa: 0.9, potencia: 10, tipo: "bifasico", consumoGravado: 1200.56 },
     { nome: "consumo 1200,554", consumo: 1200.554, fatura: null, tarifa: 0.9, potencia: 10, tipo: "bifasico", consumoGravado: 1200.55 },
     { nome: "consumo 2 casas já exato", consumo: 1234.56, fatura: null, tarifa: 1.0123, potencia: 7.5, tipo: "bifasico", consumoGravado: 1234.56 },
-    { nome: "fatura 1000 e tarifa 0,90 (consumo 1111,11)", consumo: null, fatura: 1000, tarifa: 0.9, potencia: 10, tipo: "trifasico", consumoGravado: 1111.11 },
+    { nome: "consumo informado 1111,11, fatura 1000 e tarifa 0,90", consumo: 1111.11, fatura: 1000, tarifa: 0.9, potencia: 10, tipo: "trifasico", consumoGravado: 1111.11 },
     { nome: "sistema cobre todo o consumo (consumo 300,005)", consumo: 300.005, fatura: null, tarifa: 0.9, potencia: 10, tipo: "monofasico", consumoGravado: 300.01 },
     // M2-Q2: tarifa/potência/preço/fatura com casas excedentes (preço 20000,005 -> 20000,01; potência 5,505 -> 5,51)
-    { nome: "tarifa 0,123456 e consumo 800 (tarifa gravada 0,1235)", consumo: 800, fatura: null, tarifa: 0.123456, potencia: 10, tipo: "bifasico", consumoGravado: 800, tarifaGravada: 0.1235 },
-    { nome: "tarifa 0,95231 e consumo 800 (tarifa gravada 0,9523)", consumo: 800, fatura: null, tarifa: 0.95231, potencia: 10, tipo: "bifasico", consumoGravado: 800, tarifaGravada: 0.9523 },
-    { nome: "fatura 1000 e tarifa 0,95231 (consumo 1050,09)", consumo: null, fatura: 1000, tarifa: 0.95231, potencia: 10, tipo: "bifasico", consumoGravado: 1050.09, tarifaGravada: 0.9523, faturaGravada: 1000 },
-    { nome: "potência 5,505, preço 20000,005 e fatura 1000,005 com tarifa 0,5", consumo: null, fatura: 1000.005, tarifa: 0.5, potencia: 5.505, precoKit: 20000.005, tipo: "bifasico", consumoGravado: 2000.02, tarifaGravada: 0.5, faturaGravada: 1000.01, potenciaGravada: 5.51, precoGravado: 20000.01 },
+    { nome: "tarifa 0,123456 e consumo 800 (tarifa gravada 0,12346)", consumo: 800, fatura: null, tarifa: 0.123456, potencia: 10, tipo: "bifasico", consumoGravado: 800, tarifaGravada: 0.12346 },
+    { nome: "tarifa 0,952314 e consumo 800 (tarifa gravada 0,95231)", consumo: 800, fatura: null, tarifa: 0.952314, potencia: 10, tipo: "bifasico", consumoGravado: 800, tarifaGravada: 0.95231 },
+    { nome: "consumo informado 1050,09, fatura 1000 e tarifa 0,952314", consumo: 1050.09, fatura: 1000, tarifa: 0.952314, potencia: 10, tipo: "bifasico", consumoGravado: 1050.09, tarifaGravada: 0.95231, faturaGravada: 1000 },
+    { nome: "potência 5,505, preço 20000,005, consumo informado 2000,02 e fatura 1000,005 com tarifa 0,5", consumo: 2000.02, fatura: 1000.005, tarifa: 0.5, potencia: 5.505, precoKit: 20000.005, tipo: "bifasico", consumoGravado: 2000.02, tarifaGravada: 0.5, faturaGravada: 1000.01, potenciaGravada: 5.51, precoGravado: 20000.01 },
   ];
 
-  // Os financeiros podem ser nulos no banco (estimativa incompleta, lote 1): aqui eles não viram zero, e o toEqual com o
-  // resultado do motor falha se a linha gravada vier sem os números.
-  function pegarResultados(l: {
-    geracao_estimada_kwh_mes: number;
-    kwh_faturado: number | null;
-    kwh_compensado: number | null;
-    custo_fio_b: number | null;
-    conta_sem_solar: number | null;
-    conta_com_solar: number | null;
-    economia_mensal: number | null;
-    payback_meses: number | null;
-  }) {
-    return {
-      geracaoEstimadaKwhMes: l.geracao_estimada_kwh_mes,
-      kwhFaturado: l.kwh_faturado,
-      kwhCompensado: l.kwh_compensado,
-      custoFioB: l.custo_fio_b,
-      contaSemSolar: l.conta_sem_solar,
-      contaComSolar: l.conta_com_solar,
-      economiaMensal: l.economia_mensal,
-      paybackMeses: l.payback_meses,
-    };
+  // Resultados FIXOS de uma linha legada (valores da fórmula antiga já derivados à mão: 5 kWp, R$ 20.000, trifásico,
+  // 400 kWh, tarifa 0,9, 120 kWh/kWp/mês, Fio B 60%, disponibilidade 100 kWh). São só fixture: nenhum teste os
+  // recalcula, e nenhum deles vale como resultado atual.
+  const RESULTADOS_LEGADOS = {
+    geracao_estimada_kwh_mes: 600,
+    kwh_faturado: 100,
+    kwh_compensado: 300,
+    custo_fio_b: 162,
+    economia_mensal: 108,
+    payback_meses: 185.2,
+  };
+
+  async function inserirLinhaLegada(negocio: string, caso: Caso) {
+    const { error } = await servico.from("calculos_solares").insert({
+      empresa_id: empresa,
+      negocio_id: negocio,
+      kit_nome: "Kit teste",
+      kit_potencia_kwp: caso.potencia,
+      kit_preco: caso.precoKit ?? 30000,
+      tipo_ligacao: caso.tipo,
+      consumo_medio_kwh: caso.consumo,
+      valor_fatura_medio: caso.fatura,
+      tarifa_kwh: caso.tarifa,
+      produtividade_kwh_kwp_mes: parametros.produtividade_kwh_kwp_mes,
+      percentual_fio_b: parametros.percentual_fio_b,
+      disponibilidade_kwh: 50,
+      ...RESULTADOS_LEGADOS,
+      conta_sem_solar: caso.contaSemSolarGravada ?? 360,
+      conta_com_solar: 252,
+    });
+    return error;
   }
 
-  it.each(CASOS)("$nome: calcular(entradaDaLinha(lida)) reproduz EXATAMENTE os resultados lidos; salvar de novo sem editar mantém a linha", async (caso) => {
+  async function contarLinhas(negocio: string): Promise<number> {
+    const { count, error } = await servico.from("calculos_solares").select("id", { count: "exact", head: true }).eq("negocio_id", negocio);
+    if (error) throw error;
+    return count ?? 0;
+  }
+
+  // ANTES: linhaDeCalculo gerava a linha, o teste a inseria e conferia que calcular(entradaDaLinha(lida)) reproduzia
+  // os resultados lidos e que refazer a linha devolvia a mesma. AGORA: a linha legada é fixture inserida com os valores
+  // brutos; a escala de cada coluna continua conferida contra o Postgres real; o motor atual não a reproduz.
+  it.each(CASOS)("$nome: a linha legada inserida é lida na escala das colunas; o motor atual não a reproduz nem a altera", async (caso) => {
     const negocio = await novoNegocio();
     await montarKit(negocio);
-    const entrada = {
-      kitNome: "Kit teste",
-      potenciaKwp: caso.potencia,
-      precoKit: caso.precoKit ?? 30000,
-      tipoLigacao: caso.tipo,
-      consumoMedioKwh: caso.consumo,
-      valorFaturaMedio: caso.fatura,
-      tarifaKwh: caso.tarifa,
-    };
-    const r = linhaDeCalculo(empresa, entrada, parametros);
-    if (!r.ok) throw new Error(r.mensagem);
-
-    const { error } = await servico.from("calculos_solares").insert({ ...r.linha, negocio_id: negocio });
-    expect(error).toBeNull();
+    expect(await inserirLinhaLegada(negocio, caso)).toBeNull();
     const { data: lida } = await servico.from("calculos_solares").select("*").eq("negocio_id", negocio).single();
 
-    // O que a linha prometia gravar é o que o banco guardou (nenhum campo foi re-arredondado pelo banco).
     expect(lida!.consumo_medio_kwh).toBe(caso.consumoGravado);
-    expect(lida!.consumo_medio_kwh).toBe(r.linha.consumo_medio_kwh);
+    expect(lida!.consumo_medio_kwh).toBe(consumoComoPersistido(caso.consumo));
     if (caso.contaSemSolarGravada !== undefined) expect(lida!.conta_sem_solar).toBe(caso.contaSemSolarGravada);
-    if (caso.tarifaGravada !== undefined) expect(lida!.tarifa_kwh).toBe(caso.tarifaGravada);
-    if (caso.faturaGravada !== undefined) expect(lida!.valor_fatura_medio).toBe(caso.faturaGravada);
-    if (caso.potenciaGravada !== undefined) expect(lida!.kit_potencia_kwp).toBe(caso.potenciaGravada);
-    if (caso.precoGravado !== undefined) expect(lida!.kit_preco).toBe(caso.precoGravado);
-    for (const [campo, valor] of Object.entries(r.linha)) {
-      expect(lida![campo as keyof typeof lida], campo).toEqual(valor);
+    expect(lida!.tarifa_kwh).toBe(caso.tarifaGravada ?? valorComoPersistido(caso.tarifa, 5));
+    expect(lida!.valor_fatura_medio).toBe(caso.faturaGravada ?? (caso.fatura === null ? null : valorComoPersistido(caso.fatura, 2)));
+    expect(lida!.kit_potencia_kwp).toBe(caso.potenciaGravada ?? valorComoPersistido(caso.potencia, 2));
+    expect(lida!.kit_preco).toBe(caso.precoGravado ?? valorComoPersistido(caso.precoKit ?? 30000, 2));
+    for (const [campo, valor] of Object.entries(RESULTADOS_LEGADOS)) {
+      expect(lida![campo as keyof typeof lida], campo).toBe(valor);
     }
 
-    // Reprodução só com os dados salvos: resultado EXATO.
-    expect(calcular(entradaDaLinha(lida!))).toEqual(pegarResultados(lida!));
+    // O motor atual, alimentado só com os dados salvos, NÃO devolve os números da linha: é estimativa incompleta.
+    const motor = calcular(entradaDaLinha(lida!));
+    expect(motor.estado).toBe("incompleta");
+    expect(motor).not.toHaveProperty("economiaMensal");
 
-    // (c) Salvar de novo sem editar: consumo gravado vira o consumo informado; mesma linha.
-    const r2 = linhaDeCalculo(
+    // Refazer o "salvar" com os dados lidos não cria nem altera linha: devolve incompleta e a linha segue igual.
+    const r = linhaDeCalculo(
       empresa,
       {
         kitNome: lida!.kit_nome,
@@ -424,15 +428,25 @@ describe("cálculo reproduzível a partir dos dados salvos", () => {
       },
       parametros,
     );
-    if (!r2.ok) throw new Error(r2.mensagem);
-    expect(r2.linha).toEqual(r.linha);
-
-    const { error: erroUpdate } = await servico.from("calculos_solares").update(r2.linha).eq("negocio_id", negocio);
-    expect(erroUpdate).toBeNull();
+    expect(r.ok).toBe(false);
+    expect(r.ok === false && r.incompleta).toBe(true);
+    expect(await contarLinhas(negocio)).toBe(1);
     const { data: relida } = await servico.from("calculos_solares").select("*").eq("negocio_id", negocio).single();
-    for (const [campo, valor] of Object.entries(r2.linha)) {
-      expect(relida![campo as keyof typeof relida], campo).toEqual(valor);
-    }
-    expect(calcular(entradaDaLinha(relida!))).toEqual(pegarResultados(relida!));
+    expect(relida).toEqual(lida);
+  });
+
+  it("negócio sem linha: com os parâmetros reais da empresa o motor devolve incompleta e NENHUMA linha é criada", async () => {
+    const negocio = await novoNegocio();
+    await montarKit(negocio);
+    const r = linhaDeCalculo(
+      empresa,
+      { kitNome: "Kit teste", potenciaKwp: 10, precoKit: 30000, tipoLigacao: "bifasico", consumoMedioKwh: 1200, valorFaturaMedio: null, tarifaKwh: 0.9 },
+      parametros,
+    );
+    if (r.ok || r.incompleta !== true) throw new Error("esperava estimativa incompleta");
+    expect(r.geracaoEstimadaKwhMes).toBe(1200); // 10 kWp × 120 (parâmetro real lido do banco)
+    // Sem contexto regulatório (qualificação) a estimativa fica incompleta e nada é gravado.
+    expect(r.pendencias.map((p) => p.codigo)).toContain("enquadramento_ausente");
+    expect(await contarLinhas(negocio)).toBe(0);
   });
 });

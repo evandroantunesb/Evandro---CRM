@@ -16,12 +16,15 @@ export function Contrato({
   contrato,
   siteUrl,
   precoDesatualizado = false,
+  bloqueio = null,
 }: {
   negocioId: string;
   contrato: ContratoSalvo | null;
   siteUrl: string;
   /** Valor do negócio diferente do preço do cálculo: o servidor não gera o contrato nesse estado. */
   precoDesatualizado?: boolean;
+  /** Mensagem do servidor quando o cálculo salvo impede o contrato (nunca por `legado`); nulo = liberado. */
+  bloqueio?: string | null;
 }) {
   const [resultadoGerar, acaoGerar, gerando] = useActionState(gerarContrato, null);
   const [resultadoStatus, acaoStatus] = useActionState(atualizarStatusContrato, null);
@@ -37,13 +40,19 @@ export function Contrato({
         )}
         <form action={acaoGerar} className="flex flex-col gap-2">
           <input type="hidden" name="negocioId" value={negocioId} />
-          {precoDesatualizado && (
+          {bloqueio ? (
             <p role="alert" className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900">
-              {MENSAGEM_PRECO_DESATUALIZADO}
+              {bloqueio}
             </p>
+          ) : (
+            precoDesatualizado && (
+              <p role="alert" className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                {MENSAGEM_PRECO_DESATUALIZADO}
+              </p>
+            )
           )}
           <Mensagem resultado={resultadoGerar} />
-          <Botao type="submit" disabled={gerando || precoDesatualizado} className="self-start">
+          <Botao type="submit" disabled={gerando || precoDesatualizado || !!bloqueio} className="self-start">
             {gerando ? "Gerando..." : contrato ? "Gerar novamente" : "Gerar contrato"}
           </Botao>
         </form>
