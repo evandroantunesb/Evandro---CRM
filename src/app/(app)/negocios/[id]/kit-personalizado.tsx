@@ -34,7 +34,7 @@ export type CalculoSalvo = {
   valorFaturaMedio: number | null;
   tarifaKwh: number;
   geracaoEstimadaKwhMes: number;
-  economiaMensal: number;
+  economiaMensal: number | null;
   paybackMeses: number | null;
   observacoes: string | null;
 };
@@ -244,7 +244,7 @@ export function KitPersonalizado({
           </div>
           <div>
             <dt className="text-zinc-500">Economia estimada</dt>
-            <dd className="font-medium text-green-700">{formatarMoeda(calculo.economiaMensal)}/mês</dd>
+            <dd className="font-medium text-green-700">{calculo.economiaMensal == null ? "Não calculada" : `${formatarMoeda(calculo.economiaMensal)}/mês`}</dd>
           </div>
           <div>
             <dt className="text-zinc-500">Payback estimado</dt>

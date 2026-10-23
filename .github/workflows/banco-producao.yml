@@ -236,6 +236,12 @@ jobs:
         env:
           MIGRATIONS_AUTORIZADAS: |
             20261021100000_negocio_consumo_estimado.sql
+            20261022100000_propostas_emissoes.sql
+            20261022110000_produtividade_confirmada.sql
+            20261023200000_calculos_estimativa_incompleta.sql
+            20261023210000_calculo_gd2_fio_b.sql
+            20261023220000_calculos_solares_gravacao_servidor.sql
+            20261023230000_calculos_solares_exclusao_historico.sql
         run: bash .github/scripts/validar-conjunto-migrations.sh "$RUNNER_TEMP/dry-run.txt"
       - name: Aplicar (supabase db push --include-all)
         env:
