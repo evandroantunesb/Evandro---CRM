@@ -2,7 +2,7 @@
  * Financeiro forjado (M2 P0, revisão da calculadora GD II): `calculos_solares` só é gravado pelo caminho do servidor
  * (motor compartilhado + referência tarifária lida no servidor), depois da autorização real do usuário no negócio.
  * Contra o banco local descartável, com os clientes AUTENTICADOS (RLS e privilégios reais):
- *  - (PR C, com a migration 20261023240000) vendedor autenticado não consegue INSERT, UPDATE nem UPSERT direto (nem para forjar valores, método, percentual,
+ *  - vendedor autenticado não consegue INSERT, UPDATE nem UPSERT direto (nem para forjar valores, método, percentual,
  *    fonte, autoria ou o estado `completo`, nem para criar linha "legado" com economia);
  *  - a RPC de autorização não grava nada e recusa outra empresa e o papel `operacao`;
  *  - o caminho legítimo continua gravando, com a autoria do usuário da sessão (nunca a informada);
@@ -17,7 +17,7 @@ import { atualizarPrecoCalculoComCliente, salvarKitComCliente, type Atual } from
 import { DISPONIBILIDADE_ART_291, PERCENTUAL_LEGAL_FIO_B_GD2 } from "@/lib/tarifa-gd";
 import { TIPOS_LIGACAO } from "@/lib/tipos";
 import type { SupabaseServidor } from "@/lib/supabase/server";
-import type { TablesUpdate } from "@/lib/supabase/database.types";
+import type { TablesInsert, TablesUpdate } from "@/lib/supabase/database.types";
 import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
 
 let vendedor: Usuario, colega: Usuario, operacao: Usuario, fora: Usuario, admin: Usuario;
@@ -101,9 +101,96 @@ const salvarComo = (u: Usuario, atual: Atual, negocioId: string, extra: Record<s
   );
 const linha = async (negocioId: string) => (await servico.from("calculos_solares").select("*").eq("negocio_id", negocioId).maybeSingle()).data;
 
-// Os testes de escrita direta recusada (42501 em INSERT/UPDATE/UPSERT pelo PostgREST) dependem da migration
-// 20261023240000 (revogação final) e ficam para a PR C.
-describe("histórico de cálculos", () => {
+/** Linha "completa" plausível (copiada de uma legítima) com a economia e a fonte adulteradas. */
+async function payloadForjado(negocioId: string): Promise<TablesInsert<"calculos_solares">> {
+  const modelo = await novoNegocio();
+  await salvarComo(vendedor, atualVendedor, modelo);
+  const resto = Object.fromEntries(Object.entries((await linha(modelo))!).filter(([k]) => !["id", "created_at", "updated_at"].includes(k)));
+  return { ...(resto as TablesInsert<"calculos_solares">), negocio_id: negocioId, economia_mensal: 9999.99, conta_com_solar: 0.01, percentual_legal_fio_b: 0.1 };
+}
+
+describe("vendedor autenticado não grava financeiro direto (PostgREST)", () => {
+  it("INSERT de linha `completo` forjada: recusado, nada gravado", async () => {
+    const negocioId = await novoNegocio();
+    await servico.from("kit_componentes").insert({ empresa_id: empresa, negocio_id: negocioId, tipo: "modulo", descricao: "Módulo 600 W", potencia_w: 600, quantidade: 5, ordem: 0 });
+    const { error } = await vendedor.cliente.from("calculos_solares").insert(await payloadForjado(negocioId));
+    expect(error?.code).toBe("42501");
+    expect(await linha(negocioId)).toBeNull();
+  });
+
+  it("INSERT de linha `legado` com economia (fórmula antiga forjada): recusado", async () => {
+    const negocioId = await novoNegocio();
+    await servico.from("kit_componentes").insert({ empresa_id: empresa, negocio_id: negocioId, tipo: "modulo", descricao: "Módulo 600 W", potencia_w: 600, quantidade: 5, ordem: 0 });
+    const { error } = await vendedor.cliente.from("calculos_solares").insert({
+      empresa_id: empresa,
+      negocio_id: negocioId,
+      kit_nome: "Forjado",
+      kit_potencia_kwp: 3,
+      kit_preco: 20000,
+      tipo_ligacao: "bifasico",
+      consumo_medio_kwh: 500,
+      tarifa_kwh: 0.9,
+      produtividade_kwh_kwp_mes: 100,
+      percentual_fio_b: 0.45,
+      disponibilidade_kwh: 50,
+      geracao_estimada_kwh_mes: 300,
+      kwh_faturado: 200,
+      kwh_compensado: 300,
+      custo_fio_b: 1,
+      conta_sem_solar: 450,
+      conta_com_solar: 1,
+      economia_mensal: 449,
+      payback_meses: 1,
+    });
+    expect(error?.code).toBe("42501");
+    expect(await linha(negocioId)).toBeNull();
+  });
+
+  it("UPDATE de valores, método, percentual, fonte, estado e autoria numa linha legítima: recusado, linha intacta", async () => {
+    const negocioId = await novoNegocio();
+    expect(await salvarComo(vendedor, atualVendedor, negocioId)).toMatchObject({ ok: true, mensagem: "Kit e cálculo salvos." });
+    const antes = await linha(negocioId);
+    const ataques: TablesUpdate<"calculos_solares">[] = [
+      { economia_mensal: 9999.99 },
+      { conta_sem_solar: 5000, conta_com_solar: 0.01 },
+      { metodo_calculo: "metodo_inventado" },
+      { percentual_legal_fio_b: 0.1 },
+      { fio_b_rs_mwh: 1, tarifa_origem: "oficial_aneel" },
+      { tarifa_gd_id: null },
+      { payback_meses: 3 },
+      { criado_por: atualColega.membroId, atualizado_por: atualColega.membroId },
+      { financeiro_desatualizado_em: null, financeiro_desatualizado_motivo: null, kit_preco: 1 },
+    ];
+    for (const patch of ataques) {
+      const { data, error } = await vendedor.cliente.from("calculos_solares").update(patch).eq("negocio_id", negocioId).select("id");
+      // Sem privilégio de UPDATE: erro 42501 (nunca "0 linhas" silencioso que pareça sucesso).
+      expect({ patch, codigo: error?.code, data }).toEqual({ patch, codigo: "42501", data: null });
+    }
+    expect(await linha(negocioId)).toEqual(antes);
+  });
+
+  it("UPDATE de linha `incompleto` para `completo` com números: recusado", async () => {
+    const negocioId = await novoNegocio();
+    await salvarComo(vendedor, atualVendedor, negocioId, { tarifaBaseTributaria: "com_tributos" });
+    const antes = await linha(negocioId);
+    expect(antes).toMatchObject({ estado_financeiro: "incompleto" });
+    const { error } = await vendedor.cliente
+      .from("calculos_solares")
+      .update({ estado_financeiro: "completo", economia_mensal: 191.79, metodo_calculo: "gd2_piso_655i_v1", pendencias: null })
+      .eq("negocio_id", negocioId);
+    expect(error?.code).toBe("42501");
+    expect(await linha(negocioId)).toEqual(antes);
+  });
+
+  it("UPSERT por cima da linha legítima: recusado, linha intacta", async () => {
+    const negocioId = await novoNegocio();
+    await salvarComo(vendedor, atualVendedor, negocioId);
+    const antes = await linha(negocioId);
+    const { error } = await vendedor.cliente.from("calculos_solares").upsert(await payloadForjado(negocioId), { onConflict: "negocio_id" });
+    expect(error?.code).toBe("42501");
+    expect(await linha(negocioId)).toEqual(antes);
+  });
+
   it("o trigger de histórico não é RPC exposta", async () => {
     const { error } = await vendedor.cliente.rpc("calculos_solares_arquivar_historico" as never);
     expect(error).not.toBeNull();

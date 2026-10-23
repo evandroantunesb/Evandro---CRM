@@ -285,3 +285,8 @@ Decisão do Evandro: rodada da calculadora GD II **encerrada: implementação e 
   - `tests/calculadora-db.test.ts`: INSERT direto do vendedor recusado (42501);
   - `tests/travas-kit-sdr-db.test.ts`: as asserções de INSERT/UPDATE/UPSERT direto do vendedor recusado (R3, "levar um cálculo", "criação normal", "cálculo existente" e "cálculo antigo sem itens").
 - Material de revisão (`.aurora/revisao/`, logs e PDFs) não foi incluído; segue no pacote.
+
+## PR C (lote 2 do banco) — 24/10/2026
+
+- Só a `20261023240000_calculos_solares_revogar_escrita_direta` + as asserções de segurança restauradas (`calculo-gravacao-confiavel-db`, `calculadora-db`, `travas-kit-sdr-db`, idênticas às do pacote) + lista autorizada com um único item e testes da trava.
+- Pré-requisitos antes de aplicar em produção: lote 1 (#214) aplicado e **confirmação de que o app novo (PR B) atende a produção**; a versão anterior do app grava direto com o cliente do usuário e deixaria de salvar o cálculo. Reversão de emergência (reabre a brecha): `reverter-20261023240000.sql` no pacote, contingência e não padrão.
