@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { consumoComoPersistido } from "@/lib/consumo-persistido";
 import { TIPOS_COMPONENTE_KIT, type TipoLigacao } from "@/lib/tipos";
 
 export type EntradaCalculo = {
@@ -142,13 +143,27 @@ export type Dimensionamento = {
  * arredonda os módulos para cima. Sem fator oculto: perdas e sazonalidade já estão na
  * produtividade. Estimativa comercial de partida — não considera Fio B, disponibilidade nem
  * espaço de telhado.
+ *
+ * O consumo é normalizado com `consumoComoPersistido` (numeric(10,2), como o banco grava) antes da conta,
+ * para que o dimensionamento use o mesmo consumo que será salvo (ex.: 1190,404 → 1190,40). Entrada inválida
+ * (não positiva, não finita, ou que vira 0 após a normalização) devolve null.
  */
 export function dimensionarSistema(
-  consumoMedioKwh: number,
+  consumoBrutoKwh: number,
   produtividadeKwhKwpMes: number,
   potenciaModuloW: number,
 ): Dimensionamento | null {
-  if (!(consumoMedioKwh > 0) || !(produtividadeKwhKwpMes > 0) || !(potenciaModuloW > 0)) return null;
+  const consumoMedioKwh = consumoComoPersistido(consumoBrutoKwh);
+  if (
+    !(consumoMedioKwh > 0) ||
+    !(produtividadeKwhKwpMes > 0) ||
+    !(potenciaModuloW > 0) ||
+    !Number.isFinite(consumoMedioKwh) ||
+    !Number.isFinite(produtividadeKwhKwpMes) ||
+    !Number.isFinite(potenciaModuloW)
+  ) {
+    return null;
+  }
   const potenciaNecessariaKwp = consumoMedioKwh / produtividadeKwhKwpMes;
   // O arredondamento a 6 casas evita que 20,000000000000004 vire 21 módulos.
   const modulosExatos = Number(((potenciaNecessariaKwp * 1000) / potenciaModuloW).toFixed(6));
