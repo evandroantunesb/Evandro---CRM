@@ -105,6 +105,21 @@ describe("cálculo do negócio", () => {
       .from("kit_componentes")
       .insert({ empresa_id: empresa, negocio_id: negocio, tipo: "modulo", descricao: "Módulo 550 W", potencia_w: 550, quantidade: 11, ordem: 0 });
     expect(erroKit).toBeNull();
+    // O vendedor não grava o cálculo direto (só o servidor, migration 20261023220000): a linha vai pelo serviço.
+    const { error: erroDireto } = await vendedor1.cliente.from("calculos_solares").insert({
+      empresa_id: empresa,
+      negocio_id: negocio,
+      kit_nome: "Forjado",
+      kit_potencia_kwp: 6,
+      kit_preco: 24000,
+      consumo_medio_kwh: 500,
+      tarifa_kwh: 0.9,
+      produtividade_kwh_kwp_mes: 130,
+      percentual_fio_b: 0.6,
+      disponibilidade_kwh: 100,
+      geracao_estimada_kwh_mes: 780,
+    });
+    expect(erroDireto?.code).toBe("42501");
     const { error } = await servico.from("calculos_solares").insert({
       empresa_id: empresa,
       negocio_id: negocio,

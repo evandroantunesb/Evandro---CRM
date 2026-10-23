@@ -232,16 +232,13 @@ jobs:
       # Trava fail-closed: o conjunto do dry-run acima precisa ser exatamente o autorizado, senão o
       # job termina aqui, antes da aplicação. Sem credenciais. Para autorizar outro conjunto, a lista
       # abaixo muda por commit revisado (e uma nova tag), nunca por entrada do operador.
+      # Lote 2 da calculadora GD II (revogação da escrita direta em calculos_solares): o lote 1 já tem de estar
+      # aplicado, e este só pode ser aplicado depois de confirmar que o app novo atende a produção (a versão
+      # anterior do app grava direto e deixaria de salvar o cálculo).
       - name: Conferir que o conjunto pendente é exatamente o autorizado
         env:
           MIGRATIONS_AUTORIZADAS: |
-            20261021100000_negocio_consumo_estimado.sql
-            20261022100000_propostas_emissoes.sql
-            20261022110000_produtividade_confirmada.sql
-            20261023200000_calculos_estimativa_incompleta.sql
-            20261023210000_calculo_gd2_fio_b.sql
-            20261023220000_calculos_solares_gravacao_servidor.sql
-            20261023230000_calculos_solares_exclusao_historico.sql
+            20261023240000_calculos_solares_revogar_escrita_direta.sql
         run: bash .github/scripts/validar-conjunto-migrations.sh "$RUNNER_TEMP/dry-run.txt"
       - name: Aplicar (supabase db push --include-all)
         env:

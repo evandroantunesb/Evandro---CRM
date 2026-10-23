@@ -437,8 +437,9 @@ describe("cálculo solar só é criado com kit", () => {
     expect(await temCalculo(negocioId)).toBe(false);
   });
 
-  it("R3: criar cálculo direto em negócio sem kit é recusado (pela trava do kit; a recusa do vendedor por falta de privilégio fica para a PR C)", async () => {
+  it("R3: criar cálculo direto em negócio sem kit é recusado (vendedor sem privilégio; serviço pela trava do kit)", async () => {
     const negocioId = await criarNegocio(vendedor);
+    expect((await vendedor.cliente.from("calculos_solares").insert(linhaCalculo(negocioId))).error?.code).toBe("42501");
     const { error } = await servico.from("calculos_solares").insert(linhaCalculo(negocioId));
     expect(error?.message).toContain(MENSAGEM_CALCULO);
     expect(error?.hint).toBe("mensagem_usuario");
@@ -448,14 +449,16 @@ describe("cálculo solar só é criado com kit", () => {
   it("levar um cálculo para negócio sem kit é recusado; o cálculo fica onde estava", async () => {
     const comCalculo = await negocioComCalculo();
     const semKit = await criarNegocio(vendedor);
+    expect((await vendedor.cliente.from("calculos_solares").update({ negocio_id: semKit }).eq("negocio_id", comCalculo)).error?.code).toBe("42501");
     const { error } = await servico.from("calculos_solares").update({ negocio_id: semKit }).eq("negocio_id", comCalculo);
     expect(error?.message).toContain(MENSAGEM_CALCULO);
     expect(await temCalculo(comCalculo)).toBe(true);
     expect(await temCalculo(semKit)).toBe(false);
   });
 
-  it("criação normal com kit: pelo serviço e pelo cadastro do app", async () => {
+  it("criação normal com kit: pelo serviço e pelo cadastro do app (o vendedor não grava direto)", async () => {
     const negocioId = await criarNegocio(vendedor, { componentes: KIT_UM });
+    expect((await vendedor.cliente.from("calculos_solares").insert(linhaCalculo(negocioId))).error?.code).toBe("42501");
     const { error } = await servico.from("calculos_solares").insert(linhaCalculo(negocioId));
     expect(error).toBeNull();
     expect(await temCalculo(negocioId)).toBe(true);
@@ -464,7 +467,7 @@ describe("cálculo solar só é criado com kit", () => {
 
   // ANTES: "recálculo de cálculo existente: pelo app, ..." (o app regravava a tarifa 1,05). AGORA o app não substitui a
   // linha legada por um resultado incompleto: a tarifa da linha legada fica em 0,95; upsert e update diretos seguem valendo.
-  it("cálculo existente: o app grava as novas entradas (1,05) e a legada (0,95) vai para o histórico (upsert e update direto do vendedor recusados: PR C)", async () => {
+  it("cálculo existente: o app grava as novas entradas (1,05) e a legada (0,95) vai para o histórico; upsert e update direto do vendedor são recusados", async () => {
     const negocioId = await negocioComCalculo();
     const r = await salvarKitComCliente(
       cliente(vendedor),
@@ -476,6 +479,11 @@ describe("cálculo solar só é criado com kit", () => {
     const { data: hist } = await servico.from("calculos_solares_historico").select("motivo, linha").eq("negocio_id", negocioId);
     expect(hist).toHaveLength(1);
     expect(hist![0]).toMatchObject({ motivo: "desatualizado_por_entradas", linha: { estado_financeiro: "legado", tarifa_kwh: 0.95 } });
+    // Migration 20261023220000: o cliente autenticado não grava `calculos_solares` (só o servidor).
+    const { error: erroUpsert } = await vendedor.cliente.from("calculos_solares").upsert({ ...linhaCalculo(negocioId, 1.1), estado_financeiro: "legado", pendencias: null }, { onConflict: "negocio_id" });
+    expect(erroUpsert?.code).toBe("42501");
+    const { error: erroUpdate } = await vendedor.cliente.from("calculos_solares").update({ tarifa_kwh: 1.2 }).eq("negocio_id", negocioId);
+    expect(erroUpdate?.code).toBe("42501");
     expect(await tarifaSalva(negocioId)).toBeCloseTo(1.05);
   });
 
@@ -498,7 +506,8 @@ describe("cálculo solar só é criado com kit", () => {
     expect(await temCalculo(recalcular)).toBe(true);
     expect(await lerKit(recalcular)).toEqual([]);
 
-    // O kit ausente não trava a linha antiga (a recusa do vendedor, 42501, fica para a PR C).
+    // Direto, só o serviço grava (o vendedor recebe 42501); o kit ausente não trava a linha antiga.
+    expect((await vendedor.cliente.from("calculos_solares").update({ tarifa_kwh: 1.15 }).eq("negocio_id", recalcular)).error?.code).toBe("42501");
     expect((await servico.from("calculos_solares").update({ tarifa_kwh: 1.15 }).eq("negocio_id", recalcular)).error).toBeNull();
     expect((await servico.from("calculos_solares").upsert(linhaCalculo(recalcular, 1.25), { onConflict: "negocio_id" })).error).toBeNull();
     expect(await tarifaSalva(recalcular)).toBeCloseTo(1.25);
