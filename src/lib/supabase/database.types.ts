@@ -217,87 +217,144 @@ export type Database = {
       calculos_solares: {
         Row: {
           atualizado_por: string | null;
+          autoconsumo_kwh: number | null;
           consumo_medio_kwh: number;
-          conta_com_solar: number;
-          conta_sem_solar: number;
+          conta_com_solar: number | null;
+          conta_sem_solar: number | null;
           created_at: string;
           criado_por: string | null;
-          custo_fio_b: number;
+          custo_fio_b: number | null;
+          data_referencia: string | null;
           disponibilidade_kwh: number;
-          economia_mensal: number;
+          distribuidora: string | null;
+          economia_mensal: number | null;
           empresa_id: string;
+          enquadramento: string | null;
+          estado_financeiro: string;
+          financeiro_desatualizado_em: string | null;
+          financeiro_desatualizado_motivo: string | null;
+          fio_b_base_tributaria: string | null;
+          fio_b_rs_mwh: number | null;
+          fio_b_vigencia_fim: string | null;
+          fio_b_vigencia_inicio: string | null;
           geracao_estimada_kwh_mes: number;
           id: string;
           kit_id: string | null;
           kit_nome: string;
           kit_potencia_kwp: number;
           kit_preco: number;
-          kwh_compensado: number;
-          kwh_faturado: number;
+          kwh_compensado: number | null;
+          kwh_faturado: number | null;
+          kwh_nao_compensado: number | null;
+          metodo_calculo: string | null;
           negocio_id: string;
           observacoes: string | null;
           payback_meses: number | null;
+          pendencias: Json | null;
           percentual_fio_b: number;
+          percentual_legal_fio_b: number | null;
           produtividade_kwh_kwp_mes: number;
+          ressalvas: string[] | null;
+          tarifa_base_tributaria: string | null;
+          tarifa_gd_id: string | null;
           tarifa_kwh: number;
+          tarifa_origem: string | null;
           tipo_ligacao: Database["public"]["Enums"]["tipo_ligacao"];
           updated_at: string;
           valor_fatura_medio: number | null;
         };
         Insert: {
           atualizado_por?: string | null;
+          autoconsumo_kwh?: number | null;
           consumo_medio_kwh: number;
-          conta_com_solar: number;
-          conta_sem_solar: number;
+          conta_com_solar?: number | null;
+          conta_sem_solar?: number | null;
           created_at?: string;
           criado_por?: string | null;
-          custo_fio_b: number;
+          custo_fio_b?: number | null;
+          data_referencia?: string | null;
           disponibilidade_kwh: number;
-          economia_mensal: number;
+          distribuidora?: string | null;
+          economia_mensal?: number | null;
           empresa_id: string;
+          enquadramento?: string | null;
+          estado_financeiro?: string;
+          financeiro_desatualizado_em?: string | null;
+          financeiro_desatualizado_motivo?: string | null;
+          fio_b_base_tributaria?: string | null;
+          fio_b_rs_mwh?: number | null;
+          fio_b_vigencia_fim?: string | null;
+          fio_b_vigencia_inicio?: string | null;
           geracao_estimada_kwh_mes: number;
           id?: string;
           kit_id?: string | null;
           kit_nome: string;
           kit_potencia_kwp: number;
           kit_preco: number;
-          kwh_compensado: number;
-          kwh_faturado: number;
+          kwh_compensado?: number | null;
+          kwh_faturado?: number | null;
+          kwh_nao_compensado?: number | null;
+          metodo_calculo?: string | null;
           negocio_id: string;
           observacoes?: string | null;
           payback_meses?: number | null;
+          pendencias?: Json | null;
           percentual_fio_b: number;
+          percentual_legal_fio_b?: number | null;
           produtividade_kwh_kwp_mes: number;
+          ressalvas?: string[] | null;
+          tarifa_base_tributaria?: string | null;
+          tarifa_gd_id?: string | null;
           tarifa_kwh: number;
+          tarifa_origem?: string | null;
           tipo_ligacao?: Database["public"]["Enums"]["tipo_ligacao"];
           updated_at?: string;
           valor_fatura_medio?: number | null;
         };
         Update: {
           atualizado_por?: string | null;
+          autoconsumo_kwh?: number | null;
           consumo_medio_kwh?: number;
-          conta_com_solar?: number;
-          conta_sem_solar?: number;
+          conta_com_solar?: number | null;
+          conta_sem_solar?: number | null;
           created_at?: string;
           criado_por?: string | null;
-          custo_fio_b?: number;
+          custo_fio_b?: number | null;
+          data_referencia?: string | null;
           disponibilidade_kwh?: number;
-          economia_mensal?: number;
+          distribuidora?: string | null;
+          economia_mensal?: number | null;
           empresa_id?: string;
+          enquadramento?: string | null;
+          estado_financeiro?: string;
+          financeiro_desatualizado_em?: string | null;
+          financeiro_desatualizado_motivo?: string | null;
+          fio_b_base_tributaria?: string | null;
+          fio_b_rs_mwh?: number | null;
+          fio_b_vigencia_fim?: string | null;
+          fio_b_vigencia_inicio?: string | null;
           geracao_estimada_kwh_mes?: number;
           id?: string;
           kit_id?: string | null;
           kit_nome?: string;
           kit_potencia_kwp?: number;
           kit_preco?: number;
-          kwh_compensado?: number;
-          kwh_faturado?: number;
+          kwh_compensado?: number | null;
+          kwh_faturado?: number | null;
+          kwh_nao_compensado?: number | null;
+          metodo_calculo?: string | null;
           negocio_id?: string;
           observacoes?: string | null;
           payback_meses?: number | null;
+          pendencias?: Json | null;
           percentual_fio_b?: number;
+          percentual_legal_fio_b?: number | null;
           produtividade_kwh_kwp_mes?: number;
+          ressalvas?: string[] | null;
+          tarifa_base_tributaria?: string | null;
+          tarifa_gd_id?: string | null;
           tarifa_kwh?: number;
+          tarifa_origem?: string | null;
           tipo_ligacao?: Database["public"]["Enums"]["tipo_ligacao"];
           updated_at?: string;
           valor_fatura_medio?: number | null;
@@ -335,6 +392,71 @@ export type Database = {
             foreignKeyName: "calculos_solares_negocio_id_fkey";
             columns: ["negocio_id"];
             isOneToOne: true;
+            referencedRelation: "negocios";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "calculos_solares_tarifa_gd_id_fkey";
+            columns: ["tarifa_gd_id"];
+            isOneToOne: false;
+            referencedRelation: "tarifas_gd_aneel";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      calculos_solares_historico: {
+        Row: {
+          arquivado_em: string;
+          arquivado_por: string | null;
+          arquivado_por_papel: string | null;
+          calculo_id: string;
+          empresa_id: string;
+          id: string;
+          linha: NonNullable<Json>;
+          motivo: string;
+          negocio_id: string;
+        };
+        Insert: {
+          arquivado_em?: string;
+          arquivado_por?: string | null;
+          arquivado_por_papel?: string | null;
+          calculo_id: string;
+          empresa_id: string;
+          id?: string;
+          linha: NonNullable<Json>;
+          motivo: string;
+          negocio_id: string;
+        };
+        Update: {
+          arquivado_em?: string;
+          arquivado_por?: string | null;
+          arquivado_por_papel?: string | null;
+          calculo_id?: string;
+          empresa_id?: string;
+          id?: string;
+          linha?: NonNullable<Json>;
+          motivo?: string;
+          negocio_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "calculos_solares_historico_arquivado_por_fkey";
+            columns: ["arquivado_por"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "calculos_solares_historico_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "calculos_solares_historico_negocio_id_fkey";
+            columns: ["negocio_id"];
+            isOneToOne: false;
             referencedRelation: "negocios";
             referencedColumns: ["id"];
           },
@@ -2776,6 +2898,11 @@ export type Database = {
           disponibilidade_tri_kwh: number;
           empresa_id: string;
           percentual_fio_b: number;
+          produtividade_confirmada_em: string | null;
+          produtividade_confirmada_fonte: string | null;
+          produtividade_confirmada_por: string | null;
+          produtividade_confirmada_responsavel: string | null;
+          produtividade_confirmada_valor: number | null;
           produtividade_kwh_kwp_mes: number;
           updated_at: string;
         };
@@ -2789,6 +2916,11 @@ export type Database = {
           disponibilidade_tri_kwh?: number;
           empresa_id: string;
           percentual_fio_b?: number;
+          produtividade_confirmada_em?: string | null;
+          produtividade_confirmada_fonte?: string | null;
+          produtividade_confirmada_por?: string | null;
+          produtividade_confirmada_responsavel?: string | null;
+          produtividade_confirmada_valor?: number | null;
           produtividade_kwh_kwp_mes?: number;
           updated_at?: string;
         };
@@ -2802,6 +2934,11 @@ export type Database = {
           disponibilidade_tri_kwh?: number;
           empresa_id?: string;
           percentual_fio_b?: number;
+          produtividade_confirmada_em?: string | null;
+          produtividade_confirmada_fonte?: string | null;
+          produtividade_confirmada_por?: string | null;
+          produtividade_confirmada_responsavel?: string | null;
+          produtividade_confirmada_valor?: number | null;
           produtividade_kwh_kwp_mes?: number;
           updated_at?: string;
         };
@@ -2811,6 +2948,13 @@ export type Database = {
             columns: ["empresa_id"];
             isOneToOne: true;
             referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "parametros_calculadora_produtividade_confirmada_por_fkey";
+            columns: ["produtividade_confirmada_por"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
             referencedColumns: ["id"];
           },
         ];
@@ -3357,6 +3501,82 @@ export type Database = {
           },
         ];
       };
+      propostas_emissoes: {
+        Row: {
+          dados: NonNullable<Json>;
+          dados_sha256: string;
+          emitida_em: string;
+          emitida_por: string;
+          empresa_id: string;
+          id: string;
+          negocio_id: string;
+          pdf_bytes: number;
+          pdf_caminho: string;
+          pdf_sha256: string;
+          renderizador: string;
+          tipo: string;
+          token: string;
+          validade_ate: string;
+          versao: number;
+        };
+        Insert: {
+          dados: NonNullable<Json>;
+          dados_sha256: string;
+          emitida_em?: string;
+          emitida_por: string;
+          empresa_id: string;
+          id?: string;
+          negocio_id: string;
+          pdf_bytes: number;
+          pdf_caminho: string;
+          pdf_sha256: string;
+          renderizador: string;
+          tipo?: string;
+          token?: string;
+          validade_ate: string;
+          versao: number;
+        };
+        Update: {
+          dados?: NonNullable<Json>;
+          dados_sha256?: string;
+          emitida_em?: string;
+          emitida_por?: string;
+          empresa_id?: string;
+          id?: string;
+          negocio_id?: string;
+          pdf_bytes?: number;
+          pdf_caminho?: string;
+          pdf_sha256?: string;
+          renderizador?: string;
+          tipo?: string;
+          token?: string;
+          validade_ate?: string;
+          versao?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "propostas_emissoes_emitida_por_fkey";
+            columns: ["emitida_por"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "propostas_emissoes_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "propostas_emissoes_negocio_id_fkey";
+            columns: ["negocio_id"];
+            isOneToOne: false;
+            referencedRelation: "negocios";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       recompensas: {
         Row: {
           ativa: boolean;
@@ -3649,6 +3869,75 @@ export type Database = {
           },
         ];
       };
+      tarifas_gd_aneel: {
+        Row: {
+          ato: string;
+          base_tributaria: string;
+          cnpj: string;
+          created_at: string;
+          distribuidora: string;
+          fonte_extraida_em: string;
+          fonte_linhas: NonNullable<Json>;
+          fonte_recurso_id: string;
+          fonte_resposta_sha256: string;
+          id: string;
+          modalidade: string;
+          nomes_aceitos: string[];
+          pendencias_fonte: string[];
+          subclasse: string;
+          subgrupo: string;
+          te_rs_mwh: number;
+          tusd_fio_b_rs_mwh: number;
+          tusd_rs_mwh: number;
+          vigencia_fim: string;
+          vigencia_inicio: string;
+        };
+        Insert: {
+          ato: string;
+          base_tributaria: string;
+          cnpj: string;
+          created_at?: string;
+          distribuidora: string;
+          fonte_extraida_em: string;
+          fonte_linhas: NonNullable<Json>;
+          fonte_recurso_id: string;
+          fonte_resposta_sha256: string;
+          id?: string;
+          modalidade: string;
+          nomes_aceitos: string[];
+          pendencias_fonte?: string[];
+          subclasse: string;
+          subgrupo: string;
+          te_rs_mwh: number;
+          tusd_fio_b_rs_mwh: number;
+          tusd_rs_mwh: number;
+          vigencia_fim: string;
+          vigencia_inicio: string;
+        };
+        Update: {
+          ato?: string;
+          base_tributaria?: string;
+          cnpj?: string;
+          created_at?: string;
+          distribuidora?: string;
+          fonte_extraida_em?: string;
+          fonte_linhas?: NonNullable<Json>;
+          fonte_recurso_id?: string;
+          fonte_resposta_sha256?: string;
+          id?: string;
+          modalidade?: string;
+          nomes_aceitos?: string[];
+          pendencias_fonte?: string[];
+          subclasse?: string;
+          subgrupo?: string;
+          te_rs_mwh?: number;
+          tusd_fio_b_rs_mwh?: number;
+          tusd_rs_mwh?: number;
+          vigencia_fim?: string;
+          vigencia_inicio?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -3743,6 +4032,13 @@ export type Database = {
         Args: { p_obra_id: string; p_setor: Database["public"]["Enums"]["setor_obra"] };
         Returns: string;
       };
+      autorizar_gravacao_calculo: {
+        Args: { p_negocio_id: string };
+        Returns: {
+          empresa_id: string;
+          membro_id: string;
+        }[];
+      };
       avaliar_condicao_regra: { Args: { p_condicao: Json; p_payload: Json }; Returns: boolean };
       buscar_contato_duplicado: {
         Args: { p_email: string; p_empresa_id: string; p_telefone: string };
@@ -3800,6 +4096,10 @@ export type Database = {
           isOneToOne: true;
           isSetofReturn: false;
         };
+      };
+      confirmar_produtividade_calculadora: {
+        Args: { p_empresa_id: string; p_fonte: string; p_responsavel: string; p_valor: number };
+        Returns: undefined;
       };
       contar_marco_membro: {
         Args: {
@@ -4138,6 +4438,7 @@ export type Database = {
       pode_ver_obra: { Args: { p_obra_id: string }; Returns: boolean };
       pode_ver_obra_operacao: { Args: { p_obra_id: string }; Returns: boolean };
       pode_ver_pasta_anexo: { Args: { p_caminho: string }; Returns: boolean };
+      pode_ver_pdf_proposta_emitida: { Args: { p_caminho: string }; Returns: boolean };
       pode_ver_responsavel: {
         Args: { p_empresa_id: string; p_responsavel_id: string };
         Returns: boolean;
