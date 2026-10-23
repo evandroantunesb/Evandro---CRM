@@ -259,11 +259,14 @@ async function inserirCalculoBruto(sobrescrever: Partial<InsertCalculo>) {
 }
 
 describe("M2-Q2: valorComoPersistido bate com o Postgres real nas colunas de calculos_solares", () => {
-  it.each([0.123456, 0.95231, 0.00005, 1.23455])("tarifa_kwh numeric(8,4): bruto %s", async (bruto) => {
+  // A migration 20261023210000 (lote 1) muda tarifa_kwh para numeric(9,5). Diferença temporária: o app desta versão
+  // continua normalizando a tarifa em 4 casas (CASAS_TARIFA = 4) antes de gravar; o banco aceita 5. Como 4 casas cabem
+  // em 5, o que o app grava é guardado sem mudança. O app passa a 5 casas na PR B.
+  it.each([0.123456, 0.951234, 0.000005, 1.234565])("tarifa_kwh numeric(9,5): bruto %s", async (bruto) => {
     const { negocio, error } = await inserirCalculoBruto({ tarifa_kwh: bruto });
     expect(error).toBeNull();
     const { data } = await servico.from("calculos_solares").select("tarifa_kwh").eq("negocio_id", negocio).single();
-    expect(data!.tarifa_kwh).toBe(valorComoPersistido(bruto, 4));
+    expect(data!.tarifa_kwh).toBe(valorComoPersistido(bruto, 5));
   });
 
   it.each([5.505, 6.1, 0.005])("kit_potencia_kwp numeric(6,2): bruto %s", async (bruto) => {
@@ -287,9 +290,9 @@ describe("M2-Q2: valorComoPersistido bate com o Postgres real nas colunas de cal
     expect(data!.valor_fatura_medio).toBe(valorComoPersistido(bruto, 2));
   });
 
-  it("o banco rejeita (23514) tarifa bruta 0,00004 (normaliza para 0) e o helper também prevê 0", async () => {
-    expect(valorComoPersistido(0.00004, 4)).toBe(0);
-    const { error } = await inserirCalculoBruto({ tarifa_kwh: 0.00004 });
+  it("o banco rejeita (23514) tarifa bruta 0,000004 (normaliza para 0 em 5 casas) e o helper também prevê 0", async () => {
+    expect(valorComoPersistido(0.000004, 5)).toBe(0);
+    const { error } = await inserirCalculoBruto({ tarifa_kwh: 0.000004 });
     expect(error?.code).toBe("23514");
   });
 
