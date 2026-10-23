@@ -20,6 +20,7 @@ import {
   sugerirQuantidadeModulos,
 } from "@/lib/calculadora";
 import { PreviaEstimativa } from "@/app/(app)/negocios/[id]/kit-personalizado";
+import { resolverConsumo } from "@/lib/consumo-estimado";
 import { formatarCep, formatarMascaraMoeda, formatarTelefoneBr, lerNumeroBr } from "@/lib/formatacao";
 import { montarEndereco } from "@/lib/negocio-dados";
 import { criarClienteNavegador } from "@/lib/supabase/navegador";
@@ -218,6 +219,7 @@ export function FormularioNegocio({
   // Consumo (Etapa 1): kWh direto ou valor da conta (com máscara), nunca os dois exigidos.
   const [consumoMedioKwh, setConsumoMedioKwh] = useState("");
   const [valorFaturaMedio, setValorFaturaMedio] = useState("");
+  const [tarifaEfetivaKwh, setTarifaEfetivaKwh] = useState("");
   const [tarifaKwh, setTarifaKwh] = useState("");
 
   // Dados técnicos (Etapa 3, movidos pra fora do primeiro contato).
@@ -276,14 +278,11 @@ export function FormularioNegocio({
     window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
   }
 
-  const consumoMedioEstimado = useMemo(() => {
-    const tarifa = numero(tarifaKwh);
-    const consumo = numero(consumoMedioKwh);
-    const fatura = numero(valorFaturaMedio);
-    if (consumo) return consumo;
-    if (fatura && tarifa) return fatura / tarifa;
-    return null;
-  }, [consumoMedioKwh, valorFaturaMedio, tarifaKwh]);
+  const consumoResolvido = useMemo(
+    () => resolverConsumo(numero(consumoMedioKwh), numero(valorFaturaMedio), numero(tarifaEfetivaKwh)),
+    [consumoMedioKwh, valorFaturaMedio, tarifaEfetivaKwh],
+  );
+  const consumoMedioEstimado = consumoResolvido.kwh;
 
   // Mesma conta do kit personalizado (`dimensionarSistema`), com o módulo de referência da prévia.
   const sistemaRecomendado = useMemo(
@@ -308,11 +307,11 @@ export function FormularioNegocio({
       potenciaKwp,
       precoKit: numero(valor) ?? 0,
       tipoLigacao,
-      consumoMedioKwh: numero(consumoMedioKwh) ?? 0,
+      consumoMedioKwh: consumoMedioEstimado ?? 0,
       tarifaKwh: numero(tarifaKwh) ?? 0,
       produtividadeKwhKwpMes: parametros.produtividadeKwhKwpMes,
     });
-  }, [parametros, tipoLigacao, consumoMedioKwh, tarifaKwh, potenciaKwp, valor]);
+  }, [parametros, tipoLigacao, consumoMedioEstimado, tarifaKwh, potenciaKwp, valor]);
 
   /**
    * Envio sem o reset automático (nada do que foi digitado se perde se o servidor recusar).
@@ -465,6 +464,7 @@ export function FormularioNegocio({
       <input type="hidden" name="contato_email" value={contatoEmail} />
       <input type="hidden" name="valor" value={valor} />
       <input type="hidden" name="consumo_medio_kwh" value={consumoMedioKwh} />
+      <input type="hidden" name="tarifa_efetiva_kwh" value={tarifaEfetivaKwh} />
       <input type="hidden" name="valor_fatura_medio" value={valorFaturaMedio} />
       <input type="hidden" name="tarifa_kwh" value={tarifaKwh} />
       <input type="hidden" name="estrutura_telhado" value={estruturaTelhado} />
@@ -661,10 +661,19 @@ export function FormularioNegocio({
               value={valorFaturaMedio}
               onChange={(e) => setValorFaturaMedio(formatarMascaraMoeda(e.target.value))}
             />
+            {!numero(consumoMedioKwh) && numero(valorFaturaMedio) && (
+              <Campo
+                rotulo="Tarifa efetiva da conta (R$/kWh)"
+                inputMode="decimal"
+                placeholder="ex.: 0,9500"
+                value={tarifaEfetivaKwh}
+                onChange={(e) => setTarifaEfetivaKwh(e.target.value)}
+              />
+            )}
           </div>
           <p className="text-xs text-zinc-400">
-            Informe uma das duas opções — a outra pode ficar em branco. O valor da conta em R$ não vira consumo em kWh: o negócio é
-            criado do mesmo jeito, e o consumo em kWh pode ser informado depois.
+            Informe o consumo em kWh da fatura ou estime pela conta em R$ e sua tarifa efetiva. Sem essa tarifa, o negócio é
+            criado, mas não há consumo para dimensionar ou calcular. A tarifa efetiva não é a tarifa base (TE + TUSD).
           </p>
         </fieldset>
 
@@ -706,7 +715,7 @@ export function FormularioNegocio({
             <div>
               <dt className="text-zinc-500">Consumo mensal</dt>
               <dd className="font-medium text-zinc-900">
-                {consumoMedioEstimado ? `${consumoMedioEstimado.toLocaleString("pt-BR")} kWh` : "—"}
+                {consumoMedioEstimado ? `${consumoMedioEstimado.toLocaleString("pt-BR")} kWh${consumoResolvido.origem === "estimado" ? " (estimado pela conta)" : ""}` : "—"}
               </dd>
             </div>
             <div>
@@ -834,17 +843,15 @@ export function FormularioNegocio({
           <Campo rotulo="Unidade consumidora" name="unidade_consumidora" placeholder="Opcional" />
           <Campo rotulo="Distribuidora" placeholder="Preenchida automaticamente em breve" disabled />
           <Campo
-            rotulo="Tarifa ANEEL (R$/kWh)"
+            rotulo="Tarifa base TE + TUSD (R$/kWh)"
             inputMode="decimal"
             placeholder="ex.: 0,95"
             value={tarifaKwh}
-            disabled={!componentes.length}
             onChange={(e) => setTarifaKwh(e.target.value)}
           />
           <Selecao
             rotulo="Tipo de ligação"
             value={tipoLigacao}
-            disabled={!componentes.length}
             onChange={(e) => setTipoLigacao(e.target.value as TipoLigacao)}
           >
             {TIPOS_LIGACAO.map((t) => (
@@ -855,7 +862,7 @@ export function FormularioNegocio({
           </Selecao>
           {!componentes.length && (
             <p className="text-xs text-zinc-400 md:col-span-2">
-              Tarifa e tipo de ligação são usados no cálculo do kit: monte o kit na etapa 2 para informá-los.
+              Tarifa base e tipo de ligação serão usados quando você montar o kit; sem kit, o negócio é salvo sem cálculo.
             </p>
           )}
         </fieldset>

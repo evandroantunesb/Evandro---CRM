@@ -18,8 +18,8 @@
  *  - parâmetros da empresa: `produtividade_kwh_kwp_mes` x `parametros_calculadora`. Linha legada: também
  *    `percentual_fio_b` e `disponibilidade_kwh` da empresa (como antes). Linha nova: `disponibilidade_kwh` x piso do
  *    art. 291 pela ligação (o percentual da empresa não entra no cálculo).
- *  - consumo/fatura: `consumo_medio_kwh` e `valor_fatura_medio` x `negocios.consumo_medio_kwh` e
- *    `negocios.valor_conta_energia`.
+ *  - consumo/fatura: `consumo_medio_kwh` e `valor_fatura_medio` x consumo informado OU estimado registrado no negócio
+ *    e `negocios.valor_conta_energia`.
  *  - regra tarifária (só `completo`): enquadramento pela qualificação de HOJE, linha oficial vigente HOJE e percentual
  *    legal do ANO de hoje x o retrato gravado. Virada de ano (60% → 75%) ou fim da vigência = `regra_tarifaria`.
  *  - marca R6.2 (`financeiro_desatualizado_em`): `desatualizado_por_entradas`.
@@ -171,6 +171,8 @@ export type EstadoAtualParaVigencia = {
   valorNegocio: number | null;
   /** `negocios.consumo_medio_kwh`. */
   consumoMedioKwhNegocio: number | null;
+  /** `negocios.consumo_estimado_kwh`, quando não há kWh informado. */
+  consumoEstimadoKwhNegocio?: number | null;
   /** `negocios.valor_conta_energia`. */
   valorContaEnergiaNegocio: number | null;
   /** `parametros_calculadora` atual da empresa; nulo = não lido/inexistente (não comprovado). */
@@ -266,9 +268,10 @@ export function avaliarVigencia(calculo: CalculoParaVigencia, atual: EstadoAtual
   }
 
   // Consumo: o negócio sem consumo (cálculo legado ou salvo sem consumo) não comprova nada.
-  if (atual.consumoMedioKwhNegocio == null) {
+  const consumoNegocio = atual.consumoMedioKwhNegocio ?? atual.consumoEstimadoKwhNegocio;
+  if (consumoNegocio == null) {
     achados.add("nao_comprovado");
-  } else if (valorComoPersistido(atual.consumoMedioKwhNegocio, 2) !== valorComoPersistido(calculo.consumo_medio_kwh, 2)) {
+  } else if (valorComoPersistido(consumoNegocio, 2) !== valorComoPersistido(calculo.consumo_medio_kwh, 2)) {
     achados.add("consumo");
   }
   // Fatura: negócio sem fatura com cálculo que a tem = legado (não comprovado); demais diferenças = mudou.
@@ -383,7 +386,7 @@ export async function carregarVigencia(supabase: SupabaseClient<Database>, negoc
   const [negocioR, calculoR, itensR] = await Promise.all([
     supabase
       .from("negocios")
-      .select("empresa_id, valor, consumo_medio_kwh, valor_conta_energia, qualif_tipo_cliente, qualif_distribuidora")
+      .select("empresa_id, valor, consumo_medio_kwh, consumo_estimado_kwh, valor_conta_energia, qualif_tipo_cliente, qualif_distribuidora")
       .eq("id", negocioId)
       .maybeSingle(),
     supabase.from("calculos_solares").select("*").eq("negocio_id", negocioId).maybeSingle(),
@@ -415,6 +418,7 @@ export async function carregarVigencia(supabase: SupabaseClient<Database>, negoc
     kitCatalogo: catalogoR.data,
     valorNegocio: negocio.valor,
     consumoMedioKwhNegocio: negocio.consumo_medio_kwh,
+    consumoEstimadoKwhNegocio: negocio.consumo_estimado_kwh,
     valorContaEnergiaNegocio: negocio.valor_conta_energia,
     parametros: paramsR.data,
     contexto,

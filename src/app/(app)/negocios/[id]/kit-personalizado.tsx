@@ -6,6 +6,7 @@ import { useEnvioSemReset } from "@/components/envio-sem-reset";
 import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
 import { atualizarPrecoCalculo, salvarKitPersonalizado } from "@/lib/acoes/calculadora";
 import { calcular, custosInternosEstimados, potenciaKitPersonalizadoKwp, sugerirQuantidadeModulos, type ResultadoCalculo } from "@/lib/calculadora";
+import { resolverConsumo } from "@/lib/consumo-estimado";
 import {
   mensagemDeRecusa,
   motivosDaAcao,
@@ -474,6 +475,8 @@ export function KitPersonalizado({
   estruturaTelhado,
   padraoCliente,
   consumoMedioKwhPadrao,
+  consumoEstimadoKwhPadrao = null,
+  tarifaEfetivaKwhPadrao = null,
   valorFaturaMedioPadrao,
   componentesSalvos,
   calculo,
@@ -488,6 +491,9 @@ export function KitPersonalizado({
   estruturaTelhado: string | null;
   padraoCliente: string | null;
   consumoMedioKwhPadrao: number | null;
+  /** Consumo derivado da fatura e da tarifa efetiva, separado do kWh informado. */
+  consumoEstimadoKwhPadrao?: number | null;
+  tarifaEfetivaKwhPadrao?: number | null;
   valorFaturaMedioPadrao: number | null;
   componentesSalvos: ComponenteSalvo[];
   calculo: CalculoSalvo | null;
@@ -616,16 +622,11 @@ export function KitPersonalizado({
   // Valor efetivo = o do campo; vazio, vale o já salvo no negócio (mesma regra do servidor ao salvar o kit).
   const consumoCampoVazio = lerNumeroBr(consumoMedioKwh) == null;
   const faturaCampoVazia = lerNumeroBr(valorFaturaMedio) == null;
-  const consumoEfetivo = numero(consumoMedioKwh) ?? consumoMedioKwhPadrao;
-  const faturaEfetiva = numero(valorFaturaMedio) ?? valorFaturaMedioPadrao;
+  const estimativaAtual = resolverConsumo(null, numero(valorFaturaMedio) ?? valorFaturaMedioPadrao, tarifaEfetivaKwhPadrao);
+  const consumoEfetivo = numero(consumoMedioKwh) ?? consumoMedioKwhPadrao ?? estimativaAtual.kwh ?? consumoEstimadoKwhPadrao;
 
-  // Consumo médio em kWh, vindo do campo direto (ou do salvo) ou calculado a partir da fatura + tarifa.
-  const consumoMedioEstimado = useMemo(() => {
-    const tarifa = numero(tarifaKwh);
-    if (consumoEfetivo) return consumoEfetivo;
-    if (faturaEfetiva && tarifa) return faturaEfetiva / tarifa;
-    return null;
-  }, [consumoEfetivo, faturaEfetiva, tarifaKwh]);
+  // A tarifa base do financeiro nunca converte a fatura em kWh; a estimativa persistida veio da tarifa efetiva.
+  const consumoMedioEstimado = consumoEfetivo;
 
   // Sugere a quantidade de módulos pro consumo já informado, assim que o
   // vendedor escolhe (ou digita) a potência de um módulo.
@@ -868,7 +869,9 @@ export function KitPersonalizado({
                 <dd>{numeroBr(calculo.geracaoEstimadaKwhMes)} kWh/mês</dd>
               </div>
               <div>
-                <dt className="text-zinc-500">Consumo médio</dt>
+                <dt className="text-zinc-500">
+                  Consumo médio{consumoEstimadoKwhPadrao === calculo.consumoMedioKwh && consumoMedioKwhPadrao == null ? " (estimado pela conta)" : ""}
+                </dt>
                 <dd>{numeroBr(calculo.consumoMedioKwh)} kWh/mês</dd>
               </div>
               {calculo.contaSemSolar != null && (
@@ -995,6 +998,11 @@ export function KitPersonalizado({
         <p data-testid="kit-consumo-salvo" className="-mt-2 text-xs text-zinc-400">
           Campo vazio: ao salvar, vale o consumo já salvo no negócio ({formatarNumeroBr(consumoMedioKwhPadrao)} kWh/mês). Para apagar, use
           “Dados do negócio”.
+        </p>
+      ) : consumoCampoVazio && consumoEstimadoKwhPadrao != null ? (
+        <p data-testid="kit-consumo-estimado" className="-mt-2 text-xs text-amber-800">
+          Campo vazio: ao salvar, vale a estimativa pela fatura ({formatarNumeroBr(estimativaAtual.kwh ?? consumoEstimadoKwhPadrao)} kWh/mês).
+          Informe os kWh reais da conta para substituí-la.
         </p>
       ) : (
         <p className="-mt-2 text-xs text-zinc-400">

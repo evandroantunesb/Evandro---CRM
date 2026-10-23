@@ -256,6 +256,8 @@ describe("avaliarVigencia: motivos que continuam comparáveis", () => {
 
     it("consumo do negócio diferente do calculado: consumo (na escala de 2 casas)", () => {
       expect(semLegado(CALCULO, atual({ consumoMedioKwhNegocio: 451 }))).toEqual(["consumo"]);
+      expect(semLegado(CALCULO, atual({ consumoMedioKwhNegocio: null, consumoEstimadoKwhNegocio: 450 }))).toEqual([]);
+      expect(semLegado(CALCULO, atual({ consumoMedioKwhNegocio: null, consumoEstimadoKwhNegocio: 451 }))).toEqual(["consumo"]);
       expect(semLegado(CALCULO, atual({ consumoMedioKwhNegocio: 450.004 }))).toEqual([]);
       expect(semLegado(CALCULO, atual({ consumoMedioKwhNegocio: 450.005 }))).toEqual(["consumo"]);
     });

@@ -91,7 +91,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
     supabase
       .from("negocios")
       .select(
-        "id, empresa_id, numero, titulo, valor, descricao, status, arquivado_em, arquivado_por, motivo_arquivamento, funil_id, etapa_id, origem_id, responsavel_id, motivo_perda_id, motivo_perda_detalhe, fechado_em, created_at, updated_at, tipo_telhado, unidade_consumidora, padrao_cliente, estrutura_telhado, consumo_medio_kwh, valor_conta_energia, qualif_tipo_cliente, qualif_possui_conta_energia, qualif_distribuidora, qualif_imovel_proprio, qualif_objetivo, qualif_prazo_instalacao, qualif_busca_financiamento, qualif_orcamento_outra_empresa, qualif_e_decisor, qualif_outro_decisor, qualif_participantes_decisao, qualif_observacoes, contatos(id, nome, tipo, telefone, email, endereco, cidade, uf)",
+        "id, empresa_id, numero, titulo, valor, descricao, status, arquivado_em, arquivado_por, motivo_arquivamento, funil_id, etapa_id, origem_id, responsavel_id, motivo_perda_id, motivo_perda_detalhe, fechado_em, created_at, updated_at, tipo_telhado, unidade_consumidora, padrao_cliente, estrutura_telhado, consumo_medio_kwh, consumo_estimado_kwh, tarifa_efetiva_kwh, valor_conta_energia, qualif_tipo_cliente, qualif_possui_conta_energia, qualif_distribuidora, qualif_imovel_proprio, qualif_objetivo, qualif_prazo_instalacao, qualif_busca_financiamento, qualif_orcamento_outra_empresa, qualif_e_decisor, qualif_outro_decisor, qualif_participantes_decisao, qualif_observacoes, contatos(id, nome, tipo, telefone, email, endereco, cidade, uf)",
       )
       .eq("id", id)
       .maybeSingle(),
@@ -479,6 +479,8 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
                 unidadeConsumidora: negocio.unidade_consumidora,
                 padraoCliente: negocio.padrao_cliente,
                 consumoMedioKwh: negocio.consumo_medio_kwh,
+                consumoEstimadoKwh: negocio.consumo_estimado_kwh,
+                tarifaEfetivaKwh: negocio.tarifa_efetiva_kwh,
                 valorContaEnergia: negocio.valor_conta_energia,
               }}
               origens={config.origens.filter((o) => o.ativa || o.id === negocio.origem_id)}
@@ -493,6 +495,8 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
               estruturaTelhado={negocio.estrutura_telhado}
               padraoCliente={negocio.padrao_cliente}
               consumoMedioKwhPadrao={negocio.consumo_medio_kwh}
+              consumoEstimadoKwhPadrao={negocio.consumo_estimado_kwh}
+              tarifaEfetivaKwhPadrao={negocio.tarifa_efetiva_kwh}
               valorFaturaMedioPadrao={negocio.valor_conta_energia}
               componentesSalvos={(componentes ?? []).map((c) => ({
                 tipo: c.tipo as TipoComponenteKit,
