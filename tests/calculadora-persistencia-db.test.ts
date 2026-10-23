@@ -349,14 +349,16 @@ describe("cálculo reproduzível a partir dos dados salvos", () => {
     { nome: "potência 5,505, preço 20000,005 e fatura 1000,005 com tarifa 0,5", consumo: null, fatura: 1000.005, tarifa: 0.5, potencia: 5.505, precoKit: 20000.005, tipo: "bifasico", consumoGravado: 2000.02, tarifaGravada: 0.5, faturaGravada: 1000.01, potenciaGravada: 5.51, precoGravado: 20000.01 },
   ];
 
+  // Os financeiros podem ser nulos no banco (estimativa incompleta, lote 1): aqui eles não viram zero, e o toEqual com o
+  // resultado do motor falha se a linha gravada vier sem os números.
   function pegarResultados(l: {
     geracao_estimada_kwh_mes: number;
-    kwh_faturado: number;
-    kwh_compensado: number;
-    custo_fio_b: number;
-    conta_sem_solar: number;
-    conta_com_solar: number;
-    economia_mensal: number;
+    kwh_faturado: number | null;
+    kwh_compensado: number | null;
+    custo_fio_b: number | null;
+    conta_sem_solar: number | null;
+    conta_com_solar: number | null;
+    economia_mensal: number | null;
     payback_meses: number | null;
   }) {
     return {
