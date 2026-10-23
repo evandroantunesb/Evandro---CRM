@@ -259,11 +259,14 @@ async function inserirCalculoBruto(sobrescrever: Partial<InsertCalculo>) {
 }
 
 describe("M2-Q2: valorComoPersistido bate com o Postgres real nas colunas de calculos_solares", () => {
-  it.each([0.123456, 0.95231, 0.00005, 1.23455])("tarifa_kwh numeric(8,4): bruto %s", async (bruto) => {
+  // A migration 20261023210000 (lote 1) muda tarifa_kwh para numeric(9,5). Diferença temporária: o app desta versão
+  // continua normalizando a tarifa em 4 casas (CASAS_TARIFA = 4) antes de gravar; o banco aceita 5. Como 4 casas cabem
+  // em 5, o que o app grava é guardado sem mudança. O app passa a 5 casas na PR B.
+  it.each([0.123456, 0.951234, 0.000005, 1.234565])("tarifa_kwh numeric(9,5): bruto %s", async (bruto) => {
     const { negocio, error } = await inserirCalculoBruto({ tarifa_kwh: bruto });
     expect(error).toBeNull();
     const { data } = await servico.from("calculos_solares").select("tarifa_kwh").eq("negocio_id", negocio).single();
-    expect(data!.tarifa_kwh).toBe(valorComoPersistido(bruto, 4));
+    expect(data!.tarifa_kwh).toBe(valorComoPersistido(bruto, 5));
   });
 
   it.each([5.505, 6.1, 0.005])("kit_potencia_kwp numeric(6,2): bruto %s", async (bruto) => {
@@ -287,9 +290,9 @@ describe("M2-Q2: valorComoPersistido bate com o Postgres real nas colunas de cal
     expect(data!.valor_fatura_medio).toBe(valorComoPersistido(bruto, 2));
   });
 
-  it("o banco rejeita (23514) tarifa bruta 0,00004 (normaliza para 0) e o helper também prevê 0", async () => {
-    expect(valorComoPersistido(0.00004, 4)).toBe(0);
-    const { error } = await inserirCalculoBruto({ tarifa_kwh: 0.00004 });
+  it("o banco rejeita (23514) tarifa bruta 0,000004 (normaliza para 0 em 5 casas) e o helper também prevê 0", async () => {
+    expect(valorComoPersistido(0.000004, 5)).toBe(0);
+    const { error } = await inserirCalculoBruto({ tarifa_kwh: 0.000004 });
     expect(error?.code).toBe("23514");
   });
 
@@ -349,14 +352,16 @@ describe("cálculo reproduzível a partir dos dados salvos", () => {
     { nome: "potência 5,505, preço 20000,005 e fatura 1000,005 com tarifa 0,5", consumo: null, fatura: 1000.005, tarifa: 0.5, potencia: 5.505, precoKit: 20000.005, tipo: "bifasico", consumoGravado: 2000.02, tarifaGravada: 0.5, faturaGravada: 1000.01, potenciaGravada: 5.51, precoGravado: 20000.01 },
   ];
 
+  // Os financeiros podem ser nulos no banco (estimativa incompleta, lote 1): aqui eles não viram zero, e o toEqual com o
+  // resultado do motor falha se a linha gravada vier sem os números.
   function pegarResultados(l: {
     geracao_estimada_kwh_mes: number;
-    kwh_faturado: number;
-    kwh_compensado: number;
-    custo_fio_b: number;
-    conta_sem_solar: number;
-    conta_com_solar: number;
-    economia_mensal: number;
+    kwh_faturado: number | null;
+    kwh_compensado: number | null;
+    custo_fio_b: number | null;
+    conta_sem_solar: number | null;
+    conta_com_solar: number | null;
+    economia_mensal: number | null;
     payback_meses: number | null;
   }) {
     return {

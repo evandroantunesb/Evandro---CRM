@@ -11,6 +11,19 @@ const WORKFLOW = ".github/workflows/banco-producao.yml";
 // Implantação da PR #210 (colunas consumo_estimado_kwh e tarifa_efetiva_kwh em negocios): só esta migration,
 // nenhuma a mais ou a menos.
 const AUTORIZADA = "20261021100000_negocio_consumo_estimado.sql";
+// Lote 1 do banco da calculadora GD II: a #210 (acima, ainda pendente em produção) mais as seis migrations
+// preparatórias, todas compatíveis com o app atual. A revogação final da escrita direta
+// (20261023240000_calculos_solares_revogar_escrita_direta) fica de fora: só entra depois do app novo.
+const LOTE1 = [
+  AUTORIZADA,
+  "20261022100000_propostas_emissoes.sql",
+  "20261022110000_produtividade_confirmada.sql",
+  "20261023200000_calculos_estimativa_incompleta.sql",
+  "20261023210000_calculo_gd2_fio_b.sql",
+  "20261023220000_calculos_solares_gravacao_servidor.sql",
+  "20261023230000_calculos_solares_exclusao_historico.sql",
+];
+const REVOGACAO_FINAL = "20261023240000_calculos_solares_revogar_escrita_direta.sql";
 // Migrations já aplicadas (#192, #191, #190 e o conjunto Solo #186, #188 e #189): se voltarem a aparecer como
 // pendentes, não são autorizadas.
 const SOLO = [
@@ -157,6 +170,35 @@ describe("entradas inválidas: encerra com erro antes de qualquer aplicação", 
   });
 });
 
+describe("lote 1 da calculadora GD II", () => {
+  const lista = LOTE1.join("\n");
+
+  it("o conjunto completo, listado pelo dry-run, passa", () => {
+    expect(validar(dryRunCom(...LOTE1), lista).codigo).toBe(0);
+  });
+
+  it("falta qualquer uma das sete: não passa", () => {
+    for (const faltante of LOTE1) {
+      const r = validar(dryRunCom(...LOTE1.filter((m) => m !== faltante)), lista);
+      expect(r.codigo, faltante).toBe(1);
+    }
+  });
+
+  it("a revogação final, a mais ou no lugar de outra, não passa", () => {
+    expect(validar(dryRunCom(...LOTE1, REVOGACAO_FINAL), lista).codigo).toBe(1);
+    expect(validar(dryRunCom(...LOTE1.slice(0, -1), REVOGACAO_FINAL), lista).codigo).toBe(1);
+  });
+
+  it("a revogação final não está na lista autorizada nem na pasta de migrations deste lote", () => {
+    expect(readFileSync(WORKFLOW, "utf8")).not.toContain("20261023240000");
+    expect(existsSync(`supabase/migrations/${REVOGACAO_FINAL}`)).toBe(false);
+  });
+
+  it("todas as migrations do lote existem na pasta", () => {
+    for (const m of LOTE1) expect(existsSync(`supabase/migrations/${m}`), m).toBe(true);
+  });
+});
+
 describe("ligação no workflow", () => {
   const texto = readFileSync(WORKFLOW, "utf8");
   const aplicar = texto.slice(texto.indexOf("\n  aplicar:"));
@@ -173,7 +215,7 @@ describe("ligação no workflow", () => {
   it("a trava usa o arquivo do dry-run e a lista com só as migrations autorizadas, sem entrada do operador", () => {
     const trecho = aplicar.slice(aplicar.indexOf("name: Conferir que o conjunto"), aplicar.indexOf("name: Aplicar (supabase"));
     expect(trecho).toContain('bash .github/scripts/validar-conjunto-migrations.sh "$RUNNER_TEMP/dry-run.txt"');
-    expect(trecho.match(/\d{14}_[A-Za-z0-9_.-]+\.sql/g)).toEqual([AUTORIZADA]);
+    expect(trecho.match(/\d{14}_[A-Za-z0-9_.-]+\.sql/g)).toEqual(LOTE1);
     expect(trecho).not.toContain("inputs.");
     expect(trecho).not.toContain("secrets.");
     expect(trecho).not.toContain("continue-on-error");
