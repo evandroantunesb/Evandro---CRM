@@ -552,7 +552,7 @@ describe("preço do cálculo x valor do negócio", () => {
     expect(r).toMatchObject({ ok: true, mensagem: "Preço do cálculo atualizado." });
     const depois = await lerCalculo(negocioId);
     expect(depois.kit_preco).toBe(28000);
-    expect(depois.payback_meses).toBe(Math.round((28000 / calculo.economia_mensal) * 10) / 10);
+    expect(depois.payback_meses).toBe(Math.round((28000 / calculo.economia_mensal!) * 10) / 10);
     // Geração e economia continuam as do cálculo salvo.
     expect(depois.economia_mensal).toBe(calculo.economia_mensal);
     expect(depois.geracao_estimada_kwh_mes).toBe(calculo.geracao_estimada_kwh_mes);

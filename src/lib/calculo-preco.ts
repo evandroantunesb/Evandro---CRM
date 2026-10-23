@@ -15,10 +15,10 @@ export function precoDoCalculoDesatualizado(kitPreco: number, valorNegocio: numb
 
 /**
  * Payback com o preço novo, pela mesma regra do cálculo: preço ÷ economia mensal, 1 casa; em aberto
- * sem preço ou sem economia. A economia não depende do preço, então não é refeita.
+ * sem preço ou sem economia (nula também é "sem economia", nunca zero). A economia não depende do preço, então não é refeita.
  */
-export function paybackComPreco(preco: number, economiaMensal: number): number | null {
-  if (!(preco > 0) || !(economiaMensal > 0)) return null;
+export function paybackComPreco(preco: number, economiaMensal: number | null): number | null {
+  if (!(preco > 0) || economiaMensal == null || !(economiaMensal > 0)) return null;
   return Math.round((preco / economiaMensal) * 10) / 10;
 }
 

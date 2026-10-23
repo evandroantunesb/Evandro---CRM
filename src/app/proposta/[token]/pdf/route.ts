@@ -37,6 +37,12 @@ export async function GET(_: Request, { params }: RouteContext<"/proposta/[token
     .eq("negocio_id", proposta.negocio_id)
     .maybeSingle();
   if (!calculo || !contato) return new NextResponse("Proposta não encontrada.", { status: 404 });
+  // O financeiro pode estar em aberto (nulo) num cálculo com estimativa incompleta: nunca vira zero no PDF.
+  const { conta_sem_solar, conta_com_solar, economia_mensal } = calculo;
+  if (conta_sem_solar == null || conta_com_solar == null || economia_mensal == null) {
+    return new NextResponse("Esta proposta ainda não tem a estimativa financeira completa.", { status: 409 });
+  }
+  const calculoCompleto = { ...calculo, conta_sem_solar, conta_com_solar, economia_mensal };
 
   const modoPreco = proposta.modo_preco as ModoPreco;
 
@@ -62,7 +68,7 @@ export async function GET(_: Request, { params }: RouteContext<"/proposta/[token
 
     const dados = montarDadosSistemaProposta({
       contato,
-      calculo,
+      calculo: calculoCompleto,
       modoPreco,
       componentes: componentesData ?? [],
     });
@@ -112,9 +118,9 @@ export async function GET(_: Request, { params }: RouteContext<"/proposta/[token
         kitPotenciaKwp: calculo.kit_potencia_kwp,
         tipoLigacao: calculo.tipo_ligacao as TipoLigacao,
         geracaoEstimadaKwhMes: calculo.geracao_estimada_kwh_mes,
-        contaSemSolar: calculo.conta_sem_solar,
-        contaComSolar: calculo.conta_com_solar,
-        economiaMensal: calculo.economia_mensal,
+        contaSemSolar: calculoCompleto.conta_sem_solar,
+        contaComSolar: calculoCompleto.conta_com_solar,
+        economiaMensal: calculoCompleto.economia_mensal,
         paybackMeses: calculo.payback_meses,
         kitPreco: calculo.kit_preco,
       },

@@ -88,7 +88,7 @@ export default async function PropostaPublica({ params }: PageProps<"/proposta/[
         </Cartao>
       )}
 
-      {proposta.mostrar_economia && (
+      {proposta.mostrar_economia && calculo.conta_sem_solar != null && calculo.conta_com_solar != null && calculo.economia_mensal != null && (
         <Cartao titulo="Sua economia">
           <dl className="grid grid-cols-2 gap-4 text-sm">
             <div>
