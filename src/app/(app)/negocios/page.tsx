@@ -1,4 +1,4 @@
-import { Briefcase, CalendarClock, Plus, Search, Settings2, TrendingUp, Wallet, X } from "lucide-react";
+import { Briefcase, CalendarClock, Plus, Search, Settings2, Thermometer, TrendingUp, Wallet, X } from "lucide-react";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { Botao, CLASSE_ENTRADA, Campo, Selecao } from "@/components/ui";
@@ -11,8 +11,9 @@ import {
   tempoDesde,
 } from "@/lib/crm";
 import { COOKIE_VISAO_NEGOCIOS, exigirPapel } from "@/lib/sessao";
-import { FILTRAR_NEGOCIOS_POR_RESPONSAVEL, NEGOCIOS, pode } from "@/lib/permissoes";
+import { FILTRAR_NEGOCIOS_POR_RESPONSAVEL, NEGOCIOS, REGRAS_TEMPERATURA, pode } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
+import { carregarTemperaturas, type TemperaturaNegocio } from "@/lib/temperatura";
 import { BotaoFiltros } from "./filtros";
 import { Indicadores, type Indicador } from "./indicadores";
 import { Kanban, type Card } from "./kanban";
@@ -123,7 +124,9 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
       : { count: 0 },
   ]);
 
-  let cards = montarCards(data ?? [], config, pendentes ?? [], notas ?? []);
+  // Temperatura só existe para negócio aberto (o banco ignora os demais).
+  const temperaturas = status === "aberto" ? await carregarTemperaturas(supabase, (data ?? []).map((n) => n.id)) : new Map();
+  let cards = montarCards(data ?? [], config, pendentes ?? [], notas ?? [], temperaturas);
   if (atrasados) cards = cards.filter((c) => c.tarefa === "atrasada");
   if (semProxima) cards = cards.filter((c) => c.tarefa === "nenhuma");
 
@@ -244,6 +247,17 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
             >
               <Settings2 className="h-4 w-4" aria-hidden />
               Editar etapas
+            </Link>
+          )}
+          {pode(atual.papel, REGRAS_TEMPERATURA) && (
+            <Link
+              href="/configuracoes/temperatura"
+              aria-label="Regras de temperatura"
+              title="Regras de temperatura"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-linha bg-superficie px-3 text-sm font-medium text-texto transition-colors hover:border-dourado md:min-h-9"
+            >
+              <Thermometer className="h-4 w-4" aria-hidden />
+              <span className="hidden md:inline">Temperatura</span>
             </Link>
           )}
           <Link href={`/negocios/novo?funil=${funil.id}`} aria-label="Adicionar negócio">
@@ -424,6 +438,7 @@ function montarCards(
   config: Configuracao,
   pendentes: { negocio_id: string | null; vence_em: string; titulo: string }[],
   notas: { negocio_id: string }[],
+  temperaturas: Map<string, TemperaturaNegocio>,
 ): Card[] {
   const nomeMembro = new Map(config.membros.map((m) => [m.id, m.nome]));
   const nomeOrigem = new Map(config.origens.map((o) => [o.id, o.nome]));
@@ -456,6 +471,7 @@ function montarCards(
         return e ? [{ id: e.id, nome: e.nome, cor: e.cor }] : [];
       }),
       comentarios: contagemNotas.get(n.id) ?? 0,
+      temperatura: temperaturas.get(n.id) ?? null,
     };
   });
 }

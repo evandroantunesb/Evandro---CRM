@@ -341,6 +341,11 @@ const esquemaEdicao = z.object({
   consumo_medio_kwh: numeroBrOpcional,
   tarifa_efetiva_kwh: numeroBrOpcional,
   valor_conta_energia: numeroBrOpcional,
+  // Campo "month" do navegador (AAAA-MM); vazio limpa a previsão. Gravado como 1º dia do mês.
+  fechamento_previsto: z
+    .union([z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Mês previsto inválido"), z.literal("")])
+    .optional()
+    .transform((v) => (v === undefined ? undefined : v ? `${v}-01` : null)),
 });
 
 /** Salva "Dados do negócio". A fatura escolhida no formulário vai depois, direto ao Storage (ver `enviarArquivos`). */
@@ -368,6 +373,7 @@ export async function editarNegocioComCliente(
       consumo_estimado_kwh: consumoEdicao.origem === "estimado" ? consumoEdicao.kwh : null,
       tarifa_efetiva_kwh: consumoEdicao.tarifaEfetiva,
       valor_conta_energia: d.valor_conta_energia,
+      ...(d.fechamento_previsto !== undefined ? { fechamento_previsto: d.fechamento_previsto } : {}),
       // SDR não pode alterar o valor financeiro do negócio (spec RAION_SDR_REGRAS_PERMISSOES §39) — só na criação.
       ...(pode(atual.papel, EDITAR_VALOR_NEGOCIO) ? { valor: d.valor } : {}),
       ...(pode(atual.papel, ESCOLHER_RESPONSAVEL_NEGOCIO) && d.responsavel_id ? { responsavel_id: d.responsavel_id } : {}),

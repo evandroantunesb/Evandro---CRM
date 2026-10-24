@@ -85,6 +85,9 @@ export const GOOGLE_AGENDA = ["admin", "gestor", "vendedor", "sdr"] as const sat
 /** Gestão comercial: Painel, Leads a distribuir e as pendências de gestão do sininho. */
 export const GESTAO_COMERCIAL = ["admin", "gestor"] as const satisfies ListaPapeis;
 
+/** Regras de temperatura dos negócios (Configurações > Temperatura): a mesma barreira da política de UPDATE no banco. */
+export const REGRAS_TEMPERATURA = ["admin", "gestor"] as const satisfies ListaPapeis;
+
 // --- Obras -------------------------------------------------------------------
 
 /**

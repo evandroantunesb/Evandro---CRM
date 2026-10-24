@@ -13,6 +13,7 @@ import {
   Radio,
   Tags,
   Target,
+  Thermometer,
   UserCog,
   Users,
   type LucideIcon,
@@ -42,6 +43,7 @@ const GRUPOS: { id: string; titulo: string; itens: Item[] }[] = [
     itens: [
       { href: "/configuracoes/funil", titulo: "Funis e etapas", descricao: "Etapas do Kanban e regras de cada funil.", Icone: ListTree },
       { href: "/configuracoes/listas", titulo: "Etiquetas e motivos", descricao: "Etiquetas dos negócios e motivos de perda.", Icone: Tags },
+      { href: "/configuracoes/temperatura", titulo: "Temperatura dos negócios", descricao: "Regras que deixam um negócio Quente ou Frio (o gestor também edita).", Icone: Thermometer },
     ],
   },
   {

@@ -37,6 +37,8 @@ export function EdicaoNegocio({
     consumoEstimadoKwh: number | null;
     tarifaEfetivaKwh: number | null;
     valorContaEnergia: number | null;
+    /** AAAA-MM-01 ou nulo. */
+    fechamentoPrevisto: string | null;
   };
   origens: Opcao[];
   responsaveis: Opcao[];
@@ -106,6 +108,12 @@ export function EdicaoNegocio({
         required
         readOnly={!podeEditarValor}
         defaultValue={negocio.valor != null ? String(negocio.valor).replace(".", ",") : ""}
+      />
+      <Campo
+        rotulo="Mês previsto de fechamento"
+        name="fechamento_previsto"
+        type="month"
+        defaultValue={negocio.fechamentoPrevisto?.slice(0, 7) ?? ""}
       />
       <Campo
         rotulo="Valor da conta de energia (R$)"
