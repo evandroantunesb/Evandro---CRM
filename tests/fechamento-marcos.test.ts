@@ -294,46 +294,53 @@ describe("ficha do negócio (fonte)", () => {
   });
 });
 
-describe("ficha do negócio: posição do cartão de fechamento", () => {
+describe("ficha do negócio: posição do cartão de fechamento (jornada da venda)", () => {
   const page = fonte(...PASTA, "page.tsx");
-  const inicioGrade = page.indexOf('<div className="grid gap-4 lg:grid-cols-[2fr_1fr] lg:grid-rows-[auto_1fr]">');
-  const grade = page.slice(inicioGrade);
+  const inicioJsx = page.indexOf("\n  return (\n");
+  const jsx = page.slice(inicioJsx);
   const pos = (trecho: string) => {
-    const i = grade.indexOf(trecho);
+    const i = jsx.indexOf(trecho);
     expect(i, trecho).toBeGreaterThanOrEqual(0);
     return i;
   };
+  const CARTOES_DAS_ABAS = [
+    '<CartaoRecolhivel titulo="Dados do negócio"',
+    '<Cartao titulo="Kit personalizado">',
+    '<CartaoRecolhivel titulo="Qualificação SDR"',
+    '<Cartao titulo="Contrato">',
+    '<Cartao titulo="Tarefas">',
+    '<Cartao titulo="Notas e linha do tempo">',
+    '<Cartao titulo="Contato">',
+    '<Cartao titulo="Etiquetas">',
+    "<Cartao titulo={`Arquivos",
+  ];
 
-  it("celular: o cartão de fechamento é o primeiro item da grade, antes de todos os outros cartões", () => {
-    expect(inicioGrade).toBeGreaterThan(0);
+  it("celular e computador: o cartão de fechamento vem logo após o cabeçalho, antes das abas e de todos os outros cartões", () => {
+    expect(inicioJsx).toBeGreaterThan(0);
     const fechamento = pos("<Cartao titulo={cartao.titulo}>");
-    const demais = [
-      '<Cartao titulo="Dados do negócio">',
-      '<Cartao titulo="Kit personalizado">',
-      '<Cartao titulo="Qualificação SDR">',
-      '<Cartao titulo="Tarefas">',
-      '<Cartao titulo="Notas e linha do tempo">',
-      '<Cartao titulo="Contato">',
-      '<Cartao titulo="Etiquetas">',
-      "<Cartao titulo={`Arquivos",
-    ];
-    for (const c of demais) expect(fechamento, c).toBeLessThan(pos(c));
-    expect(grade.slice(0, fechamento).match(/<Cartao\b/g)).toBeNull();
+    expect(fechamento).toBeGreaterThan(pos("</header>"));
+    expect(fechamento).toBeLessThan(pos('aria-label="Seções do negócio"'));
+    for (const c of CARTOES_DAS_ABAS) expect(fechamento, c).toBeLessThan(pos(c));
+    expect(jsx.slice(0, fechamento).match(/<Cartao(Recolhivel)?\b/g)).toBeNull();
   });
 
-  it("só o fechamento sobe: Contato, Etiquetas e Arquivos continuam depois da coluna principal", () => {
-    const principalFim = pos('<Cartao titulo="Notas e linha do tempo">');
-    for (const c of ['<Cartao titulo="Contato">', '<Cartao titulo="Etiquetas">', "<Cartao titulo={`Arquivos"]) {
-      expect(pos(c), c).toBeGreaterThan(principalFim);
-    }
+  it("cada aba renderiza só os seus cartões", () => {
+    const abas = ["visao", "sistema", "proposta", "atividades", "arquivos"].map((a) => ({ a, i: pos(`{aba === "${a}" && (`) }));
+    const abaDe = (trecho: string) => abas.filter(({ i }) => i < pos(trecho)).at(-1)?.a;
+    expect(abaDe('<CartaoRecolhivel titulo="Dados do negócio"')).toBe("visao");
+    expect(abaDe('<CartaoRecolhivel titulo="Qualificação SDR"')).toBe("visao");
+    expect(abaDe('<Cartao titulo="Contato">')).toBe("visao");
+    expect(abaDe('<Cartao titulo="Kit personalizado">')).toBe("sistema");
+    expect(abaDe('<Cartao titulo="Contrato">')).toBe("proposta");
+    expect(abaDe('<Cartao titulo="Tarefas">')).toBe("atividades");
+    expect(abaDe("<Cartao titulo={`Arquivos")).toBe("arquivos");
   });
 
-  it("desktop: fechamento no topo da coluna direita, coluna principal à esquerda ocupando as duas linhas", () => {
-    expect(grade).toMatch(/<div className="lg:col-start-2 lg:row-start-1">\s*<Cartao titulo=\{cartao\.titulo\}>/);
-    expect(grade).toMatch(
-      /<div className="flex flex-col gap-4 lg:col-start-1 lg:row-span-2 lg:row-start-1">\s*<Cartao titulo="Dados do negócio">/,
-    );
-    expect(grade).toMatch(/<div className="flex flex-col gap-4 lg:col-start-2 lg:row-start-2">\s*<Cartao titulo="Contato">/);
+  it("arquivamento: uma única instância, no topo quando arquivado e no fim da Visão geral quando não", () => {
+    expect(page.match(/<Arquivamento\b/g)).toHaveLength(1);
+    expect(pos("{arquivado && arquivamento}")).toBeLessThan(pos("<Cartao titulo={cartao.titulo}>"));
+    expect(pos("{!arquivado && arquivamento}")).toBeGreaterThan(pos('{aba === "visao" && ('));
+    expect(pos("{!arquivado && arquivamento}")).toBeLessThan(pos('{aba === "sistema" && ('));
   });
 
   it("uma única instância do cartão e das ações, sem versões escondidas por CSS", () => {

@@ -1,4 +1,4 @@
-import { ChevronLeft } from "lucide-react";
+import { ChevronDown, ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
 
@@ -121,6 +121,39 @@ export function Cartao({
         </div>
       )}
       {children}
+    </section>
+  );
+}
+
+/**
+ * Cartão que mostra e esconde o conteúdo (`<details>` nativo: abre e fecha sem JavaScript). Fechado,
+ * mostra o título e o `resumo` numa linha, para a página ficar curta.
+ */
+export function CartaoRecolhivel({
+  titulo,
+  resumo,
+  aberto = false,
+  children,
+}: {
+  titulo: string;
+  resumo?: ReactNode;
+  aberto?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <section className="painel">
+      <details open={aberto} className="group">
+        <summary
+          className={`flex min-h-16 cursor-pointer list-none items-center gap-3 rounded-2xl px-5 py-4 md:px-6 [&::-webkit-details-marker]:hidden ${FOCO}`}
+        >
+          <div className="min-w-0 flex-1">
+            <h2 className="text-lg font-semibold tracking-tight text-texto">{titulo}</h2>
+            {resumo && <p className="mt-0.5 text-sm text-texto-2">{resumo}</p>}
+          </div>
+          <ChevronDown size={18} aria-hidden className="shrink-0 text-texto-2 transition-transform duration-200 ease-raion group-open:rotate-180" />
+        </summary>
+        <div className="px-5 pb-5 md:px-6 md:pb-6">{children}</div>
+      </details>
     </section>
   );
 }

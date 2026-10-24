@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { clienteDe, clienteServico, entrarComo, lerBase } from "./ajuda";
+import { abrirAba, clienteDe, clienteServico, entrarComo, fichaNaAba, lerBase } from "./ajuda";
 import type { BaseFicticia } from "./base-ficticia";
 
 /**
@@ -83,19 +83,22 @@ test.describe("linha legada e valor do negócio editado", () => {
     const n = await negocioComCalculo("Cliente preço legado (fictício)");
     const linha = await n.calculo();
     await entrarComo(page, base.usuarios.vendedor, base.senha);
-    await page.goto(`/negocios/${n.id}`);
-    // A linha existe só como histórico recolhido de fórmula antiga.
+    // Kit (aba Sistema): a linha existe só como histórico recolhido de fórmula antiga.
+    await page.goto(fichaNaAba(n.id, "Sistema"));
     await expect(page.getByTestId("calculo-anterior")).toHaveCount(1);
     await expect(page.getByText("Atualizar preço no cálculo")).toHaveCount(0);
+    await abrirAba(page, "Proposta e contrato");
     await expect(page.getByRole("button", { name: "Gerar contrato" })).toBeEnabled();
 
     const { error } = await n.cliente.from("negocios").update({ valor: 28000 }).eq("id", n.id);
     if (error) throw error;
-    await page.goto(`/negocios/${n.id}`);
+    await page.goto(fichaNaAba(n.id, "Sistema"));
+    await expect(page.getByTestId("calculo-anterior")).toHaveCount(1);
     await expect(page.getByRole("alert").filter({ hasText: "é diferente do preço usado" })).toHaveCount(0);
     await expect(page.getByText("Atualizar preço no cálculo")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Atualizar preço no cálculo" })).toHaveCount(0);
     await expect(page.getByTestId("preco-bloqueado")).toHaveCount(0);
+    await abrirAba(page, "Proposta e contrato");
     // Contrato NÃO bloqueia por preço divergente com linha legada.
     await expect(page.getByRole("button", { name: "Gerar contrato" })).toBeEnabled();
     // Proposta nova segue bloqueada (fórmula antiga), e a linha não mudou sozinha.
