@@ -147,9 +147,10 @@ describe("regressões de tela", () => {
     for (const rotulo of ["Orientação", "Inclinação", "Área disponível"]) expect(formulario).not.toContain(rotulo);
   });
 
-  it("fotos e documentos vão como anexo geral", () => {
+  it("cadastro anexa só a conta de luz; fotos e documentos ficam para a ficha (anexo geral)", () => {
     expect(formulario).not.toContain("anexo_fatura_beneficiario");
-    expect(formulario.match(/name="anexo_geral"/g)).toHaveLength(2);
+    expect(formulario.match(/name="anexo_fatura_gerador"/g)).toHaveLength(1);
+    expect(formulario).not.toContain('name="anexo_geral"');
     expect(fonte("src", "lib", "anexos-regras.ts")).toMatch(/campo: "anexo_geral", categoria: "geral"/);
   });
 
@@ -182,46 +183,46 @@ describe("regressões de tela", () => {
     const enviar = formulario.slice(formulario.indexOf("function enviar("), formulario.indexOf("function pesquisar("));
     expect(enviar.indexOf("for (const etapa of [1, 2, 3] as const)")).toBeLessThan(enviar.indexOf("prepararEnvioCriacao("));
     expect(enviar).toMatch(/try \{\s*r = await criarNegocio\(dados\);\s*\} catch/);
-    expect(formulario).toContain('<Botao type="submit" disabled={pendente}>');
-    // A mensagem do passo também aparece no passo 3.
-    const passo3 = formulario.slice(formulario.indexOf("etapasRef.current[3] = el"));
-    expect(passo3).toContain("{erroEtapa && <Mensagem");
+    expect(formulario).toContain('<Botao type="submit" disabled={pendente}');
+    // A mensagem do passo aparece na barra de ações, junto do botão (no celular, fixa embaixo; em qualquer passo).
+    const acoes = formulario.slice(formulario.indexOf("{/* Ações:"));
+    expect(acoes).toContain("{erroEtapa ? <Mensagem");
   });
 
-  it("cadastro: Avançar confere só os campos do passo atual, sem exigência nova", () => {
+  it("cadastro: Avançar confere só os campos do passo atual; escolhas por botão são conferidas no passo delas", () => {
     const problema = formulario.slice(formulario.indexOf("function problemaDaEtapa("), formulario.indexOf("function mostrarProblema("));
     expect(problema).toContain("campoInvalido(etapa)");
     expect(formulario).toContain("etapasRef.current[etapa]");
-    // Os obrigatórios continuam os mesmos de antes: nome do negócio e origem (passo 1) e valor (passo 2).
-    expect(formulario.match(/\brequired\b/g)?.length).toBe(7);
+    // Campos com `required`: nome, WhatsApp, cidade, UF e valor. Origem, tipo de cliente, distribuidora e ligação são
+    // botões: conferidos em `problemaDaEtapa`, com mensagem própria.
+    expect(formulario.match(/\brequired\b/g)?.length).toBe(5);
+    for (const mensagem of ["Escolha a origem do cliente.", "Escolha o tipo de cliente.", "Escolha a distribuidora", "Escolha a ligação: ela muda o cálculo."]) {
+      expect(problema).toContain(mensagem);
+    }
   });
 
-  it("cadastro: Cancelar montagem fecha o editor e descarta só os itens; valor digitado fica", () => {
-    // O recorte usa o fim da função ("\n  }\n"): normaliza só o texto lido, para valer com checkout LF ou CRLF.
+  it("cadastro: ligação nunca presumida (sem padrão escondido) e a prévia não fecha a conta sem ela", () => {
+    expect(formulario).toContain("useState<TipoLigacao | null>(null)");
+    expect(formulario).toMatch(/const completo = previa\?\.estado === "completa" && tipoLigacao \? previa : null;/);
+  });
+
+  it("cadastro: Voltar ao sugerido e Seguir sem kit mexem só no kit; cliente, consumo e valor digitado ficam", () => {
     const fonteLf = formulario.replace(/\r\n/g, "\n");
-    const inicio = fonteLf.indexOf("function cancelarMontagem(");
+    const inicio = fonteLf.indexOf("function voltarAoSugerido(");
     expect(inicio).toBeGreaterThanOrEqual(0);
-    const fim = fonteLf.indexOf("\n  }\n", inicio);
-    expect(fim).toBeGreaterThan(inicio);
-    const cancelar = fonteLf.slice(inicio, fim);
-    expect(cancelar).toContain("setLinhas([])");
-    expect(cancelar).toContain("setMostrarKit(false)");
-    // Só o valor que veio da sugestão automática é limpo.
-    expect(cancelar).toContain('if (!valorTocado) setValor("")');
-    // Cliente, consumo, localização e valor digitado não são tocados.
-    expect(cancelar).not.toMatch(/setContato|setConsumoMedioKwh|setValorFaturaMedio|setCidade|setUf|setRua|setCep|setValorTocado/);
-    expect(formulario).toContain("onClick={cancelarMontagem}");
-    expect(formulario).toContain("Cancelar montagem");
-    expect(formulario).not.toContain("Desistir do kit");
+    const voltar = fonteLf.slice(inicio, fonteLf.indexOf("\n  }\n", inicio));
+    expect(voltar).toContain("setKitTocado(false)");
+    expect(voltar).toContain("setSemKit(false)");
+    expect(voltar).not.toMatch(/setContato|setConsumoMedioKwh|setValorFaturaMedio|setCidade|setUf|setRua|setCep|setValor\(|setValorTocado/);
+    expect(formulario).toContain("Voltar ao sugerido");
+    expect(formulario).toContain("Seguir sem kit");
+    expect(formulario).toContain("Trocar itens ou montar do zero");
   });
 
-  it("cadastro: passo 2 tem um botão só para seguir, que vira 'Continuar sem kit' sem kit em montagem", () => {
-    expect(formulario.match(/onClick=\{avancar\}/g)).toHaveLength(2); // passo 1 e passo 2
-    expect(formulario).toContain('{mostrarKit || componentes.length ? "Avançar" : "Continuar sem kit"}');
-    expect(formulario).toContain("Montar kit manualmente");
-    // Sugestão automática do valor continua, sempre identificada como estimativa.
-    expect(formulario).toContain("estimativa, não é cotação real");
-    expect(formulario).toContain("Estimativa ilustrativa: não é salva no negócio.");
+  it("cadastro: um botão só para seguir de passo; o valor sugerido é sempre identificado como estimativa", () => {
+    expect(formulario.match(/onClick=\{avancar\}/g)).toHaveLength(1);
+    expect(formulario).toContain("estimativa, não é cotação");
+    expect(formulario).toContain("Sem preço de catálogo para estes itens: digite o valor do negócio.");
   });
 
   it("etapa saiu do formulário de edição e da gravação", () => {
@@ -240,7 +241,8 @@ describe("regressões de tela", () => {
   });
 
   it("ficha: Cancelar na edição do kit não grava nada e volta ao que está salvo", () => {
-    const kit = fonte("src", "app", "(app)", "negocios", "[id]", "kit-personalizado.tsx");
+    // Normaliza o fim de linha do texto lido: o recorte usa "\n  }\n" e vale com checkout LF ou CRLF.
+    const kit = fonte("src", "app", "(app)", "negocios", "[id]", "kit-personalizado.tsx").replace(/\r\n/g, "\n");
     const inicio = kit.indexOf("function cancelarEdicao(");
     const cancelar = kit.slice(inicio, kit.indexOf("\n  }\n", inicio));
     expect(cancelar).not.toMatch(/\bacao\(|\benviar\(|salvarKitPersonalizado/);

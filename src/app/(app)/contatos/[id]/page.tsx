@@ -37,7 +37,7 @@ export default async function DetalheContato({ params }: PageProps<"/contatos/[i
         ← Contatos
       </Link>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-semibold text-zinc-900">{contato.nome}</h1>
+        <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">{contato.nome}</h1>
         {(atual.papel === "admin" || atual.papel === "gestor") && <ExcluirContato contatoId={contato.id} />}
       </div>
       <Cartao titulo="Dados do contato">

@@ -16,7 +16,7 @@ export default async function ConfigContrato() {
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
-      <h1 className="text-2xl font-semibold text-zinc-900">Modelo de contrato</h1>
+      <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Modelo de contrato</h1>
       <p className="text-sm text-zinc-600">
         Escreva o texto do contrato que a empresa usa. Ao gerar o contrato de um negócio, os campos entre chaves duplas
         são preenchidos automaticamente. Condições fixas (garantias, prazos, foro, dados da empresa) ficam escritas no

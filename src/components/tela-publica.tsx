@@ -34,7 +34,7 @@ export function TelaPublica({ titulo, children }: { titulo: string; children: Re
       <section className="flex flex-1 items-center justify-center p-6">
         <div className="w-full max-w-sm">
           <p className="mb-2 text-[11px] font-medium tracking-[0.3em] text-zinc-500 uppercase">CRM para negócios que vão mais longe</p>
-          <h1 className="mb-8 text-3xl font-semibold text-carvao">{titulo}</h1>
+          <h1 className="mb-8 text-4xl font-light tracking-tight text-carvao">{titulo}</h1>
           {children}
         </div>
       </section>

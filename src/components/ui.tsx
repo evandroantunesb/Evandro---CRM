@@ -1,34 +1,55 @@
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
 
+/*
+ * Componentes básicos nas cores por função (src/app/globals.css), válidos nos temas claro e escuro.
+ * Ação principal = Dourado Solar com texto carvão. Alvo de toque ≥ 44 px no celular.
+ */
+
+const FOCO = "outline-none focus-visible:ring-2 focus-visible:ring-dourado/60 focus-visible:ring-offset-2 focus-visible:ring-offset-fundo";
+
 export function Botao({
   variante = "primario",
   className = "",
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variante?: "primario" | "secundario" | "perigo" }) {
   const estilos = {
-    primario: "bg-carvao text-offwhite hover:bg-zinc-800",
-    secundario: "border border-zinc-200 bg-white text-carvao hover:border-dourado",
-    perigo: "border border-red-200 bg-white text-red-700 hover:bg-red-50",
+    primario: "bg-acao text-sobre-acao hover:bg-acao-forte",
+    secundario: "border border-linha bg-superficie text-texto hover:border-dourado",
+    perigo: "border border-red-200 bg-superficie text-red-700 hover:bg-red-50",
   }[variante];
   return (
     <button
-      className={`inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-dourado/50 disabled:opacity-50 ${estilos} ${className}`}
+      className={`inline-flex min-h-11 items-center justify-center rounded-lg px-4 py-2 text-sm font-medium transition-[background-color,border-color,transform] duration-200 ease-raion active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100 md:min-h-9 ${FOCO} ${estilos} ${className}`}
       {...props}
     />
   );
 }
 
+const CLASSE_ENTRADA =
+  "min-h-11 rounded-lg border border-linha bg-superficie px-3 py-2 text-texto outline-none transition-colors duration-200 ease-raion placeholder:text-zinc-400 focus:border-dourado focus:ring-2 focus:ring-dourado/20 disabled:bg-superficie-2 disabled:text-texto-2 aria-invalid:border-erro md:min-h-10";
+
+/** Campo com rótulo acima; `erro` aparece logo abaixo, é anunciado e liga o campo a ele (aria-describedby). */
 export function Campo({
   rotulo,
+  erro,
+  "aria-describedby": descritoPor,
   ...props
-}: InputHTMLAttributes<HTMLInputElement> & { rotulo: string }) {
+}: InputHTMLAttributes<HTMLInputElement> & { rotulo: string; erro?: string | null }) {
+  const idErro = erro ? `${props.id ?? props.name ?? "campo"}-erro` : undefined;
   return (
     <label className="flex flex-col gap-1 text-sm">
-      <span className="font-medium text-zinc-700">{rotulo}</span>
+      <span className="font-medium text-texto-2">{rotulo}</span>
       <input
-        className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-carvao outline-none placeholder:text-zinc-400 focus:border-dourado focus:ring-2 focus:ring-dourado/20 disabled:bg-zinc-100 disabled:text-zinc-500"
+        className={CLASSE_ENTRADA}
+        aria-invalid={erro ? true : undefined}
+        aria-describedby={[descritoPor, idErro].filter(Boolean).join(" ") || undefined}
         {...props}
       />
+      {erro && (
+        <span id={idErro} role="alert" className="text-xs text-erro">
+          {erro}
+        </span>
+      )}
     </label>
   );
 }
@@ -39,17 +60,14 @@ export function Selecao({
   ...props
 }: SelectHTMLAttributes<HTMLSelectElement> & { rotulo?: string; children: ReactNode }) {
   const select = (
-    <select
-      className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-carvao outline-none focus:border-dourado focus:ring-2 focus:ring-dourado/20"
-      {...props}
-    >
+    <select className={`${CLASSE_ENTRADA} text-sm`} {...props}>
       {children}
     </select>
   );
   if (!rotulo) return select;
   return (
     <label className="flex flex-col gap-1 text-sm">
-      <span className="font-medium text-zinc-700">{rotulo}</span>
+      <span className="font-medium text-texto-2">{rotulo}</span>
       {select}
     </label>
   );
@@ -79,10 +97,10 @@ export function Cartao({
   className?: string;
 }) {
   return (
-    <section className={`rounded-xl border border-zinc-200/80 bg-white p-5 shadow-[0_1px_2px_rgba(15,15,16,0.04)] ${className}`}>
+    <section className={`painel p-5 md:p-6 ${className}`}>
       {(titulo || acao) && (
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          {titulo && <h2 className="text-base font-semibold text-zinc-900">{titulo}</h2>}
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          {titulo && <h2 className="text-lg font-semibold tracking-tight text-texto">{titulo}</h2>}
           {acao}
         </div>
       )}
@@ -99,4 +117,79 @@ export function Selo({ children, tom = "neutro" }: { children: ReactNode; tom?: 
     atencao: "bg-amber-100 text-amber-800",
   }[tom];
   return <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${estilos}`}>{children}</span>;
+}
+
+/**
+ * Escolha única entre poucas opções (≤ 5), em botões em vez de lista: cada um anuncia se está marcado
+ * (aria-pressed). Com `name`, o valor escolhido também vai no envio do formulário.
+ */
+export function GrupoOpcoes<T extends string>({
+  rotulo,
+  opcoes,
+  valor,
+  aoEscolher,
+  name,
+  idErro,
+}: {
+  rotulo: string;
+  opcoes: readonly { valor: T; rotulo: string }[];
+  valor: T | null;
+  aoEscolher: (valor: T) => void;
+  name?: string;
+  /** Id da mensagem de erro do grupo (aria-describedby), quando houver. */
+  idErro?: string;
+}) {
+  return (
+    <div role="group" aria-label={rotulo} aria-describedby={idErro} className="flex flex-wrap gap-2">
+      {opcoes.map((o) => (
+        <button
+          key={o.valor}
+          type="button"
+          aria-pressed={valor === o.valor}
+          onClick={() => aoEscolher(o.valor)}
+          className={`min-h-11 rounded-full border border-linha px-4 text-sm text-texto transition-[background-color,border-color,transform] duration-200 ease-raion hover:border-texto-2 active:scale-[0.97] aria-pressed:border-dourado aria-pressed:bg-dourado/15 aria-pressed:font-semibold ${FOCO}`}
+        >
+          {o.rotulo}
+        </button>
+      ))}
+      {name && <input type="hidden" name={name} value={valor ?? ""} />}
+    </div>
+  );
+}
+
+/** Quantidade com − e + (alvos de 44 px); o número é anunciado quando muda. */
+export function Passador({
+  valor,
+  aoMudar,
+  minimo = 1,
+  maximo,
+  rotulo,
+}: {
+  valor: number;
+  aoMudar: (valor: number) => void;
+  minimo?: number;
+  maximo?: number;
+  /** O que está sendo contado, para os rótulos dos botões ("módulos"). */
+  rotulo: string;
+}) {
+  const botao = `grid h-11 w-11 place-items-center rounded-full border border-linha text-lg text-texto transition-colors duration-200 ease-raion hover:bg-superficie-2 disabled:opacity-40 ${FOCO}`;
+  return (
+    <div className="inline-flex items-center gap-1">
+      <button type="button" className={botao} aria-label={`Menos ${rotulo}`} disabled={valor <= minimo} onClick={() => aoMudar(Math.max(minimo, valor - 1))}>
+        −
+      </button>
+      <output aria-live="polite" className="min-w-8 text-center font-semibold tabular-nums">
+        {valor}
+      </output>
+      <button
+        type="button"
+        className={botao}
+        aria-label={`Mais ${rotulo}`}
+        disabled={maximo != null && valor >= maximo}
+        onClick={() => aoMudar(maximo != null ? Math.min(maximo, valor + 1) : valor + 1)}
+      >
+        +
+      </button>
+    </div>
+  );
 }

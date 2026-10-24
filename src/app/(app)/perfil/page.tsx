@@ -38,7 +38,7 @@ export default async function Perfil({ searchParams }: PageProps<"/perfil">) {
 
   return (
     <div className="mx-auto flex max-w-xl flex-col gap-4">
-      <h1 className="text-2xl font-semibold text-zinc-900">Meu perfil</h1>
+      <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Meu perfil</h1>
       <Cartao titulo="Foto">
         <FotoPerfil userId={sessao.userId} nome={sessao.nome} avatarUrl={urlAvatar} temFoto={Boolean(sessao.avatarCaminho)} />
       </Cartao>

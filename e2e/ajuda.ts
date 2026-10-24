@@ -68,3 +68,23 @@ export function clienteServico() {
 
 /** Texto do indicador "Obra X de N". */
 export const indicador = (page: Page) => page.getByRole("navigation", { name: "Navegação entre obras" }).locator("p[aria-live]");
+
+/**
+ * Passos 1 e 2 do Novo negócio no computador (as três seções ficam na mesma página): cliente novo, Cascavel/PR, a
+ * primeira origem e o consumo. Tipo de cliente, distribuidora e ligação ficam com quem chama (`escolher`).
+ */
+export async function preencherNovoNegocio(page: Page, nome: string, whatsapp: string, consumoKwh: string) {
+  await page.goto("/negocios/novo");
+  await page.getByRole("textbox", { name: "Nome", exact: true }).fill(nome);
+  await page.getByRole("textbox", { name: "WhatsApp" }).fill(whatsapp);
+  await page.getByRole("textbox", { name: "Cidade" }).fill("Cascavel");
+  await page.getByRole("combobox", { name: "UF" }).selectOption("PR");
+  const origem = page.getByRole("combobox", { name: "Origem" });
+  if (await origem.count()) await origem.selectOption({ index: 1 });
+  else await page.getByRole("group", { name: "Origem" }).getByRole("button").first().click();
+  await page.getByRole("textbox", { name: "Consumo médio mensal (kWh)" }).fill(consumoKwh);
+}
+
+/** Escolhe um botão de um grupo de opções do Novo negócio (tipo de cliente, distribuidora, ligação...). */
+export const escolher = (page: Page, grupo: string, opcao: string | RegExp) =>
+  page.getByRole("group", { name: grupo, exact: true }).getByRole("button", { name: opcao }).click();

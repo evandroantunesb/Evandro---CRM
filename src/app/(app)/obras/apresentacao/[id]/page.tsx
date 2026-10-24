@@ -76,7 +76,7 @@ function Slide({ obra, hoje }: { obra: ApresentacaoObraVM; hoje: string }) {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-xs tracking-[0.15em] text-zinc-500 uppercase">Obra #{obra.numero}</p>
-            <h1 className="text-2xl font-semibold break-words text-zinc-900 md:text-3xl">{obra.clienteNome}</h1>
+            <h1 className="text-3xl font-light tracking-tight break-words text-texto md:text-4xl">{obra.clienteNome}</h1>
           </div>
           <span className="rounded-full border border-zinc-300 px-3 py-1 text-sm font-medium text-zinc-800">{ROTULO_SITUACAO_OBRA[obra.situacao]}</span>
         </div>

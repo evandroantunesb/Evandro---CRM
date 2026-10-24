@@ -40,7 +40,7 @@ export default async function Empresa({ params }: PageProps<"/super-admin/empres
         ← Empresas
       </Link>
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-semibold text-zinc-900">{empresa.nome}</h1>
+        <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">{empresa.nome}</h1>
         <SeloSituacao situacao={empresa.situacao} />
         {ehAtual && <Selo>Empresa atual</Selo>}
         {vinculo && (

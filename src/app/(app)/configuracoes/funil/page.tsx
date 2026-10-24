@@ -21,7 +21,7 @@ export default async function ConfigFunil() {
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
-      <h1 className="text-2xl font-semibold text-zinc-900">Funis e etapas</h1>
+      <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Funis e etapas</h1>
       <p className="text-sm text-zinc-600">
         A etapa inicial é onde os negócios novos entram. Ganho e perdido ficam como status do negócio, separado da
         etapa — mas se quiser, pode marcar uma etapa pra fechar o negócio sozinha ao entrar nela (ganho direto, ou

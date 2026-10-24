@@ -95,7 +95,7 @@ export default async function PropostasContratos({ searchParams }: PageProps<"/p
     <div className="mx-auto flex max-w-[1400px] flex-col gap-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-zinc-900 md:text-[28px]">Propostas e contratos</h1>
+          <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Propostas e contratos</h1>
           <p className="text-sm text-zinc-500">
             {visao === "propostas"
               ? "Propostas enviadas e se o cliente já viu."
@@ -223,7 +223,7 @@ export default async function PropostasContratos({ searchParams }: PageProps<"/p
       </p>
 
       {visiveis.length === 0 ? (
-        <p className="rounded-lg border border-zinc-200 bg-white p-6 text-center text-sm text-zinc-500">{vazio}</p>
+        <p className="painel p-6 text-center text-sm text-zinc-500">{vazio}</p>
       ) : visao === "propostas" ? (
         <Propostas linhas={visiveis} veEquipe={veEquipe} nomeResponsavel={nomeResponsavel} />
       ) : (
@@ -257,7 +257,7 @@ function Lista({ cabecalho, linhas, celulas, card }: {
 }) {
   return (
     <>
-      <div className="hidden overflow-x-auto rounded-lg border border-zinc-200 bg-white md:block">
+      <div className="hidden overflow-x-auto painel md:block">
         <table className="w-full text-left text-sm">
           <thead className="bg-zinc-50 text-zinc-600">
             <tr>
@@ -285,7 +285,7 @@ function Lista({ cabecalho, linhas, celulas, card }: {
       </div>
       <ul className="flex flex-col gap-2 md:hidden">
         {linhas.map((l) => (
-          <li key={l.negocioId} className="rounded-lg border border-zinc-200 bg-white p-3 text-sm">
+          <li key={l.negocioId} className="painel p-3 text-sm">
             {card(l)}
           </li>
         ))}

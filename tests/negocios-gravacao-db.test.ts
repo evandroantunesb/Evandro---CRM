@@ -986,3 +986,48 @@ describe("preço do cálculo x valor do negócio", () => {
     expect((await servico.from("calculos_solares").select("id").eq("negocio_id", r.negocioId)).data).toHaveLength(0);
   });
 });
+
+// Novo negócio "Horizonte": tipo de cliente, distribuidora e base da tarifa já no cadastro. Com a referência oficial
+// casando, a criação grava o cálculo COMPLETO (o mesmo que a prévia da tela mostra); senão, incompleto com o motivo.
+describe("cadastro com qualificação", () => {
+  const comQualificacao = (extra: Record<string, string | undefined> = {}) =>
+    novoNegocio({
+      consumo_medio_kwh: "500",
+      tarifa_kwh: "0,76802",
+      tarifa_base_tributaria: "sem_tributos",
+      qualif_tipo_cliente: "residencial",
+      qualif_distribuidora: "COPEL-DIS",
+      tipo_ligacao: "bifasico",
+      componentes: KIT,
+      ...extra,
+    });
+
+  it("residencial Copel com a tarifa oficial: grava a qualificação e o cálculo completo", async () => {
+    const r = await criar(vendedor, comQualificacao());
+    const { data: negocio } = await servico.from("negocios").select("qualif_tipo_cliente, qualif_distribuidora").eq("id", r.negocioId).single();
+    expect(negocio).toEqual({ qualif_tipo_cliente: "residencial", qualif_distribuidora: "COPEL-DIS" });
+    const linha = await linhaGravada(r.negocioId);
+    expect(linha).toMatchObject({ estado_financeiro: "completo", consumo_medio_kwh: 500, tarifa_kwh: 0.76802 });
+    expect(linha!.economia_mensal).toBeGreaterThan(0);
+    expect(r.estimativa).toBeUndefined();
+  });
+
+  it("comercial: negócio e kit salvos, cálculo incompleto com o enquadramento como pendência", async () => {
+    const r = await criar(vendedor, comQualificacao({ qualif_tipo_cliente: "comercial" }));
+    expect(await linhaGravada(r.negocioId)).toMatchObject(SEM_FINANCEIRO);
+    expect(r.estimativa?.pendencias.map((p) => p.codigo)).toContain("enquadramento_nao_suportado");
+  });
+
+  it("sem base tributária declarada a tarifa digitada não vira cálculo completo", async () => {
+    const r = await criar(vendedor, comQualificacao({ tarifa_base_tributaria: "" }));
+    expect(await linhaGravada(r.negocioId)).toMatchObject({ estado_financeiro: "incompleto" });
+  });
+
+  it("título vazio é gerado pelo tipo de cliente e o nome do cliente; tipo fora da lista é recusado", async () => {
+    const r = await criar(vendedor, comQualificacao({ titulo: "", contato_nome: "Maria Fictícia" }));
+    const { data } = await servico.from("negocios").select("titulo").eq("id", r.negocioId).single();
+    expect(data!.titulo).toBe("Residencial — Maria Fictícia");
+    const recusa = await criarNegocioComCliente(cliente(vendedor), atual[vendedor.id], comQualificacao({ qualif_tipo_cliente: "empresa" }));
+    expect(recusa.ok).toBe(false);
+  });
+});

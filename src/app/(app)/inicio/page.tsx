@@ -511,48 +511,54 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
 
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-sm text-zinc-500 capitalize">
-            {agora.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "America/Sao_Paulo" })}
-          </p>
-          <h1 className="text-2xl font-semibold text-zinc-900 sm:text-3xl">
-            {saudacao(agora)}, {primeiroNome}.
-          </h1>
-          <p className="text-sm text-zinc-500">{subtitulo}</p>
+      {/* Abertura com a paisagem da marca: sempre escura (foto), igual nos dois temas. */}
+      <section className="relative isolate overflow-hidden rounded-3xl bg-carvao text-offwhite">
+        <div aria-hidden className="absolute inset-0 -z-10 bg-[url(/marca/paisagem.jpg)] bg-cover bg-[center_62%]" />
+        <div aria-hidden className="absolute inset-0 -z-10 bg-gradient-to-r from-carvao/90 via-carvao/65 to-carvao/15" />
+        <div className="flex flex-wrap items-end justify-between gap-6 px-6 py-8 md:px-10 md:py-12">
+          <div className="max-w-xl">
+            <p className="text-[11px] font-semibold tracking-[0.14em] text-offwhite/70 uppercase">
+              {agora.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long", timeZone: "America/Sao_Paulo" })}
+            </p>
+            <h1 className="mt-2 text-4xl font-light tracking-tight text-offwhite md:text-5xl">
+              {saudacao(agora)}, {primeiroNome}.
+            </h1>
+            <p className="mt-2 text-sm text-offwhite/75">{subtitulo}</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            {podeVerEquipe && (
+              <div className="inline-flex rounded-full border border-white/15 bg-white/10 p-1 backdrop-blur-md">
+                <Link
+                  href="/inicio?visao=pessoal"
+                  className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors duration-200 ease-raion ${
+                    pessoal ? "bg-dourado text-carvao" : "text-offwhite/80 hover:text-offwhite"
+                  }`}
+                >
+                  Pessoal
+                </Link>
+                <Link
+                  href="/inicio?visao=equipe"
+                  className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors duration-200 ease-raion ${
+                    !pessoal ? "bg-dourado text-carvao" : "text-offwhite/80 hover:text-offwhite"
+                  }`}
+                >
+                  Equipe
+                </Link>
+              </div>
+            )}
+            <Link
+              href="/negocios/novo"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-dourado px-5 text-sm font-semibold text-carvao transition-[box-shadow,transform] duration-200 ease-raion hover:shadow-[0_10px_30px_rgb(212_175_55/0.35)] active:scale-[0.98]"
+            >
+              <Plus size={16} />
+              Novo negócio
+            </Link>
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          {podeVerEquipe && (
-            <div className="inline-flex rounded-lg border border-zinc-200 bg-white p-0.5">
-              <Link
-                href="/inicio?visao=pessoal"
-                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                  pessoal ? "bg-carvao text-offwhite" : "text-zinc-600 hover:text-zinc-900"
-                }`}
-              >
-                Pessoal
-              </Link>
-              <Link
-                href="/inicio?visao=equipe"
-                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                  !pessoal ? "bg-carvao text-offwhite" : "text-zinc-600 hover:text-zinc-900"
-                }`}
-              >
-                Equipe
-              </Link>
-            </div>
-          )}
-          <Link
-            href="/negocios/novo"
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-dourado px-4 py-2 text-sm font-medium text-carvao transition-colors hover:bg-amber-400"
-          >
-            <Plus size={16} />
-            Novo negócio
-          </Link>
-        </div>
-      </div>
+      </section>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      {/* Indicadores numa superfície só, separados por fios (sem um cartão por número). */}
+      <div className="painel grid grid-cols-2 lg:grid-cols-4 [&>*]:border-linha max-lg:[&>*:nth-child(-n+2)]:border-b max-lg:[&>*:nth-child(odd)]:border-r lg:[&>*:not(:last-child)]:border-r">
         <Kpi
           Icone={Users}
           valor={String(leadsHoje ?? 0)}
@@ -693,8 +699,8 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
 
           <Cartao
             titulo="Minha jornada no Raion"
-            className="border-green-100 bg-[#F1FFF6]"
-            acao={<Link href="/gamificacao/jornada" className="text-sm text-[#137B43] hover:underline">Ver minha jornada →</Link>}
+            className="bg-green-50"
+            acao={<Link href="/gamificacao/jornada" className="text-sm text-energia hover:underline">Ver minha jornada →</Link>}
           >
             <div className="flex items-center gap-3">
               <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#137B43] text-white">
@@ -722,8 +728,8 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
       ) : (
         <Cartao
           titulo="Ranking da equipe"
-          className="border-green-100 bg-[#F1FFF6]"
-          acao={<Link href="/gamificacao/ranking" className="text-sm text-[#137B43] hover:underline">Ver ranking completo →</Link>}
+          className="bg-green-50"
+          acao={<Link href="/gamificacao/ranking" className="text-sm text-energia hover:underline">Ver ranking completo →</Link>}
         >
           {!rankingOrdenado.length ? (
             <p className="text-sm text-zinc-600">Ainda não há pontuação registrada este mês.</p>
@@ -781,28 +787,26 @@ function Kpi({
   barra?: number | null;
 }) {
   return (
-    <div className="flex min-h-[128px] flex-col gap-2 rounded-xl border border-zinc-200 bg-white p-4">
-      <div className="flex items-center justify-between">
-        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-dourado/10 text-dourado">
-          <Icone size={17} />
-        </span>
+    <div className="flex min-h-[132px] min-w-0 flex-col gap-2 p-4 md:p-6">
+      <div className="flex items-center justify-between gap-2">
+        <p className="flex min-w-0 items-center gap-2 text-xs font-medium text-texto-2">
+          <Icone size={15} className="shrink-0 text-dourado-texto" aria-hidden />
+          <span className="truncate">{legenda}</span>
+        </p>
         {variacaoPct != null && (
-          <span className={`text-xs font-medium ${variacaoPct >= 0 ? "text-green-700" : "text-red-700"}`}>
+          <span className={`shrink-0 text-xs font-medium ${variacaoPct >= 0 ? "text-energia" : "text-erro"}`}>
             {variacaoPct >= 0 ? "▲" : "▼"} {Math.abs(variacaoPct).toFixed(0)}%
           </span>
         )}
       </div>
-      <div>
-        <p className="text-xs font-medium text-zinc-500">{legenda}</p>
-        <p className="truncate text-2xl font-semibold text-zinc-900 [font-variant-numeric:tabular-nums]">{valor}</p>
-      </div>
+      <p className="truncate font-titulo text-3xl font-light tracking-tight text-texto tabular-nums md:text-4xl">{valor}</p>
       <div className="mt-auto flex flex-col gap-1.5">
         {barra != null && (
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
-            <div className="h-full rounded-full bg-dourado" style={{ width: `${barra}%` }} />
+          <div className="h-1 w-full overflow-hidden rounded-full bg-superficie-2">
+            <div className="h-full rounded-full bg-dourado transition-[width] duration-700 ease-raion" style={{ width: `${barra}%` }} />
           </div>
         )}
-        <p className="truncate text-xs text-zinc-500">{rodape}</p>
+        <p className="truncate text-xs text-texto-2">{rodape}</p>
       </div>
     </div>
   );

@@ -48,7 +48,7 @@ export default async function ConfigCaptura() {
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4">
-      <h1 className="text-2xl font-semibold text-zinc-900">Captura de leads</h1>
+      <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Captura de leads</h1>
       <p className="text-sm text-zinc-600">
         Crie um link (e QR Code) para divulgar. Quem preencher o formulário vira um lead novo, já distribuído
         automaticamente entre os vendedores marcados para receber leads.

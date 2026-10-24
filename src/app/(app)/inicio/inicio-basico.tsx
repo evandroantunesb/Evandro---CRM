@@ -9,7 +9,7 @@ import { ROTULO_PAPEL, type Papel } from "@/lib/tipos";
 export function InicioBasico({ nome, saudacao, empresaNome, papel }: { nome: string; saudacao: string; empresaNome: string; papel: Papel }) {
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
-      <h1 className="text-2xl font-semibold text-zinc-900 sm:text-3xl">
+      <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">
         {saudacao}, {nome}.
       </h1>
       <Cartao>

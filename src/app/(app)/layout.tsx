@@ -1,4 +1,5 @@
 import { LogOut } from "lucide-react";
+import { cookies } from "next/headers";
 import Link from "next/link";
 import { Avatar } from "@/components/avatar";
 import { assinarAvatares } from "@/lib/avatares";
@@ -10,8 +11,10 @@ import { CARTEIRA_CONTATOS, GAMIFICACAO, GESTAO_COMERCIAL, NEGOCIOS, OBRAS, PART
 import { obterSessao } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { trocarEmpresa } from "@/lib/acoes/empresa-atual";
+import { COOKIE_TEMA, lerTema } from "@/lib/tema";
 import { ROTULO_PAPEL, type Papel } from "@/lib/tipos";
 import { Menu } from "./menu";
+import { SeletorTema } from "./seletor-tema";
 import { Sininho } from "./sininho";
 
 const GRUPO_GAMIFICACAO = "Gamificação";
@@ -63,6 +66,7 @@ function itensGamificacao(papel: Papel | undefined, conquistaNova: boolean) {
 export default async function LayoutApp({ children }: { children: React.ReactNode }) {
   const sessao = await obterSessao();
   const papel = sessao.atual?.papel;
+  const tema = lerTema((await cookies()).get(COOKIE_TEMA)?.value);
 
   let pendencias: ContagemPendencias = { leadsADistribuir: 0, demais: 0 };
   let notificacoes: Awaited<ReturnType<typeof carregarNotificacoesNaoLidas>> = [];
@@ -125,8 +129,8 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
   ];
 
   return (
-    <div className="flex min-h-screen flex-col md:flex-row">
-      <aside className="flex flex-col gap-5 bg-carvao p-4 text-offwhite md:sticky md:top-0 md:h-screen md:w-64 md:overflow-y-auto md:p-5">
+    <div data-tema={tema} className="tema-app flex min-h-screen flex-col md:flex-row">
+      <aside className="barra-lateral flex flex-col gap-5 bg-carvao p-4 text-offwhite md:sticky md:top-0 md:h-screen md:w-64 md:overflow-y-auto md:border-r md:border-white/5 md:p-5">
         <div className="flex items-center justify-between gap-3 md:block">
           <Link href="/inicio" aria-label="Início">
             <LogoRaion tom="claro" altura={28} />
@@ -160,7 +164,10 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
           />
         )}
         <Menu itens={itens} />
-        <div className="hidden items-center gap-3 border-t border-white/10 pt-4 md:mt-auto md:flex">
+        <div className="hidden md:mt-auto md:block">
+          <SeletorTema tema={tema} />
+        </div>
+        <div className="hidden items-center gap-3 border-t border-white/10 pt-4 md:flex">
           <Avatar nome={sessao.nome} tamanho={36} src={urlAvatar} />
           <Link href="/perfil" className="min-w-0 flex-1" title="Meu perfil">
             <span className="block truncate text-sm font-medium text-offwhite hover:underline">{sessao.nome}</span>
@@ -177,9 +184,12 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
             {urlAvatar && <Avatar nome={sessao.nome} tamanho={24} src={urlAvatar} />}
             <span className="truncate">{sessao.nome}</span>
           </Link>
-          <form action="/sair" method="post">
-            <button className="text-offwhite/70">Sair</button>
-          </form>
+          <div className="flex items-center gap-3">
+            <SeletorTema tema={tema} />
+            <form action="/sair" method="post">
+              <button className="text-offwhite/70">Sair</button>
+            </form>
+          </div>
         </div>
       </aside>
       <main className="min-w-0 flex-1 p-4 md:p-10">{children}</main>

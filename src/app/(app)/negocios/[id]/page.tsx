@@ -363,7 +363,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
         ← Negócios
       </Link>
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-semibold text-zinc-900">{contato.nome}</h1>
+        <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">{contato.nome}</h1>
         <Selo>#{negocio.numero}</Selo>
         <Selo tom="atencao">{nomes.etapa(negocio.etapa_id)}</Selo>
         {negocio.status !== "aberto" && (

@@ -9,7 +9,7 @@ export default async function ConfigListas() {
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
-      <h1 className="text-2xl font-semibold text-zinc-900">Etiquetas e motivos de perda</h1>
+      <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Etiquetas e motivos de perda</h1>
       <Cartao titulo={`Etiquetas (${etiquetas.length})`}>
         <p className="mb-3 text-sm text-zinc-600">
           Marcações livres nos negócios, para filtrar o Kanban. Ex.: cliente quente, empresa, rural, financiamento.
