@@ -24,7 +24,7 @@ export default async function ConfigMetas() {
 
   return (
     <PaginaGf largura="formulario">
-      <VoltarGf href="/gamificacao/administracao">Administração</VoltarGf>
+      <VoltarGf href="/configuracoes#gamificacao">Configurações</VoltarGf>
       <CabecalhoPaginaGf
         titulo="Metas"
         descricao="Cada meta é individual: escolha o colaborador, a métrica e o período. O progresso é calculado sozinho a partir dos negócios e tarefas já registrados no CRM."

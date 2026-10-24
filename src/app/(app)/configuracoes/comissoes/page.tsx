@@ -48,7 +48,7 @@ export default async function ConfigComissoes() {
 
   return (
     <PaginaGf largura="formulario">
-      <VoltarGf href="/gamificacao/administracao">Administração</VoltarGf>
+      <VoltarGf href="/configuracoes#gamificacao">Configurações</VoltarGf>
       <CabecalhoPaginaGf
         titulo="Comissões"
         descricao="Cada colaborador tem um plano com salário-base opcional e faixas de resultado (receita de negócios ganhos no mês). É um conceito separado de pontos e de metas — não afeta o extrato nem o ranking da gamificação. Alterar o plano cria uma nova versão com vigência a partir do mês escolhido; versões passadas são preservadas."

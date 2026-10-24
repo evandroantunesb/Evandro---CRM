@@ -21,7 +21,7 @@ export default async function Recompensas() {
 
   return (
     <PaginaGf largura="formulario">
-      <VoltarGf href="/gamificacao/administracao">Administração</VoltarGf>
+      <VoltarGf href="/configuracoes#gamificacao">Configurações</VoltarGf>
       <CabecalhoPaginaGf
         titulo="Recompensas"
         descricao="A loja de recompensas deixa o colaborador trocar moedas por prêmios. O saldo é debitado assim que ele resgata; cancelar um resgate devolve as moedas."

@@ -1,4 +1,4 @@
-import { Cartao } from "@/components/ui";
+import { Cartao, Voltar } from "@/components/ui";
 import { PLACEHOLDERS_CONTRATO } from "@/lib/contrato";
 import { EDITAR_MODELO_CONTRATO } from "@/lib/permissoes";
 import { exigirPapel } from "@/lib/sessao";
@@ -16,6 +16,7 @@ export default async function ConfigContrato() {
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
+      <Voltar href="/configuracoes">Configurações</Voltar>
       <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Modelo de contrato</h1>
       <p className="text-sm text-zinc-600">
         Escreva o texto do contrato que a empresa usa. Ao gerar o contrato de um negócio, os campos entre chaves duplas

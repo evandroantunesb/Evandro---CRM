@@ -17,7 +17,7 @@ export default async function RegrasDePontos() {
 
   return (
     <PaginaGf largura="formulario">
-      <VoltarGf href="/gamificacao/administracao">Administração</VoltarGf>
+      <VoltarGf href="/configuracoes#gamificacao">Configurações</VoltarGf>
       <CabecalhoPaginaGf
         titulo="Regras de pontos"
         descricao="Cada regra associa um evento do CRM a XP (progressão: ranking, nível, conquistas) e/ou moedas (saldo gastável na loja). Sempre que o evento acontecer (e a condição, se houver, for satisfeita), o lançamento entra automaticamente no extrato do responsável."
