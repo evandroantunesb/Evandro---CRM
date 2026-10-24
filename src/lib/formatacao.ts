@@ -75,6 +75,14 @@ export function formatarDataIso(data: string) {
   return `${dia}/${mes}/${ano}`;
 }
 
+const MESES_CURTOS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+
+/** Mês do banco ("2026-11-01") para "nov/2026", sem passar por fuso horário. */
+export function formatarMesAno(data: string) {
+  const [ano, mes] = data.split("-");
+  return `${MESES_CURTOS[Number(mes) - 1]}/${ano}`;
+}
+
 /** Data e hora curtas para prazos: "hoje 14:00", "amanhã 09:30", "12/10 16:00". */
 export function formatarPrazo(iso: string, agora = Date.now()) {
   const fuso = "America/Sao_Paulo";

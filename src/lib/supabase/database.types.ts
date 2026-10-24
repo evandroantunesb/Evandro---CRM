@@ -2158,6 +2158,7 @@ export type Database = {
           etapa_desde: string;
           etapa_id: string;
           fechado_em: string | null;
+          fechamento_previsto: string | null;
           funil_id: string;
           handoff_origem_id: string | null;
           id: string;
@@ -2203,6 +2204,7 @@ export type Database = {
           etapa_desde?: string;
           etapa_id: string;
           fechado_em?: string | null;
+          fechamento_previsto?: string | null;
           funil_id: string;
           handoff_origem_id?: string | null;
           id?: string;
@@ -2248,6 +2250,7 @@ export type Database = {
           etapa_desde?: string;
           etapa_id?: string;
           fechado_em?: string | null;
+          fechamento_previsto?: string | null;
           funil_id?: string;
           handoff_origem_id?: string | null;
           id?: string;
@@ -3727,6 +3730,60 @@ export type Database = {
           },
         ];
       };
+      regras_temperatura: {
+        Row: {
+          ativa: boolean;
+          atualizado_por: string | null;
+          created_at: string;
+          empresa_id: string;
+          id: string;
+          ordem: number;
+          parametros: NonNullable<Json>;
+          sinal: string;
+          temperatura: string;
+          updated_at: string;
+        };
+        Insert: {
+          ativa?: boolean;
+          atualizado_por?: string | null;
+          created_at?: string;
+          empresa_id: string;
+          id?: string;
+          ordem: number;
+          parametros?: NonNullable<Json>;
+          sinal: string;
+          temperatura: string;
+          updated_at?: string;
+        };
+        Update: {
+          ativa?: boolean;
+          atualizado_por?: string | null;
+          created_at?: string;
+          empresa_id?: string;
+          id?: string;
+          ordem?: number;
+          parametros?: NonNullable<Json>;
+          sinal?: string;
+          temperatura?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "regras_temperatura_atualizado_por_fkey";
+            columns: ["atualizado_por"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "regras_temperatura_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       resgates: {
         Row: {
           created_at: string;
@@ -4359,6 +4416,7 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      inserir_regras_temperatura_padrao: { Args: { p_empresa_id: string }; Returns: undefined };
       marcar_parado_fluxo_obra: {
         Args: {
           p_motivo?: string;
@@ -4510,6 +4568,10 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      salvar_regras_temperatura: {
+        Args: { p_empresa_id: string; p_regras: Json };
+        Returns: undefined;
+      };
       sequencia_produtiva_membro: {
         Args: { p_empresa_id: string };
         Returns: {
@@ -4547,6 +4609,15 @@ export type Database = {
         Args: { p_empresa_id: string; p_papeis: Database["public"]["Enums"]["papel_membro"][] };
         Returns: boolean;
       };
+      temperatura_negocios: {
+        Args: { p_negocio_ids: string[] };
+        Returns: {
+          dias: number;
+          negocio_id: string;
+          sinal: string;
+          temperatura: string;
+        }[];
+      };
       travar_negocio_retificacao: {
         Args: { p_negocio_id: string };
         Returns: {
@@ -4563,6 +4634,7 @@ export type Database = {
           etapa_desde: string;
           etapa_id: string;
           fechado_em: string | null;
+          fechamento_previsto: string | null;
           funil_id: string;
           handoff_origem_id: string | null;
           id: string;
@@ -4617,6 +4689,7 @@ export type Database = {
           etapa_desde: string;
           etapa_id: string;
           fechado_em: string | null;
+          fechamento_previsto: string | null;
           funil_id: string;
           handoff_origem_id: string | null;
           id: string;

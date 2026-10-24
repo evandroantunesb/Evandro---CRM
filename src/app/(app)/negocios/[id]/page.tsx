@@ -10,7 +10,7 @@ import { apagarAnexo } from "@/lib/acoes/anexos";
 import { alternarEtiqueta } from "@/lib/acoes/negocios";
 import { carregarConfiguracao, formatarDataHora, formatarMoeda } from "@/lib/crm";
 import { env } from "@/lib/env";
-import { hojeEmSaoPaulo } from "@/lib/formatacao";
+import { formatarMesAno, hojeEmSaoPaulo } from "@/lib/formatacao";
 import { precoDoCalculoDesatualizado } from "@/lib/calculo-preco";
 import {
   calculoEhIncompleto,
@@ -60,6 +60,8 @@ import { PagamentoSolo, type SituacaoRegistro } from "./pagamento-solo";
 import { EmitirProposta } from "./emitir-proposta";
 import { Proposta } from "./proposta";
 import { Qualificacao } from "./qualificacao";
+import { SeloTemperatura } from "@/components/selo-temperatura";
+import { carregarTemperaturas } from "@/lib/temperatura";
 
 /** Última linha do histórico do cálculo (cópia jsonb da linha substituída) no formato da ficha. */
 function historicoDaTela(h: { arquivado_em: string; motivo: string; linha: unknown } | null): CalculoHistorico | null {
@@ -93,7 +95,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
     supabase
       .from("negocios")
       .select(
-        "id, empresa_id, numero, titulo, valor, descricao, status, arquivado_em, arquivado_por, motivo_arquivamento, funil_id, etapa_id, origem_id, responsavel_id, motivo_perda_id, motivo_perda_detalhe, fechado_em, created_at, updated_at, tipo_telhado, unidade_consumidora, padrao_cliente, estrutura_telhado, consumo_medio_kwh, consumo_estimado_kwh, tarifa_efetiva_kwh, valor_conta_energia, qualif_tipo_cliente, qualif_possui_conta_energia, qualif_distribuidora, qualif_imovel_proprio, qualif_objetivo, qualif_prazo_instalacao, qualif_busca_financiamento, qualif_orcamento_outra_empresa, qualif_e_decisor, qualif_outro_decisor, qualif_participantes_decisao, qualif_observacoes, contatos(id, nome, tipo, telefone, email, endereco, cidade, uf)",
+        "id, empresa_id, numero, titulo, valor, descricao, status, arquivado_em, arquivado_por, motivo_arquivamento, funil_id, etapa_id, origem_id, responsavel_id, motivo_perda_id, motivo_perda_detalhe, fechado_em, created_at, updated_at, tipo_telhado, unidade_consumidora, padrao_cliente, estrutura_telhado, consumo_medio_kwh, consumo_estimado_kwh, tarifa_efetiva_kwh, valor_conta_energia, fechamento_previsto, qualif_tipo_cliente, qualif_possui_conta_energia, qualif_distribuidora, qualif_imovel_proprio, qualif_objetivo, qualif_prazo_instalacao, qualif_busca_financiamento, qualif_orcamento_outra_empresa, qualif_e_decisor, qualif_outro_decisor, qualif_participantes_decisao, qualif_observacoes, contatos(id, nome, tipo, telefone, email, endereco, cidade, uf)",
       )
       .eq("id", id)
       .maybeSingle(),
@@ -101,6 +103,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
     supabase.from("parametros_calculadora").select("*").eq("empresa_id", atual.empresaId).maybeSingle(),
   ]);
   if (!negocio) notFound();
+  const temperatura = (await carregarTemperaturas(supabase, [negocio.id])).get(negocio.id) ?? null;
 
   const [{ data: atividades }, { data: notas }, { data: tarefas }, { data: anexos }, { data: marcadas }, { data: calculo }] =
     await Promise.all([
@@ -452,6 +455,10 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
             </Selo>
           )}
           {arquivado && <Selo>Arquivado</Selo>}
+          {temperatura && <SeloTemperatura valor={temperatura} detalhado />}
+          {negocio.fechamento_previsto && negocio.status === "aberto" && (
+            <Selo>Previsto para {formatarMesAno(negocio.fechamento_previsto)}</Selo>
+          )}
           {config.etiquetas
             .filter((e) => etiquetasMarcadas.has(e.id))
             .map((e) => (
@@ -573,6 +580,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
                   consumoEstimadoKwh: negocio.consumo_estimado_kwh,
                   tarifaEfetivaKwh: negocio.tarifa_efetiva_kwh,
                   valorContaEnergia: negocio.valor_conta_energia,
+                  fechamentoPrevisto: negocio.fechamento_previsto,
                 }}
                 origens={config.origens.filter((o) => o.ativa || o.id === negocio.origem_id)}
                 responsaveis={pode(atual.papel, ESCOLHER_RESPONSAVEL_NEGOCIO) ? config.membros.filter((m) => m.ativo && pode(m.papel, RESPONSAVEL_COMERCIAL)) : []}

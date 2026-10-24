@@ -113,6 +113,7 @@ export const CAMPOS_OBRIGATORIOS = [
   "contato_email",
   "contato_documento",
   "contato_cidade",
+  "fechamento_previsto",
 ] as const;
 export type CampoObrigatorio = (typeof CAMPOS_OBRIGATORIOS)[number];
 
@@ -124,6 +125,7 @@ export const ROTULO_CAMPO_OBRIGATORIO: Record<CampoObrigatorio, string> = {
   contato_email: "E-mail do contato",
   contato_documento: "CPF/CNPJ do contato",
   contato_cidade: "Cidade do contato",
+  fechamento_previsto: "Mês previsto de fechamento",
 };
 
 export const TIPOS_LIGACAO = ["monofasico", "bifasico", "trifasico"] as const;

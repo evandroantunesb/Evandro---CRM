@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Avatar } from "@/components/avatar";
 import { MoverEtapa } from "@/components/mover-etapa";
+import { SeloTemperatura } from "@/components/selo-temperatura";
 import { formatarDataHora } from "@/lib/formatacao";
 import type { Card } from "./kanban";
 
@@ -96,6 +97,7 @@ export function ListaNegocios({
             <Cabecalho campo="nome" atual={campo} ordem={ordem} onClicar={alternar}>
               Negócio / contato
             </Cabecalho>
+            <th className="px-3 py-2 font-medium">Temperatura</th>
             <th className="px-3 py-2 font-medium">Origem</th>
             <Cabecalho campo="etapa" atual={campo} ordem={ordem} onClicar={alternar}>
               Etapa
@@ -126,6 +128,7 @@ export function ListaNegocios({
                     #{c.numero} · {c.titulo}
                   </span>
                 </td>
+                <td className="px-3 py-2">{c.temperatura ? <SeloTemperatura valor={c.temperatura} /> : "—"}</td>
                 <td className="px-3 py-2">
                   {c.origem ? <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-600">{c.origem}</span> : "—"}
                 </td>
