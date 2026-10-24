@@ -1,3 +1,5 @@
+import { ChevronLeft } from "lucide-react";
+import Link from "next/link";
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
 
 /*
@@ -70,6 +72,19 @@ export function Selecao({
       <span className="font-medium text-texto-2">{rotulo}</span>
       {select}
     </label>
+  );
+}
+
+/** Link discreto de retorno, acima do título (ex.: telas de configuração voltam ao hub). */
+export function Voltar({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <Link
+      href={href}
+      className={`-ml-1 inline-flex min-h-11 w-fit items-center gap-0.5 rounded-md pr-2 text-sm font-medium text-texto-2 transition-colors hover:text-texto md:min-h-0 ${FOCO}`}
+    >
+      <ChevronLeft size={16} aria-hidden />
+      {children}
+    </Link>
   );
 }
 

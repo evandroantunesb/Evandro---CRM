@@ -66,6 +66,7 @@
   /* Movimento: entrada desacelerando; feedback rápido, transições grandes lentas e suaves. */
   --ease-raion: cubic-bezier(0.16, 1, 0.3, 1);
   --animate-entrar: entrar 520ms var(--ease-raion) both;
+  --animate-subir: subir 380ms var(--ease-raion) both;
 
   @keyframes entrar {
     from {
@@ -73,6 +74,19 @@
       transform: translateY(12px);
     }
   }
+
+  /* Janelas (src/components/janela.tsx): sobem um pouco ao abrir. */
+  @keyframes subir {
+    from {
+      opacity: 0;
+      transform: translateY(32px);
+    }
+  }
+}
+
+/* Janela modal aberta: a página de fundo não rola junto. */
+html:has(dialog[open]:modal) {
+  overflow: hidden;
 }
 
 body {
@@ -203,7 +217,10 @@ html:has(.tema-app[data-tema="escuro"]) body {
   background-color: var(--tema-carvao-elevado);
 }
 
-/* A barra lateral é sempre escura nos dois temas: os brancos translúcidos dela continuam brancos. */
+/*
+ * Barras de navegação sempre escuras nos dois temas (lateral no computador; cabeçalho e abas no
+ * celular, que também levam a classe): os brancos translúcidos delas continuam brancos.
+ */
 .tema-app .barra-lateral {
   --color-white: #ffffff;
 }

@@ -1,4 +1,4 @@
-import { Cartao } from "@/components/ui";
+import { Cartao, Voltar } from "@/components/ui";
 import { carregarConfiguracao } from "@/lib/crm";
 import { exigirPapel } from "@/lib/sessao";
 import { LinhaItem, NovoItem } from "./formularios";
@@ -9,6 +9,7 @@ export default async function ConfigListas() {
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
+      <Voltar href="/configuracoes">Configurações</Voltar>
       <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Etiquetas e motivos de perda</h1>
       <Cartao titulo={`Etiquetas (${etiquetas.length})`}>
         <p className="mb-3 text-sm text-zinc-600">

@@ -21,7 +21,7 @@ export default async function NiveisEConquistas() {
   return (
     <PaginaGf largura="formulario" className="gap-8">
       <div className="flex flex-col gap-3">
-        <VoltarGf href="/gamificacao/administracao">Administração</VoltarGf>
+        <VoltarGf href="/configuracoes#gamificacao">Configurações</VoltarGf>
         <CabecalhoPaginaGf titulo="Níveis e conquistas" />
       </div>
 

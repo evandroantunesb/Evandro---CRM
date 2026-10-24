@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Voltar } from "@/components/ui";
 import { exigirPapel } from "@/lib/sessao";
 
 export default async function LayoutPropostas({ children }: { children: React.ReactNode }) {
@@ -6,6 +7,7 @@ export default async function LayoutPropostas({ children }: { children: React.Re
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
       <div>
+        <Voltar href="/configuracoes">Configurações</Voltar>
         <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Propostas comerciais</h1>
         <p className="text-sm text-zinc-600">Monte os modelos de proposta que os vendedores usam e a identidade visual usada neles.</p>
       </div>

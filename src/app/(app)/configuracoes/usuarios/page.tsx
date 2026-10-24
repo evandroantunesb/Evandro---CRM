@@ -1,4 +1,4 @@
-import { Cartao } from "@/components/ui";
+import { Cartao, Voltar } from "@/components/ui";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import type { Papel, PerfilGamificacao, StatusMembro, TipoVendedor } from "@/lib/tipos";
@@ -30,6 +30,7 @@ export default async function Usuarios() {
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-4">
+      <Voltar href="/configuracoes">Configurações</Voltar>
       <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Usuários</h1>
       <Cartao titulo="Convidar pessoa">
         <FormularioConvite />

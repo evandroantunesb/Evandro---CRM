@@ -17,7 +17,7 @@ export default async function ConfigResgates() {
 
   return (
     <PaginaGf largura="formulario">
-      <VoltarGf href="/gamificacao/administracao">Administração</VoltarGf>
+      <VoltarGf href="/configuracoes#gamificacao">Configurações</VoltarGf>
       <CabecalhoPaginaGf
         titulo="Resgates"
         descricao="Pedidos de troca de moedas por recompensas. Cancelar um pedido devolve as moedas ao colaborador."
