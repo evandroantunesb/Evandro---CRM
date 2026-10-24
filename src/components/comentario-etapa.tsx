@@ -1,15 +1,15 @@
 "use client";
 
-import { X } from "lucide-react";
 import { useState, useTransition } from "react";
-import { Botao, Selecao } from "@/components/ui";
+import { Janela } from "@/components/janela";
+import { Botao, CLASSE_ENTRADA, Selecao } from "@/components/ui";
 import { moverEtapa } from "@/lib/acoes/negocios";
 
 type Motivo = { id: string; nome: string };
 
 /**
  * Popup obrigatório ao mover um negócio de etapa: pede um comentário curto sobre o que motivou
- * a mudança e salva como nota do negócio. Só fecha pelo botão Cancelar (clicar fora não fecha),
+ * a mudança e salva como nota do negócio. Só fecha pelos botões (clicar fora e Esc não fecham),
  * pra não perder a mudança de etapa por engano antes do vendedor escrever algo.
  *
  * Quando a etapa de destino está configurada pra fechar o negócio como perdido (`etapas.fecha_como`),
@@ -52,47 +52,43 @@ export function ModalComentarioEtapa({
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4">
-      <div className="w-full max-w-sm rounded-lg bg-white p-4 shadow-xl">
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <h3 className="font-titulo text-sm font-semibold text-carvao">Mover para &quot;{etapaNome}&quot;</h3>
-          <button type="button" onClick={aoCancelar} aria-label="Cancelar" className="text-zinc-400 hover:text-zinc-700">
-            <X size={16} />
-          </button>
-        </div>
-        {precisaMotivoPerda && (
-          <div className="mb-2">
-            <Selecao rotulo="Motivo da perda" value={motivoId} onChange={(e) => setMotivoId(e.target.value)} required>
-              <option value="" disabled>
-                Escolha o motivo
-              </option>
-              {motivos.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.nome}
-                </option>
-              ))}
-            </Selecao>
-          </div>
-        )}
+    <Janela aberta aoFechar={aoCancelar} titulo={`Mover para “${etapaNome}”`} fechaSoPelosBotoes>
+      {precisaMotivoPerda && (
+        <Selecao rotulo="Motivo da perda" value={motivoId} onChange={(e) => setMotivoId(e.target.value)} required>
+          <option value="" disabled>
+            Escolha o motivo
+          </option>
+          {motivos.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.nome}
+            </option>
+          ))}
+        </Selecao>
+      )}
+      <label className="flex flex-col gap-1 text-sm">
+        <span className="font-medium text-texto-2">{precisaMotivoPerda ? "Detalhes da perda" : "Comentário sobre a mudança de etapa"}</span>
         <textarea
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
           rows={3}
-          autoFocus
+          data-foco-inicial
           required
-          placeholder={precisaMotivoPerda ? "Detalhes da perda" : "Comentário sobre a mudança de etapa"}
-          className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm"
+          className={`${CLASSE_ENTRADA} resize-none text-sm`}
         />
-        {erro && <p className="mt-1 text-xs text-red-700">{erro}</p>}
-        <div className="mt-3 flex justify-end gap-2">
-          <Botao type="button" variante="secundario" onClick={aoCancelar} disabled={pendente}>
-            Cancelar
-          </Botao>
-          <Botao type="button" onClick={confirmar} disabled={pendente || !podeConfirmar}>
-            {pendente ? "Movendo..." : "Mover"}
-          </Botao>
-        </div>
+      </label>
+      {erro && (
+        <p role="alert" className="text-sm text-erro">
+          {erro}
+        </p>
+      )}
+      <div className="grid grid-cols-2 gap-2 md:flex md:justify-end">
+        <Botao type="button" variante="secundario" onClick={aoCancelar} disabled={pendente}>
+          Cancelar
+        </Botao>
+        <Botao type="button" onClick={confirmar} disabled={pendente || !podeConfirmar}>
+          {pendente ? "Movendo..." : "Mover"}
+        </Botao>
       </div>
-    </div>
+    </Janela>
   );
 }

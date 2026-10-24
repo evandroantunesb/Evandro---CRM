@@ -1,10 +1,11 @@
 "use client";
 
-import { ChevronDown, MoreVertical, X } from "lucide-react";
+import { Check, ChevronDown, MoreVertical } from "lucide-react";
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { alternarEtiqueta } from "@/lib/acoes/negocios";
-import { ItemMenuSuspenso, MenuSuspenso, RotuloMenuSuspenso } from "@/components/menu-suspenso";
+import { Janela } from "@/components/janela";
+import { CLASSE_ITEM_MENU, ItemMenuSuspenso, MenuSuspenso, RotuloMenuSuspenso, SeparadorMenuSuspenso } from "@/components/menu-suspenso";
 import { ModalComentarioEtapa } from "@/components/comentario-etapa";
 
 type EtiquetaDisponivel = { id: string; nome: string; cor: string | null };
@@ -48,16 +49,18 @@ export function MoverEtapa({
             <button
               type="button"
               aria-label="Opções do negócio"
+              aria-haspopup="menu"
               onClick={alternar}
-              className="rounded-md p-1 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 disabled:opacity-50"
+              className="grid h-9 w-9 place-items-center rounded-full text-texto-2 transition-colors hover:bg-superficie-2 hover:text-texto disabled:opacity-50 md:h-7 md:w-7"
             >
               <MoreVertical size={16} />
             </button>
           ) : (
             <button
               type="button"
+              aria-haspopup="menu"
               onClick={alternar}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-carvao transition-colors hover:border-dourado disabled:opacity-50"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-linha bg-superficie px-3 text-sm font-medium text-texto transition-colors hover:border-dourado disabled:opacity-50 md:min-h-9"
             >
               Mover para
               <ChevronDown size={14} />
@@ -67,13 +70,13 @@ export function MoverEtapa({
       >
         {compacto && (
           <>
-            <Link href={`/negocios/${negocioId}`} className="block px-3 py-1.5 text-sm font-medium text-zinc-800 hover:bg-zinc-50">
+            <Link href={`/negocios/${negocioId}`} role="menuitem" className={`${CLASSE_ITEM_MENU} font-medium`}>
               Abrir negócio
             </Link>
             {etiquetas.length > 0 && (
               <ItemMenuSuspenso onClick={() => setEditandoEtiquetas(true)}>Editar etiquetas</ItemMenuSuspenso>
             )}
-            {destinos.length > 0 && <div className="my-1 border-t border-zinc-100" />}
+            {destinos.length > 0 && <SeparadorMenuSuspenso />}
           </>
         )}
         {destinos.length > 0 && (
@@ -110,7 +113,7 @@ export function MoverEtapa({
   );
 }
 
-/** Modal simples pra marcar/desmarcar as etiquetas de um negócio direto do Kanban. */
+/** Janela para marcar/desmarcar as etiquetas de um negócio direto do Kanban. */
 function ModalEtiquetas({
   negocioId,
   etiquetas,
@@ -143,44 +146,27 @@ function ModalEtiquetas({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-30 flex items-center justify-center bg-black/30 p-4"
-      onClick={aoFechar}
-      onPointerDown={(e) => e.stopPropagation()}
-    >
-      <div
-        className="w-full max-w-sm rounded-lg bg-white p-4 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="font-titulo text-sm font-semibold text-carvao">Etiquetas do negócio</h3>
-          <button type="button" onClick={aoFechar} aria-label="Fechar" className="text-zinc-400 hover:text-zinc-700">
-            <X size={16} />
-          </button>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {etiquetas.map((e) => {
-            const marcada = marcadasAtual.has(e.id);
-            return (
-              <button
-                key={e.id}
-                type="button"
-                onClick={() => alternar(e.id)}
-                aria-pressed={marcada}
-                className={`rounded-full border px-2.5 py-1 text-xs font-medium ${marcada ? "text-white" : "bg-white text-zinc-700"}`}
-                style={
-                  marcada
-                    ? { background: e.cor ?? "#71717a", borderColor: e.cor ?? "#71717a" }
-                    : { borderColor: e.cor ?? "#d4d4d8" }
-                }
-              >
-                {marcada ? "✓ " : ""}
-                {e.nome}
-              </button>
-            );
-          })}
-        </div>
+    <Janela aberta aoFechar={aoFechar} titulo="Etiquetas do negócio">
+      <p className="-mt-2 text-sm text-texto-2">Toque para marcar ou desmarcar. Salva na hora.</p>
+      <div className="flex flex-wrap gap-2">
+        {etiquetas.map((e) => {
+          const marcada = marcadasAtual.has(e.id);
+          const cor = e.cor ?? "#8a8a92";
+          return (
+            <button
+              key={e.id}
+              type="button"
+              onClick={() => alternar(e.id)}
+              aria-pressed={marcada}
+              className="inline-flex min-h-11 items-center gap-2 rounded-full border border-linha px-4 text-sm text-texto transition-[background-color,border-color] duration-200 ease-raion md:min-h-9"
+              style={marcada ? { borderColor: cor, background: `color-mix(in srgb, ${cor} 16%, transparent)` } : undefined}
+            >
+              {marcada ? <Check size={14} style={{ color: cor }} aria-hidden /> : <span className="h-2 w-2 rounded-full" style={{ background: cor }} />}
+              {e.nome}
+            </button>
+          );
+        })}
       </div>
-    </div>
+    </Janela>
   );
 }

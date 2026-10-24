@@ -1,7 +1,7 @@
-import { Briefcase, CalendarClock, SlidersHorizontal, Settings2, TrendingUp, Wallet, X } from "lucide-react";
+import { Briefcase, CalendarClock, Plus, Search, Settings2, TrendingUp, Wallet, X } from "lucide-react";
 import { cookies } from "next/headers";
 import Link from "next/link";
-import { Botao, Campo, Selecao } from "@/components/ui";
+import { Botao, CLASSE_ENTRADA, Campo, Selecao } from "@/components/ui";
 import {
   carregarConfiguracao,
   fimDaSemana,
@@ -13,6 +13,7 @@ import {
 import { COOKIE_VISAO_NEGOCIOS, exigirPapel } from "@/lib/sessao";
 import { FILTRAR_NEGOCIOS_POR_RESPONSAVEL, NEGOCIOS, pode } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
+import { BotaoFiltros } from "./filtros";
 import { Indicadores, type Indicador } from "./indicadores";
 import { Kanban, type Card } from "./kanban";
 import { ListaArquivados, ListaFechados, ListaNegocios } from "./lista";
@@ -178,6 +179,26 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
   if (atrasados) chips.push({ rotulo: "Com tarefa atrasada", remover: semChave("atrasados") });
   if (semProxima) chips.push({ rotulo: "Sem próxima atividade", remover: semChave("semProxima") });
 
+  // Filtros da janela "Filtros" que estão em uso (a busca e a situação ficam à vista, fora da contagem).
+  const filtrosAtivos = [
+    texto("responsavel"),
+    texto("origem"),
+    etiqueta,
+    etapaFiltro,
+    texto("criadoDe") || texto("criadoAte"),
+    texto("valorMin") || texto("valorMax"),
+    atrasados,
+    semProxima,
+  ].filter(Boolean).length;
+  const situacoes = [
+    { valor: "aberto", rotulo: "Em andamento" },
+    { valor: "ganho", rotulo: "Ganhos" },
+    { valor: "perdido", rotulo: "Perdidos" },
+    { valor: "arquivado", rotulo: "Arquivados" },
+  ] as const;
+  const linkSituacao = (s: (typeof situacoes)[number]["valor"]) =>
+    `/negocios?${paraQuery({ ...baseParams, status: s })}${visao !== "kanban" ? `&visao=${visao}` : ""}`;
+
   const agora = agoraMs();
   const indicadores: Indicador[] = [
     { Icone: Briefcase, valor: String(cards.length), legenda: "Negócios em andamento" },
@@ -206,128 +227,150 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
   ];
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <div>
+    <div className="flex animate-entrar flex-col gap-5">
+      <header className="flex flex-wrap items-end gap-3">
+        <div className="min-w-0">
           <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Negócios</h1>
-          <p className="text-sm text-zinc-500">Acompanhe e gerencie todos os seus negócios no funil de vendas.</p>
+          <p className="text-sm text-texto-2">{funisAtivos.length > 1 ? `Funil ${funil.nome}` : "Seu funil de vendas, etapa por etapa."}</p>
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {status === "aberto" && <VisaoToggle visao={visao} query={queryVisao ? `${queryVisao}&` : ""} />}
           {atual.papel === "admin" && (
-            <Link href="/configuracoes/funil">
-              <Botao variante="secundario" className="gap-1.5">
-                <Settings2 className="h-4 w-4" />
-                Editar etapas
-              </Botao>
+            <Link
+              href="/configuracoes/funil"
+              aria-label="Editar etapas"
+              title="Editar etapas"
+              className="hidden min-h-9 items-center gap-1.5 rounded-lg border border-linha bg-superficie px-3 text-sm font-medium text-texto transition-colors hover:border-dourado md:inline-flex"
+            >
+              <Settings2 className="h-4 w-4" aria-hidden />
+              Editar etapas
             </Link>
           )}
-          <Link href={`/negocios/novo?funil=${funil.id}`}>
-            <Botao>Adicionar negócio</Botao>
+          <Link href={`/negocios/novo?funil=${funil.id}`} aria-label="Adicionar negócio">
+            <Botao className="w-11 gap-1.5 px-0 md:w-auto md:px-4">
+              <Plus className="h-5 w-5 md:h-4 md:w-4" aria-hidden />
+              <span className="hidden md:inline">Adicionar negócio</span>
+            </Botao>
           </Link>
         </div>
-      </div>
-      <form className="flex flex-col gap-2" action="/negocios">
+      </header>
+
+      <nav aria-label="Situação" className="-mx-4 flex gap-1 overflow-x-auto border-b border-linha px-4 [scrollbar-width:none] md:mx-0 md:px-0">
+        {situacoes.map((s) => (
+          <Link
+            key={s.valor}
+            href={linkSituacao(s.valor)}
+            aria-current={status === s.valor ? "page" : undefined}
+            className={`-mb-px shrink-0 border-b-2 px-3 py-2.5 text-sm whitespace-nowrap transition-colors duration-200 ease-raion ${
+              status === s.valor ? "border-dourado font-semibold text-texto" : "border-transparent text-texto-2 hover:text-texto"
+            }`}
+          >
+            {s.rotulo}
+          </Link>
+        ))}
+      </nav>
+
+      <form className="flex flex-col gap-3" action="/negocios">
+        <input type="hidden" name="status" value={status} />
         {visao !== "kanban" && <input type="hidden" name="visao" value={visao} />}
-        <div className="flex flex-wrap items-center gap-2">
-          {funisAtivos.length > 1 && (
-            <Selecao name="funil" defaultValue={funil.id} aria-label="Funil">
-              {funisAtivos.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.nome}
-                </option>
-              ))}
-            </Selecao>
-          )}
-          <input
-            name="q"
-            defaultValue={busca}
-            placeholder="Buscar por nome, telefone ou e-mail"
-            className="min-w-56 flex-1 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm"
-          />
-          {podeFiltrarResponsavel && (
-            <Selecao name="responsavel" defaultValue={texto("responsavel")} aria-label="Responsável">
-              <option value="">Todos os responsáveis</option>
-              {config.membros
-                .filter((m) => m.ativo)
-                .map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.nome}
+        {funisAtivos.length <= 1 && <input type="hidden" name="funil" value={funil.id} />}
+        <div className="flex items-center gap-2">
+          <label className="relative min-w-0 flex-1">
+            <span className="sr-only">Buscar</span>
+            <Search size={16} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-texto-2" aria-hidden />
+            <input name="q" type="search" defaultValue={busca} placeholder="Buscar por nome, telefone ou e-mail" className={`${CLASSE_ENTRADA} w-full pl-9 text-sm`} />
+          </label>
+          <BotaoFiltros ativos={filtrosAtivos}>
+            {funisAtivos.length > 1 && (
+              <Selecao rotulo="Funil" name="funil" defaultValue={funil.id}>
+                {funisAtivos.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.nome}
                   </option>
                 ))}
-            </Selecao>
-          )}
-          <Selecao name="status" defaultValue={status} aria-label="Situação">
-            <option value="aberto">Em andamento</option>
-            <option value="ganho">Ganhos</option>
-            <option value="perdido">Perdidos</option>
-            <option value="arquivado">Arquivados</option>
-          </Selecao>
-          {config.etiquetas.length > 0 && (
-            <Selecao name="etiqueta" defaultValue={etiqueta?.id ?? ""} aria-label="Etiqueta">
-              <option value="">Todas as etiquetas</option>
-              {config.etiquetas.map((e) => (
-                <option key={e.id} value={e.id}>
-                  {e.nome}
-                </option>
-              ))}
-            </Selecao>
-          )}
-          <Selecao name="origem" defaultValue={texto("origem")} aria-label="Origem">
-            <option value="">Todas as origens</option>
-            {config.origens.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.nome}
-              </option>
-            ))}
-          </Selecao>
-          <Botao type="submit" variante="secundario">
-            Filtrar
-          </Botao>
+              </Selecao>
+            )}
+            {podeFiltrarResponsavel && (
+              <Selecao rotulo="Responsável" name="responsavel" defaultValue={texto("responsavel")}>
+                <option value="">Todos os responsáveis</option>
+                {config.membros
+                  .filter((m) => m.ativo)
+                  .map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.nome}
+                    </option>
+                  ))}
+              </Selecao>
+            )}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Selecao rotulo="Etapa" name="etapa" defaultValue={etapaFiltro?.id ?? ""}>
+                <option value="">Todas as etapas</option>
+                {colunas.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nome}
+                  </option>
+                ))}
+              </Selecao>
+              <Selecao rotulo="Origem" name="origem" defaultValue={texto("origem")}>
+                <option value="">Todas as origens</option>
+                {config.origens.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.nome}
+                  </option>
+                ))}
+              </Selecao>
+              {config.etiquetas.length > 0 && (
+                <Selecao rotulo="Etiqueta" name="etiqueta" defaultValue={etiqueta?.id ?? ""}>
+                  <option value="">Todas as etiquetas</option>
+                  {config.etiquetas.map((e) => (
+                    <option key={e.id} value={e.id}>
+                      {e.nome}
+                    </option>
+                  ))}
+                </Selecao>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <Campo rotulo="Criado de" type="date" name="criadoDe" defaultValue={texto("criadoDe")} />
+              <Campo rotulo="Criado até" type="date" name="criadoAte" defaultValue={texto("criadoAte")} />
+              <Campo rotulo="Valor mínimo" type="number" name="valorMin" defaultValue={texto("valorMin")} min={0} />
+              <Campo rotulo="Valor máximo" type="number" name="valorMax" defaultValue={texto("valorMax")} min={0} />
+            </div>
+            <div className="flex flex-col gap-1 text-sm text-texto">
+              <label className="flex min-h-11 items-center gap-2.5">
+                <input type="checkbox" name="atrasados" value="1" defaultChecked={atrasados} className="h-4 w-4" />
+                Só com tarefa atrasada
+              </label>
+              <label className="flex min-h-11 items-center gap-2.5">
+                <input type="checkbox" name="semProxima" value="1" defaultChecked={semProxima} className="h-4 w-4" />
+                Sem próxima atividade
+              </label>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Link
+                href={linkLimpar}
+                className="inline-flex min-h-11 items-center justify-center rounded-lg border border-linha text-sm font-medium text-texto hover:border-dourado md:min-h-9"
+              >
+                Limpar
+              </Link>
+              <Botao type="submit">Aplicar filtros</Botao>
+            </div>
+          </BotaoFiltros>
         </div>
-        <details className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm">
-          <summary className="flex cursor-pointer items-center gap-1.5 font-medium text-zinc-700">
-            <SlidersHorizontal size={14} /> Filtros avançados
-          </summary>
-          <div className="mt-3 flex flex-wrap items-end gap-3">
-            <Selecao rotulo="Etapa" name="etapa" defaultValue={etapaFiltro?.id ?? ""}>
-              <option value="">Todas as etapas</option>
-              {colunas.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nome}
-                </option>
-              ))}
-            </Selecao>
-            <Campo rotulo="Criado de" type="date" name="criadoDe" defaultValue={texto("criadoDe")} />
-            <Campo rotulo="Criado até" type="date" name="criadoAte" defaultValue={texto("criadoAte")} />
-            <Campo rotulo="Valor mínimo" type="number" name="valorMin" defaultValue={texto("valorMin")} min={0} />
-            <Campo rotulo="Valor máximo" type="number" name="valorMax" defaultValue={texto("valorMax")} min={0} />
-            <label className="flex items-center gap-1.5 pb-2">
-              <input type="checkbox" name="atrasados" value="1" defaultChecked={atrasados} />
-              Só com tarefa atrasada
-            </label>
-            <label className="flex items-center gap-1.5 pb-2">
-              <input type="checkbox" name="semProxima" value="1" defaultChecked={semProxima} />
-              Sem próxima atividade
-            </label>
-            <Botao type="submit" variante="secundario">
-              Aplicar
-            </Botao>
-          </div>
-        </details>
         {chips.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5">
             {chips.map((c) => (
               <Link
                 key={c.rotulo}
                 href={c.remover}
-                className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2.5 py-1 text-xs text-zinc-700 hover:bg-zinc-200"
+                aria-label={`Remover filtro ${c.rotulo}`}
+                className="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-superficie-2 px-3 text-xs text-texto transition-colors hover:bg-linha"
               >
                 {c.rotulo}
-                <X size={11} />
+                <X size={12} aria-hidden />
               </Link>
             ))}
-            <Link href={linkLimpar} className="text-xs text-zinc-500 underline hover:text-zinc-800">
+            <Link href={linkLimpar} className="px-2 text-xs text-texto-2 underline underline-offset-2 hover:text-texto">
               Limpar filtros
             </Link>
           </div>

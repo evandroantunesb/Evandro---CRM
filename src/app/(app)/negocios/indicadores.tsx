@@ -2,19 +2,20 @@ import type { LucideIcon } from "lucide-react";
 
 export type Indicador = { Icone: LucideIcon; valor: string; legenda: string };
 
-/** Faixa de indicadores no topo da tela de Negócios (4 cards, dados reais do escopo/filtro atual). */
+/**
+ * Indicadores no topo da tela de Negócios (dados reais do escopo/filtro atual), numa superfície só
+ * com fios entre eles — mesmo desenho dos indicadores do Início.
+ */
 export function Indicadores({ itens }: { itens: Indicador[] }) {
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div className="painel grid grid-cols-2 lg:grid-cols-4 [&>*]:border-linha max-lg:[&>*:nth-child(-n+2)]:border-b max-lg:[&>*:nth-child(odd)]:border-r lg:[&>*:not(:last-child)]:border-r">
       {itens.map((it) => (
-        <div key={it.legenda} className="flex items-center gap-3 painel p-3.5">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-dourado/10 text-dourado">
-            <it.Icone size={18} />
-          </span>
-          <div className="min-w-0">
-            <p className="truncate text-lg font-semibold text-zinc-900">{it.valor}</p>
-            <p className="truncate text-xs text-zinc-500">{it.legenda}</p>
-          </div>
+        <div key={it.legenda} className="flex min-w-0 flex-col gap-1 px-3.5 py-3 md:gap-1.5 md:px-6 md:py-5">
+          <p className="flex min-w-0 items-center gap-2 text-xs font-medium text-texto-2">
+            <it.Icone size={15} className="shrink-0 text-dourado-texto" aria-hidden />
+            <span className="truncate">{it.legenda}</span>
+          </p>
+          <p className="truncate font-titulo text-xl font-light tracking-tight text-texto tabular-nums md:text-3xl">{it.valor}</p>
         </div>
       ))}
     </div>

@@ -27,7 +27,8 @@ export function Botao({
   );
 }
 
-const CLASSE_ENTRADA =
+/** Aparência de campo de entrada (input, select, textarea) nas cores do tema. */
+export const CLASSE_ENTRADA =
   "min-h-11 rounded-lg border border-linha bg-superficie px-3 py-2 text-texto outline-none transition-colors duration-200 ease-raion placeholder:text-zinc-400 focus:border-dourado focus:ring-2 focus:ring-dourado/20 disabled:bg-superficie-2 disabled:text-texto-2 aria-invalid:border-erro md:min-h-10";
 
 /** Campo com rótulo acima; `erro` aparece logo abaixo, é anunciado e liga o campo a ele (aria-describedby). */

@@ -86,8 +86,10 @@ export function Kanban({
   }
 
   return (
-    <DndContext sensors={sensores} onDragEnd={aoSoltar}>
-      <div className="flex gap-3 overflow-x-auto pb-4">
+    // `id` fixo: os ids de acessibilidade do dnd-kit (aria-describedby) saem iguais no servidor e no navegador.
+    <DndContext id="kanban-negocios" sensors={sensores} onDragEnd={aoSoltar}>
+      {/* Celular: uma coluna por vez, encaixando ao deslizar; no computador, rolagem livre. */}
+      <div className="-mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-4 md:mx-0 md:snap-none md:px-0">
         {colunas.map((col) => (
           <ColunaKanban
             key={col.id}
@@ -135,33 +137,35 @@ function ColunaKanban({
   return (
     <section
       ref={setNodeRef}
-      className={`flex w-72 shrink-0 flex-col rounded-xl p-2 transition-colors ${
-        isOver ? "bg-amber-50 ring-2 ring-dourado" : "bg-zinc-100"
+      aria-label={coluna.nome}
+      className={`flex w-[85vw] max-w-80 shrink-0 snap-start flex-col gap-3 rounded-2xl p-2 transition-[background-color,box-shadow] duration-200 ease-raion md:w-72 ${
+        // Faixa um pouco mais funda que o fundo nos dois temas: o cartão (superfície) fica sempre acima dela.
+        isOver ? "bg-dourado/10 ring-2 ring-dourado/50" : "bg-[light-dark(rgb(15_15_16/0.04),rgb(0_0_0/0.35))]"
       }`}
     >
-      <header className="px-1.5 pt-1.5 pb-2">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="font-titulo truncate text-sm font-semibold text-carvao" title={coluna.nome}>
+      <header className="flex flex-col gap-0.5 px-2 pt-2">
+        <div className="flex items-center gap-2">
+          <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: coluna.cor ?? "var(--color-texto-2)" }} aria-hidden />
+          <h2 className="truncate text-[15px] font-semibold tracking-tight text-texto" title={coluna.nome}>
             {coluna.nome}
           </h2>
-          <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-xs font-medium text-zinc-600 shadow-sm">
+          <span className="ml-auto shrink-0 rounded-full bg-superficie px-2 py-0.5 text-xs font-medium text-texto-2 tabular-nums">
             {cards.length}
           </span>
         </div>
-        {soma > 0 && <p className="mt-0.5 text-xs text-zinc-500">{formatarMoeda(soma)}</p>}
-        <div className="mt-2 h-[3px] rounded-full" style={{ background: coluna.cor ?? "#d4d4d8" }} />
+        <p className="pl-4 text-xs text-texto-2 tabular-nums">{soma > 0 ? formatarMoeda(soma) : "Sem valor"}</p>
       </header>
       <div className="flex flex-col gap-2">
         {cards.map((c) => (
-          <CardKanban key={c.id} card={c} colunas={colunas} corEtapa={coluna.cor} etiquetas={etiquetas} motivos={motivos} />
+          <CardKanban key={c.id} card={c} colunas={colunas} etiquetas={etiquetas} motivos={motivos} />
         ))}
-        {!cards.length && <p className="px-1 py-4 text-center text-xs text-zinc-400">Arraste um negócio para cá</p>}
+        {!cards.length && <p className="px-2 py-6 text-center text-xs text-texto-2">Nenhum negócio nesta etapa</p>}
         {coluna.inicial && (
           <Link
             href={`/negocios/novo?funil=${funilId}&etapa=${coluna.id}`}
-            className="mt-1 flex items-center justify-center gap-1 rounded-md border border-dashed border-zinc-300 py-1.5 text-xs font-medium text-zinc-500 transition-colors hover:border-dourado hover:text-carvao"
+            className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl text-sm font-medium text-texto-2 transition-colors duration-200 ease-raion hover:bg-superficie hover:text-texto md:min-h-9"
           >
-            <Plus size={13} /> Adicionar negócio
+            <Plus size={15} /> Adicionar negócio
           </Link>
         )}
       </div>
@@ -172,30 +176,25 @@ function ColunaKanban({
 /** Prazo da próxima tarefa (com alerta se atrasada) ou, na falta dela, "há X tempo" desde que entrou na etapa. */
 function PrazoOuDesde({ card }: { card: Card }) {
   if (card.tarefa !== "nenhuma" && card.tarefaVenceEm) {
-    const atrasada = card.tarefa === "atrasada";
+    const tom = { atrasada: "bg-erro/10 font-medium text-erro", hoje: "bg-dourado/15 font-medium text-dourado-texto", futura: "" }[card.tarefa];
     return (
-      <span
-        title={card.tarefaTitulo ?? undefined}
-        className={`ml-auto flex items-center gap-1 ${atrasada ? "font-medium text-red-700" : ""}`}
-      >
-        <CalendarClock size={12} />
+      <span title={card.tarefaTitulo ?? undefined} className={`ml-auto flex items-center gap-1 rounded-full px-2 py-0.5 ${tom}`}>
+        <CalendarClock size={12} aria-hidden />
         {formatarPrazo(card.tarefaVenceEm)}
       </span>
     );
   }
-  return <span className="ml-auto">{card.desde}</span>;
+  return <span className="ml-auto px-2">{card.desde}</span>;
 }
 
 function CardKanban({
   card,
   colunas,
-  corEtapa,
   etiquetas,
   motivos,
 }: {
   card: Card;
   colunas: Coluna[];
-  corEtapa: string | null;
   etiquetas: EtiquetaDisponivel[];
   motivos: MotivoDisponivel[];
 }) {
@@ -204,14 +203,14 @@ function CardKanban({
   return (
     <article
       ref={setNodeRef}
-      style={{ ...estilo, borderLeftColor: corEtapa ?? "#d4d4d8" }}
+      style={estilo}
       {...listeners}
       {...attributes}
-      className={`relative touch-manipulation rounded-md border border-l-4 border-zinc-200 bg-white p-3 text-sm shadow-sm transition-shadow ${
-        isDragging ? "z-10 cursor-grabbing opacity-80 shadow-lg" : "cursor-grab hover:shadow-md"
+      className={`painel relative touch-manipulation p-3.5 text-sm transition-[translate,rotate,opacity] duration-200 ease-raion ${
+        isDragging ? "z-10 rotate-[1.5deg] cursor-grabbing opacity-90" : "cursor-grab hover:-translate-y-0.5"
       }`}
     >
-      <div className="absolute top-2 right-2 flex items-center gap-1">
+      <div className="absolute top-2.5 right-2 flex items-center gap-0.5">
         <Avatar nome={card.responsavel} tamanho={22} />
         <MoverEtapa
           negocioId={card.id}
@@ -223,31 +222,31 @@ function CardKanban({
           motivos={motivos}
         />
       </div>
-      <Link href={`/negocios/${card.id}`} className="-m-1 block rounded-md p-1 pr-16 hover:bg-zinc-50">
-        <p className="truncate font-medium text-carvao">{card.contato}</p>
-        <p className="truncate text-zinc-600">
+      <Link
+        href={`/negocios/${card.id}`}
+        className="-m-1 block rounded-lg p-1 pr-20 focus-visible:ring-2 focus-visible:ring-dourado/60 focus-visible:outline-none md:pr-16"
+      >
+        <p className="truncate text-[15px] font-medium text-texto">{card.contato}</p>
+        <p className="truncate text-[13px] text-texto-2">
           #{card.numero} · {card.titulo}
         </p>
       </Link>
       {(card.origem || card.etiquetas.length > 0) && (
-        <div className="mt-1.5 flex flex-wrap gap-1 text-xs">
-          {card.origem && <span className="rounded-full bg-zinc-100 px-1.5 py-0.5 text-zinc-600">{card.origem}</span>}
+        <div className="mt-2.5 flex flex-wrap gap-1 text-xs">
+          {card.origem && <span className="rounded-full bg-superficie-2 px-2 py-0.5 text-texto-2">{card.origem}</span>}
           {card.etiquetas.map((e) => (
-            <span
-              key={e.id}
-              className="rounded-full px-1.5 py-0.5 text-white"
-              style={{ background: e.cor ?? "#71717a" }}
-            >
+            <span key={e.id} className="inline-flex items-center gap-1.5 rounded-full bg-superficie-2 px-2 py-0.5 text-texto">
+              <span className="h-1.5 w-1.5 rounded-full" style={{ background: e.cor ?? "#8a8a92" }} aria-hidden />
               {e.nome}
             </span>
           ))}
         </div>
       )}
-      <div className="mt-2 flex items-center gap-x-2 border-t border-zinc-100 pt-2 text-xs text-zinc-500">
-        {card.valor && <span className="font-semibold text-carvao">{card.valor}</span>}
+      <div className="mt-3 flex items-center gap-x-2 border-t border-linha pt-2.5 text-xs text-texto-2">
+        {card.valor && <span className="text-[13px] font-semibold text-texto tabular-nums">{card.valor}</span>}
         {card.comentarios > 0 && (
           <span className="flex items-center gap-0.5" title={`${card.comentarios} comentário(s)`}>
-            <MessageCircle size={12} />
+            <MessageCircle size={12} aria-hidden />
             {card.comentarios}
           </span>
         )}
