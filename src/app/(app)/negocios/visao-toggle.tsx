@@ -12,7 +12,7 @@ export function VisaoToggle({ visao, query }: { visao: "kanban" | "lista"; query
     { valor: "lista" as const, rotulo: "Lista", Icone: Rows3 },
   ];
   return (
-    <div className="inline-flex items-center gap-0.5 rounded-lg border border-zinc-200 bg-white p-0.5">
+    <div className="inline-flex items-center gap-0.5 rounded-full border border-linha bg-superficie-2 p-0.5">
       {opcoes.map(({ valor, rotulo, Icone }) => (
         <Link
           key={valor}
@@ -21,11 +21,11 @@ export function VisaoToggle({ visao, query }: { visao: "kanban" | "lista"; query
             document.cookie = `${COOKIE_VISAO}=${valor}; path=/; max-age=${60 * 60 * 24 * 365}`;
           }}
           aria-current={visao === valor ? "page" : undefined}
-          className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-            visao === valor ? "bg-carvao text-offwhite" : "text-carvao hover:bg-zinc-50"
+          className={`inline-flex min-h-10 items-center gap-1.5 rounded-full px-3.5 text-sm font-medium transition-colors duration-200 ease-raion md:min-h-8 ${
+            visao === valor ? "bg-superficie text-texto shadow-sm" : "text-texto-2 hover:text-texto"
           }`}
         >
-          <Icone size={15} className={visao === valor ? "text-dourado" : "text-zinc-400"} />
+          <Icone size={15} className={visao === valor ? "text-dourado-texto" : ""} aria-hidden />
           {rotulo}
         </Link>
       ))}
