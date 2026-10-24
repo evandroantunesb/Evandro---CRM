@@ -8,13 +8,11 @@ import { afterAll, describe, expect, it } from "vitest";
 
 const SCRIPT = ".github/scripts/validar-conjunto-migrations.sh";
 const WORKFLOW = ".github/workflows/banco-producao.yml";
-// Lote 2 do banco da calculadora GD II: só a revogação da escrita direta em `calculos_solares`, nenhuma a mais ou
-// a menos. O lote 1 (abaixo) já tem de estar aplicado, e esta só pode ser aplicada depois de confirmado que o app novo
-// (PR B) atende a produção: a versão anterior do app grava direto e deixaria de salvar o cálculo.
-const AUTORIZADA = "20261023240000_calculos_solares_revogar_escrita_direta.sql";
-// Lote 1 (#210 mais as seis migrations preparatórias da #214): já aplicado antes deste lote. Se voltar a aparecer como
-// pendente, não é autorizado.
-const LOTE1 = [
+// Temperatura do negócio (#222): só ela, nenhuma a mais ou a menos.
+const AUTORIZADA = "20261024100000_temperatura_negocio.sql";
+// Calculadora GD II, lotes 1 (#210 mais as seis preparatórias da #214) e 2 (revogação da escrita direta): já aplicados
+// antes da temperatura. Se voltarem a aparecer como pendentes, não são autorizados.
+const CALCULADORA = [
   "20261021100000_negocio_consumo_estimado.sql",
   "20261022100000_propostas_emissoes.sql",
   "20261022110000_produtividade_confirmada.sql",
@@ -22,6 +20,7 @@ const LOTE1 = [
   "20261023210000_calculo_gd2_fio_b.sql",
   "20261023220000_calculos_solares_gravacao_servidor.sql",
   "20261023230000_calculos_solares_exclusao_historico.sql",
+  "20261023240000_calculos_solares_revogar_escrita_direta.sql",
 ];
 // Migrations já aplicadas (#192, #191, #190 e o conjunto Solo #186, #188 e #189): se voltarem a aparecer como
 // pendentes, não são autorizadas.
@@ -169,26 +168,26 @@ describe("entradas inválidas: encerra com erro antes de qualquer aplicação", 
   });
 });
 
-describe("lote 2 da calculadora GD II (revogação da escrita direta)", () => {
-  it("só a revogação pendente (lote 1 já aplicado): passa", () => {
+describe("temperatura do negócio (#222)", () => {
+  it("só a temperatura pendente (calculadora já aplicada): passa", () => {
     expect(validar(dryRunCom(AUTORIZADA)).codigo).toBe(0);
   });
 
-  it("qualquer migration do lote 1 pendente junto, ou sozinha, não passa", () => {
-    for (const m of LOTE1) {
+  it("qualquer migration da calculadora pendente junto, ou sozinha, não passa", () => {
+    for (const m of CALCULADORA) {
       expect(validar(dryRunCom(AUTORIZADA, m)).codigo, m).toBe(1);
       expect(validar(dryRunCom(m)).codigo, m).toBe(1);
     }
   });
 
-  it("o lote 1 inteiro pendente, com ou sem a revogação, não passa (lote 1 ainda não aplicado)", () => {
-    expect(validar(dryRunCom(...LOTE1)).codigo).toBe(1);
-    expect(validar(dryRunCom(...LOTE1, AUTORIZADA)).codigo).toBe(1);
+  it("a calculadora inteira pendente, com ou sem a temperatura, não passa", () => {
+    expect(validar(dryRunCom(...CALCULADORA)).codigo).toBe(1);
+    expect(validar(dryRunCom(...CALCULADORA, AUTORIZADA)).codigo).toBe(1);
   });
 
-  it("a revogação existe na pasta e é a única da lista autorizada do workflow", () => {
+  it("a temperatura existe na pasta e é a única da lista autorizada do workflow", () => {
     expect(existsSync(`supabase/migrations/${AUTORIZADA}`)).toBe(true);
-    for (const m of LOTE1) expect(readFileSync(WORKFLOW, "utf8"), m).not.toContain(m);
+    for (const m of CALCULADORA) expect(readFileSync(WORKFLOW, "utf8"), m).not.toContain(m);
   });
 });
 

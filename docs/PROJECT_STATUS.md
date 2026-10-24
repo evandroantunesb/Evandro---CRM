@@ -58,7 +58,7 @@ Histórico: a migration da #139 foi aplicada em produção antes do merge, com a
 - **Spec aprovada pelo Evandro em 24/10/2026:** temperatura calculada na leitura por um cardápio fixo de regras (`regras_temperatura`) que admin **e** gestor configuram (liga/desliga, parâmetros, Quente/Frio, ordem; 1ª que bate = "porquê"; nenhuma = Morno). Padrões: contrato gerado (desde rascunho) Quente 1º; sem atividade 7 dias Frio; só pesquisando Frio; prazo imediato/até 30 dias + decisor Quente; demais desligadas. Abertura de proposta ficou **fora** (PDF baixado não é rastreável e as versões emitidas não registram abertura).
 - **Migration `20261024100000_temperatura_negocio.sql`** (aditiva: tabela + RLS, `salvar_regras_temperatura`, `temperatura_negocios`, `negocios.fechamento_previsto`, campo obrigatório "fechamento_previsto" por gatilho próprio; não reescreve função do M1). Testes em `tests/temperatura-negocio-db.test.ts`.
 - **App:** selo no Kanban, na Lista e na ficha (com o porquê); mês previsto no "Dados do negócio"; Configurações > Temperatura (link também na tela de Negócios para o gestor).
-- **Ordem obrigatória:** migration aplicada em produção (fluxo com aprovação do Evandro) **antes** do merge.
+- **Produção:** migration aplicada em 24/10/2026 pela tag `migracao-pr222-e8eab39` (conferir e aplicar com aprovação do Evandro), antes do merge.
 - **Próximas:** PR 2 forecast (3ª visão no seletor Kanban/Lista + resumo na Início; Comprometido = contrato aguardando assinatura ou assinado); PR 3 tarefas automáticas ("mês chegando" a partir do dia 20 e "parado"), que **não** geram pontos.
 
 ### P1a-0 — Arquivamento de negócio (PR draft, 2026-10-16)
