@@ -65,7 +65,7 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
       <NavegacaoObras navegacao={navegacao} atualId={id} base="/obras" query={query} />
 
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-semibold text-zinc-900">{resumo.clienteNome}</h1>
+        <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">{resumo.clienteNome}</h1>
         <Selo>Obra #{resumo.numero}</Selo>
         <Selo tom={TOM_SITUACAO[resumo.situacao]}>{ROTULO_SITUACAO_OBRA[resumo.situacao]}</Selo>
         {resumo.alertas.map((a) => (

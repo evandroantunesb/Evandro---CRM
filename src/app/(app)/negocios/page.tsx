@@ -209,10 +209,10 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-zinc-900">Negócios</h1>
+          <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Negócios</h1>
           <p className="text-sm text-zinc-500">Acompanhe e gerencie todos os seus negócios no funil de vendas.</p>
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center gap-2">
           {status === "aberto" && <VisaoToggle visao={visao} query={queryVisao ? `${queryVisao}&` : ""} />}
           {atual.papel === "admin" && (
             <Link href="/configuracoes/funil">

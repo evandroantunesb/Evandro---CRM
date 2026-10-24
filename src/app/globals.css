@@ -37,18 +37,194 @@
   --color-zinc-100: #f3f1ec;
   --color-zinc-200: #e5e7eb;
   --color-zinc-300: #d1d3d8;
-  --color-zinc-400: #9ca0a8;
+  /* Usado também em texto informativo: 4,5:1 sobre o off-white (WCAG AA); antes #9ca0a8 (2,5:1). */
+  --color-zinc-400: #6d727c;
   --color-zinc-500: #6b7280;
   --color-zinc-600: #555a64;
   --color-zinc-700: #3a3d44;
   --color-zinc-800: #1f2024;
   --color-zinc-900: #0f0f10;
   --color-zinc-950: #0a0a0b;
+
+  /*
+   * Cores por função (valores do tema claro). O tema do app (.tema-app, abaixo) as redefine para o escuro.
+   * Ação = Dourado Solar com texto carvão (9,1:1); energia = verde (economia, geração, impacto).
+   */
+  --color-fundo: #faf8f3;
+  --color-superficie: #ffffff;
+  --color-superficie-2: #f3f1ec;
+  --color-linha: #e5e2da;
+  --color-texto: #0f0f10;
+  --color-texto-2: #5f6672;
+  --color-acao: #d4af37;
+  --color-acao-forte: #b8952a;
+  --color-sobre-acao: #0f0f10;
+  --color-dourado-texto: #7a5610;
+  --color-energia: #1f7a4d;
+  --color-erro: #b42318;
+
+  /* Movimento: entrada desacelerando; feedback rápido, transições grandes lentas e suaves. */
+  --ease-raion: cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-entrar: entrar 520ms var(--ease-raion) both;
+
+  @keyframes entrar {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+  }
 }
 
 body {
   background: var(--color-offwhite);
   color: var(--color-carvao);
+}
+
+/*
+ * Tema do app (claro, escuro ou do sistema): wrapper de src/app/(app)/layout.tsx com data-tema vindo do
+ * cookie raion_tema. Escopado ao app autenticado: telas públicas (proposta, login) e PDFs ficam como estão.
+ * Cada cor usa light-dark(claro, escuro), resolvida pelo color-scheme do wrapper; assim "sistema" segue o
+ * aparelho sem duplicar regras. Mesmo método do tema da Gamificação: as utilities do Tailwind 4 leem
+ * var(--color-*), então as telas antigas (zinc/white/green/red/amber) também trocam de tema sem edição.
+ * Escuro: sem preto puro; superfícies mais altas ficam mais claras; cores dessaturadas, contraste AA.
+ */
+.tema-app {
+  color-scheme: light;
+  min-height: 100vh;
+  background-color: var(--color-fundo);
+  color: var(--color-texto);
+}
+
+.tema-app[data-tema="escuro"] {
+  color-scheme: dark;
+}
+
+.tema-app[data-tema="sistema"] {
+  color-scheme: light dark;
+}
+
+/* Fundo da página no tema escuro (sem faixa clara ao rolar além do fim, o "elástico" do iPhone). */
+html:has(.tema-app[data-tema="escuro"]),
+html:has(.tema-app[data-tema="escuro"]) body {
+  background: #0f0f10;
+}
+
+@media (prefers-color-scheme: dark) {
+  html:has(.tema-app[data-tema="sistema"]),
+  html:has(.tema-app[data-tema="sistema"]) body {
+    background: #0f0f10;
+  }
+}
+
+.tema-app {
+  --color-fundo: light-dark(#faf8f3, #0f0f10);
+  --color-superficie: light-dark(#ffffff, #161618);
+  --color-superficie-2: light-dark(#f3f1ec, #1e1e21);
+  --color-linha: light-dark(#e5e2da, rgb(250 248 243 / 10%));
+  --color-texto: light-dark(#0f0f10, #faf8f3);
+  --color-texto-2: light-dark(#5f6672, #a3a3aa);
+  --color-dourado-texto: light-dark(#7a5610, #d4af37);
+  --color-energia: light-dark(#1f7a4d, #5cc796);
+  --color-erro: light-dark(#b42318, #f2867d);
+
+  /* Escalas das telas antigas: claro = valores da marca acima; escuro = equivalentes legíveis. */
+  --color-white: light-dark(#ffffff, #161618);
+  --color-zinc-50: light-dark(#faf8f3, #1b1b1e);
+  --color-zinc-100: light-dark(#f3f1ec, #232326);
+  --color-zinc-200: light-dark(#e5e7eb, #2e2e32);
+  --color-zinc-300: light-dark(#d1d3d8, #3a3a40);
+  --color-zinc-400: light-dark(#6d727c, #8a8a92);
+  --color-zinc-500: light-dark(#6b7280, #a3a3aa);
+  --color-zinc-600: light-dark(#555a64, #b8b8be);
+  --color-zinc-700: light-dark(#3a3d44, #d0d0d4);
+  --color-zinc-800: light-dark(#1f2024, #e4e4e7);
+  --color-zinc-900: light-dark(#0f0f10, #faf8f3);
+  --color-amber-50: light-dark(#fbf7ea, rgb(212 175 55 / 10%));
+  --color-amber-100: light-dark(#f6ecce, rgb(212 175 55 / 16%));
+  --color-amber-200: light-dark(#eddb9f, rgb(212 175 55 / 32%));
+  --color-amber-700: light-dark(#8c701d, #e3c76c);
+  --color-amber-800: light-dark(#6b5516, #e3c76c);
+  --color-amber-900: light-dark(#4a3b10, #ecd78f);
+  --color-green-50: light-dark(oklch(98.2% 0.018 155.826), rgb(92 199 150 / 12%));
+  --color-green-100: light-dark(oklch(96.2% 0.044 156.743), rgb(92 199 150 / 16%));
+  --color-green-200: light-dark(oklch(92.5% 0.084 155.995), rgb(92 199 150 / 32%));
+  --color-green-600: light-dark(oklch(62.7% 0.194 149.214), #5cc796);
+  --color-green-700: light-dark(oklch(52.7% 0.154 150.069), #5cc796);
+  --color-green-800: light-dark(oklch(44.8% 0.119 151.328), #7dd3ab);
+  --color-emerald-100: light-dark(oklch(95% 0.052 163.051), rgb(92 199 150 / 16%));
+  --color-emerald-800: light-dark(oklch(43.2% 0.095 166.913), #7dd3ab);
+  --color-red-50: light-dark(oklch(97.1% 0.013 17.38), rgb(242 134 125 / 12%));
+  --color-red-100: light-dark(oklch(93.6% 0.032 17.717), rgb(242 134 125 / 16%));
+  --color-red-200: light-dark(oklch(88.5% 0.062 18.334), rgb(242 134 125 / 35%));
+  --color-red-600: light-dark(oklch(57.7% 0.245 27.325), #f2867d);
+  --color-red-700: light-dark(oklch(50.5% 0.213 27.518), #f2867d);
+  --color-red-800: light-dark(oklch(44.4% 0.177 26.899), #f5a39c);
+  --color-red-900: light-dark(oklch(39.6% 0.141 25.723), #f8bdb7);
+
+  /* Ajustes que não são de escala (iguais no claro; mudam só no escuro). */
+  --tema-carvao-elevado: light-dark(#0f0f10, #2a2a2e);
+  --tema-offwhite-superficie: light-dark(#faf8f3, #1e1e21);
+}
+
+/*
+ * Bloco de conteúdo do "Horizonte": superfície sem borda marcada; no claro, sombra quase imperceptível;
+ * no escuro, só um fio de luz (sombra não aparece sobre carvão). Substitui "rounded border bg-white".
+ */
+@utility painel {
+  border-radius: 1rem;
+  background-color: var(--color-superficie);
+  box-shadow:
+    0 0 0 1px light-dark(rgb(15 15 16 / 4%), rgb(250 248 243 / 7%)),
+    0 1px 2px light-dark(rgb(15 15 16 / 4%), transparent),
+    0 12px 32px -18px light-dark(rgb(15 15 16 / 16%), transparent);
+}
+
+/* Sobretítulo de seção ("NEGÓCIOS · FUNIL"): pequeno, espaçado, em caixa alta. */
+@utility sobretitulo {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-texto-2);
+}
+
+/* Texto carvão segue o texto do tema, exceto sobre o dourado (onde o carvão é o contraste certo). */
+.tema-app .text-carvao:not(.bg-dourado, .bg-dourado *, .bg-acao, .bg-acao *) {
+  color: var(--color-texto);
+}
+
+/* Branco como cor de texto continua branco (está sempre sobre fundo escuro ou colorido). */
+.tema-app .text-white {
+  color: #ffffff;
+}
+
+/* Blocos carvão dentro do conteúdo (seletores, destaques) sobem um nível no escuro; a barra lateral fica. */
+.tema-app main .bg-carvao {
+  background-color: var(--tema-carvao-elevado);
+}
+
+/* A barra lateral é sempre escura nos dois temas: os brancos translúcidos dela continuam brancos. */
+.tema-app .barra-lateral {
+  --color-white: #ffffff;
+}
+
+.tema-app .bg-offwhite {
+  background-color: var(--tema-offwhite-superficie);
+}
+
+.tema-app :is(input[type="checkbox"], input[type="radio"]) {
+  accent-color: var(--color-acao);
+}
+
+/* Quem pede menos movimento no sistema: animações e transições quase instantâneas. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 1ms !important;
+  }
 }
 
 h1,

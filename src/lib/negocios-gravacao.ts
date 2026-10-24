@@ -27,7 +27,15 @@ import {
 } from "@/lib/negocio-dados";
 import { EDITAR_VALOR_NEGOCIO, ESCOLHER_RESPONSAVEL_NEGOCIO, pode } from "@/lib/permissoes";
 import type { SupabaseServidor } from "@/lib/supabase/server";
-import { TIPOS_LIGACAO, type Papel, type ResultadoAcao } from "@/lib/tipos";
+import { BASES_TRIBUTARIAS } from "@/lib/tarifa-gd";
+import {
+  ROTULO_TIPO_CLIENTE_QUALIF,
+  TIPOS_CLIENTE_QUALIF,
+  TIPOS_LIGACAO,
+  type Papel,
+  type ResultadoAcao,
+  type TipoClienteQualif,
+} from "@/lib/tipos";
 
 /**
  * Núcleo da gravação do negócio, do kit e do contato. O cliente vem por parâmetro: as ações
@@ -90,7 +98,13 @@ const anexosCriacaoSchema = z
   });
 
 const esquemaNovo = z.object({
-  titulo: z.string().trim().min(2, "Informe o nome do negócio"),
+  // Vazio = gerado pelo servidor ("Residencial — Nome do cliente"); o cadastro mostra a mesma sugestão.
+  titulo: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) => (v ? v : null))
+    .pipe(z.string().min(2, "Informe o nome do negócio").nullable()),
   funil_id: z.string().uuid(),
   etapa_id: uuidOpcional,
   origem_id: uuidOpcional,
@@ -119,9 +133,25 @@ const esquemaNovo = z.object({
   tarifa_efetiva_kwh: numeroBrOpcional,
   valor_fatura_medio: numeroBrOpcional,
   tarifa_kwh: numeroBrOpcional,
+  // Base declarada da tarifa (TE + TUSD): sem ela o cálculo fica incompleto. O cadastro só a declara ao usar a tarifa oficial.
+  tarifa_base_tributaria: z
+    .enum([...BASES_TRIBUTARIAS, ""])
+    .optional()
+    .transform((v) => (v ? v : null)),
+  // Qualificação já no cadastro (mesmas regras da ficha): tipo de cliente e distribuidora entram no contexto do cálculo.
+  qualif_tipo_cliente: z
+    .enum([...TIPOS_CLIENTE_QUALIF, ""])
+    .optional()
+    .transform((v) => (v ? v : null)),
+  qualif_distribuidora: textoOpcional(80, "Distribuidora muito longa"),
   componentes: componentesJsonSchema,
   anexos: anexosCriacaoSchema,
 });
+
+/** Título padrão quando o cadastro não traz um: tipo de cliente (ou "Negócio") e o nome do cliente. */
+export function tituloPadraoNegocio(tipoCliente: TipoClienteQualif | null, nomeCliente: string): string {
+  return `${tipoCliente ? ROTULO_TIPO_CLIENTE_QUALIF[tipoCliente] : "Negócio"} — ${nomeCliente.trim()}`.slice(0, 120);
+}
 
 /** Os arquivos vão depois, do navegador direto ao Storage (`enviarArquivos`), para `empresaId/negocioId`. */
 export type EstimativaCriacao = { estado: "incompleta"; mensagem: string; pendencias: Pendencia[] };
@@ -165,9 +195,11 @@ export async function criarNegocioComCliente(supabase: SupabaseServidor, atual: 
 
   let contatoId = d.contato_id;
   let contatoCriado: string | undefined;
+  let nomeCliente = d.contato_nome ?? "";
   if (contatoId) {
-    const { data: existente } = await supabase.from("contatos").select("id, endereco, cidade, uf").eq("id", contatoId).maybeSingle();
+    const { data: existente } = await supabase.from("contatos").select("id, nome, endereco, cidade, uf").eq("id", contatoId).maybeSingle();
     if (!existente) return { ok: false, mensagem: "Contato não encontrado." };
+    nomeCliente = existente.nome;
     const { alteracoes, divergentes } = completarContato(existente, local);
     if (divergentes.length) avisos.push("contato_mantido");
     if (Object.keys(alteracoes).length) {
@@ -219,7 +251,7 @@ export async function criarNegocioComCliente(supabase: SupabaseServidor, atual: 
     .from("negocios")
     .insert({
       empresa_id: atual.empresaId,
-      titulo: d.titulo,
+      titulo: d.titulo ?? tituloPadraoNegocio(d.qualif_tipo_cliente, nomeCliente),
       funil_id: d.funil_id,
       etapa_id: etapaId,
       origem_id: d.origem_id,
@@ -236,6 +268,8 @@ export async function criarNegocioComCliente(supabase: SupabaseServidor, atual: 
       consumo_estimado_kwh: consumoCriacao.origem === "estimado" ? consumoCriacao.kwh : null,
       tarifa_efetiva_kwh: consumoCriacao.tarifaEfetiva,
       valor_conta_energia: d.valor_fatura_medio,
+      qualif_tipo_cliente: d.qualif_tipo_cliente,
+      qualif_distribuidora: d.qualif_distribuidora,
     })
     .select("id")
     .single();
@@ -248,7 +282,8 @@ export async function criarNegocioComCliente(supabase: SupabaseServidor, atual: 
     };
   }
 
-  // Itens do kit são gravados com ou sem tarifa; a estimativa só é avaliada quando há tarifa (hoje sempre incompleta).
+  // Itens do kit são gravados com ou sem tarifa; com tarifa, o cálculo usa a qualificação do cadastro (completo quando
+  // tipo de cliente, distribuidora, tarifa e base fecham com a referência oficial; senão, incompleto com as pendências).
   let estimativa: EstimativaCriacao | undefined;
   if (d.componentes.length) {
     const { error: erroKit } = await inserirItensKit(supabase, atual.empresaId, negocio.id, d.componentes);
@@ -265,8 +300,8 @@ export async function criarNegocioComCliente(supabase: SupabaseServidor, atual: 
         consumoMedioKwh: consumoCriacao.kwh,
         valorFaturaMedio: d.valor_fatura_medio,
         tarifaKwh: d.tarifa_kwh,
-        tarifaBaseTributaria: null,
-      }, { tipoCliente: null, distribuidoraInformada: null }); // negócio novo: sem qualificação, estimativa incompleta
+        tarifaBaseTributaria: d.tarifa_base_tributaria,
+      }, { tipoCliente: d.qualif_tipo_cliente, distribuidoraInformada: d.qualif_distribuidora });
       if (montado.ok) {
         const { error: erroCalculo } = autorizado.ok
           ? await gravarLinhaCalculo(autorizado.autorizacao, montado.linha, { substituir: false })

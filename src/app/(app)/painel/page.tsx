@@ -36,7 +36,7 @@ export default async function Painel() {
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-4">
-      <h1 className="text-2xl font-semibold text-zinc-900">Painel</h1>
+      <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Painel</h1>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <Estatistica rotulo="Negócios ganhos" valor={indicadores.ganhos.total} destaque="positivo" />

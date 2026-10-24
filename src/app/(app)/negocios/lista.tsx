@@ -89,7 +89,7 @@ export function ListaNegocios({
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white">
+    <div className="overflow-x-auto painel">
       <table className="w-full text-left text-sm">
         <thead className="bg-zinc-50 text-zinc-600">
           <tr>
@@ -193,7 +193,7 @@ export function ListaFechados({
   const motivo = new Map(motivos.map((m) => [m.id, m.nome]));
   const porId = new Map(linhas.map((l) => [l.id, l]));
   return (
-    <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white">
+    <div className="overflow-x-auto painel">
       <table className="w-full text-left text-sm">
         <thead className="bg-zinc-50 text-zinc-600">
           <tr>
@@ -245,7 +245,7 @@ export function ListaArquivados({ cards, linhas }: { cards: Card[]; linhas: Linh
   }
   const porId = new Map(linhas.map((l) => [l.id, l]));
   return (
-    <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white">
+    <div className="overflow-x-auto painel">
       <table className="w-full text-left text-sm">
         <thead className="bg-zinc-50 text-zinc-600">
           <tr>

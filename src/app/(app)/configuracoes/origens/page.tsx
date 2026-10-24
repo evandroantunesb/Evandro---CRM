@@ -9,7 +9,7 @@ export default async function ConfigOrigens() {
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
-      <h1 className="text-2xl font-semibold text-zinc-900">Origens dos leads</h1>
+      <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Origens dos leads</h1>
       <p className="text-sm text-zinc-600">
         Os canais por onde os leads chegam. Origem desativada some das opções, mas os negócios antigos continuam com ela.
         Todo lead que cai numa origem é sugerido pro rodízio e fica pendente de aprovação do gestor (Aquisição → Leads a

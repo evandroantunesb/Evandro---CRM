@@ -50,7 +50,7 @@ export default async function Contatos({ searchParams }: PageProps<"/contatos">)
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-4">
       <div>
-        <h1 className="text-2xl font-semibold text-zinc-900 md:text-[28px]">Contatos</h1>
+        <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Contatos</h1>
         <p className="text-sm text-zinc-500">Carteira de contatos cadastrados na empresa.</p>
       </div>
 
@@ -139,7 +139,7 @@ function KpiContato({
   rodape: string;
 }) {
   return (
-    <div className="flex min-h-[112px] flex-col gap-2 rounded-xl border border-zinc-200 bg-white p-4">
+    <div className="flex min-h-[112px] flex-col gap-2 painel p-4">
       <span className={`flex h-9 w-9 items-center justify-center rounded-lg ${TOM_KPI[tom]}`}>
         <Icone size={17} />
       </span>

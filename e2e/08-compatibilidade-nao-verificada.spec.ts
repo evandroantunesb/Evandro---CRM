@@ -1,11 +1,11 @@
-import { expect, test, type Page } from "@playwright/test";
-import { entrarComo, lerBase } from "./ajuda";
+import { expect, test } from "@playwright/test";
+import { entrarComo, lerBase, preencherNovoNegocio } from "./ajuda";
 import type { BaseFicticia } from "./base-ficticia";
 
 /**
- * E0 — a Etapa 2 do assistente de novo negócio não afirma compatibilidade técnica (interface real +
- * Supabase LOCAL). Antes: um banner verde fixo "Combinação compatível · MPPT validado · Voc validado" e um
- * botão com alertas de exemplo. Agora: "Compatibilidade técnica não verificada", sem nada validado.
+ * E0 — a seção Sistema do Novo negócio não afirma compatibilidade técnica (interface real + Supabase LOCAL).
+ * Antes: um banner verde fixo "Combinação compatível · MPPT validado · Voc validado" e um botão com alertas de
+ * exemplo. Agora: "Compatibilidade técnica não verificada", sem nada validado, inclusive no kit sugerido.
  */
 
 let base: BaseFicticia;
@@ -13,26 +13,15 @@ test.beforeAll(() => {
   base = lerBase();
 });
 
-async function irParaEtapa2(page: Page, nome: string, whatsapp: string) {
-  await page.goto("/negocios/novo");
-  await page.getByRole("textbox", { name: "Nome do negócio" }).fill(nome);
-  await page.getByRole("combobox", { name: /^Origem/ }).selectOption({ index: 1 });
-  await page.getByRole("textbox", { name: /^Nome \/ Razão social/ }).fill(nome);
-  await page.getByRole("textbox", { name: /^WhatsApp/ }).fill(whatsapp);
-  await page.getByRole("textbox", { name: /^Cidade/ }).fill("Cascavel");
-  await page.getByRole("combobox", { name: /^Estado/ }).selectOption("PR");
-  await page.getByRole("textbox", { name: "Consumo médio mensal (kWh)" }).fill("780");
-  await page.getByRole("button", { name: /^Avançar/ }).click();
-}
-
 test.describe("compatibilidade técnica não verificada", () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 
-  test("Etapa 2 avisa que a compatibilidade não foi verificada e não mostra nada validado", async ({ page }) => {
+  test("o kit sugerido avisa que a compatibilidade não foi verificada e não mostra nada validado", async ({ page }) => {
     await entrarComo(page, base.usuarios.vendedor, base.senha);
-    await irParaEtapa2(page, "Cliente E0 compatibilidade (fictício)", "45900000010");
+    await preencherNovoNegocio(page, "Cliente E0 compatibilidade (fictício)", "45900000010", "780");
 
-    await expect(page.getByText("Sistema recomendado", { exact: true })).toBeVisible();
+    // 780 / 120 = 6,5 kWp → 11 módulos de 620 W.
+    await expect(page.getByRole("region", { name: "Sistema" }).locator("output")).toHaveText("11");
     await expect(page.getByRole("status").filter({ hasText: "Compatibilidade técnica não verificada" })).toBeVisible();
 
     for (const proibido of [/MPPT validado/i, /Voc validado/i, /Combinação compatível/i, /Combinação incompatível/i, /Overload acima/i, /\(exemplo\)/i]) {
@@ -42,11 +31,11 @@ test.describe("compatibilidade técnica não verificada", () => {
     await expect(page.getByText("exemplo de catálogo")).toHaveCount(0);
   });
 
-  test("o aviso continua na Etapa 2 mesmo montando o kit manualmente", async ({ page }) => {
+  test("o aviso continua mesmo montando o kit à mão", async ({ page }) => {
     await entrarComo(page, base.usuarios.vendedor, base.senha);
-    await irParaEtapa2(page, "Cliente E0 kit manual (fictício)", "45900000011");
+    await preencherNovoNegocio(page, "Cliente E0 kit manual (fictício)", "45900000011", "780");
 
-    await page.getByRole("button", { name: "Montar kit manualmente" }).click();
+    await page.getByRole("button", { name: "Trocar itens ou montar do zero" }).click();
     await page.getByRole("button", { name: "+ Adicionar módulo" }).click();
     await page.getByLabel("Potência (W)").last().fill("620");
     await expect(page.getByRole("status").filter({ hasText: "Compatibilidade técnica não verificada" })).toBeVisible();

@@ -243,11 +243,11 @@ describe("o editor e os formulários usam a análise única (nada de conversão 
     expect(ficha).not.toMatch(/removendoKitSalvo\s*=\s*[^;]*componentes\.length\s*===\s*0/);
   });
 
-  it("cadastro: o passo 2 só avança sem problemas no kit, e a mensagem e os campos aparecem depois da tentativa", () => {
+  it("cadastro: o passo do kit (3) só avança sem problemas no kit, e a mensagem e os campos aparecem depois da tentativa", () => {
     const passo = cadastro.slice(cadastro.indexOf("function problemaDaEtapa("), cadastro.indexOf("function mostrarProblema("));
-    expect(passo).toContain("if (etapa === 2)");
+    expect(passo).toContain("if (etapa === 3)");
     expect(passo).toContain("resumoProblemasKit(problemasKit, linhas)");
-    expect(cadastro).toContain("if (etapa === 2) setMostrarProblemasKit(true);");
+    expect(cadastro).toContain("if (etapa === 3) setMostrarProblemasKit(true);");
     expect(cadastro).toContain("problemas={mostrarProblemasKit ? problemasKit : undefined}");
   });
 

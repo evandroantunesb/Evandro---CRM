@@ -21,7 +21,7 @@ export default async function Cobranca({ searchParams }: PageProps<"/super-admin
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold text-zinc-900">Cobrança</h1>
+        <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Cobrança</h1>
         <div className="flex items-center gap-3 text-sm">
           <Link href={`/super-admin/cobranca?mes=${mesAdjacente(referencia, -1)}`} className="text-zinc-600 hover:underline">
             ← Mês anterior
