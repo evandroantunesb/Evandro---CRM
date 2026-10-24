@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { ListaTarefas } from "@/components/lista-tarefas";
 import { MoverEtapa } from "@/components/mover-etapa";
 import { NovaTarefa } from "@/components/nova-tarefa";
-import { Cartao, Selo } from "@/components/ui";
+import { Cartao, CartaoRecolhivel, Selo, Voltar } from "@/components/ui";
 import { conferirArquivos } from "@/lib/anexos-servidor";
 import { AVISOS_CRIACAO, avisosDaUrl } from "@/lib/negocio-dados";
 import { apagarAnexo } from "@/lib/acoes/anexos";
@@ -32,7 +32,8 @@ import { listarEmissoesDoNegocio } from "@/lib/propostas/emissoes-dados";
 import { extrairConteudoDoModelo, produtividadeConfirmada } from "@/lib/propostas/proposta-simples";
 import { avisarSchemaAusente, funcaoAusente, tabelaAusente } from "@/lib/schema-ausente";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { cartaoFechamento } from "@/lib/venda";
+import { calcularStatusQualificacao } from "@/lib/qualificacao";
+import { cartaoFechamento, type Marco } from "@/lib/venda";
 import {
   ROTULO_CATEGORIA_ANEXO,
   type CategoriaAnexo,
@@ -84,7 +85,8 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
   const { atual } = await exigirPapel(...NEGOCIOS);
   const { id } = await params;
   // Gravação parcial na criação (códigos fixos; ver `criarNegocioComCliente`).
-  const avisos = avisosDaUrl((await searchParams).avisos);
+  const { avisos: avisosParam, aba: abaParam } = await searchParams;
+  const avisos = avisosDaUrl(avisosParam);
   const supabase = await criarClienteServidor();
 
   const [{ data: negocio }, config, { data: parametros }] = await Promise.all([
@@ -357,54 +359,132 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
   ].sort((a, b) => b.quando.localeCompare(a.quando));
   const whatsapp = contato.telefone?.replace(/\D/g, "");
 
+  // Abas da ficha (?aba=): cada uma mostra só o seu conteúdo. Proposta e contrato só para quem pode.
+  const abas: { id: string; rotulo: string; contador?: number }[] = [
+    { id: "visao", rotulo: "Visão geral" },
+    { id: "sistema", rotulo: "Sistema" },
+    ...(pode(atual.papel, PROPOSTA_E_CONTRATO) ? [{ id: "proposta", rotulo: "Proposta e contrato" }] : []),
+    { id: "atividades", rotulo: "Atividades", contador: (tarefas ?? []).filter((t) => !t.concluida_em).length },
+    { id: "arquivos", rotulo: "Arquivos", contador: anexos?.length ?? 0 },
+  ];
+  const aba = abas.find((a) => a.id === abaParam)?.id ?? "visao";
+
+  // Proposta na jornada da venda (fora dos marcos do fechamento): emitida, link gerado ou ainda não gerada.
+  // `emissoes` vem da versão mais recente para a mais antiga.
+  const aberturasProposta = aberturas?.length ?? 0;
+  const marcoProposta: Marco = {
+    titulo: "Proposta",
+    estado: emissoes.length > 0 || proposta ? "cumprido" : "pendente",
+    rotulo:
+      emissoes.length > 0
+        ? `v${emissoes[0].versao} emitida`
+        : proposta
+          ? aberturasProposta > 0
+            ? `Link aberto ${aberturasProposta}x`
+            : "Link gerado, ainda não aberto"
+          : "Ainda não gerada",
+    ancora: "#proposta",
+  };
+
+  // Uma única instância (tem ações de escrita); a página a põe no topo ou no fim da Visão geral.
+  const arquivamento = (
+    <Arquivamento
+      negocioId={negocio.id}
+      arquivamento={
+        arquivado
+          ? {
+              quando: formatarDataHora(negocio.arquivado_em!),
+              autor: negocio.arquivado_por ? nomes.membro(negocio.arquivado_por) : null,
+              motivo: negocio.motivo_arquivamento ?? "",
+            }
+          : null
+      }
+      podeArquivar={pode(atual.papel, ARQUIVAR_NEGOCIO)}
+      responsavelInativo={responsavelInativo}
+      responsaveis={config.membros.filter((m) => m.ativo && pode(m.papel, RESPONSAVEL_COMERCIAL))}
+    />
+  );
+
+  // Resumo dos dados do negócio (cartão recolhido): consumo, conta e telhado, quando informados.
+  const consumoResumo = negocio.consumo_medio_kwh ?? negocio.consumo_estimado_kwh;
+  const resumoDados =
+    [
+      consumoResumo != null && `Consumo ${consumoResumo.toLocaleString("pt-BR")} kWh/mês${negocio.consumo_medio_kwh == null ? " (estimado)" : ""}`,
+      negocio.valor_conta_energia != null && `Conta ${formatarMoeda(negocio.valor_conta_energia)}`,
+      negocio.tipo_telhado && `Telhado ${negocio.tipo_telhado}`,
+    ]
+      .filter(Boolean)
+      .join(" · ") || "Toque para ver e editar";
+
+  // Resumo da qualificação SDR (cartão recolhido): mesmo critério do selo dentro dela.
+  const statusQualificacao = calcularStatusQualificacao(!!contato.telefone, negocio.qualif_objetivo, negocio.qualif_e_decisor);
+  const qualificado = statusQualificacao.atendidos === statusQualificacao.total;
+  const simNao = (v: boolean | null) => (v === true ? "sim" : v === false ? "não" : null);
+  const resumoQualificacao = [
+    `${statusQualificacao.rotulo} · ${statusQualificacao.atendidos} de ${statusQualificacao.total} critérios`,
+    simNao(negocio.qualif_e_decisor) && `Decisor: ${simNao(negocio.qualif_e_decisor)}`,
+    simNao(negocio.qualif_imovel_proprio) && `Imóvel próprio: ${simNao(negocio.qualif_imovel_proprio)}`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-4">
-      <Link href={`/negocios?funil=${negocio.funil_id}`} className="text-sm text-zinc-600 hover:underline">
-        ← Negócios
-      </Link>
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">{contato.nome}</h1>
-        <Selo>#{negocio.numero}</Selo>
-        <Selo tom="atencao">{nomes.etapa(negocio.etapa_id)}</Selo>
-        {negocio.status !== "aberto" && (
-          <Selo tom={negocio.status === "ganho" ? "positivo" : "negativo"}>
-            {negocio.status === "ganho" ? "Ganho" : "Perdido"}
-          </Selo>
-        )}
-        {arquivado && <Selo>Arquivado</Selo>}
-        {config.etiquetas
-          .filter((e) => etiquetasMarcadas.has(e.id))
-          .map((e) => (
-            <span
-              key={e.id}
-              className="rounded-full px-2 py-0.5 text-xs font-medium text-white"
-              style={{ background: e.cor ?? "#71717a" }}
-            >
-              {e.nome}
-            </span>
-          ))}
-        {negocio.status === "aberto" && !arquivado && (
-          <MoverEtapa
-            negocioId={negocio.id}
-            etapaAtualId={negocio.etapa_id}
-            etapas={config.etapas.filter((e) => e.funilId === negocio.funil_id && e.ativa)}
-            motivos={config.motivos}
-          />
-        )}
-      </div>
-      <p className="text-sm text-zinc-600">
-        {negocio.titulo}
-        {negocio.valor != null && <> · {formatarMoeda(negocio.valor)}</>}
-        {negocio.origem_id && <> · {nomes.origem(negocio.origem_id)}</>} · Responsável:{" "}
-        {negocio.responsavel_id ? nomes.membro(negocio.responsavel_id) : "ninguém"} · Criado em{" "}
-        {formatarDataHora(negocio.created_at)}
-        {negocio.fechado_em && <> · Fechado em {formatarDataHora(negocio.fechado_em)}</>}
-      </p>
-      {obraDoNegocio && (
-        <Link href={`/obras/${obraDoNegocio.id}`} className="w-fit text-sm text-zinc-600 underline hover:text-zinc-900">
-          Ver obra nº {obraDoNegocio.numero}
-        </Link>
-      )}
+    <div className="mx-auto flex max-w-6xl animate-entrar flex-col gap-5">
+      <Voltar href={`/negocios?funil=${negocio.funil_id}`}>Negócios</Voltar>
+      <header className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-1">
+          <div className="min-w-0">
+            <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">{contato.nome}</h1>
+            <p className="mt-1 text-sm text-texto-2">
+              #{negocio.numero} · {negocio.titulo}
+              {negocio.origem_id && <> · {nomes.origem(negocio.origem_id)}</>}
+            </p>
+          </div>
+          {negocio.valor != null && (
+            <p className="font-titulo text-2xl font-light tracking-tight text-texto tabular-nums md:text-3xl">{formatarMoeda(negocio.valor)}</p>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Selo tom="atencao">{nomes.etapa(negocio.etapa_id)}</Selo>
+          {negocio.status !== "aberto" && (
+            <Selo tom={negocio.status === "ganho" ? "positivo" : "negativo"}>
+              {negocio.status === "ganho" ? "Ganho" : "Perdido"}
+            </Selo>
+          )}
+          {arquivado && <Selo>Arquivado</Selo>}
+          {config.etiquetas
+            .filter((e) => etiquetasMarcadas.has(e.id))
+            .map((e) => (
+              <span key={e.id} className="inline-flex items-center gap-1.5 rounded-full bg-superficie-2 px-2 py-0.5 text-xs text-texto">
+                <span className="h-1.5 w-1.5 rounded-full" style={{ background: e.cor ?? "#8a8a92" }} aria-hidden />
+                {e.nome}
+              </span>
+            ))}
+          {negocio.status === "aberto" && !arquivado && (
+            <div className="ml-auto">
+              <MoverEtapa
+                negocioId={negocio.id}
+                etapaAtualId={negocio.etapa_id}
+                etapas={config.etapas.filter((e) => e.funilId === negocio.funil_id && e.ativa)}
+                motivos={config.motivos}
+              />
+            </div>
+          )}
+        </div>
+        <p className="text-xs text-texto-2">
+          Responsável: {negocio.responsavel_id ? nomes.membro(negocio.responsavel_id) : "ninguém"} · Criado em{" "}
+          {formatarDataHora(negocio.created_at)}
+          {negocio.fechado_em && <> · Fechado em {formatarDataHora(negocio.fechado_em)}</>}
+          {obraDoNegocio && (
+            <>
+              {" · "}
+              <Link href={`/obras/${obraDoNegocio.id}`} className="font-medium text-dourado-texto underline-offset-2 hover:underline">
+                Ver obra nº {obraDoNegocio.numero}
+              </Link>
+            </>
+          )}
+        </p>
+      </header>
       {negocio.status === "perdido" && negocio.motivo_perda_id && (
         <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">
           Motivo da perda: {nomes.motivo(negocio.motivo_perda_id)}
@@ -412,21 +492,8 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
         </p>
       )}
 
-      <Arquivamento
-        negocioId={negocio.id}
-        arquivamento={
-          arquivado
-            ? {
-                quando: formatarDataHora(negocio.arquivado_em!),
-                autor: negocio.arquivado_por ? nomes.membro(negocio.arquivado_por) : null,
-                motivo: negocio.motivo_arquivamento ?? "",
-              }
-            : null
-        }
-        podeArquivar={pode(atual.papel, ARQUIVAR_NEGOCIO)}
-        responsavelInativo={responsavelInativo}
-        responsaveis={config.membros.filter((m) => m.ativo && pode(m.papel, RESPONSAVEL_COMERCIAL))}
-      />
+      {/* Arquivado: o aviso (e o desarquivar) fica no topo, em todas as abas. Senão, o botão vai ao fim da Visão geral. */}
+      {arquivado && arquivamento}
 
       {avisos.length > 0 && (
         <div role="alert" className="flex flex-col gap-1 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
@@ -453,178 +520,286 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
         </p>
       )}
 
-      {/* Fechamento primeiro no DOM: no celular aparece logo após o cabeçalho; no desktop a grade o
-          coloca no topo da coluna direita. Uma única instância (sem cópia escondida por CSS). */}
-      <div className="grid gap-4 lg:grid-cols-[2fr_1fr] lg:grid-rows-[auto_1fr]">
-        <div className="lg:col-start-2 lg:row-start-1">
-          <Cartao titulo={cartao.titulo}>
-            {cartao.tipo === "marcos" ? <MarcosVenda marcos={cartao.marcos} obra={obraDoNegocio}>{fechamento}</MarcosVenda> : fechamento}
-          </Cartao>
-        </div>
-        <div className="flex flex-col gap-4 lg:col-start-1 lg:row-span-2 lg:row-start-1">
-          <Cartao titulo="Dados do negócio">
-            <EdicaoNegocio
-              // Os campos usam defaultValue: desarquivar com novo responsável (ou arquivar) muda os dados por fora do
-              // editor, e sem remontar ele mostraria o responsável antigo e o gravaria no próximo "Salvar".
-              key={`${negocio.responsavel_id ?? ""}:${negocio.arquivado_em ?? ""}`}
-              empresaId={negocio.empresa_id}
-              negocio={{
-                id: negocio.id,
-                titulo: negocio.titulo,
-                origemId: negocio.origem_id,
-                responsavelId: negocio.responsavel_id,
-                valor: negocio.valor,
-                descricao: negocio.descricao,
-                tipoTelhado: negocio.tipo_telhado,
-                unidadeConsumidora: negocio.unidade_consumidora,
-                padraoCliente: negocio.padrao_cliente,
-                consumoMedioKwh: negocio.consumo_medio_kwh,
-                consumoEstimadoKwh: negocio.consumo_estimado_kwh,
-                tarifaEfetivaKwh: negocio.tarifa_efetiva_kwh,
-                valorContaEnergia: negocio.valor_conta_energia,
-              }}
-              origens={config.origens.filter((o) => o.ativa || o.id === negocio.origem_id)}
-              responsaveis={pode(atual.papel, ESCOLHER_RESPONSAVEL_NEGOCIO) ? config.membros.filter((m) => m.ativo && pode(m.papel, RESPONSAVEL_COMERCIAL)) : []}
-              podeEditarValor={pode(atual.papel, EDITAR_VALOR_NEGOCIO)}
-            />
-          </Cartao>
-          <Cartao titulo="Kit personalizado">
-            <KitPersonalizado
-              negocioId={negocio.id}
-              negocioValor={negocio.valor}
-              estruturaTelhado={negocio.estrutura_telhado}
-              padraoCliente={negocio.padrao_cliente}
-              consumoMedioKwhPadrao={negocio.consumo_medio_kwh}
-              consumoEstimadoKwhPadrao={negocio.consumo_estimado_kwh}
-              tarifaEfetivaKwhPadrao={negocio.tarifa_efetiva_kwh}
-              valorFaturaMedioPadrao={negocio.valor_conta_energia}
-              componentesSalvos={(componentes ?? []).map((c) => ({
-                tipo: c.tipo as TipoComponenteKit,
-                descricao: c.descricao,
-                potenciaW: c.potencia_w,
-                quantidade: c.quantidade,
-              }))}
-              parametros={
-                parametros
-                  ? {
-                      produtividadeKwhKwpMes: parametros.produtividade_kwh_kwp_mes,
-                      percentualFioB: parametros.percentual_fio_b,
-                      disponibilidadeMonoKwh: parametros.disponibilidade_mono_kwh,
-                      disponibilidadeBiKwh: parametros.disponibilidade_bi_kwh,
-                      disponibilidadeTriKwh: parametros.disponibilidade_tri_kwh,
-                      custoInstalacaoPorModulo: parametros.custo_instalacao_por_modulo,
-                      custoMaterialCaPorKwp: parametros.custo_material_ca_por_kwp,
-                      custoEngenharia: parametros.custo_engenharia,
-                      comissaoPercentual: parametros.comissao_percentual,
-                    }
-                  : null
-              }
-              precoDesatualizado={precoDesatualizado}
-              vigencia={vigenciaDaTela}
-              contexto={contextoEstimativa}
-              historico={historicoDaTela(historicoCalculo)}
-              calculo={
-                calculo
-                  ? {
-                      id: calculo.id,
-                      kitNome: calculo.kit_nome,
-                      kitPreco: calculo.kit_preco,
-                      tipoLigacao: calculo.tipo_ligacao as TipoLigacao,
-                      consumoMedioKwh: calculo.consumo_medio_kwh,
-                      valorFaturaMedio: calculo.valor_fatura_medio,
-                      tarifaKwh: calculo.tarifa_kwh,
-                      geracaoEstimadaKwhMes: calculo.geracao_estimada_kwh_mes,
-                      economiaMensal: calculo.economia_mensal,
-                      paybackMeses: calculo.payback_meses,
-                      observacoes: calculo.observacoes,
-                      estadoFinanceiro: calculo.estado_financeiro,
-                      contaSemSolar: calculo.conta_sem_solar,
-                      contaComSolar: calculo.conta_com_solar,
-                      kwhCompensado: calculo.kwh_compensado,
-                      kwhNaoCompensado: calculo.kwh_nao_compensado,
-                      custoFioB: calculo.custo_fio_b,
-                      tarifaBaseTributaria: calculo.tarifa_base_tributaria as BaseTributaria | null,
-                      tarifaOrigem: calculo.tarifa_origem,
-                      distribuidora: calculo.distribuidora,
-                      fioBRsMwh: calculo.fio_b_rs_mwh,
-                      percentualLegalFioB: calculo.percentual_legal_fio_b,
-                      vigenciaInicio: calculo.fio_b_vigencia_inicio,
-                      vigenciaFim: calculo.fio_b_vigencia_fim,
-                      disponibilidadeKwh: calculo.disponibilidade_kwh,
-                      dataReferencia: calculo.data_referencia,
-                      ressalvas: calculo.ressalvas,
-                    }
-                  : null
-              }
-            />
-          </Cartao>
-          <Cartao titulo="Qualificação SDR">
-            <Qualificacao
-              negocio={{
-                id: negocio.id,
-                qualifTipoCliente: negocio.qualif_tipo_cliente,
-                qualifPossuiContaEnergia: negocio.qualif_possui_conta_energia,
-                qualifDistribuidora: negocio.qualif_distribuidora,
-                qualifImovelProprio: negocio.qualif_imovel_proprio,
-                qualifObjetivo: negocio.qualif_objetivo,
-                qualifPrazoInstalacao: negocio.qualif_prazo_instalacao,
-                qualifBuscaFinanciamento: negocio.qualif_busca_financiamento,
-                qualifOrcamentoOutraEmpresa: negocio.qualif_orcamento_outra_empresa,
-                qualifEDecisor: negocio.qualif_e_decisor,
-                qualifOutroDecisor: negocio.qualif_outro_decisor,
-                qualifParticipantesDecisao: negocio.qualif_participantes_decisao,
-                qualifObservacoes: negocio.qualif_observacoes,
-              }}
-              telefoneContato={contato.telefone}
-              vendedores={config.membros.filter((m) => m.ativo && m.papel === "vendedor")}
-            />
-          </Cartao>
-          {ultimoHandoff &&
-            (souAdmin ||
-              atual.papel === "gestor" ||
-              atual.membroId === ultimoHandoff.para_membro_id ||
-              atual.membroId === ultimoHandoff.de_membro_id) &&
-            (() => {
-              if (ultimoHandoff.status === "pendente") {
+      {/* Jornada da venda: logo após o cabeçalho e fora das abas (no celular e no computador), com a
+          única instância da ação de fechamento. Os links levam à aba onde ficam proposta, contrato e pagamento. */}
+      <Cartao titulo={cartao.titulo}>
+        {cartao.tipo === "marcos" ? (
+          <MarcosVenda marcos={cartao.marcos} obra={obraDoNegocio} proposta={marcoProposta} hrefBase={`/negocios/${negocio.id}?aba=proposta`}>
+            {fechamento}
+          </MarcosVenda>
+        ) : (
+          fechamento
+        )}
+      </Cartao>
+
+      <nav aria-label="Seções do negócio" className="-mx-4 flex gap-1 overflow-x-auto border-b border-linha px-4 [scrollbar-width:none] md:mx-0 md:px-0">
+        {abas.map((a) => (
+          <Link
+            key={a.id}
+            href={`/negocios/${negocio.id}?aba=${a.id}`}
+            scroll={false}
+            aria-current={aba === a.id ? "page" : undefined}
+            className={`-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm whitespace-nowrap transition-colors duration-200 ease-raion ${
+              aba === a.id ? "border-dourado font-semibold text-texto" : "border-transparent text-texto-2 hover:text-texto"
+            }`}
+          >
+            {a.rotulo}
+            {a.contador ? <span className="rounded-full bg-superficie-2 px-1.5 text-xs text-texto-2 tabular-nums">{a.contador}</span> : null}
+          </Link>
+        ))}
+      </nav>
+
+      {/* Cada aba renderiza só o seu conteúdo. */}
+      {aba === "visao" && (
+        <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
+          <div className="flex min-w-0 flex-col gap-4">
+            <CartaoRecolhivel titulo="Dados do negócio" resumo={resumoDados}>
+              <EdicaoNegocio
+                // Os campos usam defaultValue: desarquivar com novo responsável (ou arquivar) muda os dados por fora do
+                // editor, e sem remontar ele mostraria o responsável antigo e o gravaria no próximo "Salvar".
+                key={`${negocio.responsavel_id ?? ""}:${negocio.arquivado_em ?? ""}`}
+                empresaId={negocio.empresa_id}
+                negocio={{
+                  id: negocio.id,
+                  titulo: negocio.titulo,
+                  origemId: negocio.origem_id,
+                  responsavelId: negocio.responsavel_id,
+                  valor: negocio.valor,
+                  descricao: negocio.descricao,
+                  tipoTelhado: negocio.tipo_telhado,
+                  unidadeConsumidora: negocio.unidade_consumidora,
+                  padraoCliente: negocio.padrao_cliente,
+                  consumoMedioKwh: negocio.consumo_medio_kwh,
+                  consumoEstimadoKwh: negocio.consumo_estimado_kwh,
+                  tarifaEfetivaKwh: negocio.tarifa_efetiva_kwh,
+                  valorContaEnergia: negocio.valor_conta_energia,
+                }}
+                origens={config.origens.filter((o) => o.ativa || o.id === negocio.origem_id)}
+                responsaveis={pode(atual.papel, ESCOLHER_RESPONSAVEL_NEGOCIO) ? config.membros.filter((m) => m.ativo && pode(m.papel, RESPONSAVEL_COMERCIAL)) : []}
+                podeEditarValor={pode(atual.papel, EDITAR_VALOR_NEGOCIO)}
+              />
+            </CartaoRecolhivel>
+            <CartaoRecolhivel titulo="Qualificação SDR" resumo={resumoQualificacao} aberto={atual.papel === "sdr" && !qualificado}>
+              <Qualificacao
+                negocio={{
+                  id: negocio.id,
+                  qualifTipoCliente: negocio.qualif_tipo_cliente,
+                  qualifPossuiContaEnergia: negocio.qualif_possui_conta_energia,
+                  qualifDistribuidora: negocio.qualif_distribuidora,
+                  qualifImovelProprio: negocio.qualif_imovel_proprio,
+                  qualifObjetivo: negocio.qualif_objetivo,
+                  qualifPrazoInstalacao: negocio.qualif_prazo_instalacao,
+                  qualifBuscaFinanciamento: negocio.qualif_busca_financiamento,
+                  qualifOrcamentoOutraEmpresa: negocio.qualif_orcamento_outra_empresa,
+                  qualifEDecisor: negocio.qualif_e_decisor,
+                  qualifOutroDecisor: negocio.qualif_outro_decisor,
+                  qualifParticipantesDecisao: negocio.qualif_participantes_decisao,
+                  qualifObservacoes: negocio.qualif_observacoes,
+                }}
+                telefoneContato={contato.telefone}
+                vendedores={config.membros.filter((m) => m.ativo && m.papel === "vendedor")}
+              />
+            </CartaoRecolhivel>
+            {ultimoHandoff &&
+              (souAdmin ||
+                atual.papel === "gestor" ||
+                atual.membroId === ultimoHandoff.para_membro_id ||
+                atual.membroId === ultimoHandoff.de_membro_id) &&
+              (() => {
+                if (ultimoHandoff.status === "pendente") {
+                  return (
+                    <Cartao titulo="Oportunidade">
+                      <HandoffAceite
+                        negocioId={negocio.id}
+                        handoffId={ultimoHandoff.id}
+                        deNome={ultimoHandoff.de_membro_id ? nomes.membro(ultimoHandoff.de_membro_id) : "SDR"}
+                        podeResponder={!!podeResponderHandoff}
+                      />
+                    </Cartao>
+                  );
+                }
+                if (ultimoHandoff.status === "devolvido") {
+                  return (
+                    <Cartao titulo="Oportunidade">
+                      <div className="flex flex-col gap-1">
+                        <Selo tom="negativo">Devolvido por {nomes.membro(ultimoHandoff.para_membro_id)}</Selo>
+                        <span className="text-sm text-zinc-600">{ultimoHandoff.motivo_devolucao}</span>
+                      </div>
+                    </Cartao>
+                  );
+                }
+
+                const feedbackExistente = ultimoHandoff.handoffs_feedback as unknown as { feedback: string; autor_id: string } | null;
+                const jaContatouLead = (notas ?? []).some(
+                  (n) => n.autor_id === ultimoHandoff.para_membro_id && n.created_at > ultimoHandoff.created_at,
+                );
                 return (
-                  <Cartao titulo="Oportunidade">
-                    <HandoffAceite
+                  <Cartao titulo="Feedback do lead (handoff)">
+                    <FeedbackHandoff
                       negocioId={negocio.id}
                       handoffId={ultimoHandoff.id}
-                      deNome={ultimoHandoff.de_membro_id ? nomes.membro(ultimoHandoff.de_membro_id) : "SDR"}
-                      podeResponder={!!podeResponderHandoff}
+                      souAutor={atual.membroId === ultimoHandoff.para_membro_id}
+                      jaContatouLead={jaContatouLead}
+                      feedback={feedbackExistente?.feedback ?? null}
+                      autorNome={feedbackExistente ? nomes.membro(feedbackExistente.autor_id) : null}
                     />
                   </Cartao>
                 );
-              }
-              if (ultimoHandoff.status === "devolvido") {
-                return (
-                  <Cartao titulo="Oportunidade">
-                    <div className="flex flex-col gap-1">
-                      <Selo tom="negativo">Devolvido por {nomes.membro(ultimoHandoff.para_membro_id)}</Selo>
-                      <span className="text-sm text-zinc-600">{ultimoHandoff.motivo_devolucao}</span>
-                    </div>
-                  </Cartao>
-                );
-              }
-
-              const feedbackExistente = ultimoHandoff.handoffs_feedback as unknown as { feedback: string; autor_id: string } | null;
-              const jaContatouLead = (notas ?? []).some(
-                (n) => n.autor_id === ultimoHandoff.para_membro_id && n.created_at > ultimoHandoff.created_at,
-              );
-              return (
-                <Cartao titulo="Feedback do lead (handoff)">
-                  <FeedbackHandoff
-                    negocioId={negocio.id}
-                    handoffId={ultimoHandoff.id}
-                    souAutor={atual.membroId === ultimoHandoff.para_membro_id}
-                    jaContatouLead={jaContatouLead}
-                    feedback={feedbackExistente?.feedback ?? null}
-                    autorNome={feedbackExistente ? nomes.membro(feedbackExistente.autor_id) : null}
-                  />
-                </Cartao>
-              );
-            })()}
+              })()}
+          </div>
+          <div className="flex min-w-0 flex-col gap-4">
+            <Cartao titulo="Contato">
+              <dl className="flex flex-col gap-2 text-sm">
+                <div>
+                  <dt className="text-zinc-500">{contato.tipo === "pj" ? "Razão social" : "Nome"}</dt>
+                  <dd>
+                    <Link href={`/contatos/${contato.id}`} className="font-medium text-amber-700 hover:underline">
+                      {contato.nome}
+                    </Link>
+                  </dd>
+                </div>
+                {contato.telefone && (
+                  <div>
+                    <dt className="text-zinc-500">Telefone</dt>
+                    <dd>{contato.telefone}</dd>
+                  </div>
+                )}
+                {contato.email && (
+                  <div>
+                    <dt className="text-zinc-500">E-mail</dt>
+                    <dd>{contato.email}</dd>
+                  </div>
+                )}
+                {contato.endereco && (
+                  <div>
+                    <dt className="text-zinc-500">Endereço</dt>
+                    <dd>{contato.endereco}</dd>
+                  </div>
+                )}
+                {(contato.cidade || contato.uf) && (
+                  <div>
+                    <dt className="text-zinc-500">Cidade</dt>
+                    <dd>{[contato.cidade, contato.uf].filter(Boolean).join(" / ")}</dd>
+                  </div>
+                )}
+              </dl>
+              {whatsapp && whatsapp.length >= 10 && (
+                <a
+                  href={`https://wa.me/${whatsapp.startsWith("55") ? whatsapp : `55${whatsapp}`}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-4 inline-flex w-full items-center justify-center rounded-md bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
+                >
+                  Abrir no WhatsApp
+                </a>
+              )}
+            </Cartao>
+            {etiquetasVisiveis.length > 0 && (
+              <Cartao titulo="Etiquetas">
+                <div className="flex flex-wrap gap-2">
+                  {etiquetasVisiveis.map((e) => {
+                    const marcada = etiquetasMarcadas.has(e.id);
+                    return (
+                      <form key={e.id} action={alternarEtiqueta}>
+                        <input type="hidden" name="negocioId" value={negocio.id} />
+                        <input type="hidden" name="etiquetaId" value={e.id} />
+                        <input type="hidden" name="marcar" value={String(!marcada)} />
+                        <button
+                          aria-pressed={marcada}
+                          className={`rounded-full border px-2.5 py-1 text-xs font-medium ${marcada ? "text-white" : "bg-white text-zinc-700"}`}
+                          style={
+                            marcada
+                              ? { background: e.cor ?? "#71717a", borderColor: e.cor ?? "#71717a" }
+                              : { borderColor: e.cor ?? "#d4d4d8" }
+                          }
+                        >
+                          {marcada ? "✓ " : ""}
+                          {e.nome}
+                        </button>
+                      </form>
+                    );
+                  })}
+                </div>
+              </Cartao>
+            )}
+            {!arquivado && arquivamento}
+          </div>
+        </div>
+      )}
+      {aba === "sistema" && (
+        <Cartao titulo="Kit personalizado">
+          <KitPersonalizado
+            negocioId={negocio.id}
+            negocioValor={negocio.valor}
+            estruturaTelhado={negocio.estrutura_telhado}
+            padraoCliente={negocio.padrao_cliente}
+            consumoMedioKwhPadrao={negocio.consumo_medio_kwh}
+            consumoEstimadoKwhPadrao={negocio.consumo_estimado_kwh}
+            tarifaEfetivaKwhPadrao={negocio.tarifa_efetiva_kwh}
+            valorFaturaMedioPadrao={negocio.valor_conta_energia}
+            componentesSalvos={(componentes ?? []).map((c) => ({
+              tipo: c.tipo as TipoComponenteKit,
+              descricao: c.descricao,
+              potenciaW: c.potencia_w,
+              quantidade: c.quantidade,
+            }))}
+            parametros={
+              parametros
+                ? {
+                    produtividadeKwhKwpMes: parametros.produtividade_kwh_kwp_mes,
+                    percentualFioB: parametros.percentual_fio_b,
+                    disponibilidadeMonoKwh: parametros.disponibilidade_mono_kwh,
+                    disponibilidadeBiKwh: parametros.disponibilidade_bi_kwh,
+                    disponibilidadeTriKwh: parametros.disponibilidade_tri_kwh,
+                    custoInstalacaoPorModulo: parametros.custo_instalacao_por_modulo,
+                    custoMaterialCaPorKwp: parametros.custo_material_ca_por_kwp,
+                    custoEngenharia: parametros.custo_engenharia,
+                    comissaoPercentual: parametros.comissao_percentual,
+                  }
+                : null
+            }
+            precoDesatualizado={precoDesatualizado}
+            vigencia={vigenciaDaTela}
+            contexto={contextoEstimativa}
+            historico={historicoDaTela(historicoCalculo)}
+            calculo={
+              calculo
+                ? {
+                    id: calculo.id,
+                    kitNome: calculo.kit_nome,
+                    kitPreco: calculo.kit_preco,
+                    tipoLigacao: calculo.tipo_ligacao as TipoLigacao,
+                    consumoMedioKwh: calculo.consumo_medio_kwh,
+                    valorFaturaMedio: calculo.valor_fatura_medio,
+                    tarifaKwh: calculo.tarifa_kwh,
+                    geracaoEstimadaKwhMes: calculo.geracao_estimada_kwh_mes,
+                    economiaMensal: calculo.economia_mensal,
+                    paybackMeses: calculo.payback_meses,
+                    observacoes: calculo.observacoes,
+                    estadoFinanceiro: calculo.estado_financeiro,
+                    contaSemSolar: calculo.conta_sem_solar,
+                    contaComSolar: calculo.conta_com_solar,
+                    kwhCompensado: calculo.kwh_compensado,
+                    kwhNaoCompensado: calculo.kwh_nao_compensado,
+                    custoFioB: calculo.custo_fio_b,
+                    tarifaBaseTributaria: calculo.tarifa_base_tributaria as BaseTributaria | null,
+                    tarifaOrigem: calculo.tarifa_origem,
+                    distribuidora: calculo.distribuidora,
+                    fioBRsMwh: calculo.fio_b_rs_mwh,
+                    percentualLegalFioB: calculo.percentual_legal_fio_b,
+                    vigenciaInicio: calculo.fio_b_vigencia_inicio,
+                    vigenciaFim: calculo.fio_b_vigencia_fim,
+                    disponibilidadeKwh: calculo.disponibilidade_kwh,
+                    dataReferencia: calculo.data_referencia,
+                    ressalvas: calculo.ressalvas,
+                  }
+                : null
+            }
+          />
+        </Cartao>
+      )}
+      {aba === "proposta" && (
+        <div id="proposta" className="grid scroll-mt-4 gap-4 lg:grid-cols-2 [&>*]:min-w-0">
           {pode(atual.papel, PROPOSTA_E_CONTRATO) && (
             <>
               {!emissoesAusente && (
@@ -717,6 +892,10 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
               </Cartao>
             </div>
           )}
+        </div>
+      )}
+      {aba === "atividades" && (
+        <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
           <Cartao titulo="Tarefas">
             <div className="flex flex-col gap-3">
               <ListaTarefas
@@ -765,81 +944,9 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
             </ol>
           </Cartao>
         </div>
-        <div className="flex flex-col gap-4 lg:col-start-2 lg:row-start-2">
-          <Cartao titulo="Contato">
-            <dl className="flex flex-col gap-2 text-sm">
-              <div>
-                <dt className="text-zinc-500">{contato.tipo === "pj" ? "Razão social" : "Nome"}</dt>
-                <dd>
-                  <Link href={`/contatos/${contato.id}`} className="font-medium text-amber-700 hover:underline">
-                    {contato.nome}
-                  </Link>
-                </dd>
-              </div>
-              {contato.telefone && (
-                <div>
-                  <dt className="text-zinc-500">Telefone</dt>
-                  <dd>{contato.telefone}</dd>
-                </div>
-              )}
-              {contato.email && (
-                <div>
-                  <dt className="text-zinc-500">E-mail</dt>
-                  <dd>{contato.email}</dd>
-                </div>
-              )}
-              {contato.endereco && (
-                <div>
-                  <dt className="text-zinc-500">Endereço</dt>
-                  <dd>{contato.endereco}</dd>
-                </div>
-              )}
-              {(contato.cidade || contato.uf) && (
-                <div>
-                  <dt className="text-zinc-500">Cidade</dt>
-                  <dd>{[contato.cidade, contato.uf].filter(Boolean).join(" / ")}</dd>
-                </div>
-              )}
-            </dl>
-            {whatsapp && whatsapp.length >= 10 && (
-              <a
-                href={`https://wa.me/${whatsapp.startsWith("55") ? whatsapp : `55${whatsapp}`}`}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-4 inline-flex w-full items-center justify-center rounded-md bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
-              >
-                Abrir no WhatsApp
-              </a>
-            )}
-          </Cartao>
-          {etiquetasVisiveis.length > 0 && (
-            <Cartao titulo="Etiquetas">
-              <div className="flex flex-wrap gap-2">
-                {etiquetasVisiveis.map((e) => {
-                  const marcada = etiquetasMarcadas.has(e.id);
-                  return (
-                    <form key={e.id} action={alternarEtiqueta}>
-                      <input type="hidden" name="negocioId" value={negocio.id} />
-                      <input type="hidden" name="etiquetaId" value={e.id} />
-                      <input type="hidden" name="marcar" value={String(!marcada)} />
-                      <button
-                        aria-pressed={marcada}
-                        className={`rounded-full border px-2.5 py-1 text-xs font-medium ${marcada ? "text-white" : "bg-white text-zinc-700"}`}
-                        style={
-                          marcada
-                            ? { background: e.cor ?? "#71717a", borderColor: e.cor ?? "#71717a" }
-                            : { borderColor: e.cor ?? "#d4d4d8" }
-                        }
-                      >
-                        {marcada ? "✓ " : ""}
-                        {e.nome}
-                      </button>
-                    </form>
-                  );
-                })}
-              </div>
-            </Cartao>
-          )}
+      )}
+      {aba === "arquivos" && (
+        <div className="max-w-3xl">
           <Cartao titulo={`Arquivos (${anexos?.length ?? 0})`}>
             <ul className="mb-3 flex flex-col">
               {(anexos ?? []).map((a) => (
@@ -889,7 +996,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
             {!arquivado && <EnviarAnexo empresaId={atual.empresaId} negocioId={negocio.id} />}
           </Cartao>
         </div>
-      </div>
+      )}
     </div>
   );
 }

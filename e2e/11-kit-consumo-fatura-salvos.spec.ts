@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { clienteDe, entrarComo, lerBase } from "./ajuda";
+import { abrirAba, abrirCartao, clienteDe, entrarComo, fichaNaAba, lerBase } from "./ajuda";
 import type { BaseFicticia } from "./base-ficticia";
 
 /**
@@ -70,7 +70,7 @@ async function novoNegocio(nome: string) {
 
 async function abrir(page: Page, negocioId: string) {
   await entrarComo(page, base.usuarios.vendedor, base.senha);
-  await page.goto(`/negocios/${negocioId}`);
+  await page.goto(fichaNaAba(negocioId, "Sistema"));
 }
 
 async function adicionarModulo(page: Page) {
@@ -119,6 +119,8 @@ test.describe("kWh e fatura do kit preservados", () => {
     expect(await n.calculo()).toEqual({ estado_financeiro: "incompleto", consumo_medio_kwh: 450, valor_fatura_medio: 300, economia_mensal: null });
     await page.reload();
     expect(await n.negocio()).toEqual({ consumo_medio_kwh: 450, valor_conta_energia: 300 });
+    await abrirAba(page, "Visão geral");
+    await abrirCartao(page, "Dados do negócio");
     await expect(page.getByLabel("Consumo médio (12 meses, kWh)")).toHaveValue("450");
     await expect(page.getByLabel("Valor da conta de energia (R$)")).toHaveValue("300");
   });
@@ -127,12 +129,15 @@ test.describe("kWh e fatura do kit preservados", () => {
     const n = await novoNegocio("Cliente limpa dados do negócio (fictício)");
     await abrir(page, n.id);
 
+    // "Dados do negócio" fica na Visão geral, num cartão recolhido.
+    await abrirAba(page, "Visão geral");
+    await abrirCartao(page, "Dados do negócio");
     await page.getByLabel("Consumo médio (12 meses, kWh)").fill("");
     await page.getByLabel("Valor da conta de energia (R$)").fill("");
     await page.getByRole("button", { name: "Salvar", exact: true }).click();
     await expect.poll(() => n.negocio()).toEqual({ consumo_medio_kwh: null, valor_conta_energia: null });
 
-    await page.reload();
+    await page.goto(fichaNaAba(n.id, "Sistema"));
     await adicionarModulo(page);
     // Sem tarifa: com tarifa e sem consumo nem fatura o servidor recusa o kit (comportamento anterior, coberto no teste de banco).
     await page.getByLabel("Tarifa (R$/kWh)").fill("");

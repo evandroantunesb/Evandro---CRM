@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { clienteDe, entrarComo, lerBase } from "./ajuda";
+import { clienteDe, entrarComo, fichaNaAba, lerBase } from "./ajuda";
 import type { BaseFicticia } from "./base-ficticia";
 
 /**
@@ -38,7 +38,7 @@ async function novoNegocio(nome: string) {
 
 async function abrirKit(page: Page, negocioId: string) {
   await entrarComo(page, base.usuarios.vendedor, base.senha);
-  await page.goto(`/negocios/${negocioId}`);
+  await page.goto(fichaNaAba(negocioId, "Sistema"));
   await page.getByRole("button", { name: "+ Adicionar módulo" }).click();
 }
 

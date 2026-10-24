@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { clienteDe, clienteServico, entrarComo, lerBase } from "./ajuda";
+import { abrirAba, clienteDe, clienteServico, entrarComo, fichaNaAba, lerBase } from "./ajuda";
 import type { BaseFicticia } from "./base-ficticia";
 
 /**
@@ -121,7 +121,7 @@ async function novoNegocio(nome: string, { kit = false, legado = false, distribu
 
 async function abrir(page: Page, negocioId: string) {
   await entrarComo(page, base.usuarios.vendedor, base.senha);
-  await page.goto(`/negocios/${negocioId}`);
+  await page.goto(fichaNaAba(negocioId, "Sistema"));
 }
 
 async function adicionarModulo(page: Page, potenciaW: string, quantidade: string) {
@@ -314,19 +314,22 @@ test.describe("estados do cálculo", () => {
     await expect(porId(page, "estimativa-incompleta")).toBeVisible();
 
     // Proposta: nova proposta bloqueada com a mensagem do servidor (fórmula antiga).
+    await abrirAba(page, "Proposta e contrato");
     await expect(page.getByRole("button", { name: "Gerar link da proposta" })).toBeDisabled();
     const bloqueada = porId(page, "proposta-bloqueada");
     await expect(bloqueada).toBeVisible();
     await expect(bloqueada).toContainText("O último cálculo foi feito pela fórmula antiga, que não foi validada. Recalcule o kit antes de gerar a proposta.");
 
-    // Preço: valor do negócio diverge da linha legada, mas "Atualizar preço no cálculo" não é oferecido.
+    // Preço (no kit, aba Sistema): valor do negócio diverge da linha legada, mas "Atualizar preço no cálculo" não é oferecido.
     const { error } = await n.cliente.from("negocios").update({ valor: 28000 }).eq("id", n.id);
     if (error) throw error;
-    await page.reload();
+    await page.goto(fichaNaAba(n.id, "Sistema"));
+    await expect(porId(page, "calculo-anterior")).toHaveCount(1);
     await expect(page.getByRole("button", { name: "Atualizar preço no cálculo" })).toHaveCount(0);
     await expect(page.getByText("Atualizar preço no cálculo")).toHaveCount(0);
 
     // Contrato liberado: nem legado nem preço divergente bloqueiam.
+    await abrirAba(page, "Proposta e contrato");
     await expect(page.getByRole("button", { name: "Gerar contrato" })).toBeEnabled();
     expect(await n.calculo()).toEqual(antes);
   });
@@ -337,6 +340,7 @@ test.describe("estados do cálculo", () => {
     if (error) throw error;
     const antes = await n.calculo();
     await abrir(page, n.id);
+    await abrirAba(page, "Proposta e contrato");
     await expect(page.getByRole("button", { name: "Gerar contrato" })).toBeDisabled();
     await expect(page.getByRole("alert").filter({ hasText: "O kit mudou depois do último cálculo. Recalcule antes de gerar o contrato." })).toBeVisible();
     await expect(page.getByRole("button", { name: "Gerar link da proposta" })).toBeDisabled();
@@ -367,6 +371,7 @@ test.describe("estados do cálculo", () => {
 
     // Ficha: o link existe, mas sem PDF e com o aviso de que os valores não estão disponíveis.
     await abrir(page, n.id);
+    await abrirAba(page, "Proposta e contrato");
     await expect(page.getByText("Link da proposta")).toBeVisible();
     await expect(page.getByRole("button", { name: "Baixar PDF" })).toHaveCount(0);
     await expect(porId(page, "proposta-bloqueada")).toContainText("O link já enviado ao cliente continua válido");

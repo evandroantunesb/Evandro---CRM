@@ -66,6 +66,32 @@ export function clienteServico() {
   });
 }
 
+type AbaFicha = "Visão geral" | "Sistema" | "Proposta e contrato" | "Atividades" | "Arquivos";
+const PARAMETRO_ABA: Record<AbaFicha, string> = {
+  "Visão geral": "visao",
+  Sistema: "sistema",
+  "Proposta e contrato": "proposta",
+  Atividades: "atividades",
+  Arquivos: "arquivos",
+};
+
+/** Endereço da ficha do negócio já numa aba (para entrar direto no kit, na proposta etc.). */
+export const fichaNaAba = (negocioId: string, aba: AbaFicha) => `/negocios/${negocioId}?aba=${PARAMETRO_ABA[aba]}`;
+
+/** Ficha do negócio: troca de aba como a pessoa faz, pelo link da navegação "Seções do negócio". */
+export async function abrirAba(page: Page, aba: AbaFicha) {
+  const link = page.getByRole("navigation", { name: "Seções do negócio" }).getByRole("link", { name: new RegExp(`^${aba}`) });
+  await link.click();
+  await expect(link).toHaveAttribute("aria-current", "page");
+}
+
+/** Abre um cartão recolhível da ficha pelo título (ex.: "Dados do negócio"), se ele estiver fechado. */
+export async function abrirCartao(page: Page, titulo: string) {
+  const cartao = page.locator("details").filter({ has: page.getByRole("heading", { name: titulo, exact: true }) }).first();
+  if (!(await cartao.evaluate((d) => (d as HTMLDetailsElement).open))) await cartao.locator("summary").first().click();
+  await expect(cartao).toHaveAttribute("open", "");
+}
+
 /** Texto do indicador "Obra X de N". */
 export const indicador = (page: Page) => page.getByRole("navigation", { name: "Navegação entre obras" }).locator("p[aria-live]");
 

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { expect, test } from "@playwright/test";
-import { clienteDe, entrarComo, lerBase } from "./ajuda";
+import { clienteDe, entrarComo, fichaNaAba, lerBase } from "./ajuda";
 import type { BaseFicticia } from "./base-ficticia";
 
 /**
@@ -66,7 +66,7 @@ async function negocioComKit(nome: string, confirmarProdutividade: boolean) {
 
 async function emitir(page: import("@playwright/test").Page, negocioId: string, validade: string) {
   await entrarComo(page, base.usuarios.vendedor, base.senha);
-  await page.goto(`/negocios/${negocioId}`);
+  await page.goto(fichaNaAba(negocioId, "Proposta e contrato"));
   await page.getByLabel("Válida até").fill(validade);
   await page.getByLabel("Condições de pagamento").fill("À vista por Pix ou transferência\nFinanciamento bancário, com parcelas a combinar");
   await page.getByRole("button", { name: /^Emitir/ }).click();
@@ -153,12 +153,14 @@ test.describe("proposta simples emitida", () => {
   test("SDR não vê o card de emissão e a validade é obrigatória e não pode ser passada", async ({ page }) => {
     const n = await negocioComKit("Cliente validade (fictício)", true);
     await entrarComo(page, base.usuarios.vendedor, base.senha);
-    await page.goto(`/negocios/${n.id}`);
+    await page.goto(fichaNaAba(n.id, "Proposta e contrato"));
     await expect(page.getByLabel("Válida até")).toHaveAttribute("required", "");
     await expect(page.getByLabel("Válida até")).toHaveAttribute("min", /^\d{4}-\d{2}-\d{2}$/);
 
+    // SDR: nem a aba existe; pedir a aba pelo endereço cai na Visão geral, sem o card de emissão.
     await entrarComo(page, base.usuarios.sdr, base.senha);
-    await page.goto(`/negocios/${n.id}`);
+    await page.goto(fichaNaAba(n.id, "Proposta e contrato"));
+    await expect(page.getByRole("navigation", { name: "Seções do negócio" }).getByRole("link", { name: /^Proposta e contrato/ })).toHaveCount(0);
     await expect(page.getByRole("button", { name: /^Emitir/ })).toHaveCount(0);
   });
 
