@@ -18,7 +18,8 @@ import {
 import { estadoSalvoDoKit } from "@/lib/kit-formulario";
 import { AVISOS_CRIACAO, avisosDaUrl, completarContato, montarEndereco } from "@/lib/negocio-dados";
 
-const fonte = (...partes: string[]) => readFileSync(join(__dirname, "..", ...partes), "utf8");
+// Normaliza CRLF: no Windows (core.autocrlf=true) a cópia de trabalho vem com \r\n e os testes fatiam o fonte por "\n".
+const fonte = (...partes: string[]) => readFileSync(join(__dirname, "..", ...partes), "utf8").replace(/\r\n/g, "\n");
 
 describe("endereço do contato", () => {
   it("junta rua, número, complemento, bairro e CEP; cidade e UF ficam de fora", () => {

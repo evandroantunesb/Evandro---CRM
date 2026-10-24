@@ -3385,6 +3385,112 @@ export type Database = {
           },
         ];
       };
+      proposta_versoes: {
+        Row: {
+          canonicalizacao: string;
+          conteudo_canonico: string;
+          conteudo_hash: string;
+          dados_internos: NonNullable<Json>;
+          documento: NonNullable<Json>;
+          emissao_id: string | null;
+          emitida_em: string;
+          emitida_por_membro_id: string;
+          emitida_por_nome: string | null;
+          emitida_por_user_id: string;
+          empresa_id: string;
+          hash_algoritmo: string;
+          id: string;
+          motivo_cancelamento: string | null;
+          negocio_id: string;
+          numero: number;
+          origem: string;
+          proposta_id: string;
+          recursos_status: string;
+          schema_versao: number;
+          situacao: string;
+          situacao_alterada_em: string | null;
+          situacao_alterada_por_membro_id: string | null;
+          tipo: string;
+          token: string;
+        };
+        Insert: {
+          canonicalizacao?: string;
+          conteudo_canonico: string;
+          conteudo_hash: string;
+          dados_internos: NonNullable<Json>;
+          documento: NonNullable<Json>;
+          emissao_id?: string | null;
+          emitida_em?: string;
+          emitida_por_membro_id: string;
+          emitida_por_nome?: string | null;
+          emitida_por_user_id: string;
+          empresa_id: string;
+          hash_algoritmo?: string;
+          id?: string;
+          motivo_cancelamento?: string | null;
+          negocio_id: string;
+          numero: number;
+          origem: string;
+          proposta_id: string;
+          recursos_status: string;
+          schema_versao?: number;
+          situacao?: string;
+          situacao_alterada_em?: string | null;
+          situacao_alterada_por_membro_id?: string | null;
+          tipo: string;
+          token?: string;
+        };
+        Update: {
+          canonicalizacao?: string;
+          conteudo_canonico?: string;
+          conteudo_hash?: string;
+          dados_internos?: NonNullable<Json>;
+          documento?: NonNullable<Json>;
+          emissao_id?: string | null;
+          emitida_em?: string;
+          emitida_por_membro_id?: string;
+          emitida_por_nome?: string | null;
+          emitida_por_user_id?: string;
+          empresa_id?: string;
+          hash_algoritmo?: string;
+          id?: string;
+          motivo_cancelamento?: string | null;
+          negocio_id?: string;
+          numero?: number;
+          origem?: string;
+          proposta_id?: string;
+          recursos_status?: string;
+          schema_versao?: number;
+          situacao?: string;
+          situacao_alterada_em?: string | null;
+          situacao_alterada_por_membro_id?: string | null;
+          tipo?: string;
+          token?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "proposta_versoes_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "proposta_versoes_negocio_id_empresa_id_fkey";
+            columns: ["negocio_id", "empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "negocios";
+            referencedColumns: ["id", "empresa_id"];
+          },
+          {
+            foreignKeyName: "proposta_versoes_proposta_id_negocio_id_empresa_id_fkey";
+            columns: ["proposta_id", "negocio_id", "empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "propostas";
+            referencedColumns: ["id", "negocio_id", "empresa_id"];
+          },
+        ];
+      };
       propostas: {
         Row: {
           atualizado_por: string | null;
@@ -4068,6 +4174,42 @@ export type Database = {
         };
         Returns: number;
       };
+      cancelar_proposta_versao: {
+        Args: { p_motivo: string; p_versao_id: string };
+        Returns: {
+          canonicalizacao: string;
+          conteudo_canonico: string;
+          conteudo_hash: string;
+          dados_internos: NonNullable<Json>;
+          documento: NonNullable<Json>;
+          emissao_id: string | null;
+          emitida_em: string;
+          emitida_por_membro_id: string;
+          emitida_por_nome: string | null;
+          emitida_por_user_id: string;
+          empresa_id: string;
+          hash_algoritmo: string;
+          id: string;
+          motivo_cancelamento: string | null;
+          negocio_id: string;
+          numero: number;
+          origem: string;
+          proposta_id: string;
+          recursos_status: string;
+          schema_versao: number;
+          situacao: string;
+          situacao_alterada_em: string | null;
+          situacao_alterada_por_membro_id: string | null;
+          tipo: string;
+          token: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "proposta_versoes";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       compartilha_empresa: { Args: { p_user_id: string }; Returns: boolean };
       compartilha_empresa_comercial: { Args: { p_user_id: string }; Returns: boolean };
       compartilha_empresa_identidade: { Args: { p_user_id: string }; Returns: boolean };
@@ -4211,6 +4353,42 @@ export type Database = {
       e_closer_de_handoff_pendente: { Args: { p_negocio_id: string }; Returns: boolean };
       e_membro_comercial: { Args: { p_empresa_id: string; p_membro_id: string }; Returns: boolean };
       e_plataforma_admin: { Args: Record<PropertyKey, never>; Returns: boolean };
+      emitir_proposta_versao: {
+        Args: { p_emissao_id?: string; p_negocio_id: string; p_recursos?: Json; p_tipo: string };
+        Returns: {
+          canonicalizacao: string;
+          conteudo_canonico: string;
+          conteudo_hash: string;
+          dados_internos: NonNullable<Json>;
+          documento: NonNullable<Json>;
+          emissao_id: string | null;
+          emitida_em: string;
+          emitida_por_membro_id: string;
+          emitida_por_nome: string | null;
+          emitida_por_user_id: string;
+          empresa_id: string;
+          hash_algoritmo: string;
+          id: string;
+          motivo_cancelamento: string | null;
+          negocio_id: string;
+          numero: number;
+          origem: string;
+          proposta_id: string;
+          recursos_status: string;
+          schema_versao: number;
+          situacao: string;
+          situacao_alterada_em: string | null;
+          situacao_alterada_por_membro_id: string | null;
+          tipo: string;
+          token: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "proposta_versoes";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       empresa_da_pasta_marca: { Args: { p_caminho: string }; Returns: string };
       empresa_solo_autonoma: { Args: { p_empresa_id: string }; Returns: boolean };
       encerrar_participacoes_operacionais: {
@@ -4401,6 +4579,7 @@ export type Database = {
           venda_alterada_em: string;
         }[];
       };
+      obter_proposta_versao_publica: { Args: { p_token: string }; Returns: Json };
       oportunidades_pendentes_equipe: {
         Args: { p_empresa_id: string };
         Returns: {
@@ -4460,6 +4639,67 @@ export type Database = {
           realizado: number;
         }[];
       };
+      proposta_gravar_versao: {
+        Args: {
+          p_conteudo: Json;
+          p_emissao_id: string;
+          p_membro_id: string;
+          p_negocio: Database["public"]["Tables"]["negocios"]["Row"];
+          p_numero: number;
+          p_origem: string;
+          p_proposta_id: string;
+          p_recursos_status: string;
+          p_tipo: string;
+        };
+        Returns: {
+          canonicalizacao: string;
+          conteudo_canonico: string;
+          conteudo_hash: string;
+          dados_internos: NonNullable<Json>;
+          documento: NonNullable<Json>;
+          emissao_id: string | null;
+          emitida_em: string;
+          emitida_por_membro_id: string;
+          emitida_por_nome: string | null;
+          emitida_por_user_id: string;
+          empresa_id: string;
+          hash_algoritmo: string;
+          id: string;
+          motivo_cancelamento: string | null;
+          negocio_id: string;
+          numero: number;
+          origem: string;
+          proposta_id: string;
+          recursos_status: string;
+          schema_versao: number;
+          situacao: string;
+          situacao_alterada_em: string | null;
+          situacao_alterada_por_membro_id: string | null;
+          tipo: string;
+          token: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "proposta_versoes";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      proposta_montar_conteudo: {
+        Args: { p_negocio_id: string; p_numero: number; p_rotulo: string; p_tipo: string };
+        Returns: Json;
+      };
+      proposta_parametros_economicos_validados: {
+        Args: { p_negocio_id: string };
+        Returns: boolean;
+      };
+      proposta_pendencias_definitiva: { Args: { p_negocio_id: string }; Returns: string[] };
+      proposta_recursos_do_conteudo: { Args: { p_conteudo: Json }; Returns: Json };
+      proposta_validar_recursos: {
+        Args: { p_emissao_id: string; p_empresa_id: string; p_exigidos: Json; p_recursos: Json };
+        Returns: Json;
+      };
+      proposta_versao_hash_confere: { Args: { p_versao_id: string }; Returns: boolean };
       ranking_gamificacao: {
         Args: {
           p_ate?: string;
@@ -4475,6 +4715,42 @@ export type Database = {
       reavaliar_credito_condicionado_valor: {
         Args: { p_estornado_por: string; p_evento_won_id: number; p_novo_valor: number };
         Returns: undefined;
+      };
+      reconstruir_proposta_legada: {
+        Args: { p_negocio_id: string };
+        Returns: {
+          canonicalizacao: string;
+          conteudo_canonico: string;
+          conteudo_hash: string;
+          dados_internos: NonNullable<Json>;
+          documento: NonNullable<Json>;
+          emissao_id: string | null;
+          emitida_em: string;
+          emitida_por_membro_id: string;
+          emitida_por_nome: string | null;
+          emitida_por_user_id: string;
+          empresa_id: string;
+          hash_algoritmo: string;
+          id: string;
+          motivo_cancelamento: string | null;
+          negocio_id: string;
+          numero: number;
+          origem: string;
+          proposta_id: string;
+          recursos_status: string;
+          schema_versao: number;
+          situacao: string;
+          situacao_alterada_em: string | null;
+          situacao_alterada_por_membro_id: string | null;
+          tipo: string;
+          token: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "proposta_versoes";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
       };
       registrar_historico_obra: {
         Args: {

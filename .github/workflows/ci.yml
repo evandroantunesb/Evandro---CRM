@@ -118,3 +118,36 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+
+  # Suíte SQL da P1a (arquivamento de negócio + versões de proposta). Job independente: sobe a própria stack Supabase
+  # descartável, volta o banco ao estado anterior às duas migrations, carrega a fixture determinística e roda a suíte.
+  # Sem secrets (este workflow não usa nenhum) e sem acesso a produção; o executor recusa destino remoto ou inconsistente.
+  sql-p1a:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - uses: supabase/setup-cli@45a513f8c64c0bc8e0e3dfe572b5c95be85f6359 # v3.0.1
+        with:
+          version: 2.120.0
+      - name: Subir o Supabase local
+        run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor,postgres-meta,realtime
+      - name: Voltar o banco ao estado anterior à P1a e carregar a fixture
+        run: |
+          supabase db reset --local --version 20261015110000
+          docker exec -i supabase_db_evandro---crm psql -U postgres -d postgres -X -q -v ON_ERROR_STOP=1 < tests/sql/p1a/fixture.sql
+      - name: Rodar a suíte SQL (420 verificações, 340 originais e 80 de emissão fechada)
+        run: |
+          eval "$(supabase status -o env | grep -E '^API_URL=')"
+          DB_CONTAINER=supabase_db_evandro---crm DB_NAME=postgres \
+          SUPABASE_DB_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres \
+          SUPABASE_API_URL="$API_URL" P1A_DESCARTAVEL=1 \
+          bash tests/sql/p1a/executar-testes.sh /tmp/p1a-resultado.txt
+      - name: Saída integral da suíte
+        if: always()
+        run: cat /tmp/p1a-resultado.txt || true
