@@ -46,6 +46,8 @@ import {
 } from "@/lib/tipos";
 import { Arquivamento } from "./arquivamento";
 import { Contrato } from "./contrato";
+import { EletropostoNegocio } from "./eletroposto";
+import { normalizarModelos, type ModeloEletroposto } from "@/lib/eletroposto";
 import { EdicaoNegocio } from "./edicao";
 import { EnviarAnexo } from "./enviar-anexo";
 import { Fechamento } from "./fechamento";
@@ -95,7 +97,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
     supabase
       .from("negocios")
       .select(
-        "id, empresa_id, numero, titulo, valor, descricao, status, arquivado_em, arquivado_por, motivo_arquivamento, funil_id, etapa_id, origem_id, responsavel_id, motivo_perda_id, motivo_perda_detalhe, fechado_em, created_at, updated_at, tipo_telhado, unidade_consumidora, padrao_cliente, estrutura_telhado, consumo_medio_kwh, consumo_estimado_kwh, tarifa_efetiva_kwh, valor_conta_energia, fechamento_previsto, qualif_tipo_cliente, qualif_possui_conta_energia, qualif_distribuidora, qualif_imovel_proprio, qualif_objetivo, qualif_prazo_instalacao, qualif_busca_financiamento, qualif_orcamento_outra_empresa, qualif_e_decisor, qualif_outro_decisor, qualif_participantes_decisao, qualif_observacoes, contatos(id, nome, tipo, telefone, email, endereco, cidade, uf)",
+        "id, empresa_id, tipo, numero, titulo, valor, descricao, status, arquivado_em, arquivado_por, motivo_arquivamento, funil_id, etapa_id, origem_id, responsavel_id, motivo_perda_id, motivo_perda_detalhe, fechado_em, created_at, updated_at, tipo_telhado, unidade_consumidora, padrao_cliente, estrutura_telhado, consumo_medio_kwh, consumo_estimado_kwh, tarifa_efetiva_kwh, valor_conta_energia, fechamento_previsto, qualif_tipo_cliente, qualif_possui_conta_energia, qualif_distribuidora, qualif_imovel_proprio, qualif_objetivo, qualif_prazo_instalacao, qualif_busca_financiamento, qualif_orcamento_outra_empresa, qualif_e_decisor, qualif_outro_decisor, qualif_participantes_decisao, qualif_observacoes, contatos(id, nome, tipo, telefone, email, endereco, cidade, uf)",
       )
       .eq("id", id)
       .maybeSingle(),
@@ -149,6 +151,13 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
     .select("tipo, descricao, potencia_w, quantidade")
     .eq("negocio_id", id)
     .order("ordem");
+
+  // Eletroposto: a ficha troca as abas "Sistema" e "Proposta e contrato" pela aba do eletroposto.
+  const ehEletroposto = negocio.tipo === "eletroposto";
+  const { data: eletroposto } =
+    ehEletroposto && pode(atual.papel, PROPOSTA_E_CONTRATO)
+      ? await supabase.from("negocios_eletroposto").select("token, modelos, precos, local_proprio, usina_fv, emitida_em").eq("negocio_id", id).maybeSingle()
+      : { data: null };
 
   const { data: proposta } = await supabase
     .from("propostas")
@@ -365,8 +374,8 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
   // Abas da ficha (?aba=): cada uma mostra só o seu conteúdo. Proposta e contrato só para quem pode.
   const abas: { id: string; rotulo: string; contador?: number }[] = [
     { id: "visao", rotulo: "Visão geral" },
-    { id: "sistema", rotulo: "Sistema" },
-    ...(pode(atual.papel, PROPOSTA_E_CONTRATO) ? [{ id: "proposta", rotulo: "Proposta e contrato" }] : []),
+    ...(ehEletroposto ? [] : [{ id: "sistema", rotulo: "Sistema" }]),
+    ...(pode(atual.papel, PROPOSTA_E_CONTRATO) ? [{ id: "proposta", rotulo: ehEletroposto ? "Eletroposto" : "Proposta e contrato" }] : []),
     { id: "atividades", rotulo: "Atividades", contador: (tarefas ?? []).filter((t) => !t.concluida_em).length },
     { id: "arquivos", rotulo: "Arquivos", contador: anexos?.length ?? 0 },
   ];
@@ -377,9 +386,12 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
   const aberturasProposta = aberturas?.length ?? 0;
   const marcoProposta: Marco = {
     titulo: "Proposta",
-    estado: emissoes.length > 0 || proposta ? "cumprido" : "pendente",
-    rotulo:
-      emissoes.length > 0
+    estado: emissoes.length > 0 || proposta || eletroposto ? "cumprido" : "pendente",
+    rotulo: ehEletroposto
+      ? eletroposto
+        ? "Proposta de eletroposto gerada"
+        : "Ainda não gerada"
+      : emissoes.length > 0
         ? `v${emissoes[0].versao} emitida`
         : proposta
           ? aberturasProposta > 0
@@ -806,7 +818,31 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
           />
         </Cartao>
       )}
-      {aba === "proposta" && (
+      {/* Eletroposto: a aba mostra só o eletroposto (proposta própria; contrato e pagamento ficam de fora). */}
+      {aba === "proposta" && (ehEletroposto ? (
+        <div id="proposta" className="scroll-mt-4">
+          <Cartao titulo="Eletroposto">
+            <EletropostoNegocio
+              negocioId={negocio.id}
+              siteUrl={env.siteUrl}
+              telefoneCliente={contato.telefone}
+              podeEditar={!arquivado}
+              registro={
+                eletroposto
+                  ? {
+                      token: eletroposto.token,
+                      modelos: normalizarModelos(eletroposto.modelos),
+                      precos: eletroposto.precos as Partial<Record<ModeloEletroposto, number>>,
+                      localProprio: eletroposto.local_proprio,
+                      usinaFv: eletroposto.usina_fv,
+                      emitidaEm: eletroposto.emitida_em,
+                    }
+                  : null
+              }
+            />
+          </Cartao>
+        </div>
+      ) : (
         <div id="proposta" className="grid scroll-mt-4 gap-4 lg:grid-cols-2 [&>*]:min-w-0">
           {pode(atual.papel, PROPOSTA_E_CONTRATO) && (
             <>
@@ -901,7 +937,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
             </div>
           )}
         </div>
-      )}
+      ))}
       {aba === "atividades" && (
         <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
           <Cartao titulo="Tarefas">

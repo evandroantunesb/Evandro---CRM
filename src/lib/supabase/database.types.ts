@@ -995,6 +995,7 @@ export type Database = {
           created_by: string | null;
           dias_considerado_parado: number;
           dias_uteis_gamificacao: number;
+          eletroposto_ativo: boolean;
           horas_considerado_sem_contato: number;
           id: string;
           modo_distribuicao_leads: Database["public"]["Enums"]["modo_distribuicao_leads"];
@@ -1010,6 +1011,7 @@ export type Database = {
           created_by?: string | null;
           dias_considerado_parado?: number;
           dias_uteis_gamificacao?: number;
+          eletroposto_ativo?: boolean;
           horas_considerado_sem_contato?: number;
           id?: string;
           modo_distribuicao_leads?: Database["public"]["Enums"]["modo_distribuicao_leads"];
@@ -1025,6 +1027,7 @@ export type Database = {
           created_by?: string | null;
           dias_considerado_parado?: number;
           dias_uteis_gamificacao?: number;
+          eletroposto_ativo?: boolean;
           horas_considerado_sem_contato?: number;
           id?: string;
           modo_distribuicao_leads?: Database["public"]["Enums"]["modo_distribuicao_leads"];
@@ -2183,6 +2186,7 @@ export type Database = {
           responsavel_id: string | null;
           status: Database["public"]["Enums"]["status_negocio"];
           tarifa_efetiva_kwh: number | null;
+          tipo: Database["public"]["Enums"]["tipo_negocio"];
           tipo_telhado: string | null;
           titulo: string;
           unidade_consumidora: string | null;
@@ -2229,6 +2233,7 @@ export type Database = {
           responsavel_id?: string | null;
           status?: Database["public"]["Enums"]["status_negocio"];
           tarifa_efetiva_kwh?: number | null;
+          tipo?: Database["public"]["Enums"]["tipo_negocio"];
           tipo_telhado?: string | null;
           titulo: string;
           unidade_consumidora?: string | null;
@@ -2275,6 +2280,7 @@ export type Database = {
           responsavel_id?: string | null;
           status?: Database["public"]["Enums"]["status_negocio"];
           tarifa_efetiva_kwh?: number | null;
+          tipo?: Database["public"]["Enums"]["tipo_negocio"];
           tipo_telhado?: string | null;
           titulo?: string;
           unidade_consumidora?: string | null;
@@ -2351,6 +2357,80 @@ export type Database = {
             columns: ["responsavel_id"];
             isOneToOne: false;
             referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      negocios_eletroposto: {
+        Row: {
+          atualizado_por: string | null;
+          created_at: string;
+          criado_por: string | null;
+          emitida_em: string;
+          empresa_id: string;
+          local_proprio: boolean;
+          modelos: string[];
+          negocio_id: string;
+          precos: NonNullable<Json>;
+          token: string;
+          updated_at: string;
+          usina_fv: boolean;
+        };
+        Insert: {
+          atualizado_por?: string | null;
+          created_at?: string;
+          criado_por?: string | null;
+          emitida_em?: string;
+          empresa_id: string;
+          local_proprio: boolean;
+          modelos: string[];
+          negocio_id: string;
+          precos: NonNullable<Json>;
+          token?: string;
+          updated_at?: string;
+          usina_fv: boolean;
+        };
+        Update: {
+          atualizado_por?: string | null;
+          created_at?: string;
+          criado_por?: string | null;
+          emitida_em?: string;
+          empresa_id?: string;
+          local_proprio?: boolean;
+          modelos?: string[];
+          negocio_id?: string;
+          precos?: NonNullable<Json>;
+          token?: string;
+          updated_at?: string;
+          usina_fv?: boolean;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "negocios_eletroposto_atualizado_por_fkey";
+            columns: ["atualizado_por"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "negocios_eletroposto_criado_por_fkey";
+            columns: ["criado_por"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "negocios_eletroposto_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "negocios_eletroposto_negocio_id_fkey";
+            columns: ["negocio_id"];
+            isOneToOne: true;
+            referencedRelation: "negocios";
             referencedColumns: ["id"];
           },
         ];
@@ -4268,6 +4348,7 @@ export type Database = {
       e_closer_de_handoff_pendente: { Args: { p_negocio_id: string }; Returns: boolean };
       e_membro_comercial: { Args: { p_empresa_id: string; p_membro_id: string }; Returns: boolean };
       e_plataforma_admin: { Args: Record<PropertyKey, never>; Returns: boolean };
+      eletroposto_ativo: { Args: { p_empresa_id: string }; Returns: boolean };
       empresa_da_pasta_marca: { Args: { p_caminho: string }; Returns: string };
       empresa_solo_autonoma: { Args: { p_empresa_id: string }; Returns: boolean };
       encerrar_participacoes_operacionais: {
@@ -4502,6 +4583,10 @@ export type Database = {
         Returns: boolean;
       };
       pode_ver_valor_vendido_obra: { Args: { p_obra_id: string }; Returns: boolean };
+      precos_eletroposto_validos: {
+        Args: { p_modelos: string[]; p_precos: Json };
+        Returns: boolean;
+      };
       preparar_escrita_obra: {
         Args: {
           p_bloquear_pausada: boolean;
@@ -4659,6 +4744,7 @@ export type Database = {
           responsavel_id: string | null;
           status: Database["public"]["Enums"]["status_negocio"];
           tarifa_efetiva_kwh: number | null;
+          tipo: Database["public"]["Enums"]["tipo_negocio"];
           tipo_telhado: string | null;
           titulo: string;
           unidade_consumidora: string | null;
@@ -4714,6 +4800,7 @@ export type Database = {
           responsavel_id: string | null;
           status: Database["public"]["Enums"]["status_negocio"];
           tarifa_efetiva_kwh: number | null;
+          tipo: Database["public"]["Enums"]["tipo_negocio"];
           tipo_telhado: string | null;
           titulo: string;
           unidade_consumidora: string | null;
@@ -4772,6 +4859,7 @@ export type Database = {
       tipo_calculo_comissao: "percentual" | "multiplicador";
       tipo_componente_kit: "modulo" | "inversor" | "bateria" | "outro";
       tipo_ligacao: "monofasico" | "bifasico" | "trifasico";
+      tipo_negocio: "solar" | "eletroposto";
       tipo_pessoa: "pf" | "pj";
       tipo_plano: "gratuito" | "pago";
       tipo_tarefa: "ligacao" | "whatsapp" | "visita" | "reuniao" | "email" | "outro";
@@ -4938,6 +5026,7 @@ export const Constants = {
       tipo_calculo_comissao: ["percentual", "multiplicador"],
       tipo_componente_kit: ["modulo", "inversor", "bateria", "outro"],
       tipo_ligacao: ["monofasico", "bifasico", "trifasico"],
+      tipo_negocio: ["solar", "eletroposto"],
       tipo_pessoa: ["pf", "pj"],
       tipo_plano: ["gratuito", "pago"],
       tipo_tarefa: ["ligacao", "whatsapp", "visita", "reuniao", "email", "outro"],

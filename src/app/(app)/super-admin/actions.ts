@@ -87,6 +87,15 @@ export async function alterarSituacao(formData: FormData) {
   revalidatePath(`/super-admin/empresas/${dados.empresaId}`);
 }
 
+/** Liga ou desliga o módulo de eletroposto da empresa (só o super-admin edita `empresas`, pela RLS). */
+export async function alterarEletroposto(formData: FormData) {
+  await exigirSuperAdmin();
+  const dados = z.object({ empresaId: z.string().uuid(), ativo: z.enum(["sim", "nao"]) }).parse(Object.fromEntries(formData));
+  const supabase = await criarClienteServidor();
+  await supabase.from("empresas").update({ eletroposto_ativo: dados.ativo === "sim" }).eq("id", dados.empresaId);
+  revalidatePath(`/super-admin/empresas/${dados.empresaId}`);
+}
+
 const esquemaPlano = z
   .object({
     empresaId: z.string().uuid(),
