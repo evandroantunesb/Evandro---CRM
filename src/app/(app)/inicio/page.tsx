@@ -31,6 +31,8 @@ import { obterSessao } from "@/lib/sessao";
 import { GESTAO_COMERCIAL, NEGOCIOS, PROPOSTA_E_CONTRATO, TAREFAS, pode } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { ROTULO_PAPEL, type TipoTarefa } from "@/lib/tipos";
+import { NovoNegocio } from "@/components/novo-negocio";
+import { eletropostoDisponivel } from "@/lib/eletroposto-servidor";
 import { GraficoDesempenho } from "./grafico-desempenho";
 import { InicioBasico } from "./inicio-basico";
 
@@ -85,6 +87,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
   const pessoal = !(podeVerEquipe && visaoSolicitada === "equipe");
 
   const supabase = await criarClienteServidor();
+  const eletroposto = await eletropostoDisponivel(supabase, atual);
   const agora = new Date();
   const hojeInicio = inicioDoDia();
   const hojeFimExclusivo = hojeInicio + 86_400_000;
@@ -546,13 +549,13 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
                 </Link>
               </div>
             )}
-            <Link
-              href="/negocios/novo"
+            <NovoNegocio
+              eletroposto={eletroposto}
               className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-dourado px-5 text-sm font-semibold text-carvao transition-[box-shadow,transform] duration-200 ease-raion hover:shadow-[0_10px_30px_rgb(212_175_55/0.35)] active:scale-[0.98]"
             >
               <Plus size={16} />
               Novo negócio
-            </Link>
+            </NovoNegocio>
           </div>
         </div>
       </section>
@@ -752,14 +755,16 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
       <Cartao titulo="Ações rápidas">
         <div className="flex flex-wrap gap-2.5">
           {acoesRapidas.map((a, i) => (
-            <Link
+            <NovoNegocio
               key={`${a.href}-${a.rotulo}-${i}`}
               href={a.href}
+              // Só os atalhos do cadastro de negócio pedem a escolha entre solar e eletroposto.
+              eletroposto={eletroposto && a.href === "/negocios/novo"}
               className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3.5 py-2 text-sm font-medium text-carvao transition-colors hover:bg-offwhite"
             >
               <a.Icone size={16} className="text-dourado" />
               {a.rotulo}
-            </Link>
+            </NovoNegocio>
           ))}
         </div>
       </Cartao>

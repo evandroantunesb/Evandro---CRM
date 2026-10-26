@@ -5,7 +5,7 @@ import { trocarEmpresa } from "@/lib/acoes/empresa-atual";
 import { exigirSuperAdmin } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { ROTULO_PAPEL, ROTULO_TIPO_VENDEDOR, type Papel, type TipoVendedor } from "@/lib/tipos";
-import { alterarSituacao } from "../../actions";
+import { alterarEletroposto, alterarSituacao } from "../../actions";
 import { FormularioAdmin, FormularioEdicaoEmpresa, FormularioPlano } from "../../formularios";
 import { SeloSituacao } from "../../situacao";
 
@@ -17,7 +17,7 @@ export default async function Empresa({ params }: PageProps<"/super-admin/empres
   const [{ data: empresa }, { data: plano }] = await Promise.all([
     supabase
       .from("empresas")
-      .select("id, nome, cnpj, situacao, created_at, empresa_membros(id, papel, tipo_vendedor, ativo, perfis(nome, email))")
+      .select("id, nome, cnpj, situacao, eletroposto_ativo, created_at, empresa_membros(id, papel, tipo_vendedor, ativo, perfis(nome, email))")
       .eq("id", id)
       .maybeSingle(),
     supabase
@@ -70,6 +70,21 @@ export default async function Empresa({ params }: PageProps<"/super-admin/empres
               </button>
             </form>
           ))}
+        </div>
+      </Cartao>
+      <Cartao titulo="Módulos">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-zinc-600">
+            Eletroposto: {empresa.eletroposto_ativo ? "ligado" : "desligado"}. Ligado, &quot;Novo negócio&quot; pede a escolha entre energia solar e
+            eletroposto.
+          </p>
+          <form action={alterarEletroposto}>
+            <input type="hidden" name="empresaId" value={empresa.id} />
+            <input type="hidden" name="ativo" value={empresa.eletroposto_ativo ? "nao" : "sim"} />
+            <button className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-50">
+              {empresa.eletroposto_ativo ? "Desligar eletroposto" : "Ligar eletroposto"}
+            </button>
+          </form>
         </div>
       </Cartao>
       <Cartao titulo="Plano e cobrança">

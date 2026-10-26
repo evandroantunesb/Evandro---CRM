@@ -53,6 +53,13 @@ Histórico: a migration da #139 foi aplicada em produção antes do merge, com a
 
 ## Em andamento
 
+### Eletroposto — segundo tipo de negócio (2026-10-26)
+
+- **Decisões do Evandro (26/10/2026):** "Novo negócio" abre um pop-up **obrigatório** de escolha entre Energia solar (fluxo atual) e Eletroposto (carregador DC 80 kW, modelos IBS Basic R$ 99.900, Full R$ 119.900 e Full Screen R$ 149.900, preços fixos de catálogo, sem edição). Cadastro: nome, WhatsApp, endereço do cliente, local próprio (sim/não) e usina FV (sim/não) — os dois últimos só para o vendedor, não mudam a proposta. Vários modelos = negócio sem valor até o cliente escolher. Proposta fiel ao modelo de 4 páginas da IBS, na identidade visual do Raion por enquanto; consultor = responsável pelo negócio.
+- **Migration `20261026120000_eletroposto.sql`:** `empresas.eletroposto_ativo` (padrão desligado; o super-admin liga em Super-admin › empresa › Módulos), `negocios.tipo` (`solar` | `eletroposto`, imutável) e `negocios_eletroposto` (modelos, preços congelados, token do link; RLS como a proposta emitida: SDR não lê). Testes em `tests/eletroposto.test.ts` e `tests/eletroposto-db.test.ts`.
+- **App:** `src/lib/eletroposto.ts` (catálogo e simulação; números conferidos com o modelo: R$ 6.412/mês, payback 16/19/17 meses), `/negocios/novo?tipo=eletroposto`, aba Eletroposto na ficha, proposta pública em `/proposta/eletroposto/[token]` (imprimir / salvar PDF pelo navegador).
+- **Pendências:** ligar o módulo para a IBS em produção (pelo super-admin, depois da migration aplicada); "Dados do negócio" ainda exige valor e mostra campos solares no negócio de eletroposto; sem registro de abertura do link; contrato, pagamento, gamificação e comissão do eletroposto fora desta entrega.
+
 ### Temperatura do negócio — PR 1 de 3 (2026-10-24)
 
 - **Spec aprovada pelo Evandro em 24/10/2026:** temperatura calculada na leitura por um cardápio fixo de regras (`regras_temperatura`) que admin **e** gestor configuram (liga/desliga, parâmetros, Quente/Frio, ordem; 1ª que bate = "porquê"; nenhuma = Morno). Padrões: contrato gerado (desde rascunho) Quente 1º; sem atividade 7 dias Frio; só pesquisando Frio; prazo imediato/até 30 dias + decisor Quente; demais desligadas. Abertura de proposta ficou **fora** (PDF baixado não é rastreável e as versões emitidas não registram abertura).

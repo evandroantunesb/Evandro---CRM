@@ -14,6 +14,8 @@ import { COOKIE_VISAO_NEGOCIOS, exigirPapel } from "@/lib/sessao";
 import { FILTRAR_NEGOCIOS_POR_RESPONSAVEL, NEGOCIOS, REGRAS_TEMPERATURA, pode } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { carregarTemperaturas, type TemperaturaNegocio } from "@/lib/temperatura";
+import { NovoNegocio } from "@/components/novo-negocio";
+import { eletropostoDisponivel } from "@/lib/eletroposto-servidor";
 import { BotaoFiltros } from "./filtros";
 import { Indicadores, type Indicador } from "./indicadores";
 import { Kanban, type Card } from "./kanban";
@@ -51,6 +53,7 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
   const visao = (["kanban", "lista"] as const).find((v) => v === texto("visao")) ?? ((await cookies()).get(COOKIE_VISAO_NEGOCIOS)?.value as "kanban" | "lista" | undefined) ?? "kanban";
 
   const supabase = await criarClienteServidor();
+  const eletroposto = await eletropostoDisponivel(supabase, atual);
   const consultaBase = supabase
     .from("negocios")
     .select(
@@ -260,12 +263,15 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
               <span className="hidden md:inline">Temperatura</span>
             </Link>
           )}
-          <Link href={`/negocios/novo?funil=${funil.id}`} aria-label="Adicionar negócio">
-            <Botao className="w-11 gap-1.5 px-0 md:w-auto md:px-4">
-              <Plus className="h-5 w-5 md:h-4 md:w-4" aria-hidden />
-              <span className="hidden md:inline">Adicionar negócio</span>
-            </Botao>
-          </Link>
+          <NovoNegocio
+            href={`/negocios/novo?funil=${funil.id}`}
+            eletroposto={eletroposto}
+            aria-label="Adicionar negócio"
+            className="inline-flex min-h-11 w-11 items-center justify-center gap-1.5 rounded-lg bg-acao px-0 py-2 text-sm font-medium text-sobre-acao transition-[background-color,transform] duration-200 ease-raion outline-none hover:bg-acao-forte focus-visible:ring-2 focus-visible:ring-dourado/60 focus-visible:ring-offset-2 focus-visible:ring-offset-fundo active:scale-[0.98] md:min-h-9 md:w-auto md:px-4"
+          >
+            <Plus className="h-5 w-5 md:h-4 md:w-4" aria-hidden />
+            <span className="hidden md:inline">Adicionar negócio</span>
+          </NovoNegocio>
         </div>
       </header>
 
@@ -400,6 +406,7 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
             colunas={colunas}
             cards={cards}
             funilId={funil.id}
+            eletroposto={eletroposto}
             etiquetas={config.etiquetas.filter((e) => e.ativa)}
             motivos={config.motivos}
           />

@@ -16,6 +16,7 @@ import { useState } from "react";
 import { Avatar } from "@/components/avatar";
 import { ModalComentarioEtapa } from "@/components/comentario-etapa";
 import { MoverEtapa } from "@/components/mover-etapa";
+import { NovoNegocio } from "@/components/novo-negocio";
 import { SeloTemperatura } from "@/components/selo-temperatura";
 import { formatarMoeda, formatarPrazo } from "@/lib/formatacao";
 import type { TemperaturaNegocio } from "@/lib/temperatura";
@@ -51,12 +52,15 @@ export function Kanban({
   colunas,
   cards: iniciais,
   funilId,
+  eletroposto = false,
   etiquetas,
   motivos = [],
 }: {
   colunas: Coluna[];
   cards: Card[];
   funilId: string;
+  /** "Adicionar negócio" pede a escolha entre solar e eletroposto. */
+  eletroposto?: boolean;
   etiquetas: EtiquetaDisponivel[];
   motivos?: MotivoDisponivel[];
 }) {
@@ -100,6 +104,7 @@ export function Kanban({
             coluna={col}
             colunas={colunas}
             funilId={funilId}
+            eletroposto={eletroposto}
             cards={cards.filter((c) => c.etapaId === col.id)}
             etiquetas={etiquetas}
             motivos={motivos}
@@ -126,6 +131,7 @@ function ColunaKanban({
   colunas,
   cards,
   funilId,
+  eletroposto,
   etiquetas,
   motivos,
 }: {
@@ -133,6 +139,7 @@ function ColunaKanban({
   colunas: Coluna[];
   cards: Card[];
   funilId: string;
+  eletroposto: boolean;
   etiquetas: EtiquetaDisponivel[];
   motivos: MotivoDisponivel[];
 }) {
@@ -165,12 +172,13 @@ function ColunaKanban({
         ))}
         {!cards.length && <p className="px-2 py-6 text-center text-xs text-texto-2">Nenhum negócio nesta etapa</p>}
         {coluna.inicial && (
-          <Link
+          <NovoNegocio
             href={`/negocios/novo?funil=${funilId}&etapa=${coluna.id}`}
+            eletroposto={eletroposto}
             className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl text-sm font-medium text-texto-2 transition-colors duration-200 ease-raion hover:bg-superficie hover:text-texto md:min-h-9"
           >
             <Plus size={15} /> Adicionar negócio
-          </Link>
+          </NovoNegocio>
         )}
       </div>
     </section>

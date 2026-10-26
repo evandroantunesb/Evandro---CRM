@@ -44,6 +44,7 @@ export const AVISOS_CRIACAO = {
   kit: "Os itens do kit não foram salvos. Monte o kit de novo no cartão Kit personalizado.",
   calculo: "Os itens do kit foram salvos, mas o cálculo não. Abra o cartão Kit personalizado e salve de novo.",
   anexos: "Algum arquivo não foi anexado. Confira em Arquivos e envie de novo.",
+  eletroposto: "Os modelos do eletroposto e a proposta não foram salvos. Escolha os modelos de novo na aba Eletroposto.",
 } as const;
 
 export type AvisoCriacao = keyof typeof AVISOS_CRIACAO;
