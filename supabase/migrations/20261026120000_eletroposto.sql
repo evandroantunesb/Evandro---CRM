@@ -110,7 +110,7 @@ language plpgsql set search_path = ''
 as $$
 begin
   if new.tipo is distinct from old.tipo then
-    raise exception 'O tipo do negócio não pode ser alterado.' using errcode = 'check_violation';
+    raise exception 'O tipo do negócio não pode ser alterado.' using errcode = 'check_violation', hint = 'mensagem_usuario';
   end if;
   return new;
 end;
@@ -128,7 +128,7 @@ as $$
 begin
   if new.tipo = 'eletroposto' then
     if not exists (select 1 from public.empresas e where e.id = new.empresa_id and e.eletroposto_ativo) then
-      raise exception 'O módulo de eletroposto não está ativo nesta empresa.' using errcode = 'check_violation';
+      raise exception 'O módulo de eletroposto não está ativo nesta empresa.' using errcode = 'check_violation', hint = 'mensagem_usuario';
     end if;
   end if;
   return new;
