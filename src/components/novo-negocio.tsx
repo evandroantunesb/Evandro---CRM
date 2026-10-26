@@ -10,6 +10,23 @@ export const TIPOS_NOVO_NEGOCIO = [
   { tipo: "eletroposto", titulo: "Eletroposto", Icone: PlugZap },
 ] as const;
 
+export type TipoNegocio = (typeof TIPOS_NOVO_NEGOCIO)[number]["tipo"];
+
+/** Selo do tipo no card e nas listas: eletroposto em dourado, solar neutro. */
+export function SeloTipoNegocio({ tipo }: { tipo: TipoNegocio }) {
+  const { titulo, Icone } = TIPOS_NOVO_NEGOCIO.find((t) => t.tipo === tipo)!;
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
+        tipo === "eletroposto" ? "bg-dourado/15 text-texto" : "bg-superficie-2 text-texto-2"
+      }`}
+    >
+      <Icone size={12} className={tipo === "eletroposto" ? "text-dourado" : undefined} aria-hidden />
+      {titulo}
+    </span>
+  );
+}
+
 /** Endereço do cadastro com o tipo escolhido, preservando funil e etapa (`?funil=...&etapa=...`). */
 export function hrefDoTipo(href: string, tipo: string) {
   const [caminho, consulta = ""] = href.split("?");

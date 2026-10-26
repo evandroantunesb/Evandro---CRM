@@ -14,7 +14,7 @@ import { COOKIE_VISAO_NEGOCIOS, exigirPapel } from "@/lib/sessao";
 import { FILTRAR_NEGOCIOS_POR_RESPONSAVEL, NEGOCIOS, REGRAS_TEMPERATURA, pode } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { carregarTemperaturas, type TemperaturaNegocio } from "@/lib/temperatura";
-import { NovoNegocio } from "@/components/novo-negocio";
+import { NovoNegocio, type TipoNegocio } from "@/components/novo-negocio";
 import { eletropostoDisponivel } from "@/lib/eletroposto-servidor";
 import { BotaoFiltros } from "./filtros";
 import { Indicadores, type Indicador } from "./indicadores";
@@ -57,7 +57,7 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
   const consultaBase = supabase
     .from("negocios")
     .select(
-      `id, numero, titulo, valor, etapa_id, etapa_desde, updated_at, origem_id, responsavel_id, fechado_em, motivo_perda_id,
+      `id, numero, titulo, tipo, valor, etapa_id, etapa_desde, updated_at, origem_id, responsavel_id, fechado_em, motivo_perda_id,
        arquivado_em, motivo_arquivamento, contatos!inner(nome, telefone, email), negocio_etiquetas${etiqueta ? "!inner" : ""}(etiqueta_id)`,
     )
     .eq("empresa_id", atual.empresaId)
@@ -129,7 +129,7 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
 
   // Temperatura só existe para negócio aberto (o banco ignora os demais).
   const temperaturas = status === "aberto" ? await carregarTemperaturas(supabase, (data ?? []).map((n) => n.id)) : new Map();
-  let cards = montarCards(data ?? [], config, pendentes ?? [], notas ?? [], temperaturas);
+  let cards = montarCards(data ?? [], config, pendentes ?? [], notas ?? [], temperaturas, eletroposto);
   if (atrasados) cards = cards.filter((c) => c.tarefa === "atrasada");
   if (semProxima) cards = cards.filter((c) => c.tarefa === "nenhuma");
 
@@ -424,6 +424,7 @@ type LinhaNegocio = {
   id: string;
   numero: number;
   titulo: string;
+  tipo: TipoNegocio;
   valor: number | null;
   etapa_id: string;
   etapa_desde: string;
@@ -446,6 +447,7 @@ function montarCards(
   pendentes: { negocio_id: string | null; vence_em: string; titulo: string }[],
   notas: { negocio_id: string }[],
   temperaturas: Map<string, TemperaturaNegocio>,
+  eletroposto: boolean,
 ): Card[] {
   const nomeMembro = new Map(config.membros.map((m) => [m.id, m.nome]));
   const nomeOrigem = new Map(config.origens.map((o) => [o.id, o.nome]));
@@ -479,6 +481,8 @@ function montarCards(
       }),
       comentarios: contagemNotas.get(n.id) ?? 0,
       temperatura: temperaturas.get(n.id) ?? null,
+      // Sem o módulo, o selo só marca o negócio de eletroposto que já existir; solar segue sem selo.
+      tipo: eletroposto || n.tipo === "eletroposto" ? n.tipo : null,
     };
   });
 }

@@ -16,7 +16,7 @@ import { useState } from "react";
 import { Avatar } from "@/components/avatar";
 import { ModalComentarioEtapa } from "@/components/comentario-etapa";
 import { MoverEtapa } from "@/components/mover-etapa";
-import { NovoNegocio } from "@/components/novo-negocio";
+import { NovoNegocio, SeloTipoNegocio, type TipoNegocio } from "@/components/novo-negocio";
 import { SeloTemperatura } from "@/components/selo-temperatura";
 import { formatarMoeda, formatarPrazo } from "@/lib/formatacao";
 import type { TemperaturaNegocio } from "@/lib/temperatura";
@@ -42,6 +42,8 @@ export type Card = {
   comentarios: number;
   /** Só em negócio aberto; nulo quando não calculada. */
   temperatura: TemperaturaNegocio | null;
+  /** Tipo para o selo; nulo (sem selo) em negócio solar de empresa sem o módulo de eletroposto. */
+  tipo: TipoNegocio | null;
 };
 
 type Coluna = { id: string; nome: string; cor: string | null; inicial: boolean; fechaComo?: "ganho" | "perdido" | null };
@@ -243,8 +245,9 @@ function CardKanban({
           #{card.numero} · {card.titulo}
         </p>
       </Link>
-      {(card.temperatura || card.origem || card.etiquetas.length > 0) && (
+      {(card.tipo || card.temperatura || card.origem || card.etiquetas.length > 0) && (
         <div className="mt-2.5 flex flex-wrap gap-1 text-xs">
+          {card.tipo && <SeloTipoNegocio tipo={card.tipo} />}
           {card.temperatura && <SeloTemperatura valor={card.temperatura} />}
           {card.origem && <span className="rounded-full bg-superficie-2 px-2 py-0.5 text-texto-2">{card.origem}</span>}
           {card.etiquetas.map((e) => (
