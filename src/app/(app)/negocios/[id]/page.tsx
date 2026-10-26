@@ -818,7 +818,8 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
           />
         </Cartao>
       )}
-      {aba === "proposta" && ehEletroposto && (
+      {/* Eletroposto: a aba mostra só o eletroposto (proposta própria; contrato e pagamento ficam de fora). */}
+      {aba === "proposta" && (ehEletroposto ? (
         <div id="proposta" className="scroll-mt-4">
           <Cartao titulo="Eletroposto">
             <EletropostoNegocio
@@ -841,8 +842,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
             />
           </Cartao>
         </div>
-      )}
-      {aba === "proposta" && !ehEletroposto && (
+      ) : (
         <div id="proposta" className="grid scroll-mt-4 gap-4 lg:grid-cols-2 [&>*]:min-w-0">
           {pode(atual.papel, PROPOSTA_E_CONTRATO) && (
             <>
@@ -937,7 +937,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
             </div>
           )}
         </div>
-      )}
+      ))}
       {aba === "atividades" && (
         <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
           <Cartao titulo="Tarefas">

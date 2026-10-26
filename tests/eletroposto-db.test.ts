@@ -27,7 +27,8 @@ beforeAll(async () => {
     .from("empresas")
     .insert([
       { nome: `Eletroposto ${sufixo}`, eletroposto_ativo: true },
-      { nome: `Sem eletroposto ${sufixo}` },
+      // Inserção em lote: a coluna vai explícita nas duas (a API manda null para chave ausente).
+      { nome: `Sem eletroposto ${sufixo}`, eletroposto_ativo: false },
     ])
     .select("id, nome");
   if (erroEmp) throw erroEmp;
