@@ -621,8 +621,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
           <div className="flex min-w-0 flex-col gap-4">
             {/* O SDR trabalha a qualificação: ela abre antes dos dados do negócio; nos demais papéis a ordem é a de sempre. */}
             {(() => {
-              const blocoDados = (
-            <CartaoRecolhivel titulo="Dados do negócio" resumo={resumoDados}>
+              const edicaoDados = (
               <EdicaoNegocio
                 // Os campos usam defaultValue: desarquivar com novo responsável (ou arquivar) muda os dados por fora do
                 // editor, e sem remontar ele mostraria o responsável antigo e o gravaria no próximo "Salvar".
@@ -648,8 +647,16 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
                 responsaveis={pode(atual.papel, ESCOLHER_RESPONSAVEL_NEGOCIO) ? config.membros.filter((m) => m.ativo && pode(m.papel, RESPONSAVEL_COMERCIAL)) : []}
                 podeEditarValor={pode(atual.papel, EDITAR_VALOR_NEGOCIO)}
               />
-            </CartaoRecolhivel>
               );
+              // Dados do negócio sempre à vista para quem vende; para o SDR (que trabalha a qualificação) ficam recolhidos.
+              const blocoDados =
+                atual.papel === "sdr" ? (
+                  <CartaoRecolhivel titulo="Dados do negócio" resumo={resumoDados}>
+                    {edicaoDados}
+                  </CartaoRecolhivel>
+                ) : (
+                  <Cartao titulo="Dados do negócio">{edicaoDados}</Cartao>
+                );
               const blocoQualificacao = (
             <CartaoRecolhivel titulo="Qualificação SDR" resumo={resumoQualificacao} aberto={atual.papel === "sdr"}>
               <Qualificacao
