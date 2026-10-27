@@ -129,7 +129,7 @@ test.describe("kWh e fatura do kit preservados", () => {
     const n = await novoNegocio("Cliente limpa dados do negócio (fictício)");
     await abrir(page, n.id);
 
-    // "Dados do negócio" fica na Visão geral, num cartão recolhido.
+    // "Dados do negócio" fica na Visão geral; para o vendedor, o cartão está sempre aberto.
     await abrirAba(page, "Visão geral");
     await abrirCartao(page, "Dados do negócio");
     await page.getByLabel("Consumo médio (12 meses, kWh)").fill("");
