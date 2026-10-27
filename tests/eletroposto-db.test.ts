@@ -5,7 +5,7 @@
  */
 import { beforeAll, describe, expect, it } from "vitest";
 import { criarNegocioEletropostoComCliente, salvarEletropostoComCliente } from "@/lib/eletroposto-gravacao";
-import type { Atual } from "@/lib/negocios-gravacao";
+import { editarNegocioComCliente, type Atual } from "@/lib/negocios-gravacao";
 import type { SupabaseServidor } from "@/lib/supabase/server";
 import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
 
@@ -165,6 +165,31 @@ describe("travas do banco", () => {
       precos: { basic: 99900 },
     });
     expect(error).not.toBeNull();
+  });
+});
+
+describe("Dados do negócio no eletroposto", () => {
+  it("salva sem valor (vários modelos) e não grava campos solares; o solar continua exigindo valor", async () => {
+    const r = await criar(vendedor, novo());
+    const salvo = await editarNegocioComCliente(
+      cliente(vendedor),
+      atual[vendedor.id],
+      fd({ negocioId: r.negocioId, titulo: "Eletroposto editado", valor: "", consumo_medio_kwh: "500", tipo_telhado: "laje" }),
+    );
+    expect(salvo.ok).toBe(true);
+    const { data } = await servico.from("negocios").select("titulo, valor, consumo_medio_kwh, tipo_telhado").eq("id", r.negocioId).single();
+    expect(data).toEqual({ titulo: "Eletroposto editado", valor: null, consumo_medio_kwh: null, tipo_telhado: null });
+
+    const { data: etapa } = await servico.from("etapas").select("id").eq("funil_id", funil).order("ordem").limit(1).single();
+    const { data: base } = await servico.from("negocios").select("contato_id").eq("id", r.negocioId).single();
+    const { data: solar, error } = await servico
+      .from("negocios")
+      .insert({ empresa_id: empresa, funil_id: funil, etapa_id: etapa!.id, contato_id: base!.contato_id, titulo: "Solar", valor: 1000, responsavel_id: atual[vendedor.id].membroId })
+      .select("id")
+      .single();
+    expect(error).toBeNull();
+    const recusado = await editarNegocioComCliente(cliente(vendedor), atual[vendedor.id], fd({ negocioId: solar!.id, titulo: "Solar", valor: "" }));
+    expect(recusado).toEqual({ ok: false, mensagem: "Informe o valor do negócio." });
   });
 });
 

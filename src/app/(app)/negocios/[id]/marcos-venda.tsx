@@ -27,9 +27,12 @@ export function MarcosVenda({
   obra,
   proposta = null,
   hrefBase = "",
+  soVenda = false,
   children,
 }: {
   marcos: Marcos;
+  /** Eletroposto: ainda sem contrato nem pagamento no Raion, a jornada é só Proposta e Venda ganha. */
+  soVenda?: boolean;
   /** Obra lida sob RLS; null quando não existe ou a pessoa não a enxerga. */
   obra: { id: string; numero: number } | null;
   /** Situação da proposta (fora dos marcos do fechamento), quando quem vê pode emitir proposta. */
@@ -38,7 +41,11 @@ export function MarcosVenda({
   /** A ação de fechamento (componente `Fechamento`), mostrada no marco "Venda ganha". */
   children?: ReactNode;
 }) {
-  const etapas = [proposta, marcos.venda, marcos.contrato, marcos.pagamento].filter((m): m is Marco => m != null);
+  const etapas = (soVenda ? [proposta, marcos.venda] : [proposta, marcos.venda, marcos.contrato, marcos.pagamento]).filter(
+    (m): m is Marco => m != null,
+  );
+  // O contador "x de 3 marcos" só vale para a jornada completa.
+  const progresso = soVenda ? null : marcos.progresso;
   // Negócio perdido (sem contador de progresso): não há próximo passo a sugerir.
   const proximo =
     marcos.progresso === null ? undefined : etapas.find((m) => m.estado === "pendente" && m.ancora && PROXIMO_PASSO[m.ancora]);
@@ -56,18 +63,20 @@ export function MarcosVenda({
           <ArrowRight size={18} aria-hidden className="shrink-0 text-dourado-texto transition-transform duration-200 ease-raion group-hover:translate-x-0.5" />
         </Link>
       )}
-      <ol className={`grid grid-cols-2 gap-x-3 gap-y-5 ${etapas.length === 4 ? "md:grid-cols-4" : "md:grid-cols-3"}`}>
+      <ol
+        className={`grid grid-cols-2 gap-x-3 gap-y-5 ${etapas.length === 4 ? "md:grid-cols-4" : etapas.length === 3 ? "md:grid-cols-3" : ""}`}
+      >
         {etapas.map((m) => (
           <ItemMarco key={m.titulo} marco={m} hrefBase={hrefBase}>
             {m === marcos.venda ? children : null}
           </ItemMarco>
         ))}
       </ol>
-      {(marcos.progresso || obra) && (
+      {(progresso || obra) && (
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-linha pt-3 text-sm">
-          {marcos.progresso && (
+          {progresso && (
             <p className={marcos.concluida ? "font-medium text-energia" : "text-texto-2"}>
-              {marcos.concluida ? `Venda concluída · ${marcos.progresso}` : marcos.progresso}
+              {marcos.concluida ? `Venda concluída · ${progresso}` : progresso}
             </p>
           )}
           {obra && (
