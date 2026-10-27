@@ -49,14 +49,17 @@ export function valorDoNegocio(modelos: readonly ModeloEletroposto[]): number | 
   return modelos.length === 1 ? CATALOGO_ELETROPOSTO[modelos[0]].preco : null;
 }
 
-/** Cria o contato (ou completa o existente), o negócio de eletroposto e o registro com os modelos e a proposta. */
+/**
+ * Cria o contato (ou completa o existente), o negócio de eletroposto e o registro com os modelos e a proposta.
+ * O SDR cria sem modelos (sem preço nem proposta, que ele não vê): o vendedor escolhe os modelos depois, na ficha.
+ */
 export async function criarNegocioEletropostoComCliente(supabase: SupabaseServidor, atual: Atual, formData: FormData): Promise<ResultadoCriacao> {
-  if (!pode(atual.papel, PROPOSTA_E_CONTRATO)) return { ok: false, mensagem: "Seu papel não pode criar negócio de eletroposto." };
   const dados = esquemaNovo.safeParse(Object.fromEntries(formData));
   if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
   const d = dados.data;
-  const modelos = modelosDoFormulario(formData);
-  if (!modelos.length) return { ok: false, mensagem: MENSAGEM_SEM_MODELO };
+  const escolheModelos = pode(atual.papel, PROPOSTA_E_CONTRATO);
+  const modelos = escolheModelos ? modelosDoFormulario(formData) : [];
+  if (escolheModelos && !modelos.length) return { ok: false, mensagem: MENSAGEM_SEM_MODELO };
   const endereco = d.contato_endereco || null;
   if (!d.contato_id && !endereco) return { ok: false, mensagem: "Informe o endereço do cliente." };
 
@@ -152,15 +155,16 @@ const esquemaEdicao = z.object({
 /**
  * Salva local próprio, usina FV e os modelos da proposta (cria o registro se a criação não o gravou). Modelos
  * diferentes renovam a data da proposta e congelam os preços do catálogo de agora; os mesmos modelos mantêm
- * a data e os preços já congelados. O link da proposta não muda.
+ * a data e os preços já congelados. O link é criado na primeira escolha de modelos e depois não muda.
+ * O SDR salva só local próprio e usina FV, e só enquanto o vendedor não escolheu os modelos (RLS).
  */
 export async function salvarEletropostoComCliente(supabase: SupabaseServidor, atual: Atual, formData: FormData): Promise<NonNullable<ResultadoAcao>> {
-  if (!pode(atual.papel, PROPOSTA_E_CONTRATO)) return { ok: false, mensagem: "Seu papel não pode editar o eletroposto." };
   const dados = esquemaEdicao.safeParse(Object.fromEntries(formData));
   if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
   const d = dados.data;
+  const escolheModelos = pode(atual.papel, PROPOSTA_E_CONTRATO);
   const modelos = modelosDoFormulario(formData);
-  if (!modelos.length) return { ok: false, mensagem: MENSAGEM_SEM_MODELO };
+  if (escolheModelos && !modelos.length) return { ok: false, mensagem: MENSAGEM_SEM_MODELO };
 
   const [{ data: negocio }, { data: registro, error: erroLeitura }] = await Promise.all([
     supabase.from("negocios").select("id, empresa_id, tipo").eq("id", d.negocioId).maybeSingle(),
@@ -168,6 +172,19 @@ export async function salvarEletropostoComCliente(supabase: SupabaseServidor, at
   ]);
   if (!negocio || negocio.tipo !== "eletroposto") return { ok: false, mensagem: "Negócio de eletroposto não encontrado." };
   if (erroLeitura) return { ok: false, mensagem: "Não foi possível ler o eletroposto. Nada foi alterado." };
+
+  if (!escolheModelos) {
+    const base = { local_proprio: d.local_proprio, usina_fv: d.usina_fv, atualizado_por: atual.membroId };
+    const { error } = registro
+      ? await supabase.from("negocios_eletroposto").update(base).eq("negocio_id", d.negocioId)
+      : await supabase
+          .from("negocios_eletroposto")
+          .insert({ negocio_id: d.negocioId, empresa_id: negocio.empresa_id, criado_por: atual.membroId, ...base, modelos: [], precos: {} });
+    // Registro que o SDR não vê já existe: o vendedor escolheu os modelos e os dados ficaram com ele.
+    if (error?.code === "23505") return { ok: false, mensagem: "O vendedor já gerou a proposta deste eletroposto; os dados agora ficam com ele." };
+    if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível salvar o eletroposto.") };
+    return { ok: true, mensagem: "Salvo." };
+  }
 
   const mudouModelos = !registro || registro.modelos.join() !== modelos.join();
   const base = { local_proprio: d.local_proprio, usina_fv: d.usina_fv, atualizado_por: atual.membroId };

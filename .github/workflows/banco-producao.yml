@@ -232,12 +232,13 @@ jobs:
       # Trava fail-closed: o conjunto do dry-run acima precisa ser exatamente o autorizado, senão o
       # job termina aqui, antes da aplicação. Sem credenciais. Para autorizar outro conjunto, a lista
       # abaixo muda por commit revisado (e uma nova tag), nunca por entrada do operador.
-      # Eletroposto (#223): aditiva (coluna em empresas e negocios, tabela nova com RLS e gatilhos); a temperatura
-      # (#222) já tem de estar aplicada.
+      # Eletroposto para o SDR e pontuação por tipo de negócio: policies do SDR, token do link, coluna
+      # tipo_negocio nas regras, gatilho em eventos e nova versão do motor de pontos; o eletroposto (#223) já
+      # tem de estar aplicado.
       - name: Conferir que o conjunto pendente é exatamente o autorizado
         env:
           MIGRATIONS_AUTORIZADAS: |
-                        20261026120000_eletroposto.sql
+                        20261027100000_eletroposto_sdr_pontuacao.sql
         run: bash .github/scripts/validar-conjunto-migrations.sh "$RUNNER_TEMP/dry-run.txt"
       - name: Aplicar (supabase db push --include-all)
         env:

@@ -12,9 +12,12 @@ import {
   ROTULO_OPERADOR_CONDICAO,
   ROTULO_PERFIL_GAMIFICACAO,
   ROTULO_PERIODO_LIMITE_REGRA,
+  ROTULO_TIPO_NEGOCIO,
+  TIPOS_NEGOCIO,
   type OperadorCondicao,
   type PerfilGamificacao,
   type PeriodoLimiteRegra,
+  type TipoNegocio,
 } from "@/lib/tipos";
 import {
   apagarConquista,
@@ -42,11 +45,25 @@ export type RegraSalva = {
   xp: number;
   moedas: number;
   perfilAplicavel: PerfilGamificacao | null;
+  tipoNegocio: TipoNegocio;
   limitePeriodo: PeriodoLimiteRegra | null;
   limiteQuantidade: number | null;
   unicaPorNegocio: boolean;
   ativa: boolean;
 };
+
+/** A regra vale só para negócios desse tipo (eventos sem negócio contam como energia solar). */
+function SeletorTipoNegocio({ defaultValue }: { defaultValue: TipoNegocio }) {
+  return (
+    <Selecao rotulo="Tipo de negócio" name="tipoNegocio" defaultValue={defaultValue}>
+      {TIPOS_NEGOCIO.map((t) => (
+        <option key={t} value={t}>
+          {ROTULO_TIPO_NEGOCIO[t]}
+        </option>
+      ))}
+    </Selecao>
+  );
+}
 
 function SeletorPerfil({ defaultValue }: { defaultValue: PerfilGamificacao | "" }) {
   return (
@@ -77,6 +94,7 @@ export function NovaRegra({ eventos }: { eventos: readonly EventoOpcao[] }) {
             </option>
           ))}
         </Selecao>
+        <SeletorTipoNegocio defaultValue="solar" />
       </div>
       <div className="grid gap-3 @min-[620px]:grid-cols-3">
         <Campo rotulo="XP" name="xp" type="number" step={1} defaultValue={10} required />
@@ -106,6 +124,7 @@ export function LinhaRegra({ regra, eventos }: { regra: RegraSalva; eventos: rea
     <form action={acao} className="gf-item-edicao flex flex-col gap-4">
       <input type="hidden" name="id" value={regra.id} />
       <CabecalhoItemGf titulo={regra.nome}>
+        {regra.tipoNegocio === "eletroposto" && <BadgeGf>{ROTULO_TIPO_NEGOCIO.eletroposto}</BadgeGf>}
         {regra.xp !== 0 && (
           <BadgeGf tom="positivo">
             {regra.xp > 0 ? "+" : "−"}
@@ -129,6 +148,7 @@ export function LinhaRegra({ regra, eventos }: { regra: RegraSalva; eventos: rea
             </option>
           ))}
         </Selecao>
+        <SeletorTipoNegocio defaultValue={regra.tipoNegocio} />
       </div>
       <div className="grid gap-3 @min-[620px]:grid-cols-3">
         <Campo rotulo="XP" name="xp" type="number" step={1} defaultValue={regra.xp} required />

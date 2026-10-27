@@ -8,8 +8,10 @@ import { afterAll, describe, expect, it } from "vitest";
 
 const SCRIPT = ".github/scripts/validar-conjunto-migrations.sh";
 const WORKFLOW = ".github/workflows/banco-producao.yml";
-// Eletroposto (#223): só ela, nenhuma a mais ou a menos.
-const AUTORIZADA = "20261026120000_eletroposto.sql";
+// Eletroposto para o SDR e pontuação por tipo de negócio: só ela, nenhuma a mais ou a menos.
+const AUTORIZADA = "20261027100000_eletroposto_sdr_pontuacao.sql";
+// Eletroposto (#223): aplicada em 26/10/2026, antes desta. Se voltar a aparecer como pendente, não é autorizada.
+const ELETROPOSTO = "20261026120000_eletroposto.sql";
 // Temperatura do negócio (#222): aplicada em 24/10/2026, antes do eletroposto. Se voltar a aparecer como pendente,
 // não é autorizada.
 const TEMPERATURA = "20261024100000_temperatura_negocio.sql";
@@ -171,28 +173,28 @@ describe("entradas inválidas: encerra com erro antes de qualquer aplicação", 
   });
 });
 
-describe("eletroposto (#223)", () => {
-  it("só o eletroposto pendente (temperatura e calculadora já aplicadas): passa", () => {
+describe("eletroposto para o SDR e pontuação por tipo de negócio", () => {
+  it("só ela pendente (eletroposto, temperatura e calculadora já aplicados): passa", () => {
     expect(validar(dryRunCom(AUTORIZADA)).codigo).toBe(0);
   });
 
-  it("temperatura ou qualquer migration da calculadora pendente junto, ou sozinha, não passa", () => {
-    for (const m of [TEMPERATURA, ...CALCULADORA]) {
+  it("eletroposto, temperatura ou qualquer migration da calculadora pendente junto, ou sozinha, não passa", () => {
+    for (const m of [ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) {
       expect(validar(dryRunCom(AUTORIZADA, m)).codigo, m).toBe(1);
       expect(validar(dryRunCom(m)).codigo, m).toBe(1);
     }
   });
 
-  it("a calculadora inteira pendente, com ou sem o eletroposto, não passa", () => {
+  it("a calculadora inteira pendente, com ou sem a autorizada, não passa", () => {
     expect(validar(dryRunCom(...CALCULADORA)).codigo).toBe(1);
     expect(validar(dryRunCom(...CALCULADORA, AUTORIZADA)).codigo).toBe(1);
   });
 
-  it("o eletroposto existe na pasta e é o único da lista autorizada do workflow", () => {
+  it("a autorizada existe na pasta e é a única da lista autorizada do workflow", () => {
     expect(existsSync(`supabase/migrations/${AUTORIZADA}`)).toBe(true);
     const texto = readFileSync(WORKFLOW, "utf8");
     expect(texto).toContain(AUTORIZADA);
-    for (const m of [TEMPERATURA, ...CALCULADORA]) expect(texto, m).not.toContain(m);
+    for (const m of [ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) expect(texto, m).not.toContain(m);
   });
 });
 

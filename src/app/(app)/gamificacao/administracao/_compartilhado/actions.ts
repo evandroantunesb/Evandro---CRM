@@ -7,7 +7,7 @@ import { mensagemErro } from "@/lib/erros";
 import { caminhoImagemRecompensaValido } from "@/lib/imagem-upload";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { OPERADORES_CONDICAO, PERFIS_GAMIFICACAO, PERIODOS_LIMITE_REGRA, type ResultadoAcao } from "@/lib/tipos";
+import { OPERADORES_CONDICAO, PERFIS_GAMIFICACAO, PERIODOS_LIMITE_REGRA, TIPOS_NEGOCIO, type ResultadoAcao } from "@/lib/tipos";
 
 const CAMINHO_REGRAS = "/gamificacao/administracao/regras";
 const CAMINHO_NIVEIS_CONQUISTAS = "/gamificacao/administracao/niveis-e-conquistas";
@@ -22,6 +22,7 @@ const esquema = z
     xp: z.coerce.number().int(),
     moedas: z.coerce.number().int(),
     perfilAplicavel: z.enum(PERFIS_GAMIFICACAO).optional().or(z.literal("").transform(() => undefined)),
+    tipoNegocio: z.enum(TIPOS_NEGOCIO, { message: "Escolha o tipo de negócio." }).default("solar"),
     condicaoCampo: z.string().trim().optional().or(z.literal("").transform(() => undefined)),
     condicaoOperador: z.enum(OPERADORES_CONDICAO).optional().or(z.literal("").transform(() => undefined)),
     condicaoValor: z.string().trim().optional().or(z.literal("").transform(() => undefined)),
@@ -63,6 +64,7 @@ export async function criarRegra(_: ResultadoAcao, formData: FormData): Promise<
     xp: dados.data.xp,
     moedas: dados.data.moedas,
     perfil_aplicavel: dados.data.perfilAplicavel ?? null,
+    tipo_negocio: dados.data.tipoNegocio,
     condicao: montarCondicao(dados.data),
     limite_periodo: dados.data.limitePeriodo ?? null,
     limite_quantidade: dados.data.limiteQuantidade ?? null,
@@ -92,6 +94,7 @@ export async function editarRegra(_: ResultadoAcao, formData: FormData): Promise
       xp: dados.data.xp,
       moedas: dados.data.moedas,
       perfil_aplicavel: dados.data.perfilAplicavel ?? null,
+      tipo_negocio: dados.data.tipoNegocio,
       condicao: montarCondicao(dados.data),
       limite_periodo: dados.data.limitePeriodo ?? null,
       limite_quantidade: dados.data.limiteQuantidade ?? null,

@@ -223,6 +223,15 @@ export const ROTULO_PERIODO_LIMITE_REGRA: Record<PeriodoLimiteRegra, string> = {
   mes: "por mês",
 };
 
+/** Tipo de negócio (`negocios.tipo`): cada regra de pontos vale só para negócios do seu tipo. */
+export const TIPOS_NEGOCIO = ["solar", "eletroposto"] as const;
+export type TipoNegocio = (typeof TIPOS_NEGOCIO)[number];
+
+export const ROTULO_TIPO_NEGOCIO: Record<TipoNegocio, string> = {
+  solar: "Energia solar",
+  eletroposto: "Eletroposto",
+};
+
 export const METRICAS_META = ["receita", "negocios_ganhos", "reunioes", "conversao", "tarefas_concluidas"] as const;
 export type MetricaMeta = (typeof METRICAS_META)[number];
 

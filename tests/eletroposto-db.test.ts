@@ -116,9 +116,12 @@ describe("criação do negócio de eletroposto", () => {
     }
   });
 
-  it("SDR não cria negócio de eletroposto", async () => {
-    const r = await criarNegocioEletropostoComCliente(cliente(sdr), atual[sdr.id], novo());
-    expect(r.ok).toBe(false);
+  it("SDR cria negócio de eletroposto sem modelos, preço nem proposta (os modelos enviados são ignorados)", async () => {
+    const r = await criar(sdr, novo());
+    const { data: negocio } = await servico.from("negocios").select("tipo, valor").eq("id", r.negocioId).single();
+    expect(negocio).toEqual({ tipo: "eletroposto", valor: null });
+    const { data: reg } = await servico.from("negocios_eletroposto").select("modelos, precos, local_proprio, usina_fv").eq("negocio_id", r.negocioId).single();
+    expect(reg).toEqual({ modelos: [], precos: {}, local_proprio: true, usina_fv: false });
   });
 
   it("empresa com o módulo desligado: o banco recusa o negócio de eletroposto", async () => {
@@ -202,9 +205,54 @@ describe("edição na ficha", () => {
     expect(new Date(depois!.emitida_em).getTime()).toBeGreaterThan(new Date(antes!.emitida_em).getTime());
   });
 
-  it("SDR não edita", async () => {
+  it("SDR não edita registro com proposta", async () => {
     const r = await criar(vendedor, novo());
-    const res = await salvarEletropostoComCliente(cliente(sdr), atual[sdr.id], fd({ negocioId: r.negocioId, local_proprio: "sim", usina_fv: "sim", modelos: ["basic"] }));
+    await servico.from("negocios").update({ responsavel_id: atual[sdr.id].membroId }).eq("id", r.negocioId);
+    const res = await salvarEletropostoComCliente(cliente(sdr), atual[sdr.id], fd({ negocioId: r.negocioId, local_proprio: "nao", usina_fv: "sim", modelos: ["basic"] }));
     expect(res.ok).toBe(false);
+    const { data: reg } = await servico.from("negocios_eletroposto").select("local_proprio, modelos").eq("negocio_id", r.negocioId).single();
+    expect(reg).toEqual({ local_proprio: true, modelos: ["basic", "full"] });
+  });
+
+  it("SDR edita só local e usina enquanto não há proposta; o vendedor escolhe os modelos e o link nasce novo", async () => {
+    const r = await criar(sdr, novo());
+    const { data: doSdr } = await sdr.cliente.from("negocios_eletroposto").select("token, modelos").eq("negocio_id", r.negocioId).single();
+    expect(doSdr!.modelos).toEqual([]);
+
+    // Modelos enviados pelo SDR são ignorados: ele só grava local próprio e usina FV.
+    const salvo = await salvarEletropostoComCliente(cliente(sdr), atual[sdr.id], fd({ negocioId: r.negocioId, local_proprio: "nao", usina_fv: "sim", modelos: ["screen"] }));
+    expect(salvo).toEqual({ ok: true, mensagem: "Salvo." });
+    const { data: meio } = await servico.from("negocios_eletroposto").select("modelos, local_proprio, usina_fv").eq("negocio_id", r.negocioId).single();
+    expect(meio).toEqual({ modelos: [], local_proprio: false, usina_fv: true });
+
+    // Direto no banco o SDR também não põe modelos nem preços.
+    const { data: burla } = await sdr.cliente
+      .from("negocios_eletroposto")
+      .update({ modelos: ["basic"], precos: { basic: 1 } })
+      .eq("negocio_id", r.negocioId)
+      .select("negocio_id");
+    expect(burla ?? []).toEqual([]);
+
+    await servico.from("negocios").update({ responsavel_id: atual[vendedor.id].membroId }).eq("id", r.negocioId);
+    const proposta = await salvarEletropostoComCliente(cliente(vendedor), atual[vendedor.id], fd({ negocioId: r.negocioId, local_proprio: "nao", usina_fv: "sim", modelos: ["full"] }));
+    expect(proposta.ok).toBe(true);
+    const { data: depois } = await servico.from("negocios_eletroposto").select("token, modelos, precos").eq("negocio_id", r.negocioId).single();
+    expect(depois!.modelos).toEqual(["full"]);
+    expect(depois!.precos).toEqual({ full: 119900 });
+    // O token que o SDR leu nunca vira o link da proposta com preços.
+    expect(depois!.token).not.toBe(doSdr!.token);
+
+    // Com proposta, o registro sai da visão do SDR (mesmo voltando a ser o responsável).
+    await servico.from("negocios").update({ responsavel_id: atual[sdr.id].membroId }).eq("id", r.negocioId);
+    const { data: escondido } = await sdr.cliente.from("negocios_eletroposto").select("token").eq("negocio_id", r.negocioId);
+    expect(escondido).toEqual([]);
+  });
+
+  it("o token do link é sempre gerado pelo banco e não muda depois da proposta", async () => {
+    const r = await criar(vendedor, novo());
+    const { data: antes } = await servico.from("negocios_eletroposto").select("token").eq("negocio_id", r.negocioId).single();
+    await vendedor.cliente.from("negocios_eletroposto").update({ token: "escolhido-por-mim" }).eq("negocio_id", r.negocioId);
+    const { data: depois } = await servico.from("negocios_eletroposto").select("token").eq("negocio_id", r.negocioId).single();
+    expect(depois!.token).toBe(antes!.token);
   });
 });

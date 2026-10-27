@@ -152,12 +152,13 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
     .eq("negocio_id", id)
     .order("ordem");
 
-  // Eletroposto: a ficha troca as abas "Sistema" e "Proposta e contrato" pela aba do eletroposto.
+  // Eletroposto: a ficha troca as abas "Sistema" e "Proposta e contrato" pela aba do eletroposto. O SDR também tem
+  // a aba, mas a RLS só lhe mostra o registro sem modelos (sem proposta); a proposta existe quando há modelos.
   const ehEletroposto = negocio.tipo === "eletroposto";
-  const { data: eletroposto } =
-    ehEletroposto && pode(atual.papel, PROPOSTA_E_CONTRATO)
-      ? await supabase.from("negocios_eletroposto").select("token, modelos, precos, local_proprio, usina_fv, emitida_em").eq("negocio_id", id).maybeSingle()
-      : { data: null };
+  const { data: eletroposto } = ehEletroposto
+    ? await supabase.from("negocios_eletroposto").select("token, modelos, precos, local_proprio, usina_fv, emitida_em").eq("negocio_id", id).maybeSingle()
+    : { data: null };
+  const propostaEletroposto = !!eletroposto && eletroposto.modelos.length > 0;
 
   const { data: proposta } = await supabase
     .from("propostas")
@@ -375,7 +376,11 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
   const abas: { id: string; rotulo: string; contador?: number }[] = [
     { id: "visao", rotulo: "Visão geral" },
     ...(ehEletroposto ? [] : [{ id: "sistema", rotulo: "Sistema" }]),
-    ...(pode(atual.papel, PROPOSTA_E_CONTRATO) ? [{ id: "proposta", rotulo: ehEletroposto ? "Eletroposto" : "Proposta e contrato" }] : []),
+    ...(ehEletroposto
+      ? [{ id: "proposta", rotulo: "Eletroposto" }]
+      : pode(atual.papel, PROPOSTA_E_CONTRATO)
+        ? [{ id: "proposta", rotulo: "Proposta e contrato" }]
+        : []),
     { id: "atividades", rotulo: "Atividades", contador: (tarefas ?? []).filter((t) => !t.concluida_em).length },
     { id: "arquivos", rotulo: "Arquivos", contador: anexos?.length ?? 0 },
   ];
@@ -386,9 +391,9 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
   const aberturasProposta = aberturas?.length ?? 0;
   const marcoProposta: Marco = {
     titulo: "Proposta",
-    estado: emissoes.length > 0 || proposta || eletroposto ? "cumprido" : "pendente",
+    estado: emissoes.length > 0 || proposta || propostaEletroposto ? "cumprido" : "pendente",
     rotulo: ehEletroposto
-      ? eletroposto
+      ? propostaEletroposto
         ? "Proposta de eletroposto gerada"
         : "Ainda não gerada"
       : emissoes.length > 0
@@ -844,6 +849,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
               siteUrl={env.siteUrl}
               telefoneCliente={contato.telefone}
               podeEditar={!arquivado}
+              escolheModelos={pode(atual.papel, PROPOSTA_E_CONTRATO)}
               registro={
                 eletroposto
                   ? {
