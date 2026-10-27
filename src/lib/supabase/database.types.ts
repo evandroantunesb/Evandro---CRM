@@ -936,6 +936,7 @@ export type Database = {
           id: string;
           papel: Database["public"]["Enums"]["papel_membro"];
           perfil_gamificacao: Database["public"]["Enums"]["perfil_gamificacao"] | null;
+          pode_pagar_fornecedor: boolean;
           recebe_leads: boolean;
           recebeu_lead_em: string | null;
           status: Database["public"]["Enums"]["status_membro"];
@@ -950,6 +951,7 @@ export type Database = {
           id?: string;
           papel?: Database["public"]["Enums"]["papel_membro"];
           perfil_gamificacao?: Database["public"]["Enums"]["perfil_gamificacao"] | null;
+          pode_pagar_fornecedor?: boolean;
           recebe_leads?: boolean;
           recebeu_lead_em?: string | null;
           status?: Database["public"]["Enums"]["status_membro"];
@@ -964,6 +966,7 @@ export type Database = {
           id?: string;
           papel?: Database["public"]["Enums"]["papel_membro"];
           perfil_gamificacao?: Database["public"]["Enums"]["perfil_gamificacao"] | null;
+          pode_pagar_fornecedor?: boolean;
           recebe_leads?: boolean;
           recebeu_lead_em?: string | null;
           status?: Database["public"]["Enums"]["status_membro"];
@@ -2850,6 +2853,117 @@ export type Database = {
           },
         ];
       };
+      obra_pagamentos_fornecedor: {
+        Row: {
+          autorizado_em: string;
+          autorizado_por: string;
+          comprovante_caminho: string | null;
+          comprovante_nome: string | null;
+          comprovante_tamanho: number | null;
+          comprovante_tipo_mime: string | null;
+          empresa_id: string;
+          id: string;
+          justificativa: string | null;
+          nf_caminho: string | null;
+          nf_em: string | null;
+          nf_nome: string | null;
+          nf_por: string | null;
+          nf_tamanho: number | null;
+          nf_tipo_mime: string | null;
+          obra_id: string;
+          pago_em: string | null;
+          pago_por: string | null;
+          pedido_id: string;
+          valor_autorizado: number;
+          valor_pago: number | null;
+          versao: number;
+        };
+        Insert: {
+          autorizado_em?: string;
+          autorizado_por: string;
+          comprovante_caminho?: string | null;
+          comprovante_nome?: string | null;
+          comprovante_tamanho?: number | null;
+          comprovante_tipo_mime?: string | null;
+          empresa_id: string;
+          id?: string;
+          justificativa?: string | null;
+          nf_caminho?: string | null;
+          nf_em?: string | null;
+          nf_nome?: string | null;
+          nf_por?: string | null;
+          nf_tamanho?: number | null;
+          nf_tipo_mime?: string | null;
+          obra_id: string;
+          pago_em?: string | null;
+          pago_por?: string | null;
+          pedido_id: string;
+          valor_autorizado: number;
+          valor_pago?: number | null;
+          versao: number;
+        };
+        Update: {
+          autorizado_em?: string;
+          autorizado_por?: string;
+          comprovante_caminho?: string | null;
+          comprovante_nome?: string | null;
+          comprovante_tamanho?: number | null;
+          comprovante_tipo_mime?: string | null;
+          empresa_id?: string;
+          id?: string;
+          justificativa?: string | null;
+          nf_caminho?: string | null;
+          nf_em?: string | null;
+          nf_nome?: string | null;
+          nf_por?: string | null;
+          nf_tamanho?: number | null;
+          nf_tipo_mime?: string | null;
+          obra_id?: string;
+          pago_em?: string | null;
+          pago_por?: string | null;
+          pedido_id?: string;
+          valor_autorizado?: number;
+          valor_pago?: number | null;
+          versao?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "obra_pagamentos_fornecedor_autorizado_por_fkey";
+            columns: ["autorizado_por"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "obra_pagamentos_fornecedor_empresa_id_obra_id_fkey";
+            columns: ["empresa_id", "obra_id"];
+            isOneToOne: false;
+            referencedRelation: "obras";
+            referencedColumns: ["empresa_id", "id"];
+          },
+          {
+            foreignKeyName: "obra_pagamentos_fornecedor_nf_por_fkey";
+            columns: ["nf_por"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "obra_pagamentos_fornecedor_pago_por_fkey";
+            columns: ["pago_por"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "obra_pagamentos_fornecedor_pedido_id_fkey";
+            columns: ["pedido_id"];
+            isOneToOne: false;
+            referencedRelation: "obra_compras_documentos";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       obra_participantes: {
         Row: {
           created_at: string;
@@ -4332,6 +4446,10 @@ export type Database = {
           membro_id: string;
         }[];
       };
+      autorizar_pagamento_fornecedor: {
+        Args: { p_justificativa?: string; p_pedido_id: string; p_valor: number };
+        Returns: string;
+      };
       avaliar_condicao_regra: { Args: { p_condicao: Json; p_payload: Json }; Returns: boolean };
       buscar_contato_duplicado: {
         Args: { p_email: string; p_empresa_id: string; p_telefone: string };
@@ -4364,6 +4482,13 @@ export type Database = {
       compartilha_empresa: { Args: { p_user_id: string }; Returns: boolean };
       compartilha_empresa_comercial: { Args: { p_user_id: string }; Returns: boolean };
       compartilha_empresa_identidade: { Args: { p_user_id: string }; Returns: boolean };
+      conferir_documento_financeiro_obra: {
+        Args: { p_caminho: string; p_obra_id: string };
+        Returns: {
+          tamanho: number;
+          tipo_mime: string;
+        }[];
+      };
       confirmar_pagamento: {
         Args: { p_contrato_id: string };
         Returns: {
@@ -4724,6 +4849,8 @@ export type Database = {
         Args: { p_caminho: string; p_escrever: boolean };
         Returns: boolean;
       };
+      pode_acessar_arquivo_financeiro_obra: { Args: { p_caminho: string }; Returns: boolean };
+      pode_gerir_pagamento_fornecedor: { Args: { p_obra_id: string }; Returns: boolean };
       pode_registrar_pagamento_negocio: { Args: { p_negocio_id: string }; Returns: boolean };
       pode_responder_handoff: { Args: { p_handoff_id: string }; Returns: boolean };
       pode_revisar_orcamento_obra: { Args: { p_obra_id: string }; Returns: boolean };
@@ -4779,6 +4906,16 @@ export type Database = {
       };
       reavaliar_credito_condicionado_valor: {
         Args: { p_estornado_por: string; p_evento_won_id: number; p_novo_valor: number };
+        Returns: undefined;
+      };
+      registrar_arquivo_pagamento_fornecedor: {
+        Args: {
+          p_caminho: string;
+          p_nome: string;
+          p_pagamento_id: string;
+          p_tipo: string;
+          p_valor_pago?: number;
+        };
         Returns: undefined;
       };
       registrar_documento_compras_obra: {

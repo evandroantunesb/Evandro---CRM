@@ -17,7 +17,7 @@ import {
   type StatusMembro,
   type TipoVendedor,
 } from "@/lib/tipos";
-import { atualizarMembro, carregarCarteiraAberta, convidarMembro, desligarComTransferencia, salvarSetoresMembro, type CarteiraAberta } from "./actions";
+import { atualizarMembro, carregarCarteiraAberta, convidarMembro, desligarComTransferencia, salvarPermissaoPagamentoFornecedor, salvarSetoresMembro, type CarteiraAberta } from "./actions";
 
 export function FormularioConvite() {
   const [resultado, acao, pendente] = useActionState(convidarMembro, null);
@@ -74,6 +74,7 @@ export type MembroLinha = {
   tipoVendedor: TipoVendedor | null;
   perfilGamificacao: PerfilGamificacao | null;
   recebeLeads: boolean;
+  podePagarFornecedor: boolean;
   status: StatusMembro;
   setores: { setor: string; capacidade: string }[] | null;
 };
@@ -166,6 +167,9 @@ export function LinhaMembro({ membro }: { membro: MembroLinha }) {
     {membro.papel === "operacao" && membro.status === "ativo" && papel === "operacao" && status === "ativo" && membro.setores && (
       <SetoresMembro key={`${membro.id}:${membro.setores.map((s) => `${s.setor}:${s.capacidade}`).sort().join(",")}`} membroId={membro.id} setores={membro.setores} />
     )}
+    {membro.papel === "operacao" && membro.status === "ativo" && papel === "operacao" && status === "ativo" && (
+      <PermissaoPagamentoFornecedor membroId={membro.id} habilitado={membro.podePagarFornecedor} />
+    )}
     {membro.papel === "operacao" && (!(papel === "operacao") || status !== "ativo") && (
       <p className="mt-2 text-sm text-zinc-600">Ao salvar esta alteração, os setores e as participações operacionais serão removidos.</p>
     )}
@@ -174,6 +178,27 @@ export function LinhaMembro({ membro }: { membro: MembroLinha }) {
     )}
     </div>
   );
+}
+
+function PermissaoPagamentoFornecedor({ membroId, habilitado }: { membroId: string; habilitado: boolean }) {
+  const [resultado, acao, pendente] = useActionState(salvarPermissaoPagamentoFornecedor, null);
+  return <form action={acao} className="mt-3 flex flex-col gap-2 rounded-lg border border-zinc-200 p-3 text-sm">
+    <input type="hidden" name="membroId" value={membroId} />
+    <p className="font-medium text-zinc-900">Pagamento a fornecedor</p>
+    <p className="text-zinc-600">Permissão financeira independente do setor. Também exige acesso ao setor Operacional na obra.</p>
+    <div className="flex flex-wrap items-center gap-2">
+      <SeloPagamento ativo={habilitado} />
+      <input type="hidden" name="habilitado" value={habilitado ? "nao" : "sim"} />
+      <Botao type="submit" variante="secundario" disabled={pendente}>
+        {pendente ? "Salvando..." : habilitado ? "Revogar permissão" : "Autorizar pagamento"}
+      </Botao>
+    </div>
+    <Mensagem resultado={resultado} />
+  </form>;
+}
+
+function SeloPagamento({ ativo }: { ativo: boolean }) {
+  return <span className="text-xs text-zinc-600">{ativo ? "Permissão ativa" : "Sem permissão financeira"}</span>;
 }
 
 function SetoresMembro({ membroId, setores }: { membroId: string; setores: NonNullable<MembroLinha["setores"]> }) {

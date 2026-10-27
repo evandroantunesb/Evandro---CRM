@@ -11,7 +11,7 @@ export default async function Usuarios() {
   const [{ data }, { data: setores, error: erroSetores }] = await Promise.all([
     supabase
       .from("empresa_membros")
-      .select("id, papel, tipo_vendedor, perfil_gamificacao, recebe_leads, status, perfis(nome, email)")
+      .select("id, papel, tipo_vendedor, perfil_gamificacao, recebe_leads, pode_pagar_fornecedor, status, perfis(nome, email)")
       .eq("empresa_id", atual.empresaId)
       .order("created_at"),
     supabase.from("membro_setores_obra").select("membro_id, setor, capacidade").eq("empresa_id", atual.empresaId),
@@ -27,6 +27,7 @@ export default async function Usuarios() {
       tipoVendedor: m.tipo_vendedor as TipoVendedor | null,
       perfilGamificacao: m.perfil_gamificacao as PerfilGamificacao | null,
       recebeLeads: m.recebe_leads,
+      podePagarFornecedor: m.pode_pagar_fornecedor,
       status: m.status as StatusMembro,
       setores: erroSetores ? null : (setores ?? []).filter((s) => s.membro_id === m.id),
     };

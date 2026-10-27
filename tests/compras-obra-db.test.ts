@@ -6,6 +6,7 @@ let admin: Usuario;
 let vendedor: Usuario;
 let comprador: Usuario;
 let tecnico: Usuario;
+let financeiro: Usuario;
 let externo: Usuario;
 let empresa: string;
 let obra: string;
@@ -41,6 +42,12 @@ async function enviarArquivo(ator: Usuario) {
   return { caminho, erro: envio.error };
 }
 
+async function enviarFinanceiro(ator: Usuario) {
+  const caminho = `${empresa}/${obra}/financeiro/${crypto.randomUUID()}.pdf`;
+  const envio = await ator.cliente.storage.from("obra-compras").upload(caminho, pdf, { contentType: "application/pdf" });
+  return { caminho, erro: envio.error };
+}
+
 const registrar = (ator: Usuario, tipo: "orcamento" | "pedido", caminho: string, fornecedor = "Fornecedor solar") =>
   ator.cliente.rpc("registrar_documento_compras_obra", {
     p_obra_id: obra, p_tipo: tipo, p_caminho: caminho,
@@ -48,8 +55,8 @@ const registrar = (ator: Usuario, tipo: "orcamento" | "pedido", caminho: string,
   });
 
 beforeAll(async () => {
-  [admin, vendedor, comprador, tecnico, externo] = await Promise.all(
-    ["co-admin", "co-vendedor", "co-comprador", "co-tecnico", "co-externo"].map(criarUsuario),
+  [admin, vendedor, comprador, tecnico, financeiro, externo] = await Promise.all(
+    ["co-admin", "co-vendedor", "co-comprador", "co-tecnico", "co-financeiro", "co-externo"].map(criarUsuario),
   );
   const { data: e, error } = await servico.from("empresas").insert({ nome: `Compras ${sufixo}` }).select("id").single();
   if (error) throw error;
@@ -60,6 +67,7 @@ beforeAll(async () => {
       { empresa_id: empresa, user_id: vendedor.id, papel: "vendedor" },
       { empresa_id: empresa, user_id: comprador.id, papel: "operacao" },
       { empresa_id: empresa, user_id: tecnico.id, papel: "operacao" },
+      { empresa_id: empresa, user_id: financeiro.id, papel: "operacao" },
     ]).select("id, user_id");
   if (erroMembros) throw erroMembros;
   for (const m of membros!) membro.set(m.user_id, m.id);
@@ -71,6 +79,10 @@ beforeAll(async () => {
     p_membro_id: membro.get(tecnico.id)!, p_setores: [{ setor: "operacional", capacidade: "executar" }],
   });
   if (setoresTecnico.error) throw setoresTecnico.error;
+  const setoresFinanceiro = await admin.cliente.rpc("definir_setores_membro", {
+    p_membro_id: membro.get(financeiro.id)!, p_setores: [{ setor: "operacional", capacidade: "coordenar" }],
+  });
+  if (setoresFinanceiro.error) throw setoresFinanceiro.error;
   obra = await criarObra();
   const compradorAtribuido = await admin.cliente.rpc("atribuir_participante_obra", {
     p_obra_id: obra, p_membro_id: membro.get(comprador.id)!, p_setor: "compras",
@@ -120,7 +132,7 @@ describe("documentos e aprovação de Compras", () => {
     expect(fluxo?.status).toBe("pedido_realizado");
     expect((await comprador.cliente.rpc("alterar_status_fluxo_obra", {
       p_obra_id: obra, p_setor: "compras", p_status: "faturado_fornecedor",
-    })).error?.message).toContain("comprovantes financeiros");
+    })).error?.message).toContain("comprovante e a nota fiscal");
     expect((await registrar(comprador, "pedido", pedido.caminho)).error).toBeTruthy();
 
     const novo = await enviarArquivo(comprador);
@@ -151,5 +163,106 @@ describe("documentos e aprovação de Compras", () => {
     expect(versoes).toHaveLength(3);
     expect(versoes?.[1]).toMatchObject({ versao: 2, revisao: "reprovado", motivo_reprovacao: "Inversor incompatível com o conjunto de módulos." });
     expect(versoes?.[2]).toMatchObject({ versao: 3, revisao: "pendente" });
+  });
+});
+
+describe("pagamento ao fornecedor", () => {
+  let pedidoId: string;
+  let pagamentoId: string;
+
+  it("exige permissão financeira explícita e orçamento aprovado", async () => {
+    const { data: quote } = await tecnico.cliente.from("obra_compras_documentos")
+      .select("id").eq("obra_id", obra).eq("tipo", "orcamento").order("versao", { ascending: false }).limit(1).single();
+    expect((await financeiro.cliente.rpc("autorizar_pagamento_fornecedor", {
+      p_pedido_id: quote!.id, p_valor: 12000,
+    })).error).toBeTruthy();
+    expect((await enviarFinanceiro(comprador)).erro).toBeTruthy();
+    expect((await enviarFinanceiro(financeiro)).erro).toBeTruthy();
+    const autoConcessao = await financeiro.cliente.from("empresa_membros")
+      .update({ pode_pagar_fornecedor: true }).eq("id", membro.get(financeiro.id)!).select("id");
+    expect(autoConcessao.data).toEqual([]);
+    expect((await admin.cliente.from("empresa_membros").update({ pode_pagar_fornecedor: true })
+      .eq("id", membro.get(financeiro.id)!)).error).toBeNull();
+    expect((await enviarFinanceiro(financeiro)).erro).toBeNull();
+    expect((await tecnico.cliente.rpc("revisar_orcamento_obra", {
+      p_documento_id: quote!.id, p_aprovar: true,
+    })).error).toBeNull();
+    const pedidoArquivo = await enviarArquivo(comprador);
+    expect(pedidoArquivo.erro).toBeNull();
+    expect((await registrar(comprador, "pedido", pedidoArquivo.caminho)).error).toBeNull();
+    const { data: pedido } = await comprador.cliente.from("obra_compras_documentos")
+      .select("id").eq("obra_id", obra).eq("tipo", "pedido").order("versao", { ascending: false }).limit(1).single();
+    pedidoId = pedido!.id;
+    expect((await comprador.cliente.rpc("autorizar_pagamento_fornecedor", {
+      p_pedido_id: pedidoId, p_valor: 12000,
+    })).error).toBeTruthy();
+    expect((await tecnico.cliente.rpc("autorizar_pagamento_fornecedor", {
+      p_pedido_id: pedidoId, p_valor: 12000,
+    })).error).toBeTruthy();
+    expect((await vendedor.cliente.from("obra_pagamentos_fornecedor").select("id").eq("obra_id", obra)).data).toEqual([]);
+  });
+
+  it("versiona a autorização e impede comprovante fora do valor aprovado", async () => {
+    const primeira = await financeiro.cliente.rpc("autorizar_pagamento_fornecedor", {
+      p_pedido_id: pedidoId, p_valor: 12000,
+    });
+    expect(primeira.error).toBeNull();
+    expect((await financeiro.cliente.rpc("autorizar_pagamento_fornecedor", {
+      p_pedido_id: pedidoId, p_valor: 12500,
+    })).error?.message).toContain("por que");
+    const segunda = await financeiro.cliente.rpc("autorizar_pagamento_fornecedor", {
+      p_pedido_id: pedidoId, p_valor: 12500, p_justificativa: "Frete adicional validado.",
+    });
+    expect(segunda.error).toBeNull();
+    pagamentoId = segunda.data!;
+    const arquivo = await enviarFinanceiro(financeiro);
+    expect(arquivo.erro).toBeNull();
+    expect((await financeiro.cliente.rpc("registrar_arquivo_pagamento_fornecedor", {
+      p_pagamento_id: primeira.data!, p_tipo: "comprovante", p_caminho: arquivo.caminho,
+      p_nome: "comprovante.pdf", p_valor_pago: 12000,
+    })).error?.message).toContain("mais recente");
+    expect((await financeiro.cliente.rpc("registrar_arquivo_pagamento_fornecedor", {
+      p_pagamento_id: pagamentoId, p_tipo: "nota_fiscal", p_caminho: arquivo.caminho,
+      p_nome: "nf.pdf",
+    })).error?.message).toContain("após o comprovante");
+    expect((await financeiro.cliente.rpc("registrar_arquivo_pagamento_fornecedor", {
+      p_pagamento_id: pagamentoId, p_tipo: "comprovante", p_caminho: arquivo.caminho,
+      p_nome: "comprovante.pdf", p_valor_pago: 12000,
+    })).error?.message).toContain("valor pago");
+    expect((await financeiro.cliente.rpc("registrar_arquivo_pagamento_fornecedor", {
+      p_pagamento_id: pagamentoId, p_tipo: "comprovante", p_caminho: arquivo.caminho,
+      p_nome: "comprovante.pdf", p_valor_pago: 12500,
+    })).error).toBeNull();
+    expect((await financeiro.cliente.rpc("autorizar_pagamento_fornecedor", {
+      p_pedido_id: pedidoId, p_valor: 13000, p_justificativa: "Tentativa após pagamento.",
+    })).error?.message).toContain("já possui pagamento");
+    const { data: versoes } = await financeiro.cliente.from("obra_pagamentos_fornecedor")
+      .select("versao, valor_autorizado, valor_pago").eq("pedido_id", pedidoId).order("versao");
+    expect(versoes).toEqual([
+      { versao: 1, valor_autorizado: 12000, valor_pago: null },
+      { versao: 2, valor_autorizado: 12500, valor_pago: 12500 },
+    ]);
+  });
+
+  it("só conclui Compras após a nota e mantém documentos financeiros privados", async () => {
+    expect((await comprador.cliente.rpc("alterar_status_fluxo_obra", {
+      p_obra_id: obra, p_setor: "compras", p_status: "faturado_fornecedor",
+    })).error?.message).toContain("nota fiscal");
+    const arquivo = await enviarFinanceiro(financeiro);
+    expect(arquivo.erro).toBeNull();
+    expect((await financeiro.cliente.rpc("registrar_arquivo_pagamento_fornecedor", {
+      p_pagamento_id: pagamentoId, p_tipo: "nota_fiscal", p_caminho: arquivo.caminho,
+      p_nome: "nota-fiscal.pdf",
+    })).error).toBeNull();
+    const { data: fluxo } = await comprador.cliente.from("obra_fluxos")
+      .select("status").eq("obra_id", obra).eq("setor", "compras").single();
+    expect(fluxo?.status).toBe("faturado_fornecedor");
+    expect((await vendedor.cliente.storage.from("obra-compras").createSignedUrl(arquivo.caminho, 60)).error).toBeTruthy();
+    expect((await comprador.cliente.storage.from("obra-compras").createSignedUrl(arquivo.caminho, 60)).error).toBeTruthy();
+    expect((await financeiro.cliente.storage.from("obra-compras").createSignedUrl(arquivo.caminho, 60)).error).toBeNull();
+    expect((await admin.cliente.from("empresa_membros")
+      .update({ pode_pagar_fornecedor: false }).eq("id", membro.get(financeiro.id)!)).error).toBeNull();
+    expect((await financeiro.cliente.from("obra_pagamentos_fornecedor").select("id").eq("obra_id", obra)).data).toEqual([]);
+    expect((await financeiro.cliente.storage.from("obra-compras").createSignedUrl(arquivo.caminho, 60)).error).toBeTruthy();
   });
 });

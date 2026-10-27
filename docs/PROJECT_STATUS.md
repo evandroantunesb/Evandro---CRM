@@ -1,5 +1,11 @@
 # Estado do projeto — Raion CRM
 
+## Pagamento ao fornecedor na Obra — implementação local, 2026-10-27
+
+Branch `feat/pagamento-fornecedor-obra`, empilhada sobre `feat/compras-orcamento-obra` (`51facc9`). O administrador concede ou revoga por usuário operacional a permissão específica de pagamento a fornecedor; ela também exige acesso ao setor Operacional na obra. Após o pedido vinculado ao orçamento técnico aprovado mais recente, o financeiro registra o valor autorizado, pode criar nova versão com justificativa antes de pagar, anexa o comprovante do valor aprovado e depois a nota fiscal. A nota conclui o fluxo de Compras. O histórico preserva as etapas sem expor valores ao vendedor. Comprovante, nota, valor e justificativa ficam sob RLS e Storage privados para financeiro autorizado e admin; Compras e Comercial não recebem acesso financeiro. A permissão é retirada automaticamente se o membro deixar o papel Operação ou ficar inativo.
+
+Migration `20261027232000_pagamento_fornecedor_obra.sql` aplicada **somente no Supabase local**, com tipos regenerados. Testes de Compras, pagamento, permissões, ordem documental e regressão de escritas em Obras: 43/43; typecheck e build aprovados; lint sem erros (3 avisos preexistentes). Ainda falta inspeção visual no navegador. Produção e GitHub não foram alterados. O preview da Vercel usa o banco de produção: **não abrir PR/deploy desta branch antes do fluxo manual aprovado das migrations pendentes**. Próximas etapas não iniciadas: roteamento automático dos responsáveis, rastreamento e agenda de instalação, cobrança parcelada do cliente e pós-venda.
+
 ## Compras na Obra — implementação local, 2026-10-27
 
 Branch `feat/compras-orcamento-obra`, empilhada sobre `feat/levantamento-tecnico` (`1f61bfe`). No card da Obra, usuários autorizados de Compras anexaram orçamento externo do fornecedor, com versão e valor opcional; o responsável principal do setor operacional (revisor técnico) ou admin aprova ou devolve com motivo; Compras anexa o pedido vinculado ao orçamento mais recente aprovado. Nova cotação mantém as versões anteriores e exige nova aprovação. O status de Compras avança para cotação ou pedido ao registrar o documento; depois que uma cotação existe, a ação antiga de status não pode antecipar o pedido. Faturamento permanece bloqueado até a futura etapa de comprovante financeiro e nota fiscal.

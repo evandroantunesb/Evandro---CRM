@@ -38,6 +38,9 @@ const ROTULO_TIPO: Record<string, string> = {
   documento_compras_anexado: "Documento de compras anexado",
   orcamento_aprovado: "Orçamento aprovado",
   orcamento_reprovado: "Orçamento reprovado",
+  pagamento_fornecedor_autorizado: "Pagamento ao fornecedor autorizado",
+  pagamento_fornecedor_comprovado: "Pagamento ao fornecedor comprovado",
+  nota_fiscal_fornecedor_anexada: "Nota fiscal do fornecedor anexada",
 };
 
 const ROTULO_SETOR_HISTORICO: Record<string, string> = { ...ROTULO_SETOR, comercial: "Comercial" };
@@ -140,6 +143,12 @@ function descrever(linha: LinhaHistoricoObra, nomes: ReadonlyMap<string, string>
       return "Conferência técnica aprovada";
     case "orcamento_reprovado":
       return "Conferência técnica reprovada; confira o motivo no cartão de Compras";
+    case "pagamento_fornecedor_autorizado":
+      return "Pagamento do pedido autorizado";
+    case "pagamento_fornecedor_comprovado":
+      return "Comprovante do fornecedor registrado";
+    case "nota_fiscal_fornecedor_anexada":
+      return "Nota fiscal do fornecedor registrada";
     default:
       return "Evento registrado";
   }

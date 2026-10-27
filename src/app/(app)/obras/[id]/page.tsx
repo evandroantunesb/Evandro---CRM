@@ -9,6 +9,7 @@ import { carregarObras } from "@/lib/obras/dados";
 import { filtrosDeParams, hrefObra, montarNavegacao, queryDosFiltros, temFiltroAtivo } from "@/lib/obras/navegacao";
 import { GestaoMarco, GestaoSetor } from "./gestao";
 import { ComprasObra, type DocumentoComprasVM } from "./compras";
+import { PagamentoFornecedor, type PagamentoFornecedorVM } from "./pagamento-fornecedor";
 import {
   carregarDetalheObra,
   type ContatoClienteVM,
@@ -51,17 +52,26 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
     carregarObras(supabase, { empresaId: atual.empresaId, papel: atual.papel, comResponsaveis: false }),
   ]);
   if (!obra) notFound();
-  const [{ data: podeVerCompras }, { data: podeRevisarCompras }, { data: documentosCompras }] = await Promise.all([
+  const [{ data: podeVerCompras }, { data: podeRevisarCompras }, { data: documentosCompras }, { data: podeGerirPagamento }, { data: pagamentosFornecedor }] = await Promise.all([
     supabase.rpc("pode_ver_documentos_compras_obra", { p_obra_id: id }),
     supabase.rpc("pode_revisar_orcamento_obra", { p_obra_id: id }),
     supabase.from("obra_compras_documentos")
       .select("id, tipo, versao, nome, fornecedor, valor, revisao, motivo_reprovacao, orcamento_id, anexado_em")
       .eq("obra_id", id).order("anexado_em", { ascending: false }),
+    supabase.rpc("pode_gerir_pagamento_fornecedor", { p_obra_id: id }),
+    supabase.from("obra_pagamentos_fornecedor")
+      .select("id, pedido_id, versao, valor_autorizado, justificativa, autorizado_em, pago_em, nf_em")
+      .eq("obra_id", id).order("autorizado_em", { ascending: false }),
   ]);
   const compras: DocumentoComprasVM[] = (documentosCompras ?? []).filter((d) => d.tipo === "orcamento" || d.tipo === "pedido").map((d) => ({
     id: d.id, tipo: d.tipo as "orcamento" | "pedido", versao: d.versao, nome: d.nome,
     fornecedor: d.fornecedor, valor: d.valor, revisao: d.revisao as DocumentoComprasVM["revisao"],
     motivoReprovacao: d.motivo_reprovacao, orcamentoId: d.orcamento_id, anexadoEm: d.anexado_em,
+  }));
+  const pagamentos: PagamentoFornecedorVM[] = (pagamentosFornecedor ?? []).map((p) => ({
+    id: p.id, pedidoId: p.pedido_id, versao: p.versao, valorAutorizado: p.valor_autorizado,
+    justificativa: p.justificativa, autorizadoEm: p.autorizado_em,
+    pagoEm: p.pago_em, nfEm: p.nf_em,
   }));
   const navegacao = montarNavegacao(lista.obras, filtros, id);
 
@@ -146,6 +156,12 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
           podeAnexar={gestaoDoSetor("compras")?.permissoes.alterarFluxo ?? false}
           podeRevisar={Boolean(podeRevisarCompras) && !resumo.pausaMotivo && !resumo.cancelamentoMotivo}
         />
+      </Cartao>}
+
+      {podeGerirPagamento && <Cartao titulo="Pagamento ao fornecedor">
+        <PagamentoFornecedor obraId={resumo.id} empresaId={atual.empresaId}
+          documentos={compras} pagamentos={pagamentos}
+          podeEditar={!resumo.pausaMotivo && !resumo.cancelamentoMotivo} />
       </Cartao>}
 
       <Cartao titulo="Marcos">

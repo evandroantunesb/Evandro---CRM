@@ -159,6 +159,22 @@ export async function salvarSetoresMembro(_: ResultadoAcao, formData: FormData):
   return { ok: true, mensagem: "Setores atualizados." };
 }
 
+export async function salvarPermissaoPagamentoFornecedor(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  const { atual } = await exigirPapel("admin");
+  const dados = z.object({ membroId: z.string().uuid(), habilitado: z.enum(["sim", "nao"]) })
+    .safeParse(Object.fromEntries(formData));
+  if (!dados.success) return { ok: false, mensagem: "Dados inválidos." };
+  const supabase = await criarClienteServidor();
+  const { data, error } = await supabase.from("empresa_membros")
+    .update({ pode_pagar_fornecedor: dados.data.habilitado === "sim" })
+    .eq("id", dados.data.membroId).eq("empresa_id", atual.empresaId)
+    .eq("papel", "operacao").eq("status", "ativo").select("id");
+  if (error || !data?.length) return { ok: false, mensagem: "Não foi possível alterar a permissão financeira deste usuário." };
+  revalidatePath("/configuracoes/usuarios");
+  revalidatePath("/obras");
+  return { ok: true, mensagem: dados.data.habilitado === "sim" ? "Permissão financeira concedida." : "Permissão financeira revogada." };
+}
+
 export type CarteiraAberta = {
   negocios: { id: string; numero: number; contatoNome: string }[];
   vendedores: { id: string; nome: string }[];
