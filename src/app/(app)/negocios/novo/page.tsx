@@ -10,8 +10,13 @@ import { FormularioEletroposto } from "./formulario-eletroposto";
 
 export default async function NovoNegocio({ searchParams }: PageProps<"/negocios/novo">) {
   const { atual } = await exigirPapel(...NEGOCIOS);
-  const { funil, etapa, tipo } = await searchParams;
+  const { funil, etapa, tipo, contato: contatoParam } = await searchParams;
   const supabase = await criarClienteServidor();
+  // "Novo negócio para este cliente": o cliente vem escolhido (só se quem cria o vê, pela RLS de contatos).
+  const contatoId = typeof contatoParam === "string" && /^[0-9a-f-]{36}$/i.test(contatoParam) ? contatoParam : null;
+  const { data: contatoInicial } = contatoId
+    ? await supabase.from("contatos").select("id, nome, telefone, email, endereco, cidade, uf").eq("id", contatoId).maybeSingle()
+    : { data: null };
   // Contexto regulatório sem qualificação: a tela aplica o tipo de cliente e a distribuidora escolhidos (mesmo
   // objeto que o servidor monta ao gravar), para a prévia ao vivo ser o mesmo cálculo que fica salvo.
   const [config, { data: parametros }, contexto, { data: ultimo }, { data: empresa }] = await Promise.all([
@@ -42,6 +47,7 @@ export default async function NovoNegocio({ searchParams }: PageProps<"/negocios
   const parametrosTipo = (t: string) => {
     const p = new URLSearchParams({ tipo: t, funil: funilEscolhido.id });
     if (etapaEscolhida) p.set("etapa", etapaEscolhida.id);
+    if (contatoInicial) p.set("contato", contatoInicial.id);
     return `/negocios/novo?${p}`;
   };
 
@@ -80,6 +86,7 @@ export default async function NovoNegocio({ searchParams }: PageProps<"/negocios
           responsaveis={responsaveis}
           meuMembroId={atual.membroId}
           escolheModelos={pode(atual.papel, PROPOSTA_E_CONTRATO)}
+          contatoInicial={contatoInicial}
         />
       </div>
     );
@@ -98,6 +105,7 @@ export default async function NovoNegocio({ searchParams }: PageProps<"/negocios
         responsaveis={responsaveis}
         meuMembroId={atual.membroId}
         contexto={contexto}
+        contatoInicial={contatoInicial}
         parametros={
           parametros
             ? {

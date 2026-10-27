@@ -162,6 +162,7 @@ export function FormularioNegocio({
   meuMembroId,
   contexto,
   parametros,
+  contatoInicial = null,
 }: {
   funilId: string;
   /** Etapa pré-selecionada (ex.: "Adicionar negócio" numa coluna do Kanban); senão usa a etapa inicial do funil. */
@@ -175,6 +176,8 @@ export function FormularioNegocio({
   /** Referência oficial (tarifas) sem qualificação; a tela aplica o tipo de cliente e a distribuidora escolhidos. */
   contexto: ContextoEstimativa | null;
   parametros: Parametros | null;
+  /** Cliente já escolhido ("Novo negócio para este cliente", na ficha de outro negócio). */
+  contatoInicial?: ContatoEncontrado | null;
 }) {
   const router = useRouter();
   const [resultado, setResultado] = useState<ResultadoAcao>(null);
@@ -185,8 +188,8 @@ export function FormularioNegocio({
   const [erroEtapa, setErroEtapa] = useState<string | null>(null);
 
   // ── 01 Cliente ──
-  const [modo, setModo] = useState<"novo" | "existente">("novo");
-  const [contato, setContato] = useState<ContatoEncontrado | null>(null);
+  const [modo, setModo] = useState<"novo" | "existente">(contatoInicial ? "existente" : "novo");
+  const [contato, setContato] = useState<ContatoEncontrado | null>(contatoInicial);
   const [busca, setBusca] = useState("");
   const [encontrados, setEncontrados] = useState<ContatoEncontrado[]>([]);
   const [duplicados, setDuplicados] = useState<Duplicado[]>([]);
@@ -205,8 +208,11 @@ export function FormularioNegocio({
   const [numeroEndereco, setNumeroEndereco] = useState("");
   const [complemento, setComplemento] = useState("");
   const [bairro, setBairro] = useState("");
-  const [cidade, setCidade] = useState("");
-  const [uf, setUf] = useState("");
+  const [cidade, setCidade] = useState(contatoInicial?.cidade ?? "");
+  const [uf, setUf] = useState(() => {
+    const ufContato = contatoInicial?.uf?.trim().toUpperCase();
+    return ufContato && ESTADOS_BR.includes(ufContato) ? ufContato : "";
+  });
   const [buscandoCep, setBuscandoCep] = useState(false);
   const [cepEncontrado, setCepEncontrado] = useState<boolean | null>(null);
 

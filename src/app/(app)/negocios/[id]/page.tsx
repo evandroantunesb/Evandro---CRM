@@ -3,7 +3,10 @@ import { notFound } from "next/navigation";
 import { ListaTarefas } from "@/components/lista-tarefas";
 import { MoverEtapa } from "@/components/mover-etapa";
 import { NovaTarefa } from "@/components/nova-tarefa";
+import { Plus } from "lucide-react";
+import { NovoNegocio } from "@/components/novo-negocio";
 import { Cartao, CartaoRecolhivel, Selo, Voltar } from "@/components/ui";
+import { eletropostoDisponivel } from "@/lib/eletroposto-servidor";
 import { conferirArquivos } from "@/lib/anexos-servidor";
 import { AVISOS_CRIACAO, avisosDaUrl } from "@/lib/negocio-dados";
 import { apagarAnexo } from "@/lib/acoes/anexos";
@@ -159,6 +162,19 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
     ? await supabase.from("negocios_eletroposto").select("token, modelos, precos, local_proprio, usina_fv, emitida_em").eq("negocio_id", id).maybeSingle()
     : { data: null };
   const propostaEletroposto = !!eletroposto && eletroposto.modelos.length > 0;
+
+  // Outros negócios do mesmo cliente (ex.: usina e eletroposto), só os que quem consulta vê (RLS), e o atalho para
+  // abrir mais um negócio para ele.
+  const [{ data: outrosNegocios }, eletropostoNaEmpresa] = await Promise.all([
+    supabase
+      .from("negocios")
+      .select("id, numero, titulo, tipo, status, arquivado_em")
+      .eq("contato_id", negocio.contatos.id)
+      .neq("id", negocio.id)
+      .order("created_at", { ascending: false })
+      .limit(10),
+    eletropostoDisponivel(supabase, atual),
+  ]);
 
   const { data: proposta } = await supabase
     .from("propostas")
@@ -483,17 +499,44 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
                 {e.nome}
               </span>
             ))}
-          {negocio.status === "aberto" && !arquivado && (
-            <div className="ml-auto">
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            {/* Outro produto para o mesmo cliente (ex.: usina além do eletroposto): um negócio novo, já com o cliente. */}
+            <NovoNegocio
+              href={`/negocios/novo?${new URLSearchParams({ funil: negocio.funil_id, contato: contato.id })}`}
+              eletroposto={eletropostoNaEmpresa}
+              aria-label="Adicionar produto: novo negócio para este cliente"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-acao px-3 text-sm font-medium text-sobre-acao transition-colors hover:bg-acao-forte md:min-h-9"
+            >
+              <Plus size={16} aria-hidden />
+              Adicionar produto
+            </NovoNegocio>
+            {negocio.status === "aberto" && !arquivado && (
               <MoverEtapa
                 negocioId={negocio.id}
                 etapaAtualId={negocio.etapa_id}
                 etapas={config.etapas.filter((e) => e.funilId === negocio.funil_id && e.ativa)}
                 motivos={config.motivos}
               />
-            </div>
-          )}
+            )}
+          </div>
         </div>
+        {outrosNegocios && outrosNegocios.length > 0 && (
+          <nav aria-label="Outros negócios deste cliente" className="flex flex-wrap items-center gap-2 text-xs">
+            <span className="text-texto-2">Outros negócios deste cliente:</span>
+            {outrosNegocios.map((n) => (
+              <Link
+                key={n.id}
+                href={`/negocios/${n.id}`}
+                className="inline-flex min-h-8 items-center gap-1 rounded-full border border-linha bg-superficie px-2.5 font-medium text-texto transition-colors hover:border-dourado"
+              >
+                {n.tipo === "eletroposto" ? "Eletroposto" : "Energia solar"} #{n.numero}
+                <span className="font-normal text-texto-2">
+                  · {n.arquivado_em ? "arquivado" : n.status === "ganho" ? "ganho" : n.status === "perdido" ? "perdido" : "em andamento"}
+                </span>
+              </Link>
+            ))}
+          </nav>
+        )}
         <p className="text-xs text-texto-2">
           Responsável: {negocio.responsavel_id ? nomes.membro(negocio.responsavel_id) : "ninguém"} · Criado em{" "}
           {formatarDataHora(negocio.created_at)}
