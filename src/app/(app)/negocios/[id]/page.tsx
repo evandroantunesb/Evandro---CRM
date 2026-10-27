@@ -433,7 +433,6 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
 
   // Resumo da qualificação SDR (cartão recolhido): mesmo critério do selo dentro dela.
   const statusQualificacao = calcularStatusQualificacao(!!contato.telefone, negocio.qualif_objetivo, negocio.qualif_e_decisor);
-  const qualificado = statusQualificacao.atendidos === statusQualificacao.total;
   const simNao = (v: boolean | null) => (v === true ? "sim" : v === false ? "não" : null);
   const resumoQualificacao = [
     `${statusQualificacao.rotulo} · ${statusQualificacao.atendidos} de ${statusQualificacao.total} critérios`,
@@ -572,6 +571,9 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
       {aba === "visao" && (
         <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
           <div className="flex min-w-0 flex-col gap-4">
+            {/* O SDR trabalha a qualificação: ela abre antes dos dados do negócio; nos demais papéis a ordem é a de sempre. */}
+            {(() => {
+              const blocoDados = (
             <CartaoRecolhivel titulo="Dados do negócio" resumo={resumoDados}>
               <EdicaoNegocio
                 // Os campos usam defaultValue: desarquivar com novo responsável (ou arquivar) muda os dados por fora do
@@ -599,7 +601,9 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
                 podeEditarValor={pode(atual.papel, EDITAR_VALOR_NEGOCIO)}
               />
             </CartaoRecolhivel>
-            <CartaoRecolhivel titulo="Qualificação SDR" resumo={resumoQualificacao} aberto={atual.papel === "sdr" && !qualificado}>
+              );
+              const blocoQualificacao = (
+            <CartaoRecolhivel titulo="Qualificação SDR" resumo={resumoQualificacao} aberto={atual.papel === "sdr"}>
               <Qualificacao
                 negocio={{
                   id: negocio.id,
@@ -620,6 +624,19 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
                 vendedores={config.membros.filter((m) => m.ativo && m.papel === "vendedor")}
               />
             </CartaoRecolhivel>
+              );
+              return atual.papel === "sdr" ? (
+                <>
+                  {blocoQualificacao}
+                  {blocoDados}
+                </>
+              ) : (
+                <>
+                  {blocoDados}
+                  {blocoQualificacao}
+                </>
+              );
+            })()}
             {ultimoHandoff &&
               (souAdmin ||
                 atual.papel === "gestor" ||

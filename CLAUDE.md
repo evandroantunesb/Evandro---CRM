@@ -57,6 +57,17 @@ Este arquivo contém só regras duráveis. Estado atual em `docs/PROJECT_STATUS.
 - **Identidade visual (não alterar):** Carvão `#0F0F10`, Dourado Solar `#D4AF37`, Off-white `#FAF8F3`, Cinza `#6B7280`, Cinza claro `#E5E7EB` (`src/app/globals.css`); Manrope nos títulos, Inter nos textos; logo em `src/components/marca.tsx` + `public/marca/`. Verde só no WhatsApp, vermelho só para perda e erro. **Exceção (só no módulo de gamificação — `/gamificacao` e `/configuracoes/{metas,comissoes,resgates}`):** tema escuro, verde como cor contextual principal, dourado reservado a prestígio/conquistas, vermelho limitado a alertas.
 - Respostas objetivas: o que mudou, arquivos, testes feitos e pendências.
 
+## Andamento atual (27/10/2026, a pedido do Evandro)
+
+Detalhe e histórico em `docs/PROJECT_STATUS.md`; aqui só o ponto de retomada.
+
+- **Troca de computador:** backup do trabalho local em `R:\trocapc\2026-10-26` (bundles por worktree, memória do Claude, `LEIAME.txt`). Backups diários de produção (banco e storage) rodando no GitHub, sem falha.
+- **Produção:** `main` em `4e7f10e` (eletroposto, PR #223) com a migration `migracao-eletroposto` já aplicada. Pendente: ligar o módulo para a IBS no super-admin.
+- **Em andamento — ajustes da ficha do negócio:** branch `feat/negocio-layout-ficha` (worktree `R:\wt-layout-ficha`, a partir da `origin/main`), **sem commit, push ou PR**. O layout antigo (`feat/negocio-layout-navegacao`, `R:\wt-layout`) foi superado pela ficha em abas da `main` e não foi portado; só dois ajustes valeram: (1) para o SDR, "Qualificação SDR" fica sempre aberta e acima de "Dados do negócio" (`negocios/[id]/page.tsx`); (2) os três traços de progresso do celular em `negocios/novo/formulario.tsx` viram botões (voltar livre, avançar só com o passo válido). Typecheck e lint passaram; os testes Vitest ainda não rodaram. Aceite visual do Evandro como SDR e vendedor: aprovado; falta o commit/PR com autorização dele. O `R:\wt-layout` antigo só pode ser removido depois disso.
+- **Em andamento — eletroposto para o SDR e pontuação por tipo de negócio:** branch `feat/eletroposto-sdr-pontuacao` (worktree `R:\wt-eletro-sdr`, a partir da `origin/main`), **sem commit, push ou PR**. Migration nova `20261027100000_eletroposto_sdr_pontuacao.sql` (ainda não aplicada em produção; só pelo `banco-producao.yml` com aprovação do Evandro, e antes do código chegar ao preview). Detalhe em `docs/PROJECT_STATUS.md` (seção "Eletroposto: SDR e pontuação"). Testes do eletroposto, typecheck e lint passaram localmente.
+- **Eletroposto (outros):** `feature/eletroposto-identificacao` (selo de tipo no Kanban) está no GitHub, sem PR. Pendências: "Dados do negócio" ainda exige valor e mostra campos solares no negócio de eletroposto; contrato, pagamento e comissão fora desta entrega.
+- **Ambiente neste desktop:** `node_modules` dentro de `R:\` é lento ou quebrado (links para `E:\`); instale e rode a verificação numa cópia em disco local (`pnpm install --frozen-lockfile` leva ~25 s lá). Se o Supabase local subir sem o Kong, a stack foi criada de um checkout antigo: `supabase stop` e `start` resolvem. Várias outras stacks Supabase locais (temperatura, aurora-*) estão ativas em portas próprias.
+
 ## Segurança
 
 - Nunca peça senha, token ou chave secreta no chat.
