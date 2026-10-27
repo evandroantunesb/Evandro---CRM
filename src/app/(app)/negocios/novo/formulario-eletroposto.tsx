@@ -34,7 +34,7 @@ function Bloco({ titulo, descricao, children }: { titulo: string; descricao?: st
 /**
  * Cadastro do negócio de eletroposto: modelos da proposta (um ou mais, preços fixos do catálogo), cliente
  * (nome, WhatsApp e endereço) e o que o vendedor precisa saber (local próprio e usina FV). Cria o negócio e a
- * proposta juntos e abre a ficha na aba do eletroposto.
+ * proposta juntos e abre a ficha na aba do eletroposto. O SDR cria sem modelos (sem proposta).
  */
 export function FormularioEletroposto({
   funilId,
@@ -43,6 +43,7 @@ export function FormularioEletroposto({
   origemSugerida,
   responsaveis,
   meuMembroId,
+  escolheModelos,
 }: {
   funilId: string;
   etapaId?: string;
@@ -51,6 +52,8 @@ export function FormularioEletroposto({
   /** Vazio quando quem cria é vendedor: ele sempre fica como responsável. */
   responsaveis: Opcao[];
   meuMembroId: string;
+  /** Falso para o SDR: ele cadastra o lead sem modelos; quem gera proposta escolhe depois, na ficha. */
+  escolheModelos: boolean;
 }) {
   const router = useRouter();
   const [resultado, setResultado] = useState<ResultadoAcao>(null);
@@ -88,7 +91,7 @@ export function FormularioEletroposto({
   const enderecoExistente = modo === "existente" ? (contato?.endereco ?? null) : null;
 
   function problema(): string | null {
-    if (!modelos.length) return "Escolha pelo menos um modelo de eletroposto.";
+    if (escolheModelos && !modelos.length) return "Escolha pelo menos um modelo de eletroposto.";
     if (modo === "existente" && !contato) return "Selecione o cliente existente.";
     if (modo === "novo") {
       if (nome.trim().length < 2) return "Informe o nome do cliente.";
@@ -148,6 +151,7 @@ export function FormularioEletroposto({
       )}
       <input type="hidden" name="contato_endereco" value={endereco} />
 
+      {escolheModelos && (
       <Bloco titulo="Modelos na proposta" descricao="Carregador DC de 80 kW com duas saídas. Escolha um ou mais: cada modelo é uma alternativa, os preços não se somam.">
         <div role="group" aria-label="Modelos de eletroposto" className="grid gap-3 md:grid-cols-3">
           {MODELOS_ELETROPOSTO.map((m) => {
@@ -191,6 +195,7 @@ export function FormularioEletroposto({
             : "Nenhum modelo escolhido."}
         </p>
       </Bloco>
+      )}
 
       <Bloco titulo="Cliente">
         <GrupoOpcoes

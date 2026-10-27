@@ -11,7 +11,7 @@ export default async function RegrasDePontos() {
   const supabase = await criarClienteServidor();
   const { data: regras } = await supabase
     .from("gamification_rules")
-    .select("id, nome, evento_tipo, condicao, xp, moedas, perfil_aplicavel, limite_periodo, limite_quantidade, unica_por_negocio, ativa")
+    .select("id, nome, evento_tipo, condicao, xp, moedas, perfil_aplicavel, tipo_negocio, limite_periodo, limite_quantidade, unica_por_negocio, ativa")
     .eq("empresa_id", atual.empresaId)
     .order("created_at");
 
@@ -20,7 +20,7 @@ export default async function RegrasDePontos() {
       <VoltarGf href="/configuracoes#gamificacao">Configurações</VoltarGf>
       <CabecalhoPaginaGf
         titulo="Regras de pontos"
-        descricao="Cada regra associa um evento do CRM a XP (progressão: ranking, nível, conquistas) e/ou moedas (saldo gastável na loja). Sempre que o evento acontecer (e a condição, se houver, for satisfeita), o lançamento entra automaticamente no extrato do responsável."
+        descricao="Cada regra associa um evento do CRM a XP (progressão: ranking, nível, conquistas) e/ou moedas (saldo gastável na loja). Sempre que o evento acontecer (e a condição, se houver, for satisfeita), o lançamento entra automaticamente no extrato do responsável. Cada regra vale só para negócios do seu tipo (energia solar ou eletroposto)."
       />
       <CartaoGf titulo="Nova regra">
         <NovaRegra eventos={EVENTOS_GAMIFICACAO_SELECIONAVEIS} />
@@ -43,6 +43,7 @@ export default async function RegrasDePontos() {
                   xp: r.xp,
                   moedas: r.moedas,
                   perfilAplicavel: r.perfil_aplicavel as PerfilGamificacao | null,
+                  tipoNegocio: r.tipo_negocio,
                   limitePeriodo: r.limite_periodo as PeriodoLimiteRegra | null,
                   limiteQuantidade: r.limite_quantidade,
                   unicaPorNegocio: r.unica_por_negocio,

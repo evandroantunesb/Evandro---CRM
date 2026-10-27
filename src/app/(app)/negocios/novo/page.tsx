@@ -36,8 +36,8 @@ export default async function NovoNegocio({ searchParams }: PageProps<"/negocios
   const origemSugerida = origens.some((o) => o.id === ultimo?.origem_id) ? ultimo!.origem_id : null;
   const responsaveis = pode(atual.papel, ESCOLHER_RESPONSAVEL_NEGOCIO) ? config.membros.filter((m) => m.ativo && pode(m.papel, RESPONSAVEL_COMERCIAL)) : [];
 
-  // Eletroposto: só com o módulo ligado na empresa e para quem gera proposta (SDR segue no solar).
-  const eletroposto = !!empresa?.eletroposto_ativo && pode(atual.papel, PROPOSTA_E_CONTRATO);
+  // Eletroposto: só com o módulo ligado na empresa. O SDR também cria, mas sem modelos (quem gera proposta escolhe).
+  const eletroposto = !!empresa?.eletroposto_ativo;
   const escolhido = eletroposto ? (tipo === "solar" || tipo === "eletroposto" ? tipo : null) : "solar";
   const parametrosTipo = (t: string) => {
     const p = new URLSearchParams({ tipo: t, funil: funilEscolhido.id });
@@ -79,6 +79,7 @@ export default async function NovoNegocio({ searchParams }: PageProps<"/negocios
           origemSugerida={origemSugerida}
           responsaveis={responsaveis}
           meuMembroId={atual.membroId}
+          escolheModelos={pode(atual.papel, PROPOSTA_E_CONTRATO)}
         />
       </div>
     );

@@ -17,19 +17,25 @@ const simNao = (v: boolean | null): SimNao | null => (v == null ? null : v ? "si
 /**
  * Aba Eletroposto da ficha: link da proposta (copiar, WhatsApp, abrir) e o que alimenta a proposta — modelos
  * (preços do catálogo, nunca somados) — e o que só o vendedor vê (local próprio e usina FV).
+ * O SDR (`escolheModelos` falso) vê e edita só local próprio e usina FV, enquanto não há proposta.
  */
 export function EletropostoNegocio({
   negocioId,
   siteUrl,
   telefoneCliente,
   podeEditar,
+  escolheModelos,
   registro,
 }: {
   negocioId: string;
   siteUrl: string;
   telefoneCliente: string | null;
   podeEditar: boolean;
-  /** Nulo quando a criação não gravou os modelos: a tela pede para escolher de novo. */
+  escolheModelos: boolean;
+  /**
+   * Nulo quando a criação não gravou o registro (ou, para o SDR, quando a proposta já foi gerada e a RLS o
+   * esconde). Com `modelos` vazio, o SDR cadastrou o lead e a proposta ainda não existe.
+   */
   registro: {
     token: string;
     modelos: ModeloEletroposto[];
@@ -49,7 +55,7 @@ export function EletropostoNegocio({
     setModelos((atuais) => (atuais.includes(m) ? atuais.filter((x) => x !== m) : MODELOS_ELETROPOSTO.filter((x) => x === m || atuais.includes(x))));
   }
 
-  const link = registro ? `${siteUrl}/proposta/eletroposto/${registro.token}` : null;
+  const link = registro?.modelos.length ? `${siteUrl}/proposta/eletroposto/${registro.token}` : null;
   const telefone = telefoneCliente?.replace(/\D/g, "") ?? "";
   const destino = telefone.length >= 10 ? (telefone.startsWith("55") ? telefone : `55${telefone}`) : "";
   const linkWhatsapp = link ? `https://wa.me/${destino}?text=${encodeURIComponent(`Segue a proposta do eletroposto: ${link}`)}` : null;
@@ -99,9 +105,13 @@ export function EletropostoNegocio({
             Proposta de {formatarDataHora(registro.emitidaEm)} · válida por 7 dias. Na proposta, o cliente imprime ou salva em PDF.
           </p>
         </div>
-      ) : (
+      ) : escolheModelos ? (
         <p role="alert" className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
           Os modelos do eletroposto ainda não foram salvos. Escolha abaixo e salve para gerar a proposta.
+        </p>
+      ) : (
+        <p className="rounded-md bg-superficie-2 px-3 py-2 text-sm text-texto-2">
+          Modelos, preços e proposta ficam com o vendedor. Aqui você registra o que ele precisa saber do cliente.
         </p>
       )}
 
@@ -111,6 +121,7 @@ export function EletropostoNegocio({
           {modelos.map((m) => (
             <input key={m} type="hidden" name="modelos" value={m} />
           ))}
+          {escolheModelos && (
           <div className="flex flex-col gap-2">
             <span className="text-sm font-medium text-texto-2">Modelos na proposta (cada um é uma alternativa; os preços não se somam)</span>
             <div role="group" aria-label="Modelos de eletroposto" className="grid gap-2 sm:grid-cols-3">
@@ -140,6 +151,7 @@ export function EletropostoNegocio({
               })}
             </div>
           </div>
+          )}
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-2">
               <span className="text-sm font-medium text-texto-2">Tem local próprio para a instalação?</span>
@@ -150,19 +162,23 @@ export function EletropostoNegocio({
               <GrupoOpcoes rotulo="Tem usina fotovoltaica para fornecer a energia?" opcoes={OPCOES_SIM_NAO} valor={usinaFv} aoEscolher={setUsinaFv} name="usina_fv" />
             </div>
           </div>
-          <p className="text-xs text-texto-2">Mudar os modelos atualiza a proposta no mesmo link, com nova data e os preços de catálogo de hoje.</p>
+          {escolheModelos && (
+            <p className="text-xs text-texto-2">Mudar os modelos atualiza a proposta no mesmo link, com nova data e os preços de catálogo de hoje.</p>
+          )}
           <Mensagem resultado={resultado} />
-          <Botao type="submit" disabled={salvando || !modelos.length || !localProprio || !usinaFv} className="self-start">
+          <Botao type="submit" disabled={salvando || (escolheModelos && !modelos.length) || !localProprio || !usinaFv} className="self-start">
             {salvando ? "Salvando..." : "Salvar"}
           </Botao>
         </form>
       ) : (
         registro && (
           <dl className="grid gap-3 text-sm sm:grid-cols-3">
-            <div>
-              <dt className="text-texto-2">Modelos</dt>
-              <dd>{registro.modelos.map((m) => CATALOGO_ELETROPOSTO[m].nome).join(" · ")}</dd>
-            </div>
+            {registro.modelos.length > 0 && (
+              <div>
+                <dt className="text-texto-2">Modelos</dt>
+                <dd>{registro.modelos.map((m) => CATALOGO_ELETROPOSTO[m].nome).join(" · ")}</dd>
+              </div>
+            )}
             <div>
               <dt className="text-texto-2">Local próprio</dt>
               <dd>{registro.localProprio ? "Sim" : "Não"}</dd>

@@ -1434,6 +1434,7 @@ export type Database = {
           moedas: number;
           nome: string;
           perfil_aplicavel: Database["public"]["Enums"]["perfil_gamificacao"] | null;
+          tipo_negocio: Database["public"]["Enums"]["tipo_negocio"];
           unica_por_negocio: boolean;
           updated_at: string;
           xp: number;
@@ -1451,6 +1452,7 @@ export type Database = {
           moedas?: number;
           nome: string;
           perfil_aplicavel?: Database["public"]["Enums"]["perfil_gamificacao"] | null;
+          tipo_negocio?: Database["public"]["Enums"]["tipo_negocio"];
           unica_por_negocio?: boolean;
           updated_at?: string;
           xp?: number;
@@ -1468,6 +1470,7 @@ export type Database = {
           moedas?: number;
           nome?: string;
           perfil_aplicavel?: Database["public"]["Enums"]["perfil_gamificacao"] | null;
+          tipo_negocio?: Database["public"]["Enums"]["tipo_negocio"];
           unica_por_negocio?: boolean;
           updated_at?: string;
           xp?: number;
@@ -4657,6 +4660,7 @@ export type Database = {
         Args: { p_empresa_id: string; p_regras: Json };
         Returns: undefined;
       };
+      semear_regras_eletroposto: { Args: { p_empresa_id: string }; Returns: undefined };
       sequencia_produtiva_membro: {
         Args: { p_empresa_id: string };
         Returns: {
