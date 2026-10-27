@@ -1,5 +1,9 @@
 # Estado do projeto — Raion CRM
 
+## Usuários operacionais — implementação em andamento, 2026-10-27
+
+Branch local `feat/usuarios-operacionais`, partindo de `origin/main` em `fc4a9d1`: cadastro do papel Operação e configuração por administrador dos setores de Obras e das capacidades executar/coordenar pela RPC existente. A tela informa que coordenadores veem todas as obras e que remover setor encerra participações; operação não recebe leads nem perfil de gamificação no cadastro. Sem migration nesta etapa. Typecheck e build aprovados; lint sem erros e com três avisos preexistentes em `seed-metas-vendedores.mjs` e `stack-supabase-local.test.ts`. Testes direcionados de cadastro, permissões, acesso e escrita em Obras aprovados na stack Supabase local; as suítes de banco criaram dados fictícios locais. Ainda falta validação visual em navegador. Produção não foi alterada; confirmar aplicação efetiva das migrations de Obras e a segurança da transição antes de qualquer deploy. As demais etapas do fluxo de pós-vendas ainda não foram implementadas.
+
 ## Calculadora GD II — revisão de 2026-10-23
 
 `main` em `3ee53b8`: cálculo GD II já integrado (#214–#216), limitado ao enquadramento Copel B1 residencial e ao período oficial disponível (2026/27). Sem economia financeira comprovada, a proposta com economia continua bloqueada; payback segue indisponível. A antiga PR draft #209 conflita com a linha atual e não deve ser mesclada integralmente.

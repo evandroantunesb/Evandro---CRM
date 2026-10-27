@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { criarUsuarioDireto } from "@/lib/convites";
+import { mensagemErro } from "@/lib/erros";
+import { SETORES_OBRA } from "@/lib/obras/rotulos";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { PAPEIS_CADASTRAVEIS, PERFIS_GAMIFICACAO, TIPOS_VENDEDOR, STATUS_MEMBRO, type ResultadoAcao } from "@/lib/tipos";
@@ -50,7 +52,9 @@ export async function convidarMembro(_: ResultadoAcao, formData: FormData): Prom
     user_id: userId,
     papel: dados.data.papel,
     tipo_vendedor: dados.data.papel === "vendedor" ? dados.data.tipo_vendedor : null,
-    perfil_gamificacao: dados.data.perfil_gamificacao ?? null,
+    ...(dados.data.papel === "operacao"
+      ? { perfil_gamificacao: null, recebe_leads: false }
+      : { perfil_gamificacao: dados.data.perfil_gamificacao ?? null }),
   });
   if (error) {
     if (error.code === "23505") return { ok: false, mensagem: "Essa pessoa já faz parte da empresa." };
@@ -103,8 +107,9 @@ export async function atualizarMembro(_: ResultadoAcao, formData: FormData): Pro
     .update({
       papel: dados.data.papel,
       tipo_vendedor: dados.data.papel === "vendedor" ? dados.data.tipo_vendedor : null,
-      perfil_gamificacao: dados.data.perfil_gamificacao ?? null,
-      recebe_leads: dados.data.recebe_leads === "on",
+      ...(dados.data.papel === "operacao"
+        ? { perfil_gamificacao: null, recebe_leads: false }
+        : { perfil_gamificacao: dados.data.perfil_gamificacao ?? null, recebe_leads: dados.data.recebe_leads === "on" }),
       status: dados.data.status,
     })
     .eq("id", dados.data.membroId)
@@ -118,6 +123,40 @@ export async function atualizarMembro(_: ResultadoAcao, formData: FormData): Pro
   }
   revalidatePath("/configuracoes/usuarios");
   return { ok: true, mensagem: "Salvo." };
+}
+
+/** Configuração independente do cadastro: a RPC valida e audita cada alteração no banco. */
+export async function salvarSetoresMembro(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  const { atual } = await exigirPapel("admin");
+  const esquema = z.object({
+    membroId: z.string().uuid(),
+    compras: z.enum(["sem_acesso", "executar", "coordenar"]),
+    engenharia: z.enum(["sem_acesso", "executar", "coordenar"]),
+    operacional: z.enum(["sem_acesso", "executar", "coordenar"]),
+  });
+  const dados = esquema.safeParse(Object.fromEntries(formData));
+  if (!dados.success) return { ok: false, mensagem: "Confira os setores e tente novamente." };
+
+  const supabase = await criarClienteServidor();
+  // A RPC aceita administradores da empresa do membro; esta consulta também exige a empresa atual.
+  const { data: membro, error: erroMembro } = await supabase
+    .from("empresa_membros")
+    .select("id")
+    .eq("empresa_id", atual.empresaId)
+    .eq("id", dados.data.membroId)
+    .maybeSingle();
+  if (erroMembro || !membro) return { ok: false, mensagem: "Não foi possível acessar este usuário na empresa atual." };
+
+  const setores = SETORES_OBRA.flatMap((setor) => {
+    const capacidade = dados.data[setor];
+    return capacidade === "sem_acesso" ? [] : [{ setor, capacidade }];
+  });
+  const { error } = await supabase.rpc("definir_setores_membro", { p_membro_id: membro.id, p_setores: setores });
+  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível salvar os setores.") };
+
+  revalidatePath("/configuracoes/usuarios");
+  revalidatePath("/obras");
+  return { ok: true, mensagem: "Setores atualizados." };
 }
 
 export type CarteiraAberta = {
