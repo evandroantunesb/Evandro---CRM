@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ListaTarefas } from "@/components/lista-tarefas";
 import { MoverEtapa } from "@/components/mover-etapa";
 import { NovaTarefa } from "@/components/nova-tarefa";
+import { Plus } from "lucide-react";
 import { NovoNegocio } from "@/components/novo-negocio";
 import { Cartao, CartaoRecolhivel, Selo, Voltar } from "@/components/ui";
 import { eletropostoDisponivel } from "@/lib/eletroposto-servidor";
@@ -498,17 +499,44 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
                 {e.nome}
               </span>
             ))}
-          {negocio.status === "aberto" && !arquivado && (
-            <div className="ml-auto">
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            {/* Outro produto para o mesmo cliente (ex.: usina além do eletroposto): um negócio novo, já com o cliente. */}
+            <NovoNegocio
+              href={`/negocios/novo?${new URLSearchParams({ funil: negocio.funil_id, contato: contato.id })}`}
+              eletroposto={eletropostoNaEmpresa}
+              aria-label="Adicionar produto: novo negócio para este cliente"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-acao px-3 text-sm font-medium text-sobre-acao transition-colors hover:bg-acao-forte md:min-h-9"
+            >
+              <Plus size={16} aria-hidden />
+              Adicionar produto
+            </NovoNegocio>
+            {negocio.status === "aberto" && !arquivado && (
               <MoverEtapa
                 negocioId={negocio.id}
                 etapaAtualId={negocio.etapa_id}
                 etapas={config.etapas.filter((e) => e.funilId === negocio.funil_id && e.ativa)}
                 motivos={config.motivos}
               />
-            </div>
-          )}
+            )}
+          </div>
         </div>
+        {outrosNegocios && outrosNegocios.length > 0 && (
+          <nav aria-label="Outros negócios deste cliente" className="flex flex-wrap items-center gap-2 text-xs">
+            <span className="text-texto-2">Outros negócios deste cliente:</span>
+            {outrosNegocios.map((n) => (
+              <Link
+                key={n.id}
+                href={`/negocios/${n.id}`}
+                className="inline-flex min-h-8 items-center gap-1 rounded-full border border-linha bg-superficie px-2.5 font-medium text-texto transition-colors hover:border-dourado"
+              >
+                {n.tipo === "eletroposto" ? "Eletroposto" : "Energia solar"} #{n.numero}
+                <span className="font-normal text-texto-2">
+                  · {n.arquivado_em ? "arquivado" : n.status === "ganho" ? "ganho" : n.status === "perdido" ? "perdido" : "em andamento"}
+                </span>
+              </Link>
+            ))}
+          </nav>
+        )}
         <p className="text-xs text-texto-2">
           Responsável: {negocio.responsavel_id ? nomes.membro(negocio.responsavel_id) : "ninguém"} · Criado em{" "}
           {formatarDataHora(negocio.created_at)}
@@ -749,31 +777,6 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
                 >
                   Abrir no WhatsApp
                 </a>
-              )}
-              <NovoNegocio
-                href={`/negocios/novo?${new URLSearchParams({ funil: negocio.funil_id, contato: contato.id })}`}
-                eletroposto={eletropostoNaEmpresa}
-                className="mt-2 inline-flex min-h-11 w-full items-center justify-center rounded-md border border-linha bg-superficie px-3 py-2 text-sm font-medium text-texto transition-colors hover:border-dourado md:min-h-9"
-              >
-                Novo negócio para este cliente
-              </NovoNegocio>
-              {outrosNegocios && outrosNegocios.length > 0 && (
-                <div className="mt-4 border-t border-linha pt-3">
-                  <p className="text-sm text-zinc-500">Outros negócios deste cliente</p>
-                  <ul className="mt-2 flex flex-col gap-2 text-sm">
-                    {outrosNegocios.map((n) => (
-                      <li key={n.id} className="min-w-0">
-                        <Link href={`/negocios/${n.id}`} className="font-medium text-amber-700 [overflow-wrap:anywhere] hover:underline">
-                          #{n.numero} · {n.titulo}
-                        </Link>
-                        <span className="block text-xs text-texto-2">
-                          {n.tipo === "eletroposto" ? "Eletroposto" : "Energia solar"} ·{" "}
-                          {n.arquivado_em ? "Arquivado" : n.status === "ganho" ? "Ganho" : n.status === "perdido" ? "Perdido" : "Em andamento"}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
               )}
             </Cartao>
             {etiquetasVisiveis.length > 0 && (
