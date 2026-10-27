@@ -8,6 +8,7 @@ import {
   ListChecks,
   ListTree,
   Medal,
+  HardHat,
   PackageCheck,
   QrCode,
   Radio,
@@ -61,6 +62,7 @@ const GRUPOS: { id: string; titulo: string; itens: Item[] }[] = [
     itens: [
       { href: "/configuracoes/usuarios", titulo: "Usuários", descricao: "Convites, papéis e acesso de cada pessoa.", Icone: UserCog },
       { href: "/configuracoes/equipes", titulo: "Equipes", descricao: "Equipes e seus gestores.", Icone: Users },
+      { href: "/configuracoes/obras", titulo: "Responsáveis das obras", descricao: "Distribuição automática de Compras, Engenharia e Operacional.", Icone: HardHat },
     ],
   },
   {

@@ -991,6 +991,45 @@ export type Database = {
           },
         ];
       };
+      empresa_responsaveis_obra_padrao: {
+        Row: {
+          definido_em: string;
+          definido_por_user_id: string | null;
+          empresa_id: string;
+          membro_id: string;
+          setor: Database["public"]["Enums"]["setor_obra"];
+        };
+        Insert: {
+          definido_em?: string;
+          definido_por_user_id?: string | null;
+          empresa_id: string;
+          membro_id: string;
+          setor: Database["public"]["Enums"]["setor_obra"];
+        };
+        Update: {
+          definido_em?: string;
+          definido_por_user_id?: string | null;
+          empresa_id?: string;
+          membro_id?: string;
+          setor?: Database["public"]["Enums"]["setor_obra"];
+        };
+        Relationships: [
+          {
+            foreignKeyName: "empresa_responsaveis_obra_padra_empresa_id_membro_id_setor_fkey";
+            columns: ["empresa_id", "membro_id", "setor"];
+            isOneToOne: false;
+            referencedRelation: "membro_setores_obra";
+            referencedColumns: ["empresa_id", "membro_id", "setor"];
+          },
+          {
+            foreignKeyName: "empresa_responsaveis_obra_padrao_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       empresas: {
         Row: {
           cnpj: string | null;
@@ -4588,6 +4627,14 @@ export type Database = {
         Args: {
           p_aguardando?: Database["public"]["Enums"]["aguardando_obra"];
           p_obra_id: string;
+          p_setor: Database["public"]["Enums"]["setor_obra"];
+        };
+        Returns: undefined;
+      };
+      definir_responsavel_padrao_obra: {
+        Args: {
+          p_empresa_id: string;
+          p_membro_id: string;
           p_setor: Database["public"]["Enums"]["setor_obra"];
         };
         Returns: undefined;
