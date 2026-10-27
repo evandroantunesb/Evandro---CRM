@@ -32,7 +32,7 @@ export async function criarEmpresa(_: ResultadoAcao, formData: FormData): Promis
   const supabase = await criarClienteServidor();
   const { data: empresa, error } = await supabase
     .from("empresas")
-    .insert({ nome: dados.data.nome, cnpj: dados.data.cnpj || null })
+    .insert({ nome: dados.data.nome, cnpj: dados.data.cnpj || null, vistoria_solar_obrigatoria: true })
     .select("id")
     .single();
   if (error || !empresa) return { ok: false, mensagem: "Não foi possível criar a empresa." };
@@ -93,6 +93,17 @@ export async function alterarEletroposto(formData: FormData) {
   const dados = z.object({ empresaId: z.string().uuid(), ativo: z.enum(["sim", "nao"]) }).parse(Object.fromEntries(formData));
   const supabase = await criarClienteServidor();
   await supabase.from("empresas").update({ eletroposto_ativo: dados.ativo === "sim" }).eq("id", dados.empresaId);
+  revalidatePath(`/super-admin/empresas/${dados.empresaId}`);
+}
+
+/** Ativa a vistoria obrigatória para vendas solares novas da empresa. */
+export async function alterarVistoriaSolar(formData: FormData) {
+  await exigirSuperAdmin();
+  const dados = z.object({ empresaId: z.string().uuid(), ativo: z.enum(["sim", "nao"]) }).parse(Object.fromEntries(formData));
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.from("empresas")
+    .update({ vistoria_solar_obrigatoria: dados.ativo === "sim" }).eq("id", dados.empresaId);
+  if (error) throw new Error("Não foi possível alterar a exigência de vistoria.");
   revalidatePath(`/super-admin/empresas/${dados.empresaId}`);
 }
 

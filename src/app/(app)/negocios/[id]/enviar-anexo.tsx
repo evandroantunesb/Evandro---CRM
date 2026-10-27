@@ -10,12 +10,12 @@ import { CATEGORIAS_ANEXO, ROTULO_CATEGORIA_ANEXO, type CategoriaAnexo } from "@
 
 const LIMITE = 20 * 1024 * 1024;
 
-export function EnviarAnexo({ empresaId, negocioId }: { empresaId: string; negocioId: string }) {
+export function EnviarAnexo({ empresaId, negocioId, categorias = CATEGORIAS_ANEXO, categoriaInicial = "geral" }: { empresaId: string; negocioId: string; categorias?: readonly CategoriaAnexo[]; categoriaInicial?: CategoriaAnexo }) {
   const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
-  const [categoria, setCategoria] = useState<CategoriaAnexo>("geral");
+  const [categoria, setCategoria] = useState<CategoriaAnexo>(categoriaInicial);
 
   async function enviar(arquivos: FileList | null) {
     if (!arquivos?.length) return;
@@ -55,7 +55,7 @@ export function EnviarAnexo({ empresaId, negocioId }: { empresaId: string; negoc
         value={categoria}
         onChange={(e) => setCategoria(e.target.value as CategoriaAnexo)}
       >
-        {CATEGORIAS_ANEXO.map((c) => (
+        {categorias.map((c) => (
           <option key={c} value={c}>
             {ROTULO_CATEGORIA_ANEXO[c]}
           </option>

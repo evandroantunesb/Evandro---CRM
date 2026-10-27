@@ -5,7 +5,7 @@ import { trocarEmpresa } from "@/lib/acoes/empresa-atual";
 import { exigirSuperAdmin } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { ROTULO_PAPEL, ROTULO_TIPO_VENDEDOR, type Papel, type TipoVendedor } from "@/lib/tipos";
-import { alterarEletroposto, alterarSituacao } from "../../actions";
+import { alterarEletroposto, alterarSituacao, alterarVistoriaSolar } from "../../actions";
 import { FormularioAdmin, FormularioEdicaoEmpresa, FormularioPlano } from "../../formularios";
 import { SeloSituacao } from "../../situacao";
 
@@ -17,7 +17,7 @@ export default async function Empresa({ params }: PageProps<"/super-admin/empres
   const [{ data: empresa }, { data: plano }] = await Promise.all([
     supabase
       .from("empresas")
-      .select("id, nome, cnpj, situacao, eletroposto_ativo, created_at, empresa_membros(id, papel, tipo_vendedor, ativo, perfis(nome, email))")
+      .select("id, nome, cnpj, situacao, eletroposto_ativo, vistoria_solar_obrigatoria, created_at, empresa_membros(id, papel, tipo_vendedor, ativo, perfis(nome, email))")
       .eq("id", id)
       .maybeSingle(),
     supabase
@@ -84,6 +84,21 @@ export default async function Empresa({ params }: PageProps<"/super-admin/empres
             <button className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-50">
               {empresa.eletroposto_ativo ? "Desligar eletroposto" : "Ligar eletroposto"}
             </button>
+          </form>
+        </div>
+      </Cartao>
+      <Cartao titulo="Vistoria técnica solar">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-zinc-600">
+            {empresa.vistoria_solar_obrigatoria ? "Obrigatória" : "Opcional"} para marcar uma venda solar como ganha.
+            A confirmação exige visita, inspeção e fotos do medidor e do telhado.
+          </p>
+          <form action={alterarVistoriaSolar}>
+            <input type="hidden" name="empresaId" value={empresa.id} />
+            <input type="hidden" name="ativo" value={empresa.vistoria_solar_obrigatoria ? "nao" : "sim"} />
+            <Botao variante="secundario" type="submit">
+              {empresa.vistoria_solar_obrigatoria ? "Desativar exigência" : "Exigir vistoria"}
+            </Botao>
           </form>
         </div>
       </Cartao>

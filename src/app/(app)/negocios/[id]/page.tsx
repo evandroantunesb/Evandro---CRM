@@ -68,6 +68,7 @@ import { Qualificacao } from "./qualificacao";
 import { QualificacaoEntregue } from "./qualificacao-entregue";
 import { SeloTemperatura } from "@/components/selo-temperatura";
 import { carregarTemperaturas } from "@/lib/temperatura";
+import { VistoriaTecnica } from "./vistoria-tecnica";
 
 /** Última linha do histórico do cálculo (cópia jsonb da linha substituída) no formato da ficha. */
 function historicoDaTela(h: { arquivado_em: string; motivo: string; linha: unknown } | null): CalculoHistorico | null {
@@ -159,6 +160,14 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
   // Eletroposto: a ficha troca as abas "Sistema" e "Proposta e contrato" pela aba do eletroposto. O SDR também tem
   // a aba, mas a RLS só lhe mostra o registro sem modelos (sem proposta); a proposta existe quando há modelos.
   const ehEletroposto = negocio.tipo === "eletroposto";
+  const { data: regraVistoria } = ehEletroposto
+    ? { data: null }
+    : await supabase.from("empresas").select("vistoria_solar_obrigatoria").eq("id", negocio.empresa_id).single();
+  const { data: vistoria } = ehEletroposto
+    ? { data: null }
+    : await supabase.from("vistorias_tecnicas")
+        .select("visita_realizada, medidor_inspecionado, telhado_inspecionado, observacoes, confirmada_em")
+        .eq("negocio_id", id).maybeSingle();
   const { data: eletroposto } = ehEletroposto
     ? await supabase.from("negocios_eletroposto").select("token, modelos, precos, local_proprio, usina_fv, emitida_em").eq("negocio_id", id).maybeSingle()
     : { data: null };
@@ -393,6 +402,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
   const abas: { id: string; rotulo: string; contador?: number }[] = [
     { id: "visao", rotulo: "Visão geral" },
     ...(ehEletroposto ? [] : [{ id: "sistema", rotulo: "Sistema" }]),
+    ...(!ehEletroposto ? [{ id: "vistoria", rotulo: "Vistoria técnica" }] : []),
     ...(ehEletroposto
       ? [{ id: "proposta", rotulo: "Eletroposto" }]
       : pode(atual.papel, PROPOSTA_E_CONTRATO)
@@ -877,6 +887,22 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
             )}
             {!arquivado && arquivamento}
           </div>
+        </div>
+      )}
+      {aba === "vistoria" && (
+        <div className="max-w-3xl">
+          <Cartao titulo="Vistoria técnica da venda solar">
+            <VistoriaTecnica
+              negocioId={negocio.id}
+              empresaId={negocio.empresa_id}
+              vistoria={vistoria}
+              obrigatoria={regraVistoria?.vistoria_solar_obrigatoria ?? false}
+              fotos={(anexos ?? [])
+                .filter((anexo) => anexo.categoria === "vistoria_medidor" || anexo.categoria === "vistoria_telhado")
+                .map((anexo) => ({ id: anexo.id, nome: anexo.nome, categoria: anexo.categoria, disponivel: !semArquivo.has(anexo.id) }))}
+              podeEditar={!arquivado && atual.papel === "vendedor" && negocio.responsavel_id === atual.membroId}
+            />
+          </Cartao>
         </div>
       )}
       {aba === "sistema" && (

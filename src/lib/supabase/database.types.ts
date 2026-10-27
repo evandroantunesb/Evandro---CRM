@@ -1004,6 +1004,7 @@ export type Database = {
           seq_negocio: number;
           situacao: Database["public"]["Enums"]["situacao_empresa"];
           updated_at: string;
+          vistoria_solar_obrigatoria: boolean;
         };
         Insert: {
           cnpj?: string | null;
@@ -1020,6 +1021,7 @@ export type Database = {
           seq_negocio?: number;
           situacao?: Database["public"]["Enums"]["situacao_empresa"];
           updated_at?: string;
+          vistoria_solar_obrigatoria?: boolean;
         };
         Update: {
           cnpj?: string | null;
@@ -1036,6 +1038,7 @@ export type Database = {
           seq_negocio?: number;
           situacao?: Database["public"]["Enums"]["situacao_empresa"];
           updated_at?: string;
+          vistoria_solar_obrigatoria?: boolean;
         };
         Relationships: [];
       };
@@ -4078,6 +4081,64 @@ export type Database = {
         };
         Relationships: [];
       };
+      vistorias_tecnicas: {
+        Row: {
+          confirmada_em: string | null;
+          confirmada_por: string | null;
+          empresa_id: string;
+          medidor_inspecionado: boolean;
+          negocio_id: string;
+          observacoes: string;
+          telhado_inspecionado: boolean;
+          updated_at: string;
+          visita_realizada: boolean;
+        };
+        Insert: {
+          confirmada_em?: string | null;
+          confirmada_por?: string | null;
+          empresa_id: string;
+          medidor_inspecionado?: boolean;
+          negocio_id: string;
+          observacoes?: string;
+          telhado_inspecionado?: boolean;
+          updated_at?: string;
+          visita_realizada?: boolean;
+        };
+        Update: {
+          confirmada_em?: string | null;
+          confirmada_por?: string | null;
+          empresa_id?: string;
+          medidor_inspecionado?: boolean;
+          negocio_id?: string;
+          observacoes?: string;
+          telhado_inspecionado?: boolean;
+          updated_at?: string;
+          visita_realizada?: boolean;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "vistorias_tecnicas_confirmada_por_fkey";
+            columns: ["confirmada_por"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "vistorias_tecnicas_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "vistorias_tecnicas_negocio_id_fkey";
+            columns: ["negocio_id"];
+            isOneToOne: true;
+            referencedRelation: "negocios";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -4658,6 +4719,17 @@ export type Database = {
       };
       salvar_regras_temperatura: {
         Args: { p_empresa_id: string; p_regras: Json };
+        Returns: undefined;
+      };
+      salvar_vistoria_tecnica: {
+        Args: {
+          p_confirmar: boolean;
+          p_medidor_inspecionado: boolean;
+          p_negocio_id: string;
+          p_observacoes: string;
+          p_telhado_inspecionado: boolean;
+          p_visita_realizada: boolean;
+        };
         Returns: undefined;
       };
       semear_regras_eletroposto: { Args: { p_empresa_id: string }; Returns: undefined };

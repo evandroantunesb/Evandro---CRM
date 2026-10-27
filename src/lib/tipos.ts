@@ -147,7 +147,7 @@ export const ROTULO_TIPO_COMPONENTE_KIT: Record<TipoComponenteKit, string> = {
   outro: "Outro",
 };
 
-export const CATEGORIAS_ANEXO = ["geral", "cnh", "fatura_gerador", "fatura_beneficiario"] as const;
+export const CATEGORIAS_ANEXO = ["geral", "cnh", "fatura_gerador", "fatura_beneficiario", "vistoria_medidor", "vistoria_telhado"] as const;
 export type CategoriaAnexo = (typeof CATEGORIAS_ANEXO)[number];
 
 export const ROTULO_CATEGORIA_ANEXO: Record<CategoriaAnexo, string> = {
@@ -155,6 +155,8 @@ export const ROTULO_CATEGORIA_ANEXO: Record<CategoriaAnexo, string> = {
   cnh: "CNH / documento",
   fatura_gerador: "Fatura do gerador",
   fatura_beneficiario: "Fatura dos beneficiários",
+  vistoria_medidor: "Vistoria: medidor",
+  vistoria_telhado: "Vistoria: telhado",
 };
 
 export const TIPOS_PLANO = ["gratuito", "pago"] as const;
