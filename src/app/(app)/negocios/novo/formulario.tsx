@@ -535,6 +535,19 @@ export function FormularioNegocio({
     }, 0);
   }
 
+  /** Navegação pelo indicador: voltar é livre; avançar só passa se cada passo no caminho estiver válido (mesma conferência do Continuar). */
+  function irParaEtapa(destino: 1 | 2 | 3) {
+    if (destino === etapaAtual) return;
+    if (destino > etapaAtual) {
+      for (let e = etapaAtual; e < destino; e++) {
+        const problema = problemaDaEtapa(e as 1 | 2 | 3);
+        if (problema) return mostrarProblema(e as 1 | 2 | 3, problema);
+      }
+    }
+    setErroEtapa(null);
+    setEtapaAtual(destino);
+  }
+
   function avancar() {
     const problema = problemaDaEtapa(etapaAtual);
     if (problema) return mostrarProblema(etapaAtual, problema);
@@ -589,9 +602,17 @@ export function FormularioNegocio({
         {/* Progresso do celular: três traços, o atual em dourado. */}
         <ol aria-label="Passos" className="mb-6 grid grid-cols-3 gap-2 lg:hidden">
           {ETAPAS.map((e) => (
-            <li key={e.numero} aria-current={e.numero === etapaAtual ? "step" : undefined} className="flex flex-col gap-1.5">
-              <span className={`h-1 rounded-full transition-colors duration-500 ease-raion ${e.numero <= etapaAtual ? "bg-dourado" : "bg-linha"}`} />
-              <span className={`text-xs ${e.numero === etapaAtual ? "font-semibold text-texto" : "text-texto-2"}`}>{e.titulo}</span>
+            <li key={e.numero}>
+              <button
+                type="button"
+                onClick={() => irParaEtapa(e.numero)}
+                aria-label={`Ir para o passo ${e.numero}: ${e.titulo}`}
+                aria-current={e.numero === etapaAtual ? "step" : undefined}
+                className="flex min-h-11 w-full flex-col gap-1.5 rounded-md py-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-dourado/50"
+              >
+                <span className={`h-1 rounded-full transition-colors duration-500 ease-raion ${e.numero <= etapaAtual ? "bg-dourado" : "bg-linha"}`} />
+                <span className={`text-xs ${e.numero === etapaAtual ? "font-semibold text-texto" : "text-texto-2"}`}>{e.titulo}</span>
+              </button>
             </li>
           ))}
         </ol>
