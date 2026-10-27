@@ -2573,6 +2573,98 @@ export type Database = {
           },
         ];
       };
+      obra_compras_documentos: {
+        Row: {
+          anexado_em: string;
+          anexado_por: string;
+          caminho: string;
+          empresa_id: string;
+          fornecedor: string;
+          id: string;
+          motivo_reprovacao: string | null;
+          nome: string;
+          obra_id: string;
+          orcamento_id: string | null;
+          revisado_em: string | null;
+          revisado_por: string | null;
+          revisao: string | null;
+          tamanho: number;
+          tipo: string;
+          tipo_mime: string;
+          valor: number | null;
+          versao: number;
+        };
+        Insert: {
+          anexado_em?: string;
+          anexado_por: string;
+          caminho: string;
+          empresa_id: string;
+          fornecedor: string;
+          id?: string;
+          motivo_reprovacao?: string | null;
+          nome: string;
+          obra_id: string;
+          orcamento_id?: string | null;
+          revisado_em?: string | null;
+          revisado_por?: string | null;
+          revisao?: string | null;
+          tamanho: number;
+          tipo: string;
+          tipo_mime: string;
+          valor?: number | null;
+          versao: number;
+        };
+        Update: {
+          anexado_em?: string;
+          anexado_por?: string;
+          caminho?: string;
+          empresa_id?: string;
+          fornecedor?: string;
+          id?: string;
+          motivo_reprovacao?: string | null;
+          nome?: string;
+          obra_id?: string;
+          orcamento_id?: string | null;
+          revisado_em?: string | null;
+          revisado_por?: string | null;
+          revisao?: string | null;
+          tamanho?: number;
+          tipo?: string;
+          tipo_mime?: string;
+          valor?: number | null;
+          versao?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "obra_compras_documentos_anexado_por_fkey";
+            columns: ["anexado_por"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "obra_compras_documentos_empresa_id_obra_id_fkey";
+            columns: ["empresa_id", "obra_id"];
+            isOneToOne: false;
+            referencedRelation: "obras";
+            referencedColumns: ["empresa_id", "id"];
+          },
+          {
+            foreignKeyName: "obra_compras_documentos_orcamento_id_fkey";
+            columns: ["orcamento_id"];
+            isOneToOne: false;
+            referencedRelation: "obra_compras_documentos";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "obra_compras_documentos_revisado_por_fkey";
+            columns: ["revisado_por"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       obra_dados_comerciais: {
         Row: {
           created_at: string;
@@ -4628,14 +4720,20 @@ export type Database = {
           tipo_cliente: string;
         }[];
       };
+      pode_acessar_arquivo_compras: {
+        Args: { p_caminho: string; p_escrever: boolean };
+        Returns: boolean;
+      };
       pode_registrar_pagamento_negocio: { Args: { p_negocio_id: string }; Returns: boolean };
       pode_responder_handoff: { Args: { p_handoff_id: string }; Returns: boolean };
+      pode_revisar_orcamento_obra: { Args: { p_obra_id: string }; Returns: boolean };
       pode_ver_avatar: { Args: { p_pasta: string }; Returns: boolean };
       pode_ver_contato: { Args: { p_contato_id: string }; Returns: boolean };
       pode_ver_contato_linha: {
         Args: { p_contato_id: string; p_criado_por: string; p_empresa_id: string };
         Returns: boolean;
       };
+      pode_ver_documentos_compras_obra: { Args: { p_obra_id: string }; Returns: boolean };
       pode_ver_financeiro_negocio: { Args: { p_negocio_id: string }; Returns: boolean };
       pode_ver_negocio: { Args: { p_negocio_id: string }; Returns: boolean };
       pode_ver_obra: { Args: { p_obra_id: string }; Returns: boolean };
@@ -4683,6 +4781,17 @@ export type Database = {
         Args: { p_estornado_por: string; p_evento_won_id: number; p_novo_valor: number };
         Returns: undefined;
       };
+      registrar_documento_compras_obra: {
+        Args: {
+          p_caminho: string;
+          p_fornecedor?: string;
+          p_nome: string;
+          p_obra_id: string;
+          p_tipo: string;
+          p_valor?: number;
+        };
+        Returns: string;
+      };
       registrar_historico_obra: {
         Args: {
           p_dados: Json;
@@ -4716,6 +4825,10 @@ export type Database = {
           isOneToOne: true;
           isSetofReturn: false;
         };
+      };
+      revisar_orcamento_obra: {
+        Args: { p_aprovar: boolean; p_documento_id: string; p_motivo?: string };
+        Returns: undefined;
       };
       salvar_regras_temperatura: {
         Args: { p_empresa_id: string; p_regras: Json };

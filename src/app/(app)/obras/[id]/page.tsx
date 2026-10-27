@@ -8,6 +8,7 @@ import { formatarDataHora, formatarMoeda } from "@/lib/crm";
 import { carregarObras } from "@/lib/obras/dados";
 import { filtrosDeParams, hrefObra, montarNavegacao, queryDosFiltros, temFiltroAtivo } from "@/lib/obras/navegacao";
 import { GestaoMarco, GestaoSetor } from "./gestao";
+import { ComprasObra, type DocumentoComprasVM } from "./compras";
 import {
   carregarDetalheObra,
   type ContatoClienteVM,
@@ -50,6 +51,18 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
     carregarObras(supabase, { empresaId: atual.empresaId, papel: atual.papel, comResponsaveis: false }),
   ]);
   if (!obra) notFound();
+  const [{ data: podeVerCompras }, { data: podeRevisarCompras }, { data: documentosCompras }] = await Promise.all([
+    supabase.rpc("pode_ver_documentos_compras_obra", { p_obra_id: id }),
+    supabase.rpc("pode_revisar_orcamento_obra", { p_obra_id: id }),
+    supabase.from("obra_compras_documentos")
+      .select("id, tipo, versao, nome, fornecedor, valor, revisao, motivo_reprovacao, orcamento_id, anexado_em")
+      .eq("obra_id", id).order("anexado_em", { ascending: false }),
+  ]);
+  const compras: DocumentoComprasVM[] = (documentosCompras ?? []).filter((d) => d.tipo === "orcamento" || d.tipo === "pedido").map((d) => ({
+    id: d.id, tipo: d.tipo as "orcamento" | "pedido", versao: d.versao, nome: d.nome,
+    fornecedor: d.fornecedor, valor: d.valor, revisao: d.revisao as DocumentoComprasVM["revisao"],
+    motivoReprovacao: d.motivo_reprovacao, orcamentoId: d.orcamento_id, anexadoEm: d.anexado_em,
+  }));
   const navegacao = montarNavegacao(lista.obras, filtros, id);
 
   const { resumo, gestao } = obra;
@@ -124,6 +137,16 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
           })}
         </div>
       </section>
+
+      {podeVerCompras && <Cartao titulo="Compras — orçamento e pedido">
+        <ComprasObra
+          obraId={resumo.id}
+          empresaId={atual.empresaId}
+          documentos={compras}
+          podeAnexar={gestaoDoSetor("compras")?.permissoes.alterarFluxo ?? false}
+          podeRevisar={Boolean(podeRevisarCompras) && !resumo.pausaMotivo && !resumo.cancelamentoMotivo}
+        />
+      </Cartao>}
 
       <Cartao titulo="Marcos">
         <ul className="flex flex-col gap-3 text-sm">

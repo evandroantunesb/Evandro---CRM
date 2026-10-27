@@ -35,6 +35,9 @@ const ROTULO_TIPO: Record<string, string> = {
   participante_encerrado: "Participante encerrado",
   fluxo_alterado: "Setor alterado",
   marco_alterado: "Marco alterado",
+  documento_compras_anexado: "Documento de compras anexado",
+  orcamento_aprovado: "Orçamento aprovado",
+  orcamento_reprovado: "Orçamento reprovado",
 };
 
 const ROTULO_SETOR_HISTORICO: Record<string, string> = { ...ROTULO_SETOR, comercial: "Comercial" };
@@ -131,6 +134,12 @@ function descrever(linha: LinhaHistoricoObra, nomes: ReadonlyMap<string, string>
       return descreverFluxo(linha.setor, dados);
     case "marco_alterado":
       return descreverMarco(dados);
+    case "documento_compras_anexado":
+      return ler(dados, "tipo") === "pedido" ? "Pedido anexado" : "Orçamento anexado";
+    case "orcamento_aprovado":
+      return "Conferência técnica aprovada";
+    case "orcamento_reprovado":
+      return "Conferência técnica reprovada; confira o motivo no cartão de Compras";
     default:
       return "Evento registrado";
   }
