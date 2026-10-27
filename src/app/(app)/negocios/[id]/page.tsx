@@ -3,7 +3,9 @@ import { notFound } from "next/navigation";
 import { ListaTarefas } from "@/components/lista-tarefas";
 import { MoverEtapa } from "@/components/mover-etapa";
 import { NovaTarefa } from "@/components/nova-tarefa";
+import { NovoNegocio } from "@/components/novo-negocio";
 import { Cartao, CartaoRecolhivel, Selo, Voltar } from "@/components/ui";
+import { eletropostoDisponivel } from "@/lib/eletroposto-servidor";
 import { conferirArquivos } from "@/lib/anexos-servidor";
 import { AVISOS_CRIACAO, avisosDaUrl } from "@/lib/negocio-dados";
 import { apagarAnexo } from "@/lib/acoes/anexos";
@@ -159,6 +161,19 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
     ? await supabase.from("negocios_eletroposto").select("token, modelos, precos, local_proprio, usina_fv, emitida_em").eq("negocio_id", id).maybeSingle()
     : { data: null };
   const propostaEletroposto = !!eletroposto && eletroposto.modelos.length > 0;
+
+  // Outros negócios do mesmo cliente (ex.: usina e eletroposto), só os que quem consulta vê (RLS), e o atalho para
+  // abrir mais um negócio para ele.
+  const [{ data: outrosNegocios }, eletropostoNaEmpresa] = await Promise.all([
+    supabase
+      .from("negocios")
+      .select("id, numero, titulo, tipo, status, arquivado_em")
+      .eq("contato_id", negocio.contatos.id)
+      .neq("id", negocio.id)
+      .order("created_at", { ascending: false })
+      .limit(10),
+    eletropostoDisponivel(supabase, atual),
+  ]);
 
   const { data: proposta } = await supabase
     .from("propostas")
@@ -734,6 +749,31 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
                 >
                   Abrir no WhatsApp
                 </a>
+              )}
+              <NovoNegocio
+                href={`/negocios/novo?${new URLSearchParams({ funil: negocio.funil_id, contato: contato.id })}`}
+                eletroposto={eletropostoNaEmpresa}
+                className="mt-2 inline-flex min-h-11 w-full items-center justify-center rounded-md border border-linha bg-superficie px-3 py-2 text-sm font-medium text-texto transition-colors hover:border-dourado md:min-h-9"
+              >
+                Novo negócio para este cliente
+              </NovoNegocio>
+              {outrosNegocios && outrosNegocios.length > 0 && (
+                <div className="mt-4 border-t border-linha pt-3">
+                  <p className="text-sm text-zinc-500">Outros negócios deste cliente</p>
+                  <ul className="mt-2 flex flex-col gap-2 text-sm">
+                    {outrosNegocios.map((n) => (
+                      <li key={n.id} className="min-w-0">
+                        <Link href={`/negocios/${n.id}`} className="font-medium text-amber-700 [overflow-wrap:anywhere] hover:underline">
+                          #{n.numero} · {n.titulo}
+                        </Link>
+                        <span className="block text-xs text-texto-2">
+                          {n.tipo === "eletroposto" ? "Eletroposto" : "Energia solar"} ·{" "}
+                          {n.arquivado_em ? "Arquivado" : n.status === "ganho" ? "Ganho" : n.status === "perdido" ? "Perdido" : "Em andamento"}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
             </Cartao>
             {etiquetasVisiveis.length > 0 && (

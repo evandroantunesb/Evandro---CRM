@@ -44,6 +44,7 @@ export function FormularioEletroposto({
   responsaveis,
   meuMembroId,
   escolheModelos,
+  contatoInicial = null,
 }: {
   funilId: string;
   etapaId?: string;
@@ -54,6 +55,8 @@ export function FormularioEletroposto({
   meuMembroId: string;
   /** Falso para o SDR: ele cadastra o lead sem modelos; quem gera proposta escolhe depois, na ficha. */
   escolheModelos: boolean;
+  /** Cliente já escolhido ("Novo negócio para este cliente", na ficha de outro negócio). */
+  contatoInicial?: ContatoEncontrado | null;
 }) {
   const router = useRouter();
   const [resultado, setResultado] = useState<ResultadoAcao>(null);
@@ -61,8 +64,8 @@ export function FormularioEletroposto({
   const [, iniciar] = useTransition();
 
   const [modelos, setModelos] = useState<ModeloEletroposto[]>([]);
-  const [modo, setModo] = useState<"novo" | "existente">("novo");
-  const [contato, setContato] = useState<ContatoEncontrado | null>(null);
+  const [modo, setModo] = useState<"novo" | "existente">(contatoInicial ? "existente" : "novo");
+  const [contato, setContato] = useState<ContatoEncontrado | null>(contatoInicial);
   const [busca, setBusca] = useState("");
   const [encontrados, setEncontrados] = useState<ContatoEncontrado[]>([]);
   const [duplicados, setDuplicados] = useState<Duplicado[]>([]);
