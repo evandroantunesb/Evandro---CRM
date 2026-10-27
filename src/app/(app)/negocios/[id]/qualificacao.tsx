@@ -49,6 +49,7 @@ export function Qualificacao({
   negocio,
   telefoneContato,
   vendedores,
+  eletroposto = false,
 }: {
   negocio: {
     id: string;
@@ -67,6 +68,8 @@ export function Qualificacao({
   };
   telefoneContato: string | null;
   vendedores: { id: string; nome: string }[];
+  /** Eletroposto: sem conta de energia, distribuidora e imóvel próprio (o local próprio fica no eletroposto). */
+  eletroposto?: boolean;
 }) {
   const [resultado, acao, pendente] = useActionState(atualizarQualificacao, null);
   const enviar = useEnvioSemReset(acao);
@@ -92,13 +95,17 @@ export function Qualificacao({
             </option>
           ))}
         </Selecao>
-        <SelecaoSimNao rotulo="Possui conta de energia?" name="qualif_possui_conta_energia" defaultValue={negocio.qualifPossuiContaEnergia} />
-        <Campo rotulo="Distribuidora" name="qualif_distribuidora" defaultValue={negocio.qualifDistribuidora ?? ""} />
-        <SelecaoSimNao rotulo="Imóvel próprio?" name="qualif_imovel_proprio" defaultValue={negocio.qualifImovelProprio} />
+        {!eletroposto && (
+          <>
+            <SelecaoSimNao rotulo="Possui conta de energia?" name="qualif_possui_conta_energia" defaultValue={negocio.qualifPossuiContaEnergia} />
+            <Campo rotulo="Distribuidora" name="qualif_distribuidora" defaultValue={negocio.qualifDistribuidora ?? ""} />
+            <SelecaoSimNao rotulo="Imóvel próprio?" name="qualif_imovel_proprio" defaultValue={negocio.qualifImovelProprio} />
+          </>
+        )}
         <Campo
           rotulo="Objetivo principal"
           name="qualif_objetivo"
-          placeholder="Ex.: reduzir a conta de luz"
+          placeholder={eletroposto ? "Ex.: atender clientes com carro elétrico" : "Ex.: reduzir a conta de luz"}
           defaultValue={negocio.qualifObjetivo ?? ""}
         />
         <Selecao rotulo="Pretende instalar em quanto tempo?" name="qualif_prazo_instalacao" defaultValue={negocio.qualifPrazoInstalacao ?? ""}>

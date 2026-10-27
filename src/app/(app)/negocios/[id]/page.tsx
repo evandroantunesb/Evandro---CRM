@@ -50,7 +50,7 @@ import {
 import { Arquivamento } from "./arquivamento";
 import { Contrato } from "./contrato";
 import { EletropostoNegocio } from "./eletroposto";
-import { normalizarModelos, type ModeloEletroposto } from "@/lib/eletroposto";
+import { CATALOGO_ELETROPOSTO, normalizarModelos, type ModeloEletroposto } from "@/lib/eletroposto";
 import { EdicaoNegocio } from "./edicao";
 import { EnviarAnexo } from "./enviar-anexo";
 import { Fechamento } from "./fechamento";
@@ -65,6 +65,7 @@ import { PagamentoSolo, type SituacaoRegistro } from "./pagamento-solo";
 import { EmitirProposta } from "./emitir-proposta";
 import { Proposta } from "./proposta";
 import { Qualificacao } from "./qualificacao";
+import { QualificacaoEntregue } from "./qualificacao-entregue";
 import { SeloTemperatura } from "@/components/selo-temperatura";
 import { carregarTemperaturas } from "@/lib/temperatura";
 
@@ -268,7 +269,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
 
   const { data: ultimoHandoff } = await supabase
     .from("handoffs")
-    .select("id, para_membro_id, de_membro_id, status, motivo_devolucao, created_at, handoffs_feedback(feedback, autor_id)")
+    .select("id, para_membro_id, de_membro_id, status, motivo_devolucao, created_at, qualificacao_snapshot, handoffs_feedback(feedback, autor_id)")
     .eq("negocio_id", id)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -590,7 +591,13 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
           única instância da ação de fechamento. Os links levam à aba onde ficam proposta, contrato e pagamento. */}
       <Cartao titulo={cartao.titulo}>
         {cartao.tipo === "marcos" ? (
-          <MarcosVenda marcos={cartao.marcos} obra={obraDoNegocio} proposta={marcoProposta} hrefBase={`/negocios/${negocio.id}?aba=proposta`}>
+          <MarcosVenda
+            marcos={cartao.marcos}
+            obra={obraDoNegocio}
+            proposta={marcoProposta}
+            hrefBase={`/negocios/${negocio.id}?aba=proposta`}
+            soVenda={ehEletroposto}
+          >
             {fechamento}
           </MarcosVenda>
         ) : (
@@ -646,6 +653,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
                 origens={config.origens.filter((o) => o.ativa || o.id === negocio.origem_id)}
                 responsaveis={pode(atual.papel, ESCOLHER_RESPONSAVEL_NEGOCIO) ? config.membros.filter((m) => m.ativo && pode(m.papel, RESPONSAVEL_COMERCIAL)) : []}
                 podeEditarValor={pode(atual.papel, EDITAR_VALOR_NEGOCIO)}
+                eletroposto={ehEletroposto}
               />
               );
               // Dados do negócio sempre à vista para quem vende; para o SDR (que trabalha a qualificação) ficam recolhidos.
@@ -677,7 +685,31 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
                 }}
                 telefoneContato={contato.telefone}
                 vendedores={config.membros.filter((m) => m.ativo && m.papel === "vendedor")}
+                eletroposto={ehEletroposto}
               />
+              {/* Depois do aceite, o que o SDR entregou fica à vista (só leitura), com o que mudou desde então. */}
+              {ultimoHandoff?.status === "aceito" && (
+                <div className="mt-4">
+                  <QualificacaoEntregue
+                    snapshot={(ultimoHandoff.qualificacao_snapshot ?? {}) as Record<string, string | boolean | null>}
+                    atual={{
+                      tipo_cliente: negocio.qualif_tipo_cliente,
+                      possui_conta_energia: negocio.qualif_possui_conta_energia,
+                      distribuidora: negocio.qualif_distribuidora,
+                      imovel_proprio: negocio.qualif_imovel_proprio,
+                      objetivo: negocio.qualif_objetivo,
+                      prazo_instalacao: negocio.qualif_prazo_instalacao,
+                      busca_financiamento: negocio.qualif_busca_financiamento,
+                      orcamento_outra_empresa: negocio.qualif_orcamento_outra_empresa,
+                      e_decisor: negocio.qualif_e_decisor,
+                      outro_decisor: negocio.qualif_outro_decisor,
+                      participantes_decisao: negocio.qualif_participantes_decisao,
+                    }}
+                    enviadoEm={ultimoHandoff.created_at}
+                    deNome={ultimoHandoff.de_membro_id ? nomes.membro(ultimoHandoff.de_membro_id) : "SDR"}
+                  />
+                </div>
+              )}
             </CartaoRecolhivel>
               );
               return atual.papel === "sdr" ? (
@@ -692,6 +724,35 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
                 </>
               );
             })()}
+            {/* Eletroposto: o que o vendedor precisa saber do cliente, à vista; a edição fica na aba do eletroposto. */}
+            {ehEletroposto && eletroposto && (
+              <Cartao titulo="Resumo do eletroposto">
+                <dl className="grid gap-3 text-sm sm:grid-cols-3">
+                  <div>
+                    <dt className="text-texto-2">Local próprio</dt>
+                    <dd className="text-texto">{eletroposto.local_proprio ? "Sim" : "Não"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-texto-2">Usina FV</dt>
+                    <dd className="text-texto">{eletroposto.usina_fv ? "Sim" : "Não"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-texto-2">Modelos</dt>
+                    <dd className="text-texto">
+                      {propostaEletroposto
+                        ? normalizarModelos(eletroposto.modelos).map((m) => CATALOGO_ELETROPOSTO[m].nome).join(" · ")
+                        : "Ainda não escolhidos"}
+                    </dd>
+                  </div>
+                </dl>
+                <Link
+                  href={`/negocios/${negocio.id}?aba=proposta`}
+                  className="mt-3 inline-flex min-h-11 items-center text-sm font-medium text-dourado-texto underline-offset-2 hover:underline md:min-h-0"
+                >
+                  Editar na aba Eletroposto
+                </Link>
+              </Cartao>
+            )}
             {ultimoHandoff &&
               (souAdmin ||
                 atual.papel === "gestor" ||

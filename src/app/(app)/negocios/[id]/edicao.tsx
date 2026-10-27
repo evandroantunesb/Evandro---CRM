@@ -20,6 +20,7 @@ export function EdicaoNegocio({
   origens,
   responsaveis,
   podeEditarValor = true,
+  eletroposto = false,
 }: {
   /** Empresa do negócio (pasta da fatura no Storage). */
   empresaId: string;
@@ -44,6 +45,8 @@ export function EdicaoNegocio({
   responsaveis: Opcao[];
   /** SDR não pode alterar o valor financeiro do negócio (spec RAION_SDR_REGRAS_PERMISSOES §39). */
   podeEditarValor?: boolean;
+  /** Eletroposto: sem os campos de energia solar, e o valor fica opcional até o cliente escolher o modelo. */
+  eletroposto?: boolean;
 }) {
   const router = useRouter();
   const [resultado, setResultado] = useState<ResultadoAcao>(null);
@@ -105,8 +108,9 @@ export function EdicaoNegocio({
         rotulo="Valor (R$)"
         name="valor"
         inputMode="decimal"
-        required
+        required={!eletroposto}
         readOnly={!podeEditarValor}
+        placeholder={eletroposto ? "Vazio até o cliente escolher o modelo" : undefined}
         defaultValue={negocio.valor != null ? String(negocio.valor).replace(".", ",") : ""}
       />
       <Campo
@@ -115,6 +119,8 @@ export function EdicaoNegocio({
         type="month"
         defaultValue={negocio.fechamentoPrevisto?.slice(0, 7) ?? ""}
       />
+      {!eletroposto && (
+        <>
       <Campo
         rotulo="Valor da conta de energia (R$)"
         name="valor_conta_energia"
@@ -151,6 +157,8 @@ export function EdicaoNegocio({
         defaultValue={negocio.tipoTelhado ?? ""}
       />
       <CampoArquivo key={versaoArquivo} rotulo="Fatura de energia (opcional)" name="anexo_fatura_energia" accept="image/*,.pdf" />
+        </>
+      )}
       <label className="flex flex-col gap-1 text-sm md:col-span-2">
         <span className="font-medium text-zinc-700">Descrição</span>
         <textarea

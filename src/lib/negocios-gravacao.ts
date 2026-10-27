@@ -63,6 +63,13 @@ const valorObrigatorio = z
   .transform(lerNumeroBr)
   .pipe(z.number({ error: `Valor do negócio: ${MENSAGEM_NUMERO_BR}` }).positive("Informe um valor maior que zero."));
 
+// Edição: vazio vira null aqui; a obrigatoriedade depende do tipo do negócio (lido do banco), ver `editarNegocioComCliente`.
+const valorEdicao = z
+  .string()
+  .optional()
+  .transform(lerNumeroBr)
+  .pipe(z.number({ error: `Valor do negócio: ${MENSAGEM_NUMERO_BR}` }).positive("Informe um valor maior que zero.").nullable());
+
 const numeroBrOpcional = z
   .string()
   .optional()
@@ -333,7 +340,7 @@ const esquemaEdicao = z.object({
   titulo: z.string().trim().min(2, "Informe o nome do negócio"),
   origem_id: uuidOpcional,
   responsavel_id: uuidOpcional,
-  valor: valorObrigatorio,
+  valor: valorEdicao,
   descricao: z.string().trim().optional(),
   unidade_consumidora: z.string().trim().max(60).optional(),
   padrao_cliente: z.string().trim().max(60).optional(),
@@ -358,7 +365,24 @@ export async function editarNegocioComCliente(
   if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
   const d = dados.data;
 
+  // Eletroposto: valor opcional (vários modelos na proposta = sem valor até o cliente escolher) e sem os campos
+  // solares, que nem aparecem no formulário. O tipo vem do banco, nunca do formulário.
+  const { data: registro } = await supabase.from("negocios").select("tipo").eq("id", d.negocioId).maybeSingle();
+  const ehEletroposto = registro?.tipo === "eletroposto";
+  if (!ehEletroposto && d.valor == null) return { ok: false, mensagem: "Informe o valor do negócio." };
+
   const consumoEdicao = resolverConsumo(d.consumo_medio_kwh, d.valor_conta_energia, d.tarifa_efetiva_kwh);
+  const camposSolares = ehEletroposto
+    ? {}
+    : {
+        unidade_consumidora: d.unidade_consumidora || null,
+        padrao_cliente: d.padrao_cliente || null,
+        tipo_telhado: d.tipo_telhado || null,
+        consumo_medio_kwh: consumoEdicao.origem === "informado" ? consumoEdicao.kwh : null,
+        consumo_estimado_kwh: consumoEdicao.origem === "estimado" ? consumoEdicao.kwh : null,
+        tarifa_efetiva_kwh: consumoEdicao.tarifaEfetiva,
+        valor_conta_energia: d.valor_conta_energia,
+      };
 
   const { data, error } = await supabase
     .from("negocios")
@@ -366,13 +390,7 @@ export async function editarNegocioComCliente(
       titulo: d.titulo,
       origem_id: d.origem_id,
       descricao: d.descricao || null,
-      unidade_consumidora: d.unidade_consumidora || null,
-      padrao_cliente: d.padrao_cliente || null,
-      tipo_telhado: d.tipo_telhado || null,
-      consumo_medio_kwh: consumoEdicao.origem === "informado" ? consumoEdicao.kwh : null,
-      consumo_estimado_kwh: consumoEdicao.origem === "estimado" ? consumoEdicao.kwh : null,
-      tarifa_efetiva_kwh: consumoEdicao.tarifaEfetiva,
-      valor_conta_energia: d.valor_conta_energia,
+      ...camposSolares,
       ...(d.fechamento_previsto !== undefined ? { fechamento_previsto: d.fechamento_previsto } : {}),
       // SDR não pode alterar o valor financeiro do negócio (spec RAION_SDR_REGRAS_PERMISSOES §39) — só na criação.
       ...(pode(atual.papel, EDITAR_VALOR_NEGOCIO) ? { valor: d.valor } : {}),
