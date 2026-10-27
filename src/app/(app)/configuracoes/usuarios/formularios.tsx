@@ -164,7 +164,7 @@ export function LinhaMembro({ membro }: { membro: MembroLinha }) {
       <p className="mt-2 text-sm text-zinc-600">Ao salvar, a pessoa deixará de acessar o comercial e a gamificação. Confira sua carteira antes de alterar o perfil.</p>
     )}
     {membro.papel === "operacao" && membro.status === "ativo" && papel === "operacao" && status === "ativo" && membro.setores && (
-      <SetoresMembro key={`${membro.id}:${membro.setores.map((s) => `${s.setor}:${s.capacidade}`).sort().join(",")}`} membroId={membro.id} setores={membro.setores} />
+      <SetoresMembro key={membro.id} membroId={membro.id} setores={membro.setores} />
     )}
     {membro.papel === "operacao" && (!(papel === "operacao") || status !== "ativo") && (
       <p className="mt-2 text-sm text-zinc-600">Ao salvar esta alteração, os setores e as participações operacionais serão removidos.</p>

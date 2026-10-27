@@ -31,6 +31,7 @@ test("admin atribui vários setores à mesma pessoa e mantém a configuração a
     page.waitForResponse((resposta) => resposta.request().method() === "POST" && resposta.url().includes("/configuracoes/usuarios")),
     linha.getByRole("button", { name: "Salvar setores" }).click(),
   ]);
+  await expect(linha.getByText("Setores atualizados.")).toBeVisible();
 
   await page.reload();
   await expect(linhaOperacional(page).getByRole("combobox", { name: "Compras" })).toHaveValue("coordenar");
