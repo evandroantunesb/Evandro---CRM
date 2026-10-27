@@ -19,9 +19,9 @@ const empresaId = "37f9b3b0-f944-421a-9d2d-750c3284c109";
 const formularioSetores = () => {
   const f = new FormData();
   f.set("membroId", membroId);
-  f.set("compras", "executar");
+  f.set("compras", "sem_acesso");
   f.set("engenharia", "sem_acesso");
-  f.set("operacional", "coordenar");
+  f.set("operacional", "executar");
   return f;
 };
 
@@ -70,9 +70,26 @@ describe("configuração de setores", () => {
     expect((await salvarSetoresMembro(null, formularioSetores()))?.ok).toBe(true);
     expect(mocks.exigirPapel).toHaveBeenCalledWith("admin");
     expect(eq).toHaveBeenCalledWith("empresa_id", empresaId);
-    expect(rpc).toHaveBeenCalledWith("definir_setores_membro", { p_membro_id: membroId, p_setores: [
-      { setor: "compras", capacidade: "executar" }, { setor: "operacional", capacidade: "coordenar" },
-    ] });
+    expect(rpc).toHaveBeenCalledWith("definir_setores_membro", {
+      p_membro_id: membroId,
+      p_setores: [{ setor: "operacional", capacidade: "executar" }],
+    });
+  });
+
+  it("permite que a mesma pessoa atue em Engenharia, Compras e Operacional com capacidades distintas", async () => {
+    const { rpc } = cliente({ id: membroId });
+    const f = formularioSetores();
+    f.set("compras", "coordenar");
+    f.set("engenharia", "executar");
+    expect((await salvarSetoresMembro(null, f))?.ok).toBe(true);
+    expect(rpc).toHaveBeenCalledWith("definir_setores_membro", {
+      p_membro_id: membroId,
+      p_setores: [
+        { setor: "compras", capacidade: "coordenar" },
+        { setor: "engenharia", capacidade: "executar" },
+        { setor: "operacional", capacidade: "executar" },
+      ],
+    });
   });
 
   it("não grava um membro fora da empresa atual nem oculta erro de leitura", async () => {

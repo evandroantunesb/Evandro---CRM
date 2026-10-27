@@ -182,11 +182,11 @@ function SetoresMembro({ membroId, setores }: { membroId: string; setores: NonNu
     <form action={acao} className="mt-3 rounded-lg border border-zinc-200 p-3">
       <input type="hidden" name="membroId" value={membroId} />
       <p className="text-sm font-medium text-zinc-900">Setores de Obras</p>
-      <p className="mt-1 text-xs text-zinc-600">Quem executa acessa obras em que participa. Quem coordena vê todas as obras e pode gerir participantes do setor.</p>
+      <p className="mt-1 text-xs text-zinc-600">Quem executa altera o próprio setor nas obras em que participa. Quem coordena vê todas as obras e pode gerir participantes do setor. A pessoa pode consultar o andamento de outros setores na mesma obra, sem poder alterá-los.</p>
       <div className="mt-3 grid gap-3 md:grid-cols-3">
         {SETORES_OBRA.map((setor) => (
           <Selecao key={setor} rotulo={ROTULO_SETOR[setor]} name={setor} defaultValue={setores.find((s) => s.setor === setor)?.capacidade ?? "sem_acesso"}>
-            <option value="sem_acesso">Sem acesso</option>
+            <option value="sem_acesso">Não atua no setor</option>
             <option value="executar">Executar</option>
             <option value="coordenar">Coordenar</option>
           </Selecao>
