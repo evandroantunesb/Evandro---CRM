@@ -161,13 +161,13 @@ export function LinhaMembro({ membro }: { membro: MembroLinha }) {
           </option>
         ))}
       </Selecao>
-      {papel === "operacao" && membro.papel !== "operacao" && status === "ativo" && (
+      {papel === "operacao" && status === "ativo" && (membro.papel === "operacao" ? null : (
         <fieldset className="w-full rounded-lg border border-zinc-200 p-3">
           <legend className="px-1 text-sm font-medium text-zinc-900">Setores de {membro.nome || membro.email}</legend>
           <p className="mb-3 text-xs text-zinc-600">Ao salvar o novo perfil, estes setores serão atribuídos somente a esta pessoa.</p>
           <CamposSetores setores={[]} />
         </fieldset>
-      )}
+      ))}
       <Botao type="submit" variante="secundario" disabled={pendente || carregandoCarteira}>
         {carregandoCarteira ? "Verificando carteira..." : "Salvar"}
       </Botao>

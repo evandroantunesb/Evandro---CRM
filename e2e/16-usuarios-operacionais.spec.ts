@@ -14,7 +14,7 @@ test("admin escolhe os setores ao criar a pessoa e não altera os de outra", asy
   const cadastro = page.locator("form").filter({ has: page.getByRole("button", { name: "Criar usuário" }) });
   await cadastro.getByRole("textbox", { name: "Nome" }).fill(nome);
   await cadastro.getByRole("textbox", { name: "E-mail" }).fill(`operacao.cadastro.${Date.now()}@example.test`);
-  await cadastro.getByRole("combobox", { name: "Perfil" }).selectOption("operacao");
+  await cadastro.getByRole("combobox", { name: "Perfil", exact: true }).selectOption("operacao");
   const setores = cadastro.getByRole("group", { name: "Setores desta pessoa" });
   await setores.getByRole("combobox", { name: "Compras" }).selectOption("executar");
   await setores.getByRole("combobox", { name: "Engenharia" }).selectOption("coordenar");
