@@ -23,6 +23,19 @@ const esquemaConvite = z.object({
     .or(z.literal("").transform(() => undefined)),
 });
 
+const esquemaSetores = z.object({
+  compras: z.enum(["sem_acesso", "executar", "coordenar"]),
+  engenharia: z.enum(["sem_acesso", "executar", "coordenar"]),
+  operacional: z.enum(["sem_acesso", "executar", "coordenar"]),
+});
+
+function setoresSelecionados(escolhas: z.infer<typeof esquemaSetores>) {
+  return SETORES_OBRA.flatMap((setor) => {
+    const capacidade = escolhas[setor];
+    return capacidade === "sem_acesso" ? [] : [{ setor, capacidade }];
+  });
+}
+
 function gerarSenhaTemporaria(): string {
   const alfabeto = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
   let senha = "";
@@ -35,6 +48,8 @@ export async function convidarMembro(_: ResultadoAcao, formData: FormData): Prom
   const { atual } = await exigirPapel("admin");
   const dados = esquemaConvite.safeParse(Object.fromEntries(formData));
   if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
+  const escolhas = dados.data.papel === "operacao" ? esquemaSetores.safeParse(Object.fromEntries(formData)) : null;
+  if (escolhas && !escolhas.success) return { ok: false, mensagem: "Confira os setores desta pessoa." };
 
   const senha = dados.data.senha ?? gerarSenhaTemporaria();
   let userId: string;
@@ -47,7 +62,7 @@ export async function convidarMembro(_: ResultadoAcao, formData: FormData): Prom
 
   // O vínculo é gravado com a sessão do admin: o RLS confere a permissão de novo.
   const supabase = await criarClienteServidor();
-  const { error } = await supabase.from("empresa_membros").insert({
+  const { data: membro, error } = await supabase.from("empresa_membros").insert({
     empresa_id: atual.empresaId,
     user_id: userId,
     papel: dados.data.papel,
@@ -55,19 +70,31 @@ export async function convidarMembro(_: ResultadoAcao, formData: FormData): Prom
     ...(dados.data.papel === "operacao"
       ? { perfil_gamificacao: null, recebe_leads: false }
       : { perfil_gamificacao: dados.data.perfil_gamificacao ?? null }),
-  });
+  }).select("id").single();
   if (error) {
     if (error.code === "23505") return { ok: false, mensagem: "Essa pessoa já faz parte da empresa." };
     return { ok: false, mensagem: "Não foi possível adicionar o usuário." };
   }
 
+  const mensagemCriacao = novo
+    ? `Usuário criado. Senha temporária: ${senha} — repasse pra pessoa (ela pode trocar em Meu perfil).`
+    : `${dados.data.email} já tinha conta e foi adicionado à empresa.`;
+  if (escolhas?.success) {
+    if (!membro) {
+      revalidatePath("/configuracoes/usuarios");
+      return { ok: false, mensagem: `${mensagemCriacao} Não foi possível identificar o vínculo para salvar os setores. Configure-os na lista abaixo.` };
+    }
+    const { error: erroSetores } = await supabase.rpc("definir_setores_membro", {
+      p_membro_id: membro.id,
+      p_setores: setoresSelecionados(escolhas.data),
+    });
+    if (erroSetores) {
+      revalidatePath("/configuracoes/usuarios");
+      return { ok: false, mensagem: `${mensagemCriacao} Os setores não foram salvos: ${mensagemErro(erroSetores, "tente novamente")}. Configure-os na lista abaixo.` };
+    }
+  }
   revalidatePath("/configuracoes/usuarios");
-  return {
-    ok: true,
-    mensagem: novo
-      ? `Usuário criado. Senha temporária: ${senha} — repasse pra pessoa (ela pode trocar em Meu perfil).`
-      : `${dados.data.email} já tinha conta e foi adicionado à empresa.`,
-  };
+  return { ok: true, mensagem: mensagemCriacao };
 }
 
 const esquemaAtualizacao = z.object({
@@ -83,6 +110,10 @@ export async function atualizarMembro(_: ResultadoAcao, formData: FormData): Pro
   const { atual } = await exigirPapel("admin");
   const dados = esquemaAtualizacao.safeParse(Object.fromEntries(formData));
   if (!dados.success) return { ok: false, mensagem: "Dados inválidos." };
+  const escolhas = dados.data.papel === "operacao" && formData.has("compras")
+    ? esquemaSetores.safeParse(Object.fromEntries(formData))
+    : null;
+  if (escolhas && !escolhas.success) return { ok: false, mensagem: "Confira os setores desta pessoa." };
 
   const supabase = await criarClienteServidor();
 
@@ -121,6 +152,16 @@ export async function atualizarMembro(_: ResultadoAcao, formData: FormData): Pro
     }
     return { ok: false, mensagem: "Não foi possível salvar." };
   }
+  if (escolhas?.success) {
+    const { error: erroSetores } = await supabase.rpc("definir_setores_membro", {
+      p_membro_id: dados.data.membroId,
+      p_setores: setoresSelecionados(escolhas.data),
+    });
+    if (erroSetores) {
+      revalidatePath("/configuracoes/usuarios");
+      return { ok: false, mensagem: `Perfil salvo, mas os setores não foram: ${mensagemErro(erroSetores, "tente novamente")}. Configure-os na lista desta pessoa.` };
+    }
+  }
   revalidatePath("/configuracoes/usuarios");
   return { ok: true, mensagem: "Salvo." };
 }
@@ -128,13 +169,7 @@ export async function atualizarMembro(_: ResultadoAcao, formData: FormData): Pro
 /** Configuração independente do cadastro: a RPC valida e audita cada alteração no banco. */
 export async function salvarSetoresMembro(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
   const { atual } = await exigirPapel("admin");
-  const esquema = z.object({
-    membroId: z.string().uuid(),
-    compras: z.enum(["sem_acesso", "executar", "coordenar"]),
-    engenharia: z.enum(["sem_acesso", "executar", "coordenar"]),
-    operacional: z.enum(["sem_acesso", "executar", "coordenar"]),
-  });
-  const dados = esquema.safeParse(Object.fromEntries(formData));
+  const dados = esquemaSetores.extend({ membroId: z.string().uuid() }).safeParse(Object.fromEntries(formData));
   if (!dados.success) return { ok: false, mensagem: "Confira os setores e tente novamente." };
 
   const supabase = await criarClienteServidor();
@@ -147,11 +182,7 @@ export async function salvarSetoresMembro(_: ResultadoAcao, formData: FormData):
     .maybeSingle();
   if (erroMembro || !membro) return { ok: false, mensagem: "Não foi possível acessar este usuário na empresa atual." };
 
-  const setores = SETORES_OBRA.flatMap((setor) => {
-    const capacidade = dados.data[setor];
-    return capacidade === "sem_acesso" ? [] : [{ setor, capacidade }];
-  });
-  const { error } = await supabase.rpc("definir_setores_membro", { p_membro_id: membro.id, p_setores: setores });
+  const { error } = await supabase.rpc("definir_setores_membro", { p_membro_id: membro.id, p_setores: setoresSelecionados(dados.data) });
   if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível salvar os setores.") };
 
   revalidatePath("/configuracoes/usuarios");

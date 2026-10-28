@@ -32,13 +32,40 @@ beforeEach(() => {
 
 describe("cadastro de operação", () => {
   it("não inclui operação na distribuição ou gamificação mesmo com campos forjados", async () => {
-    const insert = vi.fn().mockResolvedValue({ error: null });
-    mocks.criarClienteServidor.mockResolvedValue({ from: vi.fn().mockReturnValue({ insert }) });
+    const single = vi.fn().mockResolvedValue({ data: { id: membroId }, error: null });
+    const insert = vi.fn().mockReturnValue({ select: vi.fn().mockReturnValue({ single }) });
+    const rpc = vi.fn().mockResolvedValue({ error: null });
+    mocks.criarClienteServidor.mockResolvedValue({ from: vi.fn().mockReturnValue({ insert }), rpc });
     mocks.criarUsuarioDireto.mockResolvedValue({ userId: membroId, novo: false });
     const f = new FormData();
-    for (const [campo, valor] of Object.entries({ nome: "Pessoa", email: "pessoa@example.test", papel: "operacao", tipo_vendedor: "interno", perfil_gamificacao: "closer", recebe_leads: "on" })) f.set(campo, valor);
+    for (const [campo, valor] of Object.entries({ nome: "Pessoa", email: "pessoa@example.test", papel: "operacao", tipo_vendedor: "interno", perfil_gamificacao: "closer", recebe_leads: "on", compras: "coordenar", engenharia: "sem_acesso", operacional: "executar" })) f.set(campo, valor);
     expect((await convidarMembro(null, f))?.ok).toBe(true);
     expect(insert).toHaveBeenCalledWith(expect.objectContaining({ papel: "operacao", perfil_gamificacao: null, recebe_leads: false, empresa_id: empresaId }));
+    expect(rpc).toHaveBeenCalledWith("definir_setores_membro", {
+      p_membro_id: membroId,
+      p_setores: [{ setor: "compras", capacidade: "coordenar" }, { setor: "operacional", capacidade: "executar" }],
+    });
+  });
+
+  it("recusa setores inválidos antes de criar a conta", async () => {
+    const f = new FormData();
+    for (const [campo, valor] of Object.entries({ nome: "Pessoa", email: "pessoa@example.test", papel: "operacao", tipo_vendedor: "interno", compras: "administrar", engenharia: "sem_acesso", operacional: "executar" })) f.set(campo, valor);
+    expect((await convidarMembro(null, f))?.ok).toBe(false);
+    expect(mocks.criarUsuarioDireto).not.toHaveBeenCalled();
+  });
+
+  it("informa que a conta foi criada quando a gravação dos setores falha", async () => {
+    const single = vi.fn().mockResolvedValue({ data: { id: membroId }, error: null });
+    const insert = vi.fn().mockReturnValue({ select: vi.fn().mockReturnValue({ single }) });
+    const rpc = vi.fn().mockResolvedValue({ error: { message: "falha no banco", hint: "mensagem_usuario" } });
+    mocks.criarClienteServidor.mockResolvedValue({ from: vi.fn().mockReturnValue({ insert }), rpc });
+    mocks.criarUsuarioDireto.mockResolvedValue({ userId: membroId, novo: true });
+    const f = new FormData();
+    for (const [campo, valor] of Object.entries({ nome: "Pessoa", email: "pessoa@example.test", papel: "operacao", tipo_vendedor: "interno", compras: "sem_acesso", engenharia: "sem_acesso", operacional: "executar", senha: "temporaria123" })) f.set(campo, valor);
+    const resultado = await convidarMembro(null, f);
+    expect(resultado).toEqual(expect.objectContaining({ ok: false, mensagem: expect.stringContaining("Os setores não foram salvos") }));
+    expect(resultado?.mensagem).toContain("Usuário criado");
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/configuracoes/usuarios");
   });
 
   it("ao editar operação, também descarta perfil e distribuição informados indevidamente", async () => {
@@ -51,6 +78,21 @@ describe("cadastro de operação", () => {
     expect((await atualizarMembro(null, f))?.ok).toBe(true);
     expect(update).toHaveBeenCalledWith(expect.objectContaining({ perfil_gamificacao: null, recebe_leads: false, tipo_vendedor: null }));
     expect(eq).toHaveBeenCalledWith("empresa_id", empresaId);
+  });
+
+  it("atribui setores somente ao membro alterado para Operação", async () => {
+    const eq = vi.fn().mockReturnThis();
+    eq.mockReturnValueOnce({ eq }).mockResolvedValueOnce({ error: null });
+    const update = vi.fn().mockReturnValue({ eq });
+    const rpc = vi.fn().mockResolvedValue({ error: null });
+    mocks.criarClienteServidor.mockResolvedValue({ from: vi.fn().mockReturnValue({ update }), rpc });
+    const f = new FormData();
+    for (const [campo, valor] of Object.entries({ membroId, papel: "operacao", tipo_vendedor: "interno", status: "ativo", compras: "sem_acesso", engenharia: "coordenar", operacional: "executar" })) f.set(campo, valor);
+    expect((await atualizarMembro(null, f))?.ok).toBe(true);
+    expect(rpc).toHaveBeenCalledWith("definir_setores_membro", {
+      p_membro_id: membroId,
+      p_setores: [{ setor: "engenharia", capacidade: "coordenar" }, { setor: "operacional", capacidade: "executar" }],
+    });
   });
 });
 
