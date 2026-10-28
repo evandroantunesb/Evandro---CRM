@@ -1,5 +1,13 @@
 # Estado do projeto — Raion CRM
 
+## Usuários operacionais — implementação em andamento, 2026-10-27
+
+PR #229 (`feat/usuarios-operacionais`, partindo de `origin/main` em `fc4a9d1`): cadastro do papel Operação e configuração por administrador dos setores de Obras e das capacidades executar/coordenar pela RPC existente. A tela informa que coordenadores veem todas as obras e que remover setor encerra participações; operação não recebe leads nem perfil de gamificação no cadastro. Sem migration nesta etapa. Typecheck e build aprovados; lint sem erros e com três avisos preexistentes em `seed-metas-vendedores.mjs` e `stack-supabase-local.test.ts`. Testes direcionados de cadastro, permissões, acesso e escrita em Obras aprovados na stack Supabase local; as suítes de banco criaram dados fictícios locais. Produção não foi alterada; confirmar aplicação efetiva das migrations de Obras e a segurança da transição antes de qualquer deploy. As demais etapas do fluxo de pós-vendas ainda não foram implementadas.
+
+Decisão de produto confirmada em 27/10: os setores são uma estrutura do produto, não departamentos fixos da IBS. O admin pode definir, para cada usuário de Operação, um ou vários setores (Compras, Engenharia, Operacional) e a capacidade em cada um. Uma mesma pessoa pode acumular Engenharia, Compras e acompanhamento operacional; Vinícius foi citado como caso de atuação apenas no Operacional, sem alteração de Engenharia. A ausência de atuação em um setor bloqueia escrita nele, mas não oculta o andamento dos demais setores de uma obra que a pessoa já pode consultar. A configuração usa o formulário por pessoa e a RPC `definir_setores_membro`; nenhuma atribuição a uma pessoa real foi feita nesta etapa.
+
+Validação desta decisão: 7/7 testes direcionados de cadastro/setores, typecheck e ESLint dos arquivos alterados aprovados. O teste de navegador `e2e/16-usuarios-operacionais.spec.ts` passou (2/2) em worktree temporário no disco C:, com build do app e Supabase local: conferiu no celular o usuário que atua só no Operacional e confirmou que um admin salva três setores com capacidades diferentes para a mesma pessoa, persistidos após recarregar. Na unidade R:, o build de E2E não avançou; o teste foi concluído no C: com os mesmos arquivos. Nenhum usuário real foi alterado.
+
 ## Calculadora GD II — revisão de 2026-10-23
 
 `main` em `3ee53b8`: cálculo GD II já integrado (#214–#216), limitado ao enquadramento Copel B1 residencial e ao período oficial disponível (2026/27). Sem economia financeira comprovada, a proposta com economia continua bloqueada; payback segue indisponível. A antiga PR draft #209 conflita com a linha atual e não deve ser mesclada integralmente.

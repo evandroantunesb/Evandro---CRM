@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useState, useTransition } from "react";
 import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
+import { ROTULO_SETOR, SETORES_OBRA } from "@/lib/obras/rotulos";
 import {
   PAPEIS_CADASTRAVEIS,
   PERFIS_GAMIFICACAO,
@@ -16,7 +17,7 @@ import {
   type StatusMembro,
   type TipoVendedor,
 } from "@/lib/tipos";
-import { atualizarMembro, carregarCarteiraAberta, convidarMembro, desligarComTransferencia, type CarteiraAberta } from "./actions";
+import { atualizarMembro, carregarCarteiraAberta, convidarMembro, desligarComTransferencia, salvarSetoresMembro, type CarteiraAberta } from "./actions";
 
 export function FormularioConvite() {
   const [resultado, acao, pendente] = useActionState(convidarMembro, null);
@@ -40,7 +41,7 @@ export function FormularioConvite() {
         ))}
       </Selecao>
       {papel !== "vendedor" && <input type="hidden" name="tipo_vendedor" value="interno" />}
-      <Selecao rotulo="Perfil de gamificação (opcional)" name="perfil_gamificacao" defaultValue="">
+      <Selecao rotulo="Perfil de gamificação (opcional)" name="perfil_gamificacao" defaultValue="" disabled={papel === "operacao"}>
         <option value="">Sem perfil (fora do ranking)</option>
         {PERFIS_GAMIFICACAO.map((p) => (
           <option key={p} value={p}>
@@ -48,6 +49,7 @@ export function FormularioConvite() {
           </option>
         ))}
       </Selecao>
+      {papel === "operacao" && <p className="text-sm text-zinc-600 md:col-span-2">Após criar a pessoa, configure seus setores na lista abaixo.</p>}
       <Campo
         rotulo="Senha (opcional)"
         name="senha"
@@ -73,6 +75,7 @@ export type MembroLinha = {
   perfilGamificacao: PerfilGamificacao | null;
   recebeLeads: boolean;
   status: StatusMembro;
+  setores: { setor: string; capacidade: string }[] | null;
 };
 
 export function LinhaMembro({ membro }: { membro: MembroLinha }) {
@@ -107,7 +110,8 @@ export function LinhaMembro({ membro }: { membro: MembroLinha }) {
   }
 
   return (
-    <form action={acao} className="flex flex-col gap-2 border-t border-zinc-100 py-3 md:flex-row md:items-center">
+    <div className="border-t border-zinc-100 py-3">
+    <form action={acao} className="flex flex-col gap-2 md:flex-row md:items-center">
       <input type="hidden" name="membroId" value={membro.id} />
       <div className="min-w-0 flex-1">
         <p className="truncate font-medium text-zinc-900">{membro.nome || "(sem nome)"}</p>
@@ -133,7 +137,7 @@ export function LinhaMembro({ membro }: { membro: MembroLinha }) {
         ))}
       </Selecao>
       {papel !== "vendedor" && <input type="hidden" name="tipo_vendedor" value="interno" />}
-      <Selecao name="perfil_gamificacao" defaultValue={membro.perfilGamificacao ?? ""} aria-label="Perfil de gamificação">
+      <Selecao name="perfil_gamificacao" defaultValue={membro.perfilGamificacao ?? ""} disabled={papel === "operacao"} aria-label="Perfil de gamificação">
         <option value="">Sem perfil (fora do ranking)</option>
         {PERFIS_GAMIFICACAO.map((p) => (
           <option key={p} value={p}>
@@ -142,7 +146,7 @@ export function LinhaMembro({ membro }: { membro: MembroLinha }) {
         ))}
       </Selecao>
       <label className="flex items-center gap-1 text-sm text-zinc-700">
-        <input type="checkbox" name="recebe_leads" defaultChecked={membro.recebeLeads} /> Recebe leads
+        <input type="checkbox" name="recebe_leads" defaultChecked={membro.recebeLeads} disabled={papel === "operacao"} /> Recebe leads
       </label>
       <Selecao name="status" value={status} onChange={(e) => onStatusChange(e.target.value as StatusMembro)} aria-label="Status">
         {STATUS_MEMBRO.map((s) => (
@@ -155,6 +159,44 @@ export function LinhaMembro({ membro }: { membro: MembroLinha }) {
         {carregandoCarteira ? "Verificando carteira..." : "Salvar"}
       </Botao>
       {resultado && !resultado.ok && <Mensagem resultado={resultado} />}
+    </form>
+    {papel === "operacao" && !(membro.papel === "operacao") && (
+      <p className="mt-2 text-sm text-zinc-600">Ao salvar, a pessoa deixará de acessar o comercial e a gamificação. Confira sua carteira antes de alterar o perfil.</p>
+    )}
+    {membro.papel === "operacao" && membro.status === "ativo" && papel === "operacao" && status === "ativo" && membro.setores && (
+      <SetoresMembro key={membro.id} membroId={membro.id} setores={membro.setores} />
+    )}
+    {membro.papel === "operacao" && (!(papel === "operacao") || status !== "ativo") && (
+      <p className="mt-2 text-sm text-zinc-600">Ao salvar esta alteração, os setores e as participações operacionais serão removidos.</p>
+    )}
+    {membro.papel === "operacao" && membro.status !== "ativo" && (
+      <p className="mt-2 text-sm text-zinc-600">Para configurar setores, ative este usuário e salve. A desativação remove os setores e participações nas obras.</p>
+    )}
+    </div>
+  );
+}
+
+function SetoresMembro({ membroId, setores }: { membroId: string; setores: NonNullable<MembroLinha["setores"]> }) {
+  const [resultado, acao, pendente] = useActionState(salvarSetoresMembro, null);
+  return (
+    <form action={acao} className="mt-3 rounded-lg border border-zinc-200 p-3">
+      <input type="hidden" name="membroId" value={membroId} />
+      <p className="text-sm font-medium text-zinc-900">Setores de Obras</p>
+      <p className="mt-1 text-xs text-zinc-600">Quem executa altera o próprio setor nas obras em que participa. Quem coordena vê todas as obras e pode gerir participantes do setor. A pessoa pode consultar o andamento de outros setores na mesma obra, sem poder alterá-los.</p>
+      <div className="mt-3 grid gap-3 md:grid-cols-3">
+        {SETORES_OBRA.map((setor) => (
+          <Selecao key={setor} rotulo={ROTULO_SETOR[setor]} name={setor} defaultValue={setores.find((s) => s.setor === setor)?.capacidade ?? "sem_acesso"}>
+            <option value="sem_acesso">Não atua no setor</option>
+            <option value="executar">Executar</option>
+            <option value="coordenar">Coordenar</option>
+          </Selecao>
+        ))}
+      </div>
+      <p className="mt-2 text-xs text-zinc-600">Ao remover um setor, as participações da pessoa nesse setor são encerradas.</p>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <Botao type="submit" variante="secundario" disabled={pendente}>{pendente ? "Salvando..." : "Salvar setores"}</Botao>
+        <Mensagem resultado={resultado} />
+      </div>
     </form>
   );
 }

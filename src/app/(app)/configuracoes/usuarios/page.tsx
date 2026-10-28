@@ -8,11 +8,14 @@ export default async function Usuarios() {
   const { atual } = await exigirPapel("admin");
   const supabase = await criarClienteServidor();
 
-  const { data } = await supabase
-    .from("empresa_membros")
-    .select("id, papel, tipo_vendedor, perfil_gamificacao, recebe_leads, status, perfis(nome, email)")
-    .eq("empresa_id", atual.empresaId)
-    .order("created_at");
+  const [{ data }, { data: setores, error: erroSetores }] = await Promise.all([
+    supabase
+      .from("empresa_membros")
+      .select("id, papel, tipo_vendedor, perfil_gamificacao, recebe_leads, status, perfis(nome, email)")
+      .eq("empresa_id", atual.empresaId)
+      .order("created_at"),
+    supabase.from("membro_setores_obra").select("membro_id, setor, capacidade").eq("empresa_id", atual.empresaId),
+  ]);
 
   const membros: MembroLinha[] = (data ?? []).map((m) => {
     const perfil = m.perfis as unknown as { nome: string; email: string } | null;
@@ -25,6 +28,7 @@ export default async function Usuarios() {
       perfilGamificacao: m.perfil_gamificacao as PerfilGamificacao | null,
       recebeLeads: m.recebe_leads,
       status: m.status as StatusMembro,
+      setores: erroSetores ? null : (setores ?? []).filter((s) => s.membro_id === m.id),
     };
   });
 
@@ -39,6 +43,7 @@ export default async function Usuarios() {
         <p id="perfil-gamificacao" className="scroll-mt-4 text-sm text-zinc-600">
           O perfil de gamificação (SDR/Closer/CS Farmer) de cada pessoa é definido abaixo, junto com o restante do cadastro.
         </p>
+        {erroSetores && <p role="alert" className="text-sm text-red-700">Não foi possível carregar os setores. Atualize a página para tentar novamente.</p>}
         {membros.map((m) => (
           <LinhaMembro key={m.id} membro={m} />
         ))}

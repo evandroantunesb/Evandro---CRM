@@ -85,9 +85,13 @@ export async function abrirAba(page: Page, aba: AbaFicha) {
   await expect(link).toHaveAttribute("aria-current", "page");
 }
 
-/** Abre um cartão recolhível da ficha pelo título (ex.: "Dados do negócio"), se ele estiver fechado. */
+/** Confirma o cartão da ficha pelo título e o abre quando este papel o vê recolhido. */
 export async function abrirCartao(page: Page, titulo: string) {
-  const cartao = page.locator("details").filter({ has: page.getByRole("heading", { name: titulo, exact: true }) }).first();
+  const tituloCartao = page.getByRole("heading", { name: titulo, exact: true }).first();
+  await expect(tituloCartao).toBeVisible();
+  const cartao = page.locator("details").filter({ has: tituloCartao }).first();
+  // Alguns cartões são sempre visíveis para este papel; só o cartão recolhível precisa ser aberto.
+  if (await cartao.count() === 0) return;
   if (!(await cartao.evaluate((d) => (d as HTMLDetailsElement).open))) await cartao.locator("summary").first().click();
   await expect(cartao).toHaveAttribute("open", "");
 }
