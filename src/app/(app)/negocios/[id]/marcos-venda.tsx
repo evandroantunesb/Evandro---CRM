@@ -9,18 +9,37 @@ const ICONE: Record<EstadoMarco, { conteudo: ReactNode; classe: string }> = {
   bloqueado: { conteudo: <span className="h-1.5 w-1.5 rounded-full bg-current" />, classe: "bg-superficie-2 text-texto-2" },
 };
 
-/** Próximo passo da jornada: texto do link para o primeiro marco pendente que tem onde agir. */
+/** Próximo passo da jornada: texto do botão para o primeiro marco pendente que tem onde agir. */
 const PROXIMO_PASSO: Record<string, string> = {
   "#proposta": "Gerar proposta",
   "#contrato": "Ir ao contrato",
   "#pagamento": "Ir ao pagamento",
 };
 
+function etapasDaJornada(marcos: Marcos, proposta: Marco | null, soVenda: boolean) {
+  return (soVenda ? [proposta, marcos.venda] : [proposta, marcos.venda, marcos.contrato, marcos.pagamento]).filter(
+    (m): m is Marco => m != null,
+  );
+}
+
 /**
- * Jornada da venda: Proposta (quando informada) e os 3 marcos do fechamento. Só leitura: nenhuma ação
- * de escrita aqui. A ação do marco "Venda ganha" é o componente `Fechamento`, recebido como `children`;
- * os demais marcos só apontam para os cartões que já existem na ficha. `hrefBase` é prefixado às
- * âncoras (ex.: a aba da ficha onde ficam proposta, contrato e pagamento).
+ * Âncora do próximo passo (ex.: "#proposta"), ou null quando não há o que sugerir (negócio perdido não tem).
+ * A página usa isto para decidir se "Marcar como ganho" é a ação principal da barra ou fica no menu:
+ * a barra nunca mostra dois botões principais.
+ */
+export function proximoPassoDaVenda(marcos: Marcos, proposta: Marco | null = null, soVenda = false): string | null {
+  if (marcos.progresso === null) return null;
+  // Venda ainda aberta depois da proposta: o próximo passo é marcar o ganho (a ação de fechamento), não o contrato.
+  const marco = etapasDaJornada(marcos, proposta, soVenda).find(
+    (m) => m.estado === "pendente" && (m === marcos.venda || (m.ancora && PROXIMO_PASSO[m.ancora])),
+  );
+  return marco && marco !== marcos.venda ? marco.ancora : null;
+}
+
+/**
+ * Barra da venda: os passos da jornada (Proposta, quando informada, e os 3 marcos do fechamento) numa linha
+ * e, ao lado, uma única ação principal: o próximo passo ou a ação de fechamento (`children`, o `Fechamento`).
+ * Só leitura: os passos apontam para os cartões que já existem na ficha. `hrefBase` é prefixado às âncoras.
  */
 export function MarcosVenda({
   marcos,
@@ -38,41 +57,34 @@ export function MarcosVenda({
   /** Situação da proposta (fora dos marcos do fechamento), quando quem vê pode emitir proposta. */
   proposta?: Marco | null;
   hrefBase?: string;
-  /** A ação de fechamento (componente `Fechamento`), mostrada no marco "Venda ganha". */
+  /** A ação de fechamento (componente `Fechamento`), ao lado do próximo passo. */
   children?: ReactNode;
 }) {
-  const etapas = (soVenda ? [proposta, marcos.venda] : [proposta, marcos.venda, marcos.contrato, marcos.pagamento]).filter(
-    (m): m is Marco => m != null,
-  );
+  const etapas = etapasDaJornada(marcos, proposta, soVenda);
   // O contador "x de 3 marcos" só vale para a jornada completa.
   const progresso = soVenda ? null : marcos.progresso;
-  // Negócio perdido (sem contador de progresso): não há próximo passo a sugerir.
-  const proximo =
-    marcos.progresso === null ? undefined : etapas.find((m) => m.estado === "pendente" && m.ancora && PROXIMO_PASSO[m.ancora]);
+  const proximo = proximoPassoDaVenda(marcos, proposta, soVenda);
   return (
     <div className="flex flex-col gap-4">
-      {proximo?.ancora && (
-        <Link
-          href={`${hrefBase}${proximo.ancora}`}
-          className="group flex min-h-12 items-center justify-between gap-3 rounded-xl bg-dourado/10 px-4 py-2.5 text-sm transition-colors hover:bg-dourado/15"
-        >
-          <span className="min-w-0">
-            <span className="sobretitulo block text-[10px]">Próximo passo</span>
-            <span className="block font-semibold text-texto">{PROXIMO_PASSO[proximo.ancora]}</span>
-          </span>
-          <ArrowRight size={18} aria-hidden className="shrink-0 text-dourado-texto transition-transform duration-200 ease-raion group-hover:translate-x-0.5" />
-        </Link>
-      )}
-      <ol
-        className={`grid grid-cols-2 gap-x-3 gap-y-5 ${etapas.length === 4 ? "md:grid-cols-4" : etapas.length === 3 ? "md:grid-cols-3" : ""}`}
-      >
-        {etapas.map((m) => (
-          <ItemMarco key={m.titulo} marco={m} hrefBase={hrefBase} />
-        ))}
-      </ol>
-      {/* Ação de fechamento fora da grade dos marcos: a coluna estreita de um marco não dá espaço
-          suficiente para os botões de ganho/perda nem para os formulários de perda/reabertura. */}
-      {children && <div className="border-t border-linha pt-4">{children}</div>}
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between lg:gap-8">
+        <ol className="flex min-w-0 flex-1 items-start">
+          {etapas.map((m, i) => (
+            <ItemMarco key={m.titulo} marco={m} hrefBase={hrefBase} ultimo={i === etapas.length - 1} />
+          ))}
+        </ol>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {proximo && (
+            <Link
+              href={`${hrefBase}${proximo}`}
+              className="group inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-full bg-acao px-5 text-sm font-semibold text-sobre-acao transition-colors hover:bg-acao-forte sm:flex-none md:min-h-10"
+            >
+              {PROXIMO_PASSO[proximo]}
+              <ArrowRight size={16} aria-hidden className="transition-transform duration-200 ease-raion group-hover:translate-x-0.5" />
+            </Link>
+          )}
+          {children}
+        </div>
+      </div>
       {(progresso || obra) && (
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-linha pt-3 text-sm">
           {progresso && (
@@ -91,28 +103,26 @@ export function MarcosVenda({
   );
 }
 
-function ItemMarco({ marco, hrefBase, children }: { marco: Marco; hrefBase: string; children?: ReactNode }) {
+function ItemMarco({ marco, hrefBase, ultimo }: { marco: Marco; hrefBase: string; ultimo: boolean }) {
   const icone = ICONE[marco.estado];
+  const titulo = <span className="text-xs font-semibold text-texto md:text-sm">{marco.titulo}</span>;
   return (
-    <li className="flex min-w-0 flex-col gap-2" data-marco-estado={marco.estado}>
-      <span aria-hidden className={`flex size-7 shrink-0 items-center justify-center rounded-full ${icone.classe}`}>
+    <li className="relative flex min-w-0 flex-1 flex-col items-center gap-1.5 px-1 text-center" data-marco-estado={marco.estado}>
+      {/* Traço até o próximo passo: verde quando este já foi cumprido. */}
+      {!ultimo && (
+        <span aria-hidden className={`absolute top-3.5 left-1/2 h-0.5 w-full ${marco.estado === "cumprido" ? "bg-energia" : "bg-linha"}`} />
+      )}
+      <span aria-hidden className={`relative flex size-7 shrink-0 items-center justify-center rounded-full ${icone.classe}`}>
         {icone.conteudo}
       </span>
-      <div className="flex min-w-0 flex-col gap-1">
-        <p className="text-sm font-semibold text-texto">{marco.titulo}</p>
-        <p className="text-sm text-texto-2">
-          {marco.rotulo}
-          {marco.ancora && (
-            <>
-              {" · "}
-              <Link href={`${hrefBase}${marco.ancora}`} className="text-dourado-texto underline-offset-2 hover:underline">
-                Ver
-              </Link>
-            </>
-          )}
-        </p>
-        {children}
-      </div>
+      {marco.ancora ? (
+        <Link href={`${hrefBase}${marco.ancora}`} className="underline-offset-2 hover:underline">
+          {titulo}
+        </Link>
+      ) : (
+        titulo
+      )}
+      <span className="line-clamp-2 text-[11px] leading-tight text-texto-2 md:text-xs">{marco.rotulo}</span>
     </li>
   );
 }

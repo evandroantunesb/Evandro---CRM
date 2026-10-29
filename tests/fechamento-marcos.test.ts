@@ -14,7 +14,7 @@ import { describe, expect, it, vi } from "vitest";
 // (A action em si não mudou nesta PR; os testes de integração cobrem o servidor.)
 vi.mock("@/lib/acoes/negocios", () => ({ alterarStatus: vi.fn(async () => null) }));
 import { AvisoReabertura, Fechamento } from "@/app/(app)/negocios/[id]/fechamento";
-import { MarcosVenda } from "@/app/(app)/negocios/[id]/marcos-venda";
+import { MarcosVenda, proximoPassoDaVenda } from "@/app/(app)/negocios/[id]/marcos-venda";
 import { PROPOSTA_E_CONTRATO, pode } from "@/lib/permissoes";
 import type { Papel, StatusPagamentoContrato } from "@/lib/tipos";
 import {
@@ -192,6 +192,40 @@ describe("MarcosVenda (renderização, só leitura)", () => {
     expect(h).toContain("Perdido");
     expect(h).not.toContain("marcos concluídos");
     expect(h).not.toMatch(/faltam/i);
+  });
+});
+
+describe("barra da venda: uma única ação principal", () => {
+  const proposta = (estado: "pendente" | "cumprido") => ({ titulo: "Proposta", estado, rotulo: "", ancora: "#proposta" });
+
+  it("proposta ainda não gerada: o próximo passo é gerar a proposta", () => {
+    const m = marcosDaVenda({ negocio: "aberto", contrato: "nao_gerado", pagamento: null });
+    expect(proximoPassoDaVenda(m, proposta("pendente"))).toBe("#proposta");
+  });
+
+  it("proposta feita e venda aberta: sem link em destaque (a ação principal é marcar o ganho)", () => {
+    const m = marcosDaVenda({ negocio: "aberto", contrato: "nao_gerado", pagamento: null });
+    expect(proximoPassoDaVenda(m, proposta("cumprido"))).toBeNull();
+    expect(proximoPassoDaVenda(m)).toBeNull();
+  });
+
+  it("venda ganha: o próximo passo é o contrato", () => {
+    const m = marcosDaVenda({ negocio: "ganho", contrato: "nao_gerado", pagamento: null });
+    expect(proximoPassoDaVenda(m, proposta("cumprido"))).toBe("#contrato");
+  });
+
+  it("negócio perdido: nada a sugerir", () => {
+    const m = marcosDaVenda({ negocio: "perdido", contrato: "nao_gerado", pagamento: null });
+    expect(proximoPassoDaVenda(m, proposta("pendente"))).toBeNull();
+  });
+
+  it("negócio aberto: com próximo passo em destaque, ganho e perda ficam no menu 'Fechar negócio'", () => {
+    const secundario = renderToStaticMarkup(createElement(Fechamento, { negocioId: "n1", status: "aberto", motivos: [], principal: false }));
+    expect(secundario).toContain("Fechar negócio");
+    expect(secundario).toMatch(/role="menuitem"[^>]*>Marcar como ganho</);
+    expect(secundario).not.toContain("bg-acao");
+    const principal = renderToStaticMarkup(createElement(Fechamento, { negocioId: "n1", status: "aberto", motivos: [] }));
+    expect(principal).toMatch(/bg-acao[^>]*>.*Marcar como ganho/);
   });
 });
 

@@ -58,7 +58,7 @@ import { RegistrarArquivo } from "./registrar-arquivo";
 import { FeedbackHandoff } from "./feedback-handoff";
 import { HandoffAceite } from "./handoff-aceite";
 import { KitPersonalizado, type CalculoHistorico } from "./kit-personalizado";
-import { MarcosVenda } from "./marcos-venda";
+import { MarcosVenda, proximoPassoDaVenda } from "./marcos-venda";
 import { NovaNota } from "./nova-nota";
 import { Pagamento } from "./pagamento";
 import { PagamentoSolo, type SituacaoRegistro } from "./pagamento-solo";
@@ -342,15 +342,6 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
     pagamento: (statusPagamento as StatusPagamentoContrato | null) ?? null,
     registro: mostrarPagamentoSolo ? { ativo: registroPagamentoAtivo, disponivel: situacaoPagamentoSolo === "permitido" } : undefined,
   });
-  // Única ação de escrita do cartão (ganho/perdido/reabrir).
-  const fechamento = (
-    <Fechamento
-      negocioId={negocio.id}
-      status={negocio.status}
-      motivos={config.motivos.filter((m) => m.ativo || m.id === negocio.motivo_perda_id)}
-      somenteLeitura={atual.papel === "sdr" || arquivado}
-    />
-  );
 
   const contato = negocio.contatos as unknown as {
     id: string;
@@ -422,6 +413,17 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
           : "Ainda não gerada",
     ancora: "#proposta",
   };
+  // Única ação de escrita do cartão (ganho/perdido/reabrir). Com um próximo passo em destaque na barra,
+  // "Marcar como ganho" vai para o menu: nunca há dois botões principais.
+  const fechamento = (
+    <Fechamento
+      negocioId={negocio.id}
+      status={negocio.status}
+      motivos={config.motivos.filter((m) => m.ativo || m.id === negocio.motivo_perda_id)}
+      somenteLeitura={atual.papel === "sdr" || arquivado}
+      principal={cartao.tipo !== "marcos" || !proximoPassoDaVenda(cartao.marcos, marcoProposta, ehEletroposto)}
+    />
+  );
 
   // Uma única instância (tem ações de escrita); a página a põe no topo ou no fim da Visão geral.
   const arquivamento = (
