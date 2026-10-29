@@ -4,7 +4,7 @@ import { Cartao, Selo } from "@/components/ui";
 import { agruparObrasEngenharia } from "@/lib/engenharia-regras";
 import { carregarObras } from "@/lib/obras/dados";
 import { ROTULO_ESTADO_SETOR, rotuloAguardando, rotuloStatus } from "@/lib/obras/rotulos";
-import { ENGENHARIA, OBRAS, pode } from "@/lib/permissoes";
+import { ENGENHARIA } from "@/lib/permissoes";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { carregarTarefasSetor, contarAbasTarefasSetor } from "@/lib/tarefas-setor";
@@ -58,7 +58,6 @@ export default async function Engenharia({ searchParams }: PageProps<"/engenhari
   const grupos = agruparObrasEngenharia(obras, (s) => rotuloStatus("engenharia", s));
   const totalObras = grupos.reduce((n, g) => n + g.obras.length, 0);
   const atrasadas = tarefas.filter((t) => t.atrasada).length;
-  const verObra = pode(atual.papel, OBRAS);
 
   return (
     <div className="mx-auto flex max-w-[1100px] flex-col gap-4">
@@ -101,7 +100,7 @@ export default async function Engenharia({ searchParams }: PageProps<"/engenhari
         {totalObras === 0 ? (
           <p className="text-sm text-zinc-500">Nenhuma obra em andamento na Engenharia.</p>
         ) : (
-          <div className="flex flex-col gap-5">
+          <div role="region" aria-label="Carteira por etapa" className="flex flex-col gap-5">
             {grupos
               .filter((g) => g.obras.length > 0)
               .map((g) => (
@@ -114,13 +113,9 @@ export default async function Engenharia({ searchParams }: PageProps<"/engenhari
                       <li key={o.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm">
                         <div className="min-w-0">
                           <p className="truncate font-medium text-texto">
-                            {verObra ? (
-                              <Link href={`/obras/${o.id}`} className="hover:underline">
-                                Obra #{o.numero} · {o.clienteNome}
-                              </Link>
-                            ) : (
-                              `Obra #${o.numero} · ${o.clienteNome}`
-                            )}
+                            <Link href={`/engenharia/${o.id}`} className="hover:underline">
+                              Obra #{o.numero} · {o.clienteNome}
+                            </Link>
                           </p>
                           <p className="text-xs text-zinc-500">
                             {o.cidadeUf}

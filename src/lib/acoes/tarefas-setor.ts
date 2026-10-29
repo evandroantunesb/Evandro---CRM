@@ -27,7 +27,10 @@ function revalidar({ obraId, negocioId }: z.infer<typeof vinculo>) {
   revalidatePath("/tarefas/setores");
   revalidatePath("/engenharia");
   revalidatePath("/inicio");
-  if (obraId) revalidatePath(`/obras/${obraId}`);
+  if (obraId) {
+    revalidatePath(`/obras/${obraId}`);
+    revalidatePath(`/engenharia/${obraId}`);
+  }
   if (negocioId) revalidatePath(`/negocios/${negocioId}`);
 }
 

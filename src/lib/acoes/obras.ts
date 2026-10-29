@@ -25,6 +25,7 @@ const motivo = z.string().trim().max(MAX_MOTIVO, "Motivo muito longo.");
 
 function concluir(obraId: string, mensagem: string): ResultadoAcao {
   revalidatePath(`/obras/${obraId}`);
+  revalidatePath(`/engenharia/${obraId}`);
   revalidatePath("/obras");
   return { ok: true, mensagem };
 }
