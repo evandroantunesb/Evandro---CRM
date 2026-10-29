@@ -1,5 +1,23 @@
 # Estado do projeto — Raion CRM
 
+## Engenharia em Obras — P1, P1.5 e P1.6 integradas em 2026-10-29
+
+`main` em `ba2ef0e`. Sem migration: nada a aplicar em produção.
+
+| PR | O que entrou |
+| --- | --- |
+| #253 | Tela **Engenharia** (`/engenharia`, menu Operação; lista `ENGENHARIA` = admin, gestor, operação que atua no setor). Operação sem Engenharia vê aviso e recebe 404 no card |
+| #254 | **Card da obra** para o engenheiro (`/engenharia/[id]`): etapa e gestão do setor, tarefas de Engenharia, dados técnicos com fixação, dados do cliente que a RLS libera, histórico do setor. Blocos do detalhe da obra extraídos para `src/components/obras/detalhe-obra.tsx` |
+| #255 | **Central** (abre em `/engenharia`; abas de tarefas em `?ver=`): indicadores; "Precisa de você" (minhas tarefas e as da fila que posso assumir; obras em que sou responsável principal; para admin/coordenador, obra sem responsável → "Definir responsável"); "Aguardando terceiros"; carteira por etapa com tempo na etapa. `carregarObras` passa a ler `status_desde`/`aguardando_desde` e marca `souPrincipal` sem expor id de membro |
+
+**Decisões do Evandro (29/10):** rota própria `/engenharia` (a spec v1.3 sugere "Obras → Minha Engenharia"); obra em `enviado_concessionaria` ou `aguardando_vistoria` conta como aguardando terceiros mesmo sem a marcação; textos da próxima ação por etapa em `PROXIMA_ACAO_ENGENHARIA` (`src/lib/engenharia-regras.ts`); obra sem responsável aparece como "Definir responsável" antes de "aguardando".
+
+**Especificação vigente:** `RAION_OBRAS_ENGENHARIA_COPEL_V1_3_CENTRAL_TRABALHO.md` (v1.3, 29/10, fora do repositório): central diária, fluxo guiado de 8 passos na obra, Kanban de carteira opcional e sem arrastar para aprovar, checklist condicional Copel com selo de confiabilidade, nenhum prazo regulatório sem marco comprovado.
+
+**E2E:** `e2e/18-engenharia-card.spec.ts` escolhe a primeira obra da "Carteira por etapa", porque o 03 troca o responsável da o01 antes dele na suíte completa.
+
+**Próximo (aguarda comando):** P2 checklist e documentos versionados (migration + RLS + Storage, Opus). Faltam as respostas da seção 29 da spec (documentos e formulários por faixa, ART, ambiental, quem dispensa item, segundo revisor, quem registra a vistoria).
+
 ## Entregas de 2026-10-29 — dados do cliente, sigilo na obra e tarefas dos setores
 
 `main` em `fdd7c2e`. Todas as migrations abaixo foram aplicadas em produção pelo `banco-producao.yml` (conferir + aplicar, aprovados pelo Evandro), antes do merge de cada PR; **produção e `main` alinhadas** (última `20261029235000_tarefas_setor_notificacoes.sql`).
@@ -20,7 +38,7 @@
 
 **Próximos passos (aguardam comando do Evandro):**
 1. **T3 — tarefas automáticas:** regra por empresa disparada pelo status do setor na obra (ex.: Operacional `instalacao_concluida` → Engenharia "Cadastro do cliente no app e pedido de vistoria"; Compras `faturado_fornecedor` → Operacional "Agendar instalação com o cliente"), uma vez por obra e regra.
-2. **Engenharia em Obras:** especificação recebida (`RAION_OBRAS_ENGENHARIA_FLUXOGRAMA_TELAS_DASHBOARD.md`, v1.0, 29/10, não está no repositório). Análise feita: base de Obras, setores, participantes, histórico, dados técnicos e tarefas já existem; faltam fila "Minha Engenharia", checklist/documentos versionados, protocolos/exigências, vistoria/conexão, KPIs no servidor (hoje a lista lê até `LIMITE_OBRAS = 500`) e prazos. Ordem sugerida: P1 "Minha Engenharia" sem migration → P2 checklist e documentos (Opus) → P3 protocolos → P4 vistoria → P5 indicadores. **Aguardando o engenheiro** listar documentos Copel por tipo de projeto, ART, protocolo, exigências comuns, orçamento de conexão, vistoria e prazos (Copel/ANEEL × internos), e decidir: quem dispensa item do checklist, segundo revisor e quem registra/confirma a vistoria. Pendências e agenda da Engenharia devem reutilizar `tarefas_setor`, não criar outra lista.
+2. **Engenharia em Obras:** P1 a P1.6 entregues (seção acima). Análise original (v1.0): base de Obras, setores, participantes, histórico, dados técnicos e tarefas já existem; faltam fila "Minha Engenharia", checklist/documentos versionados, protocolos/exigências, vistoria/conexão, KPIs no servidor (hoje a lista lê até `LIMITE_OBRAS = 500`) e prazos. Ordem sugerida: P1 "Minha Engenharia" sem migration → P2 checklist e documentos (Opus) → P3 protocolos → P4 vistoria → P5 indicadores. **Aguardando o engenheiro** listar documentos Copel por tipo de projeto, ART, protocolo, exigências comuns, orçamento de conexão, vistoria e prazos (Copel/ANEEL × internos), e decidir: quem dispensa item do checklist, segundo revisor e quem registra/confirma a vistoria. Pendências e agenda da Engenharia devem reutilizar `tarefas_setor`, não criar outra lista.
 3. CNH com preenchimento automático dos dados do cliente (3b); endereço estruturado na ficha do contato (junto da #239).
 4. PRs #234 e #239 precisam de rebase na `main`.
 
