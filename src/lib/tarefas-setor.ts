@@ -63,9 +63,13 @@ export async function carregarTarefasSetor(
     supabase.from("membro_setores_obra").select("setor, capacidade").eq("empresa_id", empresaId).eq("membro_id", membroId),
   ]);
   const tarefas = (linhas ?? []).filter((t) => (SETORES_TAREFA as readonly string[]).includes(t.setor));
-  const { data: contextos } = tarefas.length
-    ? await supabase.rpc("contexto_tarefas_setor", { p_ids: tarefas.map((t) => t.id) })
-    : { data: [] };
+  const ids = tarefas.map((t) => t.id);
+  const [{ data: contextos }, { data: anexos }] = ids.length
+    ? await Promise.all([
+        supabase.rpc("contexto_tarefas_setor", { p_ids: ids }),
+        supabase.from("tarefas_setor_anexos").select("id, tarefa_id, nome, enviado_por").in("tarefa_id", ids).order("created_at"),
+      ])
+    : [{ data: [] }, { data: [] }];
 
   const nomes = new Map((identidades ?? []).map((m) => [m.membro_id, m.nome]));
   const contexto = new Map((contextos ?? []).map((c) => [c.tarefa_id, c]));
@@ -122,6 +126,16 @@ export async function carregarTarefasSetor(
         podeAtribuir: status === "aberta" && coordena,
         podeCancelar: status === "aberta" && (pedi || coordena),
         podeReabrir: status === "concluida" && (admin || atuaNoSetor || pedi),
+        podeAnexar: status === "aberta",
+        pastaAnexos: `${empresaId}/${t.id}`,
+        anexos: (anexos ?? [])
+          .filter((a) => a.tarefa_id === t.id)
+          .map((a) => ({
+            id: a.id,
+            nome: a.nome,
+            enviadoPor: a.enviado_por ? (nomes.get(a.enviado_por) ?? null) : null,
+            podeRemover: status === "aberta" && (admin || a.enviado_por === membroId),
+          })),
       };
     }),
   };

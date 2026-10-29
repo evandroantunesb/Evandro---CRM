@@ -232,13 +232,12 @@ jobs:
       # Trava fail-closed: o conjunto do dry-run acima precisa ser exatamente o autorizado, senão o
       # job termina aqui, antes da aplicação. Sem credenciais. Para autorizar outro conjunto, a lista
       # abaixo muda por commit revisado (e uma nova tag), nunca por entrada do operador.
-      # Tarefas de setor: tabelas tarefas_setor e tarefas_setor_historico (escrita só por RPC), RPCs de criar,
-      # assumir, atribuir, concluir, reabrir e cancelar e o contexto mínimo para a Operação; os dados do cliente
-      # para o contrato (#248) já têm de estar aplicados.
+      # Anexos das tarefas de setor: tabela tarefas_setor_anexos (registro só por RPC), bucket privado
+      # tarefas-setor e as políticas do Storage; as tarefas de setor (#249) já têm de estar aplicadas.
       - name: Conferir que o conjunto pendente é exatamente o autorizado
         env:
           MIGRATIONS_AUTORIZADAS: |
-                        20261029210000_tarefas_setor.sql
+                        20261029230000_tarefas_setor_anexos.sql
         run: bash .github/scripts/validar-conjunto-migrations.sh "$RUNNER_TEMP/dry-run.txt"
       - name: Aplicar (supabase db push --include-all)
         env:

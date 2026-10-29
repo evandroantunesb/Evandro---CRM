@@ -5,8 +5,9 @@ import { z } from "zod";
 import { mensagemErro } from "@/lib/erros";
 import { TAREFAS_SETOR } from "@/lib/permissoes";
 import { exigirPapel } from "@/lib/sessao";
+import { criarClienteAdmin } from "@/lib/supabase/admin";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { SETORES_TAREFA } from "@/lib/tarefas-setor-regras";
+import { BUCKET_ANEXOS_TAREFA, SETORES_TAREFA } from "@/lib/tarefas-setor-regras";
 import type { ResultadoAcao } from "@/lib/tipos";
 
 /**
@@ -36,14 +37,17 @@ const esquemaCriar = vinculo.extend({
   prazo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Informe o prazo."),
 });
 
-export async function criarTarefaSetor(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  await exigirPapel(...TAREFAS_SETOR);
+/** Resultado da criação: a pasta da tarefa no Storage, para o navegador enviar os anexos escolhidos. */
+export type ResultadoCriarTarefa = { ok: boolean; mensagem: string; pastaAnexos?: string } | null;
+
+export async function criarTarefaSetor(_: ResultadoCriarTarefa, formData: FormData): Promise<ResultadoCriarTarefa> {
+  const { atual } = await exigirPapel(...TAREFAS_SETOR);
   const dados = esquemaCriar.safeParse(Object.fromEntries(formData));
   if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
   const d = dados.data;
   if (!d.obraId === !d.negocioId) return { ok: false, mensagem: "Tarefa sem obra ou negócio." };
   const supabase = await criarClienteServidor();
-  const { error } = await supabase.rpc("criar_tarefa_setor", {
+  const { data: tarefaId, error } = await supabase.rpc("criar_tarefa_setor", {
     p_setor: d.setor,
     p_titulo: d.titulo,
     p_prazo: d.prazo,
@@ -52,7 +56,42 @@ export async function criarTarefaSetor(_: ResultadoAcao, formData: FormData): Pr
   });
   if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível criar a tarefa.") };
   revalidar(d);
-  return { ok: true, mensagem: "Tarefa enviada ao setor." };
+  return { ok: true, mensagem: "Tarefa enviada ao setor.", pastaAnexos: `${atual.empresaId}/${tarefaId}` };
+}
+
+/**
+ * Registra um arquivo que o navegador já enviou à pasta da tarefa. A RPC confere tudo de novo: a tarefa aberta e
+ * visível, o objeto no Storage enviado por quem chama; tamanho e tipo vêm do Storage.
+ */
+export async function registrarAnexoTarefaSetor(dados: {
+  caminho: string;
+  nome: string;
+  obraId?: string | null;
+  negocioId?: string | null;
+}): Promise<ResultadoAcao> {
+  await exigirPapel(...TAREFAS_SETOR);
+  const d = vinculo
+    .extend({ caminho: z.string().min(1).max(400), nome: z.string().trim().min(1).max(200) })
+    .safeParse({ ...dados, obraId: dados.obraId ?? undefined, negocioId: dados.negocioId ?? undefined });
+  if (!d.success) return { ok: false, mensagem: "Dados do arquivo inválidos." };
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.rpc("registrar_anexo_tarefa_setor", { p_caminho: d.data.caminho, p_nome: d.data.nome });
+  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível registrar o arquivo.") };
+  revalidar(d.data);
+  return { ok: true, mensagem: "Arquivo anexado." };
+}
+
+/** Remove um anexo: o banco decide (quem enviou ou o admin, tarefa aberta); só então o arquivo sai do Storage. */
+export async function removerAnexoTarefaSetor(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  await exigirPapel(...TAREFAS_SETOR);
+  const d = vinculo.extend({ anexoId: z.string().uuid() }).safeParse(Object.fromEntries(formData));
+  if (!d.success) return { ok: false, mensagem: "Arquivo inválido." };
+  const supabase = await criarClienteServidor();
+  const { data: caminho, error } = await supabase.rpc("remover_anexo_tarefa_setor", { p_anexo_id: d.data.anexoId });
+  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível remover o arquivo.") };
+  if (caminho) await criarClienteAdmin().storage.from(BUCKET_ANEXOS_TAREFA).remove([caminho]);
+  revalidar(d.data);
+  return { ok: true, mensagem: "Arquivo removido." };
 }
 
 const esquemaTarefa = vinculo.extend({ tarefaId: z.string().uuid() });
