@@ -293,7 +293,18 @@ function RemoverAnexo({ tarefa, anexoId, nome }: { tarefa: TarefaSetorVM; anexoI
 }
 
 /** Pedir uma tarefa a um setor, na obra ou no negócio. Prazo sugerido: 2 dias úteis. Os anexos sobem depois de criada. */
-export function NovaTarefaSetor({ obraId, negocioId, exemplo }: { obraId?: string; negocioId?: string; exemplo: string }) {
+export function NovaTarefaSetor({
+  obraId,
+  negocioId,
+  exemplo,
+  setorPadrao,
+}: {
+  obraId?: string;
+  negocioId?: string;
+  exemplo: string;
+  /** Setor já escolhido ao abrir o formulário (tela de um setor). */
+  setorPadrao?: SetorTarefa;
+}) {
   const router = useRouter();
   const [arquivos, setArquivos] = useState<File[]>([]);
   // Cria a tarefa e, com ela criada, envia os arquivos escolhidos; "Enviando..." cobre as duas etapas.
@@ -325,7 +336,7 @@ export function NovaTarefaSetor({ obraId, negocioId, exemplo }: { obraId?: strin
       <div className="flex flex-wrap items-end gap-2">
         <label className="flex flex-col gap-1 text-xs text-zinc-600">
           Setor responsável
-          <Selecao name="setor" defaultValue="" required aria-label="Setor">
+          <Selecao name="setor" defaultValue={setorPadrao ?? ""} required aria-label="Setor">
             <option value="" disabled>
               Para qual setor?
             </option>
