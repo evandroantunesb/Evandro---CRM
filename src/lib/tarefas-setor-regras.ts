@@ -43,7 +43,18 @@ export type TarefaSetorVM = {
   podeAtribuir: boolean;
   podeCancelar: boolean;
   podeReabrir: boolean;
+  /** Anexar só com a tarefa aberta (a RPC e o Storage conferem de novo). */
+  podeAnexar: boolean;
+  /** Pasta da tarefa no Storage (`empresa/tarefa`). */
+  pastaAnexos: string;
+  anexos: AnexoTarefaVM[];
 };
+
+/** `doPedido`: enviado por quem pediu (fotos, referências); senão, entregue por quem executou (3D, orçamento). */
+export type AnexoTarefaVM = { id: string; nome: string; enviadoPor: string | null; podeRemover: boolean; doPedido: boolean };
+
+/** Bucket dos anexos das tarefas (20261029230000_tarefas_setor_anexos.sql), pasta `empresa/tarefa/objeto`. */
+export const BUCKET_ANEXOS_TAREFA = "tarefas-setor";
 
 /** Hoje no horário de Brasília (AAAA-MM-DD), para comparar com o prazo. */
 export function hojeBrasilia(agora = new Date()): string {

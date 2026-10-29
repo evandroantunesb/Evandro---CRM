@@ -10,7 +10,17 @@ import { contarPendenciasTarefasSetor } from "@/lib/tarefas-setor";
 
 export type Notificacao = {
   id: string;
-  tipo: "lead_atribuido" | "tarefa_atribuida" | "handoff_recebido" | "handoff_devolvido" | "conquista_desbloqueada";
+  tipo:
+    | "lead_atribuido"
+    | "tarefa_atribuida"
+    | "handoff_recebido"
+    | "handoff_devolvido"
+    | "conquista_desbloqueada"
+    // Tarefas de setor (20261029235000_tarefas_setor_notificacoes.sql).
+    | "tarefa_setor_concluida"
+    | "tarefa_setor_cancelada"
+    | "tarefa_setor_atribuida"
+    | "tarefa_setor_reaberta";
   mensagem: string;
   link: string | null;
 };

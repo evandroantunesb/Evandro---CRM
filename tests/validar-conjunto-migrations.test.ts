@@ -8,8 +8,13 @@ import { afterAll, describe, expect, it } from "vitest";
 
 const SCRIPT = ".github/scripts/validar-conjunto-migrations.sh";
 const WORKFLOW = ".github/workflows/banco-producao.yml";
-// Tarefas de setor (pedidos do comercial e tarefas da obra): só ela, nenhuma a mais ou a menos.
-const AUTORIZADA = "20261029210000_tarefas_setor.sql";
+// Notificações das tarefas de setor: só ela, nenhuma a mais ou a menos.
+const AUTORIZADA = "20261029235000_tarefas_setor_notificacoes.sql";
+// Anexos das tarefas de setor (#251): aplicada em 29/10/2026, antes desta. Se voltar a aparecer como pendente, não é
+// autorizada.
+const ANEXOS_TAREFA = "20261029230000_tarefas_setor_anexos.sql";
+// Tarefas de setor (#249): aplicada em 29/10/2026, antes desta. Se voltar a aparecer como pendente, não é autorizada.
+const TAREFAS_SETOR = "20261029210000_tarefas_setor.sql";
 // Dados do cliente para o contrato (#248): aplicada em 29/10/2026, antes desta. Se voltar a aparecer como pendente,
 // não é autorizada.
 const DADOS_CLIENTE = "20261029190000_dados_cliente_contrato.sql";
@@ -194,7 +199,7 @@ describe("tarefas de setor", () => {
   });
 
   it("dados do cliente, dados pessoais da obra, fixação, validade da proposta, eletroposto SDR, eletroposto, temperatura ou qualquer migration da calculadora pendente junto, ou sozinha, não passa", () => {
-    for (const m of [DADOS_CLIENTE, CLIENTE_OCULTO, FIXACAO, VALIDADE_PROPOSTA, ELETROPOSTO_SDR, ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) {
+    for (const m of [ANEXOS_TAREFA, TAREFAS_SETOR, DADOS_CLIENTE, CLIENTE_OCULTO, FIXACAO, VALIDADE_PROPOSTA, ELETROPOSTO_SDR, ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) {
       expect(validar(dryRunCom(AUTORIZADA, m)).codigo, m).toBe(1);
       expect(validar(dryRunCom(m)).codigo, m).toBe(1);
     }
@@ -209,7 +214,7 @@ describe("tarefas de setor", () => {
     expect(existsSync(`supabase/migrations/${AUTORIZADA}`)).toBe(true);
     const texto = readFileSync(WORKFLOW, "utf8");
     expect(texto).toContain(AUTORIZADA);
-    for (const m of [DADOS_CLIENTE, CLIENTE_OCULTO, FIXACAO, VALIDADE_PROPOSTA, ELETROPOSTO_SDR, ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) expect(texto, m).not.toContain(m);
+    for (const m of [ANEXOS_TAREFA, TAREFAS_SETOR, DADOS_CLIENTE, CLIENTE_OCULTO, FIXACAO, VALIDADE_PROPOSTA, ELETROPOSTO_SDR, ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) expect(texto, m).not.toContain(m);
   });
 });
 

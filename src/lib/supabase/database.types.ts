@@ -4297,6 +4297,57 @@ export type Database = {
           },
         ];
       };
+      tarefas_setor_anexos: {
+        Row: {
+          caminho: string;
+          created_at: string;
+          empresa_id: string;
+          enviado_por: string | null;
+          id: string;
+          nome: string;
+          tamanho: number;
+          tarefa_id: string;
+          tipo_mime: string | null;
+        };
+        Insert: {
+          caminho: string;
+          created_at?: string;
+          empresa_id: string;
+          enviado_por?: string | null;
+          id?: string;
+          nome: string;
+          tamanho: number;
+          tarefa_id: string;
+          tipo_mime?: string | null;
+        };
+        Update: {
+          caminho?: string;
+          created_at?: string;
+          empresa_id?: string;
+          enviado_por?: string | null;
+          id?: string;
+          nome?: string;
+          tamanho?: number;
+          tarefa_id?: string;
+          tipo_mime?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tarefas_setor_anexos_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tarefas_setor_anexos_tarefa_id_fkey";
+            columns: ["tarefa_id"];
+            isOneToOne: false;
+            referencedRelation: "tarefas_setor";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       tarefas_setor_historico: {
         Row: {
           autor_membro_id: string | null;
@@ -4958,6 +5009,7 @@ export type Database = {
         }[];
       };
       pendencias_contrato_contato: { Args: { p_contato_id: string }; Returns: string[] };
+      pode_enviar_pasta_tarefa_setor: { Args: { p_caminho: string }; Returns: boolean };
       pode_registrar_pagamento_negocio: { Args: { p_negocio_id: string }; Returns: boolean };
       pode_responder_handoff: { Args: { p_handoff_id: string }; Returns: boolean };
       pode_ver_avatar: { Args: { p_pasta: string }; Returns: boolean };
@@ -4971,6 +5023,7 @@ export type Database = {
       pode_ver_obra: { Args: { p_obra_id: string }; Returns: boolean };
       pode_ver_obra_operacao: { Args: { p_obra_id: string }; Returns: boolean };
       pode_ver_pasta_anexo: { Args: { p_caminho: string }; Returns: boolean };
+      pode_ver_pasta_tarefa_setor: { Args: { p_caminho: string }; Returns: boolean };
       pode_ver_pdf_proposta_emitida: { Args: { p_caminho: string }; Returns: boolean };
       pode_ver_responsavel: {
         Args: { p_empresa_id: string; p_responsavel_id: string };
@@ -5015,6 +5068,10 @@ export type Database = {
         Args: { p_estornado_por: string; p_evento_won_id: number; p_novo_valor: number };
         Returns: undefined;
       };
+      registrar_anexo_tarefa_setor: {
+        Args: { p_caminho: string; p_nome: string };
+        Returns: string;
+      };
       registrar_historico_obra: {
         Args: {
           p_dados: Json;
@@ -5053,6 +5110,7 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      remover_anexo_tarefa_setor: { Args: { p_anexo_id: string }; Returns: string };
       salvar_regras_temperatura: {
         Args: { p_empresa_id: string; p_regras: Json };
         Returns: undefined;
@@ -5089,6 +5147,7 @@ export type Database = {
         Args: { p_contrato_id: string };
         Returns: Database["public"]["Enums"]["status_pagamento_contrato"];
       };
+      tarefa_da_pasta_anexo: { Args: { p_caminho: string }; Returns: string };
       tem_acesso_comercial: { Args: { p_empresa_id: string }; Returns: boolean };
       tem_acesso_financeiro: { Args: { p_empresa_id: string }; Returns: boolean };
       tem_papel: {

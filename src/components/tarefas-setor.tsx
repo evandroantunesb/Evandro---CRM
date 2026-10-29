@@ -1,6 +1,8 @@
 "use client";
 
+import { Paperclip, X } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { Botao, CLASSE_ENTRADA, Mensagem, Selecao, Selo } from "@/components/ui";
 import {
@@ -10,8 +12,13 @@ import {
   concluirTarefaSetor,
   criarTarefaSetor,
   reabrirTarefaSetor,
+  registrarAnexoTarefaSetor,
+  removerAnexoTarefaSetor,
 } from "@/lib/acoes/tarefas-setor";
+import { metaArquivo, nomeSeguro, problemaArquivo } from "@/lib/anexos-regras";
+import { criarClienteNavegador } from "@/lib/supabase/navegador";
 import {
+  BUCKET_ANEXOS_TAREFA,
   dataBr,
   hojeBrasilia,
   PRAZO_PADRAO_DIAS_UTEIS,
@@ -163,6 +170,7 @@ export function ListaTarefasSetor({
             </p>
           )}
           {t.motivoCancelamento && <p className="text-xs text-zinc-500">Motivo do cancelamento: {t.motivoCancelamento}</p>}
+          <AnexosTarefa tarefa={t} />
           <div className="flex flex-wrap items-start gap-2">
             {t.podeAgir && t.responsavel === null && <BotaoAcao tarefa={t} acao={assumirTarefaSetor} rotulo="Assumir" />}
             {t.podeAgir && (
@@ -186,9 +194,117 @@ export function ListaTarefasSetor({
   );
 }
 
-/** Pedir uma tarefa a um setor, na obra ou no negócio. Prazo sugerido: 2 dias úteis. */
+/**
+ * Envia os arquivos direto ao Storage, na pasta da tarefa, e registra cada um (arquivo nunca passa por Server
+ * Action). Devolve a primeira falha, ou null.
+ */
+async function enviarAnexos(
+  pasta: string,
+  arquivos: File[],
+  vinculo: { obraId?: string | null; negocioId?: string | null },
+): Promise<string | null> {
+  const supabase = criarClienteNavegador();
+  let falha: string | null = null;
+  for (const arquivo of arquivos) {
+    const problema = problemaArquivo(metaArquivo(arquivo));
+    if (problema) {
+      falha ??= problema;
+      continue;
+    }
+    const caminho = `${pasta}/${nomeSeguro(arquivo.name)}`;
+    const { error } = await supabase.storage.from(BUCKET_ANEXOS_TAREFA).upload(caminho, arquivo, { contentType: arquivo.type || undefined });
+    if (error) {
+      falha ??= `Não foi possível enviar "${arquivo.name}".`;
+      continue;
+    }
+    const r = await registrarAnexoTarefaSetor({ caminho, nome: arquivo.name, ...vinculo });
+    if (!r?.ok) falha ??= r?.mensagem ?? `Não foi possível registrar "${arquivo.name}".`;
+  }
+  return falha;
+}
+
+/** Arquivos da tarefa: baixar, anexar (tarefa aberta) e remover (quem enviou ou o admin). */
+function AnexosTarefa({ tarefa }: { tarefa: TarefaSetorVM }) {
+  const router = useRouter();
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  if (!tarefa.anexos.length && !tarefa.podeAnexar) return null;
+
+  async function anexar(input: HTMLInputElement) {
+    const lista = Array.from(input.files ?? []);
+    if (!lista.length) return;
+    setErro(null);
+    setEnviando(true);
+    setErro(await enviarAnexos(tarefa.pastaAnexos, lista, tarefa));
+    setEnviando(false);
+    input.value = "";
+    router.refresh();
+  }
+
+  // Separados por origem: o que veio com o pedido e o que o setor devolveu.
+  const grupos = [
+    { titulo: "Enviados no pedido", anexos: tarefa.anexos.filter((a) => a.doPedido) },
+    { titulo: `Entregues por ${tarefa.setorRotulo}`, anexos: tarefa.anexos.filter((a) => !a.doPedido) },
+  ].filter((g) => g.anexos.length > 0);
+
+  return (
+    <div className="flex flex-col gap-2">
+      {grupos.map((g, i) => (
+        <section key={g.titulo} aria-label={g.titulo} className={`flex flex-col gap-1 ${i > 0 ? "border-t border-zinc-100 pt-2" : ""}`}>
+          <p className="text-xs font-medium text-zinc-600">{g.titulo}</p>
+          <ul className="flex flex-col gap-1">
+            {g.anexos.map((a) => (
+              <li key={a.id} className="flex flex-wrap items-center gap-2 text-xs">
+                <a href={`/anexos-tarefa/${a.id}`} target="_blank" rel="noopener" className="inline-flex items-center gap-1 text-amber-700 hover:underline">
+                  <Paperclip aria-hidden className="size-3.5" />
+                  {a.nome}
+                </a>
+                {a.enviadoPor && <span className="text-zinc-500">por {a.enviadoPor}</span>}
+                {a.podeRemover && <RemoverAnexo tarefa={tarefa} anexoId={a.id} nome={a.nome} />}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+      {tarefa.podeAnexar && (
+        <label className="inline-flex w-fit cursor-pointer items-center gap-1 rounded-md border border-dashed border-zinc-400 px-3 py-1 text-xs text-zinc-700 hover:bg-zinc-50">
+          <Paperclip aria-hidden className="size-3.5" />
+          {enviando ? "Enviando..." : "Anexar"}
+          <input type="file" multiple disabled={enviando} className="hidden" onChange={(e) => anexar(e.target)} />
+        </label>
+      )}
+      {erro && <p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-800">{erro}</p>}
+    </div>
+  );
+}
+
+function RemoverAnexo({ tarefa, anexoId, nome }: { tarefa: TarefaSetorVM; anexoId: string; nome: string }) {
+  const [resultado, enviar, pendente] = useActionState(removerAnexoTarefaSetor, null);
+  return (
+    <form action={enviar} className="inline-flex items-center gap-1">
+      <Vinculo tarefa={tarefa} />
+      <input type="hidden" name="anexoId" value={anexoId} />
+      <button type="submit" disabled={pendente} aria-label={`Remover ${nome}`} className="text-zinc-500 hover:text-red-700">
+        <X aria-hidden className="size-3.5" />
+      </button>
+      {resultado && !resultado.ok && <Mensagem resultado={resultado} />}
+    </form>
+  );
+}
+
+/** Pedir uma tarefa a um setor, na obra ou no negócio. Prazo sugerido: 2 dias úteis. Os anexos sobem depois de criada. */
 export function NovaTarefaSetor({ obraId, negocioId, exemplo }: { obraId?: string; negocioId?: string; exemplo: string }) {
-  const [resultado, enviar, pendente] = useActionState(criarTarefaSetor, null);
+  const router = useRouter();
+  const [arquivos, setArquivos] = useState<File[]>([]);
+  // Cria a tarefa e, com ela criada, envia os arquivos escolhidos; "Enviando..." cobre as duas etapas.
+  const [resultado, enviar, pendente] = useActionState(async (anterior: ResultadoAcao, dados: FormData): Promise<ResultadoAcao> => {
+    const r = await criarTarefaSetor(anterior, dados);
+    if (!r?.ok || !r.pastaAnexos || !arquivos.length) return r;
+    const falha = await enviarAnexos(r.pastaAnexos, arquivos, { obraId, negocioId });
+    setArquivos([]);
+    router.refresh();
+    return { ok: true, mensagem: falha ? `Tarefa enviada ao setor, mas: ${falha} Anexe de novo na tarefa.` : r.mensagem };
+  }, null);
   const form = useRef<HTMLFormElement>(null);
   const [hoje] = useState(() => hojeBrasilia());
   useEffect(() => {
@@ -200,26 +316,38 @@ export function NovaTarefaSetor({ obraId, negocioId, exemplo }: { obraId?: strin
       {negocioId && <input type="hidden" name="negocioId" value={negocioId} />}
       <input name="titulo" placeholder={exemplo} required minLength={2} maxLength={160} className={`${CLASSE_ENTRADA} text-sm`} />
       <textarea name="descricao" placeholder="Detalhes (opcional)" rows={2} maxLength={2000} className={`${CLASSE_ENTRADA} text-sm`} />
-      <div className="flex flex-wrap gap-2">
-        <Selecao name="setor" defaultValue="" required aria-label="Setor">
-          <option value="" disabled>
-            Para qual setor?
-          </option>
-          {SETORES_TAREFA.map((s) => (
-            <option key={s} value={s}>
-              {ROTULO_SETOR[s]}
+      {/* Sem `name`: os arquivos não vão na ação; sobem direto ao Storage depois que a tarefa existe. */}
+      <label className="inline-flex w-fit cursor-pointer items-center gap-1 rounded-md border border-dashed border-zinc-400 px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50">
+        <Paperclip aria-hidden className="size-4" />
+        {arquivos.length ? `${arquivos.length} arquivo${arquivos.length > 1 ? "s" : ""} para anexar` : "Anexar arquivos (fotos, PDF)"}
+        <input type="file" multiple className="hidden" onChange={(e) => setArquivos(Array.from(e.target.files ?? []))} />
+      </label>
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="flex flex-col gap-1 text-xs text-zinc-600">
+          Setor responsável
+          <Selecao name="setor" defaultValue="" required aria-label="Setor">
+            <option value="" disabled>
+              Para qual setor?
             </option>
-          ))}
-        </Selecao>
-        <input
-          type="date"
-          name="prazo"
-          min={hoje}
-          defaultValue={somarDiasUteis(hoje, PRAZO_PADRAO_DIAS_UTEIS)}
-          required
-          aria-label="Prazo"
-          className={`${CLASSE_ENTRADA} text-sm`}
-        />
+            {SETORES_TAREFA.map((s) => (
+              <option key={s} value={s}>
+                {ROTULO_SETOR[s]}
+              </option>
+            ))}
+          </Selecao>
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-zinc-600">
+          Prazo: até quando o setor deve entregar
+          <input
+            type="date"
+            name="prazo"
+            min={hoje}
+            defaultValue={somarDiasUteis(hoje, PRAZO_PADRAO_DIAS_UTEIS)}
+            required
+            aria-label="Prazo"
+            className={`${CLASSE_ENTRADA} text-sm`}
+          />
+        </label>
         <Botao type="submit" disabled={pendente}>
           {pendente ? "Enviando..." : "Enviar ao setor"}
         </Botao>
