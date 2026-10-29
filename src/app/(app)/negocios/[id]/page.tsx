@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { ListaTarefas } from "@/components/lista-tarefas";
 import { AvancarEtapa, MoverEtapa } from "@/components/mover-etapa";
 import { NovaTarefa } from "@/components/nova-tarefa";
+import { ListaTarefasSetor, NovaTarefaSetor } from "@/components/tarefas-setor";
+import { carregarTarefasSetor } from "@/lib/tarefas-setor";
 import { Plus } from "lucide-react";
 import { NovoNegocio } from "@/components/novo-negocio";
 import { Cartao, CartaoRecolhivel, Selo, Voltar } from "@/components/ui";
@@ -30,7 +32,7 @@ import { mensagemPropostaIncompleta, pendenciasSemDados } from "@/lib/estimativa
 import { descreverAtividade } from "@/lib/linha-do-tempo";
 import type { BaseTributaria } from "@/lib/tarifa-gd";
 import { exigirPapel } from "@/lib/sessao";
-import { ARQUIVAR_NEGOCIO, ATRIBUIR_TAREFA_A_OUTROS, EDITAR_VALOR_NEGOCIO, ESCOLHER_RESPONSAVEL_NEGOCIO, FECHAR_NEGOCIO, NEGOCIOS, PAGAMENTO_SOLO, PROPOSTA_E_CONTRATO, RESPONSAVEL_COMERCIAL, VALIDADE_PROPOSTA, pode } from "@/lib/permissoes";
+import { ARQUIVAR_NEGOCIO, ATRIBUIR_TAREFA_A_OUTROS, EDITAR_VALOR_NEGOCIO, ESCOLHER_RESPONSAVEL_NEGOCIO, FECHAR_NEGOCIO, NEGOCIOS, PAGAMENTO_SOLO, PEDIDOS_AOS_SETORES, PROPOSTA_E_CONTRATO, RESPONSAVEL_COMERCIAL, VALIDADE_PROPOSTA, pode } from "@/lib/permissoes";
 import { listarEmissoesDoNegocio } from "@/lib/propostas/emissoes-dados";
 import { extrairConteudoDoModelo, validadePadraoDaEmpresa, produtividadeConfirmada } from "@/lib/propostas/proposta-simples";
 import { avisarSchemaAusente, funcaoAusente, tabelaAusente } from "@/lib/schema-ausente";
@@ -424,6 +426,11 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
     { id: "arquivos", rotulo: "Arquivos", contador: anexos?.length ?? 0 },
   ];
   const aba = abas.find((a) => a.id === abaParam)?.id ?? "visao";
+  // Pedidos aos setores (Compras, Engenharia, Operacional): só na aba Atividades, para não pesar as outras.
+  const pedidosSetor =
+    aba === "atividades" && pode(atual.papel, PEDIDOS_AOS_SETORES)
+      ? await carregarTarefasSetor(supabase, { empresaId: atual.empresaId, membroId: atual.membroId, papel: atual.papel, negocioId: negocio.id, filtro: "todas" })
+      : null;
 
   // Proposta na jornada da venda (fora dos marcos do fechamento): emitida, link gerado ou ainda não gerada.
   // `emissoes` vem da versão mais recente para a mais antiga.
@@ -1132,6 +1139,19 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
               )}
             </div>
           </Cartao>
+          {pedidosSetor && (
+            <Cartao titulo="Pedidos aos setores">
+              <div className="flex flex-col gap-3">
+                <ListaTarefasSetor
+                  tarefas={pedidosSetor.tarefas}
+                  membrosPorSetor={pedidosSetor.membrosPorSetor}
+                  vazio="Nenhum pedido. Peça um orçamento a Compras ou um 3D à Engenharia."
+                  mostrarReferencia={false}
+                />
+                {!arquivado && <NovaTarefaSetor negocioId={negocio.id} exemplo="O que você precisa? Ex.: orçamento do kit, projeto 3D" />}
+              </div>
+            </Cartao>
+          )}
           <Cartao titulo="Notas e linha do tempo">
             <NovaNota negocioId={negocio.id} />
             <ol className="flex flex-col">

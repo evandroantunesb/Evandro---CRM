@@ -28,13 +28,14 @@ import { carregarLeadsSemContato } from "@/lib/leads-sem-contato";
 import { calcularProgresso, calcularRealizado, type Meta } from "@/lib/metas";
 import { carregarPropostasParadas } from "@/lib/propostas-paradas";
 import { obterSessao } from "@/lib/sessao";
-import { GESTAO_COMERCIAL, NEGOCIOS, PROPOSTA_E_CONTRATO, TAREFAS, pode } from "@/lib/permissoes";
+import { GESTAO_COMERCIAL, NEGOCIOS, PROPOSTA_E_CONTRATO, TAREFAS, TAREFAS_DO_SETOR, pode } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { ROTULO_PAPEL, type TipoTarefa } from "@/lib/tipos";
 import { NovoNegocio } from "@/components/novo-negocio";
 import { eletropostoDisponivel } from "@/lib/eletroposto-servidor";
 import { GraficoDesempenho } from "./grafico-desempenho";
 import { InicioBasico } from "./inicio-basico";
+import { ResumoTarefasSetor } from "./resumo-tarefas-setor";
 
 const ICONE_TIPO_TAREFA: Record<TipoTarefa, LucideIcon> = {
   ligacao: Phone,
@@ -77,7 +78,15 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
 
   // Sem acesso comercial: Início neutra, retornada antes de qualquer consulta comercial.
   if (!pode(atual.papel, NEGOCIOS)) {
-    return <InicioBasico nome={sessao.nome.split(" ")[0]} saudacao={saudacao()} empresaNome={atual.empresaNome} papel={atual.papel} />;
+    return (
+      <InicioBasico
+        nome={sessao.nome.split(" ")[0]}
+        saudacao={saudacao()}
+        empresaNome={atual.empresaNome}
+        papel={atual.papel}
+        extra={pode(atual.papel, TAREFAS_DO_SETOR) && <ResumoTarefasSetor empresaId={atual.empresaId} membroId={atual.membroId} papel={atual.papel} />}
+      />
+    );
   }
 
   // Vendedor e SDR só veem a própria operação (spec RAION_SDR_REGRAS_PERMISSOES §10); admin/gestor pode alternar pra visão da empresa toda (?visao=equipe).

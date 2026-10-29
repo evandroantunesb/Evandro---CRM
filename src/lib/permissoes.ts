@@ -68,6 +68,18 @@ export const RESPONSAVEL_COMERCIAL = ["admin", "gestor", "vendedor", "sdr"] as c
 /** Tarefas (tela e ações). */
 export const TAREFAS = ["admin", "gestor", "vendedor", "sdr"] as const satisfies ListaPapeis;
 
+/**
+ * Tarefas de setor (Compras, Engenharia, Operacional): pedidos do comercial no negócio e tarefas da obra. Quem vê
+ * e quem age em cada tarefa é decidido no banco (20261029210000_tarefas_setor.sql); aqui só a entrada na tela.
+ */
+export const TAREFAS_SETOR = ["admin", "gestor", "vendedor", "sdr", "operacao"] as const satisfies ListaPapeis;
+
+/** Para quem as tarefas dos setores são a tela "Tarefas" do menu (quem executa nos setores). */
+export const TAREFAS_DO_SETOR = ["operacao"] as const satisfies ListaPapeis;
+
+/** Pedir tarefa a um setor a partir do negócio (e ver os pedidos feitos): o comercial. */
+export const PEDIDOS_AOS_SETORES = ["admin", "gestor", "vendedor", "sdr"] as const satisfies ListaPapeis;
+
 /** Ver tarefas de outros usuários. Poder de gestão. */
 export const VER_TAREFAS_DE_OUTROS = ["admin", "gestor"] as const satisfies ListaPapeis;
 
