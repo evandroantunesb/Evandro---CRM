@@ -7,7 +7,7 @@ import { LogoRaion } from "@/components/marca";
 import { carregarDiasConsideradoParado, carregarHorasConsideradoSemContato } from "@/lib/crm";
 import { carregarNotificacoesNaoLidas, contarPendencias, pendenciasDosSetores, temConquistaNaoVisualizada } from "@/lib/notificacoes";
 import { linksPendencias, type ContagemPendencias } from "@/lib/pendencias";
-import { CARTEIRA_CONTATOS, GAMIFICACAO, GESTAO_COMERCIAL, NEGOCIOS, OBRAS, PARTICIPANTES_GAMIFICACAO, PEDIDOS_AOS_SETORES, PROPOSTA_E_CONTRATO, TAREFAS, TAREFAS_DO_SETOR, pode } from "@/lib/permissoes";
+import { CARTEIRA_CONTATOS, ENGENHARIA, GAMIFICACAO, GESTAO_COMERCIAL, NEGOCIOS, OBRAS, PARTICIPANTES_GAMIFICACAO, PEDIDOS_AOS_SETORES, PROPOSTA_E_CONTRATO, TAREFAS, TAREFAS_DO_SETOR, pode } from "@/lib/permissoes";
 import { obterSessao } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { trocarEmpresa } from "@/lib/acoes/empresa-atual";
@@ -103,6 +103,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
           ...(pode(papel, PROPOSTA_E_CONTRATO) ? [{ href: "/propostas-contratos", rotulo: "Propostas e contratos", secao: "Comercial" }] : []),
           // Obras (somente leitura): comerciais e `operacao` (que hoje só vê Início).
           ...(pode(papel, OBRAS) ? [{ href: "/obras", rotulo: "Obras", secao: "Operação" }] : []),
+          ...(pode(papel, ENGENHARIA) ? [{ href: "/engenharia", rotulo: "Engenharia", secao: "Operação" }] : []),
           ...(pode(papel, PEDIDOS_AOS_SETORES) ? [{ href: "/tarefas/setores", rotulo: "Pedidos aos setores", secao: "Operação" }] : []),
           ...(pode(papel, GESTAO_COMERCIAL) ? [{ href: "/painel", rotulo: "Painel", secao: "Gestão" }] : []),
           ...itensGamificacao(papel, conquistaNova),

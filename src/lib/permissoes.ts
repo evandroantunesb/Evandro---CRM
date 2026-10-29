@@ -77,6 +77,12 @@ export const TAREFAS_SETOR = ["admin", "gestor", "vendedor", "sdr", "operacao"] 
 /** Para quem as tarefas dos setores são a tela "Tarefas" do menu (quem executa nos setores). */
 export const TAREFAS_DO_SETOR = ["operacao"] as const satisfies ListaPapeis;
 
+/**
+ * Tela "Engenharia" (fila do setor e obras em andamento nele). Admin e gestor acompanham; `operacao` entra, mas só
+ * vê a fila e as obras se atua em Engenharia (a RLS decide o que cada um enxerga).
+ */
+export const ENGENHARIA = ["admin", "gestor", "operacao"] as const satisfies ListaPapeis;
+
 /** Pedir tarefa a um setor a partir do negócio (e ver os pedidos feitos): o comercial. */
 export const PEDIDOS_AOS_SETORES = ["admin", "gestor", "vendedor", "sdr"] as const satisfies ListaPapeis;
 

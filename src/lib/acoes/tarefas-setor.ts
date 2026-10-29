@@ -25,6 +25,7 @@ const vinculo = z.object({ obraId: uuidOpcional, negocioId: uuidOpcional });
 
 function revalidar({ obraId, negocioId }: z.infer<typeof vinculo>) {
   revalidatePath("/tarefas/setores");
+  revalidatePath("/engenharia");
   revalidatePath("/inicio");
   if (obraId) revalidatePath(`/obras/${obraId}`);
   if (negocioId) revalidatePath(`/negocios/${negocioId}`);
