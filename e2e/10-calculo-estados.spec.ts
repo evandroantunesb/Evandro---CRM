@@ -313,12 +313,10 @@ test.describe("estados do cálculo", () => {
     await expect(porId(page, "previa-sistema")).toContainText("660 kWh/mês");
     await expect(porId(page, "estimativa-incompleta")).toBeVisible();
 
-    // Proposta: nova proposta bloqueada com a mensagem do servidor (fórmula antiga).
+    // Proposta: sem link emitido, o cartão do link (modelo completo) fica escondido.
     await abrirAba(page, "Proposta e contrato");
-    await expect(page.getByRole("button", { name: "Gerar link da proposta" })).toBeDisabled();
-    const bloqueada = porId(page, "proposta-bloqueada");
-    await expect(bloqueada).toBeVisible();
-    await expect(bloqueada).toContainText("O último cálculo foi feito pela fórmula antiga, que não foi validada. Recalcule o kit antes de gerar a proposta.");
+    await expect(page.getByRole("button", { name: "Gerar link da proposta" })).toHaveCount(0);
+    await expect(porId(page, "proposta-bloqueada")).toHaveCount(0);
 
     // Preço (no kit, aba Sistema): valor do negócio diverge da linha legada, mas "Atualizar preço no cálculo" não é oferecido.
     const { error } = await n.cliente.from("negocios").update({ valor: 28000 }).eq("id", n.id);
@@ -343,7 +341,7 @@ test.describe("estados do cálculo", () => {
     await abrirAba(page, "Proposta e contrato");
     await expect(page.getByRole("button", { name: "Gerar contrato" })).toBeDisabled();
     await expect(page.getByRole("alert").filter({ hasText: "O kit mudou depois do último cálculo. Recalcule antes de gerar o contrato." })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Gerar link da proposta" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Gerar link da proposta" })).toHaveCount(0);
     expect(await n.calculo()).toEqual(antes);
     const { data: contratos } = await n.cliente.from("contratos").select("id").eq("negocio_id", n.id);
     expect(contratos).toEqual([]);

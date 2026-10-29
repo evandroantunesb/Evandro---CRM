@@ -101,8 +101,8 @@ test.describe("linha legada e valor do negócio editado", () => {
     await abrirAba(page, "Proposta e contrato");
     // Contrato NÃO bloqueia por preço divergente com linha legada.
     await expect(page.getByRole("button", { name: "Gerar contrato" })).toBeEnabled();
-    // Proposta nova segue bloqueada (fórmula antiga), e a linha não mudou sozinha.
-    await expect(page.getByRole("button", { name: "Gerar link da proposta" })).toBeDisabled();
+    // O link da proposta (modelo completo) fica escondido enquanto não há link emitido, e a linha não mudou sozinha.
+    await expect(page.getByRole("button", { name: "Gerar link da proposta" })).toHaveCount(0);
     expect(await n.calculo()).toEqual(linha);
     expect(await n.calculo()).toMatchObject({ kit_preco: 25000, payback_meses: 112.2, economia_mensal: 222.75 });
   });

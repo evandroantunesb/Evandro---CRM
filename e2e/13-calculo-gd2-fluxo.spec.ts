@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { abrirAba, clienteDe, entrarComo, fichaNaAba, lerBase } from "./ajuda";
+import { abrirAba, clienteDe, entrarComo, fichaNaAba, lerBase, preencherCondicoes } from "./ajuda";
 import type { BaseFicticia } from "./base-ficticia";
 
 /**
@@ -161,19 +161,17 @@ test.describe("calculadora GD II integrada", () => {
     await expect(page.getByTestId("hipotese-autoconsumo")).toBeVisible();
     await expect(page.getByTestId("detalhes-tecnicos")).not.toHaveAttribute("open", "");
     await expect(page.getByTestId("calculo-historico")).toHaveCount(0);
-    // Link antigo (proposta com conta e economia, D1/D2 congelados): continua bloqueado mesmo com o cálculo completo.
+    // Link antigo (proposta com conta e economia, D1/D2 congelados): sem link emitido, o cartão fica escondido.
     await abrirAba(page, "Proposta e contrato");
-    await expect(page.getByRole("button", { name: "Gerar link da proposta" })).toBeDisabled();
-    await expect(page.getByTestId("proposta-bloqueada")).toHaveText(
-      "A proposta com conta e economia ainda não está liberada. Emita a proposta simples (sistema, geração e preço, sem economia).",
-    );
+    await expect(page.getByRole("button", { name: "Gerar link da proposta" })).toHaveCount(0);
+    await expect(page.getByTestId("proposta-bloqueada")).toHaveCount(0);
 
     // Proposta simples emitida (sem economia: D1/D2 congelados), com o relógio real: o banco confere `emitida_em` e a
     // validade contra o próprio `now()`.
     await relogioDoServidor(page, null);
     await page.reload();
     await page.getByLabel("Válida até").fill(AMANHA());
-    await page.getByLabel("Condições de pagamento").fill("À vista por Pix ou transferência");
+    await preencherCondicoes(page, "À vista por Pix ou transferência");
     await page.getByRole("button", { name: /^Emitir/ }).click();
     await expect(page.getByText("Proposta v1 emitida.")).toBeVisible();
     const { data: emissoes } = await n.cliente.from("propostas_emissoes").select("token, pdf_sha256").eq("negocio_id", n.id);

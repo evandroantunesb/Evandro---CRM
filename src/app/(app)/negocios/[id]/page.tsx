@@ -32,7 +32,7 @@ import type { BaseTributaria } from "@/lib/tarifa-gd";
 import { exigirPapel } from "@/lib/sessao";
 import { ARQUIVAR_NEGOCIO, ATRIBUIR_TAREFA_A_OUTROS, EDITAR_VALOR_NEGOCIO, ESCOLHER_RESPONSAVEL_NEGOCIO, FECHAR_NEGOCIO, NEGOCIOS, PAGAMENTO_SOLO, PROPOSTA_E_CONTRATO, RESPONSAVEL_COMERCIAL, pode } from "@/lib/permissoes";
 import { listarEmissoesDoNegocio } from "@/lib/propostas/emissoes-dados";
-import { extrairConteudoDoModelo, produtividadeConfirmada } from "@/lib/propostas/proposta-simples";
+import { extrairConteudoDoModelo, validadePadraoDoModelo, produtividadeConfirmada } from "@/lib/propostas/proposta-simples";
 import { avisarSchemaAusente, funcaoAusente, tabelaAusente } from "@/lib/schema-ausente";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { calcularStatusQualificacao } from "@/lib/qualificacao";
@@ -203,6 +203,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
         .maybeSingle()
     : { data: null };
   const conteudoModelo = extrairConteudoDoModelo(modeloPadrao?.proposta_modelo_blocos);
+  const validadePadraoDias = validadePadraoDoModelo(modeloPadrao?.proposta_modelo_blocos);
   const { data: parametrosEmissao } = emissoesRes && !emissoesAusente
     ? await supabase
         .from("parametros_calculadora")
@@ -998,14 +999,15 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
           </Cartao>
         </div>
       ) : (
-        <div id="proposta" className="grid scroll-mt-4 gap-4 lg:grid-cols-2 [&>*]:min-w-0">
+        <div id="proposta" className="mx-auto flex w-full max-w-3xl scroll-mt-4 flex-col gap-4 [&>*]:min-w-0">
           {pode(atual.papel, PROPOSTA_E_CONTRATO) && (
             <>
               {!emissoesAusente && (
-                <Cartao titulo="Proposta simples">
+                <Cartao titulo="Proposta">
                 <EmitirProposta
                   negocioId={negocio.id}
                   hoje={hojeEmSaoPaulo()}
+                  validadePadraoDias={validadePadraoDias}
                   conteudoModelo={conteudoModelo}
                   geracaoConfirmada={geracaoConfirmada}
                   bloqueio={arquivado ? "Negócio arquivado: não é possível emitir proposta." : bloqueioEmissao}
@@ -1014,7 +1016,10 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
                 />
                 </Cartao>
               )}
-              <Cartao titulo="Proposta">
+              {/* Link pelo modelo (com economia): fica escondido enquanto a economia não for validada pela engenharia
+                  (hoje a geração é sempre bloqueada). Um link já gerado continua à vista para copiar. */}
+              {proposta && (
+              <Cartao titulo="Proposta por link (modelo completo)">
               <Proposta
                 negocioId={negocio.id}
                 precoDesatualizado={precoDesatualizado}
@@ -1035,6 +1040,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
                 }
               />
               </Cartao>
+              )}
             </>
           )}
           {pode(atual.papel, PROPOSTA_E_CONTRATO) && (

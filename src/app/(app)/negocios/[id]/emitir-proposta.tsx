@@ -4,13 +4,14 @@ import { useActionState, useState } from "react";
 import { Botao, Campo, Mensagem } from "@/components/ui";
 import { emitirPropostaSimples } from "@/lib/acoes/propostas-emissoes";
 import { formatarDataHora, formatarDataIso } from "@/lib/formatacao";
-import { LIMITES_SIMPLES, type ConteudoDoModelo } from "@/lib/propostas/proposta-simples";
+import { LIMITES_SIMPLES, somarDias, type ConteudoDoModelo } from "@/lib/propostas/proposta-simples";
 
 export type EmissaoListada = { versao: number; token: string; validadeAte: string; emitidaEm: string };
 
 export function EmitirProposta({
   negocioId,
   hoje,
+  validadePadraoDias,
   conteudoModelo,
   geracaoConfirmada,
   bloqueio,
@@ -20,6 +21,8 @@ export function EmitirProposta({
   negocioId: string;
   /** AAAA-MM-DD de hoje em São Paulo: a validade não pode ser anterior. */
   hoje: string;
+  /** Dias de validade sugeridos (modelo padrão da empresa, ou 10): a data já vem preenchida. */
+  validadePadraoDias: number;
   /** Conteúdo que a empresa escreveu no modelo padrão publicado (só leitura): sugestão de condições e blocos com conteúdo. */
   conteudoModelo: ConteudoDoModelo;
   /** O admin confirmou a produtividade atual da calculadora: só então a proposta mostra a geração estimada. */
@@ -46,22 +49,18 @@ export function EmitirProposta({
             {bloqueio}
           </p>
         )}
-        <Campo rotulo="Válida até" type="date" name="validadeAte" required min={hoje} />
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium text-zinc-700">Condições de pagamento</span>
-          <textarea
-            name="condicoesPagamento"
-            defaultValue={conteudoModelo.condicoes}
-            rows={3}
-            required
-            maxLength={LIMITES_SIMPLES.condicoes}
-            className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-carvao outline-none focus:border-dourado focus:ring-2 focus:ring-dourado/20"
-          />
-          <span className="text-xs text-zinc-500">
-            Uma opção por linha: cada linha vira um item da lista na proposta. Sugerido pelo modelo da empresa; o que estiver aqui na emissão fica congelado
-            na versão enviada. Obrigatório: a proposta só é emitida com as condições de pagamento confirmadas.
-          </span>
-        </label>
+        <Campo
+          rotulo="Válida até"
+          type="date"
+          name="validadeAte"
+          required
+          min={hoje}
+          defaultValue={somarDias(hoje, validadePadraoDias)}
+        />
+        <p className="-mt-2 text-xs text-zinc-500">
+          Padrão de {validadePadraoDias} dias a partir de hoje (muda em Configurações › Propostas, no modelo padrão: Validade em dias).
+        </p>
+        <CondicoesPagamento sugeridas={conteudoModelo.condicoes} />
         <ul className="flex flex-col gap-1 rounded-md bg-zinc-50 px-3 py-2 text-xs text-zinc-600" data-testid="conteudo-confirmado">
           <li data-testid="geracao-status">
             Geração estimada:{" "}
@@ -133,6 +132,51 @@ export function EmitirProposta({
           })}
         </ul>
       )}
+    </div>
+  );
+}
+
+/**
+ * Condições de pagamento: com o texto do modelo da empresa, aparecem resumidas e recolhidas ("Editar
+ * condições"); sem texto no modelo, o campo já vem aberto para preencher. O que estiver no campo na
+ * emissão fica congelado na versão (o campo segue no formulário mesmo recolhido).
+ */
+function CondicoesPagamento({ sugeridas }: { sugeridas: string }) {
+  const linhas = sugeridas
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const campo = (
+    <label className="flex flex-col gap-1 text-sm">
+      <span className="font-medium text-zinc-700">Condições de pagamento</span>
+      <textarea
+        name="condicoesPagamento"
+        defaultValue={sugeridas}
+        rows={3}
+        required
+        maxLength={LIMITES_SIMPLES.condicoes}
+        className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-carvao outline-none focus:border-dourado focus:ring-2 focus:ring-dourado/20"
+      />
+      <span className="text-xs text-zinc-500">
+        Uma opção por linha: cada linha vira um item da lista na proposta. O que estiver aqui na emissão fica congelado na versão enviada.
+      </span>
+    </label>
+  );
+  if (linhas.length === 0) return campo;
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-linha px-3 py-2 text-sm" data-testid="condicoes-resumo">
+      <span className="font-medium text-texto">Condições de pagamento (do modelo da empresa)</span>
+      <ul className="list-disc pl-5 text-texto-2">
+        {linhas.map((l, i) => (
+          <li key={i}>{l}</li>
+        ))}
+      </ul>
+      <details className="group">
+        <summary className="w-fit cursor-pointer text-sm font-medium text-dourado-texto underline-offset-2 hover:underline">
+          Editar condições
+        </summary>
+        <div className="pt-2">{campo}</div>
+      </details>
     </div>
   );
 }

@@ -118,3 +118,10 @@ export async function preencherNovoNegocio(page: Page, nome: string, whatsapp: s
 /** Escolhe um botão de um grupo de opções do Novo negócio (tipo de cliente, distribuidora, ligação...). */
 export const escolher = (page: Page, grupo: string, opcao: string | RegExp) =>
   page.getByRole("group", { name: grupo, exact: true }).getByRole("button", { name: opcao }).click();
+
+/** Condições de pagamento da proposta: recolhidas quando o modelo da empresa já tem texto ("Editar condições"). */
+export async function preencherCondicoes(page: Page, texto: string) {
+  const editar = page.getByText("Editar condições", { exact: true });
+  if (await editar.isVisible()) await editar.click();
+  await page.getByLabel("Condições de pagamento").fill(texto);
+}
