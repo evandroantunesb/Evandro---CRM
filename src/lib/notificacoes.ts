@@ -43,7 +43,7 @@ export async function temConquistaNaoVisualizada(empresaId: string, membroId: st
 }
 
 /** Pendências de quem executa nos setores: as tarefas abertas com a pessoa e as da fila dos setores dela. */
-export async function contarPendenciasSetores(empresaId: string, membroId: string): Promise<ContagemPendencias> {
+export async function pendenciasDosSetores(empresaId: string, membroId: string): Promise<ContagemPendencias> {
   return { leadsADistribuir: 0, demais: await contarPendenciasTarefasSetor(await criarClienteServidor(), empresaId, membroId) };
 }
 
