@@ -135,20 +135,26 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
         </ul>
       </Cartao>
 
-      {(obra.fixacao.podeEditar || obra.fixacao.atual || obra.tecnico.estruturaTelhado) && (
-        <Cartao titulo="Fixação do telhado">
-          <div className="flex flex-col gap-2 text-sm">
-            {!obra.fixacao.podeEditar && <p className="text-zinc-900">{obra.fixacao.atual?.nome ?? "Não definida"}</p>}
-            {obra.fixacao.podeEditar && <GestaoFixacao key={resumo.id} obraId={resumo.id} fixacao={obra.fixacao} podeConfigurar={atual.papel === "admin"} />}
-            {obra.tecnico.estruturaTelhado && (
-              <p className="text-xs text-zinc-500">Informado na venda: {obra.tecnico.estruturaTelhado}</p>
-            )}
-          </div>
-        </Cartao>
-      )}
-
       <Cartao titulo="Dados técnicos">
-        <DadosTecnicos tecnico={obra.tecnico} />
+        <DadosTecnicos
+          tecnico={obra.tecnico}
+          fixacao={
+            (obra.fixacao.podeEditar || obra.fixacao.atual || obra.tecnico.estruturaTelhado) && (
+              <div className="flex flex-col gap-2 text-sm">
+                <dt className="text-xs text-zinc-500">Fixação do telhado</dt>
+                {!obra.fixacao.podeEditar && <dd className="text-zinc-900">{obra.fixacao.atual?.nome ?? "Não definida"}</dd>}
+                {obra.fixacao.podeEditar && (
+                  <dd>
+                    <GestaoFixacao key={resumo.id} obraId={resumo.id} fixacao={obra.fixacao} podeConfigurar={atual.papel === "admin"} />
+                  </dd>
+                )}
+                {obra.tecnico.estruturaTelhado && (
+                  <dd className="text-xs text-zinc-500">Informado na venda: {obra.tecnico.estruturaTelhado}</dd>
+                )}
+              </div>
+            )
+          }
+        />
       </Cartao>
 
       {obra.valorVendido != null && (
@@ -249,7 +255,8 @@ function ItemMarco({ marco, children }: { marco: MarcoDetalheVM; children?: Reac
   );
 }
 
-function DadosTecnicos({ tecnico }: { tecnico: DadosTecnicosVM }) {
+/** `fixacao`: linha da fixação do telhado (escolhida na obra), logo abaixo dos campos da venda. */
+function DadosTecnicos({ tecnico, fixacao }: { tecnico: DadosTecnicosVM; fixacao?: ReactNode }) {
   const campos: [string, string | null][] = [
     ["Kit", tecnico.kitNome],
     ["Potência", comUnidade(tecnico.potenciaKwp, "kWp")],
@@ -260,7 +267,7 @@ function DadosTecnicos({ tecnico }: { tecnico: DadosTecnicosVM }) {
     ["Tipo de telhado", tecnico.tipoTelhado],
   ];
   const preenchidos = campos.filter((c): c is [string, string] => c[1] !== null);
-  if (preenchidos.length === 0 && tecnico.kit.length === 0) return <p className="text-sm text-zinc-500">Sem dados técnicos registrados.</p>;
+  if (preenchidos.length === 0 && tecnico.kit.length === 0 && !fixacao) return <p className="text-sm text-zinc-500">Sem dados técnicos registrados.</p>;
   return (
     <div className="flex flex-col gap-4">
       {preenchidos.length > 0 && (
@@ -272,6 +279,7 @@ function DadosTecnicos({ tecnico }: { tecnico: DadosTecnicosVM }) {
           ))}
         </dl>
       )}
+      {fixacao && <dl className="min-w-0">{fixacao}</dl>}
       {tecnico.kit.length > 0 && (
         <div className="overflow-x-auto rounded-lg border border-zinc-200">
           <table className="w-full text-left text-sm">
