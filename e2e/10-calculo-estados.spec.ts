@@ -121,7 +121,7 @@ async function novoNegocio(nome: string, { kit = false, legado = false, distribu
 
 async function abrir(page: Page, negocioId: string) {
   await entrarComo(page, base.usuarios.vendedor, base.senha);
-  await page.goto(fichaNaAba(negocioId, "Sistema"));
+  await page.goto(fichaNaAba(negocioId, "Conta e sistema"));
 }
 
 async function adicionarModulo(page: Page, potenciaW: string, quantidade: string) {
@@ -323,7 +323,7 @@ test.describe("estados do cálculo", () => {
     // Preço (no kit, aba Sistema): valor do negócio diverge da linha legada, mas "Atualizar preço no cálculo" não é oferecido.
     const { error } = await n.cliente.from("negocios").update({ valor: 28000 }).eq("id", n.id);
     if (error) throw error;
-    await page.goto(fichaNaAba(n.id, "Sistema"));
+    await page.goto(fichaNaAba(n.id, "Conta e sistema"));
     await expect(porId(page, "calculo-anterior")).toHaveCount(1);
     await expect(page.getByRole("button", { name: "Atualizar preço no cálculo" })).toHaveCount(0);
     await expect(page.getByText("Atualizar preço no cálculo")).toHaveCount(0);

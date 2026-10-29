@@ -338,9 +338,9 @@ describe("ficha do negócio: posição do cartão de fechamento (jornada da vend
     return i;
   };
   const CARTOES_DAS_ABAS = [
-    '<CartaoRecolhivel titulo="Dados do negócio"',
+    '<CartaoRecolhivel titulo="Oportunidade"',
     '<Cartao titulo="Kit personalizado">',
-    '<CartaoRecolhivel titulo="Qualificação SDR"',
+    '<CartaoRecolhivel titulo="Perfil do lead"',
     '<Cartao titulo="Contrato">',
     '<Cartao titulo="Tarefas">',
     '<Cartao titulo="Notas e linha do tempo">',
@@ -361,8 +361,8 @@ describe("ficha do negócio: posição do cartão de fechamento (jornada da vend
   it("cada aba renderiza só os seus cartões", () => {
     const abas = ["visao", "sistema", "proposta", "atividades", "arquivos"].map((a) => ({ a, i: pos(`{aba === "${a}" && (`) }));
     const abaDe = (trecho: string) => abas.filter(({ i }) => i < pos(trecho)).at(-1)?.a;
-    expect(abaDe('<CartaoRecolhivel titulo="Dados do negócio"')).toBe("visao");
-    expect(abaDe('<CartaoRecolhivel titulo="Qualificação SDR"')).toBe("visao");
+    expect(abaDe('<CartaoRecolhivel titulo="Oportunidade"')).toBe("visao");
+    expect(abaDe('<CartaoRecolhivel titulo="Perfil do lead"')).toBe("visao");
     expect(abaDe('<Cartao titulo="Contato">')).toBe("visao");
     expect(abaDe('<Cartao titulo="Kit personalizado">')).toBe("sistema");
     expect(abaDe('<Cartao titulo="Contrato">')).toBe("proposta");

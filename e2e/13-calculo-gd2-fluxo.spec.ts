@@ -99,7 +99,7 @@ test.describe("calculadora GD II integrada", () => {
     await relogioDoServidor(page, DATA_CALCULO);
     const n = await negocioResidencialCopel("Cliente GD II Copel (fictício)");
     await entrarComo(page, base.usuarios.vendedor, base.senha);
-    await page.goto(fichaNaAba(n.id, "Sistema"));
+    await page.goto(fichaNaAba(n.id, "Conta e sistema"));
 
     // Sem cálculo: tarifa oficial e base "sem tributos" já vêm preenchidas, ambas editáveis.
     await montarKit(page);
@@ -188,7 +188,7 @@ test.describe("calculadora GD II integrada", () => {
     // Entrada nova: base "com tributos" (incompatível com o Fio B sem tributos) → financeiro incompleto. De volta à data
     // do cálculo, para que a única pendência seja a base (e não a vigência).
     await relogioDoServidor(page, DATA_CALCULO);
-    await page.goto(fichaNaAba(n.id, "Sistema"));
+    await page.goto(fichaNaAba(n.id, "Conta e sistema"));
     await page.getByRole("button", { name: "Editar kit / recalcular" }).click();
     await page.getByLabel("Base tributária da tarifa").selectOption("com_tributos");
     await expect(page.getByTestId("previa-economia")).toHaveCount(0);
@@ -249,7 +249,7 @@ test.describe("calculadora GD II integrada", () => {
     await relogioDoServidor(page, DATA_CALCULO);
     const n = await negocioResidencialCopel("Cliente GD II pisos (fictício)");
     await entrarComo(page, base.usuarios.vendedor, base.senha);
-    await page.goto(fichaNaAba(n.id, "Sistema"));
+    await page.goto(fichaNaAba(n.id, "Conta e sistema"));
     await montarKit(page);
     const detalhes = page.getByTestId("detalhes-tecnicos");
     await page.getByLabel("Tipo de ligação").selectOption("monofasico");
@@ -265,7 +265,7 @@ test.describe("calculadora GD II integrada", () => {
     await relogioDoServidor(page, "2026-05-10T12:00:00-03:00");
     const n = await negocioResidencialCopel("Cliente GD II antes da vigência (fictício)");
     await entrarComo(page, base.usuarios.vendedor, base.senha);
-    await page.goto(fichaNaAba(n.id, "Sistema"));
+    await page.goto(fichaNaAba(n.id, "Conta e sistema"));
     await montarKit(page);
     // Sem linha vigente nessa data: nada é sugerido e o vendedor não consegue "forçar" o resultado completo.
     await expect(page.getByLabel("Tarifa (R$/kWh)")).toHaveValue("");

@@ -84,7 +84,7 @@ test.describe("linha legada e valor do negócio editado", () => {
     const linha = await n.calculo();
     await entrarComo(page, base.usuarios.vendedor, base.senha);
     // Kit (aba Sistema): a linha existe só como histórico recolhido de fórmula antiga.
-    await page.goto(fichaNaAba(n.id, "Sistema"));
+    await page.goto(fichaNaAba(n.id, "Conta e sistema"));
     await expect(page.getByTestId("calculo-anterior")).toHaveCount(1);
     await expect(page.getByText("Atualizar preço no cálculo")).toHaveCount(0);
     await abrirAba(page, "Proposta e contrato");
@@ -92,7 +92,7 @@ test.describe("linha legada e valor do negócio editado", () => {
 
     const { error } = await n.cliente.from("negocios").update({ valor: 28000 }).eq("id", n.id);
     if (error) throw error;
-    await page.goto(fichaNaAba(n.id, "Sistema"));
+    await page.goto(fichaNaAba(n.id, "Conta e sistema"));
     await expect(page.getByTestId("calculo-anterior")).toHaveCount(1);
     await expect(page.getByRole("alert").filter({ hasText: "é diferente do preço usado" })).toHaveCount(0);
     await expect(page.getByText("Atualizar preço no cálculo")).toHaveCount(0);

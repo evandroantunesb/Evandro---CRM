@@ -70,7 +70,7 @@ async function novoNegocio(nome: string) {
 
 async function abrir(page: Page, negocioId: string) {
   await entrarComo(page, base.usuarios.vendedor, base.senha);
-  await page.goto(fichaNaAba(negocioId, "Sistema"));
+  await page.goto(fichaNaAba(negocioId, "Conta e sistema"));
 }
 
 async function adicionarModulo(page: Page) {
@@ -93,8 +93,8 @@ test.describe("kWh e fatura do kit preservados", () => {
     await page.getByLabel(ROTULO_FATURA).fill("");
     const consumo = page.getByTestId("kit-consumo-salvo");
     const fatura = page.getByTestId("kit-fatura-salva");
-    await expect(consumo).toHaveText("Campo vazio: ao salvar, vale o consumo já salvo no negócio (450 kWh/mês). Para apagar, use “Dados do negócio”.");
-    await expect(fatura).toHaveText(/^Campo vazio: ao salvar, vale a fatura já salva no negócio \(R\$\s300,00\)\. Para apagar, use “Dados do negócio”\.$/);
+    await expect(consumo).toHaveText("Campo vazio: ao salvar, vale o consumo já salvo no negócio (450 kWh/mês). Para apagar, use “Conta de luz e local”, acima.");
+    await expect(fatura).toHaveText(/^Campo vazio: ao salvar, vale a fatura já salva no negócio \(R\$\s300,00\)\. Para apagar, use “Conta de luz e local”, acima\.$/);
     await expect(page.getByText(TEXTO_PADRAO_KWH)).toHaveCount(0);
 
     // Preencher um campo troca o aviso daquele campo (kWh volta ao texto atual; fatura some); o outro segue avisando.
@@ -119,25 +119,25 @@ test.describe("kWh e fatura do kit preservados", () => {
     expect(await n.calculo()).toEqual({ estado_financeiro: "incompleto", consumo_medio_kwh: 450, valor_fatura_medio: 300, economia_mensal: null });
     await page.reload();
     expect(await n.negocio()).toEqual({ consumo_medio_kwh: 450, valor_conta_energia: 300 });
-    await abrirAba(page, "Visão geral");
-    await abrirCartao(page, "Dados do negócio");
+    await abrirAba(page, "Conta e sistema");
+    await abrirCartao(page, "Conta de luz e local");
     await expect(page.getByLabel("Consumo médio (12 meses, kWh)")).toHaveValue("450");
     await expect(page.getByLabel("Valor da conta de energia (R$)")).toHaveValue("300");
   });
 
-  test("limpar em Dados do negócio apaga os dois; no kit os avisos somem e o texto atual volta; salvar mantém vazio", async ({ page }) => {
+  test("limpar em Conta de luz e local apaga os dois; no kit os avisos somem e o texto atual volta; salvar mantém vazio", async ({ page }) => {
     const n = await novoNegocio("Cliente limpa dados do negócio (fictício)");
     await abrir(page, n.id);
 
-    // "Dados do negócio" fica na Visão geral; para o vendedor, o cartão está sempre aberto.
-    await abrirAba(page, "Visão geral");
-    await abrirCartao(page, "Dados do negócio");
+    // "Conta de luz e local" fica na aba Conta e sistema, sempre aberto.
+    await abrirAba(page, "Conta e sistema");
+    await abrirCartao(page, "Conta de luz e local");
     await page.getByLabel("Consumo médio (12 meses, kWh)").fill("");
     await page.getByLabel("Valor da conta de energia (R$)").fill("");
     await page.getByRole("button", { name: "Salvar", exact: true }).click();
     await expect.poll(() => n.negocio()).toEqual({ consumo_medio_kwh: null, valor_conta_energia: null });
 
-    await page.goto(fichaNaAba(n.id, "Sistema"));
+    await page.goto(fichaNaAba(n.id, "Conta e sistema"));
     await adicionarModulo(page);
     // Sem tarifa: com tarifa e sem consumo nem fatura o servidor recusa o kit (comportamento anterior, coberto no teste de banco).
     await page.getByLabel("Tarifa (R$/kWh)").fill("");

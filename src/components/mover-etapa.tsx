@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronDown, MoreVertical } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, MoreVertical } from "lucide-react";
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { alternarEtiqueta } from "@/lib/acoes/negocios";
@@ -110,6 +110,57 @@ export function MoverEtapa({
         />
       )}
     </div>
+  );
+}
+
+/** Atalho para a próxima etapa do funil (pela ordem), com o mesmo comentário obrigatório do "Mover para". */
+export function AvancarEtapa({
+  negocioId,
+  etapaAtualId,
+  etapas,
+  motivos = [],
+  podeFechar,
+}: {
+  negocioId: string;
+  etapaAtualId: string;
+  /** Etapas ativas do funil, já na ordem. */
+  etapas: { id: string; nome: string; fechaComo?: "ganho" | "perdido" | null }[];
+  motivos?: MotivoDisponivel[];
+  /** Falso para o SDR: etapa que fecha o negócio sozinha não aparece como próxima. */
+  podeFechar: boolean;
+}) {
+  const [confirmando, setConfirmando] = useState(false);
+  const indice = etapas.findIndex((e) => e.id === etapaAtualId);
+  const proxima = indice >= 0 ? etapas[indice + 1] : undefined;
+  if (!proxima || (proxima.fechaComo && !podeFechar)) return null;
+
+  return (
+    <>
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-superficie-2 px-4 py-3">
+        <p className="min-w-0 text-sm text-texto-2">
+          Etapa: <span className="font-semibold text-texto">{etapas[indice].nome}</span>
+        </p>
+        <button
+          type="button"
+          onClick={() => setConfirmando(true)}
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-acao px-4 text-sm font-medium text-sobre-acao transition-colors hover:bg-acao-forte md:min-h-9"
+        >
+          Avançar para {proxima.nome}
+          <ArrowRight size={16} aria-hidden />
+        </button>
+      </div>
+      {confirmando && (
+        <ModalComentarioEtapa
+          negocioId={negocioId}
+          etapaId={proxima.id}
+          etapaNome={proxima.nome}
+          precisaMotivoPerda={proxima.fechaComo === "perdido"}
+          motivos={motivos}
+          aoConcluir={() => setConfirmando(false)}
+          aoCancelar={() => setConfirmando(false)}
+        />
+      )}
+    </>
   );
 }
 
