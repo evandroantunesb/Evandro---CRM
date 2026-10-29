@@ -64,3 +64,20 @@ export function somarDiasUteis(data: string, dias: number): string {
 
 /** AAAA-MM-DD → DD/MM/AAAA. */
 export const dataBr = (data: string) => data.split("-").reverse().join("/");
+
+type LinhaAberta = { responsavel_id: string | null; criado_por: string | null; setor: string };
+
+/** Quantas tarefas abertas há em cada aba (Concluídas não conta: não é pendência). */
+export function contarAbertasPorAba(linhas: LinhaAberta[], membroId: string): Record<Exclude<FiltroTarefasSetor, "concluidas">, number> {
+  return {
+    abertas: linhas.length,
+    minhas: linhas.filter((t) => t.responsavel_id === membroId).length,
+    fila: linhas.filter((t) => t.responsavel_id === null).length,
+    pedidas: linhas.filter((t) => t.criado_por === membroId).length,
+  };
+}
+
+/** Pendências de quem executa: as tarefas abertas com a pessoa e as da fila dos setores em que ela atua. */
+export function contarPendenciasDoSetor(linhas: LinhaAberta[], membroId: string, meusSetores: readonly string[]): number {
+  return linhas.filter((t) => t.responsavel_id === membroId || (t.responsavel_id === null && meusSetores.includes(t.setor))).length;
+}

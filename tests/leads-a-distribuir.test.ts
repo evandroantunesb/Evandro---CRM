@@ -80,4 +80,9 @@ describe("linksPendencias (sininho)", () => {
       expect(linksPendencias(papel, { leadsADistribuir: 0, demais: 0 })).toEqual([{ href: "/inicio", texto: "Nenhuma pendência" }]);
     }
   });
+
+  it("operação: as tarefas do setor levam à tela Tarefas", () => {
+    expect(linksPendencias("operacao", { leadsADistribuir: 0, demais: 2 })).toEqual([{ href: "/tarefas/setores", texto: "2 pendências" }]);
+    expect(linksPendencias("operacao", { leadsADistribuir: 0, demais: 0 })).toEqual([{ href: "/tarefas/setores", texto: "Nenhuma pendência" }]);
+  });
 });

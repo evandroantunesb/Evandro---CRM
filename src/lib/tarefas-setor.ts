@@ -4,6 +4,8 @@ import { NEGOCIOS, OBRAS, pode } from "@/lib/permissoes";
 import type { SupabaseServidor } from "@/lib/supabase/server";
 import type { Papel } from "@/lib/tipos";
 import {
+  contarAbertasPorAba,
+  contarPendenciasDoSetor,
   hojeBrasilia,
   SETORES_TAREFA,
   type FiltroTarefasSetor,
@@ -123,4 +125,28 @@ export async function carregarTarefasSetor(
       };
     }),
   };
+}
+
+async function abertasVisiveis(supabase: SupabaseServidor, empresaId: string) {
+  const { data } = await supabase
+    .from("tarefas_setor")
+    .select("responsavel_id, criado_por, setor")
+    .eq("empresa_id", empresaId)
+    .eq("status", "aberta")
+    .limit(1000);
+  return data ?? [];
+}
+
+/** Números das abas da tela de tarefas: abertas que a pessoa vê em cada aba. */
+export async function contarAbasTarefasSetor(supabase: SupabaseServidor, empresaId: string, membroId: string) {
+  return contarAbertasPorAba(await abertasVisiveis(supabase, empresaId), membroId);
+}
+
+/** Pendências de tarefas do setor para o sininho de quem executa nos setores. */
+export async function contarPendenciasTarefasSetor(supabase: SupabaseServidor, empresaId: string, membroId: string): Promise<number> {
+  const [linhas, { data: setores }] = await Promise.all([
+    abertasVisiveis(supabase, empresaId),
+    supabase.from("membro_setores_obra").select("setor").eq("empresa_id", empresaId).eq("membro_id", membroId),
+  ]);
+  return contarPendenciasDoSetor(linhas, membroId, (setores ?? []).map((s) => s.setor));
 }

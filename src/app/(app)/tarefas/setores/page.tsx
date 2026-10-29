@@ -4,7 +4,7 @@ import { Cartao } from "@/components/ui";
 import { TAREFAS, TAREFAS_DO_SETOR, TAREFAS_SETOR, pode } from "@/lib/permissoes";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { carregarTarefasSetor } from "@/lib/tarefas-setor";
+import { carregarTarefasSetor, contarAbasTarefasSetor } from "@/lib/tarefas-setor";
 import { FILTROS_TAREFAS_SETOR, ROTULO_FILTRO_TAREFAS_SETOR, type FiltroTarefasSetor } from "@/lib/tarefas-setor-regras";
 
 const VAZIO: Record<FiltroTarefasSetor, string> = {
@@ -24,12 +24,10 @@ export default async function TarefasSetores({ searchParams }: PageProps<"/taref
   const { ver } = await searchParams;
   const filtro: FiltroTarefasSetor = (FILTROS_TAREFAS_SETOR as readonly string[]).includes(ver as string) ? (ver as FiltroTarefasSetor) : "abertas";
   const supabase = await criarClienteServidor();
-  const { tarefas, membrosPorSetor } = await carregarTarefasSetor(supabase, {
-    empresaId: atual.empresaId,
-    membroId: atual.membroId,
-    papel: atual.papel,
-    filtro,
-  });
+  const [{ tarefas, membrosPorSetor }, porAba] = await Promise.all([
+    carregarTarefasSetor(supabase, { empresaId: atual.empresaId, membroId: atual.membroId, papel: atual.papel, filtro }),
+    contarAbasTarefasSetor(supabase, atual.empresaId, atual.membroId),
+  ]);
   const operacao = pode(atual.papel, TAREFAS_DO_SETOR);
   const atrasadas = tarefas.filter((t) => t.atrasada).length;
 
@@ -52,18 +50,26 @@ export default async function TarefasSetores({ searchParams }: PageProps<"/taref
       </div>
 
       <nav aria-label="Filtro" className="flex flex-wrap gap-2">
-        {FILTROS_TAREFAS_SETOR.map((f) => (
-          <Link
-            key={f}
-            href={f === "abertas" ? "/tarefas/setores" : `/tarefas/setores?ver=${f}`}
-            aria-current={f === filtro ? "page" : undefined}
-            className={`rounded-full border px-3 py-1 text-sm ${
-              f === filtro ? "border-dourado bg-dourado/10 text-texto" : "border-linha text-zinc-600 hover:border-dourado"
-            }`}
-          >
-            {ROTULO_FILTRO_TAREFAS_SETOR[f]}
-          </Link>
-        ))}
+        {FILTROS_TAREFAS_SETOR.map((f) => {
+          const abertas = f === "concluidas" ? 0 : porAba[f];
+          return (
+            <Link
+              key={f}
+              href={f === "abertas" ? "/tarefas/setores" : `/tarefas/setores?ver=${f}`}
+              aria-current={f === filtro ? "page" : undefined}
+              className={`rounded-full border px-3 py-1 text-sm ${
+                f === filtro ? "border-dourado bg-dourado/10 text-texto" : "border-linha text-zinc-600 hover:border-dourado"
+              }`}
+            >
+              {ROTULO_FILTRO_TAREFAS_SETOR[f]}
+              {abertas > 0 && (
+                <span className="ml-1.5 inline-flex min-w-5 items-center justify-center rounded-full bg-dourado px-1.5 text-xs font-semibold text-carvao">
+                  {abertas}
+                </span>
+              )}
+            </Link>
+          );
+        })}
       </nav>
 
       <Cartao titulo={`${ROTULO_FILTRO_TAREFAS_SETOR[filtro]} (${tarefas.length})${atrasadas ? ` · ${atrasadas} atrasada${atrasadas > 1 ? "s" : ""}` : ""}`}>
