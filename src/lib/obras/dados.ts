@@ -29,6 +29,12 @@ export type SetorObraVM = {
   aguardando: string | null;
   /** Nome do responsável principal ativo do setor; null se não houver. */
   principalNome: string | null;
+  /** O membro da sessão é o responsável principal (só quando a carga recebe `membroId`; o id não chega à tela). */
+  souPrincipal: boolean;
+  /** Desde quando o setor está no status atual (`status_desde`); null sem fluxo gravado. */
+  statusDesde: string | null;
+  /** Desde quando aguarda terceiro (`aguardando_desde`); null se não aguarda. */
+  aguardandoDesde: string | null;
 };
 
 export type ObraListaVM = {
@@ -93,7 +99,15 @@ type LinhaObra = {
   created_at: string;
 };
 
-type LinhaFluxo = { obra_id: string; setor: string; status: string; parado: boolean; aguardando: string | null };
+type LinhaFluxo = {
+  obra_id: string;
+  setor: string;
+  status: string;
+  parado: boolean;
+  aguardando: string | null;
+  status_desde: string;
+  aguardando_desde: string | null;
+};
 type LinhaMarco = { obra_id: string; marco: string; status: string };
 type LinhaParticipante = { obra_id: string; setor: string; membro_id: string };
 
@@ -179,11 +193,14 @@ export async function carregarObras(
     empresaId,
     papel,
     comResponsaveis = true,
+    membroId,
   }: {
     empresaId: string;
     papel: string | null | undefined;
     /** false: pula participantes e nomes (a navegação entre obras não usa `principalNome`). */
     comResponsaveis?: boolean;
+    /** Membro da sessão, para marcar `souPrincipal` (fila da Engenharia). */
+    membroId?: string;
   },
 ): Promise<{ obras: ObraListaVM[]; kpis: KpisObras }> {
   const fonte = fonteDadosObras(papel);
@@ -200,7 +217,7 @@ export async function carregarObras(
   const [fluxosRes, marcosRes, participantesRes] = await Promise.all([
     Promise.all(
       lotesDeIds.map((ids) =>
-        supabase.from("obra_fluxos").select("obra_id, setor, status, parado, aguardando").eq("empresa_id", empresaId).in("obra_id", ids),
+        supabase.from("obra_fluxos").select("obra_id, setor, status, parado, aguardando, status_desde, aguardando_desde").eq("empresa_id", empresaId).in("obra_id", ids),
       ),
     ),
     Promise.all(lotesDeIds.map((ids) => supabase.from("obra_marcos").select("obra_id, marco, status").eq("empresa_id", empresaId).in("obra_id", ids))),
@@ -246,6 +263,9 @@ export async function carregarObras(
         estado: estadoSetor({ setor, status, parado: fluxo?.parado ?? false, aguardando: fluxo?.aguardando ?? null }),
         aguardando: fluxo?.aguardando ? rotuloAguardando(fluxo.aguardando) : null,
         principalNome: (principal && nomes.get(principal.membro_id)) || null,
+        souPrincipal: membroId != null && principal?.membro_id === membroId,
+        statusDesde: fluxo?.status_desde ?? null,
+        aguardandoDesde: fluxo?.aguardando_desde ?? null,
       };
     });
     return {
