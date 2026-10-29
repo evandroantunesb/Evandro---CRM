@@ -167,3 +167,25 @@ export async function encerrarParticipanteObra(_: ResultadoAcao, formData: FormD
   if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível encerrar a participação.") };
   return concluir(dados.data.obraId, "Participação encerrada.");
 }
+
+const esquemaFixacao = z.object({
+  obraId: uuid,
+  // Vazio = sem fixação definida (limpa).
+  fixacaoId: z.union([z.literal(""), uuid]),
+});
+
+/** Fixação do telhado da obra (lista da empresa). Engenharia, Compras ou Operacional; quem decide é a RPC. */
+export async function definirFixacaoObra(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  await exigirPapel(...GERIR_OBRAS);
+  const dados = esquemaFixacao.safeParse(Object.fromEntries(formData));
+  if (!dados.success) return { ok: false, mensagem: "Dados inválidos." };
+
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.rpc("definir_fixacao_obra", {
+    p_obra_id: dados.data.obraId,
+    // Sem o parâmetro, a RPC usa o padrão nulo: limpa a escolha.
+    ...(dados.data.fixacaoId ? { p_fixacao_id: dados.data.fixacaoId } : {}),
+  });
+  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível salvar a fixação.") };
+  return concluir(dados.data.obraId, dados.data.fixacaoId ? "Fixação salva." : "Fixação removida.");
+}

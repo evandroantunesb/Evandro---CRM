@@ -63,6 +63,13 @@ Histórico: a migration da #139 foi aplicada em produção antes do merge, com a
 
 ## Em andamento
 
+### Obras: tipo de fixação do telhado (2026-10-29, branch `feat/obras-fixacao-telhado`, PR rascunho)
+
+PR 1 do desenho "Obras: o que Engenharia, Compras e Operacional recebem" (Claude Doc). Decisão do Evandro: a fixação saiu do kit (#243) e passa a ser escolhida na obra, por Engenharia, Compras ou Operacional, de uma lista que cada empresa monta em Configurações (`/configuracoes/fixacoes`, só admin).
+
+- Migration `20261029150000_obras_fixacao_telhado.sql`: `fixacoes_telhado` (lista, sem DELETE), `obra_fixacao` (escolha, só via RPC), RPC `definir_fixacao_obra`, novo tipo `fixacao_definida` no histórico. Snapshot da venda intocado ("Informado na venda" continua visível como referência).
+- **Falta para retomar:** aplicar o diff de `database.types.ts` que o CI imprime (o typecheck só passa depois disso), escrever `tests/obras-fixacao-db.test.ts` (permissões por setor, obra cancelada, opção de outra empresa/desativada, histórico) e checar no preview. Migration precisa ir para produção pelo `banco-producao.yml` antes do merge.
+
 ### Eletroposto — segundo tipo de negócio (2026-10-26)
 
 - **Decisões do Evandro (26/10/2026):** "Novo negócio" abre um pop-up **obrigatório** de escolha entre Energia solar (fluxo atual) e Eletroposto (carregador DC 80 kW, modelos IBS Basic R$ 99.900, Full R$ 119.900 e Full Screen R$ 149.900, preços fixos de catálogo, sem edição). Cadastro: nome, WhatsApp, endereço do cliente, local próprio (sim/não) e usina FV (sim/não) — os dois últimos só para o vendedor, não mudam a proposta. Vários modelos = negócio sem valor até o cliente escolher. Proposta fiel ao modelo de 4 páginas da IBS, na identidade visual do Raion por enquanto; consultor = responsável pelo negócio.

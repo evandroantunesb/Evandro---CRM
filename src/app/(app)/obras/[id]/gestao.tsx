@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useState, type ReactNode } from "react";
 import { Botao, Mensagem, Selecao } from "@/components/ui";
 import { useEnvioSemReset } from "@/components/envio-sem-reset";
@@ -8,10 +9,11 @@ import {
   atribuirParticipanteObra,
   atualizarMarcoObra,
   definirAguardandoFluxoObra,
+  definirFixacaoObra,
   encerrarParticipanteObra,
   marcarParadoFluxoObra,
 } from "@/lib/acoes/obras";
-import type { MarcoDetalheVM, ParticipanteGestaoVM, SetorDetalheVM, SetorGestaoVM } from "@/lib/obras/detalhe";
+import type { FixacaoObraVM, MarcoDetalheVM, ParticipanteGestaoVM, SetorDetalheVM, SetorGestaoVM } from "@/lib/obras/detalhe";
 import { FUNCOES_OPERACIONAIS } from "@/lib/obras/gestao";
 import { AGUARDANDO_OBRA, ROTULO_FUNCAO_PARTICIPANTE, ROTULO_SETOR, STATUS_POR_SETOR, rotuloAguardando, rotuloStatus } from "@/lib/obras/rotulos";
 
@@ -388,5 +390,55 @@ export function GestaoMarco({ obraId, marco }: { obraId: string; marco: MarcoDet
       )}
       <Mensagem resultado={resultado} />
     </form>
+  );
+}
+
+/** Escolha da fixação do telhado (Engenharia, Compras ou Operacional). Sem opções, aponta para Configurações. */
+export function GestaoFixacao({ obraId, fixacao, podeConfigurar }: { obraId: string; fixacao: FixacaoObraVM; podeConfigurar: boolean }) {
+  const [resultado, acao, pendente] = useActionState(definirFixacaoObra, null);
+  const enviar = useEnvioSemReset(acao);
+  const atualId = fixacao.atual?.id ?? "";
+  const [escolhido, setEscolhido] = useState(atualId);
+  const [base, setBase] = useState(atualId);
+  if (base !== atualId) {
+    setBase(atualId);
+    setEscolhido(atualId);
+  }
+
+  if (fixacao.opcoes.length === 0) {
+    return (
+      <p className="text-sm text-zinc-600">
+        A empresa ainda não cadastrou os tipos de fixação.{" "}
+        {podeConfigurar ? (
+          <Link href="/configuracoes/fixacoes" className="font-medium text-dourado-texto underline-offset-2 hover:underline">
+            Cadastrar em Configurações
+          </Link>
+        ) : (
+          "Peça ao admin para cadastrar em Configurações."
+        )}
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-2 text-sm">
+      <form onSubmit={enviar} className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <input type="hidden" name="obraId" value={obraId} />
+        <div className="min-w-0 sm:w-72">
+          <Selecao name="fixacaoId" aria-label="Tipo de fixação" value={escolhido} onChange={(e) => setEscolhido(e.target.value)}>
+            <option value="">Não definida</option>
+            {fixacao.opcoes.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.nome}
+              </option>
+            ))}
+          </Selecao>
+        </div>
+        <Botao type="submit" variante="secundario" disabled={pendente || escolhido === atualId}>
+          {pendente ? "Salvando..." : "Salvar fixação"}
+        </Botao>
+      </form>
+      <Mensagem resultado={resultado} />
+    </div>
   );
 }

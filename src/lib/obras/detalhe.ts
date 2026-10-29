@@ -109,6 +109,18 @@ export type ObraDetalheVM = {
   historico: ItemHistoricoVM[];
   /** Controles do modo Gestão; null para quem não tem nenhuma autorização de escrita (gestor, vendedor, SDR...). */
   gestao: GestaoObraVM | null;
+  fixacao: FixacaoObraVM;
+};
+
+export type OpcaoFixacaoVM = { id: string; nome: string };
+
+/** Fixação do telhado escolhida na obra (lista da empresa em Configurações). */
+export type FixacaoObraVM = {
+  atual: OpcaoFixacaoVM | null;
+  /** Opções ativas da empresa (e a atual, mesmo desativada); só para quem pode escolher. */
+  opcoes: OpcaoFixacaoVM[];
+  /** Admin, coordenador ou participante ativo de Engenharia, Compras ou Operacional, em obra não cancelada. */
+  podeEditar: boolean;
 };
 
 /** Participação operacional ativa, com o id que as RPCs de encerrar/substituir exigem. */
@@ -383,6 +395,9 @@ export async function carregarDetalheObra(
       })
     : null;
 
+  const podeEditarFixacao = !obra.canceladaEm && Boolean(gestao?.setores.some((g) => g.permissoes.autorizacao));
+  const fixacao = await carregarFixacao(supabase, { empresaId, obraId, comOpcoes: podeEditarFixacao });
+
   return {
     resumo,
     contatoCliente: obra.contato,
@@ -393,7 +408,29 @@ export async function carregarDetalheObra(
     valorVendido: numeroOuNull(valorRes.data?.valor_vendido),
     historico: montarHistorico(historicoRes.data ?? [], nomes),
     gestao,
+    fixacao: { ...fixacao, podeEditar: podeEditarFixacao && fixacao.disponivel },
   };
+}
+
+/**
+ * Fixação da obra e, para quem escolhe, as opções da empresa. O preview da Vercel usa o banco de
+ * produção: enquanto a migration da fixação não estiver aplicada, as tabelas não existem e o
+ * bloco some (sem erro na página).
+ */
+async function carregarFixacao(
+  supabase: SupabaseServidor,
+  { empresaId, obraId, comOpcoes }: { empresaId: string; obraId: string; comOpcoes: boolean },
+): Promise<{ atual: OpcaoFixacaoVM | null; opcoes: OpcaoFixacaoVM[]; disponivel: boolean }> {
+  const [escolhaRes, listaRes] = await Promise.all([
+    supabase.from("obra_fixacao").select("fixacao_id").eq("obra_id", obraId).eq("empresa_id", empresaId).maybeSingle(),
+    supabase.from("fixacoes_telhado").select("id, nome, ativa").eq("empresa_id", empresaId).order("nome"),
+  ]);
+  if (escolhaRes.error || listaRes.error) return { atual: null, opcoes: [], disponivel: false };
+  const lista = listaRes.data ?? [];
+  const escolhida = lista.find((f) => f.id === escolhaRes.data?.fixacao_id) ?? null;
+  const atual = escolhida ? { id: escolhida.id, nome: escolhida.nome } : null;
+  const opcoes = comOpcoes ? lista.filter((f) => f.ativa || f.id === atual?.id).map((f) => ({ id: f.id, nome: f.nome })) : [];
+  return { atual, opcoes, disponivel: true };
 }
 
 type LinhaParticipanteDetalhe = { id: string; setor: string; membro_id: string; funcao: string; principal: boolean };

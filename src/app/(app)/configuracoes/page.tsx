@@ -16,6 +16,7 @@ import {
   Thermometer,
   UserCog,
   Users,
+  Wrench,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -53,6 +54,13 @@ const GRUPOS: { id: string; titulo: string; itens: Item[] }[] = [
       { href: "/configuracoes/calculadora", titulo: "Kits e calculadora", descricao: "Kits prontos do catálogo e parâmetros do cálculo.", Icone: Calculator },
       { href: "/configuracoes/propostas", titulo: "Propostas comerciais", descricao: "Modelos e identidade visual das propostas.", Icone: FileText },
       { href: "/configuracoes/contrato", titulo: "Modelo de contrato", descricao: "Texto do contrato, com campos preenchidos sozinhos.", Icone: FileSignature },
+    ],
+  },
+  {
+    id: "obras",
+    titulo: "Obras",
+    itens: [
+      { href: "/configuracoes/fixacoes", titulo: "Tipos de fixação", descricao: "Opções de fixação do telhado escolhidas na obra.", Icone: Wrench },
     ],
   },
   {
