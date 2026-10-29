@@ -430,6 +430,10 @@ const obraRpc = (extra: Linha = {}): Linha => ({
   cliente_telefone: null,
   cliente_telefone2: null,
   cliente_documento: null,
+  cliente_rg: null,
+  cliente_data_nascimento: null,
+  cliente_email: null,
+  cliente_inscricao_estadual: null,
   ...extra,
 });
 
@@ -546,7 +550,16 @@ describe("carregarDetalheObra: operacao", () => {
   it("contato só com os campos não nulos da RPC", async () => {
     const f = operacao({ cliente_endereco: "Rua A, 10", cliente_telefone: "45999990000", cliente_telefone2: null, cliente_documento: null });
     const vm = await carregarDetalheObra(f.cliente, { empresaId: EMPRESA, papel: "operacao", obraId: OBRA });
-    expect(vm?.contatoCliente).toEqual({ endereco: "Rua A, 10", telefone: "45999990000", telefone2: null, documento: null });
+    expect(vm?.contatoCliente).toEqual({
+      endereco: "Rua A, 10",
+      telefone: "45999990000",
+      telefone2: null,
+      documento: null,
+      rg: null,
+      nascimento: null,
+      email: null,
+      inscricaoEstadual: null,
+    });
   });
 
   it("sem nenhum campo de contato, contatoCliente é null", async () => {

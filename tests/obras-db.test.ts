@@ -10,7 +10,7 @@
 import { Client } from "pg";
 import { urlBancoLocal } from "./banco-local";
 import { beforeAll, describe, expect, it } from "vitest";
-import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
 
 let admin: Usuario;
 let gestor: Usuario;
@@ -70,7 +70,7 @@ beforeAll(async () => {
 async function criarNegocio(titulo: string, responsavelId: string, valor = 30000) {
   const { data: c } = await servico
     .from("contatos")
-    .insert({ empresa_id: empresa, nome: `Cliente ${titulo}`, cidade: "Goiânia", uf: "GO" })
+    .insert({ ...CLIENTE_CONTRATO, empresa_id: empresa, nome: `Cliente ${titulo}`, cidade: "Goiânia", uf: "GO" })
     .select("id")
     .single();
   const { data, error } = await servico

@@ -17,7 +17,7 @@ import { join } from "node:path";
 import { Client } from "pg";
 import { urlBancoLocal } from "./banco-local";
 import { beforeAll, describe, expect, it } from "vitest";
-import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
 
 const NOMES = [
   "admin",
@@ -134,7 +134,7 @@ beforeAll(async () => {
 async function negocio(titulo: string, responsavel: Nome = "sdr", emOutra = false) {
   const { data: c } = await servico
     .from("contatos")
-    .insert({ empresa_id: emOutra ? outra : empresa, nome: `Cliente ${titulo}`, telefone: "45999990000" })
+    .insert({ ...CLIENTE_CONTRATO, empresa_id: emOutra ? outra : empresa, nome: `Cliente ${titulo}`, telefone: "45999990000" })
     .select("id")
     .single();
   const { data, error } = await servico

@@ -13,7 +13,7 @@
  * sem se duplicar nem se confundir.
  */
 import { beforeAll, describe, expect, it } from "vitest";
-import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
 
 let sdr1: Usuario;
 let closer: Usuario;
@@ -46,7 +46,7 @@ beforeAll(async () => {
   const { data: et } = await servico.from("etapas").select("id").eq("funil_id", funil).order("ordem").limit(1).single();
   etapaInicial = et!.id;
 
-  const { data: c } = await servico.from("contatos").insert({ empresa_id: empresa, nome: "Cliente handoff won causal" }).select("id").single();
+  const { data: c } = await servico.from("contatos").insert({ ...CLIENTE_CONTRATO, empresa_id: empresa, nome: "Cliente handoff won causal" }).select("id").single();
   contato = c!.id;
 });
 

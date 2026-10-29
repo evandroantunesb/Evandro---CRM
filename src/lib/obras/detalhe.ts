@@ -88,6 +88,11 @@ export type ContatoClienteVM = {
   telefone: string | null;
   telefone2: string | null;
   documento: string | null;
+  rg: string | null;
+  /** dd/mm/aaaa */
+  nascimento: string | null;
+  email: string | null;
+  inscricaoEstadual: string | null;
 };
 
 export type ObraDetalheVM = {
@@ -210,6 +215,10 @@ async function lerObraOperacao(supabase: SupabaseServidor, empresaId: string, ob
     telefone: textoOuNull(o.cliente_telefone),
     telefone2: textoOuNull(o.cliente_telefone2),
     documento: textoOuNull(o.cliente_documento),
+    rg: textoOuNull(o.cliente_rg),
+    nascimento: textoOuNull(o.cliente_data_nascimento)?.split("-").reverse().join("/") ?? null,
+    email: textoOuNull(o.cliente_email),
+    inscricaoEstadual: textoOuNull(o.cliente_inscricao_estadual),
   };
   return {
     id: o.obra_id,

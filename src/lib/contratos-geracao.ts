@@ -10,6 +10,7 @@ import {
 } from "@/lib/contrato";
 import { calculoEhIncompleto, calculoEhLegado, carregarVigencia, mensagemDeRecusa, motivosDaAcao } from "@/lib/calculo-vigencia";
 import { MENSAGEM_PRECO_DESATUALIZADO, precoDoCalculoDesatualizado } from "@/lib/calculo-preco";
+import { mensagemPendenciasContrato, pendenciasDadosContrato, type DadosClienteContrato } from "@/lib/dados-cliente-contrato";
 import { mensagemErro } from "@/lib/erros";
 import { formatarMoeda } from "@/lib/formatacao";
 import type { SupabaseServidor } from "@/lib/supabase/server";
@@ -32,7 +33,7 @@ export async function gerarContratoComCliente(
       supabase
         .from("negocios")
         .select(
-          "titulo, numero, valor, unidade_consumidora, qualif_distribuidora, consumo_medio_kwh, responsavel_id, contatos(nome, documento, endereco, cidade, uf, email, telefone, telefone2)",
+          "titulo, numero, valor, unidade_consumidora, qualif_distribuidora, consumo_medio_kwh, responsavel_id, contatos(tipo, nome, documento, rg, data_nascimento, inscricao_estadual, endereco, cep, logradouro, numero, bairro, cidade, uf, email, telefone, telefone2)",
         )
         .eq("id", negocioId)
         .maybeSingle(),
@@ -93,6 +94,11 @@ export async function gerarContratoComCliente(
   if (!contratoProntoParaCliente(conteudoPreenchido)) {
     return { ok: false, mensagem: `O contrato ficaria com campos sem resolver: ${marcadoresPendentes(conteudoPreenchido).join(", ") || "chaves sem par"}.` };
   }
+
+  // Dados do cliente obrigatórios, além dos que o modelo usa (a mesma regra trava o contrato no banco, ver
+  // `pendencias_contrato_contato`). Por último: as recusas que já existiam continuam com a mesma mensagem.
+  const pendencias = pendenciasDadosContrato(negocio.contatos as unknown as DadosClienteContrato | null);
+  if (pendencias.length) return { ok: false, mensagem: mensagemPendenciasContrato(pendencias) };
 
   const { error } = await supabase.from("contratos").upsert(
     { empresa_id: empresaId, negocio_id: negocioId, conteudo: conteudoPreenchido, criado_por: membroId, atualizado_por: membroId },

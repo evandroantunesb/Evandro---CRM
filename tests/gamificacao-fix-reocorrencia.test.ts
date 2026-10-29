@@ -17,7 +17,7 @@
  * aqui só se acrescenta a cobertura de que `unica_por_negocio` também funciona nesse evento.
  */
 import { beforeAll, describe, expect, it } from "vitest";
-import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
 
 let sdr1: Usuario;
 let closer: Usuario;
@@ -61,7 +61,7 @@ beforeAll(async () => {
     { empresa_id: empresa, equipe_id: equipe!.id, membro_id: membro[closer.id], e_gestor: false },
   ]);
 
-  const { data: c } = await servico.from("contatos").insert({ empresa_id: empresa, nome: "Cliente fix reocorrência" }).select("id").single();
+  const { data: c } = await servico.from("contatos").insert({ ...CLIENTE_CONTRATO, empresa_id: empresa, nome: "Cliente fix reocorrência" }).select("id").single();
   contato = c!.id;
 });
 

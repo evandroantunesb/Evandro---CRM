@@ -232,13 +232,13 @@ jobs:
       # Trava fail-closed: o conjunto do dry-run acima precisa ser exatamente o autorizado, senão o
       # job termina aqui, antes da aplicação. Sem credenciais. Para autorizar outro conjunto, a lista
       # abaixo muda por commit revisado (e uma nova tag), nunca por entrada do operador.
-      # Dados pessoais da obra fora da API: bloco `cliente` sai de obras.snapshot para obra_cliente (sem policy),
-      # com garantir_obra, marcar_venda_alterada_obra e obras_operacao ajustadas; a fixação do telhado (#245) já
-      # tem de estar aplicada.
+      # Dados do cliente obrigatórios para o contrato: colunas novas em contatos, trava em contratos para o usuário
+      # do app, snapshot do cliente da obra com os campos novos e obras_operacao com a matriz por setor; os dados
+      # pessoais da obra fora da API (#247) já têm de estar aplicados.
       - name: Conferir que o conjunto pendente é exatamente o autorizado
         env:
           MIGRATIONS_AUTORIZADAS: |
-                        20261029170000_obras_cliente_oculto.sql
+                        20261029190000_dados_cliente_contrato.sql
         run: bash .github/scripts/validar-conjunto-migrations.sh "$RUNNER_TEMP/dry-run.txt"
       - name: Aplicar (supabase db push --include-all)
         env:

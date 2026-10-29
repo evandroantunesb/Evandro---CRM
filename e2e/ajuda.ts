@@ -11,6 +11,20 @@ export const ARQUIVO_BASE = join(__dirname, ".estado", "base.json");
 export const PASTA_CAPTURAS = join(__dirname, "..", "e2e-capturas");
 
 export const lerBase = (): BaseFicticia => JSON.parse(readFileSync(ARQUIVO_BASE, "utf8"));
+/** Dados do cliente que o contrato exige (20261029190000_dados_cliente_contrato.sql): CPF válido, pessoa física. */
+export const CLIENTE_CONTRATO = {
+  documento: "529.982.247-25",
+  rg: "12.345.678-9",
+  data_nascimento: "1980-05-10",
+  email: "cliente.contrato@exemplo.test",
+  telefone: "(45) 90000-0000",
+  cep: "85810000",
+  logradouro: "Rua Fictícia",
+  numero: "100",
+  bairro: "Centro",
+  cidade: "Cascavel",
+  uf: "PR",
+};
 
 export const RESOLUCOES = {
   desktop: { width: 1440, height: 900 },

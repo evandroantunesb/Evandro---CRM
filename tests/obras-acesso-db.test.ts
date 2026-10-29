@@ -12,7 +12,7 @@ import { randomUUID } from "node:crypto";
 import { Client } from "pg";
 import { urlBancoLocal } from "./banco-local";
 import { beforeAll, describe, expect, it } from "vitest";
-import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
 
 
 let admin: Usuario;
@@ -53,6 +53,8 @@ const PESSOAIS = {
   telefone2: "(62) 98888-0002",
   email: "cliente.sigiloso@exemplo.test",
   endereco: "Rua Sigilosa, 123 - Setor Teste",
+  rg: "11.222.333-4",
+  data_nascimento: "1975-03-20",
 };
 
 async function noBanco(sql: string, params: unknown[]) {
@@ -99,6 +101,7 @@ async function criarVenda(
   const { data: c } = await servico
     .from("contatos")
     .insert({
+      ...CLIENTE_CONTRATO,
       empresa_id: emp,
       nome: `Cliente ${titulo}`,
       cidade: "Goiânia",
@@ -108,6 +111,8 @@ async function criarVenda(
       telefone2: PESSOAIS.telefone2,
       email: PESSOAIS.email,
       endereco: PESSOAIS.endereco,
+      rg: PESSOAIS.rg,
+      data_nascimento: PESSOAIS.data_nascimento,
     })
     .select("id")
     .single();
@@ -527,9 +532,13 @@ describe("operacao: dados pessoais do cliente (obras_operacao)", () => {
     "cancelada_em",
     "cancelamento_motivo",
     "cidade",
+    "cliente_data_nascimento",
     "cliente_documento",
+    "cliente_email",
     "cliente_endereco",
+    "cliente_inscricao_estadual",
     "cliente_nome",
+    "cliente_rg",
     "cliente_telefone",
     "cliente_telefone2",
     "created_at",
@@ -564,21 +573,27 @@ describe("operacao: dados pessoais do cliente (obras_operacao)", () => {
     expect(l.cliente_endereco).toBe(esperado.endereco ? PESSOAIS.endereco : null);
     expect(l.cliente_telefone).toBe(esperado.telefone ? PESSOAIS.telefone : null);
     expect(l.cliente_telefone2).toBe(esperado.telefone ? PESSOAIS.telefone2 : null);
+    // `documento` = identificação do cliente, só para a Engenharia (20261029190000_dados_cliente_contrato.sql).
     expect(l.cliente_documento).toBe(esperado.documento ? PESSOAIS.documento : null);
+    expect(l.cliente_rg).toBe(esperado.documento ? PESSOAIS.rg : null);
+    expect(l.cliente_data_nascimento).toBe(esperado.documento ? PESSOAIS.data_nascimento : null);
+    expect(l.cliente_email).toBe(esperado.documento ? PESSOAIS.email : null);
+    expect(l.cliente_inscricao_estadual).toBeNull();
     // Snapshot técnico preservado, sem o bloco `cliente`.
     const snapshot = l.snapshot as Record<string, unknown>;
     expect(snapshot).not.toHaveProperty("cliente");
     expect(snapshot).toHaveProperty("negocio");
     expect(snapshot).toHaveProperty("kit");
-    // Serialização: e-mail nunca; o resto só se autorizado.
+    // Serialização: nada além do autorizado.
     const json = JSON.stringify(l);
-    expect(json).not.toContain(PESSOAIS.email);
     if (!esperado.endereco) expect(json).not.toContain(PESSOAIS.endereco);
     if (!esperado.telefone) {
       expect(json).not.toContain(PESSOAIS.telefone);
       expect(json).not.toContain(PESSOAIS.telefone2);
     }
-    if (!esperado.documento) expect(json).not.toContain(PESSOAIS.documento);
+    if (!esperado.documento) {
+      for (const valor of [PESSOAIS.documento, PESSOAIS.rg, PESSOAIS.data_nascimento, PESSOAIS.email]) expect(json).not.toContain(valor);
+    }
     // Nenhum valor em dinheiro.
     expect(Object.keys(l).some((k) => k.includes("valor"))).toBe(false);
   }
@@ -599,15 +614,15 @@ describe("operacao: dados pessoais do cliente (obras_operacao)", () => {
     }
   });
 
-  it("matriz: operacional recebe endereço e telefones; engenharia, endereço e CPF/CNPJ; compras, nada", async () => {
+  it("matriz: operacional recebe endereço e telefones; engenharia, tudo; compras, só o endereço", async () => {
     confere(await linha(opInstalador, obraA), { endereco: true, telefone: true, documento: false });
     confere(await linha(opParticipante, obraA), {
       endereco: true,
-      telefone: false,
+      telefone: true,
       documento: true,
     });
     confere(await linha(opComprador, obraA), {
-      endereco: false,
+      endereco: true,
       telefone: false,
       documento: false,
     });

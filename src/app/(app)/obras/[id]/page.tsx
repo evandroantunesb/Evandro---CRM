@@ -316,7 +316,11 @@ function ContatoCliente({ contato }: { contato: ContatoClienteVM }) {
       {contato.endereco && <Campo rotulo="Endereço">{contato.endereco}</Campo>}
       {contato.telefone && <Campo rotulo="Telefone">{contato.telefone}</Campo>}
       {contato.telefone2 && <Campo rotulo="Telefone 2">{contato.telefone2}</Campo>}
+      {contato.email && <Campo rotulo="E-mail">{contato.email}</Campo>}
       {contato.documento && <Campo rotulo="CPF/CNPJ">{contato.documento}</Campo>}
+      {contato.rg && <Campo rotulo="RG">{contato.rg}</Campo>}
+      {contato.nascimento && <Campo rotulo="Data de nascimento">{contato.nascimento}</Campo>}
+      {contato.inscricaoEstadual && <Campo rotulo="Inscrição estadual">{contato.inscricaoEstadual}</Campo>}
     </dl>
   );
 }

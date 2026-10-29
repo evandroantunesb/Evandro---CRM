@@ -773,15 +773,23 @@ export type Database = {
       };
       contatos: {
         Row: {
+          bairro: string | null;
+          cep: string | null;
           cidade: string | null;
+          complemento: string | null;
           created_at: string;
           criado_por: string | null;
+          data_nascimento: string | null;
           documento: string | null;
           email: string | null;
           empresa_id: string;
           endereco: string | null;
           id: string;
+          inscricao_estadual: string | null;
+          logradouro: string | null;
           nome: string;
+          numero: string | null;
+          rg: string | null;
           telefone: string | null;
           telefone_digitos: string | null;
           telefone2: string | null;
@@ -790,15 +798,23 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          bairro?: string | null;
+          cep?: string | null;
           cidade?: string | null;
+          complemento?: string | null;
           created_at?: string;
           criado_por?: string | null;
+          data_nascimento?: string | null;
           documento?: string | null;
           email?: string | null;
           empresa_id: string;
           endereco?: string | null;
           id?: string;
+          inscricao_estadual?: string | null;
+          logradouro?: string | null;
           nome: string;
+          numero?: string | null;
+          rg?: string | null;
           telefone?: string | null;
           telefone_digitos?: never;
           telefone2?: string | null;
@@ -807,15 +823,23 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
+          bairro?: string | null;
+          cep?: string | null;
           cidade?: string | null;
+          complemento?: string | null;
           created_at?: string;
           criado_por?: string | null;
+          data_nascimento?: string | null;
           documento?: string | null;
           email?: string | null;
           empresa_id?: string;
           endereco?: string | null;
           id?: string;
+          inscricao_estadual?: string | null;
+          logradouro?: string | null;
           nome?: string;
+          numero?: string | null;
+          rg?: string | null;
           telefone?: string | null;
           telefone_digitos?: never;
           telefone2?: string | null;
@@ -4672,9 +4696,13 @@ export type Database = {
           cancelada_em: string;
           cancelamento_motivo: string;
           cidade: string;
+          cliente_data_nascimento: string;
           cliente_documento: string;
+          cliente_email: string;
           cliente_endereco: string;
+          cliente_inscricao_estadual: string;
           cliente_nome: string;
+          cliente_rg: string;
           cliente_telefone: string;
           cliente_telefone2: string;
           created_at: string;
@@ -4717,6 +4745,7 @@ export type Database = {
           tipo_cliente: string;
         }[];
       };
+      pendencias_contrato_contato: { Args: { p_contato_id: string }; Returns: string[] };
       pode_registrar_pagamento_negocio: { Args: { p_negocio_id: string }; Returns: boolean };
       pode_responder_handoff: { Args: { p_handoff_id: string }; Returns: boolean };
       pode_ver_avatar: { Args: { p_pasta: string }; Returns: boolean };

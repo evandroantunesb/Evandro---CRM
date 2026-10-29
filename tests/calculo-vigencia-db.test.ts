@@ -30,7 +30,7 @@ const { gerarLinkProposta } = await import("@/lib/acoes/propostas");
 const { gerarContratoComCliente } = await import("@/lib/contratos-geracao");
 const { atualizarPrecoCalculoComCliente, salvarKitComCliente } = await import("@/lib/negocios-gravacao");
 const { MENSAGEM_CONTRATO_CALCULO_DESATUALIZADO, MENSAGEM_PRECO_CALCULO_LEGADO } = await import("@/lib/calculo-vigencia");
-const { criarUsuario, servico, sufixo } = await import("./ajuda");
+const { CLIENTE_CONTRATO, criarUsuario, servico, sufixo } = await import("./ajuda");
 const { nomeKitPersonalizado } = await import("@/lib/calculadora");
 const { mensagemDeRecusa, MENSAGEM_PROPOSTA_ECONOMIA_INDISPONIVEL } = await import("@/lib/calculo-vigencia");
 const { mensagemPropostaIncompleta, pendenciasSemDados } = await import("@/lib/estimativa-financeira");
@@ -85,7 +85,7 @@ const COMPONENTES_KIT = [
 async function negocioComCalculo(nome: string, opcoes: { semCalculo?: boolean } = {}) {
   const { data: c, error: e1 } = await servico
     .from("contatos")
-    .insert({ empresa_id: empresa, nome: `Cliente ${nome}`, documento: "123.456.789-09", telefone: "(45) 90000-0000" })
+    .insert({ ...CLIENTE_CONTRATO, empresa_id: empresa, nome: `Cliente ${nome}`, documento: "123.456.789-09", telefone: "(45) 90000-0000" })
     .select("id")
     .single();
   if (e1) throw e1;

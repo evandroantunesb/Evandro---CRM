@@ -165,7 +165,23 @@ export async function criarBaseFicticia(): Promise<BaseFicticia> {
     const contato = ok(
       await servico
         .from("contatos")
-        .insert({ empresa_id: emp, nome: cliente, cidade, uf: "PR", telefone: "(45) 90000-0000", endereco: "Rua Fictícia, 100", documento: "000.000.000-00" })
+        .insert({
+          empresa_id: emp,
+          nome: cliente,
+          cidade,
+          uf: "PR",
+          telefone: "(45) 90000-0000",
+          endereco: "Rua Fictícia, 100",
+          documento: "000.000.000-00",
+          // Dados que o contrato exige (20261029190000_dados_cliente_contrato.sql).
+          rg: "00.000.000-0",
+          data_nascimento: "1980-01-01",
+          email: "cliente.ficticio@exemplo.test",
+          cep: "85810000",
+          logradouro: "Rua Fictícia",
+          numero: "100",
+          bairro: "Centro",
+        })
         .select("id")
         .single(),
       "contato",

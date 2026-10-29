@@ -16,10 +16,12 @@ import { carregarVigencia, mensagemDeRecusa, motivosDaAcao } from "@/lib/calculo
 import { montarLinhaCalculo } from "@/lib/calculo-servidor";
 import { atualizarPrecoDoCalculo, autorizarGravacaoCalculo, gravarLinhaCalculo, marcarCalculoDesatualizado } from "@/lib/calculo-gravacao";
 import type { Pendencia } from "@/lib/estimativa-financeira";
+import { cnpjValido, cpfValido, formatarDocumento, soDigitos } from "@/lib/dados-cliente-contrato";
 import { mensagemErro } from "@/lib/erros";
 import { lerNumeroBr, MENSAGEM_NUMERO_BR } from "@/lib/formatacao";
 import {
   completarContato,
+  montarEndereco,
   MENSAGEM_CALCULO_NAO_CONFERIDO,
   MENSAGEM_REMOCAO_COM_CALCULO,
   MENSAGEM_REMOCAO_SEM_CONFIRMACAO,
@@ -134,6 +136,12 @@ const esquemaNovo = z.object({
   contato_endereco: textoOpcional(300, "Endereço muito longo"),
   contato_cidade: textoOpcional(120, "Cidade muito longa"),
   contato_uf: ufOpcional,
+  // Partes do endereço em colunas próprias (o contrato exige). CEP só com 8 dígitos; outro valor fica de fora.
+  contato_cep: textoOpcional().transform((v) => (v && soDigitos(v).length === 8 ? soDigitos(v) : null)),
+  contato_logradouro: textoOpcional(200, "Rua muito longa"),
+  contato_numero: textoOpcional(20, "Número muito longo"),
+  contato_bairro: textoOpcional(120, "Bairro muito longo"),
+  contato_complemento: textoOpcional(120, "Complemento muito longo"),
   // Calculadora solar: roda no backend a partir do kit personalizado, quando há tarifa.
   tipo_ligacao: z.enum(TIPOS_LIGACAO).optional(),
   consumo_medio_kwh: numeroBrOpcional,
@@ -198,7 +206,16 @@ export async function criarNegocioComCliente(supabase: SupabaseServidor, atual: 
   const problema = d.anexos.map(problemaArquivo).find(Boolean);
   if (problema) return { ok: false, mensagem: `${problema} Escolha outro arquivo.` };
   const avisos: AvisoCriacao[] = [];
-  const local = { endereco: d.contato_endereco, cidade: d.contato_cidade, uf: d.contato_uf };
+  const local = {
+    endereco: d.contato_endereco,
+    cidade: d.contato_cidade,
+    uf: d.contato_uf,
+    cep: d.contato_cep,
+    logradouro: d.contato_logradouro,
+    numero: d.contato_numero,
+    bairro: d.contato_bairro,
+    complemento: d.contato_complemento,
+  };
 
   let contatoId = d.contato_id;
   let contatoCriado: string | undefined;
@@ -707,4 +724,69 @@ export async function editarContatoComCliente(supabase: SupabaseServidor, formDa
   const { data, error } = await supabase.from("contatos").update(campos).eq("id", contatoId).select("id");
   if (error || !data?.length) return { ok: false, mensagem: "Não foi possível salvar o contato." };
   return { ok: true, mensagem: "Contato salvo." };
+}
+
+const esquemaDadosClienteContrato = z
+  .object({
+    contatoId: z.string().uuid(),
+    tipo: z.enum(["pf", "pj"]),
+    nome: z.string().trim().min(2, "Informe o nome completo").max(200, "Nome muito longo"),
+    documento: textoOpcional(20, "CPF/CNPJ muito longo"),
+    rg: textoOpcional(30, "RG muito longo"),
+    data_nascimento: z
+      .string()
+      .trim()
+      .optional()
+      .transform((v) => v || null)
+      .refine((v) => v == null || (/^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v))), "Data de nascimento inválida")
+      .refine((v) => v == null || (v >= "1900-01-01" && v <= new Date().toISOString().slice(0, 10)), "Data de nascimento fora do intervalo"),
+    email: z.union([z.literal(""), z.string().trim().email("E-mail inválido")]).transform((v) => v || null),
+    telefone: z.string({ error: "Informe o telefone" }).trim().min(1, "Informe o telefone").max(30, "Telefone muito longo"),
+    cep: textoOpcional()
+      .transform((v) => (v ? soDigitos(v) : null))
+      .refine((v) => v == null || v.length === 8, "CEP deve ter 8 dígitos"),
+    logradouro: textoOpcional(200, "Rua muito longa"),
+    numero: textoOpcional(20, "Número muito longo"),
+    bairro: textoOpcional(120, "Bairro muito longo"),
+    complemento: textoOpcional(120, "Complemento muito longo"),
+    cidade: textoOpcional(120, "Cidade muito longa"),
+    uf: ufOpcional,
+    inscricao_estadual: textoOpcional(30, "Inscrição estadual muito longa"),
+  })
+  .superRefine((d, ctx) => {
+    if (!d.documento) return;
+    const valido = d.tipo === "pj" ? cnpjValido(d.documento) : cpfValido(d.documento);
+    if (!valido) ctx.addIssue({ code: "custom", path: ["documento"], message: d.tipo === "pj" ? "CNPJ inválido" : "CPF inválido" });
+  });
+
+/**
+ * Dados do cliente para o contrato, preenchidos na ficha do negócio. Salva o que vier (pode ser parcial): a trava
+ * fica na geração do contrato (`pendenciasDadosContrato` aqui e `pendencias_contrato_contato` no banco). Pessoa
+ * jurídica não guarda RG nem nascimento. `endereco` continua em uma linha, montada a partir dos campos novos.
+ */
+export async function salvarDadosClienteComCliente(supabase: SupabaseServidor, formData: FormData): Promise<NonNullable<ResultadoAcao>> {
+  const dados = esquemaDadosClienteContrato.safeParse(Object.fromEntries(formData));
+  if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
+  const { contatoId, ...d } = dados.data;
+  const pj = d.tipo === "pj";
+  const campos = {
+    ...d,
+    documento: d.documento ? formatarDocumento(d.documento) : null,
+    rg: pj ? null : d.rg,
+    data_nascimento: pj ? null : d.data_nascimento,
+    inscricao_estadual: pj ? d.inscricao_estadual : null,
+    endereco:
+      montarEndereco({
+        rua: d.logradouro ?? undefined,
+        numero: d.numero ?? undefined,
+        complemento: d.complemento ?? undefined,
+        bairro: d.bairro ?? undefined,
+        cep: d.cep ? d.cep.replace(/(\d{5})(\d{3})/, "$1-$2") : undefined,
+      }) || null,
+  };
+
+  const { data, error } = await supabase.from("contatos").update(campos).eq("id", contatoId).select("id");
+  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível salvar os dados do cliente.") };
+  if (!data?.length) return { ok: false, mensagem: "Não foi possível salvar os dados do cliente." };
+  return { ok: true, mensagem: "Dados do cliente salvos." };
 }

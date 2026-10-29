@@ -6,7 +6,7 @@
  * nenhum evento quando o negócio nunca passou por handoff.
  */
 import { beforeAll, describe, expect, it } from "vitest";
-import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
 
 let sdr1: Usuario;
 let sdr2: Usuario;
@@ -39,7 +39,7 @@ beforeAll(async () => {
   const { data: et } = await servico.from("etapas").select("id").eq("funil_id", funil).order("ordem").limit(1).single();
   etapaInicial = et!.id;
 
-  const { data: c } = await servico.from("contatos").insert({ empresa_id: empresa, nome: "Cliente contrato SDR" }).select("id").single();
+  const { data: c } = await servico.from("contatos").insert({ ...CLIENTE_CONTRATO, empresa_id: empresa, nome: "Cliente contrato SDR" }).select("id").single();
   contato = c!.id;
 });
 

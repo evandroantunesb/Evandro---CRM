@@ -10,7 +10,7 @@
 import { Client } from "pg";
 import { urlBancoLocal } from "./banco-local";
 import { beforeAll, describe, expect, it } from "vitest";
-import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
 
 async function noBanco(sql: string, params: unknown[] = []) {
   const banco = new Client({ connectionString: urlBancoLocal() });
@@ -40,7 +40,7 @@ let opcaoDeB: string;
 async function criarVenda(emp: string, responsavel: Usuario, confirmador: Usuario, titulo: string): Promise<string> {
   const { data: f } = await servico.from("funis").select("id").eq("empresa_id", emp).single();
   const { data: et } = await servico.from("etapas").select("id").eq("funil_id", f!.id).order("ordem").limit(1).single();
-  const { data: c } = await servico.from("contatos").insert({ empresa_id: emp, nome: `Cliente ${titulo}` }).select("id").single();
+  const { data: c } = await servico.from("contatos").insert({ ...CLIENTE_CONTRATO, empresa_id: emp, nome: `Cliente ${titulo}` }).select("id").single();
   const { data: neg, error } = await servico
     .from("negocios")
     .insert({ empresa_id: emp, titulo, contato_id: c!.id, funil_id: f!.id, etapa_id: et!.id, responsavel_id: membro[responsavel.id], valor: 30000 })
