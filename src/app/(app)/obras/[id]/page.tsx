@@ -60,7 +60,7 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
     <div className="mx-auto flex max-w-5xl flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <ModosObras modo="gestao" hrefGestao={hrefObra("/obras", id, query)} hrefApresentacao={hrefObra("/obras/apresentacao", id, query)} />
-        {temFiltroAtivo(filtros) && <span className="text-xs text-zinc-500">Navegando pela lista filtrada</span>}
+        {temFiltroAtivo(filtros) && <span className="text-xs text-texto-2">Navegando pela lista filtrada</span>}
       </div>
       <NavegacaoObras navegacao={navegacao} atualId={id} base="/obras" query={query} />
 
@@ -75,7 +75,7 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
         ))}
       </div>
       {resumo.negocioId && (
-        <Link href={`/negocios/${resumo.negocioId}`} className="w-fit text-sm text-zinc-600 underline hover:text-zinc-900">
+        <Link href={`/negocios/${resumo.negocioId}`} className="w-fit text-sm text-texto-2 underline hover:text-texto">
           Ver negócio
         </Link>
       )}
@@ -100,8 +100,8 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
           </p>
         )}
         {obra.participantesComerciais.length > 0 && (
-          <div className="mt-3 border-t border-zinc-100 pt-3">
-            <p className="mb-1 text-xs text-zinc-500">Comercial</p>
+          <div className="mt-3 border-t border-linha pt-3">
+            <p className="mb-1 text-xs text-texto-2">Comercial</p>
             <ListaParticipantes participantes={obra.participantesComerciais} />
           </div>
         )}
@@ -110,7 +110,7 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
       {gestao?.bloqueio && <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-900">{gestao.bloqueio}</p>}
 
       <section className="flex flex-col gap-2">
-        <h2 className="text-base font-semibold text-zinc-900">Setores</h2>
+        <h2 className="text-base font-semibold text-texto">Setores</h2>
         {/* 3 colunas só a partir de 1280px: no tablet o menu lateral deixa ~430px para o conteúdo. */}
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3 [&>*]:min-w-0">
           {obra.setores.map((s) => {
@@ -141,7 +141,7 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
 
       {obra.valorVendido != null && (
         <Cartao titulo="Valor vendido">
-          <p className="text-2xl font-semibold text-zinc-900">{formatarMoeda(obra.valorVendido)}</p>
+          <p className="text-2xl font-semibold text-texto">{formatarMoeda(obra.valorVendido)}</p>
         </Cartao>
       )}
 
@@ -153,17 +153,17 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
 
       <Cartao titulo="Histórico">
         {obra.historico.length === 0 ? (
-          <p className="text-sm text-zinc-500">Nenhum evento registrado.</p>
+          <p className="text-sm text-texto-2">Nenhum evento registrado.</p>
         ) : (
           <ol className="flex flex-col">
             {obra.historico.map((h, i) => (
-              <li key={i} className="flex flex-col gap-0.5 border-t border-zinc-100 py-2 text-sm first:border-t-0 first:pt-0">
+              <li key={i} className="flex flex-col gap-0.5 border-t border-linha py-2 text-sm first:border-t-0 first:pt-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-medium text-zinc-900">{h.tipoRotulo}</span>
+                  <span className="font-medium text-texto">{h.tipoRotulo}</span>
                   {h.setorRotulo && <Selo>{h.setorRotulo}</Selo>}
                 </div>
-                {h.descricao && <p className="text-zinc-700">{h.descricao}</p>}
-                <p className="text-xs text-zinc-500">
+                {h.descricao && <p className="text-texto-2">{h.descricao}</p>}
+                <p className="text-xs text-texto-2">
                   {formatarDataHora(h.quando)} · {h.autor}
                 </p>
               </li>
@@ -178,8 +178,8 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
 function Campo({ rotulo, children }: { rotulo: string; children: ReactNode }) {
   return (
     <div>
-      <dt className="text-xs text-zinc-500">{rotulo}</dt>
-      <dd className="break-words text-zinc-900">{children}</dd>
+      <dt className="text-xs text-texto-2">{rotulo}</dt>
+      <dd className="break-words text-texto">{children}</dd>
     </div>
   );
 }
@@ -188,8 +188,8 @@ function ListaParticipantes({ participantes }: { participantes: ParticipanteObra
   return (
     <ul className="flex flex-col gap-0.5 text-sm">
       {participantes.map((p, i) => (
-        <li key={i} className="text-zinc-800">
-          {p.nome} <span className="text-xs text-zinc-500">· {p.principal ? `${p.funcaoRotulo} principal` : p.funcaoRotulo}</span>
+        <li key={i} className="text-texto">
+          {p.nome} <span className="text-xs text-texto-2">· {p.principal ? `${p.funcaoRotulo} principal` : p.funcaoRotulo}</span>
         </li>
       ))}
     </ul>
@@ -205,13 +205,13 @@ function CartaoSetor({ setor, children }: { setor: SetorDetalheVM; children?: Re
           <Selo>{setor.statusRotulo}</Selo>
           {setor.estado === "parado" && <Selo tom="atencao">{ROTULO_ESTADO_SETOR.parado}</Selo>}
         </div>
-        {setor.aguardando && setor.estado !== "concluido" && <p className="text-zinc-700">{setor.aguardando}</p>}
-        {setor.paradoMotivo && <p className="text-zinc-700">Motivo da parada: {setor.paradoMotivo}</p>}
-        {setor.statusDesde && <p className="text-xs text-zinc-500">Neste status desde {formatarDataHora(setor.statusDesde)}</p>}
-        <div className="w-full border-t border-zinc-100 pt-2">
-          <p className="mb-1 text-xs text-zinc-500">Participantes</p>
+        {setor.aguardando && setor.estado !== "concluido" && <p className="text-texto-2">{setor.aguardando}</p>}
+        {setor.paradoMotivo && <p className="text-texto-2">Motivo da parada: {setor.paradoMotivo}</p>}
+        {setor.statusDesde && <p className="text-xs text-texto-2">Neste status desde {formatarDataHora(setor.statusDesde)}</p>}
+        <div className="w-full border-t border-linha pt-2">
+          <p className="mb-1 text-xs text-texto-2">Participantes</p>
           {setor.participantes.length === 0 ? (
-            <p className="text-xs text-zinc-500">Nenhum participante ativo.</p>
+            <p className="text-xs text-texto-2">Nenhum participante ativo.</p>
           ) : (
             <ListaParticipantes participantes={setor.participantes} />
           )}
@@ -226,10 +226,10 @@ function ItemMarco({ marco, children }: { marco: MarcoDetalheVM; children?: Reac
   return (
     <li className="flex flex-col gap-2">
       <div className="flex flex-col gap-0.5 sm:flex-row sm:items-center sm:justify-between">
-        <span className="text-zinc-900">{marco.rotulo}</span>
+        <span className="text-texto">{marco.rotulo}</span>
         <span className="flex flex-wrap items-center gap-2">
           <Selo>{marco.statusRotulo}</Selo>
-          {marco.motivo && <span className="text-xs text-zinc-600">{marco.motivo}</span>}
+          {marco.motivo && <span className="text-xs text-texto-2">{marco.motivo}</span>}
         </span>
       </div>
       {children}
@@ -249,7 +249,7 @@ function DadosTecnicos({ tecnico }: { tecnico: DadosTecnicosVM }) {
     ["Estrutura do telhado", tecnico.estruturaTelhado],
   ];
   const preenchidos = campos.filter((c): c is [string, string] => c[1] !== null);
-  if (preenchidos.length === 0 && tecnico.kit.length === 0) return <p className="text-sm text-zinc-500">Sem dados técnicos registrados.</p>;
+  if (preenchidos.length === 0 && tecnico.kit.length === 0) return <p className="text-sm text-texto-2">Sem dados técnicos registrados.</p>;
   return (
     <div className="flex flex-col gap-4">
       {preenchidos.length > 0 && (
@@ -262,9 +262,9 @@ function DadosTecnicos({ tecnico }: { tecnico: DadosTecnicosVM }) {
         </dl>
       )}
       {tecnico.kit.length > 0 && (
-        <div className="overflow-x-auto rounded-lg border border-zinc-200">
+        <div className="overflow-x-auto rounded-lg border border-linha">
           <table className="w-full text-left text-sm">
-            <thead className="bg-zinc-50 text-zinc-600">
+            <thead className="bg-superficie-2 text-texto-2">
               <tr>
                 {["Tipo", "Descrição", "Potência", "Quantidade"].map((c) => (
                   <th key={c} className="px-3 py-2 font-medium whitespace-nowrap">
@@ -275,11 +275,11 @@ function DadosTecnicos({ tecnico }: { tecnico: DadosTecnicosVM }) {
             </thead>
             <tbody>
               {tecnico.kit.map((k, i) => (
-                <tr key={i} className="border-t border-zinc-100 align-top">
-                  <td className="px-3 py-2 whitespace-nowrap text-zinc-700">{k.tipo}</td>
-                  <td className="min-w-44 px-3 py-2 text-zinc-900">{k.descricao}</td>
-                  <td className="px-3 py-2 whitespace-nowrap text-zinc-700">{comUnidade(k.potenciaW, "W") ?? "—"}</td>
-                  <td className="px-3 py-2 whitespace-nowrap text-zinc-700">{k.quantidade ?? "—"}</td>
+                <tr key={i} className="border-t border-linha align-top">
+                  <td className="px-3 py-2 whitespace-nowrap text-texto-2">{k.tipo}</td>
+                  <td className="min-w-44 px-3 py-2 text-texto">{k.descricao}</td>
+                  <td className="px-3 py-2 whitespace-nowrap text-texto-2">{comUnidade(k.potenciaW, "W") ?? "—"}</td>
+                  <td className="px-3 py-2 whitespace-nowrap text-texto-2">{k.quantidade ?? "—"}</td>
                 </tr>
               ))}
             </tbody>

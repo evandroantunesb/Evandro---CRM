@@ -23,9 +23,9 @@ export default async function EntradaApresentacao({ searchParams }: PageProps<"/
     <div className="mx-auto flex max-w-5xl flex-col gap-4">
       <ModosObras modo="apresentacao" hrefGestao={`/obras${query ? `?${query}` : ""}`} hrefApresentacao={`/obras/apresentacao${query ? `?${query}` : ""}`} />
       <div className="painel p-8 text-center">
-        <p className="text-base font-medium text-zinc-900">Nenhuma obra para apresentar.</p>
-        <p className="mt-1 text-sm text-zinc-500">{query ? "Nenhuma obra com esses filtros." : "Ainda não há obras visíveis para você."}</p>
-        <Link href={`/obras${query ? `?${query}` : ""}`} className="mt-4 inline-block text-sm text-zinc-600 underline hover:text-zinc-900">
+        <p className="text-base font-medium text-texto">Nenhuma obra para apresentar.</p>
+        <p className="mt-1 text-sm text-texto-2">{query ? "Nenhuma obra com esses filtros." : "Ainda não há obras visíveis para você."}</p>
+        <Link href={`/obras${query ? `?${query}` : ""}`} className="mt-4 inline-block text-sm text-texto-2 underline hover:text-texto">
           Voltar para a lista
         </Link>
       </div>

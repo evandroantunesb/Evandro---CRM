@@ -51,14 +51,14 @@ export default async function Obras({ searchParams }: PageProps<"/obras">) {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Obras</h1>
-          <p className="text-sm text-zinc-500">Vendas já pagas e o andamento de cada setor da obra.</p>
+          <p className="text-sm text-texto-2">Vendas já pagas e o andamento de cada setor da obra.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <ModosObras modo="gestao" hrefGestao={`/obras${query ? `?${query}` : ""}`} hrefApresentacao={`/obras/apresentacao${query ? `?${query}` : ""}`} />
           {visiveis.length > 0 && (
             <Link
               href={hrefGestao(visiveis[0].id)}
-              className="inline-flex min-h-9 items-center rounded-lg border border-zinc-200 bg-white px-3 text-sm font-medium text-carvao hover:border-dourado"
+              className="inline-flex min-h-9 items-center rounded-lg border border-linha bg-superficie px-3 text-sm font-medium text-texto hover:border-dourado"
             >
               Percorrer {visiveis.length === 1 ? "a obra" : `as ${visiveis.length} obras`} ›
             </Link>
@@ -73,7 +73,7 @@ export default async function Obras({ searchParams }: PageProps<"/obras">) {
           name="q"
           defaultValue={busca}
           placeholder="Buscar cliente ou nº da obra"
-          className="min-w-56 flex-1 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm"
+          className="min-w-56 flex-1 rounded-md border border-linha bg-superficie px-3 py-2 text-sm"
         />
         <Selecao name="situacao" defaultValue={situacao ?? ""} aria-label="Situação da obra">
           <option value="">Situação: todas</option>
@@ -110,17 +110,17 @@ export default async function Obras({ searchParams }: PageProps<"/obras">) {
         <Botao type="submit" variante="secundario">
           Filtrar
         </Botao>
-        <Link href="/obras" className="text-xs text-zinc-500 underline hover:text-zinc-800">
+        <Link href="/obras" className="text-xs text-texto-2 underline hover:text-texto">
           Limpar filtros
         </Link>
       </form>
 
-      <p className="text-xs text-zinc-500">
+      <p className="text-xs text-texto-2">
         {visiveis.length} de {obras.length} obra{obras.length === 1 ? "" : "s"}
       </p>
 
       {visiveis.length === 0 ? (
-        <p className="painel p-6 text-center text-sm text-zinc-500">
+        <p className="painel p-6 text-center text-sm text-texto-2">
           {filtrando ? "Nenhuma obra com esses filtros." : "Nenhuma obra para mostrar."}
         </p>
       ) : (
@@ -145,9 +145,9 @@ function Indicadores({ kpis }: { kpis: KpisObras }) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9">
       {itens.map(([rotulo, valor]) => (
-        <div key={rotulo} className="rounded-xl border border-zinc-200/80 bg-white p-3 shadow-[0_1px_2px_rgba(15,15,16,0.04)]">
-          <p className="text-2xl font-semibold text-zinc-900">{valor}</p>
-          <p className="text-xs text-zinc-600">{rotulo}</p>
+        <div key={rotulo} className="painel p-3">
+          <p className="text-2xl font-semibold text-texto">{valor}</p>
+          <p className="text-xs text-texto-2">{rotulo}</p>
         </div>
       ))}
     </div>
@@ -176,8 +176,8 @@ function CelulaSetor({ s }: { s: SetorObraVM }) {
     <div className="flex flex-col items-start gap-1">
       <Selo>{s.statusRotulo}</Selo>
       {s.estado === "parado" && <Selo tom="atencao">Parado</Selo>}
-      {s.aguardando && s.estado === "aguardando" && <span className="text-xs text-zinc-600">{s.aguardando}</span>}
-      {s.principalNome && <span className="text-xs text-zinc-500">{s.principalNome}</span>}
+      {s.aguardando && s.estado === "aguardando" && <span className="text-xs text-texto-2">{s.aguardando}</span>}
+      {s.principalNome && <span className="text-xs text-texto-2">{s.principalNome}</span>}
     </div>
   );
 }
@@ -186,14 +186,14 @@ function CelulaSetor({ s }: { s: SetorObraVM }) {
 function ListaObras({ obras, hrefDe }: { obras: ObraListaVM[]; hrefDe: (id: string) => string }) {
   const cabecalho = ["Obra", "Cliente", "Cidade/UF", "Potência", ...SETORES_OBRA.map((s) => ROTULO_SETOR[s]), "Situação"];
   const celulas = (o: ObraListaVM): ReactNode[] => [
-    <Link key="n" href={hrefDe(o.id)} className="font-medium text-zinc-900 underline-offset-2 hover:underline">
+    <Link key="n" href={hrefDe(o.id)} className="font-medium text-texto underline-offset-2 hover:underline">
       #{o.numero}
     </Link>,
-    <Link key="c" href={hrefDe(o.id)} className="text-zinc-900 underline-offset-2 hover:underline">
+    <Link key="c" href={hrefDe(o.id)} className="text-texto underline-offset-2 hover:underline">
       {o.clienteNome}
     </Link>,
-    <span key="u" className="text-zinc-700">{cidadeUf(o)}</span>,
-    <span key="p" className="text-zinc-700">{formatarPotencia(o.potenciaKwp)}</span>,
+    <span key="u" className="text-texto-2">{cidadeUf(o)}</span>,
+    <span key="p" className="text-texto-2">{formatarPotencia(o.potenciaKwp)}</span>,
     ...o.setores.map((s) => <CelulaSetor key={s.setor} s={s} />),
     <Situacao key="s" obra={o} />,
   ];
@@ -201,7 +201,7 @@ function ListaObras({ obras, hrefDe }: { obras: ObraListaVM[]; hrefDe: (id: stri
     <>
       <div className="hidden overflow-x-auto painel md:block">
         <table className="w-full text-left text-sm">
-          <thead className="bg-zinc-50 text-zinc-600">
+          <thead className="bg-superficie-2 text-texto-2">
             <tr>
               {cabecalho.map((c) => (
                 <th key={c} className="px-3 py-2 font-medium whitespace-nowrap">
@@ -212,7 +212,7 @@ function ListaObras({ obras, hrefDe }: { obras: ObraListaVM[]; hrefDe: (id: stri
           </thead>
           <tbody>
             {obras.map((o) => (
-              <tr key={o.id} className="border-t border-zinc-100 align-top hover:bg-zinc-50/60">
+              <tr key={o.id} className="border-t border-linha align-top hover:bg-superficie-2/60">
                 {celulas(o).map((c, i) => (
                   // Cliente fica com o espaço que sobra (e pode quebrar); os demais não quebram.
                   <td key={i} className={i === 1 ? "min-w-44 px-3 py-2" : "px-3 py-2 whitespace-nowrap"}>
@@ -230,10 +230,10 @@ function ListaObras({ obras, hrefDe }: { obras: ObraListaVM[]; hrefDe: (id: stri
             <div className="flex flex-col gap-2">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <Link href={hrefDe(o.id)} className="font-medium text-zinc-900 underline-offset-2 hover:underline">
+                  <Link href={hrefDe(o.id)} className="font-medium text-texto underline-offset-2 hover:underline">
                     #{o.numero} {o.clienteNome}
                   </Link>
-                  <p className="text-xs text-zinc-500">
+                  <p className="text-xs text-texto-2">
                     {cidadeUf(o)} · {formatarPotencia(o.potenciaKwp)}
                   </p>
                 </div>
@@ -241,7 +241,7 @@ function ListaObras({ obras, hrefDe }: { obras: ObraListaVM[]; hrefDe: (id: stri
               </div>
               {o.setores.map((s) => (
                 <div key={s.setor} className="flex items-start justify-between gap-2">
-                  <span className="pt-0.5 text-xs text-zinc-500">{ROTULO_SETOR[s.setor]}</span>
+                  <span className="pt-0.5 text-xs text-texto-2">{ROTULO_SETOR[s.setor]}</span>
                   <div className="[&>div]:items-end">
                     <CelulaSetor s={s} />
                   </div>
