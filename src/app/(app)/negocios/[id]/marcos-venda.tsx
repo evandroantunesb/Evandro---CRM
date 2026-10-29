@@ -67,11 +67,12 @@ export function MarcosVenda({
         className={`grid grid-cols-2 gap-x-3 gap-y-5 ${etapas.length === 4 ? "md:grid-cols-4" : etapas.length === 3 ? "md:grid-cols-3" : ""}`}
       >
         {etapas.map((m) => (
-          <ItemMarco key={m.titulo} marco={m} hrefBase={hrefBase}>
-            {m === marcos.venda ? children : null}
-          </ItemMarco>
+          <ItemMarco key={m.titulo} marco={m} hrefBase={hrefBase} />
         ))}
       </ol>
+      {/* Ação de fechamento fora da grade dos marcos: a coluna estreita de um marco não dá espaço
+          suficiente para os botões de ganho/perda nem para os formulários de perda/reabertura. */}
+      {children && <div className="border-t border-linha pt-4">{children}</div>}
       {(progresso || obra) && (
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-linha pt-3 text-sm">
           {progresso && (

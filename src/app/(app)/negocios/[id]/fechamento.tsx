@@ -92,34 +92,32 @@ export function Fechamento({
     );
   }
 
-  // Só ícones, para o marco "Venda ganha" ter o mesmo peso dos outros marcos da jornada; o nome vai no
-  // aria-label e na dica. Alvo de 44 px no celular, 36 px no computador.
-  const classeIcone =
-    "grid size-11 place-items-center rounded-full border bg-superficie transition-colors duration-200 ease-raion focus-visible:ring-2 focus-visible:outline-none disabled:opacity-50 md:size-9";
+  // Nome por extenso (não só ícone): aqui a ação fica fora da grade estreita dos marcos, com espaço de sobra.
+  const classeBotao =
+    "flex min-h-11 items-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors duration-200 ease-raion focus-visible:ring-2 focus-visible:outline-none disabled:opacity-50";
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex gap-2">
+      <p className="text-sm font-medium text-texto-2">Marcar negócio como:</p>
+      <div className="flex flex-wrap gap-2">
         <form action={acao}>
           <input type="hidden" name="negocioId" value={negocioId} />
           <input type="hidden" name="status" value="ganho" />
           <button
             type="submit"
             disabled={pendente}
-            aria-label="Marcar como ganho"
-            title="Marcar como ganho"
-            className={`${classeIcone} border-dourado/60 text-dourado-texto hover:bg-dourado hover:text-carvao focus-visible:ring-dourado/50`}
+            className={`${classeBotao} border-dourado/60 text-dourado-texto hover:bg-dourado hover:text-carvao focus-visible:ring-dourado/50`}
           >
-            <Check size={18} strokeWidth={2.5} aria-hidden />
+            <Check size={16} strokeWidth={2.5} aria-hidden />
+            Ganho
           </button>
         </form>
         <button
           type="button"
           onClick={() => setPerdendo(true)}
-          aria-label="Marcar como perdido"
-          title="Marcar como perdido"
-          className={`${classeIcone} border-red-300 text-red-700 hover:bg-red-600 hover:text-white focus-visible:ring-red-400/50`}
+          className={`${classeBotao} border-red-300 text-red-700 hover:bg-red-600 hover:text-white focus-visible:ring-red-400/50`}
         >
-          <X size={18} strokeWidth={2.5} aria-hidden />
+          <X size={16} strokeWidth={2.5} aria-hidden />
+          Perdido
         </button>
       </div>
       <Mensagem resultado={resultado} />

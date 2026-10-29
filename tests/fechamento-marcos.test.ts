@@ -141,9 +141,9 @@ describe("MarcosVenda (renderização, só leitura)", () => {
       createElement(MarcosVenda, { marcos: marcosDaVenda(c), obra }, createElement("span", null, "AÇÃO")),
     );
 
-  it("mostra os 3 marcos na ordem e a ação de fechamento dentro do marco Venda ganha", () => {
+  it("mostra os 3 marcos na ordem e a ação de fechamento abaixo deles, com a largura do cartão", () => {
     const h = html({ negocio: "aberto", contrato: "nao_gerado", pagamento: null });
-    const i = ["Venda ganha", "AÇÃO", "Contrato assinado", "Pagamento confirmado"].map((t) => h.indexOf(t));
+    const i = ["Venda ganha", "Contrato assinado", "Pagamento confirmado", "</ol>", "AÇÃO", "0 de 3 marcos concluídos"].map((t) => h.indexOf(t));
     expect(i.every((x) => x >= 0)).toBe(true);
     expect([...i].sort((a, b) => a - b)).toEqual(i);
     expect(h).toContain("0 de 3 marcos concluídos");
