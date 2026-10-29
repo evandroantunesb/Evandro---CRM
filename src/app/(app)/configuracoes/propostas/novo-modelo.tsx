@@ -58,14 +58,14 @@ export function NovoModeloColapsavel() {
           type="button"
           onClick={() => setAberto((v) => !v)}
           aria-expanded={aberto}
-          className="inline-flex items-center gap-1 text-sm font-medium text-carvao hover:text-dourado"
+          className="inline-flex items-center gap-1 text-sm font-medium text-texto hover:text-dourado"
         >
           {aberto ? "Fechar" : "Criar modelo"}
           <ChevronDown size={14} className={`transition-transform ${aberto ? "rotate-180" : ""}`} />
         </button>
       }
     >
-      {aberto ? <NovoModelo /> : <p className="text-sm text-zinc-500">Clique em &quot;Criar modelo&quot; para montar um novo modelo de proposta.</p>}
+      {aberto ? <NovoModelo /> : <p className="text-sm text-texto-2">Clique em &quot;Criar modelo&quot; para montar um novo modelo de proposta.</p>}
     </Cartao>
   );
 }

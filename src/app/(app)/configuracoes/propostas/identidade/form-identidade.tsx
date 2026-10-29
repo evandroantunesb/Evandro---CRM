@@ -74,16 +74,16 @@ function CampoImagem({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-sm font-medium text-zinc-700">{rotulo}</span>
-      <p className="text-xs text-zinc-500">{descricao}</p>
+      <span className="text-sm font-medium text-texto">{rotulo}</span>
+      <p className="text-xs text-texto-2">{descricao}</p>
       <div className="flex items-center gap-3">
         {mostrar ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={mostrar} alt={rotulo} className="h-14 w-14 rounded-lg border border-zinc-200 object-contain bg-zinc-50" />
+          <img src={mostrar} alt={rotulo} className="h-14 w-14 rounded-lg border border-linha object-contain bg-superficie-2" />
         ) : (
-          <div className="flex h-14 w-14 items-center justify-center rounded-lg border border-dashed border-zinc-300 text-[10px] text-zinc-400">Sem imagem</div>
+          <div className="flex h-14 w-14 items-center justify-center rounded-lg border border-dashed border-linha text-[10px] text-texto-2">Sem imagem</div>
         )}
-        <label className="inline-flex cursor-pointer items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700 hover:border-dourado">
+        <label className="inline-flex cursor-pointer items-center justify-center rounded-lg border border-linha bg-superficie px-3 py-2 text-sm text-texto hover:border-dourado">
           {enviando ? "Enviando..." : "Trocar imagem"}
           <input ref={input} type="file" accept="image/*" disabled={enviando} className="hidden" onChange={(e) => enviar(e.target.files?.[0])} />
         </label>
@@ -113,7 +113,7 @@ export function FormIdentidade({
   return (
     <Cartao titulo="Identidade visual da proposta">
       <form action={acao} className="flex flex-col gap-4">
-        <p className="text-sm text-zinc-600">
+        <p className="text-sm text-texto-2">
           Usada nas propostas emitidas para os clientes. Sem essas informações, a proposta usa o nome da empresa em texto simples e as cores padrão — nunca a
           marca Raion.
         </p>
@@ -149,13 +149,13 @@ export function FormIdentidade({
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-zinc-700">Cor primária</span>
+            <span className="font-medium text-texto">Cor primária</span>
             <div className="flex items-center gap-2">
               <input
                 type="color"
                 value={/^#[0-9a-fA-F]{6}$/.test(corPrimaria) ? corPrimaria : "#0F0F10"}
                 onChange={(e) => setCorPrimaria(e.target.value)}
-                className="h-9 w-9 rounded border border-zinc-200"
+                className="h-9 w-9 rounded border border-linha"
                 aria-label="Selecionar cor primária"
               />
               <input
@@ -165,18 +165,18 @@ export function FormIdentidade({
                 onChange={(e) => setCorPrimaria(e.target.value)}
                 placeholder="#0F0F10"
                 pattern="^#[0-9a-fA-F]{6}$"
-                className="flex-1 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-carvao outline-none focus:border-dourado focus:ring-2 focus:ring-dourado/20"
+                className="flex-1 rounded-lg border border-linha bg-superficie px-3 py-2 text-sm text-texto outline-none focus:border-dourado focus:ring-2 focus:ring-dourado/20"
               />
             </div>
           </label>
           <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-zinc-700">Cor de destaque</span>
+            <span className="font-medium text-texto">Cor de destaque</span>
             <div className="flex items-center gap-2">
               <input
                 type="color"
                 value={/^#[0-9a-fA-F]{6}$/.test(corDestaque) ? corDestaque : "#D4AF37"}
                 onChange={(e) => setCorDestaque(e.target.value)}
-                className="h-9 w-9 rounded border border-zinc-200"
+                className="h-9 w-9 rounded border border-linha"
                 aria-label="Selecionar cor de destaque"
               />
               <input
@@ -186,7 +186,7 @@ export function FormIdentidade({
                 onChange={(e) => setCorDestaque(e.target.value)}
                 placeholder="#D4AF37"
                 pattern="^#[0-9a-fA-F]{6}$"
-                className="flex-1 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-carvao outline-none focus:border-dourado focus:ring-2 focus:ring-dourado/20"
+                className="flex-1 rounded-lg border border-linha bg-superficie px-3 py-2 text-sm text-texto outline-none focus:border-dourado focus:ring-2 focus:ring-dourado/20"
               />
             </div>
           </label>

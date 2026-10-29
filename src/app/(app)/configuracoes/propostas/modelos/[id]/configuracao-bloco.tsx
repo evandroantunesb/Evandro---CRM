@@ -17,7 +17,7 @@ function campoDoConfig(config: unknown, chave: string): string {
   return typeof v === "string" ? v : "";
 }
 
-const CLASSE_CAMPO = "rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-sm text-carvao outline-none focus:border-dourado";
+const CLASSE_CAMPO = "rounded-lg border border-linha bg-superficie px-2 py-1.5 text-sm text-texto outline-none focus:border-dourado";
 
 function CampoFormulario({
   modeloId,
@@ -32,7 +32,7 @@ function CampoFormulario({
 }) {
   const [resultado, acao, salvando] = useActionState(salvarConfigBlocoModelo, null);
   return (
-    <form action={acao} className="flex flex-col gap-2 rounded-lg bg-zinc-50 p-3">
+    <form action={acao} className="flex flex-col gap-2 rounded-lg bg-superficie-2 p-3">
       <input type="hidden" name="modeloId" value={modeloId} />
       <input type="hidden" name="id" value={blocoId} />
       <input type="hidden" name="config" value={configJson} />
@@ -57,7 +57,7 @@ function EditorLista({ modeloId, blocoId, config, rotulo, dica }: { modeloId: st
   return (
     <CampoFormulario modeloId={modeloId} blocoId={blocoId} configJson={configJson}>
       <label className="flex flex-col gap-1 text-xs">
-        <span className="font-medium text-zinc-600">
+        <span className="font-medium text-texto-2">
           {rotulo} ({dica})
         </span>
         <textarea value={texto} onChange={(e) => setTexto(e.target.value)} rows={Math.min(8, Math.max(3, texto.split("\n").length))} className={CLASSE_CAMPO} />
@@ -97,11 +97,11 @@ function EditorListaDupla({
   return (
     <CampoFormulario modeloId={modeloId} blocoId={blocoId} configJson={configJson}>
       <label className="flex flex-col gap-1 text-xs">
-        <span className="font-medium text-zinc-600">{rotuloA}</span>
+        <span className="font-medium text-texto-2">{rotuloA}</span>
         <textarea value={a} onChange={(e) => setA(e.target.value)} rows={3} className={CLASSE_CAMPO} />
       </label>
       <label className="flex flex-col gap-1 text-xs">
-        <span className="font-medium text-zinc-600">{rotuloB}</span>
+        <span className="font-medium text-texto-2">{rotuloB}</span>
         <textarea value={b} onChange={(e) => setB(e.target.value)} rows={3} className={CLASSE_CAMPO} />
       </label>
     </CampoFormulario>
@@ -127,7 +127,7 @@ function EditorCampos({
       {campos.map((c) =>
         c.multilinha ? (
           <label key={c.chave} className="flex flex-col gap-1 text-xs">
-            <span className="font-medium text-zinc-600">{c.rotulo}</span>
+            <span className="font-medium text-texto-2">{c.rotulo}</span>
             <textarea
               value={valores[c.chave] ?? ""}
               onChange={(e) => setValores((v) => ({ ...v, [c.chave]: e.target.value }))}
@@ -137,7 +137,7 @@ function EditorCampos({
           </label>
         ) : (
           <label key={c.chave} className="flex flex-col gap-1 text-xs">
-            <span className="font-medium text-zinc-600">{c.rotulo}</span>
+            <span className="font-medium text-texto-2">{c.rotulo}</span>
             <input value={valores[c.chave] ?? ""} onChange={(e) => setValores((v) => ({ ...v, [c.chave]: e.target.value }))} className={CLASSE_CAMPO} />
           </label>
         ),
@@ -153,7 +153,7 @@ function EditorDozeMeses({ modeloId, blocoId, config, chave, rotulo }: { modeloI
   return (
     <CampoFormulario modeloId={modeloId} blocoId={blocoId} configJson={configJson}>
       <label className="flex flex-col gap-1 text-xs">
-        <span className="font-medium text-zinc-600">{rotulo}</span>
+        <span className="font-medium text-texto-2">{rotulo}</span>
         <input value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Jan, Fev, Mar, ..." className={CLASSE_CAMPO} />
       </label>
     </CampoFormulario>
@@ -248,7 +248,7 @@ export function ConfiguracaoBloco({ modeloId, blocoId, tipo, config }: { modeloI
 
   return (
     <div>
-      <button type="button" onClick={() => setAberto((v) => !v)} className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-zinc-500 hover:text-carvao">
+      <button type="button" onClick={() => setAberto((v) => !v)} className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-texto-2 hover:text-texto">
         Personalizar conteúdo
         <ChevronDown size={12} className={`transition-transform ${aberto ? "rotate-180" : ""}`} />
       </button>
