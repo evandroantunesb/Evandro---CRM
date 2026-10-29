@@ -22,12 +22,12 @@ import { AGUARDANDO_OBRA, ROTULO_FUNCAO_PARTICIPANTE, ROTULO_SETOR, STATUS_POR_S
  */
 
 const CAMPO_TEXTO =
-  "w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-carvao outline-none placeholder:text-zinc-400 focus:border-dourado focus:ring-2 focus:ring-dourado/20";
+  "w-full rounded-lg border border-linha bg-superficie px-3 py-2 text-sm text-texto outline-none placeholder:text-texto-2 focus:border-dourado focus:ring-2 focus:ring-dourado/20";
 
 function Bloco({ titulo, children }: { titulo: string; children: ReactNode }) {
   return (
-    <div className="flex flex-col gap-2 border-t border-zinc-100 pt-3">
-      <p className="text-xs font-medium tracking-wide text-zinc-500 uppercase">{titulo}</p>
+    <div className="flex flex-col gap-2 border-t border-linha pt-3">
+      <p className="text-xs font-medium tracking-wide text-texto-2 uppercase">{titulo}</p>
       {children}
     </div>
   );
@@ -38,8 +38,8 @@ export function GestaoSetor({ obraId, setor, gestao }: { obraId: string; setor: 
   const { alterarFluxo, gerirParticipantes } = gestao.permissoes;
   if (!alterarFluxo && !gerirParticipantes) return null;
   return (
-    <details className="group w-full min-w-0 rounded-lg border border-zinc-200 bg-zinc-50/60 text-sm [&_select]:w-full [&_select]:min-w-0">
-      <summary className="cursor-pointer list-none px-3 py-2 font-medium text-zinc-800 select-none group-open:border-b group-open:border-zinc-200">
+    <details className="group w-full min-w-0 rounded-lg border border-linha bg-superficie-2/60 text-sm [&_select]:w-full [&_select]:min-w-0">
+      <summary className="cursor-pointer list-none px-3 py-2 font-medium text-texto select-none group-open:border-b group-open:border-linha">
         <span className="inline-block transition-transform group-open:rotate-90">›</span> Atualizar {ROTULO_SETOR[setor.setor]}
       </summary>
       <div className="flex flex-col gap-3 p-3">
@@ -122,7 +122,7 @@ function FormParado({ obraId, setor }: { obraId: string; setor: SetorDetalheVM }
     <Bloco titulo="Parada">
       {parado ? (
         <div className="flex flex-col gap-2">
-          {setor.paradoMotivo && <p className="text-zinc-700">Motivo atual: {setor.paradoMotivo}</p>}
+          {setor.paradoMotivo && <p className="text-texto-2">Motivo atual: {setor.paradoMotivo}</p>}
           <form onSubmit={enviar} className="flex flex-col gap-2">
             <input type="hidden" name="obraId" value={obraId} />
             <input type="hidden" name="setor" value={setor.setor} />
@@ -201,7 +201,7 @@ function GestaoParticipantes({ obraId, gestao }: { obraId: string; gestao: Setor
   return (
     <Bloco titulo="Participantes">
       {gestao.participantes.length === 0 ? (
-        <p className="text-zinc-500">Nenhum participante ativo.</p>
+        <p className="text-texto-2">Nenhum participante ativo.</p>
       ) : (
         <ul className="flex flex-col gap-2">
           {gestao.participantes.map((p) => (
@@ -220,17 +220,17 @@ function ItemParticipante({ obraId, participante }: { obraId: string; participan
   const [encerrando, setEncerrando] = useState(false);
 
   return (
-    <li className="flex flex-col gap-2 rounded-md border border-zinc-200 bg-white p-2">
+    <li className="flex flex-col gap-2 rounded-md border border-linha bg-superficie p-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-zinc-900">
+        <span className="text-texto">
           {participante.nome}{" "}
-          <span className="text-xs text-zinc-500">· {participante.principal ? `${participante.funcaoRotulo} principal` : participante.funcaoRotulo}</span>
+          <span className="text-xs text-texto-2">· {participante.principal ? `${participante.funcaoRotulo} principal` : participante.funcaoRotulo}</span>
         </span>
         {participante.proprio ? (
-          <span className="text-xs text-zinc-500">Você</span>
+          <span className="text-xs text-texto-2">Você</span>
         ) : (
           !encerrando && (
-            <button type="button" onClick={() => setEncerrando(true)} className="text-xs text-zinc-600 underline hover:text-zinc-900">
+            <button type="button" onClick={() => setEncerrando(true)} className="text-xs text-texto-2 underline hover:text-texto">
               Encerrar participação
             </button>
           )
@@ -275,13 +275,13 @@ function FormAtribuir({ obraId, gestao }: { obraId: string; gestao: SetorGestaoV
   }
 
   return (
-    <form onSubmit={enviar} className="flex flex-col gap-2 rounded-md border border-zinc-200 bg-white p-2">
+    <form onSubmit={enviar} className="flex flex-col gap-2 rounded-md border border-linha bg-superficie p-2">
       <input type="hidden" name="obraId" value={obraId} />
       <input type="hidden" name="setor" value={gestao.setor} />
       <input type="hidden" name="principal" value={principal ? "true" : "false"} />
       <input type="hidden" name="substituiId" value={substituindo?.participanteId ?? ""} />
       {gestao.candidatos.length === 0 ? (
-        <p className="text-zinc-500">Nenhum colaborador de Operação com este setor. O admin define os setores em Configurações.</p>
+        <p className="text-texto-2">Nenhum colaborador de Operação com este setor. O admin define os setores em Configurações.</p>
       ) : (
         <Selecao name="membroId" rotulo="Colaborador" required defaultValue="">
           <option value="" disabled>
@@ -296,7 +296,7 @@ function FormAtribuir({ obraId, gestao }: { obraId: string; gestao: SetorGestaoV
         </Selecao>
       )}
       {!gestao.candidatosVerificados && (
-        <p className="text-xs text-zinc-500">
+        <p className="text-xs text-texto-2">
           A lista mostra os colaboradores ativos. Só entra quem tem o papel Operação neste setor e não é coordenador; o sistema avisa se não for possível.
         </p>
       )}
@@ -316,7 +316,7 @@ function FormAtribuir({ obraId, gestao }: { obraId: string; gestao: SetorGestaoV
         ))}
       </Selecao>
       {funcao === "responsavel" && (
-        <label className="flex items-center gap-2 text-sm text-zinc-700">
+        <label className="flex items-center gap-2 text-sm text-texto-2">
           <input type="checkbox" checked={principal} onChange={(e) => setPrincipal(e.target.checked)} />
           Responsável principal do setor
         </label>
@@ -359,7 +359,7 @@ export function GestaoMarco({ obraId, marco }: { obraId: string; marco: MarcoDet
   const mudou = status !== marco.status || status === "nao_se_aplica";
 
   return (
-    <form onSubmit={enviar} className="flex flex-col gap-2 rounded-md border border-zinc-200 bg-zinc-50/60 p-2 text-sm">
+    <form onSubmit={enviar} className="flex flex-col gap-2 rounded-md border border-linha bg-superficie-2/60 p-2 text-sm">
       <input type="hidden" name="obraId" value={obraId} />
       <input type="hidden" name="marco" value={marco.marco} />
       <div className="flex flex-wrap items-center gap-2">
