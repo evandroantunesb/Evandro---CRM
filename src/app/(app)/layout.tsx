@@ -5,9 +5,9 @@ import { Avatar } from "@/components/avatar";
 import { assinarAvatares } from "@/lib/avatares";
 import { LogoRaion } from "@/components/marca";
 import { carregarDiasConsideradoParado, carregarHorasConsideradoSemContato } from "@/lib/crm";
-import { carregarNotificacoesNaoLidas, contarPendencias, temConquistaNaoVisualizada } from "@/lib/notificacoes";
+import { carregarNotificacoesNaoLidas, contarPendencias, pendenciasDosSetores, temConquistaNaoVisualizada } from "@/lib/notificacoes";
 import { linksPendencias, type ContagemPendencias } from "@/lib/pendencias";
-import { CARTEIRA_CONTATOS, GAMIFICACAO, GESTAO_COMERCIAL, NEGOCIOS, OBRAS, PARTICIPANTES_GAMIFICACAO, PROPOSTA_E_CONTRATO, TAREFAS, pode } from "@/lib/permissoes";
+import { CARTEIRA_CONTATOS, GAMIFICACAO, GESTAO_COMERCIAL, NEGOCIOS, OBRAS, PARTICIPANTES_GAMIFICACAO, PEDIDOS_AOS_SETORES, PROPOSTA_E_CONTRATO, TAREFAS, TAREFAS_DO_SETOR, pode } from "@/lib/permissoes";
 import { obterSessao } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { trocarEmpresa } from "@/lib/acoes/empresa-atual";
@@ -53,7 +53,7 @@ function itensGamificacao(papel: Papel | undefined, conquistaNova: boolean): Ite
 /** Abas fixas da barra do celular por papel (o resto do menu fica em "Mais"). */
 function abasDoCelular(papel: Papel | undefined) {
   if (papel === "admin" || papel === "gestor") return ["/inicio", "/negocios", "/painel"];
-  if (papel === "operacao") return ["/inicio", "/obras"];
+  if (papel === "operacao") return ["/inicio", "/tarefas/setores", "/obras"];
   return ["/inicio", "/negocios", "/tarefas"];
 }
 
@@ -71,7 +71,9 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
       carregarHorasConsideradoSemContato(sessao.atual.empresaId),
     ]);
     [pendencias, notificacoes, conquistaNova] = await Promise.all([
-      contarPendencias(sessao.atual.empresaId, sessao.atual.membroId, sessao.atual.papel, dias, horas),
+      pode(papel, TAREFAS_DO_SETOR)
+        ? pendenciasDosSetores(sessao.atual.empresaId, sessao.atual.membroId)
+        : contarPendencias(sessao.atual.empresaId, sessao.atual.membroId, sessao.atual.papel, dias, horas),
       carregarNotificacoesNaoLidas(sessao.atual.empresaId, sessao.atual.membroId),
       temConquistaNaoVisualizada(sessao.atual.empresaId, sessao.atual.membroId),
     ]);
@@ -92,6 +94,8 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
       ? [
           { href: "/inicio", rotulo: "Início" },
           ...(pode(papel, TAREFAS) ? [{ href: "/tarefas", rotulo: "Tarefas" }] : []),
+          // Tarefas dos setores: para a Operação é a tela de tarefas; para o comercial, os pedidos que fez aos setores.
+          ...(pode(papel, TAREFAS_DO_SETOR) ? [{ href: "/tarefas/setores", rotulo: "Tarefas" }] : []),
           ...(pode(papel, GESTAO_COMERCIAL) ? [{ href: "/leads-a-distribuir", rotulo: "Leads a distribuir", secao: "Comercial" }] : []),
           ...(pode(papel, NEGOCIOS) ? [{ href: "/negocios", rotulo: "Negócios", secao: "Comercial" }] : []),
           ...(pode(papel, CARTEIRA_CONTATOS) ? [{ href: "/contatos", rotulo: "Contatos", secao: "Comercial" }] : []),
@@ -99,6 +103,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
           ...(pode(papel, PROPOSTA_E_CONTRATO) ? [{ href: "/propostas-contratos", rotulo: "Propostas e contratos", secao: "Comercial" }] : []),
           // Obras (somente leitura): comerciais e `operacao` (que hoje só vê Início).
           ...(pode(papel, OBRAS) ? [{ href: "/obras", rotulo: "Obras", secao: "Operação" }] : []),
+          ...(pode(papel, PEDIDOS_AOS_SETORES) ? [{ href: "/tarefas/setores", rotulo: "Pedidos aos setores", secao: "Operação" }] : []),
           ...(pode(papel, GESTAO_COMERCIAL) ? [{ href: "/painel", rotulo: "Painel", secao: "Gestão" }] : []),
           ...itensGamificacao(papel, conquistaNova),
         ]

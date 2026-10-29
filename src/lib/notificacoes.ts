@@ -6,6 +6,7 @@ import { carregarPropostasParadas } from "@/lib/propostas-paradas";
 import type { ContagemPendencias } from "@/lib/pendencias";
 import { escopoPendencias } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
+import { contarPendenciasTarefasSetor } from "@/lib/tarefas-setor";
 
 export type Notificacao = {
   id: string;
@@ -39,6 +40,11 @@ export async function temConquistaNaoVisualizada(empresaId: string, membroId: st
     .eq("tipo", "conquista_desbloqueada")
     .is("lida_em", null);
   return (count ?? 0) > 0;
+}
+
+/** Pendências de quem executa nos setores: as tarefas abertas com a pessoa e as da fila dos setores dela. */
+export async function pendenciasDosSetores(empresaId: string, membroId: string): Promise<ContagemPendencias> {
+  return { leadsADistribuir: 0, demais: await contarPendenciasTarefasSetor(await criarClienteServidor(), empresaId, membroId) };
 }
 
 /**

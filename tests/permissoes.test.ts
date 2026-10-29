@@ -35,6 +35,10 @@ const MATRIZ: Record<string, string[]> = {
   TAREFAS: ["admin", "gestor", "vendedor", "sdr"],
   VER_TAREFAS_DE_OUTROS: ["admin", "gestor"],
   ATRIBUIR_TAREFA_A_OUTROS: ["admin", "gestor"],
+  // Tarefas de setor: entrada na tela; quem vê e age em cada tarefa é decidido no banco (tarefas_setor).
+  TAREFAS_SETOR: ["admin", "gestor", "vendedor", "sdr", "operacao"],
+  TAREFAS_DO_SETOR: ["operacao"],
+  PEDIDOS_AOS_SETORES: ["admin", "gestor", "vendedor", "sdr"],
   GOOGLE_AGENDA: ["admin", "gestor", "vendedor", "sdr"],
   GESTAO_COMERCIAL: ["admin", "gestor"],
   // Regras de temperatura: mesma barreira da política de UPDATE de `regras_temperatura`.

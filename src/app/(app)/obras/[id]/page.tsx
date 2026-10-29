@@ -8,6 +8,8 @@ import { formatarDataHora, formatarMoeda } from "@/lib/crm";
 import { carregarObras } from "@/lib/obras/dados";
 import { filtrosDeParams, hrefObra, montarNavegacao, queryDosFiltros, temFiltroAtivo } from "@/lib/obras/navegacao";
 import { GestaoFixacao, GestaoMarco, GestaoSetor } from "./gestao";
+import { ListaTarefasSetor, NovaTarefaSetor } from "@/components/tarefas-setor";
+import { carregarTarefasSetor } from "@/lib/tarefas-setor";
 import {
   carregarDetalheObra,
   type ContatoClienteVM,
@@ -45,9 +47,10 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
 
   const supabase = await criarClienteServidor();
   // A lista navegável é recalculada aqui, a cada obra: mesma empresa, mesma RLS, mesmos filtros.
-  const [obra, lista] = await Promise.all([
+  const [obra, lista, tarefasSetor] = await Promise.all([
     carregarDetalheObra(supabase, { empresaId: atual.empresaId, papel: atual.papel, obraId: id, membroId: atual.membroId }),
     carregarObras(supabase, { empresaId: atual.empresaId, papel: atual.papel, comResponsaveis: false }),
+    carregarTarefasSetor(supabase, { empresaId: atual.empresaId, membroId: atual.membroId, papel: atual.papel, obraId: id, filtro: "todas" }),
   ]);
   if (!obra) notFound();
   const navegacao = montarNavegacao(lista.obras, filtros, id);
@@ -124,6 +127,20 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
           })}
         </div>
       </section>
+
+      <Cartao titulo="Tarefas dos setores">
+        <div className="flex flex-col gap-4">
+          <ListaTarefasSetor
+            tarefas={tarefasSetor.tarefas.filter((t) => t.status !== "cancelada")}
+            membrosPorSetor={tarefasSetor.membrosPorSetor}
+            vazio="Nenhuma tarefa nesta obra."
+            mostrarReferencia={false}
+          />
+          {resumo.situacao !== "cancelada" && (
+            <NovaTarefaSetor obraId={resumo.id} exemplo="O que o setor precisa fazer? Ex.: comprar a estrutura de fixação" />
+          )}
+        </div>
+      </Cartao>
 
       <Cartao titulo="Marcos">
         <ul className="flex flex-col gap-3 text-sm">
