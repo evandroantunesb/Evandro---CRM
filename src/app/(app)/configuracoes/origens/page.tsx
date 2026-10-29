@@ -11,7 +11,7 @@ export default async function ConfigOrigens() {
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
       <Voltar href="/configuracoes">Configurações</Voltar>
       <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Origens dos leads</h1>
-      <p className="text-sm text-zinc-600">
+      <p className="text-sm text-texto-2">
         Os canais por onde os leads chegam. Origem desativada some das opções, mas os negócios antigos continuam com ela.
         Todo lead que cai numa origem é sugerido pro rodízio e fica pendente de aprovação do gestor (Comercial → Leads a
         distribuir) até o prazo de auto-aprovação abaixo — depois disso, entra sozinho pro responsável sugerido.
@@ -25,7 +25,7 @@ export default async function ConfigOrigens() {
         ))}
       </Cartao>
       <Cartao titulo="Distribuição de leads entre vendedores e SDR">
-        <p className="mb-3 text-sm text-zinc-600">
+        <p className="mb-3 text-sm text-texto-2">
           Define como o rodízio escolhe o responsável sugerido quando um lead novo chega.
         </p>
         <DistribuicaoLeads modo={modoDistribuicaoLeads} percentual={percentualLeadsSdr} />

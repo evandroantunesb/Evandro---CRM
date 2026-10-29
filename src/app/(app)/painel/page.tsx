@@ -48,7 +48,7 @@ export default async function Painel() {
       {leadsADistribuir > 0 && (
         <Link
           href="/leads-a-distribuir"
-          className="flex items-center justify-between gap-3 rounded-xl border border-dourado/40 bg-dourado/5 px-4 py-3 text-sm text-zinc-900 hover:border-dourado"
+          className="flex items-center justify-between gap-3 rounded-xl border border-dourado/40 bg-dourado/5 px-4 py-3 text-sm text-texto hover:border-dourado"
         >
           <span>
             <strong>{leadsADistribuir}</strong> lead{leadsADistribuir === 1 ? "" : "s"} aguardando distribuição
@@ -59,13 +59,13 @@ export default async function Painel() {
 
       {pendentes.error && (
         <Cartao titulo="Oportunidades aguardando aceite">
-          <p className="text-sm text-zinc-600">Não foi possível carregar as oportunidades aguardando aceite agora. Atualize a página em instantes.</p>
+          <p className="text-sm text-texto-2">Não foi possível carregar as oportunidades aguardando aceite agora. Atualize a página em instantes.</p>
         </Cartao>
       )}
 
       {oportunidadesPendentes.length > 0 && (
         <Cartao titulo={`Oportunidades aguardando aceite (${oportunidadesPendentes.length})`}>
-          <p className="mb-2 text-sm text-zinc-600">
+          <p className="mb-2 text-sm text-texto-2">
             Enviadas pelo SDR a vendedores da sua equipe e ainda sem resposta. Você pode aceitar ou devolver em nome do vendedor.
           </p>
           <OportunidadesPendentes itens={oportunidadesPendentes} agoraMs={agora.getTime()} />
@@ -74,7 +74,7 @@ export default async function Painel() {
 
       {leadsSemContato.length > 0 && (
         <Cartao titulo={`Leads sem contato (${leadsSemContato.length})`}>
-          <p className="mb-2 text-sm text-zinc-600">
+          <p className="mb-2 text-sm text-texto-2">
             Leads novos, ainda na etapa inicial, sem nenhuma nota registrada há mais de {config.horasConsideradoSemContato} horas.
           </p>
           <ul className="flex flex-col">
@@ -99,16 +99,16 @@ export default async function Painel() {
         <Cartao titulo={`Tarefas atrasadas (${tarefasAtrasadas.length})`}>
           <ul className="flex flex-col">
             {tarefasAtrasadas.map((t) => (
-              <li key={t.id} className="flex items-center gap-3 border-t border-zinc-100 py-2.5 first:border-t-0">
+              <li key={t.id} className="flex items-center gap-3 border-t border-linha py-2.5 first:border-t-0">
                 <div className="min-w-0 flex-1">
                   {t.negocioId ? (
-                    <Link href={`/negocios/${t.negocioId}`} className="truncate text-sm font-medium text-zinc-900 hover:underline">
+                    <Link href={`/negocios/${t.negocioId}`} className="truncate text-sm font-medium text-texto hover:underline">
                       {t.contatoNome ?? t.titulo}
                     </Link>
                   ) : (
-                    <p className="truncate text-sm font-medium text-zinc-900">{t.titulo}</p>
+                    <p className="truncate text-sm font-medium text-texto">{t.titulo}</p>
                   )}
-                  <p className="truncate text-xs text-zinc-500">
+                  <p className="truncate text-xs text-texto-2">
                     {t.contatoNome ? t.titulo : "Tarefa"}
                     {t.responsavelNome ? ` · ${t.responsavelNome}` : ""}
                   </p>
@@ -122,7 +122,7 @@ export default async function Painel() {
 
       {leadsParados.length > 0 && (
         <Cartao titulo={`Leads parados (${leadsParados.length})`}>
-          <p className="mb-2 text-sm text-zinc-600">
+          <p className="mb-2 text-sm text-texto-2">
             Sem mudar de etapa nem ganhar uma nota nova há mais de {config.diasConsideradoParado} dias.
           </p>
           <ul className="flex flex-col">
@@ -145,7 +145,7 @@ export default async function Painel() {
 
       {propostasParadas.length > 0 && (
         <Cartao titulo={`Propostas paradas (${propostasParadas.length})`}>
-          <p className="mb-2 text-sm text-zinc-600">
+          <p className="mb-2 text-sm text-texto-2">
             Proposta gerada, sem o cliente abrir de novo nem mudar de etapa há mais de {config.diasConsideradoParado} dias.
           </p>
           <ul className="flex flex-col">
@@ -168,7 +168,7 @@ export default async function Painel() {
 
       <Cartao titulo="Leads por origem">
         {indicadores.porOrigem.length === 0 ? (
-          <p className="text-sm text-zinc-500">Nenhum negócio cadastrado ainda.</p>
+          <p className="text-sm text-texto-2">Nenhum negócio cadastrado ainda.</p>
         ) : (
           <Tabela
             cabecalho={["Origem", "Negócios"]}
@@ -179,7 +179,7 @@ export default async function Painel() {
 
       <Cartao titulo="Negócios em aberto por etapa">
         {indicadores.porEtapa.length === 0 ? (
-          <p className="text-sm text-zinc-500">Nenhum negócio em aberto.</p>
+          <p className="text-sm text-texto-2">Nenhum negócio em aberto.</p>
         ) : (
           <Tabela
             cabecalho={["Funil", "Etapa", "Negócios", "Valor"]}
@@ -190,7 +190,7 @@ export default async function Painel() {
 
       <Cartao titulo="Desempenho por vendedor">
         {indicadores.porVendedor.length === 0 ? (
-          <p className="text-sm text-zinc-500">Nenhum negócio com responsável definido ainda.</p>
+          <p className="text-sm text-texto-2">Nenhum negócio com responsável definido ainda.</p>
         ) : (
           <Tabela
             cabecalho={["Vendedor", "Em aberto", "Ganhos", "Perdidos", "Valor ganho", "Tarefas atrasadas"]}
@@ -210,11 +210,11 @@ export default async function Painel() {
 }
 
 function Estatistica({ rotulo, valor, destaque }: { rotulo: string; valor: string | number; destaque: "positivo" | "negativo" | "neutro" }) {
-  const cor = { positivo: "text-green-700", negativo: "text-red-700", neutro: "text-zinc-900" }[destaque];
+  const cor = { positivo: "text-green-700", negativo: "text-red-700", neutro: "text-texto" }[destaque];
   return (
-    <div className="rounded-xl border border-zinc-200/80 bg-white p-4 shadow-[0_1px_2px_rgba(15,15,16,0.04)]">
+    <div className="rounded-xl border border-linha bg-superficie p-4 shadow-[0_1px_2px_rgba(15,15,16,0.04)]">
       <p className={`text-2xl font-semibold ${cor}`}>{valor}</p>
-      <p className="text-sm text-zinc-600">{rotulo}</p>
+      <p className="text-sm text-texto-2">{rotulo}</p>
     </div>
   );
 }
@@ -224,7 +224,7 @@ function Tabela({ cabecalho, linhas }: { cabecalho: string[]; linhas: string[][]
     <div className="overflow-x-auto">
       <table className="w-full text-left text-sm">
         <thead>
-          <tr className="text-zinc-500">
+          <tr className="text-texto-2">
             {cabecalho.map((c) => (
               <th key={c} className="py-1.5 pr-4 font-medium">
                 {c}
@@ -234,9 +234,9 @@ function Tabela({ cabecalho, linhas }: { cabecalho: string[]; linhas: string[][]
         </thead>
         <tbody>
           {linhas.map((linha, i) => (
-            <tr key={i} className="border-t border-zinc-100">
+            <tr key={i} className="border-t border-linha">
               {linha.map((valor, j) => (
-                <td key={j} className="py-1.5 pr-4 text-zinc-800">
+                <td key={j} className="py-1.5 pr-4 text-texto">
                   {valor}
                 </td>
               ))}

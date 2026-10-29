@@ -16,7 +16,7 @@ import {
   renomear,
 } from "./actions";
 
-const inputClasse = "min-w-0 flex-1 rounded-md border border-zinc-300 px-3 py-1.5 text-sm";
+const inputClasse = "min-w-0 flex-1 rounded-md border border-linha px-3 py-1.5 text-sm";
 
 export function NovoFunil() {
   const [resultado, acao, pendente] = useActionState(criarFunil, null);
@@ -44,7 +44,7 @@ export function DiasConsideradoParado({ dias }: { dias: number }) {
         className={`${inputClasse} max-w-20 flex-none`}
         required
       />
-      <span className="text-sm text-zinc-600">dias sem atividade pra considerar &quot;parado&quot; (leads e propostas)</span>
+      <span className="text-sm text-texto-2">dias sem atividade pra considerar &quot;parado&quot; (leads e propostas)</span>
       <Botao type="submit" variante="secundario" disabled={pendente}>
         Salvar
       </Botao>
@@ -66,7 +66,7 @@ export function HorasConsideradoSemContato({ horas }: { horas: number }) {
         className={`${inputClasse} max-w-20 flex-none`}
         required
       />
-      <span className="text-sm text-zinc-600">horas sem nenhum contato pra considerar um lead novo &quot;sem contato&quot;</span>
+      <span className="text-sm text-texto-2">horas sem nenhum contato pra considerar um lead novo &quot;sem contato&quot;</span>
       <Botao type="submit" variante="secundario" disabled={pendente}>
         Salvar
       </Botao>
@@ -96,7 +96,7 @@ export function Renomear({ tabela, id, nome }: { tabela: "funis" | "etapas"; id:
       <input type="hidden" name="tabela" value={tabela} />
       <input type="hidden" name="id" value={id} />
       <input name="nome" defaultValue={nome} aria-label="Nome" className={inputClasse} required />
-      <button disabled={pendente} className="text-sm text-zinc-600 hover:underline">
+      <button disabled={pendente} className="text-sm text-texto-2 hover:underline">
         Salvar
       </button>
       {resultado && !resultado.ok && <span className="text-sm text-red-700">{resultado.mensagem}</span>}
@@ -110,7 +110,7 @@ export function AlternarEtapa({ etapaId, ativa }: { etapaId: string; ativa: bool
     <form action={acao} className="flex items-center gap-2">
       <input type="hidden" name="etapaId" value={etapaId} />
       <input type="hidden" name="ativa" value={String(!ativa)} />
-      <button disabled={pendente} className="text-sm text-zinc-600 hover:underline">
+      <button disabled={pendente} className="text-sm text-texto-2 hover:underline">
         {ativa ? "Desativar" : "Reativar"}
       </button>
       {resultado && !resultado.ok && <span className="text-sm text-red-700">{resultado.mensagem}</span>}
@@ -128,7 +128,7 @@ export function CorEtapa({ etapaId, cor }: { etapaId: string; cor: string | null
         name="cor"
         defaultValue={cor ?? "#a1a1aa"}
         aria-label="Cor da etapa"
-        className="h-6 w-6 cursor-pointer rounded border border-zinc-300 p-0"
+        className="h-6 w-6 cursor-pointer rounded border border-linha p-0"
         onChange={(e) => e.currentTarget.form?.requestSubmit()}
       />
     </form>
@@ -144,7 +144,7 @@ export function FechaComoEtapa({ etapaId, fechaComo }: { etapaId: string; fechaC
         name="fechaComo"
         defaultValue={fechaComo ?? ""}
         onChange={(e) => e.currentTarget.form?.requestSubmit()}
-        className="rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm text-zinc-700"
+        className="rounded-md border border-linha bg-superficie px-2 py-1 text-sm text-texto"
       >
         <option value="">Não fecha o negócio</option>
         <option value="ganho">Marca como ganho</option>
@@ -159,7 +159,7 @@ export function MarcaNegociacaoEtapa({ etapaId, marcaNegociacao }: { etapaId: st
   return (
     <form action={definirMarcaNegociacaoEtapa} title="Marca a entrada do negócio nesta etapa como 'entrou em negociação' na gamificação">
       <input type="hidden" name="etapaId" value={etapaId} />
-      <label className="flex items-center gap-1 text-sm text-zinc-600">
+      <label className="flex items-center gap-1 text-sm text-texto-2">
         <input
           type="checkbox"
           name="marcaNegociacao"
@@ -176,7 +176,7 @@ export function CamposObrigatorios({ etapaId, campos }: { etapaId: string; campo
   const [resultado, acao, pendente] = useActionState(definirCamposObrigatorios, null);
   return (
     <details className="w-full pl-7 text-sm">
-      <summary className="cursor-pointer text-zinc-600">
+      <summary className="cursor-pointer text-texto-2">
         Campos obrigatórios para entrar nesta etapa
         {campos.length > 0 &&
           ` (${campos.map((c) => ROTULO_CAMPO_OBRIGATORIO[c as keyof typeof ROTULO_CAMPO_OBRIGATORIO] ?? c).join(", ")})`}
@@ -184,7 +184,7 @@ export function CamposObrigatorios({ etapaId, campos }: { etapaId: string; campo
       <form action={acao} className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
         <input type="hidden" name="etapaId" value={etapaId} />
         {CAMPOS_OBRIGATORIOS.map((c) => (
-          <label key={c} className="flex items-center gap-1 text-zinc-700">
+          <label key={c} className="flex items-center gap-1 text-texto">
             <input type="checkbox" name="campos" value={c} defaultChecked={campos.includes(c)} />
             {ROTULO_CAMPO_OBRIGATORIO[c]}
           </label>

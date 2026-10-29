@@ -18,7 +18,7 @@ export default async function ConfigCalculadora() {
       <Voltar href="/configuracoes">Configurações</Voltar>
       <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Kits e calculadora</h1>
       <Cartao titulo={`Kits (${kits.length})`}>
-        <p className="mb-3 text-sm text-zinc-600">
+        <p className="mb-3 text-sm text-texto-2">
           Kits prontos do catálogo, com potência e preço. O vendedor escolhe um deles na calculadora do negócio.
         </p>
         {kits.map((k) => (
@@ -29,7 +29,7 @@ export default async function ConfigCalculadora() {
         </div>
       </Cartao>
       <Cartao titulo="Parâmetros da calculadora">
-        <p className="mb-3 text-sm text-zinc-600">
+        <p className="mb-3 text-sm text-texto-2">
           Usados na estimativa de economia (modo comercial, sem simulação de engenharia). Valide estes números com o
           engenheiro responsável antes de usar com clientes.
         </p>
