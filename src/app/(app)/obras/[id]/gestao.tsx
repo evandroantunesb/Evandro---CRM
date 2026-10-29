@@ -421,10 +421,11 @@ export function GestaoFixacao({ obraId, fixacao, podeConfigurar }: { obraId: str
   }
 
   return (
-    <div className="flex flex-col gap-2 text-sm">
-      <form onSubmit={enviar} className="flex flex-col gap-2 sm:flex-row sm:items-center">
+    <div className="flex w-full min-w-0 flex-col gap-2 text-sm">
+      <form onSubmit={enviar} className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
         <input type="hidden" name="obraId" value={obraId} />
-        <div className="min-w-0 sm:w-72">
+        {/* O select mede pela opção mais longa: sem w-full/min-w-0 ele estoura a largura do celular. */}
+        <div className="w-full min-w-0 sm:w-72 [&_select]:w-full [&_select]:min-w-0">
           <Selecao name="fixacaoId" aria-label="Tipo de fixação" value={escolhido} onChange={(e) => setEscolhido(e.target.value)}>
             <option value="">Não definida</option>
             {fixacao.opcoes.map((o) => (
