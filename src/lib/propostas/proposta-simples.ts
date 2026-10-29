@@ -106,6 +106,25 @@ export function extrairConteudoDoModelo(blocos: { tipo: string; ativo: boolean; 
   };
 }
 
+/** Validade padrão da proposta quando o modelo não define uma (decisão do Evandro, 29/10/2026). */
+export const VALIDADE_PADRAO_DIAS = 10;
+
+/**
+ * Dias de validade sugeridos na emissão: o "Validade (dias)" do bloco "Dados do documento" do modelo padrão,
+ * entre 1 e 180; senão, 10. É só a sugestão do campo "Válida até": o vendedor pode trocar a data.
+ */
+export function validadePadraoDoModelo(blocos: { tipo: string; config: unknown }[] | null | undefined): number {
+  const config = (blocos ?? []).find((b) => b.tipo === "proposal_identity")?.config as { validadeDias?: unknown } | null | undefined;
+  const dias = Number(typeof config?.validadeDias === "string" ? config.validadeDias.trim() : config?.validadeDias);
+  return Number.isInteger(dias) && dias >= 1 && dias <= 180 ? dias : VALIDADE_PADRAO_DIAS;
+}
+
+/** AAAA-MM-DD somado de `dias` (calendário, sem fuso). */
+export function somarDias(dataIso: string, dias: number): string {
+  const [a, m, d] = dataIso.split("-").map(Number) as [number, number, number];
+  return new Date(Date.UTC(a, m - 1, d + dias)).toISOString().slice(0, 10);
+}
+
 // ---------------------------------------------------------------------------
 // Dados congelados da emissão
 // ---------------------------------------------------------------------------

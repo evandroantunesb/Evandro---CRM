@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { expect, test } from "@playwright/test";
-import { clienteDe, entrarComo, fichaNaAba, lerBase } from "./ajuda";
+import { clienteDe, entrarComo, fichaNaAba, lerBase, preencherCondicoes } from "./ajuda";
 import type { BaseFicticia } from "./base-ficticia";
 
 /**
@@ -68,7 +68,7 @@ async function emitir(page: import("@playwright/test").Page, negocioId: string, 
   await entrarComo(page, base.usuarios.vendedor, base.senha);
   await page.goto(fichaNaAba(negocioId, "Proposta e contrato"));
   await page.getByLabel("Válida até").fill(validade);
-  await page.getByLabel("Condições de pagamento").fill("À vista por Pix ou transferência\nFinanciamento bancário, com parcelas a combinar");
+  await preencherCondicoes(page, "À vista por Pix ou transferência\nFinanciamento bancário, com parcelas a combinar");
   await page.getByRole("button", { name: /^Emitir/ }).click();
 }
 
@@ -119,7 +119,7 @@ test.describe("proposta simples emitida", () => {
     // Nova versão: outro link, outro arquivo; a anterior continua igual.
     await page.reload();
     await page.getByLabel("Válida até").fill(AMANHA());
-    await page.getByLabel("Condições de pagamento").fill("À vista por Pix ou transferência");
+    await preencherCondicoes(page, "À vista por Pix ou transferência");
     await page.getByRole("button", { name: /^Emitir/ }).click();
     await expect(page.getByText("Proposta v2 emitida.")).toBeVisible();
     const { data: depois } = await n.cliente.from("propostas_emissoes").select("token, pdf_sha256, versao").eq("negocio_id", n.id).order("versao");
