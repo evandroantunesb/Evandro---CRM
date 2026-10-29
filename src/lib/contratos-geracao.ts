@@ -10,6 +10,7 @@ import {
 } from "@/lib/contrato";
 import { calculoEhIncompleto, calculoEhLegado, carregarVigencia, mensagemDeRecusa, motivosDaAcao } from "@/lib/calculo-vigencia";
 import { MENSAGEM_PRECO_DESATUALIZADO, precoDoCalculoDesatualizado } from "@/lib/calculo-preco";
+import { mensagemPendenciasContrato, pendenciasDadosContrato, type DadosClienteContrato } from "@/lib/dados-cliente-contrato";
 import { mensagemErro } from "@/lib/erros";
 import { formatarMoeda } from "@/lib/formatacao";
 import type { SupabaseServidor } from "@/lib/supabase/server";
@@ -32,7 +33,7 @@ export async function gerarContratoComCliente(
       supabase
         .from("negocios")
         .select(
-          "titulo, numero, valor, unidade_consumidora, qualif_distribuidora, consumo_medio_kwh, responsavel_id, contatos(nome, documento, endereco, cidade, uf, email, telefone, telefone2)",
+          "titulo, numero, valor, unidade_consumidora, qualif_distribuidora, consumo_medio_kwh, responsavel_id, contatos(tipo, nome, documento, rg, data_nascimento, inscricao_estadual, endereco, cep, logradouro, numero, bairro, cidade, uf, email, telefone, telefone2)",
         )
         .eq("id", negocioId)
         .maybeSingle(),
@@ -52,6 +53,9 @@ export async function gerarContratoComCliente(
   if (existente && existente.status !== "rascunho") {
     return { ok: false, mensagem: "Este contrato já saiu do rascunho — o texto não muda mais automaticamente." };
   }
+  // Dados do cliente obrigatórios (a mesma regra trava o contrato no banco, ver `pendencias_contrato_contato`).
+  const pendencias = pendenciasDadosContrato(negocio.contatos as unknown as DadosClienteContrato | null);
+  if (pendencias.length) return { ok: false, mensagem: mensagemPendenciasContrato(pendencias) };
   // O contrato usa o valor atual do negócio e a proposta, o preço do cálculo: com os dois diferentes, não gera.
   // Com cálculo legado (fórmula antiga) a proposta não mostra preço nenhum e "Atualizar preço" é recusado: a guarda
   // não protege nada e só travaria o contrato, que segue usando o valor atual do negócio (decisão de Nora, M2-B8).

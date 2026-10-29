@@ -6,6 +6,9 @@ export const PLACEHOLDERS_CONTRATO = [
   { chave: "empresa_cnpj", rotulo: "CNPJ da empresa" },
   { chave: "cliente_nome", rotulo: "Nome do cliente" },
   { chave: "cliente_documento", rotulo: "CPF/CNPJ do cliente" },
+  { chave: "cliente_rg", rotulo: "RG do cliente" },
+  { chave: "cliente_data_nascimento", rotulo: "Data de nascimento do cliente" },
+  { chave: "cliente_inscricao_estadual", rotulo: "Inscrição estadual do cliente" },
   { chave: "cliente_endereco", rotulo: "Endereço do cliente" },
   { chave: "cliente_cidade", rotulo: "Cidade do cliente" },
   { chave: "cliente_uf", rotulo: "UF do cliente" },
@@ -114,6 +117,9 @@ export type FontesContrato = {
     email: string | null;
     telefone: string | null;
     telefone2: string | null;
+    rg?: string | null;
+    data_nascimento?: string | null;
+    inscricao_estadual?: string | null;
   } | null;
   calculo: {
     kit_nome: string | null;
@@ -152,6 +158,9 @@ export function montarDadosContrato(f: FontesContrato): DadosContrato {
     empresa_cnpj: f.empresa?.cnpj ?? "",
     cliente_nome: c?.nome ?? "",
     cliente_documento: c?.documento ?? "",
+    cliente_rg: c?.rg ?? "",
+    cliente_data_nascimento: c?.data_nascimento ? c.data_nascimento.split("-").reverse().join("/") : "",
+    cliente_inscricao_estadual: c?.inscricao_estadual ?? "",
     cliente_endereco: c?.endereco ?? "",
     cliente_cidade: c?.cidade ?? "",
     cliente_uf: c?.uf ?? "",
