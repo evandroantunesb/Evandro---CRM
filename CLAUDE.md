@@ -6,6 +6,14 @@ SaaS multiempresa de CRM, inicialmente focado em empresas de energia solar (uso 
 
 Este arquivo contém só regras duráveis. Estado atual em `docs/PROJECT_STATUS.md`; produto e módulos futuros em `docs/ROADMAP.md`; guia técnico em `AGENTS.md`; detalhes em `docs/arquitetura.md` e `docs/regras-negocio.md`. Se algum documento divergir do código, **o código e o GitHub são a fonte da verdade** — avise o Evandro.
 
+## Escopo Mestre obrigatório — antes de iniciar qualquer trabalho
+
+- **Fonte de escopo aprovada:** [`docs/RAION_CRM_PLANO_MESTRE.md`](docs/RAION_CRM_PLANO_MESTRE.md) (v3, 15/10/2026). Ela contém todas as frentes conhecidas do Raion, IDs A01–G08 e marcos M0–M15; `docs/ROADMAP.md` é histórico/insumo e não substitui essa abrangência.
+- **Antes de propor, diagnosticar ou implementar** qualquer tarefa, identificar e informar: IDs do escopo correspondentes, marco ativo, resultado esperado, dependências, critério de aceite funcional e relação com as PRs atuais. Se a demanda revelar algo novo, registrar explicitamente como lacuna a inventariar/alteração proposta; não descartar como "fora do escopo".
+- **Ordem fechada:** somente um marco principal de implementação ativo por vez. Não abrir outras frentes, criar PR ou ampliar o escopo sem autorização explícita. Incidente crítico comprovado pode exigir exceção pontual, com justificativa, revisão e aceite próprios.
+- **Pronto não é igual a código existente nem CI verde:** exigir demonstração funcional e aprovação do responsável antes de declarar entrega concluída. Preservar histórico, decisões e pendências; não reclassificar requisitos sem autorização.
+- O Plano Mestre é uma **referência aprovada de abrangência**, não significa que o inventário funcional M0 esteja concluído ou que cada hipótese técnica esteja aprovada. Código e estado real do GitHub continuam fonte da verdade para implementação; divergências devem ser registradas e submetidas para revisão do escopo.
+
 ## Antes de editar
 
 - Sincronize a branch com o remoto e rode `git status`, `git log` e `git diff`. Nunca presuma o estado do repositório pela memória ou pela documentação.
