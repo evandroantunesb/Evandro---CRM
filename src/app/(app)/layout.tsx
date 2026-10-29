@@ -5,7 +5,7 @@ import { Avatar } from "@/components/avatar";
 import { assinarAvatares } from "@/lib/avatares";
 import { LogoRaion } from "@/components/marca";
 import { carregarDiasConsideradoParado, carregarHorasConsideradoSemContato } from "@/lib/crm";
-import { carregarNotificacoesNaoLidas, contarPendencias, temConquistaNaoVisualizada } from "@/lib/notificacoes";
+import { carregarNotificacoesNaoLidas, contarPendencias, contarPendenciasSetores, temConquistaNaoVisualizada } from "@/lib/notificacoes";
 import { linksPendencias, type ContagemPendencias } from "@/lib/pendencias";
 import { CARTEIRA_CONTATOS, GAMIFICACAO, GESTAO_COMERCIAL, NEGOCIOS, OBRAS, PARTICIPANTES_GAMIFICACAO, PEDIDOS_AOS_SETORES, PROPOSTA_E_CONTRATO, TAREFAS, TAREFAS_DO_SETOR, pode } from "@/lib/permissoes";
 import { obterSessao } from "@/lib/sessao";
@@ -71,7 +71,9 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
       carregarHorasConsideradoSemContato(sessao.atual.empresaId),
     ]);
     [pendencias, notificacoes, conquistaNova] = await Promise.all([
-      contarPendencias(sessao.atual.empresaId, sessao.atual.membroId, sessao.atual.papel, dias, horas),
+      pode(papel, TAREFAS_DO_SETOR)
+        ? contarPendenciasSetores(sessao.atual.empresaId, sessao.atual.membroId)
+        : contarPendencias(sessao.atual.empresaId, sessao.atual.membroId, sessao.atual.papel, dias, horas),
       carregarNotificacoesNaoLidas(sessao.atual.empresaId, sessao.atual.membroId),
       temConquistaNaoVisualizada(sessao.atual.empresaId, sessao.atual.membroId),
     ]);

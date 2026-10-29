@@ -4,7 +4,7 @@ import { carregarLeadsParados } from "@/lib/leads-parados";
 import { carregarLeadsSemContato } from "@/lib/leads-sem-contato";
 import { carregarPropostasParadas } from "@/lib/propostas-paradas";
 import type { ContagemPendencias } from "@/lib/pendencias";
-import { escopoPendencias, pode, TAREFAS_DO_SETOR } from "@/lib/permissoes";
+import { escopoPendencias } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { contarPendenciasTarefasSetor } from "@/lib/tarefas-setor";
 
@@ -42,6 +42,11 @@ export async function temConquistaNaoVisualizada(empresaId: string, membroId: st
   return (count ?? 0) > 0;
 }
 
+/** Pendências de quem executa nos setores: as tarefas abertas com a pessoa e as da fila dos setores dela. */
+export async function contarPendenciasSetores(empresaId: string, membroId: string): Promise<ContagemPendencias> {
+  return { leadsADistribuir: 0, demais: await contarPendenciasTarefasSetor(await criarClienteServidor(), empresaId, membroId) };
+}
+
 /**
  * Pendências do usuário logado, separadas entre a fila de distribuição e o resto — mesmos
  * números do Painel/Leads a distribuir (admin/gestor, empresa toda) ou da Início (vendedor/SDR,
@@ -54,10 +59,6 @@ export async function contarPendencias(
   diasConsideradoParado: number,
   horasConsideradoSemContato: number,
 ): Promise<ContagemPendencias> {
-  // Quem executa nos setores: as tarefas abertas com a pessoa e as da fila dos setores dela.
-  if (pode(papel, TAREFAS_DO_SETOR)) {
-    return { leadsADistribuir: 0, demais: await contarPendenciasTarefasSetor(await criarClienteServidor(), empresaId, membroId) };
-  }
   // Escopo por lista positiva (spec RAION_SDR_REGRAS_PERMISSOES §10): gestão comercial vê a empresa
   // toda; vendedor e SDR, a própria carteira; papel sem acesso comercial não conta nada.
   const escopo = escopoPendencias(papel);
