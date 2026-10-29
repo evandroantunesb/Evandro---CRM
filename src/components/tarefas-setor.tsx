@@ -313,26 +313,32 @@ export function NovaTarefaSetor({ obraId, negocioId, exemplo }: { obraId?: strin
         {arquivos.length ? `${arquivos.length} arquivo${arquivos.length > 1 ? "s" : ""} para anexar` : "Anexar arquivos (fotos, PDF)"}
         <input type="file" multiple className="hidden" onChange={(e) => setArquivos(Array.from(e.target.files ?? []))} />
       </label>
-      <div className="flex flex-wrap gap-2">
-        <Selecao name="setor" defaultValue="" required aria-label="Setor">
-          <option value="" disabled>
-            Para qual setor?
-          </option>
-          {SETORES_TAREFA.map((s) => (
-            <option key={s} value={s}>
-              {ROTULO_SETOR[s]}
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="flex flex-col gap-1 text-xs text-zinc-600">
+          Setor responsável
+          <Selecao name="setor" defaultValue="" required aria-label="Setor">
+            <option value="" disabled>
+              Para qual setor?
             </option>
-          ))}
-        </Selecao>
-        <input
-          type="date"
-          name="prazo"
-          min={hoje}
-          defaultValue={somarDiasUteis(hoje, PRAZO_PADRAO_DIAS_UTEIS)}
-          required
-          aria-label="Prazo"
-          className={`${CLASSE_ENTRADA} text-sm`}
-        />
+            {SETORES_TAREFA.map((s) => (
+              <option key={s} value={s}>
+                {ROTULO_SETOR[s]}
+              </option>
+            ))}
+          </Selecao>
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-zinc-600">
+          Prazo: até quando o setor deve entregar
+          <input
+            type="date"
+            name="prazo"
+            min={hoje}
+            defaultValue={somarDiasUteis(hoje, PRAZO_PADRAO_DIAS_UTEIS)}
+            required
+            aria-label="Prazo"
+            className={`${CLASSE_ENTRADA} text-sm`}
+          />
+        </label>
         <Botao type="submit" disabled={pendente}>
           {pendente ? "Enviando..." : "Enviar ao setor"}
         </Botao>
