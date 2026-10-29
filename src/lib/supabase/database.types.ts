@@ -2605,6 +2605,35 @@ export type Database = {
           },
         ];
       };
+      obra_cliente: {
+        Row: {
+          created_at: string;
+          dados: NonNullable<Json>;
+          empresa_id: string;
+          obra_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          dados: NonNullable<Json>;
+          empresa_id: string;
+          obra_id: string;
+        };
+        Update: {
+          created_at?: string;
+          dados?: NonNullable<Json>;
+          empresa_id?: string;
+          obra_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "obra_cliente_empresa_id_obra_id_fkey";
+            columns: ["empresa_id", "obra_id"];
+            isOneToOne: false;
+            referencedRelation: "obras";
+            referencedColumns: ["empresa_id", "id"];
+          },
+        ];
+      };
       obra_dados_comerciais: {
         Row: {
           created_at: string;
