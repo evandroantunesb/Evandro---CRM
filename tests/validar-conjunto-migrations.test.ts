@@ -8,9 +8,12 @@ import { afterAll, describe, expect, it } from "vitest";
 
 const SCRIPT = ".github/scripts/validar-conjunto-migrations.sh";
 const WORKFLOW = ".github/workflows/banco-producao.yml";
-// Fixação do telhado na obra (#245): só ela, nenhuma a mais ou a menos.
-const AUTORIZADA = "20261029150000_obras_fixacao_telhado.sql";
-// Validade padrão da proposta (#244): aplicada em 29/10/2026, antes desta. Se voltar a aparecer como pendente, não é
+// Dados pessoais da obra fora da API (obra_cliente): só ela, nenhuma a mais ou a menos.
+const AUTORIZADA = "20261029170000_obras_cliente_oculto.sql";
+// Fixação do telhado na obra (#245): aplicada em 29/10/2026, antes desta. Se voltar a aparecer como pendente, não é
+// autorizada.
+const FIXACAO = "20261029150000_obras_fixacao_telhado.sql";
+// Validade padrão da proposta (#244): aplicada em 29/10/2026, antes da fixação. Se voltar a aparecer como pendente, não é
 // autorizada.
 const VALIDADE_PROPOSTA = "20261029130000_proposta_preferencias.sql";
 // Eletroposto para o SDR e pontuação por tipo de negócio (#225): aplicada em 27/10/2026, antes da validade. Se voltar a
@@ -179,13 +182,13 @@ describe("entradas inválidas: encerra com erro antes de qualquer aplicação", 
   });
 });
 
-describe("fixação do telhado na obra", () => {
-  it("só ela pendente (validade da proposta, eletroposto SDR, eletroposto, temperatura e calculadora já aplicados): passa", () => {
+describe("dados pessoais da obra fora da API", () => {
+  it("só ela pendente (fixação, validade da proposta, eletroposto SDR, eletroposto, temperatura e calculadora já aplicados): passa", () => {
     expect(validar(dryRunCom(AUTORIZADA)).codigo).toBe(0);
   });
 
-  it("validade da proposta, eletroposto SDR, eletroposto, temperatura ou qualquer migration da calculadora pendente junto, ou sozinha, não passa", () => {
-    for (const m of [VALIDADE_PROPOSTA, ELETROPOSTO_SDR, ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) {
+  it("fixação, validade da proposta, eletroposto SDR, eletroposto, temperatura ou qualquer migration da calculadora pendente junto, ou sozinha, não passa", () => {
+    for (const m of [FIXACAO, VALIDADE_PROPOSTA, ELETROPOSTO_SDR, ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) {
       expect(validar(dryRunCom(AUTORIZADA, m)).codigo, m).toBe(1);
       expect(validar(dryRunCom(m)).codigo, m).toBe(1);
     }
@@ -200,7 +203,7 @@ describe("fixação do telhado na obra", () => {
     expect(existsSync(`supabase/migrations/${AUTORIZADA}`)).toBe(true);
     const texto = readFileSync(WORKFLOW, "utf8");
     expect(texto).toContain(AUTORIZADA);
-    for (const m of [VALIDADE_PROPOSTA, ELETROPOSTO_SDR, ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) expect(texto, m).not.toContain(m);
+    for (const m of [FIXACAO, VALIDADE_PROPOSTA, ELETROPOSTO_SDR, ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) expect(texto, m).not.toContain(m);
   });
 });
 

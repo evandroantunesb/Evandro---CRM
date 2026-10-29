@@ -657,19 +657,36 @@ describe("operacao: dados pessoais do cliente (obras_operacao)", () => {
     }
   });
 
-  it("comercial continua igual: lê obras direto com o snapshot completo; a RPC não é caminho dele", async () => {
+  // 20261029170000_obras_cliente_oculto.sql: o comercial continua lendo a obra direto, mas o snapshot
+  // não traz mais o bloco `cliente`, e `obra_cliente` não entrega nada pela API para nenhum papel.
+  it("comercial lê a obra direto sem dado pessoal no snapshot; a RPC não é caminho dele", async () => {
     for (const usuario of [admin, vendedor, gestor]) {
-      const { data } = await usuario.cliente.from("obras").select("snapshot").eq("id", obraA);
-      const cliente = (data![0].snapshot as { cliente: Record<string, unknown> }).cliente;
-      expect(cliente).toMatchObject({
-        documento: PESSOAIS.documento,
-        telefone: PESSOAIS.telefone,
-        email: PESSOAIS.email,
-        endereco: PESSOAIS.endereco,
-      });
+      const { data, error } = await usuario.cliente.from("obras").select("*").eq("id", obraA);
+      expect(error).toBeNull();
+      expect(data).toHaveLength(1);
+      expect(data![0].snapshot).not.toHaveProperty("cliente");
+      const texto = JSON.stringify(data);
+      for (const valor of Object.values(PESSOAIS)) expect(texto, valor).not.toContain(valor);
       const { data: pelaRpc } = await usuario.cliente.rpc("obras_operacao");
       expect(pelaRpc).toEqual([]);
     }
+  });
+
+  it("obra_cliente não é legível pela API por nenhum papel", async () => {
+    for (const usuario of [admin, gestor, vendedor, sdr, opParticipante, opInstalador, opCoordena, adminB]) {
+      const { data } = await usuario.cliente.from("obra_cliente").select("*");
+      expect(data ?? []).toEqual([]);
+    }
+  });
+
+  it("os dados pessoais seguem guardados no servidor, fora do snapshot", async () => {
+    const { data } = await servico.from("obra_cliente").select("dados").eq("obra_id", obraA).single();
+    expect(data!.dados).toMatchObject({
+      documento: PESSOAIS.documento,
+      telefone: PESSOAIS.telefone,
+      email: PESSOAIS.email,
+      endereco: PESSOAIS.endereco,
+    });
   });
 
   it("valor vendido continua bloqueado para todo operacao", async () => {
