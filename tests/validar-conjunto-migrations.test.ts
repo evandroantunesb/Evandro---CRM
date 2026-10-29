@@ -8,9 +8,12 @@ import { afterAll, describe, expect, it } from "vitest";
 
 const SCRIPT = ".github/scripts/validar-conjunto-migrations.sh";
 const WORKFLOW = ".github/workflows/banco-producao.yml";
-// Dados do cliente obrigatórios para o contrato e levados até a Obra: só ela, nenhuma a mais ou a menos.
-const AUTORIZADA = "20261029190000_dados_cliente_contrato.sql";
-// Dados pessoais da obra fora da API (#247): aplicada em 29/10/2026, antes desta. Se voltar a aparecer como pendente,
+// Tarefas de setor (pedidos do comercial e tarefas da obra): só ela, nenhuma a mais ou a menos.
+const AUTORIZADA = "20261029210000_tarefas_setor.sql";
+// Dados do cliente para o contrato (#248): aplicada em 29/10/2026, antes desta. Se voltar a aparecer como pendente,
+// não é autorizada.
+const DADOS_CLIENTE = "20261029190000_dados_cliente_contrato.sql";
+// Dados pessoais da obra fora da API (#247): aplicada em 29/10/2026, antes da #248. Se voltar a aparecer como pendente,
 // não é autorizada.
 const CLIENTE_OCULTO = "20261029170000_obras_cliente_oculto.sql";
 // Fixação do telhado na obra (#245): aplicada em 29/10/2026, antes da #247. Se voltar a aparecer como pendente, não é
@@ -185,13 +188,13 @@ describe("entradas inválidas: encerra com erro antes de qualquer aplicação", 
   });
 });
 
-describe("dados do cliente obrigatórios para o contrato", () => {
-  it("só ela pendente (dados pessoais da obra, fixação, validade da proposta, eletroposto SDR, eletroposto, temperatura e calculadora já aplicados): passa", () => {
+describe("tarefas de setor", () => {
+  it("só ela pendente (dados do cliente, dados pessoais da obra, fixação, validade da proposta, eletroposto SDR, eletroposto, temperatura e calculadora já aplicados): passa", () => {
     expect(validar(dryRunCom(AUTORIZADA)).codigo).toBe(0);
   });
 
-  it("dados pessoais da obra, fixação, validade da proposta, eletroposto SDR, eletroposto, temperatura ou qualquer migration da calculadora pendente junto, ou sozinha, não passa", () => {
-    for (const m of [CLIENTE_OCULTO, FIXACAO, VALIDADE_PROPOSTA, ELETROPOSTO_SDR, ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) {
+  it("dados do cliente, dados pessoais da obra, fixação, validade da proposta, eletroposto SDR, eletroposto, temperatura ou qualquer migration da calculadora pendente junto, ou sozinha, não passa", () => {
+    for (const m of [DADOS_CLIENTE, CLIENTE_OCULTO, FIXACAO, VALIDADE_PROPOSTA, ELETROPOSTO_SDR, ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) {
       expect(validar(dryRunCom(AUTORIZADA, m)).codigo, m).toBe(1);
       expect(validar(dryRunCom(m)).codigo, m).toBe(1);
     }
@@ -206,7 +209,7 @@ describe("dados do cliente obrigatórios para o contrato", () => {
     expect(existsSync(`supabase/migrations/${AUTORIZADA}`)).toBe(true);
     const texto = readFileSync(WORKFLOW, "utf8");
     expect(texto).toContain(AUTORIZADA);
-    for (const m of [CLIENTE_OCULTO, FIXACAO, VALIDADE_PROPOSTA, ELETROPOSTO_SDR, ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) expect(texto, m).not.toContain(m);
+    for (const m of [DADOS_CLIENTE, CLIENTE_OCULTO, FIXACAO, VALIDADE_PROPOSTA, ELETROPOSTO_SDR, ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) expect(texto, m).not.toContain(m);
   });
 });
 
