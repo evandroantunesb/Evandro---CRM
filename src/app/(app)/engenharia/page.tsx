@@ -144,7 +144,7 @@ function Central({
   const indicadores: [string, number][] = [
     ["Obras na Engenharia", totalObras],
     ["Precisam de você", tarefasMinhas.length + acoes.length],
-    ["Com terceiros", comTerceiros.length],
+    ["Aguardando terceiros", comTerceiros.length],
     ["Paradas", paradas],
     ["Tarefas atrasadas", atrasadas],
   ];
@@ -230,7 +230,7 @@ function ListaObras({ obras, acao = false }: { obras: ObraNaEngenharia[]; acao?:
           <li key={o.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm">
             <div className="min-w-0">
               {acao && o.proximaAcao && <p className="font-medium text-texto">{o.proximaAcao}</p>}
-              <p className={`truncate ${acao ? "text-zinc-700" : "font-medium text-texto"}`}>
+              <p className={`break-words ${acao ? "text-zinc-700" : "font-medium text-texto"}`}>
                 <Link href={`/engenharia/${o.id}`} className="hover:underline">
                   Obra #{o.numero} · {o.clienteNome}
                 </Link>
