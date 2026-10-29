@@ -100,7 +100,7 @@ export default async function Engenharia({ searchParams }: PageProps<"/engenhari
         {totalObras === 0 ? (
           <p className="text-sm text-zinc-500">Nenhuma obra em andamento na Engenharia.</p>
         ) : (
-          <div className="flex flex-col gap-5">
+          <div role="region" aria-label="Carteira por etapa" className="flex flex-col gap-5">
             {grupos
               .filter((g) => g.obras.length > 0)
               .map((g) => (
