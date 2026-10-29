@@ -214,7 +214,7 @@ describe("tarefas de setor (ordem importa)", { concurrent: false, shuffle: false
   });
 
   it("quem não atua na obra não cria tarefa nela", async () => {
-    const { error } = await engFora.cliente.rpc("criar_tarefa_setor", { p_setor: "compras", p_titulo: "X", p_prazo: amanha(), p_obra_id: obra });
+    const { error } = await engFora.cliente.rpc("criar_tarefa_setor", { p_setor: "compras", p_titulo: "Comprar cabos", p_prazo: amanha(), p_obra_id: obra });
     expect(error?.message).toBe("Você não pode criar tarefa aqui.");
   });
 
