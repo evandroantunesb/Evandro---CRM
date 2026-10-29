@@ -25,7 +25,7 @@ export function RegistrarArquivo({ negocioId, arquivo }: { negocioId: string; ar
         value={categoria}
         disabled={pendente}
         onChange={(e) => setCategoria(e.target.value as CategoriaAnexo)}
-        className="rounded-md border border-zinc-300 bg-white px-1 py-0.5 text-xs"
+        className="rounded-md border border-linha bg-superficie px-1 py-0.5 text-xs"
       >
         {CATEGORIAS_ANEXO.map((c) => (
           <option key={c} value={c}>

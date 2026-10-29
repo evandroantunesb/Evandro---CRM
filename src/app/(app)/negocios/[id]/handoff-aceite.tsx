@@ -28,7 +28,7 @@ export function HandoffAceite({
     return (
       <div className="flex items-center gap-2">
         <Selo tom="atencao">Aguardando aceite</Selo>
-        <span className="text-sm text-zinc-600">Enviado por {deNome}, esperando o vendedor aceitar.</span>
+        <span className="text-sm text-texto-2">Enviado por {deNome}, esperando o vendedor aceitar.</span>
       </div>
     );
   }
@@ -37,7 +37,7 @@ export function HandoffAceite({
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2">
         <Selo tom="atencao">Aguardando seu aceite</Selo>
-        <span className="text-sm text-zinc-600">Enviado por {deNome}.</span>
+        <span className="text-sm text-texto-2">Enviado por {deNome}.</span>
       </div>
       {!devolvendo && (
         <div className="flex items-center gap-2">
@@ -55,12 +55,12 @@ export function HandoffAceite({
         </div>
       )}
       {devolvendo && (
-        <form action={acaoDevolver} className="flex flex-col gap-2 rounded-lg border border-zinc-200 p-3">
+        <form action={acaoDevolver} className="flex flex-col gap-2 rounded-lg border border-linha p-3">
           <input type="hidden" name="handoffId" value={handoffId} />
           <input type="hidden" name="negocioId" value={negocioId} />
           <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-zinc-700">Motivo da devolução</span>
-            <textarea name="motivo" rows={2} required className="rounded-lg border border-zinc-200 px-3 py-2 text-sm" />
+            <span className="font-medium text-texto-2">Motivo da devolução</span>
+            <textarea name="motivo" rows={2} required className="rounded-lg border border-linha px-3 py-2 text-sm" />
           </label>
           <div className="flex items-center gap-2">
             <Botao type="submit" variante="primario" disabled={pendenteDevolver}>

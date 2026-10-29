@@ -261,7 +261,7 @@ describe("reabertura com confirmação", () => {
     const h = renderToStaticMarkup(
       createElement(Fechamento, { negocioId: "n1", status: "ganho", motivos: [], somenteLeitura: true }),
     );
-    expect(h).toBe('<span class="text-sm text-zinc-700">Ganho</span>');
+    expect(h).toBe('<span class="text-sm text-texto-2">Ganho</span>');
   });
 });
 

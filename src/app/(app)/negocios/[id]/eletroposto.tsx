@@ -139,7 +139,7 @@ export function EletropostoNegocio({
                       marcado ? "border-dourado bg-dourado/10" : "border-linha bg-superficie hover:border-texto-2"
                     }`}
                   >
-                    <span aria-hidden className={`grid h-5 w-5 shrink-0 place-items-center rounded border ${marcado ? "border-dourado bg-dourado text-carvao" : "border-linha"}`}>
+                    <span aria-hidden className={`grid h-5 w-5 shrink-0 place-items-center rounded border ${marcado ? "border-dourado bg-dourado text-texto" : "border-linha"}`}>
                       {marcado && <Check size={14} strokeWidth={3} />}
                     </span>
                     <span className="min-w-0">
