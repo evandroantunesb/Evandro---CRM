@@ -50,7 +50,8 @@ export type TarefaSetorVM = {
   anexos: AnexoTarefaVM[];
 };
 
-export type AnexoTarefaVM = { id: string; nome: string; enviadoPor: string | null; podeRemover: boolean };
+/** `doPedido`: enviado por quem pediu (fotos, referências); senão, entregue por quem executou (3D, orçamento). */
+export type AnexoTarefaVM = { id: string; nome: string; enviadoPor: string | null; podeRemover: boolean; doPedido: boolean };
 
 /** Bucket dos anexos das tarefas (20261029230000_tarefas_setor_anexos.sql), pasta `empresa/tarefa/objeto`. */
 export const BUCKET_ANEXOS_TAREFA = "tarefas-setor";

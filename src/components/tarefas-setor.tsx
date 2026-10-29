@@ -241,22 +241,31 @@ function AnexosTarefa({ tarefa }: { tarefa: TarefaSetorVM }) {
     router.refresh();
   }
 
+  // Separados por origem: o que veio com o pedido e o que o setor devolveu.
+  const grupos = [
+    { titulo: "Enviados no pedido", anexos: tarefa.anexos.filter((a) => a.doPedido) },
+    { titulo: `Entregues por ${tarefa.setorRotulo}`, anexos: tarefa.anexos.filter((a) => !a.doPedido) },
+  ].filter((g) => g.anexos.length > 0);
+
   return (
-    <div className="flex flex-col gap-1">
-      {tarefa.anexos.length > 0 && (
-        <ul className="flex flex-col gap-1">
-          {tarefa.anexos.map((a) => (
-            <li key={a.id} className="flex flex-wrap items-center gap-2 text-xs">
-              <a href={`/anexos-tarefa/${a.id}`} target="_blank" rel="noopener" className="inline-flex items-center gap-1 text-amber-700 hover:underline">
-                <Paperclip aria-hidden className="size-3.5" />
-                {a.nome}
-              </a>
-              {a.enviadoPor && <span className="text-zinc-500">por {a.enviadoPor}</span>}
-              {a.podeRemover && <RemoverAnexo tarefa={tarefa} anexoId={a.id} nome={a.nome} />}
-            </li>
-          ))}
-        </ul>
-      )}
+    <div className="flex flex-col gap-2">
+      {grupos.map((g, i) => (
+        <section key={g.titulo} aria-label={g.titulo} className={`flex flex-col gap-1 ${i > 0 ? "border-t border-zinc-100 pt-2" : ""}`}>
+          <p className="text-xs font-medium text-zinc-600">{g.titulo}</p>
+          <ul className="flex flex-col gap-1">
+            {g.anexos.map((a) => (
+              <li key={a.id} className="flex flex-wrap items-center gap-2 text-xs">
+                <a href={`/anexos-tarefa/${a.id}`} target="_blank" rel="noopener" className="inline-flex items-center gap-1 text-amber-700 hover:underline">
+                  <Paperclip aria-hidden className="size-3.5" />
+                  {a.nome}
+                </a>
+                {a.enviadoPor && <span className="text-zinc-500">por {a.enviadoPor}</span>}
+                {a.podeRemover && <RemoverAnexo tarefa={tarefa} anexoId={a.id} nome={a.nome} />}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
       {tarefa.podeAnexar && (
         <label className="inline-flex w-fit cursor-pointer items-center gap-1 rounded-md border border-dashed border-zinc-400 px-3 py-1 text-xs text-zinc-700 hover:bg-zinc-50">
           <Paperclip aria-hidden className="size-3.5" />

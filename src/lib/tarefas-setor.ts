@@ -135,6 +135,7 @@ export async function carregarTarefasSetor(
             nome: a.nome,
             enviadoPor: a.enviado_por ? (nomes.get(a.enviado_por) ?? null) : null,
             podeRemover: status === "aberta" && (admin || a.enviado_por === membroId),
+            doPedido: a.enviado_por !== null && a.enviado_por === t.criado_por,
           })),
       };
     }),
