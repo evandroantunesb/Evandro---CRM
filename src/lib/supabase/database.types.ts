@@ -3471,6 +3471,48 @@ export type Database = {
           },
         ];
       };
+      proposta_preferencias: {
+        Row: {
+          atualizado_por: string | null;
+          created_at: string;
+          empresa_id: string;
+          id: string;
+          updated_at: string;
+          validade_dias: number;
+        };
+        Insert: {
+          atualizado_por?: string | null;
+          created_at?: string;
+          empresa_id: string;
+          id?: string;
+          updated_at?: string;
+          validade_dias: number;
+        };
+        Update: {
+          atualizado_por?: string | null;
+          created_at?: string;
+          empresa_id?: string;
+          id?: string;
+          updated_at?: string;
+          validade_dias?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "proposta_preferencias_atualizado_por_fkey";
+            columns: ["atualizado_por"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "proposta_preferencias_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: true;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       propostas: {
         Row: {
           atualizado_por: string | null;
