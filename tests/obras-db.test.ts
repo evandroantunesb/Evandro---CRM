@@ -145,6 +145,10 @@ describe("criação da obra", () => {
     const tecnico = JSON.stringify(obra.snapshot);
     expect(tecnico).not.toContain("kit_preco");
     expect(tecnico).not.toContain("\"valor\"");
+    // Dados pessoais fora do snapshot, só em obra_cliente (20261029170000_obras_cliente_oculto.sql).
+    expect(obra.snapshot).not.toHaveProperty("cliente");
+    const { data: cliente } = await servico.from("obra_cliente").select("dados").eq("obra_id", obra.id).single();
+    expect(cliente!.dados).toMatchObject({ nome: "Cliente Três sinais", cidade: "Goiânia" });
 
     const { data: comercial } = await servico.from("obra_dados_comerciais").select("*").eq("obra_id", obra.id).single();
     expect(Number(comercial!.valor_vendido)).toBe(30000);
