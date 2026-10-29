@@ -4178,6 +4178,166 @@ export type Database = {
           },
         ];
       };
+      tarefas_setor: {
+        Row: {
+          cancelada_em: string | null;
+          cancelada_por: string | null;
+          concluida_em: string | null;
+          concluida_por: string | null;
+          created_at: string;
+          criado_por: string | null;
+          descricao: string | null;
+          empresa_id: string;
+          id: string;
+          motivo_cancelamento: string | null;
+          negocio_id: string | null;
+          obra_id: string | null;
+          origem: string;
+          prazo: string;
+          responsavel_id: string | null;
+          resposta: string | null;
+          setor: Database["public"]["Enums"]["setor_obra"];
+          status: string;
+          titulo: string;
+          updated_at: string;
+        };
+        Insert: {
+          cancelada_em?: string | null;
+          cancelada_por?: string | null;
+          concluida_em?: string | null;
+          concluida_por?: string | null;
+          created_at?: string;
+          criado_por?: string | null;
+          descricao?: string | null;
+          empresa_id: string;
+          id?: string;
+          motivo_cancelamento?: string | null;
+          negocio_id?: string | null;
+          obra_id?: string | null;
+          origem?: string;
+          prazo: string;
+          responsavel_id?: string | null;
+          resposta?: string | null;
+          setor: Database["public"]["Enums"]["setor_obra"];
+          status?: string;
+          titulo: string;
+          updated_at?: string;
+        };
+        Update: {
+          cancelada_em?: string | null;
+          cancelada_por?: string | null;
+          concluida_em?: string | null;
+          concluida_por?: string | null;
+          created_at?: string;
+          criado_por?: string | null;
+          descricao?: string | null;
+          empresa_id?: string;
+          id?: string;
+          motivo_cancelamento?: string | null;
+          negocio_id?: string | null;
+          obra_id?: string | null;
+          origem?: string;
+          prazo?: string;
+          responsavel_id?: string | null;
+          resposta?: string | null;
+          setor?: Database["public"]["Enums"]["setor_obra"];
+          status?: string;
+          titulo?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tarefas_setor_empresa_id_cancelada_por_fkey";
+            columns: ["empresa_id", "cancelada_por"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["empresa_id", "id"];
+          },
+          {
+            foreignKeyName: "tarefas_setor_empresa_id_concluida_por_fkey";
+            columns: ["empresa_id", "concluida_por"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["empresa_id", "id"];
+          },
+          {
+            foreignKeyName: "tarefas_setor_empresa_id_criado_por_fkey";
+            columns: ["empresa_id", "criado_por"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["empresa_id", "id"];
+          },
+          {
+            foreignKeyName: "tarefas_setor_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tarefas_setor_empresa_id_obra_id_fkey";
+            columns: ["empresa_id", "obra_id"];
+            isOneToOne: false;
+            referencedRelation: "obras";
+            referencedColumns: ["empresa_id", "id"];
+          },
+          {
+            foreignKeyName: "tarefas_setor_empresa_id_responsavel_id_fkey";
+            columns: ["empresa_id", "responsavel_id"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["empresa_id", "id"];
+          },
+          {
+            foreignKeyName: "tarefas_setor_negocio_id_fkey";
+            columns: ["negocio_id"];
+            isOneToOne: false;
+            referencedRelation: "negocios";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      tarefas_setor_historico: {
+        Row: {
+          autor_membro_id: string | null;
+          autor_user_id: string | null;
+          created_at: string;
+          dados: NonNullable<Json>;
+          empresa_id: string;
+          id: number;
+          tarefa_id: string;
+          tipo: string;
+        };
+        Insert: {
+          autor_membro_id?: string | null;
+          autor_user_id?: string | null;
+          created_at?: string;
+          dados?: NonNullable<Json>;
+          empresa_id: string;
+          id?: never;
+          tarefa_id: string;
+          tipo: string;
+        };
+        Update: {
+          autor_membro_id?: string | null;
+          autor_user_id?: string | null;
+          created_at?: string;
+          dados?: NonNullable<Json>;
+          empresa_id?: string;
+          id?: never;
+          tarefa_id?: string;
+          tipo?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tarefas_setor_historico_tarefa_id_fkey";
+            columns: ["tarefa_id"];
+            isOneToOne: false;
+            referencedRelation: "tarefas_setor";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       tarifas_gd_aneel: {
         Row: {
           ato: string;
@@ -4295,6 +4455,7 @@ export type Database = {
         Returns: boolean;
       };
       arquivar_negocio: { Args: { p_motivo: string; p_negocio_id: string }; Returns: undefined };
+      assumir_tarefa_setor: { Args: { p_tarefa_id: string }; Returns: undefined };
       atribuir_participante_obra: {
         Args: {
           p_funcao?: Database["public"]["Enums"]["funcao_participante_obra"];
@@ -4305,6 +4466,10 @@ export type Database = {
           p_substitui_id?: string;
         };
         Returns: string;
+      };
+      atribuir_tarefa_setor: {
+        Args: { p_membro_id?: string; p_tarefa_id: string };
+        Returns: undefined;
       };
       atualizar_marco_obra: {
         Args: {
@@ -4341,6 +4506,7 @@ export type Database = {
         Args: { p_obra_id: string; p_setor: Database["public"]["Enums"]["setor_obra"] };
         Returns: string;
       };
+      autorizacao_tarefa_setor: { Args: { p_tarefa_id: string }; Returns: string };
       autorizar_gravacao_calculo: {
         Args: { p_negocio_id: string };
         Returns: {
@@ -4377,9 +4543,17 @@ export type Database = {
         };
         Returns: number;
       };
+      cancelar_tarefa_setor: {
+        Args: { p_motivo: string; p_tarefa_id: string };
+        Returns: undefined;
+      };
       compartilha_empresa: { Args: { p_user_id: string }; Returns: boolean };
       compartilha_empresa_comercial: { Args: { p_user_id: string }; Returns: boolean };
       compartilha_empresa_identidade: { Args: { p_user_id: string }; Returns: boolean };
+      concluir_tarefa_setor: {
+        Args: { p_resposta?: string; p_tarefa_id: string };
+        Returns: undefined;
+      };
       confirmar_pagamento: {
         Args: { p_contrato_id: string };
         Returns: {
@@ -4419,6 +4593,17 @@ export type Database = {
           p_perfil_requerido?: Database["public"]["Enums"]["perfil_gamificacao"];
         };
         Returns: number;
+      };
+      contexto_tarefas_setor: {
+        Args: { p_ids: string[] };
+        Returns: {
+          cidade: string;
+          cliente_nome: string;
+          negocio_numero: number;
+          obra_numero: number;
+          tarefa_id: string;
+          uf: string;
+        }[];
       };
       corrigir_registro_pagamento: {
         Args: {
@@ -4470,6 +4655,18 @@ export type Database = {
           isOneToOne: true;
           isSetofReturn: false;
         };
+      };
+      criar_tarefa_setor: {
+        Args: {
+          p_descricao?: string;
+          p_negocio_id?: string;
+          p_obra_id?: string;
+          p_prazo: string;
+          p_responsavel_id?: string;
+          p_setor: Database["public"]["Enums"]["setor_obra"];
+          p_titulo: string;
+        };
+        Returns: string;
       };
       decidir_atribuicao_lead: {
         Args: { p_automatico: boolean; p_id: string; p_membro_final_id: string };
@@ -4686,6 +4883,14 @@ export type Database = {
       };
       marcar_venda_alterada_obra: { Args: { p_negocio_id: string }; Returns: undefined };
       membro_ativo: { Args: { p_empresa_id: string }; Returns: boolean };
+      membro_atua_no_setor: {
+        Args: {
+          p_empresa_id: string;
+          p_membro_id: string;
+          p_setor: Database["public"]["Enums"]["setor_obra"];
+        };
+        Returns: boolean;
+      };
       meu_membro_id: { Args: { p_empresa_id: string }; Returns: string };
       obra_snapshot_comercial: { Args: { p_negocio_id: string }; Returns: Json };
       obra_snapshot_tecnico: { Args: { p_negocio_id: string }; Returns: Json };
@@ -4764,6 +4969,7 @@ export type Database = {
         Args: { p_empresa_id: string; p_responsavel_id: string };
         Returns: boolean;
       };
+      pode_ver_tarefa_setor: { Args: { p_tarefa_id: string }; Returns: boolean };
       pode_ver_valor_vendido_obra: { Args: { p_obra_id: string }; Returns: boolean };
       precos_eletroposto_validos: {
         Args: { p_modelos: string[]; p_precos: Json };
@@ -4797,6 +5003,7 @@ export type Database = {
           total_xp: number;
         }[];
       };
+      reabrir_tarefa_setor: { Args: { p_tarefa_id: string }; Returns: undefined };
       reavaliar_credito_condicionado_valor: {
         Args: { p_estornado_por: string; p_evento_won_id: number; p_novo_valor: number };
         Returns: undefined;
@@ -4808,6 +5015,10 @@ export type Database = {
           p_setor: Database["public"]["Enums"]["setor_obra"];
           p_tipo: string;
         };
+        Returns: undefined;
+      };
+      registrar_historico_tarefa_setor: {
+        Args: { p_dados: Json; p_empresa_id: string; p_tarefa_id: string; p_tipo: string };
         Returns: undefined;
       };
       registrar_pagamento_negocio: {
@@ -4994,6 +5205,37 @@ export type Database = {
         SetofOptions: {
           from: "*";
           to: "negocios";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      travar_tarefa_setor: {
+        Args: { p_tarefa_id: string };
+        Returns: {
+          cancelada_em: string | null;
+          cancelada_por: string | null;
+          concluida_em: string | null;
+          concluida_por: string | null;
+          created_at: string;
+          criado_por: string | null;
+          descricao: string | null;
+          empresa_id: string;
+          id: string;
+          motivo_cancelamento: string | null;
+          negocio_id: string | null;
+          obra_id: string | null;
+          origem: string;
+          prazo: string;
+          responsavel_id: string | null;
+          resposta: string | null;
+          setor: Database["public"]["Enums"]["setor_obra"];
+          status: string;
+          titulo: string;
+          updated_at: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "tarefas_setor";
           isOneToOne: true;
           isSetofReturn: false;
         };
