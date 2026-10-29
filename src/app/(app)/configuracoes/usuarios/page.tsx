@@ -1,7 +1,7 @@
 import { Cartao, Voltar } from "@/components/ui";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import type { Papel, PerfilGamificacao, StatusMembro, TipoVendedor } from "@/lib/tipos";
+import { PAPEIS_CADASTRAVEIS, ROTULO_PAPEL, type Papel, type PerfilGamificacao, type StatusMembro, type TipoVendedor } from "@/lib/tipos";
 import { FormularioConvite, LinhaMembro, type MembroLinha } from "./formularios";
 
 export default async function Usuarios() {
@@ -45,9 +45,18 @@ export default async function Usuarios() {
             O perfil de gamificação (SDR/Closer/CS Farmer) de cada pessoa é definido abaixo, junto com o restante do cadastro.
           </p>
           {erroSetores && <p role="alert" className="text-sm text-red-700">Não foi possível carregar os setores. Atualize a página para tentar novamente.</p>}
-          {membros.map((m) => (
-            <LinhaMembro key={m.id} membro={m} />
-          ))}
+          {PAPEIS_CADASTRAVEIS.map((papel) => {
+            const doGrupo = membros.filter((m) => m.papel === papel);
+            if (doGrupo.length === 0) return null;
+            return (
+              <div key={papel} className="flex flex-col gap-3">
+                <p className="sobretitulo">{ROTULO_PAPEL[papel]} · {doGrupo.length}</p>
+                {doGrupo.map((m) => (
+                  <LinhaMembro key={m.id} membro={m} />
+                ))}
+              </div>
+            );
+          })}
         </div>
       </Cartao>
     </div>

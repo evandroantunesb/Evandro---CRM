@@ -1,5 +1,6 @@
 "use client";
 
+import { HardHat, Phone, ShieldCheck, Handshake, UserCog, type LucideIcon } from "lucide-react";
 import { useActionState, useEffect, useState, useTransition } from "react";
 import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
 import { ROTULO_SETOR, SETORES_OBRA } from "@/lib/obras/rotulos";
@@ -86,6 +87,27 @@ export type MembroLinha = {
 
 const PAPEIS_CONVERTIVEIS_EM_OPERACAO: readonly Papel[] = ["admin", "gestor", "vendedor", "sdr"];
 
+/** Ícone discreto por papel, ao lado do nome — sem cor nova, só para orientação visual rápida na lista. */
+const ICONE_PAPEL: Record<Papel, LucideIcon> = {
+  admin: ShieldCheck,
+  gestor: UserCog,
+  vendedor: Handshake,
+  sdr: Phone,
+  operacao: HardHat,
+};
+
+/**
+ * Degradê bem sutil por papel, só com os tons já aprovados (dourado/carvão/cinza): papéis comerciais em
+ * dourado, decrescente por hierarquia; Operação (módulo de obras, fora do comercial) em cinza.
+ */
+const DEGRADE_PAPEL: Record<Papel, string> = {
+  admin: "from-dourado/14 via-dourado/4",
+  gestor: "from-dourado/9 via-dourado/2",
+  vendedor: "from-dourado/5 via-transparent",
+  sdr: "from-cinza/10 via-transparent",
+  operacao: "from-cinza/14 via-cinza/3",
+};
+
 export function LinhaMembro({ membro }: { membro: MembroLinha }) {
   const [resultado, acao, pendente] = useActionState(atualizarMembro, null);
   const [papel, setPapel] = useState<Papel>(membro.papel);
@@ -117,16 +139,22 @@ export function LinhaMembro({ membro }: { membro: MembroLinha }) {
     );
   }
 
+  const IconePapel = ICONE_PAPEL[papel];
   return (
-    <div className="flex flex-col gap-4 rounded-2xl border border-linha bg-superficie-2 p-4 md:p-5">
+    <div
+      className={`flex flex-col gap-4 rounded-2xl border border-linha bg-superficie-2 bg-gradient-to-br ${DEGRADE_PAPEL[papel]} p-4 md:p-5`}
+    >
       <form action={acao} className="flex flex-col gap-4">
         <input type="hidden" name="membroId" value={membro.id} />
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="truncate font-medium text-texto">{membro.nome || "(sem nome)"}</p>
-            <p className="truncate text-sm text-texto-2">{membro.email}</p>
+          <div className="flex min-w-0 items-start gap-2">
+            <IconePapel size={18} aria-hidden className="mt-0.5 shrink-0 text-texto-2" />
+            <div className="min-w-0">
+              <p className="truncate font-medium text-texto">{membro.nome || "(sem nome)"}</p>
+              <p className="truncate text-sm text-texto-2">{membro.email}</p>
+            </div>
           </div>
-          <Botao type="submit" variante="secundario" disabled={pendente || carregandoCarteira} className="shrink-0">
+          <Botao type="submit" disabled={pendente || carregandoCarteira} className="shrink-0">
             {carregandoCarteira ? "Verificando carteira..." : "Salvar"}
           </Botao>
         </div>
