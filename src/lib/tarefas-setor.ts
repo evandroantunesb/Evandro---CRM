@@ -30,6 +30,7 @@ export async function carregarTarefasSetor(
     papel,
     obraId,
     negocioId,
+    setor,
     filtro = "abertas",
     agora = new Date(),
   }: {
@@ -38,6 +39,8 @@ export async function carregarTarefasSetor(
     papel: Papel;
     obraId?: string;
     negocioId?: string;
+    /** Só as tarefas deste setor (tela de um setor). */
+    setor?: SetorTarefa;
     filtro?: FiltroTarefasSetor | "todas";
     agora?: Date;
   },
@@ -51,6 +54,7 @@ export async function carregarTarefasSetor(
     .limit(300);
   if (obraId) consulta = consulta.eq("obra_id", obraId);
   if (negocioId) consulta = consulta.eq("negocio_id", negocioId);
+  if (setor) consulta = consulta.eq("setor", setor);
   if (filtro === "concluidas") consulta = consulta.eq("status", "concluida");
   else if (filtro !== "todas") consulta = consulta.eq("status", "aberta");
   if (filtro === "minhas") consulta = consulta.eq("responsavel_id", membroId);
@@ -142,19 +146,16 @@ export async function carregarTarefasSetor(
   };
 }
 
-async function abertasVisiveis(supabase: SupabaseServidor, empresaId: string) {
-  const { data } = await supabase
-    .from("tarefas_setor")
-    .select("responsavel_id, criado_por, setor")
-    .eq("empresa_id", empresaId)
-    .eq("status", "aberta")
-    .limit(1000);
+async function abertasVisiveis(supabase: SupabaseServidor, empresaId: string, setor?: SetorTarefa) {
+  let consulta = supabase.from("tarefas_setor").select("responsavel_id, criado_por, setor").eq("empresa_id", empresaId).eq("status", "aberta");
+  if (setor) consulta = consulta.eq("setor", setor);
+  const { data } = await consulta.limit(1000);
   return data ?? [];
 }
 
 /** Números das abas da tela de tarefas: abertas que a pessoa vê em cada aba. */
-export async function contarAbasTarefasSetor(supabase: SupabaseServidor, empresaId: string, membroId: string) {
-  return contarAbertasPorAba(await abertasVisiveis(supabase, empresaId), membroId);
+export async function contarAbasTarefasSetor(supabase: SupabaseServidor, empresaId: string, membroId: string, setor?: SetorTarefa) {
+  return contarAbertasPorAba(await abertasVisiveis(supabase, empresaId, setor), membroId);
 }
 
 /** Pendências de tarefas do setor para o sininho de quem executa nos setores. */
