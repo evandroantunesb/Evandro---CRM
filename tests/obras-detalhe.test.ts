@@ -244,6 +244,16 @@ describe("montarHistorico", () => {
     expect(m(undefined)).toBe("Marco: alterado");
   });
 
+  it("fixação do telhado", () => {
+    const f = (dados: unknown) => descricaoDe(linha("fixacao_definida", dados));
+    expect(montarHistorico([linha("fixacao_definida", {})], nomes)[0].tipoRotulo).toBe("Fixação do telhado");
+    expect(f({ de: "Gancho cerâmica", para: "Mini trilho" })).toBe("Gancho cerâmica → Mini trilho");
+    expect(f({ de: null, para: "Mini trilho" })).toBe("Definida como Mini trilho");
+    expect(f({ de: "Mini trilho", para: null })).toBe("Mini trilho removida");
+    expect(f({ de: 1, para: { x: 1 } })).toBe("Fixação alterada");
+    expect(f(undefined)).toBe("Fixação alterada");
+  });
+
   it("tipo desconhecido: rótulo e texto neutros", () => {
     const [i] = montarHistorico([linha("SEGREDO-TIPO", { x: 1 }, { setor: "SEGREDO-SETOR" })], nomes);
     expect(i.tipoRotulo).toBe("Evento");
@@ -478,7 +488,7 @@ const identidades = [
   { membro_id: "m-edu", nome: "Edu", avatar_caminho: "x/edu.png" },
 ];
 
-const SECUNDARIAS = ["from:obra_fluxos", "from:obra_marcos", "from:obra_participantes", "from:obra_historico", "rpc:identidade_membros"];
+const SECUNDARIAS = ["from:obra_fluxos", "from:obra_marcos", "from:obra_participantes", "from:obra_historico", "rpc:identidade_membros", "from:obra_fixacao", "from:fixacoes_telhado"];
 
 const comercial = (extraObra: Linha = {}) =>
   criarFake({ tabelas: { obras: [obraTabela(extraObra)], ...filhas() }, rpcs: { identidade_membros: identidades } });

@@ -7,7 +7,7 @@ import { Cartao, Selo } from "@/components/ui";
 import { formatarDataHora, formatarMoeda } from "@/lib/crm";
 import { carregarObras } from "@/lib/obras/dados";
 import { filtrosDeParams, hrefObra, montarNavegacao, queryDosFiltros, temFiltroAtivo } from "@/lib/obras/navegacao";
-import { GestaoMarco, GestaoSetor } from "./gestao";
+import { GestaoFixacao, GestaoMarco, GestaoSetor } from "./gestao";
 import {
   carregarDetalheObra,
   type ContatoClienteVM,
@@ -135,6 +135,18 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
         </ul>
       </Cartao>
 
+      {(obra.fixacao.podeEditar || obra.fixacao.atual || obra.tecnico.estruturaTelhado) && (
+        <Cartao titulo="Fixação do telhado">
+          <div className="flex flex-col gap-2 text-sm">
+            {!obra.fixacao.podeEditar && <p className="text-zinc-900">{obra.fixacao.atual?.nome ?? "Não definida"}</p>}
+            {obra.fixacao.podeEditar && <GestaoFixacao key={resumo.id} obraId={resumo.id} fixacao={obra.fixacao} podeConfigurar={atual.papel === "admin"} />}
+            {obra.tecnico.estruturaTelhado && (
+              <p className="text-xs text-zinc-500">Informado na venda: {obra.tecnico.estruturaTelhado}</p>
+            )}
+          </div>
+        </Cartao>
+      )}
+
       <Cartao titulo="Dados técnicos">
         <DadosTecnicos tecnico={obra.tecnico} />
       </Cartao>
@@ -246,7 +258,6 @@ function DadosTecnicos({ tecnico }: { tecnico: DadosTecnicosVM }) {
     ["Geração estimada", comUnidade(tecnico.geracaoEstimadaKwhMes, "kWh/mês")],
     ["Distribuidora", tecnico.distribuidora],
     ["Tipo de telhado", tecnico.tipoTelhado],
-    ["Estrutura do telhado", tecnico.estruturaTelhado],
   ];
   const preenchidos = campos.filter((c): c is [string, string] => c[1] !== null);
   if (preenchidos.length === 0 && tecnico.kit.length === 0) return <p className="text-sm text-zinc-500">Sem dados técnicos registrados.</p>;

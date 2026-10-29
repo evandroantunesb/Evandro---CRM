@@ -35,6 +35,7 @@ const ROTULO_TIPO: Record<string, string> = {
   participante_encerrado: "Participante encerrado",
   fluxo_alterado: "Setor alterado",
   marco_alterado: "Marco alterado",
+  fixacao_definida: "Fixação do telhado",
 };
 
 const ROTULO_SETOR_HISTORICO: Record<string, string> = { ...ROTULO_SETOR, comercial: "Comercial" };
@@ -131,6 +132,18 @@ function descrever(linha: LinhaHistoricoObra, nomes: ReadonlyMap<string, string>
       return descreverFluxo(linha.setor, dados);
     case "marco_alterado":
       return descreverMarco(dados);
+    case "fixacao_definida": {
+      const nome = (chave: "de" | "para") => {
+        const v = ler(dados, chave);
+        return typeof v === "string" && v.trim() ? v.trim() : null;
+      };
+      const de = nome("de");
+      const para = nome("para");
+      if (de && para) return `${de} → ${para}`;
+      if (para) return `Definida como ${para}`;
+      if (de) return `${de} removida`;
+      return "Fixação alterada";
+    }
     default:
       return "Evento registrado";
   }

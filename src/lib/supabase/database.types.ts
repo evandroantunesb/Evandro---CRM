@@ -1318,6 +1318,41 @@ export type Database = {
           },
         ];
       };
+      fixacoes_telhado: {
+        Row: {
+          ativa: boolean;
+          created_at: string;
+          empresa_id: string;
+          id: string;
+          nome: string;
+          updated_at: string;
+        };
+        Insert: {
+          ativa?: boolean;
+          created_at?: string;
+          empresa_id: string;
+          id?: string;
+          nome: string;
+          updated_at?: string;
+        };
+        Update: {
+          ativa?: boolean;
+          created_at?: string;
+          empresa_id?: string;
+          id?: string;
+          nome?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "fixacoes_telhado_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       formularios: {
         Row: {
           ativo: boolean;
@@ -2601,6 +2636,45 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "obra_dados_comerciais_empresa_id_obra_id_fkey";
+            columns: ["empresa_id", "obra_id"];
+            isOneToOne: false;
+            referencedRelation: "obras";
+            referencedColumns: ["empresa_id", "id"];
+          },
+        ];
+      };
+      obra_fixacao: {
+        Row: {
+          created_at: string;
+          empresa_id: string;
+          fixacao_id: string;
+          obra_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          empresa_id: string;
+          fixacao_id: string;
+          obra_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          empresa_id?: string;
+          fixacao_id?: string;
+          obra_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "obra_fixacao_empresa_id_fixacao_id_fkey";
+            columns: ["empresa_id", "fixacao_id"];
+            isOneToOne: false;
+            referencedRelation: "fixacoes_telhado";
+            referencedColumns: ["empresa_id", "id"];
+          },
+          {
+            foreignKeyName: "obra_fixacao_empresa_id_obra_id_fkey";
             columns: ["empresa_id", "obra_id"];
             isOneToOne: false;
             referencedRelation: "obras";
@@ -4356,6 +4430,10 @@ export type Database = {
         };
         Returns: undefined;
       };
+      definir_fixacao_obra: {
+        Args: { p_fixacao_id?: string; p_obra_id: string };
+        Returns: undefined;
+      };
       definir_setores_membro: {
         Args: { p_membro_id: string; p_setores: Json };
         Returns: undefined;
@@ -4511,6 +4589,7 @@ export type Database = {
       };
       incrementar_preenchimento_formulario: { Args: { p_id: string }; Returns: undefined };
       incrementar_visualizacao_formulario: { Args: { p_id: string }; Returns: undefined };
+      inserir_fixacoes_telhado_padrao: { Args: { p_empresa_id: string }; Returns: undefined };
       inserir_registro_pagamento: {
         Args: {
           p_data: string;
