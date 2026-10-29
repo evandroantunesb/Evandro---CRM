@@ -30,9 +30,9 @@ import { mensagemPropostaIncompleta, pendenciasSemDados } from "@/lib/estimativa
 import { descreverAtividade } from "@/lib/linha-do-tempo";
 import type { BaseTributaria } from "@/lib/tarifa-gd";
 import { exigirPapel } from "@/lib/sessao";
-import { ARQUIVAR_NEGOCIO, ATRIBUIR_TAREFA_A_OUTROS, EDITAR_VALOR_NEGOCIO, ESCOLHER_RESPONSAVEL_NEGOCIO, FECHAR_NEGOCIO, NEGOCIOS, PAGAMENTO_SOLO, PROPOSTA_E_CONTRATO, RESPONSAVEL_COMERCIAL, pode } from "@/lib/permissoes";
+import { ARQUIVAR_NEGOCIO, ATRIBUIR_TAREFA_A_OUTROS, EDITAR_VALOR_NEGOCIO, ESCOLHER_RESPONSAVEL_NEGOCIO, FECHAR_NEGOCIO, NEGOCIOS, PAGAMENTO_SOLO, PROPOSTA_E_CONTRATO, RESPONSAVEL_COMERCIAL, VALIDADE_PROPOSTA, pode } from "@/lib/permissoes";
 import { listarEmissoesDoNegocio } from "@/lib/propostas/emissoes-dados";
-import { extrairConteudoDoModelo, validadePadraoDoModelo, produtividadeConfirmada } from "@/lib/propostas/proposta-simples";
+import { extrairConteudoDoModelo, validadePadraoDaEmpresa, produtividadeConfirmada } from "@/lib/propostas/proposta-simples";
 import { avisarSchemaAusente, funcaoAusente, tabelaAusente } from "@/lib/schema-ausente";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { calcularStatusQualificacao } from "@/lib/qualificacao";
@@ -203,7 +203,12 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
         .maybeSingle()
     : { data: null };
   const conteudoModelo = extrairConteudoDoModelo(modeloPadrao?.proposta_modelo_blocos);
-  const validadePadraoDias = validadePadraoDoModelo(modeloPadrao?.proposta_modelo_blocos);
+  // Validade definida por admin/gestor (Configurações › Validade da proposta). Sem a tabela (antes da migration, o
+  // preview usa o banco de produção) ou sem linha, vale a do modelo padrão.
+  const { data: preferenciaProposta } = emissoesRes && !emissoesAusente
+    ? await supabase.from("proposta_preferencias").select("validade_dias").eq("empresa_id", atual.empresaId).maybeSingle()
+    : { data: null };
+  const validadePadraoDias = validadePadraoDaEmpresa(preferenciaProposta?.validade_dias, modeloPadrao?.proposta_modelo_blocos);
   const { data: parametrosEmissao } = emissoesRes && !emissoesAusente
     ? await supabase
         .from("parametros_calculadora")
@@ -1008,6 +1013,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
                   negocioId={negocio.id}
                   hoje={hojeEmSaoPaulo()}
                   validadePadraoDias={validadePadraoDias}
+                  podeAjustarValidade={pode(atual.papel, VALIDADE_PROPOSTA)}
                   conteudoModelo={conteudoModelo}
                   geracaoConfirmada={geracaoConfirmada}
                   bloqueio={arquivado ? "Negócio arquivado: não é possível emitir proposta." : bloqueioEmissao}
