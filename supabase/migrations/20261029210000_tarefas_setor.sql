@@ -392,6 +392,28 @@ as $$
   where t.id = any(p_ids) and public.pode_ver_tarefa_setor(t.id);
 $$;
 
+-- Quem atua no setor (para escolher o responsável): só o admin ou o coordenador do setor recebe a lista; os
+-- setores dos colegas continuam fechados (`membro_setores_obra` só mostra a própria linha). Nomes vêm de
+-- `identidade_membros`.
+create or replace function public.membros_do_setor(p_empresa_id uuid, p_setor public.setor_obra)
+returns table (membro_id uuid, capacidade public.capacidade_obra)
+language sql stable security definer set search_path = ''
+as $$
+  select s.membro_id, s.capacidade
+  from public.membro_setores_obra s
+  join public.empresa_membros m on m.id = s.membro_id and m.empresa_id = s.empresa_id and m.ativo and m.papel = 'operacao'
+  where s.empresa_id = p_empresa_id and s.setor = p_setor
+    and (
+      public.tem_papel(p_empresa_id, '{admin}')
+      or exists (
+        select 1 from public.membro_setores_obra eu
+        where eu.empresa_id = p_empresa_id and eu.membro_id = public.meu_membro_id(p_empresa_id)
+          and eu.setor = p_setor and eu.capacidade = 'coordenar'
+      )
+    )
+  order by s.membro_id;
+$$;
+
 -- Funções internas: ninguém executa pela API.
 revoke all on function public.membro_atua_no_setor(uuid, uuid, public.setor_obra) from public, anon, authenticated, service_role;
 revoke all on function public.autorizacao_tarefa_setor(uuid) from public, anon, authenticated, service_role;
@@ -415,5 +437,7 @@ revoke all on function public.cancelar_tarefa_setor(uuid, text) from public, ano
 grant execute on function public.cancelar_tarefa_setor(uuid, text) to authenticated;
 revoke all on function public.contexto_tarefas_setor(uuid[]) from public, anon, authenticated, service_role;
 grant execute on function public.contexto_tarefas_setor(uuid[]) to authenticated;
+revoke all on function public.membros_do_setor(uuid, public.setor_obra) from public, anon, authenticated, service_role;
+grant execute on function public.membros_do_setor(uuid, public.setor_obra) to authenticated;
 
 reset lock_timeout;

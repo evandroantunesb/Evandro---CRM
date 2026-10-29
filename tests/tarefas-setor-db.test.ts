@@ -251,4 +251,17 @@ describe("tarefas de setor (ordem importa)", { concurrent: false, shuffle: false
     const { data } = await servico.from("eventos").select("id").in("entidade_id", [pedido3d, tarefaObra]);
     expect(data).toEqual([]);
   });
+
+  it("membros do setor: o coordenador e o admin recebem a lista; quem executa e o comercial, não", async () => {
+    const esperado = [engExec, engFora, engCoord].map((u) => membro[u.id]).sort();
+    for (const u of [engCoord, admin]) {
+      const { data, error } = await u.cliente.rpc("membros_do_setor", { p_empresa_id: empresa, p_setor: "engenharia" });
+      expect(error).toBeNull();
+      expect(data!.map((m) => m.membro_id).sort()).toEqual(esperado);
+    }
+    for (const u of [engExec, comprasExec, vendedor]) {
+      expect((await u.cliente.rpc("membros_do_setor", { p_empresa_id: empresa, p_setor: "engenharia" })).data).toEqual([]);
+    }
+    expect((await engCoord.cliente.rpc("membros_do_setor", { p_empresa_id: empresa, p_setor: "compras" })).data).toEqual([]);
+  });
 });
