@@ -65,7 +65,7 @@ Histórico: a migration da #139 foi aplicada em produção antes do merge, com a
 
 ### Obras: tipo de fixação do telhado (2026-10-29, branch `feat/obras-fixacao-telhado`, PR rascunho)
 
-PR 1 do desenho "Obras: o que Engenharia, Compras e Operacional recebem" (Claude Doc). Decisão do Evandro: a fixação saiu do kit (#243) e passa a ser escolhida na obra, por Engenharia, Compras ou Operacional, de uma lista que cada empresa monta em Configurações (`/configuracoes/fixacoes`, só admin).
+PR 1 do desenho "Obras: o que Engenharia, Compras e Operacional recebem" (Claude Doc). Decisão do Evandro: a fixação saiu do kit (#243) e passa a ser escolhida na obra, por Engenharia, Compras ou Operacional, de uma lista que cada empresa monta em Configurações (`/configuracoes/fixacoes`, só admin).  A lista já nasce com as 11 opções que o Evandro passou (por superfície).
 
 - Migration `20261029150000_obras_fixacao_telhado.sql`: `fixacoes_telhado` (lista, sem DELETE), `obra_fixacao` (escolha, só via RPC), RPC `definir_fixacao_obra`, novo tipo `fixacao_definida` no histórico. Snapshot da venda intocado ("Informado na venda" continua visível como referência).
 - **Falta para retomar:** aplicar o diff de `database.types.ts` que o CI imprime (o typecheck só passa depois disso), escrever `tests/obras-fixacao-db.test.ts` (permissões por setor, obra cancelada, opção de outra empresa/desativada, histórico) e checar no preview. Migration precisa ir para produção pelo `banco-producao.yml` antes do merge.

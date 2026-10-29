@@ -7,6 +7,7 @@
 -- O que faz:
 --  * `fixacoes_telhado`: lista da empresa (nome, ativa). Admin cria e edita; qualquer membro ativo lê.
 --    Sem DELETE: opção desativada some da escolha, mas a obra que já usa continua mostrando o nome.
+--    Já nasce com a lista inicial do Evandro (existentes e empresas novas).
 --  * `obra_fixacao`: uma linha por obra com a opção escolhida. Lida por quem vê a obra (comercial ou
 --    operação, mesmas regras das tabelas filhas); escrita direta revogada, inclusive para service_role.
 --  * `definir_fixacao_obra(obra, fixacao)`: única porta de escrita. Vale quem atua em qualquer um dos três
@@ -65,6 +66,43 @@ create policy "admin edita fixações do telhado" on public.fixacoes_telhado for
   with check (public.tem_papel(empresa_id, '{admin}'));
 revoke delete, truncate on public.fixacoes_telhado from anon, authenticated;
 revoke all on public.fixacoes_telhado from anon;
+
+-- Lista inicial (passada pelo Evandro em 29/10/2026), por tipo de superfície. Cada empresa edita e
+-- desativa o que não usa; empresas novas recebem a mesma lista.
+create or replace function public.inserir_fixacoes_telhado_padrao(p_empresa_id uuid)
+returns void
+language sql security definer set search_path = ''
+as $$
+  insert into public.fixacoes_telhado (empresa_id, nome) values
+    (p_empresa_id, 'Telhado cerâmico: gancho de aço inox (U ou T)'),
+    (p_empresa_id, 'Fibrocimento: parafuso prisioneiro inox com vedação EPDM'),
+    (p_empresa_id, 'Metálico: minitrilho'),
+    (p_empresa_id, 'Metálico: suporte tipo L ou X'),
+    (p_empresa_id, 'Metálico: perfil contínuo com parafuso brocante'),
+    (p_empresa_id, 'Laje: triângulo com chumbamento químico'),
+    (p_empresa_id, 'Laje: triângulo com lastro de concreto (sem furar)'),
+    (p_empresa_id, 'Solo: monoposte'),
+    (p_empresa_id, 'Solo: multibases'),
+    (p_empresa_id, 'Carport'),
+    (p_empresa_id, 'Seguidor solar (tracker)')
+  on conflict (empresa_id, lower(trim(nome))) do nothing;
+$$;
+revoke all on function public.inserir_fixacoes_telhado_padrao(uuid) from public, anon, authenticated, service_role;
+
+create or replace function public.criar_fixacoes_telhado_empresa()
+returns trigger
+language plpgsql security definer set search_path = ''
+as $$
+begin
+  perform public.inserir_fixacoes_telhado_padrao(new.id);
+  return null;
+end;
+$$;
+revoke all on function public.criar_fixacoes_telhado_empresa() from public, anon, authenticated, service_role;
+create trigger empresas_fixacoes_telhado after insert on public.empresas
+  for each row execute function public.criar_fixacoes_telhado_empresa();
+
+select public.inserir_fixacoes_telhado_padrao(id) from public.empresas;
 
 -- ---------------------------------------------------------------------------
 -- Escolha na obra
