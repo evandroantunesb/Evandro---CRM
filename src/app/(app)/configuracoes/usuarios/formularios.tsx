@@ -118,7 +118,7 @@ export function LinhaMembro({ membro }: { membro: MembroLinha }) {
   }
 
   return (
-    <div className="painel flex flex-col gap-4 p-4 md:p-5">
+    <div className="flex flex-col gap-4 rounded-2xl border border-linha bg-superficie-2 p-4 md:p-5">
       <form action={acao} className="flex flex-col gap-4">
         <input type="hidden" name="membroId" value={membro.id} />
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -176,7 +176,7 @@ export function LinhaMembro({ membro }: { membro: MembroLinha }) {
           <input type="checkbox" name="recebe_leads" defaultChecked={membro.recebeLeads} disabled={papel === "operacao"} /> Recebe leads
         </label>
         {papel === "operacao" && status === "ativo" && PAPEIS_CONVERTIVEIS_EM_OPERACAO.includes(membro.papel) && (
-          <fieldset className="rounded-xl bg-superficie-2 p-4">
+          <fieldset className="rounded-xl border border-linha bg-superficie p-4">
             <legend className="px-1 text-sm font-medium text-texto">Setores de {membro.nome || membro.email}</legend>
             <p className="mb-3 text-xs text-texto-2">Ao salvar o novo perfil, estes setores serão atribuídos somente a esta pessoa.</p>
             <CamposSetores setores={[]} />
@@ -217,7 +217,7 @@ function CamposSetores({ setores }: { setores: NonNullable<MembroLinha["setores"
 function SetoresMembro({ membroId, nome, setores }: { membroId: string; nome: string; setores: NonNullable<MembroLinha["setores"]> }) {
   const [resultado, acao, pendente] = useActionState(salvarSetoresMembro, null);
   return (
-    <form action={acao} className="rounded-xl bg-superficie-2 p-4">
+    <form action={acao} className="rounded-xl border border-linha bg-superficie p-4">
       <input type="hidden" name="membroId" value={membroId} />
       <p className="text-sm font-medium text-texto">Setores de {nome}</p>
       <p className="mt-1 text-xs text-texto-2">Quem executa altera o próprio setor nas obras em que participa. Quem coordena vê todas as obras e pode gerir participantes do setor. A pessoa pode consultar o andamento de outros setores na mesma obra, sem poder alterá-los.</p>
