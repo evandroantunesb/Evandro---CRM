@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
-import { CabecalhoItemGf, StatusAtivoGf } from "../../_compartilhado/formulario-ui";
+import { ItemColapsavelGf, StatusAtivoGf } from "../../_compartilhado/formulario-ui";
 import { BadgeGf, formatarNumeroGf } from "../../_compartilhado/ui";
 import { EVENTOS_TETO_OBRIGATORIO, MARCOS_CONQUISTA, ROTULO_MARCO_CONQUISTA, eventoNaoPontuavel, type MarcoConquista } from "@/lib/gamificacao";
 import {
@@ -121,67 +121,73 @@ export function LinhaRegra({ regra, eventos }: { regra: RegraSalva; eventos: rea
   const campos = eventos.find((e) => e.tipo === eventoTipo)?.campos ?? [];
 
   return (
-    <form action={acao} className="gf-item-edicao flex flex-col gap-4">
+    <form action={acao} className="gf-item-edicao">
       <input type="hidden" name="id" value={regra.id} />
-      <CabecalhoItemGf titulo={regra.nome}>
-        {regra.tipoNegocio === "eletroposto" && <BadgeGf>{ROTULO_TIPO_NEGOCIO.eletroposto}</BadgeGf>}
-        {regra.xp !== 0 && (
-          <BadgeGf tom="positivo">
-            {regra.xp > 0 ? "+" : "−"}
-            {formatarNumeroGf(Math.abs(regra.xp))} XP
-          </BadgeGf>
+      <ItemColapsavelGf
+        titulo={regra.nome}
+        resumo={
+          <>
+            {regra.tipoNegocio === "eletroposto" && <BadgeGf>{ROTULO_TIPO_NEGOCIO.eletroposto}</BadgeGf>}
+            {regra.xp !== 0 && (
+              <BadgeGf tom="positivo">
+                {regra.xp > 0 ? "+" : "−"}
+                {formatarNumeroGf(Math.abs(regra.xp))} XP
+              </BadgeGf>
+            )}
+            {regra.moedas !== 0 && (
+              <BadgeGf tom="atencao">
+                {regra.moedas > 0 ? "+" : "−"}
+                {formatarNumeroGf(Math.abs(regra.moedas))} moedas
+              </BadgeGf>
+            )}
+            <StatusAtivoGf ativa={regra.ativa} />
+          </>
+        }
+      >
+        <div className="grid gap-3 @min-[560px]:grid-cols-2">
+          <Campo rotulo="Nome" name="nome" defaultValue={regra.nome} required />
+          <Selecao rotulo="Evento" name="eventoTipo" value={eventoTipo} onChange={(e) => setEventoTipo(e.target.value)}>
+            {eventos.map((ev) => (
+              <option key={ev.tipo} value={ev.tipo}>
+                {ev.rotulo}
+              </option>
+            ))}
+          </Selecao>
+          <SeletorTipoNegocio defaultValue={regra.tipoNegocio} />
+        </div>
+        <div className="grid gap-3 @min-[620px]:grid-cols-3">
+          <Campo rotulo="XP" name="xp" type="number" step={1} defaultValue={regra.xp} required />
+          <Campo rotulo="Moedas" name="moedas" type="number" step={1} defaultValue={regra.moedas} required />
+          <SeletorPerfil defaultValue={regra.perfilAplicavel ?? ""} />
+        </div>
+        {eventoNaoPontuavel(eventoTipo) && (
+          <p className="gf-t-aux">
+            Esse evento não gera mais XP nem moedas. A regra fica só como registro; lançamentos antigos não mudam.
+          </p>
         )}
-        {regra.moedas !== 0 && (
-          <BadgeGf tom="atencao">
-            {regra.moedas > 0 ? "+" : "−"}
-            {formatarNumeroGf(Math.abs(regra.moedas))} moedas
-          </BadgeGf>
-        )}
-        <StatusAtivoGf ativa={regra.ativa} />
-      </CabecalhoItemGf>
-      <div className="grid gap-3 @min-[560px]:grid-cols-2">
-        <Campo rotulo="Nome" name="nome" defaultValue={regra.nome} required />
-        <Selecao rotulo="Evento" name="eventoTipo" value={eventoTipo} onChange={(e) => setEventoTipo(e.target.value)}>
-          {eventos.map((ev) => (
-            <option key={ev.tipo} value={ev.tipo}>
-              {ev.rotulo}
-            </option>
-          ))}
-        </Selecao>
-        <SeletorTipoNegocio defaultValue={regra.tipoNegocio} />
-      </div>
-      <div className="grid gap-3 @min-[620px]:grid-cols-3">
-        <Campo rotulo="XP" name="xp" type="number" step={1} defaultValue={regra.xp} required />
-        <Campo rotulo="Moedas" name="moedas" type="number" step={1} defaultValue={regra.moedas} required />
-        <SeletorPerfil defaultValue={regra.perfilAplicavel ?? ""} />
-      </div>
-      {eventoNaoPontuavel(eventoTipo) && (
-        <p className="gf-t-aux">
-          Esse evento não gera mais XP nem moedas. A regra fica só como registro; lançamentos antigos não mudam.
-        </p>
-      )}
-      <CondicaoTeto
-        campos={campos}
-        condicaoInicial={regra.condicao}
-        limitePeriodoInicial={regra.limitePeriodo}
-        limiteQuantidadeInicial={regra.limiteQuantidade}
-        tetoObrigatorio={(EVENTOS_TETO_OBRIGATORIO as readonly string[]).includes(eventoTipo)}
-      />
-      <label className="flex items-center gap-2 text-sm text-[var(--gf-texto)]">
-        <input type="checkbox" name="unicaPorNegocio" defaultChecked={regra.unicaPorNegocio} /> Pontua só a primeira vez por negócio (evita pontuar de novo se o card sair e voltar)
-      </label>
-      <div className="flex flex-wrap items-center gap-3 border-t border-[var(--gf-borda)] pt-4">
+        <CondicaoTeto
+          campos={campos}
+          condicaoInicial={regra.condicao}
+          limitePeriodoInicial={regra.limitePeriodo}
+          limiteQuantidadeInicial={regra.limiteQuantidade}
+          tetoObrigatorio={(EVENTOS_TETO_OBRIGATORIO as readonly string[]).includes(eventoTipo)}
+        />
         <label className="flex items-center gap-2 text-sm text-[var(--gf-texto)]">
-          <input type="checkbox" name="ativa" defaultChecked={regra.ativa} /> Ativa
+          <input type="checkbox" name="unicaPorNegocio" defaultChecked={regra.unicaPorNegocio} /> Pontua só a primeira vez por negócio (evita pontuar de novo se o card sair e voltar)
         </label>
-        <Botao type="submit" variante="secundario" disabled={pendente}>
-          Salvar
-        </Botao>
-        <button type="submit" formAction={apagarRegra} className="gf-botao-texto sm:ml-auto">
-          Apagar
-        </button>
-        <Mensagem resultado={resultado} />
-      </div>
+        <div className="flex flex-wrap items-center gap-3 border-t border-[var(--gf-borda)] pt-4">
+          <label className="flex items-center gap-2 text-sm text-[var(--gf-texto)]">
+            <input type="checkbox" name="ativa" defaultChecked={regra.ativa} /> Ativa
+          </label>
+          <Botao type="submit" variante="secundario" disabled={pendente}>
+            Salvar
+          </Botao>
+          <button type="submit" formAction={apagarRegra} className="gf-botao-texto sm:ml-auto">
+            Apagar
+          </button>
+          <Mensagem resultado={resultado} />
+        </div>
+      </ItemColapsavelGf>
     </form>
   );
 }
@@ -276,28 +282,34 @@ export function NovoNivel() {
 export function LinhaNivel({ nivel }: { nivel: NivelSalvo }) {
   const [resultado, acao, pendente] = useActionState(editarNivel, null);
   return (
-    <form action={acao} className="gf-item-edicao flex flex-col gap-4">
-      <CabecalhoItemGf titulo={`Nível ${nivel.nivel}${nivel.nome ? ` · ${nivel.nome}` : ""}`}>
-        <BadgeGf>{formatarNumeroGf(nivel.xpMinimo)} XP mínimo</BadgeGf>
-        <StatusAtivoGf ativa={nivel.ativa} ativo="Ativo" inativo="Inativo" />
-      </CabecalhoItemGf>
-      <div className="grid gap-3 @min-[620px]:grid-cols-[7rem_minmax(0,1fr)_11rem]">
-        <Campo rotulo="Nível" name="nivel" type="number" defaultValue={nivel.nivel} readOnly />
-        <Campo rotulo="Nome" name="nome" defaultValue={nivel.nome ?? ""} placeholder="Ex.: Veterano" />
-        <Campo rotulo="XP mínimo" name="xpMinimo" type="number" min={0} step={1} defaultValue={nivel.xpMinimo} required />
-      </div>
-      <div className="flex flex-wrap items-center gap-3 border-t border-[var(--gf-borda)] pt-4">
-        <label className="flex items-center gap-2 text-sm text-[var(--gf-texto)]">
-          <input type="checkbox" name="ativa" defaultChecked={nivel.ativa} /> Ativo
-        </label>
-        <Botao type="submit" variante="secundario" disabled={pendente}>
-          Salvar
-        </Botao>
-        <button type="submit" formAction={apagarNivel} className="gf-botao-texto sm:ml-auto">
-          Apagar
-        </button>
-        <Mensagem resultado={resultado} />
-      </div>
+    <form action={acao} className="gf-item-edicao">
+      <ItemColapsavelGf
+        titulo={`Nível ${nivel.nivel}${nivel.nome ? ` · ${nivel.nome}` : ""}`}
+        resumo={
+          <>
+            <BadgeGf>{formatarNumeroGf(nivel.xpMinimo)} XP mínimo</BadgeGf>
+            <StatusAtivoGf ativa={nivel.ativa} ativo="Ativo" inativo="Inativo" />
+          </>
+        }
+      >
+        <div className="grid gap-3 @min-[620px]:grid-cols-[7rem_minmax(0,1fr)_11rem]">
+          <Campo rotulo="Nível" name="nivel" type="number" defaultValue={nivel.nivel} readOnly />
+          <Campo rotulo="Nome" name="nome" defaultValue={nivel.nome ?? ""} placeholder="Ex.: Veterano" />
+          <Campo rotulo="XP mínimo" name="xpMinimo" type="number" min={0} step={1} defaultValue={nivel.xpMinimo} required />
+        </div>
+        <div className="flex flex-wrap items-center gap-3 border-t border-[var(--gf-borda)] pt-4">
+          <label className="flex items-center gap-2 text-sm text-[var(--gf-texto)]">
+            <input type="checkbox" name="ativa" defaultChecked={nivel.ativa} /> Ativo
+          </label>
+          <Botao type="submit" variante="secundario" disabled={pendente}>
+            Salvar
+          </Botao>
+          <button type="submit" formAction={apagarNivel} className="gf-botao-texto sm:ml-auto">
+            Apagar
+          </button>
+          <Mensagem resultado={resultado} />
+        </div>
+      </ItemColapsavelGf>
     </form>
   );
 }
@@ -379,45 +391,51 @@ export function LinhaConquista({ conquista }: { conquista: ConquistaSalva }) {
   const [resultado, acao, pendente] = useActionState(editarConquista, null);
   const [metrica, setMetrica] = useState<"xp_acumulado" | "marco_contagem">(conquista.metrica);
   return (
-    <form action={acao} className="gf-item-edicao flex flex-col gap-4">
+    <form action={acao} className="gf-item-edicao">
       <input type="hidden" name="id" value={conquista.id} />
-      <CabecalhoItemGf titulo={`${conquista.icone} ${conquista.nome}`}>
-        {conquista.xpBonus > 0 && <BadgeGf tom="positivo">+{formatarNumeroGf(conquista.xpBonus)} XP bônus</BadgeGf>}
-        <StatusAtivoGf ativa={conquista.ativa} />
-      </CabecalhoItemGf>
-      <div className="grid gap-3 @min-[480px]:grid-cols-[5.5rem_1fr]">
-        <Campo rotulo="Ícone" name="icone" defaultValue={conquista.icone} maxLength={8} />
-        <Campo rotulo="Nome" name="nome" defaultValue={conquista.nome} required />
-      </div>
-      <Campo rotulo="Descrição" name="descricao" defaultValue={conquista.descricao} />
-      <div className="grid gap-3 @min-[560px]:grid-cols-2">
-        <SeletorMetricaConquista metrica={metrica} setMetrica={setMetrica} marco={conquista.marco ?? ""} />
-      </div>
-      <div className="grid gap-3 @min-[620px]:grid-cols-3">
-        <Campo
-          rotulo={metrica === "marco_contagem" ? "Quantidade necessária" : "XP necessário"}
-          name="valor"
-          type="number"
-          min={1}
-          step={1}
-          defaultValue={conquista.valor}
-          required
-        />
-        <Campo rotulo="XP bônus ao desbloquear" name="xpBonus" type="number" min={0} step={1} defaultValue={conquista.xpBonus} />
-        <SeletorPerfil defaultValue={conquista.perfilAplicavel ?? ""} />
-      </div>
-      <div className="flex flex-wrap items-center gap-3 border-t border-[var(--gf-borda)] pt-4">
-        <label className="flex items-center gap-2 text-sm text-[var(--gf-texto)]">
-          <input type="checkbox" name="ativa" defaultChecked={conquista.ativa} /> Ativa
-        </label>
-        <Botao type="submit" variante="secundario" disabled={pendente}>
-          Salvar
-        </Botao>
-        <button type="submit" formAction={apagarConquista} className="gf-botao-texto sm:ml-auto">
-          Apagar
-        </button>
-        <Mensagem resultado={resultado} />
-      </div>
+      <ItemColapsavelGf
+        titulo={`${conquista.icone} ${conquista.nome}`}
+        resumo={
+          <>
+            {conquista.xpBonus > 0 && <BadgeGf tom="positivo">+{formatarNumeroGf(conquista.xpBonus)} XP bônus</BadgeGf>}
+            <StatusAtivoGf ativa={conquista.ativa} />
+          </>
+        }
+      >
+        <div className="grid gap-3 @min-[480px]:grid-cols-[5.5rem_1fr]">
+          <Campo rotulo="Ícone" name="icone" defaultValue={conquista.icone} maxLength={8} />
+          <Campo rotulo="Nome" name="nome" defaultValue={conquista.nome} required />
+        </div>
+        <Campo rotulo="Descrição" name="descricao" defaultValue={conquista.descricao} />
+        <div className="grid gap-3 @min-[560px]:grid-cols-2">
+          <SeletorMetricaConquista metrica={metrica} setMetrica={setMetrica} marco={conquista.marco ?? ""} />
+        </div>
+        <div className="grid gap-3 @min-[620px]:grid-cols-3">
+          <Campo
+            rotulo={metrica === "marco_contagem" ? "Quantidade necessária" : "XP necessário"}
+            name="valor"
+            type="number"
+            min={1}
+            step={1}
+            defaultValue={conquista.valor}
+            required
+          />
+          <Campo rotulo="XP bônus ao desbloquear" name="xpBonus" type="number" min={0} step={1} defaultValue={conquista.xpBonus} />
+          <SeletorPerfil defaultValue={conquista.perfilAplicavel ?? ""} />
+        </div>
+        <div className="flex flex-wrap items-center gap-3 border-t border-[var(--gf-borda)] pt-4">
+          <label className="flex items-center gap-2 text-sm text-[var(--gf-texto)]">
+            <input type="checkbox" name="ativa" defaultChecked={conquista.ativa} /> Ativa
+          </label>
+          <Botao type="submit" variante="secundario" disabled={pendente}>
+            Salvar
+          </Botao>
+          <button type="submit" formAction={apagarConquista} className="gf-botao-texto sm:ml-auto">
+            Apagar
+          </button>
+          <Mensagem resultado={resultado} />
+        </div>
+      </ItemColapsavelGf>
     </form>
   );
 }
@@ -460,50 +478,56 @@ export function NovaRecompensa() {
 export function LinhaRecompensa({ empresaId, recompensa }: { empresaId: string; recompensa: RecompensaSalva }) {
   const [resultado, acao, pendente] = useActionState(editarRecompensa, null);
   return (
-    <div className="gf-item-edicao flex flex-col gap-4">
-      <CabecalhoItemGf titulo={recompensa.nome}>
-        <BadgeGf tom="atencao">{formatarNumeroGf(recompensa.custoMoedas)} moedas</BadgeGf>
-        <StatusAtivoGf ativa={recompensa.ativa} />
-      </CabecalhoItemGf>
-      {/* Fora do <form>: o envio da imagem é direto ao Storage e tem ações próprias. */}
-      <ImagemRecompensaAdmin
-        empresaId={empresaId}
-        recompensaId={recompensa.id}
-        nome={recompensa.nome}
-        imagemUrl={recompensa.imagemUrl}
-        temImagem={!!recompensa.imagemCaminho}
-      />
-      <form action={acao} className="flex flex-col gap-4">
-        <input type="hidden" name="id" value={recompensa.id} />
-        <Campo rotulo="Nome" name="nome" defaultValue={recompensa.nome} required />
-        <Campo rotulo="Descrição" name="descricao" defaultValue={recompensa.descricao} />
-        <div className="grid gap-3 @min-[620px]:grid-cols-3">
-          <Campo rotulo="Custo em moedas" name="custoMoedas" type="number" min={1} step={1} defaultValue={recompensa.custoMoedas} required />
-          <Campo rotulo="Estoque" name="estoque" type="number" min={0} step={1} defaultValue={recompensa.estoque ?? undefined} placeholder="Ilimitado" />
-          <Campo
-            rotulo="Limite por colaborador"
-            name="limitePorMembro"
-            type="number"
-            min={1}
-            step={1}
-            defaultValue={recompensa.limitePorMembro ?? undefined}
-            placeholder="Sem limite"
-          />
-        </div>
-        <Campo rotulo="Validade" name="validadeAte" type="date" defaultValue={recompensa.validadeAte ?? ""} />
-        <div className="flex flex-wrap items-center gap-3 border-t border-[var(--gf-borda)] pt-4">
-          <label className="flex items-center gap-2 text-sm text-[var(--gf-texto)]">
-            <input type="checkbox" name="ativa" defaultChecked={recompensa.ativa} /> Ativa
-          </label>
-          <Botao type="submit" variante="secundario" disabled={pendente}>
-            Salvar
-          </Botao>
-          <button type="submit" formAction={apagarRecompensa} className="gf-botao-texto sm:ml-auto">
-            Apagar
-          </button>
-          <Mensagem resultado={resultado} />
-        </div>
-      </form>
+    <div className="gf-item-edicao">
+      <ItemColapsavelGf
+        titulo={recompensa.nome}
+        resumo={
+          <>
+            <BadgeGf tom="atencao">{formatarNumeroGf(recompensa.custoMoedas)} moedas</BadgeGf>
+            <StatusAtivoGf ativa={recompensa.ativa} />
+          </>
+        }
+      >
+        {/* Fora do <form>: o envio da imagem é direto ao Storage e tem ações próprias. */}
+        <ImagemRecompensaAdmin
+          empresaId={empresaId}
+          recompensaId={recompensa.id}
+          nome={recompensa.nome}
+          imagemUrl={recompensa.imagemUrl}
+          temImagem={!!recompensa.imagemCaminho}
+        />
+        <form action={acao} className="flex flex-col gap-4">
+          <input type="hidden" name="id" value={recompensa.id} />
+          <Campo rotulo="Nome" name="nome" defaultValue={recompensa.nome} required />
+          <Campo rotulo="Descrição" name="descricao" defaultValue={recompensa.descricao} />
+          <div className="grid gap-3 @min-[620px]:grid-cols-3">
+            <Campo rotulo="Custo em moedas" name="custoMoedas" type="number" min={1} step={1} defaultValue={recompensa.custoMoedas} required />
+            <Campo rotulo="Estoque" name="estoque" type="number" min={0} step={1} defaultValue={recompensa.estoque ?? undefined} placeholder="Ilimitado" />
+            <Campo
+              rotulo="Limite por colaborador"
+              name="limitePorMembro"
+              type="number"
+              min={1}
+              step={1}
+              defaultValue={recompensa.limitePorMembro ?? undefined}
+              placeholder="Sem limite"
+            />
+          </div>
+          <Campo rotulo="Validade" name="validadeAte" type="date" defaultValue={recompensa.validadeAte ?? ""} />
+          <div className="flex flex-wrap items-center gap-3 border-t border-[var(--gf-borda)] pt-4">
+            <label className="flex items-center gap-2 text-sm text-[var(--gf-texto)]">
+              <input type="checkbox" name="ativa" defaultChecked={recompensa.ativa} /> Ativa
+            </label>
+            <Botao type="submit" variante="secundario" disabled={pendente}>
+              Salvar
+            </Botao>
+            <button type="submit" formAction={apagarRecompensa} className="gf-botao-texto sm:ml-auto">
+              Apagar
+            </button>
+            <Mensagem resultado={resultado} />
+          </div>
+        </form>
+      </ItemColapsavelGf>
     </div>
   );
 }
