@@ -25,8 +25,11 @@ test("executor de Engenharia abre o card da obra e cria tarefa; Compras não ent
   await novo.getByRole("button", { name: "Enviar ao setor" }).click();
   await expect(page.getByText(titulo, { exact: true })).toBeVisible();
 
+  // Na Central, a tarefa da fila que o executor pode assumir aparece em "Precisa de você", com o link para o card.
   await page.goto("/engenharia");
-  await expect(page.getByText(titulo, { exact: true })).toBeVisible();
+  const tarefasMinhas = page.getByRole("region", { name: "Tarefas" });
+  await expect(tarefasMinhas.getByText(titulo, { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: new RegExp(`^Obra #${obra!.numero} `) }).first()).toHaveAttribute("href", `/engenharia/${obras.o01}`);
 
   await entrarComo(page, usuarios.execCompras, senha);
   await page.goto("/engenharia");

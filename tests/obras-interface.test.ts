@@ -408,7 +408,7 @@ describe("filtrarObras", () => {
     potenciaKwp: null,
     situacao: "em_andamento",
     alertas: [],
-    setores: SETORES_OBRA.map((setor) => ({ setor, status: null, statusRotulo: "", estado: "em_andamento", aguardando: null, principalNome: null })),
+    setores: SETORES_OBRA.map((setor) => ({ setor, status: null, statusRotulo: "", estado: "em_andamento", aguardando: null, principalNome: null, souPrincipal: false, statusDesde: null, aguardandoDesde: null })),
     criadaEm: "2026-10-01T00:00:00Z",
     ...extra,
   });

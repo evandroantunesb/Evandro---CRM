@@ -1,18 +1,20 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { ListaTarefasSetor } from "@/components/tarefas-setor";
 import { Cartao, Selo } from "@/components/ui";
-import { agruparObrasEngenharia } from "@/lib/engenharia-regras";
-import { carregarObras } from "@/lib/obras/dados";
-import { ROTULO_ESTADO_SETOR, rotuloAguardando, rotuloStatus } from "@/lib/obras/rotulos";
-import { ENGENHARIA } from "@/lib/permissoes";
+import { diasDesde, montarCentralEngenharia, type ObraNaEngenharia } from "@/lib/engenharia-regras";
+import { carregarObras, type ObraListaVM } from "@/lib/obras/dados";
+import { ROTULO_ESTADO_SETOR, rotuloStatus } from "@/lib/obras/rotulos";
+import { ENGENHARIA, OBRAS, pode } from "@/lib/permissoes";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { carregarTarefasSetor, contarAbasTarefasSetor } from "@/lib/tarefas-setor";
-import { ROTULO_FILTRO_TAREFAS_SETOR, type FiltroTarefasSetor } from "@/lib/tarefas-setor-regras";
+import { ROTULO_FILTRO_TAREFAS_SETOR, type FiltroTarefasSetor, type TarefaSetorVM } from "@/lib/tarefas-setor-regras";
 
 // Sem "Pedidas por mim": a Engenharia vê o que é do setor, não o que pediu a outros.
 const FILTROS = ["abertas", "minhas", "fila", "concluidas"] as const satisfies readonly FiltroTarefasSetor[];
-const VAZIO: Record<(typeof FILTROS)[number], string> = {
+type Filtro = (typeof FILTROS)[number];
+const VAZIO: Record<Filtro, string> = {
   abertas: "Nenhuma tarefa de Engenharia aberta.",
   minhas: "Nenhuma tarefa com você.",
   fila: "Nenhuma tarefa esperando alguém assumir.",
@@ -22,14 +24,25 @@ const VAZIO: Record<(typeof FILTROS)[number], string> = {
 const formatarPotencia = (kwp: number | null) =>
   kwp == null ? "" : ` · ${new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 2 }).format(kwp)} kWp`;
 
+const ha = (desde: string | null) => {
+  if (!desde) return null;
+  const dias = diasDesde(desde);
+  return dias === 0 ? "desde hoje" : `há ${dias} dia${dias > 1 ? "s" : ""}`;
+};
+
+// No contexto da Engenharia, a tarefa de obra abre o card da obra para o engenheiro, não a tela de Obras.
+const paraCard = (t: TarefaSetorVM): TarefaSetorVM =>
+  t.obraId ? { ...t, referencia: { ...t.referencia, href: `/engenharia/${t.obraId}` } } : t;
+
 /**
- * Engenharia: a fila de tarefas do setor e as obras em andamento por etapa do projeto. Admin e gestor acompanham;
- * `operacao` vê só se atua em Engenharia. Tudo sob RLS: a tela não decide permissão, só monta o que chega.
+ * Central da Engenharia: abre no que exige ação de quem entrou (tarefas e obras), depois o que espera terceiros e a
+ * carteira por etapa; as abas de tarefas ficam em `?ver=`. Admin e gestor acompanham; `operacao` vê só se atua em
+ * Engenharia. Tudo sob RLS: a tela não decide permissão, só monta o que chega.
  */
 export default async function Engenharia({ searchParams }: PageProps<"/engenharia">) {
   const { atual } = await exigirPapel(...ENGENHARIA);
   const { ver } = await searchParams;
-  const filtro = (FILTROS as readonly string[]).includes(ver as string) ? (ver as (typeof FILTROS)[number]) : "abertas";
+  const filtro = (FILTROS as readonly string[]).includes(ver as string) ? (ver as Filtro) : null;
   const supabase = await criarClienteServidor();
 
   const { data: meusSetores } = await supabase
@@ -39,7 +52,7 @@ export default async function Engenharia({ searchParams }: PageProps<"/engenhari
     .eq("membro_id", atual.membroId)
     .eq("setor", "engenharia");
   const atua = (meusSetores ?? []).length > 0;
-  const coordena = (meusSetores ?? []).some((s) => s.capacidade === "coordenar");
+  const coordenaSetor = (meusSetores ?? []).some((s) => s.capacidade === "coordenar");
 
   if (atual.papel === "operacao" && !atua) {
     return (
@@ -50,50 +63,134 @@ export default async function Engenharia({ searchParams }: PageProps<"/engenhari
     );
   }
 
-  const [{ tarefas, membrosPorSetor }, porAba, { obras }] = await Promise.all([
-    carregarTarefasSetor(supabase, { empresaId: atual.empresaId, membroId: atual.membroId, papel: atual.papel, filtro, setor: "engenharia" }),
+  const [{ tarefas, membrosPorSetor }, porAba, obras] = await Promise.all([
+    carregarTarefasSetor(supabase, {
+      empresaId: atual.empresaId,
+      membroId: atual.membroId,
+      papel: atual.papel,
+      filtro: filtro ?? "abertas",
+      setor: "engenharia",
+    }),
     contarAbasTarefasSetor(supabase, atual.empresaId, atual.membroId, "engenharia"),
-    carregarObras(supabase, { empresaId: atual.empresaId, papel: atual.papel }),
+    // As obras só entram na Central; as abas de tarefas não as usam.
+    filtro ? null : carregarObras(supabase, { empresaId: atual.empresaId, papel: atual.papel, membroId: atual.membroId }).then((r) => r.obras),
   ]);
-  const grupos = agruparObrasEngenharia(obras, (s) => rotuloStatus("engenharia", s));
-  const totalObras = grupos.reduce((n, g) => n + g.obras.length, 0);
-  const atrasadas = tarefas.filter((t) => t.atrasada).length;
+  const listaTarefas = tarefas.map(paraCard);
 
   return (
     <div className="mx-auto flex max-w-[1100px] flex-col gap-4">
       <div>
         <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Engenharia</h1>
-        <p className="text-sm text-zinc-500">As tarefas do setor e as obras em andamento por etapa do projeto.</p>
+        <p className="text-sm text-zinc-500">O que precisa de você hoje, o que espera terceiros e as obras por etapa do projeto.</p>
         {atual.papel === "operacao" && (
-          <p className="mt-1 text-sm text-zinc-700">Você atua em Engenharia como {coordena ? "coordenador" : "executor"}.</p>
+          <p className="mt-1 text-sm text-zinc-700">Você atua em Engenharia como {coordenaSetor ? "coordenador" : "executor"}.</p>
         )}
       </div>
 
-      <nav aria-label="Filtro" className="flex flex-wrap gap-2">
-        {FILTROS.map((f) => {
-          const abertas = f === "concluidas" ? 0 : porAba[f];
-          return (
-            <Link
-              key={f}
-              href={f === "abertas" ? "/engenharia" : `/engenharia?ver=${f}`}
-              aria-current={f === filtro ? "page" : undefined}
-              className={`rounded-full border px-3 py-1 text-sm ${
-                f === filtro ? "border-dourado bg-dourado/10 text-texto" : "border-linha text-zinc-600 hover:border-dourado"
-              }`}
-            >
-              {ROTULO_FILTRO_TAREFAS_SETOR[f]}
-              {abertas > 0 && (
-                <span className="ml-1.5 inline-flex min-w-5 items-center justify-center rounded-full bg-dourado px-1.5 text-xs font-semibold text-carvao">
-                  {abertas}
-                </span>
-              )}
-            </Link>
-          );
-        })}
+      <nav aria-label="Visão" className="flex flex-wrap gap-2">
+        <Aba href="/engenharia" atual={filtro === null}>
+          Central
+        </Aba>
+        {FILTROS.map((f) => (
+          <Aba key={f} href={`/engenharia?ver=${f}`} atual={f === filtro} contagem={f === "concluidas" ? 0 : porAba[f]}>
+            {ROTULO_FILTRO_TAREFAS_SETOR[f]}
+          </Aba>
+        ))}
       </nav>
 
-      <Cartao titulo={`${ROTULO_FILTRO_TAREFAS_SETOR[filtro]} (${tarefas.length})${atrasadas ? ` · ${atrasadas} atrasada${atrasadas > 1 ? "s" : ""}` : ""}`}>
-        <ListaTarefasSetor tarefas={tarefas} membrosPorSetor={membrosPorSetor} vazio={VAZIO[filtro]} />
+      {filtro || !obras ? (
+        <Cartao titulo={`${ROTULO_FILTRO_TAREFAS_SETOR[filtro ?? "abertas"]} (${tarefas.length})`}>
+          <ListaTarefasSetor tarefas={listaTarefas} membrosPorSetor={membrosPorSetor} vazio={VAZIO[filtro ?? "abertas"]} />
+        </Cartao>
+      ) : (
+        <Central
+          tarefas={listaTarefas}
+          membrosPorSetor={membrosPorSetor}
+          obras={obras}
+          membroId={atual.membroId}
+          podeVerObras={pode(atual.papel, OBRAS)}
+          // Definir responsável é do admin e do coordenador (quem a RPC deixa gerir a obra); o gestor só acompanha.
+          coordena={atual.papel === "admin" || coordenaSetor}
+        />
+      )}
+    </div>
+  );
+}
+
+function Central({
+  tarefas,
+  membrosPorSetor,
+  obras,
+  membroId,
+  podeVerObras,
+  coordena,
+}: {
+  tarefas: TarefaSetorVM[];
+  membrosPorSetor: Parameters<typeof ListaTarefasSetor>[0]["membrosPorSetor"];
+  obras: ObraListaVM[];
+  membroId: string;
+  podeVerObras: boolean;
+  coordena: boolean;
+}) {
+  const { acoes, comTerceiros, grupos } = montarCentralEngenharia(obras, (s) => rotuloStatus("engenharia", s), { coordena });
+
+  // Minhas tarefas e as da fila que eu posso assumir; o resto do setor fica nas abas.
+  const tarefasMinhas = tarefas.filter((t) => t.responsavel?.id === membroId || (!t.responsavel && t.podeAgir));
+  const atrasadas = tarefas.filter((t) => t.atrasada).length;
+  const totalObras = grupos.reduce((n, g) => n + g.obras.length, 0);
+  const paradas = grupos.reduce((n, g) => n + g.obras.filter((o) => o.estado === "parado").length, 0);
+  const nada = tarefasMinhas.length === 0 && acoes.length === 0;
+
+  const indicadores: [string, number][] = [
+    ["Obras na Engenharia", totalObras],
+    ["Precisam de você", tarefasMinhas.length + acoes.length],
+    ["Com terceiros", comTerceiros.length],
+    ["Paradas", paradas],
+    ["Tarefas atrasadas", atrasadas],
+  ];
+
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        {indicadores.map(([rotulo, valor]) => (
+          <div key={rotulo} className="rounded-xl border border-zinc-200/80 bg-white p-3 shadow-[0_1px_2px_rgba(15,15,16,0.04)]">
+            <p className="text-2xl font-semibold text-zinc-900">{valor}</p>
+            <p className="text-xs text-zinc-600">{rotulo}</p>
+          </div>
+        ))}
+      </div>
+
+      <Cartao titulo="Precisa de você">
+        {nada ? (
+          <p className="text-sm text-zinc-500">Nenhuma ação pendente para você agora.</p>
+        ) : (
+          <div className="flex flex-col gap-5">
+            {tarefasMinhas.length > 0 && (
+              <section aria-label="Tarefas">
+                <h3 className="mb-2 text-sm font-medium text-texto">
+                  Tarefas <span className="text-zinc-500">({tarefasMinhas.length})</span>
+                </h3>
+                <ListaTarefasSetor tarefas={tarefasMinhas} membrosPorSetor={membrosPorSetor} vazio="" />
+              </section>
+            )}
+            {acoes.length > 0 && (
+              <section aria-label="Próximas ações nas obras">
+                <h3 className="mb-2 text-sm font-medium text-texto">
+                  Obras <span className="text-zinc-500">({acoes.length})</span>
+                </h3>
+                <ListaObras obras={acoes} acao />
+              </section>
+            )}
+          </div>
+        )}
+      </Cartao>
+
+      <Cartao titulo={`Aguardando terceiros (${comTerceiros.length})`}>
+        {comTerceiros.length === 0 ? (
+          <p className="text-sm text-zinc-500">Nenhuma obra esperando cliente, fornecedor ou concessionária.</p>
+        ) : (
+          <ListaObras obras={comTerceiros} acao />
+        )}
       </Cartao>
 
       <Cartao titulo={`Obras na Engenharia (${totalObras})`}>
@@ -108,33 +205,67 @@ export default async function Engenharia({ searchParams }: PageProps<"/engenhari
                   <h3 className="mb-2 text-sm font-medium text-texto">
                     {g.rotulo} <span className="text-zinc-500">({g.obras.length})</span>
                   </h3>
-                  <ul className="divide-y divide-linha rounded-lg border border-linha">
-                    {g.obras.map((o) => (
-                      <li key={o.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm">
-                        <div className="min-w-0">
-                          <p className="truncate font-medium text-texto">
-                            <Link href={`/engenharia/${o.id}`} className="hover:underline">
-                              Obra #{o.numero} · {o.clienteNome}
-                            </Link>
-                          </p>
-                          <p className="text-xs text-zinc-500">
-                            {o.cidadeUf}
-                            {formatarPotencia(o.potenciaKwp)}
-                            {o.principalNome ? ` · ${o.principalNome}` : ""}
-                          </p>
-                        </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {o.aguardando && <Selo tom="atencao">{rotuloAguardando(o.aguardando)}</Selo>}
-                          {o.estado === "parado" && <Selo tom="atencao">{ROTULO_ESTADO_SETOR.parado}</Selo>}
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
+                  <ListaObras obras={g.obras} />
                 </section>
               ))}
+            {podeVerObras && (
+              <Link href="/obras" className="w-fit text-sm text-zinc-600 underline hover:text-zinc-900">
+                Ver carteira completa em Obras
+              </Link>
+            )}
           </div>
         )}
       </Cartao>
-    </div>
+    </>
+  );
+}
+
+/** Linhas de obra. Com `acao`, destaca a próxima ação e a etapa; na carteira, só os dados da obra. */
+function ListaObras({ obras, acao = false }: { obras: ObraNaEngenharia[]; acao?: boolean }) {
+  return (
+    <ul className="divide-y divide-linha rounded-lg border border-linha">
+      {obras.map((o) => {
+        const tempo = ha(o.desde);
+        return (
+          <li key={o.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm">
+            <div className="min-w-0">
+              {acao && o.proximaAcao && <p className="font-medium text-texto">{o.proximaAcao}</p>}
+              <p className={`truncate ${acao ? "text-zinc-700" : "font-medium text-texto"}`}>
+                <Link href={`/engenharia/${o.id}`} className="hover:underline">
+                  Obra #{o.numero} · {o.clienteNome}
+                </Link>
+              </p>
+              <p className="text-xs text-zinc-500">
+                {acao ? o.statusRotulo : o.cidadeUf}
+                {!acao && formatarPotencia(o.potenciaKwp)}
+                {o.principalNome ? ` · ${o.principalNome}` : " · Sem responsável"}
+                {tempo ? ` · ${o.aguardando ? "aguardando" : "na etapa"} ${tempo}` : ""}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {o.aguardando && <Selo tom="atencao">{o.aguardando}</Selo>}
+              {o.estado === "parado" && <Selo tom="atencao">{ROTULO_ESTADO_SETOR.parado}</Selo>}
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function Aba({ href, atual, contagem = 0, children }: { href: string; atual: boolean; contagem?: number; children: ReactNode }) {
+  return (
+    <Link
+      href={href}
+      aria-current={atual ? "page" : undefined}
+      className={`rounded-full border px-3 py-1 text-sm ${atual ? "border-dourado bg-dourado/10 text-texto" : "border-linha text-zinc-600 hover:border-dourado"}`}
+    >
+      {children}
+      {contagem > 0 && (
+        <span className="ml-1.5 inline-flex min-w-5 items-center justify-center rounded-full bg-dourado px-1.5 text-xs font-semibold text-carvao">
+          {contagem}
+        </span>
+      )}
+    </Link>
   );
 }
