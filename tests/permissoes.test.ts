@@ -51,6 +51,8 @@ const MATRIZ: Record<string, string[]> = {
   VER_NEGOCIO_DA_OBRA: ["admin", "gestor", "vendedor"],
   // Modo GestÃ£o de Obras: espelha as RPCs da 3b-3. Gestor, vendedor e SDR sÃ³ leem.
   GERIR_OBRAS: ["admin", "operacao"],
+  // Tela Engenharia: operação só vê se atua no setor (checado na página e na RLS).
+  ENGENHARIA: ["admin", "gestor", "operacao"],
 };
 
 const listas = Object.entries(permissoes).filter(([, v]) => Array.isArray(v)) as [string, ListaPapeis][];
