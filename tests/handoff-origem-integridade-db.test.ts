@@ -5,7 +5,7 @@
  * (`handoff.contrato_assinado`, `handoff.won`) seguem indo para o SDR de origem.
  */
 import { beforeAll, describe, expect, it } from "vitest";
-import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
 
 type Empresa = { id: string; funil: string; etapa: string; contato: string };
 
@@ -18,7 +18,7 @@ async function criarEmpresa(nome: string): Promise<Empresa> {
   if (error) throw error;
   const { data: f } = await servico.from("funis").select("id").eq("empresa_id", e!.id).single();
   const { data: et } = await servico.from("etapas").select("id").eq("funil_id", f!.id).order("ordem").limit(1).single();
-  const { data: c } = await servico.from("contatos").insert({ empresa_id: e!.id, nome: `Cliente ${nome}` }).select("id").single();
+  const { data: c } = await servico.from("contatos").insert({ ...CLIENTE_CONTRATO, empresa_id: e!.id, nome: `Cliente ${nome}` }).select("id").single();
   return { id: e!.id, funil: f!.id, etapa: et!.id, contato: c!.id };
 }
 

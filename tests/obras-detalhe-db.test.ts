@@ -8,7 +8,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { carregarDetalheObra } from "@/lib/obras/detalhe";
 import type { SupabaseServidor } from "@/lib/supabase/server";
-import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
 
 const PESSOAIS = {
   documento: "123.456.789-09",
@@ -40,7 +40,7 @@ async function criarVenda(emp: string, responsavel: Usuario, confirmador: Usuari
   const { data: et } = await servico.from("etapas").select("id").eq("funil_id", f!.id).order("ordem").limit(1).single();
   const { data: c } = await servico
     .from("contatos")
-    .insert({ empresa_id: emp, nome: `Cliente ${titulo}`, cidade: "Goiânia", uf: "GO", ...PESSOAIS })
+    .insert({ ...CLIENTE_CONTRATO, empresa_id: emp, nome: `Cliente ${titulo}`, cidade: "Goiânia", uf: "GO", ...PESSOAIS })
     .select("id")
     .single();
   const { data: neg, error } = await servico

@@ -7,7 +7,7 @@
  * (20261001250000_gamificacao_pagamento_confirmado.sql).
  */
 import { beforeAll, describe, expect, it } from "vitest";
-import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
 
 let closer: Usuario;
 let closer2: Usuario;
@@ -48,7 +48,7 @@ beforeAll(async () => {
   const { data: et } = await servico.from("etapas").select("id").eq("funil_id", funil).order("ordem").limit(1).single();
   etapaInicial = et!.id;
 
-  const { data: c } = await servico.from("contatos").insert({ empresa_id: empresa, nome: "Cliente pagamento" }).select("id").single();
+  const { data: c } = await servico.from("contatos").insert({ ...CLIENTE_CONTRATO, empresa_id: empresa, nome: "Cliente pagamento" }).select("id").single();
   contato = c!.id;
 
   // `gestor` só enxerga negócio de responsável fora da própria empresa/equipe via `pode_ver_responsavel`

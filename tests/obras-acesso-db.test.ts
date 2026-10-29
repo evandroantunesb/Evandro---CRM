@@ -12,7 +12,7 @@ import { randomUUID } from "node:crypto";
 import { Client } from "pg";
 import { urlBancoLocal } from "./banco-local";
 import { beforeAll, describe, expect, it } from "vitest";
-import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
 
 
 let admin: Usuario;
@@ -101,6 +101,7 @@ async function criarVenda(
   const { data: c } = await servico
     .from("contatos")
     .insert({
+      ...CLIENTE_CONTRATO,
       empresa_id: emp,
       nome: `Cliente ${titulo}`,
       cidade: "Goiânia",
