@@ -232,12 +232,13 @@ jobs:
       # Trava fail-closed: o conjunto do dry-run acima precisa ser exatamente o autorizado, senão o
       # job termina aqui, antes da aplicação. Sem credenciais. Para autorizar outro conjunto, a lista
       # abaixo muda por commit revisado (e uma nova tag), nunca por entrada do operador.
-      # Validade padrão da proposta (#244): tabela proposta_preferencias com RLS (admin e gestor escrevem,
-      # acesso comercial lê) e gatilhos de autor e auditoria; o eletroposto SDR (#225) já tem de estar aplicado.
+      # Fixação do telhado na obra (#245): lista fixacoes_telhado por empresa (com a lista inicial), escolha em
+      # obra_fixacao só pela RPC definir_fixacao_obra e o tipo fixacao_definida no histórico da obra; a validade
+      # padrão da proposta (#244) já tem de estar aplicada.
       - name: Conferir que o conjunto pendente é exatamente o autorizado
         env:
           MIGRATIONS_AUTORIZADAS: |
-                        20261029130000_proposta_preferencias.sql
+                        20261029150000_obras_fixacao_telhado.sql
         run: bash .github/scripts/validar-conjunto-migrations.sh "$RUNNER_TEMP/dry-run.txt"
       - name: Aplicar (supabase db push --include-all)
         env:
