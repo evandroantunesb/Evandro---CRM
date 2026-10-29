@@ -1,5 +1,6 @@
 import {
   BadgeDollarSign,
+  CalendarClock,
   Calculator,
   ChevronRight,
   FileSignature,
@@ -53,6 +54,7 @@ const GRUPOS: { id: string; titulo: string; itens: Item[] }[] = [
     itens: [
       { href: "/configuracoes/calculadora", titulo: "Kits e calculadora", descricao: "Kits prontos do catálogo e parâmetros do cálculo.", Icone: Calculator },
       { href: "/configuracoes/propostas", titulo: "Propostas comerciais", descricao: "Modelos e identidade visual das propostas.", Icone: FileText },
+      { href: "/configuracoes/validade-proposta", titulo: "Validade da proposta", descricao: "Prazo padrão da proposta (o gestor também edita).", Icone: CalendarClock },
       { href: "/configuracoes/contrato", titulo: "Modelo de contrato", descricao: "Texto do contrato, com campos preenchidos sozinhos.", Icone: FileSignature },
     ],
   },

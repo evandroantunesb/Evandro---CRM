@@ -120,6 +120,14 @@ export function validadePadraoDoModelo(blocos: { tipo: string; config: unknown }
 }
 
 /** AAAA-MM-DD somado de `dias` (calendário, sem fuso). */
+/** Validade sugerida na emissão: a da empresa (admin/gestor) quando válida; senão a do modelo padrão; senão 10 dias. */
+export function validadePadraoDaEmpresa(
+  diasDaEmpresa: number | null | undefined,
+  blocos: { tipo: string; config: unknown }[] | null | undefined,
+): number {
+  return Number.isInteger(diasDaEmpresa) && diasDaEmpresa! >= 1 && diasDaEmpresa! <= 180 ? diasDaEmpresa! : validadePadraoDoModelo(blocos);
+}
+
 export function somarDias(dataIso: string, dias: number): string {
   const [a, m, d] = dataIso.split("-").map(Number) as [number, number, number];
   return new Date(Date.UTC(a, m - 1, d + dias)).toISOString().slice(0, 10);

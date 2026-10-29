@@ -8,9 +8,12 @@ import { afterAll, describe, expect, it } from "vitest";
 
 const SCRIPT = ".github/scripts/validar-conjunto-migrations.sh";
 const WORKFLOW = ".github/workflows/banco-producao.yml";
-// Eletroposto para o SDR e pontuação por tipo de negócio: só ela, nenhuma a mais ou a menos.
-const AUTORIZADA = "20261027100000_eletroposto_sdr_pontuacao.sql";
-// Eletroposto (#223): aplicada em 26/10/2026, antes desta. Se voltar a aparecer como pendente, não é autorizada.
+// Validade padrão da proposta (#244): só ela, nenhuma a mais ou a menos.
+const AUTORIZADA = "20261029130000_proposta_preferencias.sql";
+// Eletroposto para o SDR e pontuação por tipo de negócio (#225): aplicada em 27/10/2026, antes desta. Se voltar a
+// aparecer como pendente, não é autorizada.
+const ELETROPOSTO_SDR = "20261027100000_eletroposto_sdr_pontuacao.sql";
+// Eletroposto (#223): aplicada em 26/10/2026, antes do eletroposto SDR. Se voltar a aparecer como pendente, não é autorizada.
 const ELETROPOSTO = "20261026120000_eletroposto.sql";
 // Temperatura do negócio (#222): aplicada em 24/10/2026, antes do eletroposto. Se voltar a aparecer como pendente,
 // não é autorizada.
@@ -173,13 +176,13 @@ describe("entradas inválidas: encerra com erro antes de qualquer aplicação", 
   });
 });
 
-describe("eletroposto para o SDR e pontuação por tipo de negócio", () => {
-  it("só ela pendente (eletroposto, temperatura e calculadora já aplicados): passa", () => {
+describe("validade padrão da proposta", () => {
+  it("só ela pendente (eletroposto SDR, eletroposto, temperatura e calculadora já aplicados): passa", () => {
     expect(validar(dryRunCom(AUTORIZADA)).codigo).toBe(0);
   });
 
-  it("eletroposto, temperatura ou qualquer migration da calculadora pendente junto, ou sozinha, não passa", () => {
-    for (const m of [ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) {
+  it("eletroposto SDR, eletroposto, temperatura ou qualquer migration da calculadora pendente junto, ou sozinha, não passa", () => {
+    for (const m of [ELETROPOSTO_SDR, ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) {
       expect(validar(dryRunCom(AUTORIZADA, m)).codigo, m).toBe(1);
       expect(validar(dryRunCom(m)).codigo, m).toBe(1);
     }
@@ -194,7 +197,7 @@ describe("eletroposto para o SDR e pontuação por tipo de negócio", () => {
     expect(existsSync(`supabase/migrations/${AUTORIZADA}`)).toBe(true);
     const texto = readFileSync(WORKFLOW, "utf8");
     expect(texto).toContain(AUTORIZADA);
-    for (const m of [ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) expect(texto, m).not.toContain(m);
+    for (const m of [ELETROPOSTO_SDR, ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) expect(texto, m).not.toContain(m);
   });
 });
 
