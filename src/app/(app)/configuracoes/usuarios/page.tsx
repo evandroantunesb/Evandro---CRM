@@ -40,13 +40,15 @@ export default async function Usuarios() {
         <FormularioConvite />
       </Cartao>
       <Cartao titulo={`Equipe (${membros.length})`}>
-        <p id="perfil-gamificacao" className="scroll-mt-4 text-sm text-zinc-600">
-          O perfil de gamificação (SDR/Closer/CS Farmer) de cada pessoa é definido abaixo, junto com o restante do cadastro.
-        </p>
-        {erroSetores && <p role="alert" className="text-sm text-red-700">Não foi possível carregar os setores. Atualize a página para tentar novamente.</p>}
-        {membros.map((m) => (
-          <LinhaMembro key={m.id} membro={m} />
-        ))}
+        <div className="flex flex-col gap-4">
+          <p id="perfil-gamificacao" className="scroll-mt-4 text-sm text-texto-2">
+            O perfil de gamificação (SDR/Closer/CS Farmer) de cada pessoa é definido abaixo, junto com o restante do cadastro.
+          </p>
+          {erroSetores && <p role="alert" className="text-sm text-red-700">Não foi possível carregar os setores. Atualize a página para tentar novamente.</p>}
+          {membros.map((m) => (
+            <LinhaMembro key={m.id} membro={m} />
+          ))}
+        </div>
       </Cartao>
     </div>
   );
