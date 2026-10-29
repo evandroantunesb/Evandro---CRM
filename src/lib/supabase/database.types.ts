@@ -4891,6 +4891,13 @@ export type Database = {
         };
         Returns: boolean;
       };
+      membros_do_setor: {
+        Args: { p_empresa_id: string; p_setor: Database["public"]["Enums"]["setor_obra"] };
+        Returns: {
+          capacidade: Database["public"]["Enums"]["capacidade_obra"];
+          membro_id: string;
+        }[];
+      };
       meu_membro_id: { Args: { p_empresa_id: string }; Returns: string };
       obra_snapshot_comercial: { Args: { p_negocio_id: string }; Returns: Json };
       obra_snapshot_tecnico: { Args: { p_negocio_id: string }; Returns: Json };
