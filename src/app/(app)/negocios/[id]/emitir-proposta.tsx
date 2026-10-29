@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useState } from "react";
 import { Botao, Campo, Mensagem } from "@/components/ui";
 import { emitirPropostaSimples } from "@/lib/acoes/propostas-emissoes";
@@ -12,6 +13,7 @@ export function EmitirProposta({
   negocioId,
   hoje,
   validadePadraoDias,
+  podeAjustarValidade = false,
   conteudoModelo,
   geracaoConfirmada,
   bloqueio,
@@ -23,6 +25,8 @@ export function EmitirProposta({
   hoje: string;
   /** Dias de validade sugeridos (modelo padrão da empresa, ou 10): a data já vem preenchida. */
   validadePadraoDias: number;
+  /** Admin e gestor: a dica leva à tela onde se muda a validade padrão. */
+  podeAjustarValidade?: boolean;
   /** Conteúdo que a empresa escreveu no modelo padrão publicado (só leitura): sugestão de condições e blocos com conteúdo. */
   conteudoModelo: ConteudoDoModelo;
   /** O admin confirmou a produtividade atual da calculadora: só então a proposta mostra a geração estimada. */
@@ -58,7 +62,12 @@ export function EmitirProposta({
           defaultValue={somarDias(hoje, validadePadraoDias)}
         />
         <p className="-mt-2 text-xs text-zinc-500">
-          Padrão de {validadePadraoDias} dias a partir de hoje (muda em Configurações › Propostas, no modelo padrão: Validade em dias).
+          Padrão de {validadePadraoDias} dias a partir de hoje.{" "}
+          {podeAjustarValidade && (
+            <Link href="/configuracoes/validade-proposta" className="font-medium text-dourado-texto underline-offset-2 hover:underline">
+              Mudar o padrão
+            </Link>
+          )}
         </p>
         <CondicoesPagamento sugeridas={conteudoModelo.condicoes} />
         <ul className="flex flex-col gap-1 rounded-md bg-zinc-50 px-3 py-2 text-xs text-zinc-600" data-testid="conteudo-confirmado">

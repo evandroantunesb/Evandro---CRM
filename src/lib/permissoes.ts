@@ -87,6 +87,8 @@ export const GESTAO_COMERCIAL = ["admin", "gestor"] as const satisfies ListaPape
 
 /** Regras de temperatura dos negócios (Configurações > Temperatura): a mesma barreira da política de UPDATE no banco. */
 export const REGRAS_TEMPERATURA = ["admin", "gestor"] as const satisfies ListaPapeis;
+// Validade padrão da proposta: mesma barreira das políticas de `proposta_preferencias`.
+export const VALIDADE_PROPOSTA = ["admin", "gestor"] as const satisfies ListaPapeis;
 
 // --- Obras -------------------------------------------------------------------
 
