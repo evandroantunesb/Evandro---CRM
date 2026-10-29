@@ -1,7 +1,9 @@
 "use client";
 
-import { Check, X } from "lucide-react";
-import { useActionState, useState } from "react";
+import { Check, ChevronDown, MoreHorizontal } from "lucide-react";
+import { useActionState, useState, useTransition } from "react";
+import { Janela } from "@/components/janela";
+import { ItemMenuSuspenso, MenuSuspenso } from "@/components/menu-suspenso";
 import { Botao, Mensagem, Selecao } from "@/components/ui";
 import { alterarStatus } from "@/lib/acoes/negocios";
 import { avisoReabertura } from "@/lib/venda";
@@ -15,14 +17,18 @@ export function Fechamento({
   status,
   motivos,
   somenteLeitura,
+  principal = true,
 }: {
   negocioId: string;
   status: "aberto" | "ganho" | "perdido";
   motivos: Opcao[];
   /** SDR não pode marcar ganho/perdido (spec RAION_SDR_REGRAS_PERMISSOES §39) — só visualiza o status. */
   somenteLeitura?: boolean;
+  /** "Marcar como ganho" é a ação principal da barra; falso quando já há um próximo passo em destaque. */
+  principal?: boolean;
 }) {
   const [resultado, acao, pendente] = useActionState(alterarStatus, null);
+  const [, iniciar] = useTransition();
   const [perdendo, setPerdendo] = useState(false);
   const [reabrindo, setReabrindo] = useState(false);
 
@@ -33,19 +39,21 @@ export function Fechamento({
   if (status !== "aberto") {
     if (reabrindo) {
       return (
-        <form action={acao} onSubmit={() => setReabrindo(false)} className="flex flex-col gap-3">
-          <input type="hidden" name="negocioId" value={negocioId} />
-          <input type="hidden" name="status" value="aberto" />
-          <AvisoReabertura status={status} />
-          <div className="flex flex-wrap gap-2">
-            <Botao type="button" variante="secundario" onClick={() => setReabrindo(false)}>
-              Voltar
-            </Botao>
-            <Botao type="submit" disabled={pendente}>
-              Confirmar reabertura
-            </Botao>
-          </div>
-        </form>
+        <Janela aberta aoFechar={() => setReabrindo(false)} titulo="Reabrir o negócio" fechaSoPelosBotoes>
+          <form action={acao} onSubmit={() => setReabrindo(false)} className="flex flex-col gap-3">
+            <input type="hidden" name="negocioId" value={negocioId} />
+            <input type="hidden" name="status" value="aberto" />
+            <AvisoReabertura status={status} />
+            <div className="flex flex-wrap gap-2">
+              <Botao type="button" variante="secundario" onClick={() => setReabrindo(false)}>
+                Voltar
+              </Botao>
+              <Botao type="submit" disabled={pendente}>
+                Confirmar reabertura
+              </Botao>
+            </div>
+          </form>
+        </Janela>
       );
     }
     return (
@@ -60,67 +68,101 @@ export function Fechamento({
 
   if (perdendo) {
     return (
-      <form action={acao} className="flex flex-col gap-2">
-        <input type="hidden" name="negocioId" value={negocioId} />
-        <input type="hidden" name="status" value="perdido" />
-        <Selecao rotulo="Motivo da perda" name="motivo_perda_id" required defaultValue="">
-          <option value="" disabled>
-            Escolha o motivo
-          </option>
-          {motivos.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.nome}
+      <Janela aberta aoFechar={() => setPerdendo(false)} titulo="Marcar como perdido" fechaSoPelosBotoes>
+        <form action={acao} className="flex flex-col gap-3">
+          <input type="hidden" name="negocioId" value={negocioId} />
+          <input type="hidden" name="status" value="perdido" />
+          <Selecao rotulo="Motivo da perda" name="motivo_perda_id" required defaultValue="" data-foco-inicial>
+            <option value="" disabled>
+              Escolha o motivo
             </option>
-          ))}
-        </Selecao>
-        <textarea
-          name="motivo_perda_detalhe"
-          rows={2}
-          placeholder="Detalhes (opcional). Ex.: fechou com a empresa X por R$ 2 mil a menos"
-          className="rounded-md border border-zinc-300 px-3 py-2 text-sm"
-        />
-        <div className="flex flex-wrap gap-2">
-          <Botao type="submit" variante="perigo" disabled={pendente}>
-            Confirmar perda
-          </Botao>
-          <Botao type="button" variante="secundario" onClick={() => setPerdendo(false)}>
-            Cancelar
-          </Botao>
-        </div>
-        <Mensagem resultado={resultado} />
-      </form>
+            {motivos.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.nome}
+              </option>
+            ))}
+          </Selecao>
+          <textarea
+            name="motivo_perda_detalhe"
+            rows={3}
+            placeholder="Detalhes (opcional). Ex.: fechou com a empresa X por R$ 2 mil a menos"
+            className="rounded-md border border-linha bg-superficie px-3 py-2 text-sm text-texto"
+          />
+          <Mensagem resultado={resultado} />
+          <div className="flex flex-wrap gap-2">
+            <Botao type="button" variante="secundario" onClick={() => setPerdendo(false)}>
+              Cancelar
+            </Botao>
+            <Botao type="submit" variante="perigo" disabled={pendente}>
+              Confirmar perda
+            </Botao>
+          </div>
+        </form>
+      </Janela>
     );
   }
 
-  // Só ícones, para o marco "Venda ganha" ter o mesmo peso dos outros marcos da jornada; o nome vai no
-  // aria-label e na dica. Alvo de 44 px no celular, 36 px no computador.
-  const classeIcone =
-    "grid size-11 place-items-center rounded-full border bg-superficie transition-colors duration-200 ease-raion focus-visible:ring-2 focus-visible:outline-none disabled:opacity-50 md:size-9";
+  function marcarGanho() {
+    const dados = new FormData();
+    dados.set("negocioId", negocioId);
+    dados.set("status", "ganho");
+    iniciar(() => acao(dados));
+  }
+
+  const itensMenu = (
+    <>
+      {!principal && <ItemMenuSuspenso onClick={marcarGanho}>Marcar como ganho</ItemMenuSuspenso>}
+      <ItemMenuSuspenso onClick={() => setPerdendo(true)}>Marcar como perdido</ItemMenuSuspenso>
+    </>
+  );
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex gap-2">
-        <form action={acao}>
-          <input type="hidden" name="negocioId" value={negocioId} />
-          <input type="hidden" name="status" value="ganho" />
-          <button
-            type="submit"
-            disabled={pendente}
-            aria-label="Marcar como ganho"
-            title="Marcar como ganho"
-            className={`${classeIcone} border-dourado/60 text-dourado-texto hover:bg-dourado hover:text-carvao focus-visible:ring-dourado/50`}
+      <div className="flex items-center gap-2">
+        {principal ? (
+          <>
+            <button
+              type="button"
+              onClick={marcarGanho}
+              disabled={pendente}
+              className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-full bg-acao px-5 text-sm font-semibold text-sobre-acao transition-colors hover:bg-acao-forte disabled:opacity-50 sm:flex-none md:min-h-10"
+            >
+              <Check size={16} strokeWidth={2.5} aria-hidden />
+              {pendente ? "Salvando..." : "Marcar como ganho"}
+            </button>
+            <MenuSuspenso
+              trigger={({ alternar }) => (
+                <button
+                  type="button"
+                  aria-label="Mais ações de fechamento"
+                  aria-haspopup="menu"
+                  onClick={alternar}
+                  className="grid size-11 place-items-center rounded-full border border-linha text-texto-2 transition-colors hover:bg-superficie-2 hover:text-texto md:size-10"
+                >
+                  <MoreHorizontal size={18} aria-hidden />
+                </button>
+              )}
+            >
+              {itensMenu}
+            </MenuSuspenso>
+          </>
+        ) : (
+          <MenuSuspenso
+            trigger={({ alternar }) => (
+              <button
+                type="button"
+                aria-haspopup="menu"
+                onClick={alternar}
+                disabled={pendente}
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-linha px-4 text-sm font-medium text-texto transition-colors hover:border-dourado disabled:opacity-50 md:min-h-10"
+              >
+                Fechar negócio
+                <ChevronDown size={14} aria-hidden />
+              </button>
+            )}
           >
-            <Check size={18} strokeWidth={2.5} aria-hidden />
-          </button>
-        </form>
-        <button
-          type="button"
-          onClick={() => setPerdendo(true)}
-          aria-label="Marcar como perdido"
-          title="Marcar como perdido"
-          className={`${classeIcone} border-red-300 text-red-700 hover:bg-red-600 hover:text-white focus-visible:ring-red-400/50`}
-        >
-          <X size={18} strokeWidth={2.5} aria-hidden />
-        </button>
+            {itensMenu}
+          </MenuSuspenso>
+        )}
       </div>
       <Mensagem resultado={resultado} />
     </div>
