@@ -605,7 +605,8 @@ export async function salvarKitComCliente(
   const { data: estrutura, error: erroEstrutura } = await supabase
     .from("negocios")
     .update({
-      estrutura_telhado: d.estruturaTelhado || null,
+      // A estrutura do telhado saiu do kit (fica com a obra): sem o campo no formulário, mantém o gravado.
+      ...(d.estruturaTelhado !== undefined && { estrutura_telhado: d.estruturaTelhado || null }),
       consumo_medio_kwh: consumoDoKit.origem === "informado" ? consumoDoKit.kwh : null,
       consumo_estimado_kwh: consumoDoKit.origem === "estimado" ? consumoDoKit.kwh : consumoDoKit.origem === "ausente" ? negocio.consumo_estimado_kwh : null,
       tarifa_efetiva_kwh: consumoDoKit.origem === "informado" ? null : negocio.tarifa_efetiva_kwh,

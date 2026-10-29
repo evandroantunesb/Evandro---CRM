@@ -756,11 +756,6 @@ export function KitPersonalizado({
                 rodape="Complete o que falta e recalcule o kit para ver a conta e a economia."
               />
             )}
-            {estruturaTelhado && (
-              <p className="text-sm">
-                <span className="text-zinc-500">Estrutura do telhado:</span> {estruturaTelhado}
-              </p>
-            )}
             {calculo.estadoFinanceiro === "incompleto" ? (
               // Resultado técnico salvo (sem parte financeira): recolhido; a prévia acima é o estado atual.
               <details data-testid="resultado-tecnico-salvo" className="rounded-md border border-dashed border-zinc-300 px-3 py-2 text-sm">
@@ -898,12 +893,6 @@ export function KitPersonalizado({
                   {textoPayback(calculo.economiaMensal, calculo.paybackMeses)}
                 </dd>
               </div>
-              {estruturaTelhado && (
-                <div>
-                  <dt className="text-zinc-500">Estrutura do telhado</dt>
-                  <dd>{estruturaTelhado}</dd>
-                </div>
-              )}
             </dl>
             <p className="-mt-1 text-xs text-zinc-500">Payback indisponível: {MOTIVO_PAYBACK}.</p>
             <HipotesesELimitacoes
@@ -966,13 +955,6 @@ export function KitPersonalizado({
           &ldquo;Oportunidade&rdquo; (aba Negócio) se quiser usar.
         </p>
       )}
-      <Campo
-        rotulo="Estrutura do telhado"
-        name="estruturaTelhado"
-        value={estrutura}
-        onChange={(e) => setEstrutura(e.target.value)}
-        placeholder="Ex.: perfil de alumínio, gancho"
-      />
       <Selecao
         rotulo="Tipo de ligação"
         name="tipoLigacao"
