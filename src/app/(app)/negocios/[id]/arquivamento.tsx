@@ -53,7 +53,7 @@ export function Arquivamento({
                 required
                 rows={2}
                 placeholder="Motivo do desarquivamento (obrigatório)"
-                className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900"
+                className="rounded-md border border-linha bg-superficie px-3 py-2 text-sm text-texto"
               />
               {responsavelInativo && (
                 <Selecao rotulo="Novo responsável (o atual não está mais ativo)" name="novoResponsavelId" required defaultValue="">
@@ -98,9 +98,9 @@ export function Arquivamento({
     );
   }
   return (
-    <form onSubmit={enviarArquivar} className="flex flex-col gap-2 rounded-md border border-zinc-200 px-3 py-2">
+    <form onSubmit={enviarArquivar} className="flex flex-col gap-2 rounded-md border border-linha px-3 py-2">
       <input type="hidden" name="negocioId" value={negocioId} />
-      <p className="text-sm text-zinc-700">
+      <p className="text-sm text-texto-2">
         O negócio sai das listas, do funil e do painel e fica somente leitura (notas e etiquetas continuam). Nada é
         apagado e é possível desarquivar depois.
       </p>
@@ -109,7 +109,7 @@ export function Arquivamento({
         required
         rows={2}
         placeholder="Motivo do arquivamento (obrigatório)"
-        className="rounded-md border border-zinc-300 px-3 py-2 text-sm"
+        className="rounded-md border border-linha px-3 py-2 text-sm"
       />
       <div className="flex flex-wrap gap-2">
         <Botao type="button" variante="secundario" onClick={() => setAbrirArquivar(false)}>

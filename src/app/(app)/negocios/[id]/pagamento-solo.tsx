@@ -68,9 +68,9 @@ export function PagamentoSolo({
       {!ativo && !soHistorico && situacao === "permitido" && <FormRegistrar negocioId={negocioId} hoje={hoje} />}
 
       {!ativo && !soHistorico && historico.length > 0 && situacao === "indisponivel" && (
-        <p role="status" className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-700">
+        <p role="status" className="rounded-lg border border-linha bg-superficie-2 px-3 py-2 text-sm text-texto-2">
           O registro anterior foi estornado e continua no histórico. Não é possível registrar um novo recebimento pelo
-          fluxo Solo nesta situação. No Pro, confira o <a href="#contrato" className="underline hover:text-zinc-900">contrato</a>:
+          fluxo Solo nesta situação. No Pro, confira o <a href="#contrato" className="underline hover:text-texto">contrato</a>:
           após a assinatura, um admin ou gestor diferente do responsável registrado na assinatura pode usar
           <strong> Confirmar pagamento</strong> neste cartão.
         </p>
@@ -100,14 +100,14 @@ export function PagamentoSolo({
 
       {historico.length > 0 && (
         <details className="text-sm">
-          <summary className="cursor-pointer text-zinc-600">Histórico de registros ({historico.length})</summary>
+          <summary className="cursor-pointer text-texto-2">Histórico de registros ({historico.length})</summary>
           <ul className="mt-2 flex flex-col gap-2">
             {historico.map((r) => (
-              <li key={r.id} className="border-l-2 border-zinc-200 pl-3 text-zinc-700">
+              <li key={r.id} className="border-l-2 border-linha pl-3 text-texto-2">
                 Recebido em {formatarDataIso(r.dataRecebimento)} · registrado por {r.autor} em {formatarDataHora(r.registradoEm)}
                 {r.observacao && <> · {r.observacao}</>}
                 <br />
-                <span className="text-zinc-500">
+                <span className="text-texto-2">
                   Estornado{r.estornadoPor ? ` por ${r.estornadoPor}` : ""} em {formatarDataHora(r.estornadoEm!)}: {r.motivoEstorno}
                 </span>
               </li>
@@ -124,21 +124,21 @@ function RegistroAtivo({ registro }: { registro: RegistroVisivel }) {
     <div className="flex flex-col gap-1">
       <Selo tom="positivo">Pago/Recebido</Selo>
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-        <dt className="text-zinc-500">Recebido em</dt>
-        <dd className="text-zinc-900">{formatarDataIso(registro.dataRecebimento)}</dd>
-        <dt className="text-zinc-500">Registrado por</dt>
-        <dd className="text-zinc-900">
+        <dt className="text-texto-2">Recebido em</dt>
+        <dd className="text-texto">{formatarDataIso(registro.dataRecebimento)}</dd>
+        <dt className="text-texto-2">Registrado por</dt>
+        <dd className="text-texto">
           {registro.autor} · {formatarDataHora(registro.registradoEm)}
           {registro.substituiId && " (correção)"}
         </dd>
         {registro.observacao && (
           <>
-            <dt className="text-zinc-500">Observação</dt>
-            <dd className="whitespace-pre-wrap text-zinc-900">{registro.observacao}</dd>
+            <dt className="text-texto-2">Observação</dt>
+            <dd className="whitespace-pre-wrap text-texto">{registro.observacao}</dd>
           </>
         )}
       </dl>
-      <p className="text-xs text-zinc-500">Registro manual informado pelo administrador. Não é conciliação bancária.</p>
+      <p className="text-xs text-texto-2">Registro manual informado pelo administrador. Não é conciliação bancária.</p>
     </div>
   );
 }
@@ -148,13 +148,13 @@ function CamposPagamento({ hoje, data, observacao }: { hoje: string; data: strin
     <>
       <Campo rotulo="Data do recebimento" type="date" name="dataRecebimento" defaultValue={data} max={hoje} required />
       <label className="flex flex-col gap-1 text-sm">
-        <span className="font-medium text-zinc-700">Observação (opcional)</span>
+        <span className="font-medium text-texto-2">Observação (opcional)</span>
         <textarea
           name="observacao"
           rows={2}
           maxLength={500}
           defaultValue={observacao ?? ""}
-          className="rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+          className="rounded-lg border border-linha px-3 py-2 text-sm"
         />
       </label>
     </>
@@ -164,7 +164,7 @@ function CamposPagamento({ hoje, data, observacao }: { hoje: string; data: strin
 function FormRegistrar({ negocioId, hoje }: { negocioId: string; hoje: string }) {
   const [resultado, acao, enviando] = useActionState(registrarPagamento, null);
   return (
-    <form action={acao} className="flex flex-col gap-2 rounded-lg border border-zinc-200 p-3">
+    <form action={acao} className="flex flex-col gap-2 rounded-lg border border-linha p-3">
       <input type="hidden" name="negocioId" value={negocioId} />
       <CamposPagamento hoje={hoje} data={hoje} />
       <div className="flex flex-wrap items-center gap-2">
@@ -173,7 +173,7 @@ function FormRegistrar({ negocioId, hoje }: { negocioId: string; hoje: string })
         </Botao>
         <Mensagem resultado={resultado} />
       </div>
-      <p className="text-xs text-zinc-500">Pode ser antes ou depois de gerar o contrato. Não precisa de outra aprovação.</p>
+      <p className="text-xs text-texto-2">Pode ser antes ou depois de gerar o contrato. Não precisa de outra aprovação.</p>
     </form>
   );
 }
@@ -181,14 +181,14 @@ function FormRegistrar({ negocioId, hoje }: { negocioId: string; hoje: string })
 function FormCorrigir({ negocioId, hoje, registro, onCancelar }: { negocioId: string; hoje: string; registro: RegistroVisivel; onCancelar: () => void }) {
   const [resultado, acao, enviando] = useActionState(corrigirRegistroPagamento, null);
   return (
-    <form action={acao} className="flex flex-col gap-2 rounded-lg border border-zinc-200 p-3">
+    <form action={acao} className="flex flex-col gap-2 rounded-lg border border-linha p-3">
       <input type="hidden" name="negocioId" value={negocioId} />
       <CamposPagamento hoje={hoje} data={registro.dataRecebimento} observacao={registro.observacao} />
       <label className="flex flex-col gap-1 text-sm">
-        <span className="font-medium text-zinc-700">Motivo da correção</span>
-        <textarea name="motivo" rows={2} required maxLength={1000} className="rounded-lg border border-zinc-200 px-3 py-2 text-sm" />
+        <span className="font-medium text-texto-2">Motivo da correção</span>
+        <textarea name="motivo" rows={2} required maxLength={1000} className="rounded-lg border border-linha px-3 py-2 text-sm" />
       </label>
-      <p className="text-xs text-zinc-500">O registro atual fica no histórico como estornado e o corrigido passa a valer.</p>
+      <p className="text-xs text-texto-2">O registro atual fica no histórico como estornado e o corrigido passa a valer.</p>
       <div className="flex flex-wrap items-center gap-2">
         <Botao type="submit" variante="primario" disabled={enviando}>
           {enviando ? "Salvando…" : "Salvar correção"}
@@ -205,11 +205,11 @@ function FormCorrigir({ negocioId, hoje, registro, onCancelar }: { negocioId: st
 function FormEstornar({ negocioId, onCancelar }: { negocioId: string; onCancelar: () => void }) {
   const [resultado, acao, enviando] = useActionState(estornarRegistroPagamento, null);
   return (
-    <form action={acao} className="flex flex-col gap-2 rounded-lg border border-zinc-200 p-3">
+    <form action={acao} className="flex flex-col gap-2 rounded-lg border border-linha p-3">
       <input type="hidden" name="negocioId" value={negocioId} />
       <label className="flex flex-col gap-1 text-sm">
-        <span className="font-medium text-zinc-700">Motivo do estorno</span>
-        <textarea name="motivo" rows={2} required maxLength={1000} className="rounded-lg border border-zinc-200 px-3 py-2 text-sm" />
+        <span className="font-medium text-texto-2">Motivo do estorno</span>
+        <textarea name="motivo" rows={2} required maxLength={1000} className="rounded-lg border border-linha px-3 py-2 text-sm" />
       </label>
       <div className="flex flex-wrap items-center gap-2">
         <Botao type="submit" variante="secundario" disabled={enviando}>

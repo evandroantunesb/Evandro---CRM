@@ -34,7 +34,7 @@ export function Contrato({
     return (
       <div className="flex flex-col gap-3">
         {contrato && (
-          <p className="text-sm text-zinc-600">
+          <p className="text-sm text-texto-2">
             Contrato gerado como rascunho. Gerar de novo substitui o texto pelo modelo atual.
           </p>
         )}
@@ -84,13 +84,13 @@ function LinkContrato({
   const link = `${siteUrl}/contrato/${token}`;
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-sm font-medium text-zinc-700">Link do contrato</span>
+      <span className="text-sm font-medium text-texto-2">Link do contrato</span>
       <div className="flex flex-wrap gap-2">
         <input
           readOnly
           value={link}
           onFocus={(e) => e.currentTarget.select()}
-          className="min-w-0 flex-1 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-700 outline-none"
+          className="min-w-0 flex-1 rounded-lg border border-linha bg-superficie-2 px-3 py-2 text-sm text-texto-2 outline-none"
         />
         <Botao
           type="button"

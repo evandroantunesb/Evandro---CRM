@@ -44,7 +44,7 @@ export function Proposta({
     return (
       <form action={acaoGerar} className="flex flex-col gap-3">
         <input type="hidden" name="negocioId" value={negocioId} />
-        <p className="text-sm text-zinc-600">Gere um link para enviar a proposta ao cliente, sem precisar de PDF.</p>
+        <p className="text-sm text-texto-2">Gere um link para enviar a proposta ao cliente, sem precisar de PDF.</p>
         {bloqueio ? <AvisoProposta mensagem={bloqueio} /> : precoDesatualizado && <AvisoPrecoDesatualizado />}
         {modelos.length > 0 && (
           <Selecao rotulo="Modelo de proposta" name="modeloId" defaultValue={padrao?.id ?? modelos[0]!.id}>
@@ -71,13 +71,13 @@ export function Proposta({
     <div className="flex flex-col gap-3">
       {bloqueio ? <AvisoProposta mensagem={bloqueio} jaEmitida /> : precoDesatualizado && <AvisoPrecoDesatualizado />}
       <div className="flex flex-col gap-1">
-        <span className="text-sm font-medium text-zinc-700">Link da proposta</span>
+        <span className="text-sm font-medium text-texto-2">Link da proposta</span>
         <div className="flex flex-wrap gap-2">
           <input
             readOnly
             value={link}
             onFocus={(e) => e.currentTarget.select()}
-            className="min-w-0 flex-1 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-700 outline-none"
+            className="min-w-0 flex-1 rounded-lg border border-linha bg-superficie-2 px-3 py-2 text-sm text-texto-2 outline-none"
           />
           <Botao
             type="button"
@@ -103,7 +103,7 @@ export function Proposta({
         </div>
       </div>
 
-      <form action={acaoExibicao} className="flex flex-col gap-3 rounded-lg border border-zinc-200 p-3">
+      <form action={acaoExibicao} className="flex flex-col gap-3 rounded-lg border border-linha p-3">
         <input type="hidden" name="negocioId" value={negocioId} />
         <Selecao rotulo="Como mostrar o preço" name="modoPreco" defaultValue={proposta.modoPreco}>
           {MODOS_PRECO.map((m) => (
@@ -113,13 +113,13 @@ export function Proposta({
           ))}
         </Selecao>
         <div className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium text-zinc-700">Seções na proposta</span>
-          <label className="flex items-center gap-2 text-sm text-zinc-700">
-            <input type="checkbox" name="mostrarSistema" defaultChecked={proposta.mostrarSistema} className="rounded border-zinc-300" />
+          <span className="text-sm font-medium text-texto-2">Seções na proposta</span>
+          <label className="flex items-center gap-2 text-sm text-texto-2">
+            <input type="checkbox" name="mostrarSistema" defaultChecked={proposta.mostrarSistema} className="rounded border-linha" />
             O sistema (kit, potência, geração)
           </label>
-          <label className="flex items-center gap-2 text-sm text-zinc-700">
-            <input type="checkbox" name="mostrarEconomia" defaultChecked={proposta.mostrarEconomia} className="rounded border-zinc-300" />
+          <label className="flex items-center gap-2 text-sm text-texto-2">
+            <input type="checkbox" name="mostrarEconomia" defaultChecked={proposta.mostrarEconomia} className="rounded border-linha" />
             Sua economia (conta, economia, payback)
           </label>
         </div>
@@ -130,9 +130,9 @@ export function Proposta({
       </form>
 
       {proposta.aberturas === 0 ? (
-        <p className="text-sm text-zinc-600">O cliente ainda não abriu o link.</p>
+        <p className="text-sm text-texto-2">O cliente ainda não abriu o link.</p>
       ) : (
-        <p className="flex items-center gap-2 text-[11px] text-zinc-400">
+        <p className="flex items-center gap-2 text-[11px] text-texto-2">
           <span className="flex items-center gap-1" title="Vezes que o cliente abriu o link">
             <Eye size={12} /> {proposta.aberturas}
           </span>

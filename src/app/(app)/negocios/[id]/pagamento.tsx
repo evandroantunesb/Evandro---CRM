@@ -33,7 +33,7 @@ export function Pagamento({
       <Selo tom={tom}>{ROTULO_STATUS_PAGAMENTO_CONTRATO[status]}</Selo>
 
       {!podeConfirmar && status !== "confirmado" && (
-        <p className="text-sm text-zinc-600">Só gestor ou admin pode confirmar o pagamento.</p>
+        <p className="text-sm text-texto-2">Só gestor ou admin pode confirmar o pagamento.</p>
       )}
 
       {podeConfirmar && (status === "pendente" || status === "estornado") && (
@@ -56,12 +56,12 @@ export function Pagamento({
       )}
 
       {podeConfirmar && status === "confirmado" && estornando && (
-        <form action={acaoEstornar} className="flex flex-col gap-2 rounded-lg border border-zinc-200 p-3">
+        <form action={acaoEstornar} className="flex flex-col gap-2 rounded-lg border border-linha p-3">
           <input type="hidden" name="negocioId" value={negocioId} />
           <input type="hidden" name="contratoId" value={contratoId} />
           <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-zinc-700">Motivo do estorno</span>
-            <textarea name="motivo" rows={2} required className="rounded-lg border border-zinc-200 px-3 py-2 text-sm" />
+            <span className="font-medium text-texto-2">Motivo do estorno</span>
+            <textarea name="motivo" rows={2} required className="rounded-lg border border-linha px-3 py-2 text-sm" />
           </label>
           <div className="flex items-center gap-2">
             <Botao type="submit" variante="primario">

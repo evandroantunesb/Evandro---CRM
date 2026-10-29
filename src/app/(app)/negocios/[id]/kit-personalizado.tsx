@@ -253,7 +253,7 @@ function HipotesesELimitacoes({
   const presumidas = ressalvas.filter((r) => RESSALVAS_PRESUMIDAS.includes(r));
   return (
     <div className="flex flex-col gap-2">
-      <p data-testid="hipotese-autoconsumo" className="text-xs text-zinc-600">
+      <p data-testid="hipotese-autoconsumo" className="text-xs text-texto-2">
         Hipótese: autoconsumo simultâneo considerado zero (toda a geração é tratada como injetada na rede e compensada).
       </p>
       {presumidas.length > 0 && (
@@ -266,8 +266,8 @@ function HipotesesELimitacoes({
           Tarifa informada pelo vendedor: não é a tarifa oficial (TE + TUSD) da distribuidora.
         </p>
       )}
-      <details data-testid="limitacoes-estimativa" className="rounded-md border border-zinc-200 px-3 py-2 text-xs text-zinc-600">
-        <summary className="cursor-pointer font-medium text-zinc-700">Limitações da estimativa</summary>
+      <details data-testid="limitacoes-estimativa" className="rounded-md border border-linha px-3 py-2 text-xs text-texto-2">
+        <summary className="cursor-pointer font-medium text-texto-2">Limitações da estimativa</summary>
         <ul className="mt-1 list-disc pl-5">
           {ressalvas
             .filter((r) => !RESSALVAS_PRESUMIDAS.includes(r))
@@ -309,32 +309,32 @@ export function PreviaEstimativa({
         className={`grid grid-cols-2 gap-3 rounded-lg bg-amber-50 px-4 py-3 text-sm ${completa ? "md:grid-cols-3" : ""}`}
       >
         <div>
-          <dt className="text-zinc-500">Potência do kit</dt>
-          <dd className="font-medium text-zinc-900">{numeroBr(potenciaKwp)} kWp</dd>
+          <dt className="text-texto-2">Potência do kit</dt>
+          <dd className="font-medium text-texto">{numeroBr(potenciaKwp)} kWp</dd>
         </div>
         <div>
-          <dt className="text-zinc-500">Geração estimada</dt>
-          <dd className="font-medium text-zinc-900">{previa.geracaoEstimadaKwhMes.toLocaleString("pt-BR")} kWh/mês</dd>
+          <dt className="text-texto-2">Geração estimada</dt>
+          <dd className="font-medium text-texto">{previa.geracaoEstimadaKwhMes.toLocaleString("pt-BR")} kWh/mês</dd>
         </div>
         {previa.estado === "completa" && (
           <>
             <div>
-              <dt className="text-zinc-500">Conta hoje (energia)</dt>
-              <dd className="font-medium text-zinc-900">{formatarMoeda(previa.contaSemSolar)}/mês</dd>
+              <dt className="text-texto-2">Conta hoje (energia)</dt>
+              <dd className="font-medium text-texto">{formatarMoeda(previa.contaSemSolar)}/mês</dd>
             </div>
             <div>
-              <dt className="text-zinc-500">Conta com o sistema</dt>
-              <dd className="font-medium text-zinc-900">{formatarMoeda(previa.contaComSolar)}/mês</dd>
+              <dt className="text-texto-2">Conta com o sistema</dt>
+              <dd className="font-medium text-texto">{formatarMoeda(previa.contaComSolar)}/mês</dd>
             </div>
             <div>
-              <dt className="text-zinc-500">Economia estimada</dt>
-              <dd data-testid="previa-economia" className={previa.economiaMensal > 0 ? "font-medium text-green-700" : "font-medium text-zinc-700"}>
+              <dt className="text-texto-2">Economia estimada</dt>
+              <dd data-testid="previa-economia" className={previa.economiaMensal > 0 ? "font-medium text-green-700" : "font-medium text-texto-2"}>
                 {previa.economiaMensal > 0 ? `${formatarMoeda(previa.economiaMensal)}/mês` : TEXTO_SEM_ECONOMIA}
               </dd>
             </div>
             <div>
-              <dt className="text-zinc-500">Payback estimado</dt>
-              <dd data-testid="previa-payback" className="font-medium text-zinc-900" title={MOTIVO_PAYBACK}>
+              <dt className="text-texto-2">Payback estimado</dt>
+              <dd data-testid="previa-payback" className="font-medium text-texto" title={MOTIVO_PAYBACK}>
                 indisponível
               </dd>
             </div>
@@ -343,7 +343,7 @@ export function PreviaEstimativa({
       </dl>
       {previa.estado === "completa" && (
         <>
-          <p className="-mt-2 text-xs text-zinc-500">Payback indisponível: {MOTIVO_PAYBACK}.</p>
+          <p className="-mt-2 text-xs text-texto-2">Payback indisponível: {MOTIVO_PAYBACK}.</p>
           <HipotesesELimitacoes ressalvas={previa.retrato.ressalvas} kwhNaoCompensado={previa.kwhNaoCompensado} tarifaOrigem={previa.retrato.tarifaOrigem} />
         </>
       )}
@@ -351,13 +351,13 @@ export function PreviaEstimativa({
         <div
           role="status"
           data-testid="estimativa-incompleta"
-          className="flex flex-col gap-2 rounded-lg bg-zinc-50 px-4 py-3 text-sm text-zinc-700"
+          className="flex flex-col gap-2 rounded-lg bg-superficie-2 px-4 py-3 text-sm text-texto-2"
         >
-          <p className="font-medium text-zinc-900">Estimativa financeira incompleta</p>
+          <p className="font-medium text-texto">Estimativa financeira incompleta</p>
           <p>Por enquanto não há conta nem economia calculadas para este kit.</p>
           {vendedor.length > 0 && (
             <div data-testid="pendencias-vendedor">
-              <p className="font-medium text-zinc-800">O que você pode informar</p>
+              <p className="font-medium text-texto">O que você pode informar</p>
               <ul className="list-disc pl-5">
                 {vendedor.map((v) => (
                   <li key={v}>Informe {v}.</li>
@@ -367,7 +367,7 @@ export function PreviaEstimativa({
           )}
           {empresa.length > 0 && (
             <div data-testid="pendencias-empresa">
-              <p className="font-medium text-zinc-800">O que não depende de você</p>
+              <p className="font-medium text-texto">O que não depende de você</p>
               <ul className="list-disc pl-5">
                 {empresa.map((m) => (
                   <li key={m}>{m}</li>
@@ -375,7 +375,7 @@ export function PreviaEstimativa({
               </ul>
             </div>
           )}
-          <p className="text-xs text-zinc-500">{rodape}</p>
+          <p className="text-xs text-texto-2">{rodape}</p>
         </div>
       )}
     </div>
@@ -398,7 +398,7 @@ function MensagemKitSalvo({
 }) {
   const { vendedor, empresa } = separarPendencias(pendencias);
   return (
-    <p data-testid="kit-salvo" role="status" className="rounded-md bg-zinc-50 px-3 py-2 text-sm text-zinc-700">
+    <p data-testid="kit-salvo" role="status" className="rounded-md bg-superficie-2 px-3 py-2 text-sm text-texto-2">
       {tecnicoSalvo ? "Kit e resultado técnico salvos." : "Itens do kit salvos."} A conta e a economia ainda não foram calculadas.
       {vendedor.length > 0 && ` Falta você informar ${juntar(vendedor)}.`}
       {empresa.length > 0 && ` Não depende de você: ${juntar(empresa.map((m) => m.replace(/\.\s*$/, "").replace(/^./, (c) => c.toLowerCase())))}.`}
@@ -414,10 +414,10 @@ function MensagemKitSalvo({
 /** Fio B é calculado pelo motor, não digitado: aqui só leitura e recolhido. */
 function DetalhesTecnicos({ dados }: { dados: DadosTecnicos | null }) {
   return (
-    <details data-testid="detalhes-tecnicos" className="rounded-md border border-zinc-200 px-3 py-2 text-sm">
-      <summary className="cursor-pointer font-medium text-zinc-700">Detalhes técnicos</summary>
+    <details data-testid="detalhes-tecnicos" className="rounded-md border border-linha px-3 py-2 text-sm">
+      <summary className="cursor-pointer font-medium text-texto-2">Detalhes técnicos</summary>
       {dados ? (
-        <ul className="mt-2 list-disc pl-5 text-xs text-zinc-600">
+        <ul className="mt-2 list-disc pl-5 text-xs text-texto-2">
           <li>
             Tarifa (T): R$ {formatarNumeroBr(dados.tarifaKwh)}/kWh,{" "}
             {dados.tarifaBaseTributaria ? ROTULO_BASE[dados.tarifaBaseTributaria] : "base não declarada"} —{" "}
@@ -444,12 +444,12 @@ function DetalhesTecnicos({ dados }: { dados: DadosTecnicos | null }) {
           <li>Data de referência: {formatarDataIso(dados.dataReferencia)}.</li>
         </ul>
       ) : (
-        <p className="mt-2 text-zinc-600">
+        <p className="mt-2 text-texto-2">
           O Fio B é calculado automaticamente a partir da tarifa oficial da distribuidora vigente na data do cálculo e do percentual
           legal do ano. Aparece aqui quando a estimativa estiver completa.
         </p>
       )}
-      <p className="mt-2 text-xs text-zinc-500">Só leitura: o vendedor informa consumo, tarifa (com a base tributária), kit e preço.</p>
+      <p className="mt-2 text-xs text-texto-2">Só leitura: o vendedor informa consumo, tarifa (com a base tributária), kit e preço.</p>
     </details>
   );
 }
@@ -671,7 +671,7 @@ export function KitPersonalizado({
   const avisoSalvo =
     avisoKitSalvo &&
     (calculoSalvo ? (
-      <p data-testid="kit-salvo" role="status" className="rounded-md bg-zinc-50 px-3 py-2 text-sm text-zinc-700">
+      <p data-testid="kit-salvo" role="status" className="rounded-md bg-superficie-2 px-3 py-2 text-sm text-texto-2">
         {resultado?.mensagem}
       </p>
     ) : (
@@ -679,7 +679,7 @@ export function KitPersonalizado({
     ));
 
   if (!parametros) {
-    return <p className="text-sm text-zinc-600">Parâmetros da calculadora não configurados para a empresa.</p>;
+    return <p className="text-sm text-texto-2">Parâmetros da calculadora não configurados para a empresa.</p>;
   }
 
   // "Atualizar preço no cálculo" fica desabilitado quando o servidor recusa (cálculo legado, incompleto ou desatualizado).
@@ -690,16 +690,16 @@ export function KitPersonalizado({
 
   /** Último cálculo substituído, guardado no histórico (nunca é o resultado atual). */
   const blocoHistorico = historico && (
-    <details data-testid="calculo-historico" className="rounded-md border border-dashed border-zinc-300 px-3 py-2 text-sm">
-      <summary className="cursor-pointer text-zinc-500">
+    <details data-testid="calculo-historico" className="rounded-md border border-dashed border-linha px-3 py-2 text-sm">
+      <summary className="cursor-pointer text-texto-2">
         Cálculo anterior — desatualizado (guardado no histórico em {new Date(historico.arquivadoEm).toLocaleDateString("pt-BR")})
       </summary>
-      <p className="mt-2 text-xs text-zinc-500">
+      <p className="mt-2 text-xs text-texto-2">
         {historico.motivo === "desatualizado_por_entradas"
           ? "As entradas mudaram e o resultado novo ficou incompleto. Os valores abaixo são só histórico: não correspondem às entradas atuais e não entram em proposta."
           : "Substituído por um recálculo. Os valores abaixo são só histórico."}
       </p>
-      <dl className="mt-2 grid grid-cols-2 gap-3 text-sm text-zinc-500">
+      <dl className="mt-2 grid grid-cols-2 gap-3 text-sm text-texto-2">
         <div>
           <dt>Kit</dt>
           <dd>{historico.kitNome}</dd>
@@ -758,15 +758,15 @@ export function KitPersonalizado({
             )}
             {estruturaTelhado && (
               <p className="text-sm">
-                <span className="text-zinc-500">Estrutura do telhado:</span> {estruturaTelhado}
+                <span className="text-texto-2">Estrutura do telhado:</span> {estruturaTelhado}
               </p>
             )}
             {calculo.estadoFinanceiro === "incompleto" ? (
               // Resultado técnico salvo (sem parte financeira): recolhido; a prévia acima é o estado atual.
-              <details data-testid="resultado-tecnico-salvo" className="rounded-md border border-dashed border-zinc-300 px-3 py-2 text-sm">
-                <summary className="cursor-pointer text-zinc-500">Resultado técnico salvo (sem economia)</summary>
+              <details data-testid="resultado-tecnico-salvo" className="rounded-md border border-dashed border-linha px-3 py-2 text-sm">
+                <summary className="cursor-pointer text-texto-2">Resultado técnico salvo (sem economia)</summary>
                 {outrosMotivos.filter((m) => m !== "incompleta").length > 0 && (
-                  <ul className="mt-1 list-disc pl-5 text-xs text-zinc-500">
+                  <ul className="mt-1 list-disc pl-5 text-xs text-texto-2">
                     {outrosMotivos
                       .filter((m) => m !== "incompleta")
                       .map((m) => (
@@ -774,7 +774,7 @@ export function KitPersonalizado({
                       ))}
                   </ul>
                 )}
-                <dl className="mt-2 grid grid-cols-2 gap-3 text-sm text-zinc-500">
+                <dl className="mt-2 grid grid-cols-2 gap-3 text-sm text-texto-2">
                   <div>
                     <dt>Kit</dt>
                     <dd>{calculo.kitNome}</dd>
@@ -802,23 +802,23 @@ export function KitPersonalizado({
               </details>
             ) : (
               /* Histórico: valores do cálculo antigo, em visual secundário e recolhidos; não são o resultado atual. */
-              <details data-testid="calculo-anterior" className="rounded-md border border-dashed border-zinc-300 px-3 py-2 text-sm">
-                <summary className="cursor-pointer text-zinc-500">
+              <details data-testid="calculo-anterior" className="rounded-md border border-dashed border-linha px-3 py-2 text-sm">
+                <summary className="cursor-pointer text-texto-2">
                   {legado ? "Cálculo anterior (fórmula antiga, não validada)" : "Cálculo anterior (desatualizado)"}
                 </summary>
-                <p className="mt-2 text-xs text-zinc-500">
+                <p className="mt-2 text-xs text-texto-2">
                   {legado
                     ? "Este cálculo foi feito por uma fórmula antiga, que não foi validada. Os valores abaixo são só histórico: não são a economia nem o payback atuais e não entram em proposta."
                     : "Os valores abaixo são só histórico: não correspondem às entradas atuais e não entram em proposta."}
                 </p>
                 {outrosMotivos.length > 0 && (
-                  <ul className="mt-1 list-disc pl-5 text-xs text-zinc-500">
+                  <ul className="mt-1 list-disc pl-5 text-xs text-texto-2">
                     {outrosMotivos.map((m) => (
                       <li key={m}>{textoDoMotivo(m).replace(/^./, (c) => c.toUpperCase())}.</li>
                     ))}
                   </ul>
                 )}
-                <dl className="mt-2 grid grid-cols-2 gap-3 text-sm text-zinc-500">
+                <dl className="mt-2 grid grid-cols-2 gap-3 text-sm text-texto-2">
                   <div>
                     <dt>Kit</dt>
                     <dd>{calculo.kitNome}</dd>
@@ -845,7 +845,7 @@ export function KitPersonalizado({
                   </div>
                 </dl>
                 {vigencia && vigencia.naoVerificavel.length > 0 && (
-                  <p className="mt-2 text-xs text-zinc-400">
+                  <p className="mt-2 text-xs text-texto-2">
                     Conferido: kit, preço, consumo e parâmetros. Não conferido: {juntar(vigencia.naoVerificavel.map((n) => ROTULO_NAO_VERIFICAVEL[n]))}.
                   </p>
                 )}
@@ -857,55 +857,55 @@ export function KitPersonalizado({
           <>
             <dl data-testid="resultado-atual" className="grid grid-cols-2 gap-3 text-sm">
               <div>
-                <dt className="text-zinc-500">Kit</dt>
-                <dd className="font-medium text-zinc-900">{calculo.kitNome}</dd>
+                <dt className="text-texto-2">Kit</dt>
+                <dd className="font-medium text-texto">{calculo.kitNome}</dd>
               </div>
               <div>
-                <dt className="text-zinc-500">Ligação</dt>
+                <dt className="text-texto-2">Ligação</dt>
                 <dd>{ROTULO_TIPO_LIGACAO[calculo.tipoLigacao]}</dd>
               </div>
               <div>
-                <dt className="text-zinc-500">Geração estimada</dt>
+                <dt className="text-texto-2">Geração estimada</dt>
                 <dd>{numeroBr(calculo.geracaoEstimadaKwhMes)} kWh/mês</dd>
               </div>
               <div>
-                <dt className="text-zinc-500">
+                <dt className="text-texto-2">
                   Consumo médio{consumoEstimadoKwhPadrao === calculo.consumoMedioKwh && consumoMedioKwhPadrao == null ? " (estimado pela conta)" : ""}
                 </dt>
                 <dd>{numeroBr(calculo.consumoMedioKwh)} kWh/mês</dd>
               </div>
               {calculo.contaSemSolar != null && (
                 <div>
-                  <dt className="text-zinc-500">Conta hoje (energia)</dt>
+                  <dt className="text-texto-2">Conta hoje (energia)</dt>
                   <dd>{formatarMoeda(calculo.contaSemSolar)}/mês</dd>
                 </div>
               )}
               {calculo.contaComSolar != null && (
                 <div>
-                  <dt className="text-zinc-500">Conta com o sistema</dt>
+                  <dt className="text-texto-2">Conta com o sistema</dt>
                   <dd>{formatarMoeda(calculo.contaComSolar)}/mês</dd>
                 </div>
               )}
               <div>
-                <dt className="text-zinc-500">Economia estimada</dt>
-                <dd data-testid="economia-salva" className={(calculo.economiaMensal ?? 0) > 0 ? "font-medium text-green-700" : "text-zinc-700"}>
+                <dt className="text-texto-2">Economia estimada</dt>
+                <dd data-testid="economia-salva" className={(calculo.economiaMensal ?? 0) > 0 ? "font-medium text-green-700" : "text-texto-2"}>
                   {textoEconomia(calculo.economiaMensal)}
                 </dd>
               </div>
               <div>
-                <dt className="text-zinc-500">Payback estimado</dt>
+                <dt className="text-texto-2">Payback estimado</dt>
                 <dd data-testid="payback-salvo" title={MOTIVO_PAYBACK}>
                   {textoPayback(calculo.economiaMensal, calculo.paybackMeses)}
                 </dd>
               </div>
               {estruturaTelhado && (
                 <div>
-                  <dt className="text-zinc-500">Estrutura do telhado</dt>
+                  <dt className="text-texto-2">Estrutura do telhado</dt>
                   <dd>{estruturaTelhado}</dd>
                 </div>
               )}
             </dl>
-            <p className="-mt-1 text-xs text-zinc-500">Payback indisponível: {MOTIVO_PAYBACK}.</p>
+            <p className="-mt-1 text-xs text-texto-2">Payback indisponível: {MOTIVO_PAYBACK}.</p>
             <HipotesesELimitacoes
               ressalvas={calculo.ressalvas ?? []}
               kwhNaoCompensado={calculo.kwhNaoCompensado ?? null}
@@ -914,18 +914,18 @@ export function KitPersonalizado({
           </>
         )}
         {componentesSalvos.length > 0 && (
-          <ul className="flex flex-col gap-1 rounded-lg bg-zinc-50 p-3 text-sm">
+          <ul className="flex flex-col gap-1 rounded-lg bg-superficie-2 p-3 text-sm">
             {componentesSalvos.map((c, i) => (
               <li key={i}>
-                <span className="text-zinc-500">{ROTULO_TIPO_COMPONENTE_KIT[c.tipo]}:</span> {c.descricao}
+                <span className="text-texto-2">{ROTULO_TIPO_COMPONENTE_KIT[c.tipo]}:</span> {c.descricao}
                 {c.potenciaW ? ` · ${numeroBr(c.potenciaW)} W` : ""} × {c.quantidade}
               </li>
             ))}
           </ul>
         )}
-        {calculo.observacoes && <p className="text-sm text-zinc-600">{calculo.observacoes}</p>}
+        {calculo.observacoes && <p className="text-sm text-texto-2">{calculo.observacoes}</p>}
         <DetalhesTecnicos dados={calculoDesatualizado ? null : tecnicosSalvos} />
-        <p className="text-xs text-zinc-400">
+        <p className="text-xs text-texto-2">
           Estimativa do modo comercial (sem simulação de engenharia) — confirme com o time técnico antes de fechar.
         </p>
         <Botao type="button" variante="secundario" onClick={() => {
@@ -944,7 +944,7 @@ export function KitPersonalizado({
       <input type="hidden" name="negocioId" value={negocioId} />
       <input type="hidden" name="componentes" value={JSON.stringify(componentes)} />
       {!calculo && componentesSalvos.length > 0 && !avisoKitSalvo && (
-        <p className="rounded-md bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
+        <p className="rounded-md bg-superficie-2 px-3 py-2 text-xs text-texto-2">
           Itens do kit salvos, ainda sem cálculo de conta e economia.
         </p>
       )}
@@ -961,7 +961,7 @@ export function KitPersonalizado({
       />
       {problemaKit && <Mensagem resultado={{ ok: false, mensagem: problemaKit }} />}
       {precoSugerido != null && (
-        <p className="-mt-1 text-xs text-zinc-400">
+        <p className="-mt-1 text-xs text-texto-2">
           Preço sugerido (catálogo + custos internos, estimativa de teste): {formatarMoeda(precoSugerido)} — ajuste em
           &ldquo;Dados do negócio&rdquo; se quiser usar.
         </p>
@@ -995,7 +995,7 @@ export function KitPersonalizado({
         onChange={(e) => setConsumoMedioKwh(e.target.value)}
       />
       {consumoCampoVazio && consumoMedioKwhPadrao != null ? (
-        <p data-testid="kit-consumo-salvo" className="-mt-2 text-xs text-zinc-400">
+        <p data-testid="kit-consumo-salvo" className="-mt-2 text-xs text-texto-2">
           Campo vazio: ao salvar, vale o consumo já salvo no negócio ({formatarNumeroBr(consumoMedioKwhPadrao)} kWh/mês). Para apagar, use
           “Dados do negócio”.
         </p>
@@ -1005,7 +1005,7 @@ export function KitPersonalizado({
           Informe os kWh reais da conta para substituí-la.
         </p>
       ) : (
-        <p className="-mt-2 text-xs text-zinc-400">
+        <p className="-mt-2 text-xs text-texto-2">
           O kit é salvo mesmo sem o consumo em kWh. Só o valor da conta em R$ não é usado como consumo.
         </p>
       )}
@@ -1018,7 +1018,7 @@ export function KitPersonalizado({
         onChange={(e) => setValorFaturaMedio(e.target.value)}
       />
       {faturaCampoVazia && valorFaturaMedioPadrao != null && (
-        <p data-testid="kit-fatura-salva" className="-mt-2 text-xs text-zinc-400">
+        <p data-testid="kit-fatura-salva" className="-mt-2 text-xs text-texto-2">
           Campo vazio: ao salvar, vale a fatura já salva no negócio ({formatarMoeda(valorFaturaMedioPadrao)}). Para apagar, use “Dados do
           negócio”.
         </p>
@@ -1041,7 +1041,7 @@ export function KitPersonalizado({
         <option value="sem_tributos">Sem tributos (como a ANEEL publica)</option>
         <option value="com_tributos">Com tributos (ICMS, PIS/Cofins)</option>
       </Selecao>
-      <p data-testid="tarifa-origem" className="-mt-2 text-xs text-zinc-400">
+      <p data-testid="tarifa-origem" className="-mt-2 text-xs text-texto-2">
         {tarifaOficial && tarifaOficialKwh != null ? (
           <>
             Tarifa oficial {tarifaOficial.distribuidora} ({tarifaOficial.ato}, TE + TUSD, sem tributos): R${" "}
@@ -1068,13 +1068,13 @@ export function KitPersonalizado({
         />
       )}
       <label className="flex flex-col gap-1 text-sm">
-        <span className="font-medium text-zinc-700">Observações (opcional)</span>
+        <span className="font-medium text-texto-2">Observações (opcional)</span>
         <textarea
           key={versaoObservacoes}
           name="observacoes"
           rows={2}
           defaultValue={calculo?.observacoes ?? ""}
-          className="rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-dourado focus:ring-2 focus:ring-dourado/20"
+          className="rounded-lg border border-linha px-3 py-2 text-sm outline-none focus:border-dourado focus:ring-2 focus:ring-dourado/20"
         />
       </label>
       {removendoKitSalvo &&

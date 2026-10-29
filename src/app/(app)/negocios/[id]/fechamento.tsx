@@ -27,7 +27,7 @@ export function Fechamento({
   const [reabrindo, setReabrindo] = useState(false);
 
   if (somenteLeitura) {
-    return <span className="text-sm text-zinc-700">{ROTULO_STATUS[status]}</span>;
+    return <span className="text-sm text-texto-2">{ROTULO_STATUS[status]}</span>;
   }
 
   if (status !== "aberto") {
@@ -77,7 +77,7 @@ export function Fechamento({
           name="motivo_perda_detalhe"
           rows={2}
           placeholder="Detalhes (opcional). Ex.: fechou com a empresa X por R$ 2 mil a menos"
-          className="rounded-md border border-zinc-300 px-3 py-2 text-sm"
+          className="rounded-md border border-linha px-3 py-2 text-sm"
         />
         <div className="flex flex-wrap gap-2">
           <Botao type="submit" variante="perigo" disabled={pendente}>
@@ -107,7 +107,7 @@ export function Fechamento({
             disabled={pendente}
             aria-label="Marcar como ganho"
             title="Marcar como ganho"
-            className={`${classeIcone} border-dourado/60 text-dourado-texto hover:bg-dourado hover:text-carvao focus-visible:ring-dourado/50`}
+            className={`${classeIcone} border-dourado/60 text-dourado-texto hover:bg-dourado hover:text-texto focus-visible:ring-dourado/50`}
           >
             <Check size={18} strokeWidth={2.5} aria-hidden />
           </button>

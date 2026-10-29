@@ -61,7 +61,7 @@ export function EnviarAnexo({ empresaId, negocioId }: { empresaId: string; negoc
           </option>
         ))}
       </Selecao>
-      <label className="inline-flex cursor-pointer items-center justify-center rounded-md border border-dashed border-zinc-400 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50">
+      <label className="inline-flex cursor-pointer items-center justify-center rounded-md border border-dashed border-linha px-3 py-2 text-sm text-texto-2 hover:bg-superficie-2">
         {enviando ? "Enviando..." : "Anexar arquivo (foto, conta de luz, PDF)"}
         <input
           ref={input}

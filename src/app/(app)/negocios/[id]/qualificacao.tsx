@@ -25,8 +25,8 @@ function EnviarParaVendas({ negocioId, habilitado, vendedores }: { negocioId: st
   return (
     <form action={acao} className="flex flex-col gap-2 rounded-lg border border-dourado/30 bg-dourado/5 p-3">
       <input type="hidden" name="negocioId" value={negocioId} />
-      <span className="text-sm font-medium text-carvao">Enviar para vendas</span>
-      {!habilitado && <span className="text-xs text-zinc-500">Qualifique o negócio (selo acima) antes de enviar.</span>}
+      <span className="text-sm font-medium text-texto">Enviar para vendas</span>
+      {!habilitado && <span className="text-xs text-texto-2">Qualifique o negócio (selo acima) antes de enviar.</span>}
       <div className="flex flex-wrap items-center gap-2">
         <Selecao name="paraMembroId" defaultValue="" disabled={!habilitado}>
           <option value="">Escolha o vendedor</option>
@@ -81,7 +81,7 @@ export function Qualificacao({
         <input type="hidden" name="negocioId" value={negocio.id} />
       <div className="flex items-center gap-2">
         <Selo tom={status.tom}>{status.rotulo}</Selo>
-        <span className="text-xs text-zinc-500">
+        <span className="text-xs text-texto-2">
           {status.atendidos} de {status.total} critérios atendidos
         </span>
       </div>
@@ -131,12 +131,12 @@ export function Qualificacao({
         />
       </div>
       <label className="flex flex-col gap-1 text-sm">
-        <span className="font-medium text-zinc-700">Observações comerciais</span>
+        <span className="font-medium text-texto-2">Observações comerciais</span>
         <textarea
           name="qualif_observacoes"
           rows={3}
           defaultValue={negocio.qualifObservacoes ?? ""}
-          className="rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+          className="rounded-lg border border-linha px-3 py-2 text-sm"
         />
       </label>
         <div className="flex items-center gap-2">

@@ -30,11 +30,11 @@ export function FeedbackHandoff({
   if (!souAutor) {
     return (
       <div className="flex flex-col gap-2">
-        <p className="text-xs text-zinc-500">Visível só para admin/gestor — o SDR não tem acesso a este feedback.</p>
+        <p className="text-xs text-texto-2">Visível só para admin/gestor — o SDR não tem acesso a este feedback.</p>
         {feedback ? (
-          <p className="whitespace-pre-wrap rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700">{feedback}</p>
+          <p className="whitespace-pre-wrap rounded-lg border border-linha bg-superficie-2 p-3 text-sm text-texto-2">{feedback}</p>
         ) : (
-          <p className="text-sm text-zinc-500">{autorNome ?? "O vendedor"} ainda não escreveu um feedback sobre este lead.</p>
+          <p className="text-sm text-texto-2">{autorNome ?? "O vendedor"} ainda não escreveu um feedback sobre este lead.</p>
         )}
       </div>
     );
@@ -42,7 +42,7 @@ export function FeedbackHandoff({
 
   if (!jaContatouLead && !feedback) {
     return (
-      <p className="text-sm text-zinc-500">
+      <p className="text-sm text-texto-2">
         Registre uma nota do contato com o lead (em &quot;Notas e linha do tempo&quot;) pra liberar o feedback aqui.
       </p>
     );
@@ -52,13 +52,13 @@ export function FeedbackHandoff({
     <form action={acao} className="flex flex-col gap-2">
       <input type="hidden" name="handoffId" value={handoffId} />
       <input type="hidden" name="negocioId" value={negocioId} />
-      <p className="text-xs text-zinc-500">Só o gestor vê este feedback — é uma métrica pra avaliar o trabalho do SDR.</p>
+      <p className="text-xs text-texto-2">Só o gestor vê este feedback — é uma métrica pra avaliar o trabalho do SDR.</p>
       <textarea
         name="feedback"
         rows={3}
         defaultValue={feedback ?? ""}
         placeholder="Como estava a qualidade deste lead? O contato foi correto, o cliente estava mesmo pronto, etc."
-        className="rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+        className="rounded-lg border border-linha px-3 py-2 text-sm"
       />
       <div className="flex items-center gap-2">
         <Botao type="submit" variante="secundario" disabled={pendente}>

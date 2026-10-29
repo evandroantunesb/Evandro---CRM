@@ -776,7 +776,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
                     <Cartao titulo="Oportunidade">
                       <div className="flex flex-col gap-1">
                         <Selo tom="negativo">Devolvido por {nomes.membro(ultimoHandoff.para_membro_id)}</Selo>
-                        <span className="text-sm text-zinc-600">{ultimoHandoff.motivo_devolucao}</span>
+                        <span className="text-sm text-texto-2">{ultimoHandoff.motivo_devolucao}</span>
                       </div>
                     </Cartao>
                   );
@@ -804,7 +804,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
             <Cartao titulo="Contato">
               <dl className="flex flex-col gap-2 text-sm">
                 <div>
-                  <dt className="text-zinc-500">{contato.tipo === "pj" ? "Razão social" : "Nome"}</dt>
+                  <dt className="text-texto-2">{contato.tipo === "pj" ? "Razão social" : "Nome"}</dt>
                   <dd>
                     <Link href={`/contatos/${contato.id}`} className="font-medium text-amber-700 hover:underline">
                       {contato.nome}
@@ -813,25 +813,25 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
                 </div>
                 {contato.telefone && (
                   <div>
-                    <dt className="text-zinc-500">Telefone</dt>
+                    <dt className="text-texto-2">Telefone</dt>
                     <dd>{contato.telefone}</dd>
                   </div>
                 )}
                 {contato.email && (
                   <div>
-                    <dt className="text-zinc-500">E-mail</dt>
+                    <dt className="text-texto-2">E-mail</dt>
                     <dd>{contato.email}</dd>
                   </div>
                 )}
                 {contato.endereco && (
                   <div>
-                    <dt className="text-zinc-500">Endereço</dt>
+                    <dt className="text-texto-2">Endereço</dt>
                     <dd>{contato.endereco}</dd>
                   </div>
                 )}
                 {(contato.cidade || contato.uf) && (
                   <div>
-                    <dt className="text-zinc-500">Cidade</dt>
+                    <dt className="text-texto-2">Cidade</dt>
                     <dd>{[contato.cidade, contato.uf].filter(Boolean).join(" / ")}</dd>
                   </div>
                 )}
@@ -859,7 +859,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
                         <input type="hidden" name="marcar" value={String(!marcada)} />
                         <button
                           aria-pressed={marcada}
-                          className={`rounded-full border px-2.5 py-1 text-xs font-medium ${marcada ? "text-white" : "bg-white text-zinc-700"}`}
+                          className={`rounded-full border px-2.5 py-1 text-xs font-medium ${marcada ? "text-white" : "bg-superficie text-texto-2"}`}
                           style={
                             marcada
                               ? { background: e.cor ?? "#71717a", borderColor: e.cor ?? "#71717a" }
@@ -1034,7 +1034,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
               <Cartao titulo="Pagamento">
                 <div className="flex flex-col gap-4">
                   {registroManualIndisponivel && (
-                    <p className="text-xs text-zinc-500" role="status">
+                    <p className="text-xs text-texto-2" role="status">
                       Registro manual de pagamento temporariamente indisponível.
                     </p>
                   )}
@@ -1106,16 +1106,16 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
                     key={item.chave}
                     className="my-1 flex flex-col rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm"
                   >
-                    <span className="whitespace-pre-wrap text-zinc-900">{item.texto}</span>
-                    <span className="flex gap-2 text-xs text-zinc-500">
+                    <span className="whitespace-pre-wrap text-texto">{item.texto}</span>
+                    <span className="flex gap-2 text-xs text-texto-2">
                       {item.nota.autor_id ? nomes.membro(item.nota.autor_id) : "usuário removido"} ·{" "}
                       {formatarDataHora(item.quando)}
                     </span>
                   </li>
                 ) : (
-                  <li key={item.chave} className="flex flex-col border-l-2 border-zinc-200 py-2 pl-3 text-sm">
-                    <span className="text-zinc-800">{item.texto}</span>
-                    <span className="text-xs text-zinc-500">{formatarDataHora(item.quando)}</span>
+                  <li key={item.chave} className="flex flex-col border-l-2 border-linha py-2 pl-3 text-sm">
+                    <span className="text-texto">{item.texto}</span>
+                    <span className="text-xs text-texto-2">{formatarDataHora(item.quando)}</span>
                   </li>
                 ),
               )}
@@ -1130,10 +1130,10 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
               {(anexos ?? []).map((a) => (
                 <li
                   key={a.id}
-                  className="flex items-center gap-2 border-t border-zinc-100 py-2 text-sm first:border-t-0"
+                  className="flex items-center gap-2 border-t border-linha py-2 text-sm first:border-t-0"
                 >
                   {semArquivo.has(a.id) ? (
-                    <span className="min-w-0 flex-1 truncate text-zinc-500">
+                    <span className="min-w-0 flex-1 truncate text-texto-2">
                       {a.nome} <Selo tom="negativo">não recebido</Selo>
                     </span>
                   ) : (
@@ -1147,11 +1147,11 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
                     </a>
                   )}
                   {a.categoria !== "geral" && <Selo tom="atencao">{ROTULO_CATEGORIA_ANEXO[a.categoria as CategoriaAnexo]}</Selo>}
-                  <span className="text-xs text-zinc-500">{tamanhoLegivel(a.tamanho)}</span>
+                  <span className="text-xs text-texto-2">{tamanhoLegivel(a.tamanho)}</span>
                   {(souAdmin || a.enviado_por === atual.membroId) && (
                     <form action={apagarAnexo}>
                       <input type="hidden" name="anexoId" value={a.id} />
-                      <button className="text-xs text-zinc-400 hover:text-red-700">Apagar</button>
+                      <button className="text-xs text-texto-2 hover:text-red-700">Apagar</button>
                     </form>
                   )}
                 </li>
@@ -1164,7 +1164,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
                   {conferencia.semRegistro.map((o) => (
                     <li key={o.caminho} className="flex items-center gap-2 py-1">
                       <span className="min-w-0 flex-1 truncate">{o.nome}</span>
-                      <span className="text-xs text-zinc-500">{tamanhoLegivel(o.tamanho)}</span>
+                      <span className="text-xs text-texto-2">{tamanhoLegivel(o.tamanho)}</span>
                       <RegistrarArquivo negocioId={negocio.id} arquivo={o} />
                     </li>
                   ))}

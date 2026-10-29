@@ -160,12 +160,12 @@ export function EdicaoNegocio({
         </>
       )}
       <label className="flex flex-col gap-1 text-sm md:col-span-2">
-        <span className="font-medium text-zinc-700">Descrição</span>
+        <span className="font-medium text-texto-2">Descrição</span>
         <textarea
           name="descricao"
           rows={3}
           defaultValue={negocio.descricao ?? ""}
-          className="rounded-md border border-zinc-300 px-3 py-2"
+          className="rounded-md border border-linha px-3 py-2"
         />
       </label>
       <div className="flex items-center gap-3 md:col-span-2">
