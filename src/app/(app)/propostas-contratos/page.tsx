@@ -96,7 +96,7 @@ export default async function PropostasContratos({ searchParams }: PageProps<"/p
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Propostas e contratos</h1>
-          <p className="text-sm text-zinc-500">
+          <p className="text-sm text-texto-2">
             {visao === "propostas"
               ? "Propostas enviadas e se o cliente já viu."
               : "Contratos, assinatura e pagamento de cada venda."}
@@ -105,7 +105,7 @@ export default async function PropostasContratos({ searchParams }: PageProps<"/p
         {visao === "contratos" && pode(atual.papel, EDITAR_MODELO_CONTRATO) && (
           <Link
             href="/configuracoes/contrato"
-            className="inline-flex min-h-10 items-center rounded-lg border border-zinc-200 bg-white px-3.5 py-2 text-sm font-medium text-carvao hover:bg-offwhite"
+            className="inline-flex min-h-10 items-center rounded-lg border border-linha bg-superficie px-3.5 py-2 text-sm font-medium text-texto hover:bg-offwhite"
           >
             Editar modelo
           </Link>
@@ -113,19 +113,19 @@ export default async function PropostasContratos({ searchParams }: PageProps<"/p
       </div>
 
       {registroManualIndisponivel && (
-        <p className="text-xs text-zinc-500" role="status">
+        <p className="text-xs text-texto-2" role="status">
           Registro manual de pagamento temporariamente indisponível: a situação de pagamento mostra só as confirmações do contrato.
         </p>
       )}
 
-      <nav className="flex gap-1 border-b border-zinc-200" aria-label="Visão">
+      <nav className="flex gap-1 border-b border-linha" aria-label="Visão">
         {VISOES_VENDA.map((v) => (
           <Link
             key={v}
             href={`/propostas-contratos?visao=${v}`}
             aria-current={v === visao ? "page" : undefined}
             className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
-              v === visao ? "border-dourado text-zinc-900" : "border-transparent text-zinc-500 hover:text-zinc-800"
+              v === visao ? "border-dourado text-texto" : "border-transparent text-texto-2 hover:text-texto"
             }`}
           >
             {ROTULO_VISAO_VENDA[v]} ({linhasDaVisao(linhas, v).length})
@@ -139,7 +139,7 @@ export default async function PropostasContratos({ searchParams }: PageProps<"/p
             key={a}
             href={atalho === a ? base : `${base}&atalho=${a}`}
             className={`rounded-full border px-3 py-1 text-sm transition-colors ${
-              atalho === a ? "border-carvao bg-carvao text-offwhite" : "border-zinc-300 bg-white text-zinc-700 hover:border-zinc-500"
+              atalho === a ? "border-carvao bg-carvao text-offwhite" : "border-linha bg-superficie text-texto-2 hover:border-texto-2"
             }`}
           >
             {ATALHOS_VENDA[a]}
@@ -154,7 +154,7 @@ export default async function PropostasContratos({ searchParams }: PageProps<"/p
           name="q"
           defaultValue={texto("q")}
           placeholder="Buscar cliente ou nº"
-          className="min-w-56 flex-1 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm"
+          className="min-w-56 flex-1 rounded-md border border-linha bg-superficie px-3 py-2 text-sm"
         />
         {visao === "contratos" && (
           <>
@@ -212,18 +212,18 @@ export default async function PropostasContratos({ searchParams }: PageProps<"/p
         <Botao type="submit" variante="secundario">
           Filtrar
         </Botao>
-        <Link href={base} className="text-xs text-zinc-500 underline hover:text-zinc-800">
+        <Link href={base} className="text-xs text-texto-2 underline hover:text-texto">
           Limpar filtros
         </Link>
       </form>
 
-      <p className="text-xs text-zinc-500">
+      <p className="text-xs text-texto-2">
         {visiveis.length} de {daGuia.length} {visao === "propostas" ? "proposta" : "contrato"}
         {daGuia.length === 1 ? "" : "s"}
       </p>
 
       {visiveis.length === 0 ? (
-        <p className="painel p-6 text-center text-sm text-zinc-500">{vazio}</p>
+        <p className="painel p-6 text-center text-sm text-texto-2">{vazio}</p>
       ) : visao === "propostas" ? (
         <Propostas linhas={visiveis} veEquipe={veEquipe} nomeResponsavel={nomeResponsavel} />
       ) : (
@@ -240,10 +240,10 @@ const valor = (l: LinhaVenda) => (l.valor != null ? formatarMoeda(l.valor) : "�
 function NegocioLink({ l }: { l: LinhaVenda }) {
   return (
     <>
-      <Link href={`/negocios/${l.negocioId}`} className="font-medium text-zinc-900 hover:text-dourado hover:underline">
+      <Link href={`/negocios/${l.negocioId}`} className="font-medium text-texto hover:text-dourado hover:underline">
         #{l.numero} {l.clienteNome}
       </Link>
-      {l.titulo !== l.clienteNome && <p className="truncate text-xs text-zinc-500">{l.titulo}</p>}
+      {l.titulo !== l.clienteNome && <p className="truncate text-xs text-texto-2">{l.titulo}</p>}
     </>
   );
 }
@@ -259,7 +259,7 @@ function Lista({ cabecalho, linhas, celulas, card }: {
     <>
       <div className="hidden overflow-x-auto painel md:block">
         <table className="w-full text-left text-sm">
-          <thead className="bg-zinc-50 text-zinc-600">
+          <thead className="bg-superficie-2 text-texto-2">
             <tr>
               {cabecalho.map((c, i) => (
                 <th key={c} className={`px-3 py-2 font-medium whitespace-nowrap ${i === 0 ? "w-full" : ""}`}>
@@ -270,7 +270,7 @@ function Lista({ cabecalho, linhas, celulas, card }: {
           </thead>
           <tbody>
             {linhas.map((l) => (
-              <tr key={l.negocioId} className="border-t border-zinc-100 hover:bg-zinc-50/60">
+              <tr key={l.negocioId} className="border-t border-linha hover:bg-superficie-2/60">
                 {celulas(l).map((c, i) => (
                   // Cliente fica com o espaço que sobra (e pode quebrar); status, valor, responsável e
                   // datas nunca quebram — se não couber, a tabela rola na horizontal.
@@ -297,7 +297,7 @@ function Lista({ cabecalho, linhas, celulas, card }: {
 function LinhaCard({ rotulo, children }: { rotulo: string; children: ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-2">
-      <span className="text-xs text-zinc-500">{rotulo}</span>
+      <span className="text-xs text-texto-2">{rotulo}</span>
       <span className="text-right whitespace-nowrap">{children}</span>
     </div>
   );
@@ -310,12 +310,12 @@ function Propostas({ linhas, veEquipe, nomeResponsavel }: PropsLista) {
       cabecalho={["Cliente", ...(veEquipe ? ["Responsável"] : []), "Valor", "Proposta", "Visualizações", "Última visualização", "Atualizado em"]}
       celulas={(l) => [
         <NegocioLink key="n" l={l} />,
-        ...(veEquipe ? [<span key="r" className="whitespace-nowrap text-zinc-700">{nomeResponsavel(l)}</span>] : []),
+        ...(veEquipe ? [<span key="r" className="whitespace-nowrap text-texto-2">{nomeResponsavel(l)}</span>] : []),
         <span key="v" className="whitespace-nowrap">{valor(l)}</span>,
         <Selo key="p" tom={TOM_PROPOSTA[l.proposta]}>{ROTULO_SITUACAO_PROPOSTA[l.proposta]}</Selo>,
-        <span key="a" className="text-zinc-700">{l.propostaAberturas}</span>,
-        <span key="u" className="whitespace-nowrap text-zinc-600">{l.propostaUltimaAbertura ? formatarDataHora(l.propostaUltimaAbertura) : "—"}</span>,
-        <span key="m" className="whitespace-nowrap text-zinc-600">{formatarDataHora(l.ultimaMovimentacao)}</span>,
+        <span key="a" className="text-texto-2">{l.propostaAberturas}</span>,
+        <span key="u" className="whitespace-nowrap text-texto-2">{l.propostaUltimaAbertura ? formatarDataHora(l.propostaUltimaAbertura) : "—"}</span>,
+        <span key="m" className="whitespace-nowrap text-texto-2">{formatarDataHora(l.ultimaMovimentacao)}</span>,
       ]}
       card={(l) => (
         <div className="flex flex-col gap-1.5">
@@ -340,19 +340,19 @@ function Propostas({ linhas, veEquipe, nomeResponsavel }: PropsLista) {
 
 function Contratos({ linhas, veEquipe, nomeResponsavel }: PropsLista) {
   const pagamento = (l: LinhaVenda) =>
-    l.pagamento ? <Selo tom={TOM_PAGAMENTO[l.pagamento]}>{ROTULO_PAGAMENTO[l.pagamento]}</Selo> : <span className="text-xs text-zinc-400">Após assinatura</span>;
+    l.pagamento ? <Selo tom={TOM_PAGAMENTO[l.pagamento]}>{ROTULO_PAGAMENTO[l.pagamento]}</Selo> : <span className="text-xs text-texto-2">Após assinatura</span>;
   return (
     <Lista
       linhas={linhas}
       cabecalho={["Cliente", ...(veEquipe ? ["Responsável"] : []), "Valor", "Contrato", "Pagamento", "Situação", "Atualizado em"]}
       celulas={(l) => [
         <NegocioLink key="n" l={l} />,
-        ...(veEquipe ? [<span key="r" className="whitespace-nowrap text-zinc-700">{nomeResponsavel(l)}</span>] : []),
+        ...(veEquipe ? [<span key="r" className="whitespace-nowrap text-texto-2">{nomeResponsavel(l)}</span>] : []),
         <span key="v" className="whitespace-nowrap">{valor(l)}</span>,
         <Selo key="c" tom={TOM_CONTRATO[l.contrato]}>{ROTULO_SITUACAO_CONTRATO[l.contrato]}</Selo>,
         <span key="p">{pagamento(l)}</span>,
         <Selo key="s" tom={TOM_NEGOCIO[l.negocio]}>{ROTULO_NEGOCIO[l.negocio]}</Selo>,
-        <span key="m" className="whitespace-nowrap text-zinc-600">{formatarDataHora(l.ultimaMovimentacao)}</span>,
+        <span key="m" className="whitespace-nowrap text-texto-2">{formatarDataHora(l.ultimaMovimentacao)}</span>,
       ]}
       card={(l) => (
         <div className="flex flex-col gap-1.5">
