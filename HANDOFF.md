@@ -1,6 +1,27 @@
-# Handoff — Raion CRM (2026-09-29, ~20h UTC)
+# Handoff para Claude — Raion CRM (2026-10-28)
 
-> **Obsoleto.** Substituído por `docs/HANDOFF-CLAUDE-2026-10-06.md` e, para o estado atual, por `docs/PROJECT_STATUS.md`. Mantido só como histórico.
+Leia `AGENTS.md`, `CLAUDE.md` e `docs/PROJECT_STATUS.md` antes de agir. Código e GitHub prevalecem sobre notas antigas. Este resumo cobre a conversa atual; o histórico de 29/09 permanece abaixo.
+
+## Estado imediato
+
+- `main` em `46bf650`: PR #229 (cadastro do papel Operação e edição de setores) mesclada e implantada na Vercel. Conferência de produção em 28/10, somente leitura: as quatro migrations de Obras estão registradas, as RPCs necessárias existem e havia zero membros de Operação e zero setores atribuídos a outros papéis. Nenhum dado foi alterado nessa conferência.
+- [PR #230](https://github.com/evandroantunesb/Evandro---CRM/pull/230) aberta: documenta a conferência pós-merge, CI e preview aprovados. Não foi mesclada.
+- [PR #231](https://github.com/evandroantunesb/Evandro---CRM/pull/231) aberta, branch `fix/setores-por-usuario`: corrige o cadastro e a conversão para Operação para selecionar setores **por pessoa na mesma interação**, via RPC `definir_setores_membro`. A linha de edição identifica o nome da pessoa. Não cria migration nem muda RLS. Cabe ao Evandro autorizar o merge dessa PR específica.
+- Worktree limpo da #231: `C:\Users\evand\raion-crm-setores-usuario`. O clone original `R:\raion-crm\raion-crm` contém alterações locais anteriores em `.gitignore`, `CLAUDE.md`, `.aurora/`, `.claude/agents/` e `supabase/snippets/`; preserve-as. Há também o worktree `R:\raion-crm\raion-crm-postmerge-229` da #230.
+
+## Problema e correção da #231
+
+O usuário observou que os setores pareciam ser uma escolha global. No código da #229, o banco já associa setores a `membro_id`, mas o formulário de criação só selecionava o papel; os setores apareciam depois, num bloco chamado genericamente “Setores de Obras”. Ao converter outro membro para Operação, havia o mesmo segundo passo. A #231 exibe Compras, Engenharia e Operacional no formulário da pessoa e grava pelo ID do vínculo. Se a conta ou perfil for salvo e a RPC falhar, a mensagem informa a gravação parcial e orienta concluir os setores na linha da pessoa.
+
+Arquivos da #231: `src/app/(app)/configuracoes/usuarios/actions.ts`, `formularios.tsx`, `tests/usuarios-operacionais.test.ts` e `e2e/16-usuarios-operacionais.spec.ts`. Typecheck, ESLint dos arquivos alterados e `git diff --check` passaram localmente. O Vitest local não iniciou porque o Supabase local/Docker não estão disponíveis; a trava fail-closed funcionou. A primeira CI falhou por uma comparação negativa de papel capturada por `tests/permissoes.test.ts`, e o primeiro E2E por seletor Playwright ambíguo. O commit `46b9d8d` corrigiu ambos; o [navegador seguinte](https://github.com/evandroantunesb/Evandro---CRM/actions/runs/40790489708) aprovou **85/85** cenários, incluindo a criação com setores por pessoa. A segunda CI aprovou os 10 testes de usuários operacionais, mas a varredura de permissões rejeitou uma condição visual com fallback por papel. O commit `81d4c02` trocou essa condição por uma lista positiva de papéis. Conferir os checks do HEAD da PR antes de declarar tudo pronto; não há merge autorizado.
+
+## Contas Demo e próximos passos
+
+O Evandro autorizou criar contas fictícias na empresa `Raion Solar Demo` para validar a configuração. **Nenhuma conta foi criada nesta conversa.** O formulário exige senha de pelo menos oito caracteres, e não há sessão de admin conectada ao agente; não inserir usuários diretamente em `auth.users` nem escrever setores fora da RPC. Não pedir nem registrar senha no chat. Após a #231 passar e ser mesclada com autorização explícita, um admin pode criar as contas pelo próprio aplicativo, escolhendo os setores no cadastro. Validar depois por consulta de leitura e teste autenticado se houver acesso apropriado. Não executar seed nem alterar produção por outro caminho sem a autorização específica exigida em `CLAUDE.md`.
+
+## Histórico de 2026-09-29
+
+> A seção abaixo foi substituída por `docs/HANDOFF-CLAUDE-2026-10-06.md` e `docs/PROJECT_STATUS.md`. Mantida só como histórico.
 
 Contexto para uma nova sessão continuar sem repetir trabalho. Leia junto com `CLAUDE.md` (regras permanentes) e `PROGRESS.md` (estado atual). Arquitetura e regras de negócio detalhadas estão em `docs/`.
 

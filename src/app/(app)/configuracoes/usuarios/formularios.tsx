@@ -49,7 +49,13 @@ export function FormularioConvite() {
           </option>
         ))}
       </Selecao>
-      {papel === "operacao" && <p className="text-sm text-zinc-600 md:col-span-2">Após criar a pessoa, configure seus setores na lista abaixo.</p>}
+      {papel === "operacao" && (
+        <fieldset className="rounded-lg border border-zinc-200 p-3 md:col-span-2">
+          <legend className="px-1 text-sm font-medium text-zinc-900">Setores desta pessoa</legend>
+          <p className="mb-3 text-xs text-zinc-600">Escolha em quais setores esta pessoa poderá executar ou coordenar. A configuração será salva junto com o cadastro.</p>
+          <CamposSetores setores={[]} />
+        </fieldset>
+      )}
       <Campo
         rotulo="Senha (opcional)"
         name="senha"
@@ -77,6 +83,8 @@ export type MembroLinha = {
   status: StatusMembro;
   setores: { setor: string; capacidade: string }[] | null;
 };
+
+const PAPEIS_CONVERTIVEIS_EM_OPERACAO: readonly Papel[] = ["admin", "gestor", "vendedor", "sdr"];
 
 export function LinhaMembro({ membro }: { membro: MembroLinha }) {
   const [resultado, acao, pendente] = useActionState(atualizarMembro, null);
@@ -111,7 +119,7 @@ export function LinhaMembro({ membro }: { membro: MembroLinha }) {
 
   return (
     <div className="border-t border-zinc-100 py-3">
-    <form action={acao} className="flex flex-col gap-2 md:flex-row md:items-center">
+    <form action={acao} className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center">
       <input type="hidden" name="membroId" value={membro.id} />
       <div className="min-w-0 flex-1">
         <p className="truncate font-medium text-zinc-900">{membro.nome || "(sem nome)"}</p>
@@ -155,6 +163,13 @@ export function LinhaMembro({ membro }: { membro: MembroLinha }) {
           </option>
         ))}
       </Selecao>
+      {papel === "operacao" && status === "ativo" && PAPEIS_CONVERTIVEIS_EM_OPERACAO.includes(membro.papel) && (
+        <fieldset className="w-full rounded-lg border border-zinc-200 p-3">
+          <legend className="px-1 text-sm font-medium text-zinc-900">Setores de {membro.nome || membro.email}</legend>
+          <p className="mb-3 text-xs text-zinc-600">Ao salvar o novo perfil, estes setores serão atribuídos somente a esta pessoa.</p>
+          <CamposSetores setores={[]} />
+        </fieldset>
+      )}
       <Botao type="submit" variante="secundario" disabled={pendente || carregandoCarteira}>
         {carregandoCarteira ? "Verificando carteira..." : "Salvar"}
       </Botao>
@@ -164,7 +179,7 @@ export function LinhaMembro({ membro }: { membro: MembroLinha }) {
       <p className="mt-2 text-sm text-zinc-600">Ao salvar, a pessoa deixará de acessar o comercial e a gamificação. Confira sua carteira antes de alterar o perfil.</p>
     )}
     {membro.papel === "operacao" && membro.status === "ativo" && papel === "operacao" && status === "ativo" && membro.setores && (
-      <SetoresMembro key={membro.id} membroId={membro.id} setores={membro.setores} />
+      <SetoresMembro key={membro.id} membroId={membro.id} nome={membro.nome || membro.email} setores={membro.setores} />
     )}
     {membro.papel === "operacao" && (!(papel === "operacao") || status !== "ativo") && (
       <p className="mt-2 text-sm text-zinc-600">Ao salvar esta alteração, os setores e as participações operacionais serão removidos.</p>
@@ -176,22 +191,28 @@ export function LinhaMembro({ membro }: { membro: MembroLinha }) {
   );
 }
 
-function SetoresMembro({ membroId, setores }: { membroId: string; setores: NonNullable<MembroLinha["setores"]> }) {
+function CamposSetores({ setores }: { setores: NonNullable<MembroLinha["setores"]> }) {
+  return (
+    <div className="grid gap-3 md:grid-cols-3">
+      {SETORES_OBRA.map((setor) => (
+        <Selecao key={setor} rotulo={ROTULO_SETOR[setor]} name={setor} defaultValue={setores.find((s) => s.setor === setor)?.capacidade ?? "sem_acesso"}>
+          <option value="sem_acesso">Não atua no setor</option>
+          <option value="executar">Executar</option>
+          <option value="coordenar">Coordenar</option>
+        </Selecao>
+      ))}
+    </div>
+  );
+}
+
+function SetoresMembro({ membroId, nome, setores }: { membroId: string; nome: string; setores: NonNullable<MembroLinha["setores"]> }) {
   const [resultado, acao, pendente] = useActionState(salvarSetoresMembro, null);
   return (
     <form action={acao} className="mt-3 rounded-lg border border-zinc-200 p-3">
       <input type="hidden" name="membroId" value={membroId} />
-      <p className="text-sm font-medium text-zinc-900">Setores de Obras</p>
+      <p className="text-sm font-medium text-zinc-900">Setores de {nome}</p>
       <p className="mt-1 text-xs text-zinc-600">Quem executa altera o próprio setor nas obras em que participa. Quem coordena vê todas as obras e pode gerir participantes do setor. A pessoa pode consultar o andamento de outros setores na mesma obra, sem poder alterá-los.</p>
-      <div className="mt-3 grid gap-3 md:grid-cols-3">
-        {SETORES_OBRA.map((setor) => (
-          <Selecao key={setor} rotulo={ROTULO_SETOR[setor]} name={setor} defaultValue={setores.find((s) => s.setor === setor)?.capacidade ?? "sem_acesso"}>
-            <option value="sem_acesso">Não atua no setor</option>
-            <option value="executar">Executar</option>
-            <option value="coordenar">Coordenar</option>
-          </Selecao>
-        ))}
-      </div>
+      <div className="mt-3"><CamposSetores setores={setores} /></div>
       <p className="mt-2 text-xs text-zinc-600">Ao remover um setor, as participações da pessoa nesse setor são encerradas.</p>
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <Botao type="submit" variante="secundario" disabled={pendente}>{pendente ? "Salvando..." : "Salvar setores"}</Botao>
