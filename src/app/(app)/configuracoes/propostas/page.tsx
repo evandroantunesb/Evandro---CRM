@@ -28,7 +28,7 @@ export default async function ConfigPropostas() {
     <div className="flex flex-col gap-4 pt-4">
       <NovoModeloColapsavel />
       <div className="flex flex-col gap-3">
-        {lista.length === 0 && <p className="text-sm text-zinc-500">Nenhum modelo criado ainda.</p>}
+        {lista.length === 0 && <p className="text-sm text-texto-2">Nenhum modelo criado ainda.</p>}
         {lista.map((modelo) => (
           <CardModelo key={modelo.id} modelo={modelo} />
         ))}
