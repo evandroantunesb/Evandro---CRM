@@ -53,9 +53,6 @@ export async function gerarContratoComCliente(
   if (existente && existente.status !== "rascunho") {
     return { ok: false, mensagem: "Este contrato já saiu do rascunho — o texto não muda mais automaticamente." };
   }
-  // Dados do cliente obrigatórios (a mesma regra trava o contrato no banco, ver `pendencias_contrato_contato`).
-  const pendencias = pendenciasDadosContrato(negocio.contatos as unknown as DadosClienteContrato | null);
-  if (pendencias.length) return { ok: false, mensagem: mensagemPendenciasContrato(pendencias) };
   // O contrato usa o valor atual do negócio e a proposta, o preço do cálculo: com os dois diferentes, não gera.
   // Com cálculo legado (fórmula antiga) a proposta não mostra preço nenhum e "Atualizar preço" é recusado: a guarda
   // não protege nada e só travaria o contrato, que segue usando o valor atual do negócio (decisão de Nora, M2-B8).
@@ -97,6 +94,11 @@ export async function gerarContratoComCliente(
   if (!contratoProntoParaCliente(conteudoPreenchido)) {
     return { ok: false, mensagem: `O contrato ficaria com campos sem resolver: ${marcadoresPendentes(conteudoPreenchido).join(", ") || "chaves sem par"}.` };
   }
+
+  // Dados do cliente obrigatórios, além dos que o modelo usa (a mesma regra trava o contrato no banco, ver
+  // `pendencias_contrato_contato`). Por último: as recusas que já existiam continuam com a mesma mensagem.
+  const pendencias = pendenciasDadosContrato(negocio.contatos as unknown as DadosClienteContrato | null);
+  if (pendencias.length) return { ok: false, mensagem: mensagemPendenciasContrato(pendencias) };
 
   const { error } = await supabase.from("contratos").upsert(
     { empresa_id: empresaId, negocio_id: negocioId, conteudo: conteudoPreenchido, criado_por: membroId, atualizado_por: membroId },

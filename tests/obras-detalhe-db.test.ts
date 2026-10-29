@@ -184,17 +184,17 @@ describe("detalhe da obra com RLS real", () => {
     semPessoais(vm, ["endereco", "telefone"]);
   });
 
-  it("operacao participante da engenharia: endereço e documento; sem telefone", async () => {
+  it("operacao participante da engenharia: endereço, telefone, documento e e-mail (20261029190000_dados_cliente_contrato.sql)", async () => {
     const vm = await detalhe(opEngenharia, "operacao");
-    expect(vm!.contatoCliente).toMatchObject({ endereco: PESSOAIS.endereco, documento: PESSOAIS.documento, telefone: null, telefone2: null });
-    semPessoais(vm, ["endereco", "documento"]);
+    expect(vm!.contatoCliente).toMatchObject({ endereco: PESSOAIS.endereco, documento: PESSOAIS.documento, telefone: PESSOAIS.telefone, email: PESSOAIS.email });
+    semPessoais(vm, ["endereco", "documento", "telefone", "email"]);
   });
 
-  it("operacao participante de compras: sem contato do cliente", async () => {
+  it("operacao participante de compras: só o endereço, para cotar o kit (20261029190000_dados_cliente_contrato.sql)", async () => {
     const vm = await detalhe(opCompras, "operacao");
     expect(vm).not.toBeNull();
-    expect(vm!.contatoCliente).toBeNull();
-    semPessoais(vm);
+    expect(vm!.contatoCliente).toMatchObject({ endereco: PESSOAIS.endereco, telefone: null, documento: null, email: null });
+    semPessoais(vm, ["endereco"]);
   });
 
   it("operacao vê vendedor/SDR da obra (só nome e função), como a RLS da #148 libera", async () => {

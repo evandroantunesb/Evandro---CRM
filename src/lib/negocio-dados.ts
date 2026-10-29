@@ -12,7 +12,10 @@ export function montarEndereco(p: { rua?: string; numero?: string; complemento?:
     .join(", ");
 }
 
-export type LocalContato = { endereco: string | null; cidade: string | null; uf: string | null };
+/** Partes do endereço em colunas próprias (o contrato exige; `endereco` continua sendo a linha montada com elas). */
+export type PartesEndereco = { cep?: string | null; logradouro?: string | null; numero?: string | null; bairro?: string | null; complemento?: string | null };
+
+export type LocalContato = { endereco: string | null; cidade: string | null; uf: string | null } & PartesEndereco;
 
 const normalizar = (v: string) => v.trim().replace(/\s+/g, " ").toLocaleLowerCase("pt-BR");
 
@@ -32,6 +35,14 @@ export function completarContato(
     const atual = salvo[campo]?.trim();
     if (!atual) alteracoes[campo] = novo;
     else if (normalizar(atual) !== normalizar(novo)) divergentes.push(campo);
+  }
+  // As partes do endereço só acompanham a linha `endereco` quando ela foi completada agora: nunca ficam
+  // diferentes de um endereço que já estava salvo.
+  if (alteracoes.endereco) {
+    for (const parte of ["cep", "logradouro", "numero", "bairro", "complemento"] as const) {
+      const novo = digitado[parte]?.trim();
+      if (novo) alteracoes[parte] = novo;
+    }
   }
   return { alteracoes, divergentes };
 }

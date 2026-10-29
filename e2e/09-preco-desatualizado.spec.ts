@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { abrirAba, clienteDe, clienteServico, entrarComo, fichaNaAba, lerBase } from "./ajuda";
+import { abrirAba, CLIENTE_CONTRATO, clienteDe, clienteServico, entrarComo, fichaNaAba, lerBase } from "./ajuda";
 import type { BaseFicticia } from "./base-ficticia";
 
 /**
@@ -21,7 +21,7 @@ async function negocioComCalculo(nome: string) {
   const c = await clienteDe(v, base.senha);
   const { data: funil } = await c.from("funis").select("id").eq("empresa_id", base.empresaA).single();
   const { data: etapa } = await c.from("etapas").select("id").eq("funil_id", funil!.id).order("ordem").limit(1).single();
-  const { data: contato, error: e1 } = await c.from("contatos").insert({ empresa_id: base.empresaA, nome, telefone: "(45) 90000-0000" }).select("id").single();
+  const { data: contato, error: e1 } = await c.from("contatos").insert({ ...CLIENTE_CONTRATO, empresa_id: base.empresaA, nome }).select("id").single();
   if (e1) throw e1;
   // Consumo e conta no negócio coerentes com a linha (senão o contrato recusaria por "consumo não comprovado").
   const { data: negocio, error: e2 } = await c

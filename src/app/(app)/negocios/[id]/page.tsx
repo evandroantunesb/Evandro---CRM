@@ -49,6 +49,8 @@ import {
 } from "@/lib/tipos";
 import { Arquivamento } from "./arquivamento";
 import { Contrato } from "./contrato";
+import { DadosCliente, type DadosClienteFicha } from "./dados-cliente";
+import { mensagemPendenciasContrato, pendenciasDadosContrato } from "@/lib/dados-cliente-contrato";
 import { EletropostoNegocio } from "./eletroposto";
 import { CATALOGO_ELETROPOSTO, normalizarModelos, type ModeloEletroposto } from "@/lib/eletroposto";
 import { EdicaoNegocio } from "./edicao";
@@ -101,7 +103,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
     supabase
       .from("negocios")
       .select(
-        "id, empresa_id, tipo, numero, titulo, valor, descricao, status, arquivado_em, arquivado_por, motivo_arquivamento, funil_id, etapa_id, origem_id, responsavel_id, motivo_perda_id, motivo_perda_detalhe, fechado_em, created_at, updated_at, tipo_telhado, unidade_consumidora, padrao_cliente, estrutura_telhado, consumo_medio_kwh, consumo_estimado_kwh, tarifa_efetiva_kwh, valor_conta_energia, fechamento_previsto, qualif_tipo_cliente, qualif_possui_conta_energia, qualif_distribuidora, qualif_imovel_proprio, qualif_objetivo, qualif_prazo_instalacao, qualif_busca_financiamento, qualif_orcamento_outra_empresa, qualif_e_decisor, qualif_outro_decisor, qualif_participantes_decisao, qualif_observacoes, contatos(id, nome, tipo, telefone, email, endereco, cidade, uf)",
+        "id, empresa_id, tipo, numero, titulo, valor, descricao, status, arquivado_em, arquivado_por, motivo_arquivamento, funil_id, etapa_id, origem_id, responsavel_id, motivo_perda_id, motivo_perda_detalhe, fechado_em, created_at, updated_at, tipo_telhado, unidade_consumidora, padrao_cliente, estrutura_telhado, consumo_medio_kwh, consumo_estimado_kwh, tarifa_efetiva_kwh, valor_conta_energia, fechamento_previsto, qualif_tipo_cliente, qualif_possui_conta_energia, qualif_distribuidora, qualif_imovel_proprio, qualif_objetivo, qualif_prazo_instalacao, qualif_busca_financiamento, qualif_orcamento_outra_empresa, qualif_e_decisor, qualif_outro_decisor, qualif_participantes_decisao, qualif_observacoes, contatos(id, nome, tipo, telefone, email, endereco, cidade, uf, documento, rg, data_nascimento, inscricao_estadual, cep, logradouro, numero, bairro, complemento)",
       )
       .eq("id", id)
       .maybeSingle(),
@@ -349,16 +351,9 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
     registro: mostrarPagamentoSolo ? { ativo: registroPagamentoAtivo, disponivel: situacaoPagamentoSolo === "permitido" } : undefined,
   });
 
-  const contato = negocio.contatos as unknown as {
-    id: string;
-    nome: string;
-    tipo: string;
-    telefone: string | null;
-    email: string | null;
-    endereco: string | null;
-    cidade: string | null;
-    uf: string | null;
-  };
+  const contato = negocio.contatos as unknown as DadosClienteFicha & { endereco: string | null };
+  // Dados do cliente que faltam para o contrato (o servidor e o banco conferem de novo ao gerar).
+  const pendenciasCliente = pendenciasDadosContrato(contato);
   const mapa = <T extends { id: string; nome: string }>(xs: T[]) => new Map(xs.map((x) => [x.id, x.nome]));
   const etapas = mapa(config.etapas);
   const origens = mapa(config.origens);
@@ -1050,13 +1045,20 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
             </>
           )}
           {pode(atual.papel, PROPOSTA_E_CONTRATO) && (
-            <div id="contrato" className="scroll-mt-4">
+            <div id="contrato" className="flex scroll-mt-4 flex-col gap-4">
+              {!arquivado && (!contrato || contrato.status === "rascunho") && (
+                <Cartao titulo="Dados do cliente para o contrato">
+                  <DadosCliente negocioId={negocio.id} contato={contato} pendencias={pendenciasCliente} />
+                </Cartao>
+              )}
               <Cartao titulo="Contrato">
                 <Contrato
                   negocioId={negocio.id}
                   siteUrl={env.siteUrl}
                   precoDesatualizado={precoDesatualizado}
-                  bloqueio={bloqueioContrato}
+                  bloqueio={
+                    bloqueioContrato ?? (!precoDesatualizado && pendenciasCliente.length ? mensagemPendenciasContrato(pendenciasCliente) : null)
+                  }
                   contrato={contrato ? { token: contrato.token, status: contrato.status as StatusContrato } : null}
                 />
               </Cartao>

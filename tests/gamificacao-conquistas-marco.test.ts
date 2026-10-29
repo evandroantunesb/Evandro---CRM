@@ -9,7 +9,7 @@
  * ausência de dependência de `gamification_rules`/`point_ledger`.
  */
 import { beforeAll, describe, expect, it } from "vitest";
-import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
 
 let sdr1: Usuario;
 let closer: Usuario;
@@ -59,7 +59,7 @@ beforeAll(async () => {
     { empresa_id: empresa, equipe_id: equipeId, membro_id: membro[sdr1.id], e_gestor: false },
   ]);
 
-  const { data: c } = await servico.from("contatos").insert({ empresa_id: empresa, nome: "Cliente conquistas marco", telefone: "45999990000" }).select("id").single();
+  const { data: c } = await servico.from("contatos").insert({ ...CLIENTE_CONTRATO, empresa_id: empresa, nome: "Cliente conquistas marco", telefone: "45999990000" }).select("id").single();
   contato = c!.id;
 });
 

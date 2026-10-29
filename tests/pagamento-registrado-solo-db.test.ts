@@ -5,7 +5,7 @@
  * os dois caminhos nunca deixam dois pagamentos ativos no mesmo negócio.
  */
 import { beforeAll, describe, expect, it } from "vitest";
-import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
 
 type Empresa = { id: string; funil: string; etapa: string; contato: string; motivoPerda: string };
 
@@ -37,7 +37,7 @@ async function criarEmpresa(nome: string, produto: "solo" | "pro" | null, vincul
   for (const v of vs!) membro[`${emp!.id}:${v.user_id}`] = v.id;
   const { data: f } = await servico.from("funis").select("id").eq("empresa_id", emp!.id).single();
   const { data: et } = await servico.from("etapas").select("id").eq("funil_id", f!.id).order("ordem").limit(1).single();
-  const { data: c } = await servico.from("contatos").insert({ empresa_id: emp!.id, nome: `Cliente ${nome}` }).select("id").single();
+  const { data: c } = await servico.from("contatos").insert({ ...CLIENTE_CONTRATO, empresa_id: emp!.id, nome: `Cliente ${nome}` }).select("id").single();
   const { data: m } = await servico.from("motivos_perda").upsert({ empresa_id: emp!.id, nome: "Motivo teste" }, { onConflict: "empresa_id,nome" }).select("id").single();
   return { id: emp!.id, funil: f!.id, etapa: et!.id, contato: c!.id, motivoPerda: m!.id };
 }

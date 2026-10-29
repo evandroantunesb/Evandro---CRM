@@ -136,6 +136,12 @@ const esquemaNovo = z.object({
   contato_endereco: textoOpcional(300, "Endereço muito longo"),
   contato_cidade: textoOpcional(120, "Cidade muito longa"),
   contato_uf: ufOpcional,
+  // Partes do endereço em colunas próprias (o contrato exige). CEP só com 8 dígitos; outro valor fica de fora.
+  contato_cep: textoOpcional().transform((v) => (v && soDigitos(v).length === 8 ? soDigitos(v) : null)),
+  contato_logradouro: textoOpcional(200, "Rua muito longa"),
+  contato_numero: textoOpcional(20, "Número muito longo"),
+  contato_bairro: textoOpcional(120, "Bairro muito longo"),
+  contato_complemento: textoOpcional(120, "Complemento muito longo"),
   // Calculadora solar: roda no backend a partir do kit personalizado, quando há tarifa.
   tipo_ligacao: z.enum(TIPOS_LIGACAO).optional(),
   consumo_medio_kwh: numeroBrOpcional,
@@ -200,7 +206,16 @@ export async function criarNegocioComCliente(supabase: SupabaseServidor, atual: 
   const problema = d.anexos.map(problemaArquivo).find(Boolean);
   if (problema) return { ok: false, mensagem: `${problema} Escolha outro arquivo.` };
   const avisos: AvisoCriacao[] = [];
-  const local = { endereco: d.contato_endereco, cidade: d.contato_cidade, uf: d.contato_uf };
+  const local = {
+    endereco: d.contato_endereco,
+    cidade: d.contato_cidade,
+    uf: d.contato_uf,
+    cep: d.contato_cep,
+    logradouro: d.contato_logradouro,
+    numero: d.contato_numero,
+    bairro: d.contato_bairro,
+    complemento: d.contato_complemento,
+  };
 
   let contatoId = d.contato_id;
   let contatoCriado: string | undefined;

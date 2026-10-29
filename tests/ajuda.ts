@@ -10,6 +10,20 @@ const SENHA = "senha-de-teste-123";
 export const servico = createClient<Database>(URL, SERVICE, { auth: { persistSession: false } });
 
 export const sufixo = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+/** Dados do cliente que o contrato exige (20261029190000_dados_cliente_contrato.sql): CPF válido, pessoa física. */
+export const CLIENTE_CONTRATO = {
+  documento: "529.982.247-25",
+  rg: "12.345.678-9",
+  data_nascimento: "1980-05-10",
+  email: "cliente.contrato@exemplo.test",
+  telefone: "(45) 90000-0000",
+  cep: "85810000",
+  logradouro: "Rua Fictícia",
+  numero: "100",
+  bairro: "Centro",
+  cidade: "Cascavel",
+  uf: "PR",
+};
 
 export async function criarUsuario(nome: string) {
   const email = `${nome}-${sufixo}@teste.raion`;

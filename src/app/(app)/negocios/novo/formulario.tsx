@@ -589,6 +589,11 @@ export function FormularioNegocio({
       <input type="hidden" name="tipo_ligacao" value={tipoLigacao ?? ""} />
       <input type="hidden" name="componentes" value={JSON.stringify(componentes)} />
       <input type="hidden" name="contato_endereco" value={enderecoCompleto} />
+      <input type="hidden" name="contato_cep" value={cep} />
+      <input type="hidden" name="contato_logradouro" value={rua} />
+      <input type="hidden" name="contato_numero" value={numeroEndereco} />
+      <input type="hidden" name="contato_bairro" value={bairro} />
+      <input type="hidden" name="contato_complemento" value={complemento} />
       <input type="hidden" name="contato_cidade" value={cidade} />
       <input type="hidden" name="contato_uf" value={uf} />
       <input type="hidden" name="contato_nome" value={contatoNome} />

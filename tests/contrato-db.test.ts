@@ -8,7 +8,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { nomeKitPersonalizado } from "@/lib/calculadora";
 import { atualizarStatusContratoComCliente, gerarContratoComCliente } from "@/lib/contratos-geracao";
 import type { SupabaseServidor } from "@/lib/supabase/server";
-import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
 
 let admin: Usuario;
 let vendedor: Usuario;
@@ -45,7 +45,7 @@ beforeAll(async () => {
 async function negocio(titulo: string, contato: Record<string, string | null> = {}) {
   const { data: c } = await servico
     .from("contatos")
-    .insert({ empresa_id: empresa, nome: `Cliente ${titulo}`, documento: "123.456.789-09", ...contato })
+    .insert({ ...CLIENTE_CONTRATO, empresa_id: empresa, nome: `Cliente ${titulo}`, documento: "123.456.789-09", ...contato })
     .select("id")
     .single();
   const { data: n, error } = await servico

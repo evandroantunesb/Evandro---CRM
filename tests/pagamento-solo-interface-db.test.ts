@@ -6,7 +6,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import type { SupabaseServidor } from "@/lib/supabase/server";
 import { carregarLinhasVenda } from "@/lib/venda";
-import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
 
 type Empresa = { id: string; funil: string; etapa: string; contato: string };
 const membro: Record<string, string> = {};
@@ -23,7 +23,7 @@ async function criarEmpresa(nome: string, produto: "solo" | null, vinculos: { u:
   for (const v of vs!) membro[`${emp!.id}:${v.user_id}`] = v.id;
   const { data: f } = await servico.from("funis").select("id").eq("empresa_id", emp!.id).single();
   const { data: et } = await servico.from("etapas").select("id").eq("funil_id", f!.id).order("ordem").limit(1).single();
-  const { data: c } = await servico.from("contatos").insert({ empresa_id: emp!.id, nome: `Cliente ${nome}` }).select("id").single();
+  const { data: c } = await servico.from("contatos").insert({ ...CLIENTE_CONTRATO, empresa_id: emp!.id, nome: `Cliente ${nome}` }).select("id").single();
   return { id: emp!.id, funil: f!.id, etapa: et!.id, contato: c!.id };
 }
 
