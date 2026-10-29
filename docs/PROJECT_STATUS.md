@@ -1,5 +1,29 @@
 # Estado do projeto — Raion CRM
 
+## Entregas de 2026-10-29 — dados do cliente, sigilo na obra e tarefas dos setores
+
+`main` em `fdd7c2e`. Todas as migrations abaixo foram aplicadas em produção pelo `banco-producao.yml` (conferir + aplicar, aprovados pelo Evandro), antes do merge de cada PR; **produção e `main` alinhadas** (última `20261029235000_tarefas_setor_notificacoes.sql`).
+
+| PR | O que entrou | Migration |
+| --- | --- | --- |
+| #244 | Validade padrão da proposta (Configurações) | `20261029130000_proposta_preferencias.sql` |
+| #245 / #246 | Tipo de fixação do telhado escolhido na obra (lista por empresa em `/configuracoes/fixacoes`); a escolha fica no card "Dados técnicos" | `20261029150000_obras_fixacao_telhado.sql` |
+| #247 | Dados pessoais do cliente fora da API da obra: `obra_cliente` (sem policy, só RPC); `obras.snapshot` sem `cliente` | `20261029170000_obras_cliente_oculto.sql` |
+| #248 | Dados do cliente obrigatórios para gerar contrato (nome, CPF, RG, nascimento, e-mail, telefone, CEP, rua, número, bairro, cidade; CNPJ com IE opcional), card "Dados do cliente" no negócio com ViaCEP. Contratos já existentes não são bloqueados. Na obra: endereço para Operacional, Engenharia e Compras; telefones para Operacional e Engenharia; documentos, RG, nascimento, e-mail e IE só Engenharia | `20261029190000_dados_cliente_contrato.sql` |
+| #249 | Tarefas de setor (banco): `tarefas_setor` + histórico, escrita só por RPC, visibilidade por setor/participação | `20261029210000_tarefas_setor.sql` |
+| #250 | Telas: **Tarefas** (menu da Operação, `/tarefas/setores`) e **Pedidos aos setores** (comercial); card no negócio (aba Atividades) e na obra; número de abertas nas abas; tarefas abertas no sininho da Operação; "Você atua em" no topo | — |
+| #251 | Anexos nas tarefas (bucket privado `tarefas-setor`, separados entre "Enviados no pedido" e "Entregues por <setor>"); rótulos de setor e prazo; notificações no sininho (concluída/cancelada → quem pediu; atribuída/reaberta → responsável) | `20261029230000_tarefas_setor_anexos.sql`, `20261029235000_tarefas_setor_notificacoes.sql` |
+
+**Regras das tarefas de setor (decididas pelo Evandro):** o comercial (inclusive vendedor e SDR) pede a Compras, Engenharia ou Operacional no negócio (ex.: orçamento do kit, projeto 3D); quem atua na obra pede na obra. Prazo padrão de 2 dias úteis. A tarefa nasce na fila do setor; quem atua no setor assume, conclui com resposta (e anexos) e quem pediu vê a resposta no negócio. Coordenador e admin atribuem; quem pediu, o coordenador e o admin cancelam com motivo; quem pediu ou o setor reabrem. Sem gamificação. Na obra, tarefa da fila só aparece para coordenador do setor ou participante da obra naquele setor (no negócio, para todo o setor).
+
+**Lição do teste em produção:** um pedido criado num negócio de outra empresa (admin com acesso a mais de uma) não aparece para a Operação da Raion Solar Demo — conferir a empresa embaixo da logo antes de testar. Teste E2E `e2e/17-tarefas-setor.spec.ts` cobre o caminho admin → Engenharia com anexo.
+
+**Próximos passos (aguardam comando do Evandro):**
+1. **T3 — tarefas automáticas:** regra por empresa disparada pelo status do setor na obra (ex.: Operacional `instalacao_concluida` → Engenharia "Cadastro do cliente no app e pedido de vistoria"; Compras `faturado_fornecedor` → Operacional "Agendar instalação com o cliente"), uma vez por obra e regra.
+2. **Engenharia em Obras:** especificação recebida (`RAION_OBRAS_ENGENHARIA_FLUXOGRAMA_TELAS_DASHBOARD.md`, v1.0, 29/10, não está no repositório). Análise feita: base de Obras, setores, participantes, histórico, dados técnicos e tarefas já existem; faltam fila "Minha Engenharia", checklist/documentos versionados, protocolos/exigências, vistoria/conexão, KPIs no servidor (hoje a lista lê até `LIMITE_OBRAS = 500`) e prazos. Ordem sugerida: P1 "Minha Engenharia" sem migration → P2 checklist e documentos (Opus) → P3 protocolos → P4 vistoria → P5 indicadores. **Aguardando o engenheiro** listar documentos Copel por tipo de projeto, ART, protocolo, exigências comuns, orçamento de conexão, vistoria e prazos (Copel/ANEEL × internos), e decidir: quem dispensa item do checklist, segundo revisor e quem registra/confirma a vistoria. Pendências e agenda da Engenharia devem reutilizar `tarefas_setor`, não criar outra lista.
+3. CNH com preenchimento automático dos dados do cliente (3b); endereço estruturado na ficha do contato (junto da #239).
+4. PRs #234 e #239 precisam de rebase na `main`.
+
 ## Usuários operacionais — PR #229 integrada e conferida em 2026-10-28
 
 PR #229 (`feat/usuarios-operacionais`) integrada na `main` em `46bf650`: cadastro do papel Operação e configuração por administrador dos setores de Obras e das capacidades executar/coordenar pela RPC existente. A tela informa que coordenadores veem todas as obras e que remover setor encerra participações; operação não recebe leads nem perfil de gamificação no cadastro. Sem migration nesta etapa. CI pós-merge aprovada ([run 40611162841](https://github.com/evandroantunesb/Evandro---CRM/actions/runs/40611162841)); deploy Vercel de produção do mesmo SHA em estado `READY`, com o alias `raion-crm-roan.vercel.app`; `/login` respondeu HTTP 200. Testes direcionados de cadastro, permissões, acesso e escrita em Obras foram aprovados na stack Supabase local; as suítes de banco criaram dados fictícios locais. As demais etapas do fluxo de pós-vendas ainda não foram implementadas.
@@ -63,12 +87,9 @@ Histórico: a migration da #139 foi aplicada em produção antes do merge, com a
 
 ## Em andamento
 
-### Obras: tipo de fixação do telhado (2026-10-29, branch `feat/obras-fixacao-telhado`, PR rascunho)
+### Obras: tipo de fixação do telhado — concluído em 2026-10-29
 
-PR 1 do desenho "Obras: o que Engenharia, Compras e Operacional recebem" (Claude Doc). Decisão do Evandro: a fixação saiu do kit (#243) e passa a ser escolhida na obra, por Engenharia, Compras ou Operacional, de uma lista que cada empresa monta em Configurações (`/configuracoes/fixacoes`, só admin).  A lista já nasce com as 11 opções que o Evandro passou (por superfície).
-
-- Migration `20261029150000_obras_fixacao_telhado.sql`: `fixacoes_telhado` (lista, sem DELETE), `obra_fixacao` (escolha, só via RPC), RPC `definir_fixacao_obra`, novo tipo `fixacao_definida` no histórico. Snapshot da venda intocado ("Informado na venda" continua visível como referência).
-- **Falta para retomar:** aplicar o diff de `database.types.ts` que o CI imprime (o typecheck só passa depois disso), escrever `tests/obras-fixacao-db.test.ts` (permissões por setor, obra cancelada, opção de outra empresa/desativada, histórico) e checar no preview. Migration precisa ir para produção pelo `banco-producao.yml` antes do merge.
+Integrado (#245; ajuste visual #246) e migration `20261029150000_obras_fixacao_telhado.sql` aplicada em produção. Ver a seção "Entregas de 2026-10-29" no topo.
 
 ### Eletroposto — segundo tipo de negócio (2026-10-26)
 
