@@ -119,6 +119,17 @@ export function validadePadraoDoModelo(blocos: { tipo: string; config: unknown }
   return Number.isInteger(dias) && dias >= 1 && dias <= 180 ? dias : VALIDADE_PADRAO_DIAS;
 }
 
+/**
+ * Dias de validade sugeridos na emissão, com a preferência da empresa (Configurações > Propostas >
+ * Validade padrão) por cima: preferência da empresa > "Validade (dias)" do modelo padrão > 10.
+ */
+export function validadePadraoDaProposta(
+  validadeDiasPreferencia: number | null | undefined,
+  blocos: { tipo: string; config: unknown }[] | null | undefined,
+): number {
+  return validadeDiasPreferencia ?? validadePadraoDoModelo(blocos);
+}
+
 /** AAAA-MM-DD somado de `dias` (calendário, sem fuso). */
 export function somarDias(dataIso: string, dias: number): string {
   const [a, m, d] = dataIso.split("-").map(Number) as [number, number, number];

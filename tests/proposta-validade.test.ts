@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { somarDias, VALIDADE_PADRAO_DIAS, validadePadraoDoModelo } from "@/lib/propostas/proposta-simples";
+import { somarDias, VALIDADE_PADRAO_DIAS, validadePadraoDaProposta, validadePadraoDoModelo } from "@/lib/propostas/proposta-simples";
 
 describe("validade padrão da proposta", () => {
   it("sem modelo ou sem o campo: 10 dias", () => {
@@ -23,5 +23,17 @@ describe("validade padrão da proposta", () => {
   it("somarDias atravessa mês e ano", () => {
     expect(somarDias("2026-10-29", 10)).toBe("2026-11-08");
     expect(somarDias("2026-12-25", 10)).toBe("2027-01-04");
+  });
+});
+
+describe("precedência: preferência da empresa > modelo > 10", () => {
+  it("sem preferência, usa a validade do modelo (ou 10)", () => {
+    expect(validadePadraoDaProposta(null, [{ tipo: "proposal_identity", config: { validadeDias: 15 } }])).toBe(15);
+    expect(validadePadraoDaProposta(undefined, null)).toBe(10);
+  });
+
+  it("com preferência, ignora o modelo", () => {
+    expect(validadePadraoDaProposta(45, [{ tipo: "proposal_identity", config: { validadeDias: 15 } }])).toBe(45);
+    expect(validadePadraoDaProposta(5, null)).toBe(5);
   });
 });

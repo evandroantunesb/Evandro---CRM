@@ -1,4 +1,4 @@
-import { Briefcase, CalendarClock, Plus, Search, Settings2, Thermometer, TrendingUp, Wallet, X } from "lucide-react";
+import { Briefcase, CalendarClock, FileClock, Plus, Search, Settings2, Thermometer, TrendingUp, Wallet, X } from "lucide-react";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { Botao, CLASSE_ENTRADA, Campo, Selecao } from "@/components/ui";
@@ -11,7 +11,7 @@ import {
   tempoDesde,
 } from "@/lib/crm";
 import { COOKIE_VISAO_NEGOCIOS, exigirPapel } from "@/lib/sessao";
-import { FILTRAR_NEGOCIOS_POR_RESPONSAVEL, NEGOCIOS, REGRAS_TEMPERATURA, pode } from "@/lib/permissoes";
+import { FILTRAR_NEGOCIOS_POR_RESPONSAVEL, NEGOCIOS, REGRAS_TEMPERATURA, VALIDADE_PADRAO_PROPOSTA, pode } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { carregarTemperaturas, type TemperaturaNegocio } from "@/lib/temperatura";
 import { NovoNegocio } from "@/components/novo-negocio";
@@ -261,6 +261,17 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
             >
               <Thermometer className="h-4 w-4" aria-hidden />
               <span className="hidden md:inline">Temperatura</span>
+            </Link>
+          )}
+          {pode(atual.papel, VALIDADE_PADRAO_PROPOSTA) && (
+            <Link
+              href="/configuracoes/validade-proposta"
+              aria-label="Validade padrão da proposta"
+              title="Validade padrão da proposta"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-linha bg-superficie px-3 text-sm font-medium text-texto transition-colors hover:border-dourado md:min-h-9"
+            >
+              <FileClock className="h-4 w-4" aria-hidden />
+              <span className="hidden md:inline">Validade da proposta</span>
             </Link>
           )}
           <NovoNegocio

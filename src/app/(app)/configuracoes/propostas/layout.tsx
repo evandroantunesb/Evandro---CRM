@@ -18,6 +18,9 @@ export default async function LayoutPropostas({ children }: { children: React.Re
         <Link href="/configuracoes/propostas/identidade" className="rounded-t-lg px-3 py-2 text-sm font-medium text-zinc-600 hover:text-carvao">
           Identidade visual
         </Link>
+        <Link href="/configuracoes/validade-proposta" className="rounded-t-lg px-3 py-2 text-sm font-medium text-zinc-600 hover:text-carvao">
+          Validade padrão
+        </Link>
       </nav>
       {children}
     </div>

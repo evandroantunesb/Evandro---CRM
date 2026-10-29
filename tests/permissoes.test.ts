@@ -39,6 +39,8 @@ const MATRIZ: Record<string, string[]> = {
   GESTAO_COMERCIAL: ["admin", "gestor"],
   // Regras de temperatura: mesma barreira da política de UPDATE de `regras_temperatura`.
   REGRAS_TEMPERATURA: ["admin", "gestor"],
+  // Validade padrão da proposta: mesma barreira da RLS de `proposta_preferencias`.
+  VALIDADE_PADRAO_PROPOSTA: ["admin", "gestor"],
   GAMIFICACAO: ["admin", "gestor", "vendedor", "sdr"],
   PARTICIPANTES_GAMIFICACAO: ["vendedor", "sdr"],
   OBRAS: ["admin", "gestor", "vendedor", "sdr", "operacao"],
@@ -68,6 +70,7 @@ describe("listas de permissão", () => {
       permissoes.ATRIBUIR_TAREFA_A_OUTROS,
       permissoes.GESTAO_COMERCIAL,
       permissoes.REGRAS_TEMPERATURA,
+      permissoes.VALIDADE_PADRAO_PROPOSTA,
     ]) {
       expect(pode("sdr", lista)).toBe(false);
     }

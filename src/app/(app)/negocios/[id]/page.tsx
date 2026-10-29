@@ -32,7 +32,7 @@ import type { BaseTributaria } from "@/lib/tarifa-gd";
 import { exigirPapel } from "@/lib/sessao";
 import { ARQUIVAR_NEGOCIO, ATRIBUIR_TAREFA_A_OUTROS, EDITAR_VALOR_NEGOCIO, ESCOLHER_RESPONSAVEL_NEGOCIO, FECHAR_NEGOCIO, NEGOCIOS, PAGAMENTO_SOLO, PROPOSTA_E_CONTRATO, RESPONSAVEL_COMERCIAL, pode } from "@/lib/permissoes";
 import { listarEmissoesDoNegocio } from "@/lib/propostas/emissoes-dados";
-import { extrairConteudoDoModelo, validadePadraoDoModelo, produtividadeConfirmada } from "@/lib/propostas/proposta-simples";
+import { extrairConteudoDoModelo, validadePadraoDaProposta, produtividadeConfirmada } from "@/lib/propostas/proposta-simples";
 import { avisarSchemaAusente, funcaoAusente, tabelaAusente } from "@/lib/schema-ausente";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { calcularStatusQualificacao } from "@/lib/qualificacao";
@@ -203,7 +203,14 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
         .maybeSingle()
     : { data: null };
   const conteudoModelo = extrairConteudoDoModelo(modeloPadrao?.proposta_modelo_blocos);
-  const validadePadraoDias = validadePadraoDoModelo(modeloPadrao?.proposta_modelo_blocos);
+  // Preferência da empresa (Configurações > Propostas > Validade padrão); antes da migration o card some.
+  const preferenciaRes = emissoesRes && !emissoesAusente
+    ? await supabase.from("proposta_preferencias").select("validade_dias").eq("empresa_id", atual.empresaId).maybeSingle()
+    : { data: null, error: null };
+  const preferenciaAusente = tabelaAusente(preferenciaRes.error, "proposta_preferencias");
+  if (preferenciaRes.error && preferenciaAusente) avisarSchemaAusente("proposta_preferencias", preferenciaRes.error);
+  else if (preferenciaRes.error) throw new Error("Não foi possível ler a validade padrão da proposta.");
+  const validadePadraoDias = validadePadraoDaProposta(preferenciaRes.data?.validade_dias, modeloPadrao?.proposta_modelo_blocos);
   const { data: parametrosEmissao } = emissoesRes && !emissoesAusente
     ? await supabase
         .from("parametros_calculadora")
