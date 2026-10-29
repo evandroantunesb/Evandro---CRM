@@ -1,23 +1,28 @@
 import { expect, test } from "@playwright/test";
 import { clienteServico, entrarComo, lerBase } from "./ajuda";
 
-// Engenharia: a lista mostra a obra na etapa certa, o card abre e aceita uma tarefa do setor; quem não atua em Engenharia
+// Engenharia: a lista mostra as obras por etapa, o card abre e aceita uma tarefa do setor; quem não atua em Engenharia
 // não entra nem na lista nem no card.
 test("executor de Engenharia abre o card da obra e cria tarefa; Compras não entra", async ({ page }) => {
-  const { usuarios, senha, obras } = lerBase();
-  const { data: obra } = await clienteServico().from("obras").select("numero, cliente_nome").eq("id", obras.o01).single();
+  const { usuarios, senha } = lerBase();
   const titulo = `Pedir vistoria ${Date.now()}`;
 
   await entrarComo(page, usuarios.execEng, senha);
   await page.getByRole("link", { name: "Engenharia", exact: true }).first().click();
   await page.waitForURL("**/engenharia");
   await expect(page.getByRole("heading", { name: "Engenharia", level: 1 })).toBeVisible();
-  const etapa = page.getByRole("region", { name: "Projeto em elaboração" });
-  await etapa.getByRole("link", { name: new RegExp(`Obra #${obra!.numero} `) }).click();
+  // A primeira obra que o executor vê na carteira: outros testes (03) trocam responsáveis e etapas da base antes deste,
+  // então não se fixa obra nem etapa.
+  const etapa = page.getByRole("region", { name: "Carteira por etapa" }).getByRole("region").first();
+  const rotuloEtapa = (await etapa.getByRole("heading").textContent())!.replace(/\s*\(\d+\)$/, "");
+  const link = etapa.getByRole("link").first();
+  const obraId = (await link.getAttribute("href"))!.split("/").at(-1)!;
+  const { data: obra } = await clienteServico().from("obras").select("numero, cliente_nome").eq("id", obraId).single();
+  await link.click();
 
-  await page.waitForURL(`**/engenharia/${obras.o01}`);
+  await page.waitForURL(`**/engenharia/${obraId}`);
   await expect(page.getByRole("heading", { name: obra!.cliente_nome, level: 1 })).toBeVisible();
-  await expect(page.getByText("Projeto em elaboração").first()).toBeVisible();
+  await expect(page.getByText(rotuloEtapa).first()).toBeVisible();
 
   const novo = page.locator("form").filter({ has: page.getByRole("button", { name: "Enviar ao setor" }) });
   await novo.getByPlaceholder(/O que a Engenharia precisa fazer/).fill(titulo);
@@ -34,6 +39,6 @@ test("executor de Engenharia abre o card da obra e cria tarefa; Compras não ent
   await entrarComo(page, usuarios.execCompras, senha);
   await page.goto("/engenharia");
   await expect(page.getByText("Você não atua em Engenharia nesta empresa.")).toBeVisible();
-  const resposta = await page.goto(`/engenharia/${obras.o01}`);
+  const resposta = await page.goto(`/engenharia/${obraId}`);
   expect(resposta?.status()).toBe(404);
 });
