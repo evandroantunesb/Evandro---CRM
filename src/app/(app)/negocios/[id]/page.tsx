@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ListaTarefas } from "@/components/lista-tarefas";
-import { MoverEtapa } from "@/components/mover-etapa";
+import { AvancarEtapa, MoverEtapa } from "@/components/mover-etapa";
 import { NovaTarefa } from "@/components/nova-tarefa";
 import { Plus } from "lucide-react";
 import { NovoNegocio } from "@/components/novo-negocio";
@@ -30,7 +30,7 @@ import { mensagemPropostaIncompleta, pendenciasSemDados } from "@/lib/estimativa
 import { descreverAtividade } from "@/lib/linha-do-tempo";
 import type { BaseTributaria } from "@/lib/tarifa-gd";
 import { exigirPapel } from "@/lib/sessao";
-import { ARQUIVAR_NEGOCIO, ATRIBUIR_TAREFA_A_OUTROS, EDITAR_VALOR_NEGOCIO, ESCOLHER_RESPONSAVEL_NEGOCIO, NEGOCIOS, PAGAMENTO_SOLO, PROPOSTA_E_CONTRATO, RESPONSAVEL_COMERCIAL, pode } from "@/lib/permissoes";
+import { ARQUIVAR_NEGOCIO, ATRIBUIR_TAREFA_A_OUTROS, EDITAR_VALOR_NEGOCIO, ESCOLHER_RESPONSAVEL_NEGOCIO, FECHAR_NEGOCIO, NEGOCIOS, PAGAMENTO_SOLO, PROPOSTA_E_CONTRATO, RESPONSAVEL_COMERCIAL, pode } from "@/lib/permissoes";
 import { listarEmissoesDoNegocio } from "@/lib/propostas/emissoes-dados";
 import { extrairConteudoDoModelo, produtividadeConfirmada } from "@/lib/propostas/proposta-simples";
 import { avisarSchemaAusente, funcaoAusente, tabelaAusente } from "@/lib/schema-ausente";
@@ -656,14 +656,29 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
                 eletroposto={ehEletroposto}
               />
               );
+              // Atalho para a próxima etapa dentro do cartão (o "Mover para" do cabeçalho continua para qualquer etapa).
+              const conteudoDados = (
+                <div className="flex flex-col gap-4">
+                  {negocio.status === "aberto" && !arquivado && (
+                    <AvancarEtapa
+                      negocioId={negocio.id}
+                      etapaAtualId={negocio.etapa_id}
+                      etapas={config.etapas.filter((e) => e.funilId === negocio.funil_id && e.ativa)}
+                      motivos={config.motivos}
+                      podeFechar={pode(atual.papel, FECHAR_NEGOCIO)}
+                    />
+                  )}
+                  {edicaoDados}
+                </div>
+              );
               // Dados do negócio sempre à vista para quem vende; para o SDR (que trabalha a qualificação) ficam recolhidos.
               const blocoDados =
                 atual.papel === "sdr" ? (
                   <CartaoRecolhivel titulo="Dados do negócio" resumo={resumoDados}>
-                    {edicaoDados}
+                    {conteudoDados}
                   </CartaoRecolhivel>
                 ) : (
-                  <Cartao titulo="Dados do negócio">{edicaoDados}</Cartao>
+                  <Cartao titulo="Dados do negócio">{conteudoDados}</Cartao>
                 );
               const blocoQualificacao = (
             <CartaoRecolhivel titulo="Qualificação SDR" resumo={resumoQualificacao} aberto={atual.papel === "sdr"}>

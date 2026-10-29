@@ -113,12 +113,7 @@ export function EdicaoNegocio({
         placeholder={eletroposto ? "Vazio até o cliente escolher o modelo" : undefined}
         defaultValue={negocio.valor != null ? String(negocio.valor).replace(".", ",") : ""}
       />
-      <Campo
-        rotulo="Mês previsto de fechamento"
-        name="fechamento_previsto"
-        type="month"
-        defaultValue={negocio.fechamentoPrevisto?.slice(0, 7) ?? ""}
-      />
+      <MesPrevisto inicial={negocio.fechamentoPrevisto?.slice(0, 7) ?? ""} />
       {!eletroposto && (
         <>
       <Campo
@@ -175,5 +170,49 @@ export function EdicaoNegocio({
         <Mensagem resultado={resultado} />
       </div>
     </form>
+  );
+}
+
+const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+
+/**
+ * Mês e ano em duas listas, em vez do `type="month"` (que no Firefox e no Safari vira um texto "aaaa-mm").
+ * Envia AAAA-MM no mesmo campo de antes; mês em branco limpa a previsão.
+ */
+function MesPrevisto({ inicial }: { inicial: string }) {
+  const [ano, setAno] = useState(inicial.slice(0, 4));
+  const [mes, setMes] = useState(inicial.slice(5, 7));
+  const anoAtual = new Date().getFullYear();
+  const primeiro = Math.min(anoAtual, Number(ano) || anoAtual);
+  const anos = Array.from({ length: anoAtual + 3 - primeiro + 1 }, (_, i) => String(primeiro + i));
+  return (
+    <fieldset className="flex flex-col gap-1">
+      <legend className="mb-1 text-sm font-medium text-texto-2">Mês previsto de fechamento</legend>
+      <input type="hidden" name="fechamento_previsto" value={ano && mes ? `${ano}-${mes}` : ""} />
+      <div className="grid grid-cols-[minmax(0,1fr)_112px] gap-2">
+        <Selecao
+          aria-label="Mês previsto"
+          value={mes}
+          onChange={(e) => {
+            setMes(e.target.value);
+            if (e.target.value && !ano) setAno(String(anoAtual));
+          }}
+        >
+          <option value="">Sem previsão</option>
+          {MESES.map((nome, i) => (
+            <option key={nome} value={String(i + 1).padStart(2, "0")}>
+              {nome}
+            </option>
+          ))}
+        </Selecao>
+        <Selecao aria-label="Ano previsto" value={ano} onChange={(e) => setAno(e.target.value)} disabled={!mes}>
+          {anos.map((a) => (
+            <option key={a} value={a}>
+              {a}
+            </option>
+          ))}
+        </Selecao>
+      </div>
+    </fieldset>
   );
 }
