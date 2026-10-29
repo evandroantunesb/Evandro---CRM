@@ -38,7 +38,7 @@ async function novoNegocio(nome: string) {
 
 async function abrirKit(page: Page, negocioId: string) {
   await entrarComo(page, base.usuarios.vendedor, base.senha);
-  await page.goto(fichaNaAba(negocioId, "Sistema"));
+  await page.goto(fichaNaAba(negocioId, "Conta e sistema"));
   await page.getByRole("button", { name: "+ Adicionar módulo" }).click();
 }
 

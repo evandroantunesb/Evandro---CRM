@@ -337,7 +337,7 @@ export async function criarNegocioComCliente(supabase: SupabaseServidor, atual: 
 // que exige comentário e impede o SDR de cair numa etapa que fecha o negócio.
 const esquemaEdicao = z.object({
   negocioId: z.string().uuid(),
-  titulo: z.string().trim().min(2, "Informe o nome do negócio"),
+  titulo: z.string().trim().min(2, "Informe o nome do negócio").optional(),
   origem_id: uuidOpcional,
   responsavel_id: uuidOpcional,
   valor: valorEdicao,
@@ -355,12 +355,19 @@ const esquemaEdicao = z.object({
     .transform((v) => (v === undefined ? undefined : v ? `${v}-01` : null)),
 });
 
-/** Salva "Dados do negócio". A fatura escolhida no formulário vai depois, direto ao Storage (ver `enviarArquivos`). */
+/**
+ * Salva os dados do negócio. A ficha manda em dois formulários: "Oportunidade" (nome, origem, responsável, valor,
+ * previsão, descrição) e "Conta de luz e local" (campos solares). Só a parte presente no formulário é gravada:
+ * a outra nunca é apagada por não ter vindo. A fatura vai depois, direto ao Storage (ver `enviarArquivos`).
+ */
 export async function editarNegocioComCliente(
   supabase: SupabaseServidor,
   atual: Atual,
   formData: FormData,
 ): Promise<NonNullable<ResultadoAcao> & { negocioId?: string }> {
+  const temComercial = formData.has("titulo");
+  const temTecnico = formData.has("valor_conta_energia");
+  if (!temComercial && !temTecnico) return { ok: false, mensagem: "Nada para salvar." };
   const dados = esquemaEdicao.safeParse(Object.fromEntries(formData));
   if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
   const d = dados.data;
@@ -369,10 +376,10 @@ export async function editarNegocioComCliente(
   // solares, que nem aparecem no formulário. O tipo vem do banco, nunca do formulário.
   const { data: registro } = await supabase.from("negocios").select("tipo").eq("id", d.negocioId).maybeSingle();
   const ehEletroposto = registro?.tipo === "eletroposto";
-  if (!ehEletroposto && d.valor == null) return { ok: false, mensagem: "Informe o valor do negócio." };
+  if (temComercial && !ehEletroposto && d.valor == null) return { ok: false, mensagem: "Informe o valor do negócio." };
 
   const consumoEdicao = resolverConsumo(d.consumo_medio_kwh, d.valor_conta_energia, d.tarifa_efetiva_kwh);
-  const camposSolares = ehEletroposto
+  const camposSolares = ehEletroposto || !temTecnico
     ? {}
     : {
         unidade_consumidora: d.unidade_consumidora || null,
@@ -387,14 +394,18 @@ export async function editarNegocioComCliente(
   const { data, error } = await supabase
     .from("negocios")
     .update({
-      titulo: d.titulo,
-      origem_id: d.origem_id,
-      descricao: d.descricao || null,
+      ...(temComercial
+        ? {
+            titulo: d.titulo!,
+            origem_id: d.origem_id,
+            descricao: d.descricao || null,
+            ...(d.fechamento_previsto !== undefined ? { fechamento_previsto: d.fechamento_previsto } : {}),
+            // SDR não pode alterar o valor financeiro do negócio (spec RAION_SDR_REGRAS_PERMISSOES §39) — só na criação.
+            ...(pode(atual.papel, EDITAR_VALOR_NEGOCIO) ? { valor: d.valor } : {}),
+            ...(pode(atual.papel, ESCOLHER_RESPONSAVEL_NEGOCIO) && d.responsavel_id ? { responsavel_id: d.responsavel_id } : {}),
+          }
+        : {}),
       ...camposSolares,
-      ...(d.fechamento_previsto !== undefined ? { fechamento_previsto: d.fechamento_previsto } : {}),
-      // SDR não pode alterar o valor financeiro do negócio (spec RAION_SDR_REGRAS_PERMISSOES §39) — só na criação.
-      ...(pode(atual.papel, EDITAR_VALOR_NEGOCIO) ? { valor: d.valor } : {}),
-      ...(pode(atual.papel, ESCOLHER_RESPONSAVEL_NEGOCIO) && d.responsavel_id ? { responsavel_id: d.responsavel_id } : {}),
     })
     .eq("id", d.negocioId)
     .select("id");

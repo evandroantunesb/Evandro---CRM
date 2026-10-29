@@ -121,7 +121,7 @@ test.describe("calculadora: números no padrão brasileiro", () => {
   test("1200 kWh: salvar → reabrir → salvar sem editar mantém o consumo e o resultado técnico (sem parte financeira)", async ({ page }) => {
     const n = await novoNegocio("Cliente M2-a ida e volta (fictício)");
     await entrarComo(page, base.usuarios.vendedor, base.senha);
-    await page.goto(fichaNaAba(n.id, "Sistema"));
+    await page.goto(fichaNaAba(n.id, "Conta e sistema"));
     await montarKit(page, "1200", "0,95");
     await expect(page.getByTestId("previa-sistema")).toContainText("660 kWh/mês"); // prévia: geração não depende do consumo
     await salvar(page);
@@ -147,7 +147,7 @@ test.describe("calculadora: números no padrão brasileiro", () => {
     const linha = await n.calculo();
     expect(linha).toMatchObject({ consumo_medio_kwh: 1200, tarifa_kwh: 0.95 });
     await entrarComo(page, base.usuarios.vendedor, base.senha);
-    await page.goto(fichaNaAba(n.id, "Sistema"));
+    await page.goto(fichaNaAba(n.id, "Conta e sistema"));
 
     for (let i = 0; i < 2; i++) {
       await page.getByRole("button", { name: "Editar kit / recalcular" }).click();
@@ -171,7 +171,7 @@ test.describe("calculadora: números no padrão brasileiro", () => {
     const linha = await n.calculo();
     expect(linha).toMatchObject({ consumo_medio_kwh: 1200 });
     await entrarComo(page, base.usuarios.vendedor, base.senha);
-    await page.goto(fichaNaAba(n.id, "Sistema"));
+    await page.goto(fichaNaAba(n.id, "Conta e sistema"));
 
     await page.getByRole("button", { name: "Editar kit / recalcular" }).click();
     await expect(page.getByLabel("Consumo médio (kWh/mês)")).toHaveValue("450");
@@ -187,7 +187,7 @@ test.describe("calculadora: números no padrão brasileiro", () => {
   test("1.200,50 tem prévia e grava 1200,5 no negócio; 1.2 é recusado sem gravar", async ({ page }) => {
     const n = await novoNegocio("Cliente M2-a decimal (fictício)");
     await entrarComo(page, base.usuarios.vendedor, base.senha);
-    await page.goto(fichaNaAba(n.id, "Sistema"));
+    await page.goto(fichaNaAba(n.id, "Conta e sistema"));
     await montarKit(page, "1.200,50", "0,95");
     await expect(page.getByTestId("previa-sistema")).toContainText("660 kWh/mês");
     // Consumo válido: nada sobre consumo na lista do vendedor (o que falta é a qualificação e a base da tarifa).

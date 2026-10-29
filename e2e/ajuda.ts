@@ -66,10 +66,10 @@ export function clienteServico() {
   });
 }
 
-type AbaFicha = "Visão geral" | "Sistema" | "Proposta e contrato" | "Atividades" | "Arquivos";
+type AbaFicha = "Negócio" | "Conta e sistema" | "Proposta e contrato" | "Atividades" | "Arquivos";
 const PARAMETRO_ABA: Record<AbaFicha, string> = {
-  "Visão geral": "visao",
-  Sistema: "sistema",
+  Negócio: "visao",
+  "Conta e sistema": "sistema",
   "Proposta e contrato": "proposta",
   Atividades: "atividades",
   Arquivos: "arquivos",

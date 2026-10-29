@@ -637,7 +637,7 @@ export function KitPersonalizado({
   }, [parametros, consumoMedioEstimado]);
 
   // Preço de referência (teste) do catálogo + custos internos configurados —
-  // só informativo aqui, já que o valor do negócio é editado em "Dados do negócio".
+  // só informativo aqui, já que o valor do negócio é editado em "Oportunidade".
   const precoSugerido = useMemo(() => {
     if (!parametros) return null;
     // Só linhas válidas, com a mesma quantidade que vai para o servidor ("1.200" = 1200 aqui também).
@@ -726,7 +726,7 @@ export function KitPersonalizado({
       <div className="flex flex-col gap-3">
         {!padraoCliente && (
           <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            Favor adicionar o padrão atual do cliente (em &quot;Dados do negócio&quot;) para conferir compatibilidade com o kit.
+            Favor adicionar o padrão atual do cliente (em &quot;Conta de luz e local&quot;, acima) para conferir compatibilidade com o kit.
           </p>
         )}
         {avisoSalvo}
@@ -950,7 +950,7 @@ export function KitPersonalizado({
       )}
       {!padraoCliente && (
         <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
-          Favor adicionar o padrão atual do cliente (em &quot;Dados do negócio&quot;) para conferir compatibilidade com o kit.
+          Favor adicionar o padrão atual do cliente (em &quot;Conta de luz e local&quot;, acima) para conferir compatibilidade com o kit.
         </p>
       )}
       <EditorComponentesKit
@@ -963,7 +963,7 @@ export function KitPersonalizado({
       {precoSugerido != null && (
         <p className="-mt-1 text-xs text-zinc-400">
           Preço sugerido (catálogo + custos internos, estimativa de teste): {formatarMoeda(precoSugerido)} — ajuste em
-          &ldquo;Dados do negócio&rdquo; se quiser usar.
+          &ldquo;Oportunidade&rdquo; (aba Negócio) se quiser usar.
         </p>
       )}
       <Campo
@@ -997,7 +997,7 @@ export function KitPersonalizado({
       {consumoCampoVazio && consumoMedioKwhPadrao != null ? (
         <p data-testid="kit-consumo-salvo" className="-mt-2 text-xs text-zinc-400">
           Campo vazio: ao salvar, vale o consumo já salvo no negócio ({formatarNumeroBr(consumoMedioKwhPadrao)} kWh/mês). Para apagar, use
-          “Dados do negócio”.
+          “Conta de luz e local”, acima.
         </p>
       ) : consumoCampoVazio && consumoEstimadoKwhPadrao != null ? (
         <p data-testid="kit-consumo-estimado" className="-mt-2 text-xs text-amber-800">
@@ -1019,8 +1019,8 @@ export function KitPersonalizado({
       />
       {faturaCampoVazia && valorFaturaMedioPadrao != null && (
         <p data-testid="kit-fatura-salva" className="-mt-2 text-xs text-zinc-400">
-          Campo vazio: ao salvar, vale a fatura já salva no negócio ({formatarMoeda(valorFaturaMedioPadrao)}). Para apagar, use “Dados do
-          negócio”.
+          Campo vazio: ao salvar, vale a fatura já salva no negócio ({formatarMoeda(valorFaturaMedioPadrao)}). Para apagar, use
+          “Conta de luz e local”, acima.
         </p>
       )}
       <Campo

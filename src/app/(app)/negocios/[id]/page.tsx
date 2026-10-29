@@ -390,9 +390,39 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
   const whatsapp = contato.telefone?.replace(/\D/g, "");
 
   // Abas da ficha (?aba=): cada uma mostra só o seu conteúdo. Proposta e contrato só para quem pode.
+  // Dados do negócio em dois cartões: Oportunidade (aba Negócio) e Conta de luz e local (aba Conta e sistema).
+  const edicaoDados = (secao: "comercial" | "tecnico") => (
+    <EdicaoNegocio
+      secao={secao}
+      // Os campos usam defaultValue: desarquivar com novo responsável (ou arquivar) muda os dados por fora do
+      // editor, e sem remontar ele mostraria o responsável antigo e o gravaria no próximo "Salvar".
+      key={`${secao}:${negocio.responsavel_id ?? ""}:${negocio.arquivado_em ?? ""}`}
+      empresaId={negocio.empresa_id}
+      negocio={{
+        id: negocio.id,
+        titulo: negocio.titulo,
+        origemId: negocio.origem_id,
+        responsavelId: negocio.responsavel_id,
+        valor: negocio.valor,
+        descricao: negocio.descricao,
+        tipoTelhado: negocio.tipo_telhado,
+        unidadeConsumidora: negocio.unidade_consumidora,
+        padraoCliente: negocio.padrao_cliente,
+        consumoMedioKwh: negocio.consumo_medio_kwh,
+        consumoEstimadoKwh: negocio.consumo_estimado_kwh,
+        tarifaEfetivaKwh: negocio.tarifa_efetiva_kwh,
+        valorContaEnergia: negocio.valor_conta_energia,
+        fechamentoPrevisto: negocio.fechamento_previsto,
+      }}
+      origens={config.origens.filter((o) => o.ativa || o.id === negocio.origem_id)}
+      responsaveis={pode(atual.papel, ESCOLHER_RESPONSAVEL_NEGOCIO) ? config.membros.filter((m) => m.ativo && pode(m.papel, RESPONSAVEL_COMERCIAL)) : []}
+      podeEditarValor={pode(atual.papel, EDITAR_VALOR_NEGOCIO)}
+      eletroposto={ehEletroposto}
+    />
+  );
   const abas: { id: string; rotulo: string; contador?: number }[] = [
-    { id: "visao", rotulo: "Visão geral" },
-    ...(ehEletroposto ? [] : [{ id: "sistema", rotulo: "Sistema" }]),
+    { id: "visao", rotulo: "Negócio" },
+    ...(ehEletroposto ? [] : [{ id: "sistema", rotulo: "Conta e sistema" }]),
     ...(ehEletroposto
       ? [{ id: "proposta", rotulo: "Eletroposto" }]
       : pode(atual.papel, PROPOSTA_E_CONTRATO)
@@ -628,35 +658,6 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
           <div className="flex min-w-0 flex-col gap-4">
             {/* O SDR trabalha a qualificação: ela abre antes dos dados do negócio; nos demais papéis a ordem é a de sempre. */}
             {(() => {
-              const edicaoDados = (
-              <EdicaoNegocio
-                // Os campos usam defaultValue: desarquivar com novo responsável (ou arquivar) muda os dados por fora do
-                // editor, e sem remontar ele mostraria o responsável antigo e o gravaria no próximo "Salvar".
-                key={`${negocio.responsavel_id ?? ""}:${negocio.arquivado_em ?? ""}`}
-                empresaId={negocio.empresa_id}
-                negocio={{
-                  id: negocio.id,
-                  titulo: negocio.titulo,
-                  origemId: negocio.origem_id,
-                  responsavelId: negocio.responsavel_id,
-                  valor: negocio.valor,
-                  descricao: negocio.descricao,
-                  tipoTelhado: negocio.tipo_telhado,
-                  unidadeConsumidora: negocio.unidade_consumidora,
-                  padraoCliente: negocio.padrao_cliente,
-                  consumoMedioKwh: negocio.consumo_medio_kwh,
-                  consumoEstimadoKwh: negocio.consumo_estimado_kwh,
-                  tarifaEfetivaKwh: negocio.tarifa_efetiva_kwh,
-                  valorContaEnergia: negocio.valor_conta_energia,
-                  fechamentoPrevisto: negocio.fechamento_previsto,
-                }}
-                origens={config.origens.filter((o) => o.ativa || o.id === negocio.origem_id)}
-                responsaveis={pode(atual.papel, ESCOLHER_RESPONSAVEL_NEGOCIO) ? config.membros.filter((m) => m.ativo && pode(m.papel, RESPONSAVEL_COMERCIAL)) : []}
-                podeEditarValor={pode(atual.papel, EDITAR_VALOR_NEGOCIO)}
-                eletroposto={ehEletroposto}
-              />
-              );
-              // Atalho para a próxima etapa dentro do cartão (o "Mover para" do cabeçalho continua para qualquer etapa).
               const conteudoDados = (
                 <div className="flex flex-col gap-4">
                   {negocio.status === "aberto" && !arquivado && (
@@ -668,20 +669,20 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
                       podeFechar={pode(atual.papel, FECHAR_NEGOCIO)}
                     />
                   )}
-                  {edicaoDados}
+                  {edicaoDados("comercial")}
                 </div>
               );
-              // Dados do negócio sempre à vista para quem vende; para o SDR (que trabalha a qualificação) ficam recolhidos.
+              // Oportunidade sempre à vista para quem vende; para o SDR (que trabalha a qualificação) fica recolhida.
               const blocoDados =
                 atual.papel === "sdr" ? (
-                  <CartaoRecolhivel titulo="Dados do negócio" resumo={resumoDados}>
+                  <CartaoRecolhivel titulo="Oportunidade" resumo={resumoDados}>
                     {conteudoDados}
                   </CartaoRecolhivel>
                 ) : (
-                  <Cartao titulo="Dados do negócio">{conteudoDados}</Cartao>
+                  <Cartao titulo="Oportunidade">{conteudoDados}</Cartao>
                 );
               const blocoQualificacao = (
-            <CartaoRecolhivel titulo="Qualificação SDR" resumo={resumoQualificacao} aberto={atual.papel === "sdr"}>
+            <CartaoRecolhivel titulo="Perfil do lead" resumo={resumoQualificacao} aberto>
               <Qualificacao
                 negocio={{
                   id: negocio.id,
@@ -895,6 +896,8 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
         </div>
       )}
       {aba === "sistema" && (
+        <div className="flex flex-col gap-4">
+        <Cartao titulo="Conta de luz e local">{edicaoDados("tecnico")}</Cartao>
         <Cartao titulo="Kit personalizado">
           <KitPersonalizado
             negocioId={negocio.id}
@@ -965,6 +968,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
             }
           />
         </Cartao>
+        </div>
       )}
       {/* Eletroposto: a aba mostra só o eletroposto (proposta própria; contrato e pagamento ficam de fora). */}
       {aba === "proposta" && (ehEletroposto ? (
