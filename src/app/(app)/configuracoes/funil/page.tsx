@@ -23,7 +23,7 @@ export default async function ConfigFunil() {
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
       <Voltar href="/configuracoes">Configurações</Voltar>
       <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Funis e etapas</h1>
-      <p className="text-sm text-zinc-600">
+      <p className="text-sm text-texto-2">
         A etapa inicial é onde os negócios novos entram. Ganho e perdido ficam como status do negócio, separado da
         etapa — mas se quiser, pode marcar uma etapa pra fechar o negócio sozinha ao entrar nela (ganho direto, ou
         perdido pedindo o motivo no popup de mover). Em cada etapa você pode exigir campos preenchidos (ex.: valor
@@ -38,7 +38,7 @@ export default async function ConfigFunil() {
               <form action={alternarFunil}>
                 <input type="hidden" name="funilId" value={funil.id} />
                 <input type="hidden" name="ativo" value={String(!funil.ativo)} />
-                <button className="text-sm text-zinc-600 hover:underline">{funil.ativo ? "Desativar funil" : "Reativar funil"}</button>
+                <button className="text-sm text-texto-2 hover:underline">{funil.ativo ? "Desativar funil" : "Reativar funil"}</button>
               </form>
             }
           >
@@ -48,8 +48,8 @@ export default async function ConfigFunil() {
             </div>
             <ol className="mb-3 flex flex-col">
               {doFunil.map((etapa, i) => (
-                <li key={etapa.id} className="flex flex-wrap items-center gap-2 border-t border-zinc-100 py-2">
-                  <span className="w-5 text-sm text-zinc-400">{i + 1}</span>
+                <li key={etapa.id} className="flex flex-wrap items-center gap-2 border-t border-linha py-2">
+                  <span className="w-5 text-sm text-texto-2">{i + 1}</span>
                   <CorEtapa etapaId={etapa.id} cor={etapa.cor} />
                   <Renomear tabela="etapas" id={etapa.id} nome={etapa.nome} />
                   {etapa.inicial ? (
@@ -58,7 +58,7 @@ export default async function ConfigFunil() {
                     etapa.ativa && (
                       <form action={definirInicial}>
                         <input type="hidden" name="etapaId" value={etapa.id} />
-                        <button className="text-sm text-zinc-600 hover:underline">Tornar inicial</button>
+                        <button className="text-sm text-texto-2 hover:underline">Tornar inicial</button>
                       </form>
                     )
                   )}
@@ -70,7 +70,7 @@ export default async function ConfigFunil() {
                       <button
                         disabled={direcao === "cima" ? i === 0 : i === doFunil.length - 1}
                         aria-label={direcao === "cima" ? "Subir" : "Descer"}
-                        className="rounded border border-zinc-300 px-2 text-sm disabled:opacity-30"
+                        className="rounded border border-linha px-2 text-sm disabled:opacity-30"
                       >
                         {direcao === "cima" ? "↑" : "↓"}
                       </button>

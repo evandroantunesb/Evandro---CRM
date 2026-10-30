@@ -51,7 +51,7 @@ export default async function Contatos({ searchParams }: PageProps<"/contatos">)
     <div className="mx-auto flex max-w-[1400px] flex-col gap-4">
       <div>
         <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Contatos</h1>
-        <p className="text-sm text-zinc-500">Carteira de contatos cadastrados na empresa.</p>
+        <p className="text-sm text-texto-2">Carteira de contatos cadastrados na empresa.</p>
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -73,12 +73,12 @@ export default async function Contatos({ searchParams }: PageProps<"/contatos">)
             name="q"
             defaultValue={busca}
             placeholder="Buscar por nome, telefone ou e-mail"
-            className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-carvao outline-none placeholder:text-zinc-400 focus:border-dourado focus:ring-2 focus:ring-dourado/20 sm:max-w-sm"
+            className="w-full rounded-lg border border-linha bg-superficie px-3 py-2 text-sm text-texto outline-none placeholder:text-texto-2 focus:border-dourado focus:ring-2 focus:ring-dourado/20 sm:max-w-sm"
           />
         </form>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="text-xs font-medium text-zinc-500">
+            <thead className="text-xs font-medium text-texto-2">
               <tr>
                 <th className="py-2 pr-4">Nome</th>
                 <th className="py-2 pr-4">Telefone</th>
@@ -89,16 +89,16 @@ export default async function Contatos({ searchParams }: PageProps<"/contatos">)
             </thead>
             <tbody>
               {contatos.map((c) => (
-                <tr key={c.id} className="border-t border-zinc-100 hover:bg-offwhite/60">
+                <tr key={c.id} className="border-t border-linha hover:bg-offwhite/60">
                   <td className="py-2 pr-4">
                     <Link href={`/contatos/${c.id}`} className="flex items-center gap-2 font-medium text-amber-700 hover:underline">
                       <Avatar nome={c.nome} tamanho={24} />
                       {c.nome}
                     </Link>
                   </td>
-                  <td className="py-2 pr-4 text-zinc-700">{c.telefone || "—"}</td>
-                  <td className="py-2 pr-4 text-zinc-700">{c.email || "—"}</td>
-                  <td className="py-2 pr-4 text-zinc-700">{[c.cidade, c.uf].filter(Boolean).join(" / ") || "—"}</td>
+                  <td className="py-2 pr-4 text-texto">{c.telefone || "—"}</td>
+                  <td className="py-2 pr-4 text-texto">{c.email || "—"}</td>
+                  <td className="py-2 pr-4 text-texto">{[c.cidade, c.uf].filter(Boolean).join(" / ") || "—"}</td>
                   <td className="py-2">
                     {c.negocios > 0 ? <Selo tom="atencao">{c.negocios}</Selo> : <Selo>0</Selo>}
                   </td>
@@ -106,7 +106,7 @@ export default async function Contatos({ searchParams }: PageProps<"/contatos">)
               ))}
               {!contatos.length && (
                 <tr>
-                  <td colSpan={5} className="py-6 text-center text-zinc-500">
+                  <td colSpan={5} className="py-6 text-center text-texto-2">
                     {busca ? "Nenhum contato encontrado com essa busca." : "Nenhum contato cadastrado ainda."}
                   </td>
                 </tr>
@@ -120,7 +120,7 @@ export default async function Contatos({ searchParams }: PageProps<"/contatos">)
 }
 
 const TOM_KPI = {
-  neutro: "bg-zinc-100 text-zinc-600",
+  neutro: "bg-superficie-2 text-texto-2",
   ambar: "bg-amber-50 text-amber-700",
   verde: "bg-green-50 text-green-700",
 };
@@ -144,10 +144,10 @@ function KpiContato({
         <Icone size={17} />
       </span>
       <div>
-        <p className="text-xs font-medium text-zinc-500">{legenda}</p>
-        <p className="text-2xl font-semibold text-zinc-900 [font-variant-numeric:tabular-nums]">{valor}</p>
+        <p className="text-xs font-medium text-texto-2">{legenda}</p>
+        <p className="text-2xl font-semibold text-texto [font-variant-numeric:tabular-nums]">{valor}</p>
       </div>
-      <p className="text-xs text-zinc-500">{rodape}</p>
+      <p className="text-xs text-texto-2">{rodape}</p>
     </div>
   );
 }

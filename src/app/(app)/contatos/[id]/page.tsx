@@ -33,7 +33,7 @@ export default async function DetalheContato({ params }: PageProps<"/contatos/[i
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-4">
-      <Link href="/contatos" className="text-sm text-zinc-600 hover:underline">
+      <Link href="/contatos" className="text-sm text-texto-2 hover:underline">
         ← Contatos
       </Link>
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -46,7 +46,7 @@ export default async function DetalheContato({ params }: PageProps<"/contatos/[i
       <Cartao titulo={`Negócios (${negocios?.length ?? 0})`}>
         <ul>
           {(negocios ?? []).map((n) => (
-            <li key={n.id} className="flex flex-wrap items-center gap-2 border-t border-zinc-100 py-2 text-sm">
+            <li key={n.id} className="flex flex-wrap items-center gap-2 border-t border-linha py-2 text-sm">
               <Link href={`/negocios/${n.id}`} className="font-medium text-amber-700 hover:underline">
                 #{n.numero} · {n.titulo}
               </Link>
@@ -55,7 +55,7 @@ export default async function DetalheContato({ params }: PageProps<"/contatos/[i
                 <Selo tom={n.status === "ganho" ? "positivo" : "negativo"}>{n.status === "ganho" ? "Ganho" : "Perdido"}</Selo>
               )}
               {n.arquivado_em && <Selo>Arquivado</Selo>}
-              <span className="ml-auto text-zinc-500">
+              <span className="ml-auto text-texto-2">
                 {formatarMoeda(n.valor)} {formatarDataHora(n.created_at)}
               </span>
             </li>
