@@ -1063,6 +1063,53 @@ export type Database = {
         };
         Relationships: [];
       };
+      engenharia_checklist_modelo: {
+        Row: {
+          ativo: boolean;
+          created_at: string;
+          descricao: string | null;
+          empresa_id: string;
+          grupo: string;
+          id: string;
+          obrigatorio: boolean;
+          ordem: number;
+          titulo: string;
+          updated_at: string;
+        };
+        Insert: {
+          ativo?: boolean;
+          created_at?: string;
+          descricao?: string | null;
+          empresa_id: string;
+          grupo: string;
+          id?: string;
+          obrigatorio?: boolean;
+          ordem?: number;
+          titulo: string;
+          updated_at?: string;
+        };
+        Update: {
+          ativo?: boolean;
+          created_at?: string;
+          descricao?: string | null;
+          empresa_id?: string;
+          grupo?: string;
+          id?: string;
+          obrigatorio?: boolean;
+          ordem?: number;
+          titulo?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "engenharia_checklist_modelo_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       equipe_membros: {
         Row: {
           created_at: string;
@@ -2689,6 +2736,129 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "obra_dados_comerciais_empresa_id_obra_id_fkey";
+            columns: ["empresa_id", "obra_id"];
+            isOneToOne: false;
+            referencedRelation: "obras";
+            referencedColumns: ["empresa_id", "id"];
+          },
+        ];
+      };
+      obra_engenharia_documentos: {
+        Row: {
+          caminho: string;
+          created_at: string;
+          empresa_id: string;
+          enviado_por: string | null;
+          id: string;
+          item_id: string;
+          nome: string;
+          obra_id: string;
+          tamanho: number;
+          tipo_mime: string | null;
+          versao: number;
+        };
+        Insert: {
+          caminho: string;
+          created_at?: string;
+          empresa_id: string;
+          enviado_por?: string | null;
+          id?: string;
+          item_id: string;
+          nome: string;
+          obra_id: string;
+          tamanho: number;
+          tipo_mime?: string | null;
+          versao: number;
+        };
+        Update: {
+          caminho?: string;
+          created_at?: string;
+          empresa_id?: string;
+          enviado_por?: string | null;
+          id?: string;
+          item_id?: string;
+          nome?: string;
+          obra_id?: string;
+          tamanho?: number;
+          tipo_mime?: string | null;
+          versao?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "obra_engenharia_documentos_empresa_id_item_id_fkey";
+            columns: ["empresa_id", "item_id"];
+            isOneToOne: false;
+            referencedRelation: "obra_engenharia_itens";
+            referencedColumns: ["empresa_id", "id"];
+          },
+          {
+            foreignKeyName: "obra_engenharia_documentos_empresa_id_obra_id_fkey";
+            columns: ["empresa_id", "obra_id"];
+            isOneToOne: false;
+            referencedRelation: "obras";
+            referencedColumns: ["empresa_id", "id"];
+          },
+        ];
+      };
+      obra_engenharia_itens: {
+        Row: {
+          atualizado_em: string | null;
+          atualizado_por: string | null;
+          created_at: string;
+          descricao: string | null;
+          empresa_id: string;
+          grupo: string;
+          id: string;
+          modelo_id: string;
+          motivo: string | null;
+          obra_id: string;
+          obrigatorio: boolean;
+          ordem: number;
+          status: string;
+          titulo: string;
+        };
+        Insert: {
+          atualizado_em?: string | null;
+          atualizado_por?: string | null;
+          created_at?: string;
+          descricao?: string | null;
+          empresa_id: string;
+          grupo: string;
+          id?: string;
+          modelo_id: string;
+          motivo?: string | null;
+          obra_id: string;
+          obrigatorio: boolean;
+          ordem: number;
+          status?: string;
+          titulo: string;
+        };
+        Update: {
+          atualizado_em?: string | null;
+          atualizado_por?: string | null;
+          created_at?: string;
+          descricao?: string | null;
+          empresa_id?: string;
+          grupo?: string;
+          id?: string;
+          modelo_id?: string;
+          motivo?: string | null;
+          obra_id?: string;
+          obrigatorio?: boolean;
+          ordem?: number;
+          status?: string;
+          titulo?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "obra_engenharia_itens_empresa_id_modelo_id_fkey";
+            columns: ["empresa_id", "modelo_id"];
+            isOneToOne: false;
+            referencedRelation: "engenharia_checklist_modelo";
+            referencedColumns: ["empresa_id", "id"];
+          },
+          {
+            foreignKeyName: "obra_engenharia_itens_empresa_id_obra_id_fkey";
             columns: ["empresa_id", "obra_id"];
             isOneToOne: false;
             referencedRelation: "obras";
@@ -4489,6 +4659,10 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      alterar_item_engenharia: {
+        Args: { p_item_id: string; p_motivo?: string; p_status: string };
+        Returns: undefined;
+      };
       alterar_status_fluxo_obra: {
         Args: {
           p_obra_id: string;
@@ -4497,6 +4671,7 @@ export type Database = {
         };
         Returns: undefined;
       };
+      aplicar_checklist_engenharia: { Args: { p_obra_id: string }; Returns: number };
       aprovar_atribuicao_lead: {
         Args: { p_id: string; p_membro_final_id?: string };
         Returns: undefined;
@@ -4890,6 +5065,7 @@ export type Database = {
       };
       incrementar_preenchimento_formulario: { Args: { p_id: string }; Returns: undefined };
       incrementar_visualizacao_formulario: { Args: { p_id: string }; Returns: undefined };
+      inserir_checklist_engenharia_padrao: { Args: { p_empresa_id: string }; Returns: undefined };
       inserir_fixacoes_telhado_padrao: { Args: { p_empresa_id: string }; Returns: undefined };
       inserir_registro_pagamento: {
         Args: {
@@ -4950,6 +5126,7 @@ export type Database = {
         }[];
       };
       meu_membro_id: { Args: { p_empresa_id: string }; Returns: string };
+      obra_da_pasta_engenharia: { Args: { p_caminho: string }; Returns: string };
       obra_snapshot_comercial: { Args: { p_negocio_id: string }; Returns: Json };
       obra_snapshot_tecnico: { Args: { p_negocio_id: string }; Returns: Json };
       obras_operacao: {
@@ -5009,6 +5186,7 @@ export type Database = {
         }[];
       };
       pendencias_contrato_contato: { Args: { p_contato_id: string }; Returns: string[] };
+      pode_enviar_pasta_engenharia: { Args: { p_caminho: string }; Returns: boolean };
       pode_enviar_pasta_tarefa_setor: { Args: { p_caminho: string }; Returns: boolean };
       pode_registrar_pagamento_negocio: { Args: { p_negocio_id: string }; Returns: boolean };
       pode_responder_handoff: { Args: { p_handoff_id: string }; Returns: boolean };
@@ -5018,11 +5196,13 @@ export type Database = {
         Args: { p_contato_id: string; p_criado_por: string; p_empresa_id: string };
         Returns: boolean;
       };
+      pode_ver_documentos_engenharia: { Args: { p_obra_id: string }; Returns: boolean };
       pode_ver_financeiro_negocio: { Args: { p_negocio_id: string }; Returns: boolean };
       pode_ver_negocio: { Args: { p_negocio_id: string }; Returns: boolean };
       pode_ver_obra: { Args: { p_obra_id: string }; Returns: boolean };
       pode_ver_obra_operacao: { Args: { p_obra_id: string }; Returns: boolean };
       pode_ver_pasta_anexo: { Args: { p_caminho: string }; Returns: boolean };
+      pode_ver_pasta_engenharia: { Args: { p_caminho: string }; Returns: boolean };
       pode_ver_pasta_tarefa_setor: { Args: { p_caminho: string }; Returns: boolean };
       pode_ver_pdf_proposta_emitida: { Args: { p_caminho: string }; Returns: boolean };
       pode_ver_responsavel: {
@@ -5070,6 +5250,10 @@ export type Database = {
       };
       registrar_anexo_tarefa_setor: {
         Args: { p_caminho: string; p_nome: string };
+        Returns: string;
+      };
+      registrar_documento_engenharia: {
+        Args: { p_caminho: string; p_item_id: string; p_nome: string };
         Returns: string;
       };
       registrar_historico_obra: {
