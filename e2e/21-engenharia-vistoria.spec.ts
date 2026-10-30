@@ -77,7 +77,7 @@ test("vistoria com não conformidade, nova vistoria, medidor, conexão e conclus
   await expect(vistoria.getByText(/Vistoria aprovada não é conexão/)).toBeVisible();
 
   // Gate G6 na tela: aprovada sem conexão não conclui.
-  await page.getByText("Atualizar Engenharia", { exact: true }).click();
+  await page.locator("summary").filter({ hasText: "Atualizar Engenharia" }).click();
   await page.getByLabel("Status de Engenharia").selectOption("concluido");
   await page.getByRole("button", { name: "Salvar status" }).click();
   await expect(page.getByText("Para concluir a Engenharia, registre a vistoria aprovada e a conexão confirmada.")).toBeVisible();
@@ -90,7 +90,7 @@ test("vistoria com não conformidade, nova vistoria, medidor, conexão e conclus
   await expect(vistoria.getByText(/Conexão confirmada\. Conclua a Engenharia/)).toBeVisible();
 
   await page.reload();
-  await page.getByText("Atualizar Engenharia", { exact: true }).click();
+  await page.locator("summary").filter({ hasText: "Atualizar Engenharia" }).click();
   await page.getByLabel("Status de Engenharia").selectOption("concluido");
   await page.getByRole("button", { name: "Salvar status" }).click();
   await expect(cartao(page, "Engenharia").getByText("Concluído").first()).toBeVisible();
