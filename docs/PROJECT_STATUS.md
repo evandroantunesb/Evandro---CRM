@@ -1,5 +1,48 @@
 # Estado do projeto — Raion CRM
 
+## Engenharia em Obras — P1 a P1.6 integradas em 2026-10-29; P2 e P3 em 2026-10-30
+
+`main` em `ba2ef0e`. Sem migration: nada a aplicar em produção.
+
+| PR | O que entrou |
+| --- | --- |
+| #253 | Tela **Engenharia** (`/engenharia`, menu Operação; lista `ENGENHARIA` = admin, gestor, operação que atua no setor). Operação sem Engenharia vê aviso e recebe 404 no card |
+| #254 | **Card da obra** para o engenheiro (`/engenharia/[id]`): etapa e gestão do setor, tarefas de Engenharia, dados técnicos com fixação, dados do cliente que a RLS libera, histórico do setor. Blocos do detalhe da obra extraídos para `src/components/obras/detalhe-obra.tsx` |
+| #255 | **Central** (abre em `/engenharia`; abas de tarefas em `?ver=`): indicadores; "Precisa de você" (minhas tarefas e as da fila que posso assumir; obras em que sou responsável principal; para admin/coordenador, obra sem responsável → "Definir responsável"); "Aguardando terceiros"; carteira por etapa com tempo na etapa. `carregarObras` passa a ler `status_desde`/`aguardando_desde` e marca `souPrincipal` sem expor id de membro |
+
+**Decisões do Evandro (29/10):** rota própria `/engenharia` (a spec v1.3 sugere "Obras → Minha Engenharia"); obra em `enviado_concessionaria` ou `aguardando_vistoria` conta como aguardando terceiros mesmo sem a marcação; textos da próxima ação por etapa em `PROXIMA_ACAO_ENGENHARIA` (`src/lib/engenharia-regras.ts`); obra sem responsável aparece como "Definir responsável" antes de "aguardando".
+
+**Especificação vigente:** `RAION_OBRAS_ENGENHARIA_COPEL_V1_3_CENTRAL_TRABALHO.md` (v1.3, 29/10, fora do repositório): central diária, fluxo guiado de 8 passos na obra, Kanban de carteira opcional e sem arrastar para aprovar, checklist condicional Copel com selo de confiabilidade, nenhum prazo regulatório sem marco comprovado.
+
+**E2E:** `e2e/18-engenharia-card.spec.ts` escolhe a primeira obra da "Carteira por etapa", porque o 03 troca o responsável da o01 antes dele na suíte completa.
+
+### P2 — checklist de documentos (#257)
+
+**Migration `20261030100000_engenharia_checklist.sql` aplicada em produção em 30/10/2026** pelo `banco-producao.yml` (tag `migracao-pr257-f55d0da`; conferir + aplicar aprovados pelo Evandro; dry-run listou só ela). #257 mesclada em 30/10.
+
+- **Modelo por empresa** (`/configuracoes/engenharia`, só admin; sem DELETE): nasce com 11 itens da spec v1.3 seção 24.2 (padrão Copel, a revisar com o responsável técnico). Aplicar na obra copia os itens ativos; editar o modelo não muda obra já aplicada; "Trazer itens novos do modelo" só acrescenta.
+- **Documentos versionados** no bucket privado `engenharia-documentos` (`empresa/obra/objeto`); nada se apaga (arquivo errado = nova versão + item inválido). Download por `/documentos-engenharia/[id]`.
+- **Status:** pendente → em conferência (sozinho ao anexar) → válido (exige arquivo) | inválido (motivo); "não se aplica" (motivo). Nova versão de item válido volta para conferência.
+- **Regras padrão (ajustáveis):** anexa e confere quem tem `autorizacao_setor_obra(obra, 'engenharia')` (admin, coordenador, participante ativo); obrigatório só admin ou coordenador dispensa; arquivos só para admin e Engenharia da obra (gestor, comercial e outros setores veem só o status); obra pausada aceita, cancelada recusa; sem segundo revisor.
+- **Histórico:** checklist aplicado, documento anexado (item e versão), item alterado. Sem nome de arquivo nem motivo (o histórico é visto por quem vê a obra).
+- Escrita só pelas RPCs `aplicar_checklist_engenharia`, `registrar_documento_engenharia`, `alterar_item_engenharia` (todas por `preparar_escrita_obra`). Testes: `tests/engenharia-checklist-db.test.ts`, `tests/engenharia-checklist-regras.test.ts`, `e2e/19-engenharia-checklist.spec.ts`.
+- **Lição:** ao trocar `MIGRATIONS_AUTORIZADAS` no workflow, atualizar junto `tests/validar-conjunto-migrations.test.ts` (a autorizada nova e a anterior como "já aplicada").
+
+O engenheiro testou o P2 em 30/10.
+
+### P3 — protocolos, exigências e trava de etapa (#258, empilhada sobre a #257)
+
+**Migration `20261030120000_engenharia_protocolos.sql` aplicada em produção em 30/10/2026** (tag `migracao-pr258-ce6a13b`; conferir + aplicar aprovados pelo Evandro; dry-run listou só ela). #258 mesclada em 30/10 (base trocada para `main` antes de apagar a branch da #257). **Produção e `main` alinhadas** (última `20261030120000_engenharia_protocolos.sql`; `main` em `95d7edb`).
+
+- **Protocolo** (canal PEW/CAW/atendimento/outro; um ativo por obra) com eventos imutáveis, arquivos por evento e pacote de documentos (snapshot) a cada envio/reenvio. Situações: protocolado → em análise / com exigência → aprovado / orçamento emitido → encerrado; indeferido e cancelado.
+- **Exigências** com categoria e prazo interno; reenvio marca como reenviadas; aprovação, orçamento ou encerramento resolvem todas.
+- **G2:** protocolo só com checklist aplicado e obrigatórios válidos ou dispensados; registrar leva a Engenharia para "Enviado à concessionária".
+- **G3:** `alterar_status_fluxo_obra` recusa sair de "A iniciar"/"Projeto em elaboração" para etapa posterior sem protocolo válido (cancelado/indeferido não contam). A base E2E protocola antes de avançar as obras.
+- **Central:** exigência aberta vira ação da equipe, não espera de terceiros. Histórico sem número do protocolo nem texto da distribuidora.
+- Escrita só pelas RPCs `registrar_protocolo_engenharia`, `registrar_evento_protocolo_engenharia`, `registrar_arquivo_protocolo_engenharia`; leitura por `pode_ver_documentos_engenharia`. Testes: `tests/engenharia-protocolos-db.test.ts`, `tests/engenharia-protocolos-regras.test.ts`, `e2e/20-engenharia-protocolo.spec.ts`.
+
+**Próximo:** P4 vistoria e conexão (aguarda comando do Evandro).
+
 ## Entregas de 2026-10-29 — dados do cliente, sigilo na obra e tarefas dos setores
 
 `main` em `fdd7c2e`. Todas as migrations abaixo foram aplicadas em produção pelo `banco-producao.yml` (conferir + aplicar, aprovados pelo Evandro), antes do merge de cada PR; **produção e `main` alinhadas** (última `20261029235000_tarefas_setor_notificacoes.sql`).
@@ -20,7 +63,7 @@
 
 **Próximos passos (aguardam comando do Evandro):**
 1. **T3 — tarefas automáticas:** regra por empresa disparada pelo status do setor na obra (ex.: Operacional `instalacao_concluida` → Engenharia "Cadastro do cliente no app e pedido de vistoria"; Compras `faturado_fornecedor` → Operacional "Agendar instalação com o cliente"), uma vez por obra e regra.
-2. **Engenharia em Obras:** especificação recebida (`RAION_OBRAS_ENGENHARIA_FLUXOGRAMA_TELAS_DASHBOARD.md`, v1.0, 29/10, não está no repositório). Análise feita: base de Obras, setores, participantes, histórico, dados técnicos e tarefas já existem; faltam fila "Minha Engenharia", checklist/documentos versionados, protocolos/exigências, vistoria/conexão, KPIs no servidor (hoje a lista lê até `LIMITE_OBRAS = 500`) e prazos. Ordem sugerida: P1 "Minha Engenharia" sem migration → P2 checklist e documentos (Opus) → P3 protocolos → P4 vistoria → P5 indicadores. **Aguardando o engenheiro** listar documentos Copel por tipo de projeto, ART, protocolo, exigências comuns, orçamento de conexão, vistoria e prazos (Copel/ANEEL × internos), e decidir: quem dispensa item do checklist, segundo revisor e quem registra/confirma a vistoria. Pendências e agenda da Engenharia devem reutilizar `tarefas_setor`, não criar outra lista.
+2. **Engenharia em Obras:** P1 a P1.6 entregues (seção acima). Análise original (v1.0): base de Obras, setores, participantes, histórico, dados técnicos e tarefas já existem; faltam fila "Minha Engenharia", checklist/documentos versionados, protocolos/exigências, vistoria/conexão, KPIs no servidor (hoje a lista lê até `LIMITE_OBRAS = 500`) e prazos. Ordem sugerida: P1 "Minha Engenharia" sem migration → P2 checklist e documentos (Opus) → P3 protocolos → P4 vistoria → P5 indicadores. **Aguardando o engenheiro** listar documentos Copel por tipo de projeto, ART, protocolo, exigências comuns, orçamento de conexão, vistoria e prazos (Copel/ANEEL × internos), e decidir: quem dispensa item do checklist, segundo revisor e quem registra/confirma a vistoria. Pendências e agenda da Engenharia devem reutilizar `tarefas_setor`, não criar outra lista.
 3. CNH com preenchimento automático dos dados do cliente (3b); endereço estruturado na ficha do contato (junto da #239).
 4. PRs #234 e #239 precisam de rebase na `main`.
 
