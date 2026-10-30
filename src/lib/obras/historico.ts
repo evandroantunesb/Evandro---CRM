@@ -39,7 +39,22 @@ const ROTULO_TIPO: Record<string, string> = {
   checklist_engenharia_aplicado: "Checklist aplicado",
   documento_engenharia_enviado: "Documento anexado",
   item_engenharia_alterado: "Item do checklist",
+  protocolo_engenharia_registrado: "Protocolo registrado",
+  protocolo_engenharia_atualizado: "Protocolo atualizado",
 };
+
+// Situações e registros do protocolo (mesmos de `engenharia-protocolos-regras`, sem importar regra de tela).
+const ROTULO_PROTOCOLO: Record<string, string> = {
+  protocolado: "Protocolado",
+  em_analise: "Em análise",
+  com_exigencia: "Com exigência",
+  aprovado: "Aprovado",
+  orcamento_emitido: "Orçamento emitido",
+  indeferido: "Indeferido",
+  cancelado: "Cancelado",
+  encerrado: "Encerrado",
+};
+const ROTULO_CANAL_PROTOCOLO: Record<string, string> = { pew: "PEW", caw: "CAW", atendimento: "atendimento comercial", outro: "outro canal" };
 
 // Rótulos dos status do checklist da Engenharia (mesmos de `ROTULO_STATUS_ITEM`, sem importar regra de tela).
 const ROTULO_ITEM_ENGENHARIA: Record<string, string> = {
@@ -173,6 +188,20 @@ function descrever(linha: LinhaHistoricoObra, nomes: ReadonlyMap<string, string>
       const de = rotulo(ROTULO_ITEM_ENGENHARIA, ler(dados, "de"));
       const para = rotulo(ROTULO_ITEM_ENGENHARIA, ler(dados, "para"));
       return de && para ? `${nome}: ${de} → ${para}` : nome;
+    }
+    // Número do protocolo e texto da distribuidora não aparecem (o histórico é visto por quem vê a obra).
+    case "protocolo_engenharia_registrado": {
+      const distribuidora = ler(dados, "distribuidora");
+      const canal = rotulo(ROTULO_CANAL_PROTOCOLO, ler(dados, "canal"));
+      const nome = typeof distribuidora === "string" && distribuidora.trim() ? distribuidora.trim() : "Distribuidora";
+      return canal ? `${nome}, via ${canal}` : nome;
+    }
+    case "protocolo_engenharia_atualizado": {
+      const de = rotulo(ROTULO_PROTOCOLO, ler(dados, "de"));
+      const para = rotulo(ROTULO_PROTOCOLO, ler(dados, "para"));
+      const reenvio = ler(dados, "tipo") === "reenvio";
+      if (reenvio) return "Reenviado com correções";
+      return de && para ? `${de} → ${para}` : "Situação do protocolo alterada";
     }
     default:
       return "Evento registrado";

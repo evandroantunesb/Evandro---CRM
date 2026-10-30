@@ -662,9 +662,10 @@ describe(
         ).toBeNull();
         expect((await status(coordEng, obraX, "operacional", "agendada")).error).not.toBeNull();
         expect((await status(coordOp, obraX, "engenharia", "aprovado")).error).not.toBeNull();
+        // Engenharia volta para "A iniciar": avançar além do projeto exige protocolo (20261030120000).
         for (const [setor, alvo] of [
           ["compras", "cotando"],
-          ["engenharia", "aprovado"],
+          ["engenharia", "a_iniciar"],
           ["operacional", "agendada"],
         ] as [Setor, string][]) {
           expect((await status(admin, obraX, setor, alvo)).error, setor).toBeNull();
@@ -687,7 +688,7 @@ describe(
         );
         expect((await status(admin, obraA, "compras", "inexistente")).error).not.toBeNull();
         const antes = await Promise.all([fluxo(obraA, "compras"), fluxo(obraA, "operacional")]);
-        expect((await status(admin, obraA, "engenharia", "aprovado")).error).toBeNull();
+        expect((await status(admin, obraA, "engenharia", "a_iniciar")).error).toBeNull();
         const depois = await Promise.all([fluxo(obraA, "compras"), fluxo(obraA, "operacional")]);
         expect(depois).toEqual(antes);
       });
@@ -977,7 +978,7 @@ describe(
 
       it("coordenador desativado e reativado não recupera escrita até receber setor de novo", async () => {
         expect(
-          (await status(coordTemp, obraX, "engenharia", "aguardando_vistoria")).error,
+          (await status(coordTemp, obraX, "engenharia", "projeto_em_elaboracao")).error,
         ).toBeNull();
         await admin.cliente
           .from("empresa_membros")
@@ -1000,7 +1001,8 @@ describe(
             ])
           ).error,
         ).toBeNull();
-        expect((await status(coordTemp, obraX, "engenharia", "concluido")).error).toBeNull();
+        // Etapas antes do protocolo: avançar além do projeto exige protocolo (20261030120000).
+        expect((await status(coordTemp, obraX, "engenharia", "a_iniciar")).error).toBeNull();
       });
 
       it("retirar o setor encerra só as participações daquele setor, com histórico e auditoria", async () => {

@@ -242,6 +242,26 @@ export async function criarBaseFicticia(): Promise<BaseFicticia> {
   const admin = clientes.admin;
   const status = async (obra: string, setor: "compras" | "engenharia" | "operacional", novo: string) =>
     feito(await admin.rpc("alterar_status_fluxo_obra", { p_obra_id: obra, p_setor: setor, p_status: novo }), `status ${setor}`);
+  // Avançar a Engenharia além do projeto exige protocolo (20261030120000), e o protocolo exige o checklist
+  // resolvido: segue o fluxo real (aplica, o admin marca os obrigatórios como "não se aplica" e registra).
+  const protocolar = async (obra: string) => {
+    feito(await admin.rpc("aplicar_checklist_engenharia", { p_obra_id: obra }), "checklist");
+    const { data: itens } = await admin.from("obra_engenharia_itens").select("id").eq("obra_id", obra).eq("obrigatorio", true);
+    for (const i of itens ?? []) {
+      feito(await admin.rpc("alterar_item_engenharia", { p_item_id: i.id, p_status: "dispensado", p_motivo: "Base fictícia" }), "item");
+    }
+    feito(
+      await admin.rpc("registrar_protocolo_engenharia", {
+        p_obra_id: obra,
+        p_distribuidora: "Copel",
+        p_canal: "pew",
+        p_numero: `FICT-${obra.slice(0, 8)}`,
+        p_tipo_solicitacao: "nova_conexao",
+        p_protocolado_em: new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date()),
+      }),
+      "protocolo",
+    );
+  };
   const parado = async (obra: string, setor: "compras" | "engenharia" | "operacional", motivo: string) =>
     feito(await admin.rpc("marcar_parado_fluxo_obra", { p_obra_id: obra, p_setor: setor, p_parado: true, p_motivo: motivo }), "parado");
   const aguardando = async (obra: string, setor: "compras" | "engenharia" | "operacional", quem: "cliente" | "fornecedor" | "concessionaria") =>
@@ -267,6 +287,7 @@ export async function criarBaseFicticia(): Promise<BaseFicticia> {
   await atribuir(obras.o01, "execOp", "operacional", "apoio");
   // o02: compras adiantado, engenharia aguardando concessionária.
   await status(obras.o02, "compras", "pedido_realizado");
+  await protocolar(obras.o02);
   await status(obras.o02, "engenharia", "enviado_concessionaria");
   await aguardando(obras.o02, "engenharia", "concessionaria");
   await atribuir(obras.o02, "execCompras", "compras", "responsavel", true);
@@ -275,18 +296,21 @@ export async function criarBaseFicticia(): Promise<BaseFicticia> {
   await parado(obras.o03, "engenharia", "Documentação do cliente incompleta (fictício)");
   // o04: operacional agendado, aguardando cliente.
   await status(obras.o04, "compras", "faturado_fornecedor");
+  await protocolar(obras.o04);
   await status(obras.o04, "engenharia", "aprovado");
   await status(obras.o04, "operacional", "agendada");
   await aguardando(obras.o04, "operacional", "cliente");
   await atribuir(obras.o04, "execOp", "operacional", "responsavel", true);
   // o05: concluída (3 setores finais + marcos resolvidos).
   await status(obras.o05, "compras", "faturado_fornecedor");
+  await protocolar(obras.o05);
   await status(obras.o05, "engenharia", "concluido");
   await status(obras.o05, "operacional", "concluido");
   await marco(obras.o05, "nf_cliente", "concluido");
   await marco(obras.o05, "garantia", "nao_se_aplica", "Garantia direta do fabricante (fictício)");
   // o06: Usina Solar Fazenda Modelo — obra principal da Apresentação (instalação em andamento, NF concluída).
   await status(obras.o06, "compras", "faturado_fornecedor");
+  await protocolar(obras.o06);
   await status(obras.o06, "engenharia", "aprovado");
   await status(obras.o06, "operacional", "em_instalacao");
   await marco(obras.o06, "nf_cliente", "concluido");
