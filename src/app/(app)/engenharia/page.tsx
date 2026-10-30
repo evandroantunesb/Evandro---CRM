@@ -173,7 +173,8 @@ function Central({
   const totalObras = grupos.reduce((n, g) => n + g.obras.length, 0);
   const paradas = grupos.reduce((n, g) => n + g.obras.filter((o) => o.estado === "parado").length, 0);
   const nada = tarefasMinhas.length === 0 && acoes.length === 0;
-  const prazosVencidos = grupos.reduce((n, g) => n + g.obras.filter((o) => (prazos.get(o.id) ?? []).some((p) => p.diasRestantes < 0)).length, 0);
+  // Como a carteira, vem do banco: obras em curso com algum prazo vencido, sem o limite de linhas da lista.
+  const prazosVencidos = [...prazos.values()].filter((lista) => lista.some((p) => p.diasRestantes < 0)).length;
 
   const numeros: [string, number][] = [
     // Carteira e paradas vêm do banco (sem o limite de linhas da lista); se ele falhar, contam a lista.

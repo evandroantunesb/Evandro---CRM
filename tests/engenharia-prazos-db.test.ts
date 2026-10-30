@@ -59,6 +59,13 @@ async function criarVenda(emp: string, responsavel: Usuario, confirmador: Usuari
 
 const hoje = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
 
+/** Data AAAA-MM-DD de N dias corridos atrás, no horário de Brasília. */
+const diasAtras = (n: number) => {
+  const d = new Date(`${hoje()}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - n);
+  return d.toISOString().slice(0, 10);
+};
+
 const ok = <T extends { error: unknown }>(r: T, contexto: string): T => {
   if (r.error) throw new Error(`${contexto}: ${JSON.stringify(r.error)}`);
   return r;
@@ -68,6 +75,25 @@ const ok = <T extends { error: unknown }>(r: T, contexto: string): T => {
 async function vence(inicio: string, dias: number): Promise<string> {
   const [l] = await noBanco("select public.somar_dias_uteis($1, $2::date, $3)::text as d", [empresa, inicio, dias]);
   return l.d;
+}
+
+/** Dias úteis restantes até o limite, pelo próprio banco. */
+async function restantes(limite: string): Promise<number> {
+  const [l] = await noBanco("select public.prazo_dias_restantes($1, $2::date, public.hoje_brasilia()) as d", [empresa, limite]);
+  return l.d;
+}
+
+async function indicadores(quem: Usuario, desde: string) {
+  const { data, error } = await quem.cliente.rpc("indicadores_engenharia", { p_empresa_id: empresa, p_desde: desde });
+  if (error) throw error;
+  return data as {
+    carteira: { total: number; paradas: number };
+    etapas: { etapa: string; mediana: number; n: number }[];
+    protocolo_aprovacao: { mediana: number | null; n: number };
+    exigencia: { com: number; total: number };
+    nao_conformidade: { com: number; total: number };
+    conexao: { mediana: number | null; n: number };
+  };
 }
 
 async function prazos(quem: Usuario) {
@@ -122,7 +148,11 @@ describe("Engenharia: prazos e indicadores (ordem importa)", { concurrent: false
         public.somar_dias_uteis($1, '2026-10-30', 1)::text as apos_finados,
         public.somar_dias_uteis($1, '2026-11-03', 0) as zero,
         public.dias_uteis_entre($1, '2026-10-30', '2026-11-06') as uteis,
-        public.dias_uteis_entre($1, '2026-11-06', '2026-10-30') as invertido`,
+        public.dias_uteis_entre($1, '2026-11-06', '2026-10-30') as invertido,
+        public.prazo_dias_restantes($1, '2026-11-06', '2026-11-04') as faltam,
+        public.prazo_dias_restantes($1, '2026-11-06', '2026-11-06') as vence_hoje,
+        public.prazo_dias_restantes($1, '2026-11-06', '2026-11-07') as venceu_sexta_hoje_sabado,
+        public.prazo_dias_restantes($1, '2026-11-04', '2026-11-06') as atraso`,
       [empresa],
     );
     expect(l).toEqual({
@@ -138,6 +168,11 @@ describe("Engenharia: prazos e indicadores (ordem importa)", { concurrent: false
       zero: null,
       uteis: 4,
       invertido: 0,
+      faltam: 2,
+      vence_hoje: 0,
+      // Sem dia útil entre o limite e hoje, mas o prazo já passou: é atraso, não "vence hoje".
+      venceu_sexta_hoje_sabado: -1,
+      atraso: -2,
     });
   });
 
@@ -192,6 +227,8 @@ describe("Engenharia: prazos e indicadores (ordem importa)", { concurrent: false
   });
 
   it("protocolo: sai o prazo da etapa e entra o da distribuidora; exigência aberta troca para o prazo interno", async () => {
+    // Protocolo e exigência com data passada: os prazos contam do fato registrado, não de quando foi digitado.
+    const inicio = diasAtras(21);
     ok(await execEng.cliente.rpc("aplicar_checklist_engenharia", { p_obra_id: obra }), "checklist");
     const { data: itens } = await servico.from("obra_engenharia_itens").select("id").eq("obra_id", obra).eq("obrigatorio", true);
     for (const i of itens!) ok(await admin.cliente.rpc("alterar_item_engenharia", { p_item_id: i.id, p_status: "dispensado", p_motivo: "Teste" }), "dispensar");
@@ -202,42 +239,54 @@ describe("Engenharia: prazos e indicadores (ordem importa)", { concurrent: false
         p_canal: "pew",
         p_numero: `PZ-${sufixo}`,
         p_tipo_solicitacao: "nova_conexao",
-        p_protocolado_em: hoje(),
+        p_protocolado_em: inicio,
       }),
       "protocolo",
     );
     protocolo = r.data as string;
+    const analise = await vence(inicio, 10);
     expect(await prazos(execEng)).toEqual([
-      { obra_id: obra, chave: "distribuidora_analise", inicio: hoje(), limite: await vence(hoje(), 10), dias_restantes: 10 },
+      { obra_id: obra, chave: "distribuidora_analise", inicio, limite: analise, dias_restantes: await restantes(analise) },
     ]);
     // Quem não vê os registros da Engenharia não recebe o prazo do protocolo.
     expect(await prazos(vendedor)).toEqual([]);
+    // Protocolo ainda sem resposta da distribuidora não entra na taxa de exigência.
+    expect((await indicadores(admin, inicio)).exigencia).toEqual({ com: 0, total: 0 });
 
     ok(
       await execEng.cliente.rpc("registrar_evento_protocolo_engenharia", {
         p_protocolo_id: protocolo,
         p_tipo: "exigencia",
-        p_ocorrido_em: hoje(),
+        p_ocorrido_em: inicio,
         p_categoria: "projeto_eletrico",
         p_descricao: "Diagrama ilegível",
       }),
       "exigência",
     );
-    expect(await prazos(execEng)).toEqual([{ obra_id: obra, chave: "exigencia", inicio: hoje(), limite: await vence(hoje(), 3), dias_restantes: 3 }]);
+    const exigencia = await vence(inicio, 3);
+    const esperado = [{ obra_id: obra, chave: "exigencia", inicio, limite: exigencia, dias_restantes: await restantes(exigencia) }];
+    expect(await prazos(execEng)).toEqual(esperado);
+    expect(esperado[0].dias_restantes).toBeLessThan(0);
+
+    // Segunda exigência, de hoje, com prazo interno posterior ao da primeira: a mais urgente continua sendo a primeira
+    // (compara vencimento com vencimento, não com a data de criação).
+    ok(
+      await execEng.cliente.rpc("registrar_evento_protocolo_engenharia", {
+        p_protocolo_id: protocolo,
+        p_tipo: "exigencia",
+        p_ocorrido_em: hoje(),
+        p_categoria: "art",
+        p_descricao: "ART sem assinatura",
+        p_prazo_interno: await vence(inicio, 5),
+      }),
+      "segunda exigência",
+    );
+    expect(await prazos(execEng)).toEqual(esperado);
   });
 
   it("indicadores: carteira, tempo na etapa e protocolos com exigência; só da empresa de quem chama", async () => {
-    const desde = hoje();
-    const { data, error } = await admin.cliente.rpc("indicadores_engenharia", { p_empresa_id: empresa, p_desde: desde });
-    if (error) throw error;
-    const ind = data as {
-      carteira: { total: number; paradas: number };
-      etapas: { etapa: string; mediana: number; n: number }[];
-      protocolo_aprovacao: { mediana: number | null; n: number };
-      exigencia: { com: number; total: number };
-      nao_conformidade: { com: number; total: number };
-      conexao: { mediana: number | null; n: number };
-    };
+    const desde = diasAtras(21);
+    const ind = await indicadores(admin, desde);
     expect(ind.carteira).toEqual({ total: 1, paradas: 0 });
     expect(ind.etapas).toEqual([{ etapa: "a_iniciar", mediana: 0, n: 1 }]);
     expect(ind.exigencia).toEqual({ com: 1, total: 1 });
@@ -246,8 +295,22 @@ describe("Engenharia: prazos e indicadores (ordem importa)", { concurrent: false
     expect(ind.conexao).toEqual({ mediana: null, n: 0 });
 
     // Quem atua na Engenharia vê a mesma carteira; quem é de outra empresa não consulta.
-    const { data: deExec } = await execEng.cliente.rpc("indicadores_engenharia", { p_empresa_id: empresa, p_desde: desde });
-    expect((deExec as typeof ind).carteira.total).toBe(1);
+    expect((await indicadores(execEng, desde)).carteira.total).toBe(1);
     expect((await adminB.cliente.rpc("indicadores_engenharia", { p_empresa_id: empresa, p_desde: desde })).error?.code).toBe("42501");
+    // O vendedor vê a obra (carteira), mas não os protocolos: o agregado não revela o que a RLS esconde.
+    const doVendedor = await indicadores(vendedor, desde);
+    expect(doVendedor.carteira.total).toBe(1);
+    expect(doVendedor.exigencia).toEqual({ com: 0, total: 0 });
+    expect(doVendedor.protocolo_aprovacao).toEqual({ mediana: null, n: 0 });
+  });
+
+  it("obra pausada não tem prazo correndo", async () => {
+    expect(await prazos(execEng)).toHaveLength(1);
+    // Fixture direta no banco local: a pausa ainda não tem ação própria.
+    await noBanco("update public.obras set pausada_em = now(), pausa_motivo = 'Teste de prazo' where id = $1", [obra]);
+    expect(await prazos(execEng)).toEqual([]);
+    expect(await prazos(admin)).toEqual([]);
+    await noBanco("update public.obras set pausada_em = null, pausa_motivo = null where id = $1", [obra]);
+    expect(await prazos(execEng)).toHaveLength(1);
   });
 });

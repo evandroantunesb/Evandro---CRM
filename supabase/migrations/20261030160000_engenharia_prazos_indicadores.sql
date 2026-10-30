@@ -44,14 +44,16 @@ create or replace function public.feriado_nacional(p_data date)
 returns boolean
 language sql immutable set search_path = ''
 as $$
-  select to_char(p_data, 'MM-DD') in ('01-01', '04-21', '05-01', '09-07', '10-12', '11-02', '11-15', '12-25')
-    or (to_char(p_data, 'MM-DD') = '11-20' and extract(year from p_data) >= 2024)
+  -- Páscoa e "MM-DD" calculados uma vez por data: a função roda para cada dia dos intervalos de prazo.
+  select x.md in ('01-01', '04-21', '05-01', '09-07', '10-12', '11-02', '11-15', '12-25')
+    or (x.md = '11-20' and extract(year from p_data) >= 2024)
     or p_data in (
-      public.data_pascoa(extract(year from p_data)::int) - 48, -- segunda de Carnaval
-      public.data_pascoa(extract(year from p_data)::int) - 47, -- terça de Carnaval
-      public.data_pascoa(extract(year from p_data)::int) - 2,  -- Sexta-feira Santa
-      public.data_pascoa(extract(year from p_data)::int) + 60  -- Corpus Christi
-    );
+      x.pascoa - 48, -- segunda de Carnaval
+      x.pascoa - 47, -- terça de Carnaval
+      x.pascoa - 2,  -- Sexta-feira Santa
+      x.pascoa + 60  -- Corpus Christi
+    )
+  from (select to_char(p_data, 'MM-DD') as md, public.data_pascoa(extract(year from p_data)::int) as pascoa) x;
 $$;
 
 -- Feriados da empresa (municipais, estaduais): o admin cadastra e remove. É configuração, não fato: pode apagar.
@@ -106,6 +108,31 @@ as $$
   select count(*)::int
   from generate_series(p_inicio + 1, p_fim, interval '1 day') d
   where public.dia_util(p_empresa_id, d::date);
+$$;
+
+-- Dias úteis até o vencimento: 0 = vence hoje; negativo = dias úteis de atraso. Limite já passado é sempre atraso
+-- (pelo menos −1), mesmo sem dia útil entre ele e hoje (venceu na sexta, hoje é sábado; prazo digitado num feriado).
+create or replace function public.prazo_dias_restantes(p_empresa_id uuid, p_limite date, p_hoje date)
+returns integer
+language sql stable set search_path = ''
+as $$
+  select case when p_limite >= p_hoje then public.dias_uteis_entre(p_empresa_id, p_hoje, p_limite)
+              else least(-1, -public.dias_uteis_entre(p_empresa_id, p_limite, p_hoje)) end;
+$$;
+
+-- Engenharia em curso na obra: obra nem pausada nem cancelada e setor ainda não concluído (inclusive pela exceção que
+-- conclui sem a conexão). Fora disso o prazo não corre. Security definer porque o papel `operacao` não lê `obras`;
+-- só responde sobre obra que quem chama vê (mesma regra da RLS das tabelas filhas).
+create or replace function public.engenharia_em_curso(p_obra_id uuid)
+returns boolean
+language sql stable security definer set search_path = ''
+as $$
+  select coalesce((
+    select o.pausada_em is null and o.cancelada_em is null and f.status <> 'concluido'
+    from public.obras o
+    join public.obra_fluxos f on f.obra_id = o.id and f.setor = 'engenharia'
+    where o.id = p_obra_id and (public.pode_ver_obra(o.id) or public.pode_ver_obra_operacao(o.id))
+  ), false);
 $$;
 
 -- ---------------------------------------------------------------------------
@@ -175,14 +202,13 @@ select public.inserir_prazos_engenharia_padrao(id) from public.empresas;
 -- ---------------------------------------------------------------------------
 
 -- Um prazo por obra e chave, só dos marcos em aberto. Security invoker: a RLS de cada tabela decide o que entra
--- (fluxo: quem vê a obra; protocolo, exigência e vistoria: quem vê os registros da Engenharia).
--- dias_restantes: 0 = vence hoje; negativo = dias úteis de atraso.
+-- (fluxo: quem vê a obra; protocolo, exigência e vistoria: quem vê os registros da Engenharia). Só corre prazo com a
+-- Engenharia em curso (`engenharia_em_curso`). dias_restantes: ver `prazo_dias_restantes`.
 create or replace function public.prazos_engenharia(p_empresa_id uuid)
 returns table (obra_id uuid, chave text, inicio date, limite date, dias_restantes integer)
 language sql stable set search_path = ''
 as $$
-  with hoje as (select (now() at time zone 'America/Sao_Paulo')::date as d),
-  prazo as (select p.chave, p.dias_uteis from public.engenharia_prazos p where p.empresa_id = p_empresa_id and p.dias_uteis is not null),
+  with prazo as (select p.chave, p.dias_uteis from public.engenharia_prazos p where p.empresa_id = p_empresa_id and p.dias_uteis is not null),
   ultima_vistoria as (
     select distinct on (v.obra_id) v.*
     from public.obra_engenharia_vistorias v
@@ -195,11 +221,15 @@ as $$
     from public.obra_fluxos f
     where f.empresa_id = p_empresa_id and f.setor = 'engenharia' and f.status in ('a_iniciar', 'projeto_em_elaboracao')
     union all
-    -- Exigência aberta: o prazo interno digitado na exigência vence o padrão. A mais urgente da obra.
-    (select distinct on (e.obra_id) e.obra_id, 'exigencia', (e.created_at at time zone 'America/Sao_Paulo')::date, e.prazo_interno
+    -- Exigência aberta: conta da data em que a distribuidora a emitiu (o evento), não de quando foi digitada. O prazo
+    -- interno digitado vence o padrão. A mais urgente da obra: o menor vencimento efetivo.
+    (select distinct on (e.obra_id) e.obra_id, 'exigencia', ev.ocorrido_em,
+      coalesce(e.prazo_interno, public.somar_dias_uteis(p_empresa_id, ev.ocorrido_em, pr.dias_uteis)) as fixo
     from public.obra_engenharia_exigencias e
+    join public.obra_engenharia_protocolo_eventos ev on ev.id = e.evento_id
+    left join prazo pr on pr.chave = 'exigencia'
     where e.empresa_id = p_empresa_id and e.status = 'aberta'
-    order by e.obra_id, coalesce(e.prazo_interno, (e.created_at at time zone 'America/Sao_Paulo')::date))
+    order by e.obra_id, fixo nulls last, ev.ocorrido_em)
     union all
     -- Correção de campo: desde a não conformidade, enquanto não houver a correção registrada.
     select v.obra_id, 'correcao_campo', (
@@ -234,19 +264,20 @@ as $$
     left join prazo pr on pr.chave = m.chave
     where m.inicio is not null and (m.fixo is not null or pr.dias_uteis is not null)
   )
-  select x.obra_id, x.chave, x.inicio, x.limite,
-    case when x.limite >= h.d then public.dias_uteis_entre(p_empresa_id, h.d, x.limite)
-         else -public.dias_uteis_entre(p_empresa_id, x.limite, h.d) end
-  from vencimentos x cross join hoje h;
+  select x.obra_id, x.chave, x.inicio, x.limite, public.prazo_dias_restantes(p_empresa_id, x.limite, public.hoje_brasilia())
+  from vencimentos x
+  where public.engenharia_em_curso(x.obra_id);
 $$;
 
 -- ---------------------------------------------------------------------------
 -- Indicadores de desempenho
 -- ---------------------------------------------------------------------------
 
--- Agregados das obras que quem chama pode ver (a mesma regra da RLS de obras), sem limite de linhas. Security definer
--- só para ler `obras` também pelo caminho do papel `operacao` (que não lê a tabela direto); devolve apenas contagens
--- e medianas, nunca dados de uma obra. Período: marcos ocorridos a partir de p_desde.
+-- Agregados do que quem chama pode ver, sem limite de linhas. Security definer só para ler `obras` também pelo
+-- caminho do papel `operacao` (que não lê a tabela direto); devolve apenas contagens e medianas. Cada fonte aplica a
+-- mesma regra da RLS da sua tabela: fluxo e histórico, quem vê a obra; protocolos e exigências,
+-- `pode_ver_documentos_engenharia`; vistorias, `pode_ver_vistoria_obra`. Assim o agregado de uma obra só nunca
+-- revela o que a RLS esconde. Período: marcos ocorridos a partir de p_desde.
 create or replace function public.indicadores_engenharia(p_empresa_id uuid, p_desde date)
 returns jsonb
 language plpgsql stable security definer set search_path = ''
@@ -263,6 +294,8 @@ begin
     from public.obras o
     where o.empresa_id = p_empresa_id and (public.pode_ver_obra(o.id) or public.pode_ver_obra_operacao(o.id))
   ),
+  obras_docs as (select o.id from obras_vis o where public.pode_ver_documentos_engenharia(o.id)),
+  obras_vistoria as (select o.id from obras_vis o where public.pode_ver_vistoria_obra(o.id)),
   fluxo as (
     select f.* from public.obra_fluxos f join obras_vis o on o.id = f.obra_id where f.setor = 'engenharia'
   ),
@@ -281,26 +314,32 @@ begin
   ),
   aprovacoes as (
     select public.dias_uteis_entre(p_empresa_id, p.protocolado_em, a.aprovado_em) as dias
-    from public.obra_engenharia_protocolos p join obras_vis o on o.id = p.obra_id
+    from public.obra_engenharia_protocolos p join obras_docs o on o.id = p.obra_id
     cross join lateral (
       select min(ev.ocorrido_em) as aprovado_em from public.obra_engenharia_protocolo_eventos ev
       where ev.protocolo_id = p.id and ev.tipo = 'aprovado'
     ) a
     where a.aprovado_em >= p_desde
   ),
+  -- Só protocolos que a distribuidora já respondeu (exigência, aprovação, orçamento ou indeferimento): os que ainda
+  -- esperam análise não dizem se haverá exigência e baixariam a taxa.
   protocolos as (
     select exists (select 1 from public.obra_engenharia_exigencias e where e.protocolo_id = p.id) as com_exigencia
-    from public.obra_engenharia_protocolos p join obras_vis o on o.id = p.obra_id
+    from public.obra_engenharia_protocolos p join obras_docs o on o.id = p.obra_id
     where p.protocolado_em >= p_desde and p.status <> 'cancelado'
+      and exists (
+        select 1 from public.obra_engenharia_protocolo_eventos ev
+        where ev.protocolo_id = p.id and ev.tipo in ('exigencia', 'aprovado', 'orcamento_emitido', 'indeferido')
+      )
   ),
   resultados as (
     select ev.tipo = 'nao_conformidade' as nc
-    from public.obra_engenharia_vistoria_eventos ev join obras_vis o on o.id = ev.obra_id
+    from public.obra_engenharia_vistoria_eventos ev join obras_vistoria o on o.id = ev.obra_id
     where ev.tipo in ('aprovada', 'nao_conformidade') and ev.ocorrido_em >= p_desde
   ),
   conexoes as (
     select public.dias_uteis_entre(p_empresa_id, coalesce(a.aprovada_em, v.realizada_em), v.conexao_confirmada_em) as dias
-    from public.obra_engenharia_vistorias v join obras_vis o on o.id = v.obra_id
+    from public.obra_engenharia_vistorias v join obras_vistoria o on o.id = v.obra_id
     cross join lateral (
       select min(ev.ocorrido_em) as aprovada_em from public.obra_engenharia_vistoria_eventos ev
       where ev.vistoria_id = v.id and ev.tipo = 'aprovada'
@@ -343,6 +382,10 @@ revoke all on function public.somar_dias_uteis(uuid, date, integer) from public,
 grant execute on function public.somar_dias_uteis(uuid, date, integer) to authenticated;
 revoke all on function public.dias_uteis_entre(uuid, date, date) from public, anon, authenticated, service_role;
 grant execute on function public.dias_uteis_entre(uuid, date, date) to authenticated;
+revoke all on function public.prazo_dias_restantes(uuid, date, date) from public, anon, authenticated, service_role;
+grant execute on function public.prazo_dias_restantes(uuid, date, date) to authenticated;
+revoke all on function public.engenharia_em_curso(uuid) from public, anon, authenticated, service_role;
+grant execute on function public.engenharia_em_curso(uuid) to authenticated;
 revoke all on function public.prazos_engenharia(uuid) from public, anon, authenticated, service_role;
 grant execute on function public.prazos_engenharia(uuid) to authenticated;
 revoke all on function public.indicadores_engenharia(uuid, date) from public, anon, authenticated, service_role;

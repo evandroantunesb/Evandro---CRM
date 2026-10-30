@@ -66,8 +66,13 @@ export async function salvarPrazos(_: ResultadoAcao, formData: FormData): Promis
     valores.push({ chave, dias: d.data === "" ? null : d.data });
   }
 
+  // Só o que mudou: cada linha gravada vira um registro de auditoria, e menos escritas deixam menos espaço para um
+  // salvamento parcial se uma delas falhar.
   const supabase = await criarClienteServidor();
-  for (const v of valores) {
+  const { data: atuais, error: erroLeitura } = await supabase.from("engenharia_prazos").select("chave, dias_uteis").eq("empresa_id", atual.empresaId);
+  if (erroLeitura) return { ok: false, mensagem: "Não foi possível salvar os prazos." };
+  const antes = new Map((atuais ?? []).map((p) => [p.chave, p.dias_uteis]));
+  for (const v of valores.filter((v) => antes.get(v.chave) !== v.dias)) {
     const { error } = await supabase
       .from("engenharia_prazos")
       .update({ dias_uteis: v.dias })

@@ -9,6 +9,7 @@ import {
   type PrazoObra,
 } from "@/lib/engenharia-prazos-regras";
 import type { SupabaseServidor } from "@/lib/supabase/server";
+import { hojeBrasilia } from "@/lib/tarefas-setor-regras";
 
 /** Prazos em curso por obra, o mais urgente primeiro. A RLS das tabelas de origem decide o que cada um recebe. */
 export async function carregarPrazosObras(supabase: SupabaseServidor, empresaId: string): Promise<Map<string, PrazoObra[]>> {
@@ -24,13 +25,15 @@ export async function carregarPrazosObras(supabase: SupabaseServidor, empresaId:
   return mapa;
 }
 
-/** Indicadores do período (marcos a partir de hoje − N dias, no horário de Brasília). Null se o banco recusar. */
+/** Indicadores dos últimos N dias corridos, hoje incluído (horário de Brasília). Null se o banco recusar. */
 export async function carregarIndicadoresEngenharia(
   supabase: SupabaseServidor,
   empresaId: string,
   periodo: PeriodoIndicadores,
 ): Promise<IndicadoresEngenharia | null> {
-  const desde = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date(Date.now() - periodo * 86_400_000));
+  const inicio = new Date(`${hojeBrasilia()}T12:00:00Z`);
+  inicio.setUTCDate(inicio.getUTCDate() - (periodo - 1));
+  const desde = inicio.toISOString().slice(0, 10);
   const { data, error } = await supabase.rpc("indicadores_engenharia", { p_empresa_id: empresaId, p_desde: desde });
   return error ? null : lerIndicadores(data);
 }
