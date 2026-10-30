@@ -18,7 +18,7 @@
 
 ### P2 — checklist de documentos (#257)
 
-**Migration `20261030100000_engenharia_checklist.sql` aplicada em produção em 30/10/2026** pelo `banco-producao.yml` (tag `migracao-pr257-f55d0da`; conferir + aplicar aprovados pelo Evandro; dry-run listou só ela). Enquanto a #257 não for mesclada, **produção fica à frente da `main`** nessa migration.
+**Migration `20261030100000_engenharia_checklist.sql` aplicada em produção em 30/10/2026** pelo `banco-producao.yml` (tag `migracao-pr257-f55d0da`; conferir + aplicar aprovados pelo Evandro; dry-run listou só ela). #257 mesclada em 30/10.
 
 - **Modelo por empresa** (`/configuracoes/engenharia`, só admin; sem DELETE): nasce com 11 itens da spec v1.3 seção 24.2 (padrão Copel, a revisar com o responsável técnico). Aplicar na obra copia os itens ativos; editar o modelo não muda obra já aplicada; "Trazer itens novos do modelo" só acrescenta.
 - **Documentos versionados** no bucket privado `engenharia-documentos` (`empresa/obra/objeto`); nada se apaga (arquivo errado = nova versão + item inválido). Download por `/documentos-engenharia/[id]`.
@@ -32,7 +32,7 @@ O engenheiro testou o P2 em 30/10.
 
 ### P3 — protocolos, exigências e trava de etapa (#258, empilhada sobre a #257)
 
-**Migration `20261030120000_engenharia_protocolos.sql` aplicada em produção em 30/10/2026** (tag `migracao-pr258-ce6a13b`; conferir + aplicar aprovados pelo Evandro; dry-run listou só ela). Produção fica à frente da `main` até #257 e #258 serem mescladas. Ao mesclar a #257, trocar a base da #258 para `main` **antes** de apagar a branch.
+**Migration `20261030120000_engenharia_protocolos.sql` aplicada em produção em 30/10/2026** (tag `migracao-pr258-ce6a13b`; conferir + aplicar aprovados pelo Evandro; dry-run listou só ela). #258 mesclada em 30/10 (base trocada para `main` antes de apagar a branch da #257). **Produção e `main` alinhadas** (última `20261030120000_engenharia_protocolos.sql`; `main` em `95d7edb`).
 
 - **Protocolo** (canal PEW/CAW/atendimento/outro; um ativo por obra) com eventos imutáveis, arquivos por evento e pacote de documentos (snapshot) a cada envio/reenvio. Situações: protocolado → em análise / com exigência → aprovado / orçamento emitido → encerrado; indeferido e cancelado.
 - **Exigências** com categoria e prazo interno; reenvio marca como reenviadas; aprovação, orçamento ou encerramento resolvem todas.
