@@ -67,7 +67,7 @@ test("vistoria com não conformidade, nova vistoria, medidor, conexão e conclus
   await campo.getByRole("button", { name: "Registrar", exact: true }).click();
   await expect(page.getByText("Correção de campo feita").first()).toBeVisible();
   await page.goto(`/engenharia/${obra}`);
-  await expect(vistoria.getByText("Correção de campo feita")).toBeVisible();
+  await expect(vistoria.locator("li").filter({ hasText: "Correção de campo feita" })).toBeVisible();
 
   await vistoria.getByRole("button", { name: "Registrar pedido de vistoria" }).click();
   await expect(vistoria.getByText("Solicitada", { exact: true })).toBeVisible();

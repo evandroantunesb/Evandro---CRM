@@ -5634,6 +5634,7 @@ export type Database = {
       pendencias_contrato_contato: { Args: { p_contato_id: string }; Returns: string[] };
       pode_enviar_pasta_engenharia: { Args: { p_caminho: string }; Returns: boolean };
       pode_enviar_pasta_tarefa_setor: { Args: { p_caminho: string }; Returns: boolean };
+      pode_enviar_pasta_vistoria: { Args: { p_caminho: string }; Returns: boolean };
       pode_registrar_pagamento_negocio: { Args: { p_negocio_id: string }; Returns: boolean };
       pode_responder_handoff: { Args: { p_handoff_id: string }; Returns: boolean };
       pode_ver_avatar: { Args: { p_pasta: string }; Returns: boolean };
@@ -5650,6 +5651,7 @@ export type Database = {
       pode_ver_pasta_anexo: { Args: { p_caminho: string }; Returns: boolean };
       pode_ver_pasta_engenharia: { Args: { p_caminho: string }; Returns: boolean };
       pode_ver_pasta_tarefa_setor: { Args: { p_caminho: string }; Returns: boolean };
+      pode_ver_pasta_vistoria: { Args: { p_caminho: string }; Returns: boolean };
       pode_ver_pdf_proposta_emitida: { Args: { p_caminho: string }; Returns: boolean };
       pode_ver_responsavel: {
         Args: { p_empresa_id: string; p_responsavel_id: string };
@@ -5657,6 +5659,7 @@ export type Database = {
       };
       pode_ver_tarefa_setor: { Args: { p_tarefa_id: string }; Returns: boolean };
       pode_ver_valor_vendido_obra: { Args: { p_obra_id: string }; Returns: boolean };
+      pode_ver_vistoria_obra: { Args: { p_obra_id: string }; Returns: boolean };
       precos_eletroposto_validos: {
         Args: { p_modelos: string[]; p_precos: Json };
         Returns: boolean;
@@ -5788,6 +5791,10 @@ export type Database = {
           semana: Json;
           sequencia: number;
         }[];
+      };
+      setor_registro_vistoria: {
+        Args: { p_obra_id: string; p_tipo: string };
+        Returns: Database["public"]["Enums"]["setor_obra"];
       };
       situacao_registro_pagamento: { Args: { p_negocio_id: string }; Returns: string };
       situacao_vistoria_obra: {
