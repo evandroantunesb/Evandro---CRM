@@ -120,6 +120,32 @@ describe("central com exigência aberta (P3)", () => {
   });
 });
 
+describe("central com vistoria (P4)", () => {
+  it("não conformidade e conexão confirmada viram ação; vistoria em andamento espera a distribuidora", () => {
+    const central = montarCentralEngenharia([obra(1, "aguardando_vistoria"), obra(2, "aguardando_vistoria"), obra(3, "aguardando_vistoria")], rotulo, {
+      coordena: false,
+      acoesVistoria: new Map([
+        ["o1", "Corrigir a não conformidade e pedir nova vistoria"],
+        ["o2", "Concluir a Engenharia"],
+      ]),
+    });
+    expect(central.acoes.map((o) => [o.numero, o.proximaAcao])).toEqual([
+      [1, "Corrigir a não conformidade e pedir nova vistoria"],
+      [2, "Concluir a Engenharia"],
+    ]);
+    expect(central.comTerceiros.map((o) => [o.numero, o.proximaAcao])).toEqual([[3, "Acompanhar vistoria e troca do medidor"]]);
+  });
+
+  it("exigência aberta vem antes da ação da vistoria", () => {
+    const { acoes } = montarCentralEngenharia([obra(4, "aguardando_vistoria")], rotulo, {
+      coordena: false,
+      exigencias: new Map([["o4", 1]]),
+      acoesVistoria: new Map([["o4", "Concluir a Engenharia"]]),
+    });
+    expect(acoes[0].proximaAcao).toBe("Responder exigência da concessionária");
+  });
+});
+
 describe("diasDesde", () => {
   it("conta dias corridos no horário de Brasília", () => {
     const agora = new Date("2026-10-29T15:00:00Z");

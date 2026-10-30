@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { CANAIS_PROTOCOLO, CATEGORIAS_EXIGENCIA, TIPOS_RESPOSTA, TIPOS_SOLICITACAO } from "@/lib/engenharia-protocolos-regras";
+import { TIPOS_REGISTRO_VISTORIA } from "@/lib/engenharia-vistoria-regras";
 import { mensagemErro } from "@/lib/erros";
 import { ENGENHARIA } from "@/lib/permissoes";
 import { exigirPapel } from "@/lib/sessao";
@@ -157,4 +158,88 @@ export async function registrarArquivoProtocoloEngenharia(dados: { obraId: strin
   if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível registrar o arquivo.") };
   revalidar(d.data.obraId);
   return { ok: true, mensagem: "Arquivo anexado." };
+}
+
+const esquemaPedidoVistoria = comObra.extend({
+  solicitadaEm: data,
+  numero: z.preprocess(vazioComoNada, z.string().trim().max(60, "Número muito longo.").optional()),
+  observacao: z.preprocess(vazioComoNada, z.string().trim().max(1000, "Observação muito longa.").optional()),
+});
+
+/**
+ * Registra o pedido de vistoria feito à distribuidora. A RPC exige protocolo aprovado e instalação concluída (G5) e
+ * leva a Engenharia para "Aguardando vistoria".
+ */
+export async function solicitarVistoriaEngenharia(_: ResultadoEventoProtocolo, formData: FormData): Promise<ResultadoEventoProtocolo> {
+  await exigirPapel(...ENGENHARIA);
+  const d = esquemaPedidoVistoria.safeParse(Object.fromEntries(formData));
+  if (!d.success) return { ok: false, mensagem: d.error.issues[0]?.message ?? "Dados inválidos." };
+  const supabase = await criarClienteServidor();
+  const { data: vistoriaId, error } = await supabase.rpc("solicitar_vistoria_engenharia", {
+    p_obra_id: d.data.obraId,
+    p_solicitada_em: d.data.solicitadaEm,
+    ...(d.data.numero ? { p_numero: d.data.numero } : {}),
+    ...(d.data.observacao ? { p_observacao: d.data.observacao } : {}),
+  });
+  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível registrar o pedido de vistoria.") };
+  const { data: evento } = await supabase
+    .from("obra_engenharia_vistoria_eventos")
+    .select("id")
+    .eq("vistoria_id", vistoriaId as string)
+    .eq("tipo", "solicitada")
+    .maybeSingle();
+  revalidar(d.data.obraId);
+  return { ok: true, mensagem: "Pedido de vistoria registrado. A Engenharia passou para Aguardando vistoria.", eventoId: evento?.id };
+}
+
+const esquemaEventoVistoria = comObra.extend({
+  vistoriaId: z.string().uuid(),
+  tipo: z.enum(TIPOS_REGISTRO_VISTORIA, { error: "Escolha o que aconteceu." }),
+  data,
+  descricao: z.preprocess(vazioComoNada, z.string().trim().max(4000, "Texto muito longo.").optional()),
+});
+
+/** Agendamento, resultado da vistoria, medidor adequado ou conexão confirmada. A RPC confere a ordem e as datas. */
+export async function registrarEventoVistoriaEngenharia(_: ResultadoEventoProtocolo, formData: FormData): Promise<ResultadoEventoProtocolo> {
+  await exigirPapel(...ENGENHARIA);
+  const d = esquemaEventoVistoria.safeParse(Object.fromEntries(formData));
+  if (!d.success) return { ok: false, mensagem: d.error.issues[0]?.message ?? "Dados inválidos." };
+  const supabase = await criarClienteServidor();
+  const { data: eventoId, error } = await supabase.rpc("registrar_evento_vistoria_engenharia", {
+    p_vistoria_id: d.data.vistoriaId,
+    p_tipo: d.data.tipo,
+    p_data: d.data.data,
+    ...(d.data.descricao ? { p_descricao: d.data.descricao } : {}),
+  });
+  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível registrar.") };
+  revalidar(d.data.obraId);
+  return { ok: true, mensagem: "Registrado.", eventoId: eventoId as string };
+}
+
+/** Anexa ao evento da vistoria um arquivo que o navegador já enviou à pasta da obra (relatório, foto, comprovante). */
+export async function registrarArquivoVistoriaEngenharia(dados: { obraId: string; eventoId: string; caminho: string; nome: string }): Promise<ResultadoAcao> {
+  await exigirPapel(...ENGENHARIA);
+  const d = comObra
+    .extend({ eventoId: z.string().uuid(), caminho: z.string().min(1).max(400), nome: z.string().trim().min(1).max(200) })
+    .safeParse(dados);
+  if (!d.success) return { ok: false, mensagem: "Dados do arquivo inválidos." };
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.rpc("registrar_arquivo_vistoria_engenharia", { p_evento_id: d.data.eventoId, p_caminho: d.data.caminho, p_nome: d.data.nome });
+  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível registrar o arquivo.") };
+  revalidar(d.data.obraId);
+  return { ok: true, mensagem: "Arquivo anexado." };
+}
+
+const esquemaExcecao = comObra.extend({ motivo: z.string().trim().min(10, "Explique o motivo (mínimo 10 caracteres).").max(500, "Motivo muito longo.") });
+
+/** Exceção ao G6: o admin conclui a Engenharia sem a conexão confirmada, com motivo (guardado no histórico, sem exibição). */
+export async function concluirEngenhariaSemConexao(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  await exigirPapel("admin");
+  const d = esquemaExcecao.safeParse(Object.fromEntries(formData));
+  if (!d.success) return { ok: false, mensagem: d.error.issues[0]?.message ?? "Dados inválidos." };
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.rpc("concluir_engenharia_sem_conexao", { p_obra_id: d.data.obraId, p_motivo: d.data.motivo });
+  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível concluir a Engenharia.") };
+  revalidar(d.data.obraId);
+  return { ok: true, mensagem: "Engenharia concluída sem a conexão confirmada." };
 }

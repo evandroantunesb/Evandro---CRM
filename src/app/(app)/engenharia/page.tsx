@@ -4,6 +4,7 @@ import { ListaTarefasSetor } from "@/components/tarefas-setor";
 import { Cartao, Selo } from "@/components/ui";
 import { diasDesde, montarCentralEngenharia, type ObraNaEngenharia } from "@/lib/engenharia-regras";
 import { contarExigenciasAbertas } from "@/lib/engenharia-protocolos";
+import { carregarAcoesVistoria } from "@/lib/engenharia-vistoria";
 import { carregarObras, type ObraListaVM } from "@/lib/obras/dados";
 import { ROTULO_ESTADO_SETOR, rotuloStatus } from "@/lib/obras/rotulos";
 import { ENGENHARIA, OBRAS, pode } from "@/lib/permissoes";
@@ -64,7 +65,7 @@ export default async function Engenharia({ searchParams }: PageProps<"/engenhari
     );
   }
 
-  const [{ tarefas, membrosPorSetor }, porAba, obras, exigencias] = await Promise.all([
+  const [{ tarefas, membrosPorSetor }, porAba, obras, exigencias, acoesVistoria] = await Promise.all([
     carregarTarefasSetor(supabase, {
       empresaId: atual.empresaId,
       membroId: atual.membroId,
@@ -76,6 +77,7 @@ export default async function Engenharia({ searchParams }: PageProps<"/engenhari
     // As obras só entram na Central; as abas de tarefas não as usam.
     filtro ? null : carregarObras(supabase, { empresaId: atual.empresaId, papel: atual.papel, membroId: atual.membroId }).then((r) => r.obras),
     filtro ? null : contarExigenciasAbertas(supabase, atual.empresaId),
+    filtro ? null : carregarAcoesVistoria(supabase, atual.empresaId),
   ]);
   const listaTarefas = tarefas.map(paraCard);
 
@@ -110,6 +112,7 @@ export default async function Engenharia({ searchParams }: PageProps<"/engenhari
           membrosPorSetor={membrosPorSetor}
           obras={obras}
           exigencias={exigencias ?? new Map()}
+          acoesVistoria={acoesVistoria ?? new Map()}
           membroId={atual.membroId}
           podeVerObras={pode(atual.papel, OBRAS)}
           // Definir responsável é do admin e do coordenador (quem a RPC deixa gerir a obra); o gestor só acompanha.
@@ -125,6 +128,7 @@ function Central({
   membrosPorSetor,
   obras,
   exigencias,
+  acoesVistoria,
   membroId,
   podeVerObras,
   coordena,
@@ -133,11 +137,12 @@ function Central({
   membrosPorSetor: Parameters<typeof ListaTarefasSetor>[0]["membrosPorSetor"];
   obras: ObraListaVM[];
   exigencias: ReadonlyMap<string, number>;
+  acoesVistoria: ReadonlyMap<string, string>;
   membroId: string;
   podeVerObras: boolean;
   coordena: boolean;
 }) {
-  const { acoes, comTerceiros, grupos } = montarCentralEngenharia(obras, (s) => rotuloStatus("engenharia", s), { coordena, exigencias });
+  const { acoes, comTerceiros, grupos } = montarCentralEngenharia(obras, (s) => rotuloStatus("engenharia", s), { coordena, exigencias, acoesVistoria });
 
   // Minhas tarefas e as da fila que eu posso assumir; o resto do setor fica nas abas.
   const tarefasMinhas = tarefas.filter((t) => t.responsavel?.id === membroId || (!t.responsavel && t.podeAgir));

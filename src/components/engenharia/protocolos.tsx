@@ -1,17 +1,14 @@
 "use client";
 
-import { Paperclip } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useActionState, useEffect, useState, type ReactNode } from "react";
+import { useActionState, useState } from "react";
 import { Botao, CLASSE_ENTRADA, Mensagem, Selo } from "@/components/ui";
 import {
   registrarArquivoProtocoloEngenharia,
   registrarEventoProtocoloEngenharia,
   registrarProtocoloEngenharia,
-  type ResultadoEventoProtocolo,
 } from "@/lib/acoes/engenharia";
-import { metaArquivo, nomeSeguro, problemaArquivo } from "@/lib/anexos-regras";
-import { BUCKET_DOCUMENTOS_ENGENHARIA } from "@/lib/engenharia-checklist-regras";
+import { LinkArquivo, Rotulo, dataBr, hojeBr, useEnvioDepois } from "./eventos-comum";
 import {
   CANAIS_PROTOCOLO,
   CATEGORIAS_EXIGENCIA,
@@ -30,13 +27,6 @@ import {
   type StatusProtocolo,
   type TipoResposta,
 } from "@/lib/engenharia-protocolos-regras";
-import { criarClienteNavegador } from "@/lib/supabase/navegador";
-
-const hojeBr = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
-const dataBr = (iso: string) => {
-  const [a, m, d] = iso.slice(0, 10).split("-");
-  return `${d}/${m}/${a}`;
-};
 
 // Sem verde (WhatsApp); vermelho só para indeferido (perda). Exigência é atenção, não erro.
 const TOM: Record<StatusProtocolo, "neutro" | "atencao" | "negativo"> = {
@@ -49,28 +39,6 @@ const TOM: Record<StatusProtocolo, "neutro" | "atencao" | "negativo"> = {
   cancelado: "neutro",
   encerrado: "neutro",
 };
-
-/** Envia os arquivos à pasta da obra e liga cada um ao evento. Devolve a primeira falha, ou null. */
-async function anexarAoEvento(pasta: string, obraId: string, eventoId: string, arquivos: File[]): Promise<string | null> {
-  const supabase = criarClienteNavegador();
-  let falha: string | null = null;
-  for (const arquivo of arquivos) {
-    const problema = problemaArquivo(metaArquivo(arquivo));
-    if (problema) {
-      falha ??= problema;
-      continue;
-    }
-    const caminho = `${pasta}/${nomeSeguro(arquivo.name)}`;
-    const { error } = await supabase.storage.from(BUCKET_DOCUMENTOS_ENGENHARIA).upload(caminho, arquivo, { contentType: arquivo.type || undefined });
-    if (error) {
-      falha ??= `Não foi possível enviar "${arquivo.name}".`;
-      continue;
-    }
-    const r = await registrarArquivoProtocoloEngenharia({ obraId, eventoId, caminho, nome: arquivo.name });
-    if (!r?.ok) falha ??= r?.mensagem ?? `Não foi possível registrar "${arquivo.name}".`;
-  }
-  return falha;
-}
 
 /**
  * Protocolo na concessionária: o engenheiro protocola no portal da distribuidora e registra aqui (o Raion não acessa o
@@ -131,7 +99,7 @@ function NovoProtocolo({ obraId, pasta }: { obraId: string; pasta: string }) {
   const [resultado, acao, pendente] = useActionState(registrarProtocoloEngenharia, null);
   const [comprovantes, setComprovantes] = useState<File[]>([]);
   const [erroArquivo, setErroArquivo] = useState<string | null>(null);
-  useEnvioDepois(resultado, pasta, obraId, comprovantes, setErroArquivo, router.refresh);
+  useEnvioDepois(resultado, registrarArquivoProtocoloEngenharia, pasta, obraId, comprovantes, setErroArquivo, router.refresh);
 
   return (
     <form action={acao} className="flex flex-col gap-3 rounded-lg border border-linha p-3">
@@ -182,31 +150,6 @@ function NovoProtocolo({ obraId, pasta }: { obraId: string; pasta: string }) {
       {erroArquivo && <p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-800">{erroArquivo}</p>}
     </form>
   );
-}
-
-/** Depois que o registro devolve o evento, envia os arquivos escolhidos e atualiza a tela. */
-function useEnvioDepois(
-  resultado: ResultadoEventoProtocolo,
-  pasta: string,
-  obraId: string,
-  arquivos: File[],
-  setErro: (e: string | null) => void,
-  atualizar: () => void,
-) {
-  useEffect(() => {
-    if (!resultado?.ok || !resultado.eventoId || arquivos.length === 0) return;
-    let ativo = true;
-    anexarAoEvento(pasta, obraId, resultado.eventoId, arquivos).then((falha) => {
-      if (!ativo) return;
-      setErro(falha);
-      atualizar();
-    });
-    return () => {
-      ativo = false;
-    };
-    // Um envio por resultado: os arquivos são os do momento do registro.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resultado]);
 }
 
 function Protocolo({ obraId, pasta, protocolo, podeAgir }: { obraId: string; pasta: string; protocolo: ProtocoloVM; podeAgir: boolean }) {
@@ -263,10 +206,7 @@ function Protocolo({ obraId, pasta, protocolo, podeAgir }: { obraId: string; pas
               </details>
             )}
             {e.arquivos.map((a) => (
-              <a key={a.id} href={`/arquivos-protocolo/${a.id}`} target="_blank" rel="noopener" className="inline-flex w-fit items-center gap-1 text-xs text-amber-700 hover:underline">
-                <Paperclip aria-hidden className="size-3.5" />
-                {a.nome}
-              </a>
+              <LinkArquivo key={a.id} href={`/arquivos-protocolo/${a.id}`} nome={a.nome} />
             ))}
           </li>
         ))}
@@ -283,7 +223,7 @@ function NovaResposta({ obraId, pasta, protocolo, possiveis }: { obraId: string;
   const [tipo, setTipo] = useState<TipoResposta>(possiveis[0]);
   const [arquivos, setArquivos] = useState<File[]>([]);
   const [erroArquivo, setErroArquivo] = useState<string | null>(null);
-  useEnvioDepois(resultado, pasta, obraId, arquivos, setErroArquivo, router.refresh);
+  useEnvioDepois(resultado, registrarArquivoProtocoloEngenharia, pasta, obraId, arquivos, setErroArquivo, router.refresh);
   const atual = possiveis.includes(tipo) ? tipo : possiveis[0];
 
   return (
@@ -339,14 +279,5 @@ function NovaResposta({ obraId, pasta, protocolo, possiveis }: { obraId: string;
       </div>
       {erroArquivo && <p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-800">{erroArquivo}</p>}
     </form>
-  );
-}
-
-function Rotulo({ texto, children }: { texto: string; children: ReactNode }) {
-  return (
-    <label className="flex flex-col gap-1 text-xs text-zinc-600">
-      {texto}
-      {children}
-    </label>
   );
 }

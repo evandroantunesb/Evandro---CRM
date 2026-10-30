@@ -8,9 +8,11 @@ import { formatarDataHora, formatarMoeda } from "@/lib/crm";
 import { carregarObras } from "@/lib/obras/dados";
 import { filtrosDeParams, hrefObra, montarNavegacao, queryDosFiltros, temFiltroAtivo } from "@/lib/obras/navegacao";
 import { GestaoFixacao, GestaoMarco, GestaoSetor } from "./gestao";
+import { ResumoVistoria } from "@/components/engenharia/vistoria-resumo";
 import { Campo, CartaoSetor, ContatoCliente, DadosTecnicos, ListaParticipantes, comUnidade } from "@/components/obras/detalhe-obra";
 import { ListaTarefasSetor, NovaTarefaSetor } from "@/components/tarefas-setor";
 import { carregarTarefasSetor } from "@/lib/tarefas-setor";
+import { carregarSituacaoVistoria } from "@/lib/engenharia-vistoria";
 import { carregarDetalheObra, type MarcoDetalheVM } from "@/lib/obras/detalhe";
 import {
   ROTULO_ALERTA_OBRA,
@@ -36,10 +38,11 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
 
   const supabase = await criarClienteServidor();
   // A lista navegável é recalculada aqui, a cada obra: mesma empresa, mesma RLS, mesmos filtros.
-  const [obra, lista, tarefasSetor] = await Promise.all([
+  const [obra, lista, tarefasSetor, vistoria] = await Promise.all([
     carregarDetalheObra(supabase, { empresaId: atual.empresaId, papel: atual.papel, obraId: id, membroId: atual.membroId }),
     carregarObras(supabase, { empresaId: atual.empresaId, papel: atual.papel, comResponsaveis: false }),
     carregarTarefasSetor(supabase, { empresaId: atual.empresaId, membroId: atual.membroId, papel: atual.papel, obraId: id, filtro: "todas" }),
+    carregarSituacaoVistoria(supabase, id),
   ]);
   if (!obra) notFound();
   const navegacao = montarNavegacao(lista.obras, filtros, id);
@@ -110,6 +113,8 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
             return (
               <CartaoSetor key={s.setor} setor={s}>
                 {/* key pela obra: ao navegar para outra obra, nenhum estado de formulário da anterior sobrevive. */}
+                {/* A vistoria é registrada pela Engenharia; o Operacional acompanha a situação e as datas. */}
+                {s.setor === "operacional" && vistoria && <ResumoVistoria situacao={vistoria} />}
                 {g && <GestaoSetor key={resumo.id} obraId={resumo.id} setor={s} gestao={g} />}
               </CartaoSetor>
             );

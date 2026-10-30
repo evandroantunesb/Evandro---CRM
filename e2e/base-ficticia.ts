@@ -262,6 +262,18 @@ export async function criarBaseFicticia(): Promise<BaseFicticia> {
       "protocolo",
     );
   };
+  // Concluir a Engenharia exige vistoria aprovada e conexão confirmada (20261030140000), e pedir a vistoria exige o
+  // protocolo aprovado e a instalação concluída: aprova o protocolo e registra pedido, vistoria, medidor e conexão.
+  const conectar = async (obra: string) => {
+    const hoje = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+    const { data: protocolo } = await admin.from("obra_engenharia_protocolos").select("id").eq("obra_id", obra).single();
+    feito(await admin.rpc("registrar_evento_protocolo_engenharia", { p_protocolo_id: protocolo!.id, p_tipo: "aprovado", p_ocorrido_em: hoje }), "aprovar");
+    const pedido = await admin.rpc("solicitar_vistoria_engenharia", { p_obra_id: obra, p_solicitada_em: hoje });
+    feito(pedido, "vistoria");
+    for (const tipo of ["aprovada", "medidor_adequado", "conexao_confirmada"]) {
+      feito(await admin.rpc("registrar_evento_vistoria_engenharia", { p_vistoria_id: pedido.data as string, p_tipo: tipo, p_data: hoje }), tipo);
+    }
+  };
   const parado = async (obra: string, setor: "compras" | "engenharia" | "operacional", motivo: string) =>
     feito(await admin.rpc("marcar_parado_fluxo_obra", { p_obra_id: obra, p_setor: setor, p_parado: true, p_motivo: motivo }), "parado");
   const aguardando = async (obra: string, setor: "compras" | "engenharia" | "operacional", quem: "cliente" | "fornecedor" | "concessionaria") =>
@@ -304,8 +316,9 @@ export async function criarBaseFicticia(): Promise<BaseFicticia> {
   // o05: concluída (3 setores finais + marcos resolvidos).
   await status(obras.o05, "compras", "faturado_fornecedor");
   await protocolar(obras.o05);
-  await status(obras.o05, "engenharia", "concluido");
   await status(obras.o05, "operacional", "concluido");
+  await conectar(obras.o05);
+  await status(obras.o05, "engenharia", "concluido");
   await marco(obras.o05, "nf_cliente", "concluido");
   await marco(obras.o05, "garantia", "nao_se_aplica", "Garantia direta do fabricante (fictício)");
   // o06: Usina Solar Fazenda Modelo — obra principal da Apresentação (instalação em andamento, NF concluída).
