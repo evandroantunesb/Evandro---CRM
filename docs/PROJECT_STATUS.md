@@ -1,6 +1,6 @@
 # Estado do projeto — Raion CRM
 
-## Engenharia em Obras — P1 a P1.6 integradas em 2026-10-29; P2 em 2026-10-30
+## Engenharia em Obras — P1 a P1.6 integradas em 2026-10-29; P2 e P3 em 2026-10-30
 
 `main` em `ba2ef0e`. Sem migration: nada a aplicar em produção.
 
@@ -28,7 +28,20 @@
 - Escrita só pelas RPCs `aplicar_checklist_engenharia`, `registrar_documento_engenharia`, `alterar_item_engenharia` (todas por `preparar_escrita_obra`). Testes: `tests/engenharia-checklist-db.test.ts`, `tests/engenharia-checklist-regras.test.ts`, `e2e/19-engenharia-checklist.spec.ts`.
 - **Lição:** ao trocar `MIGRATIONS_AUTORIZADAS` no workflow, atualizar junto `tests/validar-conjunto-migrations.test.ts` (a autorizada nova e a anterior como "já aplicada").
 
-O engenheiro testou o P2 em 30/10. **Próximo:** P3 protocolos, exigências e bloqueio de etapa (migration + RLS, Opus).
+O engenheiro testou o P2 em 30/10.
+
+### P3 — protocolos, exigências e trava de etapa (#258, empilhada sobre a #257)
+
+**Migration `20261030120000_engenharia_protocolos.sql` aplicada em produção em 30/10/2026** (tag `migracao-pr258-ce6a13b`; conferir + aplicar aprovados pelo Evandro; dry-run listou só ela). Produção fica à frente da `main` até #257 e #258 serem mescladas. Ao mesclar a #257, trocar a base da #258 para `main` **antes** de apagar a branch.
+
+- **Protocolo** (canal PEW/CAW/atendimento/outro; um ativo por obra) com eventos imutáveis, arquivos por evento e pacote de documentos (snapshot) a cada envio/reenvio. Situações: protocolado → em análise / com exigência → aprovado / orçamento emitido → encerrado; indeferido e cancelado.
+- **Exigências** com categoria e prazo interno; reenvio marca como reenviadas; aprovação, orçamento ou encerramento resolvem todas.
+- **G2:** protocolo só com checklist aplicado e obrigatórios válidos ou dispensados; registrar leva a Engenharia para "Enviado à concessionária".
+- **G3:** `alterar_status_fluxo_obra` recusa sair de "A iniciar"/"Projeto em elaboração" para etapa posterior sem protocolo válido (cancelado/indeferido não contam). A base E2E protocola antes de avançar as obras.
+- **Central:** exigência aberta vira ação da equipe, não espera de terceiros. Histórico sem número do protocolo nem texto da distribuidora.
+- Escrita só pelas RPCs `registrar_protocolo_engenharia`, `registrar_evento_protocolo_engenharia`, `registrar_arquivo_protocolo_engenharia`; leitura por `pode_ver_documentos_engenharia`. Testes: `tests/engenharia-protocolos-db.test.ts`, `tests/engenharia-protocolos-regras.test.ts`, `e2e/20-engenharia-protocolo.spec.ts`.
+
+**Próximo:** P4 vistoria e conexão (aguarda comando do Evandro).
 
 ## Entregas de 2026-10-29 — dados do cliente, sigilo na obra e tarefas dos setores
 
