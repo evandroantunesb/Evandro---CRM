@@ -101,6 +101,25 @@ describe("montarCentralEngenharia", () => {
   });
 });
 
+describe("central com exigência aberta (P3)", () => {
+  it("obra na etapa da concessionária com exigência aberta vira ação de quem é o principal", () => {
+    const central = montarCentralEngenharia([obra(1, "enviado_concessionaria"), obra(2, "enviado_concessionaria")], rotulo, {
+      coordena: false,
+      exigencias: new Map([["o1", 2]]),
+    });
+    expect(central.acoes.map((o) => [o.numero, o.proximaAcao])).toEqual([[1, "Responder 2 exigências da concessionária"]]);
+    expect(central.comTerceiros.map((o) => o.numero)).toEqual([2]);
+  });
+
+  it("sem responsável, quem coordena vê 'Definir responsável' antes da exigência", () => {
+    const { acoes } = montarCentralEngenharia([obra(3, "enviado_concessionaria", { principalNome: null, souPrincipal: false })], rotulo, {
+      coordena: true,
+      exigencias: new Map([["o3", 1]]),
+    });
+    expect(acoes[0].proximaAcao).toBe(ACAO_SEM_RESPONSAVEL);
+  });
+});
+
 describe("diasDesde", () => {
   it("conta dias corridos no horário de Brasília", () => {
     const agora = new Date("2026-10-29T15:00:00Z");

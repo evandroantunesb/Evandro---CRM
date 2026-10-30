@@ -2,11 +2,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { GestaoFixacao, GestaoSetor } from "@/app/(app)/obras/[id]/gestao";
 import { ChecklistEngenharia } from "@/components/engenharia/checklist";
+import { ProtocolosEngenharia } from "@/components/engenharia/protocolos";
 import { Campo, CartaoSetor, ContatoCliente, DadosTecnicos, comUnidade } from "@/components/obras/detalhe-obra";
 import { ListaTarefasSetor, NovaTarefaSetor } from "@/components/tarefas-setor";
 import { Cartao, Selo } from "@/components/ui";
 import { formatarDataHora } from "@/lib/crm";
 import { carregarChecklistEngenharia } from "@/lib/engenharia-checklist";
+import { carregarProtocolosEngenharia } from "@/lib/engenharia-protocolos";
 import { carregarDetalheObra } from "@/lib/obras/detalhe";
 import { ROTULO_ALERTA_OBRA, ROTULO_SETOR, ROTULO_SITUACAO_OBRA, type AlertaObra, type SituacaoObra } from "@/lib/obras/rotulos";
 import { ENGENHARIA, OBRAS, VER_NEGOCIO_DA_OBRA, pode } from "@/lib/permissoes";
@@ -22,15 +24,15 @@ const TOM_ALERTA: Record<AlertaObra, Tom> = { estorno: "negativo", venda_alterad
 /**
  * Card da obra para a Engenharia: o que o engenheiro precisa para trabalhar numa obra só (etapa do projeto, tarefas
  * do setor, dados técnicos, dados do cliente que a Engenharia pode ver e o histórico). Reaproveita o detalhe da
- * obra: quem decide o que aparece é a RLS e as RPCs, não esta tela. O checklist de documentos está aqui (P2);
- * protocolos e vistoria entram nas próximas etapas.
+ * obra: quem decide o que aparece é a RLS e as RPCs, não esta tela. Checklist de documentos (P2) e protocolos na
+ * concessionária (P3) estão aqui; a vistoria entra na próxima etapa.
  */
 export default async function CardEngenharia({ params }: PageProps<"/engenharia/[id]">) {
   const { atual } = await exigirPapel(...ENGENHARIA);
   const { id } = await params;
   const supabase = await criarClienteServidor();
 
-  const [obra, tarefas, { data: meusSetores }, checklist] = await Promise.all([
+  const [obra, tarefas, { data: meusSetores }, checklist, protocolos] = await Promise.all([
     carregarDetalheObra(supabase, { empresaId: atual.empresaId, papel: atual.papel, obraId: id, membroId: atual.membroId }),
     carregarTarefasSetor(supabase, {
       empresaId: atual.empresaId,
@@ -47,6 +49,7 @@ export default async function CardEngenharia({ params }: PageProps<"/engenharia/
       .eq("membro_id", atual.membroId)
       .eq("setor", "engenharia"),
     carregarChecklistEngenharia(supabase, { empresaId: atual.empresaId, obraId: id }),
+    carregarProtocolosEngenharia(supabase, { empresaId: atual.empresaId, obraId: id }),
   ]);
   // Operação só entra no card de quem atua em Engenharia (mesma regra da lista).
   if (!obra || (atual.papel === "operacao" && (meusSetores ?? []).length === 0)) notFound();
@@ -56,6 +59,10 @@ export default async function CardEngenharia({ params }: PageProps<"/engenharia/
   const gestaoEngenharia = gestao?.setores.find((s) => s.setor === "engenharia") ?? null;
   // Mesma regra de `autorizacao_setor_obra`: admin, coordenador da Engenharia ou participante ativo dela.
   const autorizacaoEngenharia = gestaoEngenharia?.permissoes.autorizacao ?? null;
+  // Gate G2: obrigatórios ainda não resolvidos (null = checklist não aplicado).
+  const pendentesChecklist = checklist.length
+    ? checklist.filter((i) => i.obrigatorio && i.status !== "valido" && i.status !== "dispensado").length
+    : null;
   const local = [resumo.cidade, resumo.uf].filter(Boolean).join("/");
   // Histórico da Engenharia e do que é da obra toda; os outros setores ficam na tela de Obras.
   const historico = obra.historico.filter((h) => !h.setorRotulo || h.setorRotulo === ROTULO_SETOR.engenharia);
@@ -127,6 +134,18 @@ export default async function CardEngenharia({ params }: PageProps<"/engenharia/
           veDocumentos={autorizacaoEngenharia !== null}
         />
       </Cartao>
+
+      {autorizacaoEngenharia !== null && (
+        <Cartao titulo="Protocolo na concessionária">
+          <ProtocolosEngenharia
+            obraId={resumo.id}
+            pasta={`${atual.empresaId}/${resumo.id}`}
+            protocolos={protocolos}
+            podeAgir={resumo.situacao !== "cancelada"}
+            pendentesChecklist={pendentesChecklist}
+          />
+        </Cartao>
+      )}
 
       <Cartao titulo="Tarefas de Engenharia">
         <div className="flex flex-col gap-4">

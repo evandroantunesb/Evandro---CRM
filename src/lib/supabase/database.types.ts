@@ -2800,6 +2800,70 @@ export type Database = {
           },
         ];
       };
+      obra_engenharia_exigencias: {
+        Row: {
+          categoria: string;
+          created_at: string;
+          descricao: string;
+          empresa_id: string;
+          evento_id: string;
+          id: string;
+          obra_id: string;
+          prazo_interno: string | null;
+          protocolo_id: string;
+          resolvida_em: string | null;
+          status: string;
+        };
+        Insert: {
+          categoria: string;
+          created_at?: string;
+          descricao: string;
+          empresa_id: string;
+          evento_id: string;
+          id?: string;
+          obra_id: string;
+          prazo_interno?: string | null;
+          protocolo_id: string;
+          resolvida_em?: string | null;
+          status?: string;
+        };
+        Update: {
+          categoria?: string;
+          created_at?: string;
+          descricao?: string;
+          empresa_id?: string;
+          evento_id?: string;
+          id?: string;
+          obra_id?: string;
+          prazo_interno?: string | null;
+          protocolo_id?: string;
+          resolvida_em?: string | null;
+          status?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "obra_engenharia_exigencias_empresa_id_evento_id_fkey";
+            columns: ["empresa_id", "evento_id"];
+            isOneToOne: false;
+            referencedRelation: "obra_engenharia_protocolo_eventos";
+            referencedColumns: ["empresa_id", "id"];
+          },
+          {
+            foreignKeyName: "obra_engenharia_exigencias_empresa_id_obra_id_fkey";
+            columns: ["empresa_id", "obra_id"];
+            isOneToOne: false;
+            referencedRelation: "obras";
+            referencedColumns: ["empresa_id", "id"];
+          },
+          {
+            foreignKeyName: "obra_engenharia_exigencias_empresa_id_protocolo_id_fkey";
+            columns: ["empresa_id", "protocolo_id"];
+            isOneToOne: false;
+            referencedRelation: "obra_engenharia_protocolos";
+            referencedColumns: ["empresa_id", "id"];
+          },
+        ];
+      };
       obra_engenharia_itens: {
         Row: {
           atualizado_em: string | null;
@@ -2859,6 +2923,206 @@ export type Database = {
           },
           {
             foreignKeyName: "obra_engenharia_itens_empresa_id_obra_id_fkey";
+            columns: ["empresa_id", "obra_id"];
+            isOneToOne: false;
+            referencedRelation: "obras";
+            referencedColumns: ["empresa_id", "id"];
+          },
+        ];
+      };
+      obra_engenharia_protocolo_arquivos: {
+        Row: {
+          caminho: string;
+          created_at: string;
+          empresa_id: string;
+          enviado_por: string | null;
+          evento_id: string;
+          id: string;
+          nome: string;
+          obra_id: string;
+          tamanho: number;
+          tipo_mime: string | null;
+        };
+        Insert: {
+          caminho: string;
+          created_at?: string;
+          empresa_id: string;
+          enviado_por?: string | null;
+          evento_id: string;
+          id?: string;
+          nome: string;
+          obra_id: string;
+          tamanho: number;
+          tipo_mime?: string | null;
+        };
+        Update: {
+          caminho?: string;
+          created_at?: string;
+          empresa_id?: string;
+          enviado_por?: string | null;
+          evento_id?: string;
+          id?: string;
+          nome?: string;
+          obra_id?: string;
+          tamanho?: number;
+          tipo_mime?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "obra_engenharia_protocolo_arquivos_empresa_id_evento_id_fkey";
+            columns: ["empresa_id", "evento_id"];
+            isOneToOne: false;
+            referencedRelation: "obra_engenharia_protocolo_eventos";
+            referencedColumns: ["empresa_id", "id"];
+          },
+          {
+            foreignKeyName: "obra_engenharia_protocolo_arquivos_empresa_id_obra_id_fkey";
+            columns: ["empresa_id", "obra_id"];
+            isOneToOne: false;
+            referencedRelation: "obras";
+            referencedColumns: ["empresa_id", "id"];
+          },
+        ];
+      };
+      obra_engenharia_protocolo_documentos: {
+        Row: {
+          documento_id: string;
+          empresa_id: string;
+          evento_id: string;
+        };
+        Insert: {
+          documento_id: string;
+          empresa_id: string;
+          evento_id: string;
+        };
+        Update: {
+          documento_id?: string;
+          empresa_id?: string;
+          evento_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "obra_engenharia_protocolo_documentos_documento_id_fkey";
+            columns: ["documento_id"];
+            isOneToOne: false;
+            referencedRelation: "obra_engenharia_documentos";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "obra_engenharia_protocolo_documentos_empresa_id_evento_id_fkey";
+            columns: ["empresa_id", "evento_id"];
+            isOneToOne: false;
+            referencedRelation: "obra_engenharia_protocolo_eventos";
+            referencedColumns: ["empresa_id", "id"];
+          },
+        ];
+      };
+      obra_engenharia_protocolo_eventos: {
+        Row: {
+          autor_membro_id: string | null;
+          created_at: string;
+          descricao: string | null;
+          empresa_id: string;
+          id: string;
+          obra_id: string;
+          ocorrido_em: string;
+          protocolo_id: string;
+          status_de: string | null;
+          status_para: string;
+          tipo: string;
+        };
+        Insert: {
+          autor_membro_id?: string | null;
+          created_at?: string;
+          descricao?: string | null;
+          empresa_id: string;
+          id?: string;
+          obra_id: string;
+          ocorrido_em: string;
+          protocolo_id: string;
+          status_de?: string | null;
+          status_para: string;
+          tipo: string;
+        };
+        Update: {
+          autor_membro_id?: string | null;
+          created_at?: string;
+          descricao?: string | null;
+          empresa_id?: string;
+          id?: string;
+          obra_id?: string;
+          ocorrido_em?: string;
+          protocolo_id?: string;
+          status_de?: string | null;
+          status_para?: string;
+          tipo?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "obra_engenharia_protocolo_eventos_empresa_id_obra_id_fkey";
+            columns: ["empresa_id", "obra_id"];
+            isOneToOne: false;
+            referencedRelation: "obras";
+            referencedColumns: ["empresa_id", "id"];
+          },
+          {
+            foreignKeyName: "obra_engenharia_protocolo_eventos_empresa_id_protocolo_id_fkey";
+            columns: ["empresa_id", "protocolo_id"];
+            isOneToOne: false;
+            referencedRelation: "obra_engenharia_protocolos";
+            referencedColumns: ["empresa_id", "id"];
+          },
+        ];
+      };
+      obra_engenharia_protocolos: {
+        Row: {
+          canal: string;
+          created_at: string;
+          distribuidora: string;
+          empresa_id: string;
+          id: string;
+          numero: string;
+          obra_id: string;
+          observacao: string | null;
+          protocolado_em: string;
+          registrado_por: string | null;
+          status: string;
+          tipo_solicitacao: string;
+          updated_at: string;
+        };
+        Insert: {
+          canal: string;
+          created_at?: string;
+          distribuidora: string;
+          empresa_id: string;
+          id?: string;
+          numero: string;
+          obra_id: string;
+          observacao?: string | null;
+          protocolado_em: string;
+          registrado_por?: string | null;
+          status?: string;
+          tipo_solicitacao: string;
+          updated_at?: string;
+        };
+        Update: {
+          canal?: string;
+          created_at?: string;
+          distribuidora?: string;
+          empresa_id?: string;
+          id?: string;
+          numero?: string;
+          obra_id?: string;
+          observacao?: string | null;
+          protocolado_em?: string;
+          registrado_por?: string | null;
+          status?: string;
+          tipo_solicitacao?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "obra_engenharia_protocolos_empresa_id_obra_id_fkey";
             columns: ["empresa_id", "obra_id"];
             isOneToOne: false;
             referencedRelation: "obras";
@@ -5055,6 +5319,17 @@ export type Database = {
       expirar_atribuicoes_leads: { Args: Record<PropertyKey, never>; Returns: undefined };
       fechar_comissao: { Args: { p_comissao_id: string }; Returns: undefined };
       garantir_obra: { Args: { p_negocio_id: string }; Returns: string };
+      gravar_status_fluxo_obra: {
+        Args: {
+          p_aut: string;
+          p_obra_id: string;
+          p_origem: string;
+          p_setor: Database["public"]["Enums"]["setor_obra"];
+          p_status: string;
+        };
+        Returns: undefined;
+      };
+      hoje_brasilia: { Args: Record<PropertyKey, never>; Returns: string };
       identidade_membros: {
         Args: { p_empresa_id: string };
         Returns: {
@@ -5252,8 +5527,23 @@ export type Database = {
         Args: { p_caminho: string; p_nome: string };
         Returns: string;
       };
+      registrar_arquivo_protocolo_engenharia: {
+        Args: { p_caminho: string; p_evento_id: string; p_nome: string };
+        Returns: string;
+      };
       registrar_documento_engenharia: {
         Args: { p_caminho: string; p_item_id: string; p_nome: string };
+        Returns: string;
+      };
+      registrar_evento_protocolo_engenharia: {
+        Args: {
+          p_categoria?: string;
+          p_descricao?: string;
+          p_ocorrido_em: string;
+          p_prazo_interno?: string;
+          p_protocolo_id: string;
+          p_tipo: string;
+        };
         Returns: string;
       };
       registrar_historico_obra: {
@@ -5269,6 +5559,7 @@ export type Database = {
         Args: { p_dados: Json; p_empresa_id: string; p_tarefa_id: string; p_tipo: string };
         Returns: undefined;
       };
+      registrar_pacote_protocolo: { Args: { p_evento_id: string }; Returns: number };
       registrar_pagamento_negocio: {
         Args: { p_data_recebimento?: string; p_negocio_id: string; p_observacao?: string };
         Returns: {
@@ -5293,6 +5584,18 @@ export type Database = {
           isOneToOne: true;
           isSetofReturn: false;
         };
+      };
+      registrar_protocolo_engenharia: {
+        Args: {
+          p_canal: string;
+          p_distribuidora: string;
+          p_numero: string;
+          p_obra_id: string;
+          p_observacao?: string;
+          p_protocolado_em: string;
+          p_tipo_solicitacao: string;
+        };
+        Returns: string;
       };
       remover_anexo_tarefa_setor: { Args: { p_anexo_id: string }; Returns: string };
       salvar_regras_temperatura: {

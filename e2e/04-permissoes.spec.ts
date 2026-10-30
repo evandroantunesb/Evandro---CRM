@@ -110,7 +110,8 @@ test.describe("permissões reais no banco local (RPC direta)", () => {
 
   test("coordenador: só o setor que coordena", async () => {
     const coord = await clienteDe(usuarios.coordEng, senha);
-    aceita(await coord.rpc("alterar_status_fluxo_obra", { p_obra_id: obras.o12, p_setor: "engenharia", p_status: "aprovado" }));
+    // Volta para "A iniciar": avançar além do projeto exige protocolo (20261030120000).
+    aceita(await coord.rpc("alterar_status_fluxo_obra", { p_obra_id: obras.o12, p_setor: "engenharia", p_status: "a_iniciar" }));
     recusada(await coord.rpc("alterar_status_fluxo_obra", { p_obra_id: obras.o12, p_setor: "compras", p_status: "pedido_realizado" }));
     recusada(await coord.rpc("alterar_status_fluxo_obra", { p_obra_id: obras.o12, p_setor: "operacional", p_status: "agendada" }));
     recusada(await coord.rpc("atualizar_marco_obra", { p_obra_id: obras.o12, p_marco: "nf_cliente", p_status: "concluido" }));
