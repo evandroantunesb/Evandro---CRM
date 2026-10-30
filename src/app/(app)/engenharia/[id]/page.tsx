@@ -3,12 +3,15 @@ import { notFound } from "next/navigation";
 import { GestaoFixacao, GestaoSetor } from "@/app/(app)/obras/[id]/gestao";
 import { ChecklistEngenharia } from "@/components/engenharia/checklist";
 import { ProtocolosEngenharia } from "@/components/engenharia/protocolos";
+import { VistoriaEngenharia } from "@/components/engenharia/vistoria";
 import { Campo, CartaoSetor, ContatoCliente, DadosTecnicos, comUnidade } from "@/components/obras/detalhe-obra";
 import { ListaTarefasSetor, NovaTarefaSetor } from "@/components/tarefas-setor";
 import { Cartao, Selo } from "@/components/ui";
 import { formatarDataHora } from "@/lib/crm";
 import { carregarChecklistEngenharia } from "@/lib/engenharia-checklist";
 import { carregarProtocolosEngenharia } from "@/lib/engenharia-protocolos";
+import { carregarVistoriasEngenharia } from "@/lib/engenharia-vistoria";
+import { bloqueioPedidoVistoria } from "@/lib/engenharia-vistoria-regras";
 import { carregarDetalheObra } from "@/lib/obras/detalhe";
 import { ROTULO_ALERTA_OBRA, ROTULO_SETOR, ROTULO_SITUACAO_OBRA, type AlertaObra, type SituacaoObra } from "@/lib/obras/rotulos";
 import { ENGENHARIA, OBRAS, VER_NEGOCIO_DA_OBRA, pode } from "@/lib/permissoes";
@@ -24,15 +27,15 @@ const TOM_ALERTA: Record<AlertaObra, Tom> = { estorno: "negativo", venda_alterad
 /**
  * Card da obra para a Engenharia: o que o engenheiro precisa para trabalhar numa obra só (etapa do projeto, tarefas
  * do setor, dados técnicos, dados do cliente que a Engenharia pode ver e o histórico). Reaproveita o detalhe da
- * obra: quem decide o que aparece é a RLS e as RPCs, não esta tela. Checklist de documentos (P2) e protocolos na
- * concessionária (P3) estão aqui; a vistoria entra na próxima etapa.
+ * obra: quem decide o que aparece é a RLS e as RPCs, não esta tela. Checklist de documentos (P2), protocolos na
+ * concessionária (P3) e vistoria, medição e conexão (P4).
  */
 export default async function CardEngenharia({ params }: PageProps<"/engenharia/[id]">) {
   const { atual } = await exigirPapel(...ENGENHARIA);
   const { id } = await params;
   const supabase = await criarClienteServidor();
 
-  const [obra, tarefas, { data: meusSetores }, checklist, protocolos] = await Promise.all([
+  const [obra, tarefas, { data: meusSetores }, checklist, protocolos, vistorias] = await Promise.all([
     carregarDetalheObra(supabase, { empresaId: atual.empresaId, papel: atual.papel, obraId: id, membroId: atual.membroId }),
     carregarTarefasSetor(supabase, {
       empresaId: atual.empresaId,
@@ -50,6 +53,7 @@ export default async function CardEngenharia({ params }: PageProps<"/engenharia/
       .eq("setor", "engenharia"),
     carregarChecklistEngenharia(supabase, { empresaId: atual.empresaId, obraId: id }),
     carregarProtocolosEngenharia(supabase, { empresaId: atual.empresaId, obraId: id }),
+    carregarVistoriasEngenharia(supabase, { empresaId: atual.empresaId, obraId: id }),
   ]);
   // Operação só entra no card de quem atua em Engenharia (mesma regra da lista).
   if (!obra || (atual.papel === "operacao" && (meusSetores ?? []).length === 0)) notFound();
@@ -59,10 +63,18 @@ export default async function CardEngenharia({ params }: PageProps<"/engenharia/
   const gestaoEngenharia = gestao?.setores.find((s) => s.setor === "engenharia") ?? null;
   // Mesma regra de `autorizacao_setor_obra`: admin, coordenador da Engenharia ou participante ativo dela.
   const autorizacaoEngenharia = gestaoEngenharia?.permissoes.autorizacao ?? null;
+  // Na vistoria, quem também atua no Operacional desta obra registra a correção de campo aqui mesmo.
+  const atuaOperacional = (gestao?.setores.find((s) => s.setor === "operacional")?.permissoes.autorizacao ?? null) !== null;
   // Gate G2: obrigatórios ainda não resolvidos (null = checklist não aplicado).
   const pendentesChecklist = checklist.length
     ? checklist.filter((i) => i.obrigatorio && i.status !== "valido" && i.status !== "dispensado").length
     : null;
+  // Gate G5: protocolo aprovado (ou orçamento emitido) e instalação concluída pelo Operacional.
+  const operacional = obra.setores.find((s) => s.setor === "operacional");
+  const bloqueioVistoria = bloqueioPedidoVistoria({
+    protocoloAprovado: protocolos.some((p) => p.status === "aprovado" || p.status === "orcamento_emitido" || p.status === "encerrado"),
+    instalacaoConcluida: operacional?.status === "instalacao_concluida" || operacional?.status === "concluido",
+  });
   const local = [resumo.cidade, resumo.uf].filter(Boolean).join("/");
   // Histórico da Engenharia e do que é da obra toda; os outros setores ficam na tela de Obras.
   const historico = obra.historico.filter((h) => !h.setorRotulo || h.setorRotulo === ROTULO_SETOR.engenharia);
@@ -143,6 +155,21 @@ export default async function CardEngenharia({ params }: PageProps<"/engenharia/
             protocolos={protocolos}
             podeAgir={resumo.situacao !== "cancelada"}
             pendentesChecklist={pendentesChecklist}
+          />
+        </Cartao>
+      )}
+
+      {autorizacaoEngenharia !== null && (
+        <Cartao titulo="Vistoria e conexão">
+          <VistoriaEngenharia
+            obraId={resumo.id}
+            pasta={`${atual.empresaId}/${resumo.id}`}
+            vistorias={vistorias}
+            podeAgir={resumo.situacao !== "cancelada"}
+            atuo={{ engenharia: true, operacional: atuaOperacional }}
+            bloqueioPedido={bloqueioVistoria}
+            admin={autorizacaoEngenharia === "admin"}
+            engenhariaConcluida={engenharia?.status === "concluido"}
           />
         </Cartao>
       )}

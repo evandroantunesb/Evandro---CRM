@@ -8,9 +8,12 @@ import { formatarDataHora, formatarMoeda } from "@/lib/crm";
 import { carregarObras } from "@/lib/obras/dados";
 import { filtrosDeParams, hrefObra, montarNavegacao, queryDosFiltros, temFiltroAtivo } from "@/lib/obras/navegacao";
 import { GestaoFixacao, GestaoMarco, GestaoSetor } from "./gestao";
+import { VistoriaEngenharia } from "@/components/engenharia/vistoria";
+import { ResumoVistoria } from "@/components/engenharia/vistoria-resumo";
 import { Campo, CartaoSetor, ContatoCliente, DadosTecnicos, ListaParticipantes, comUnidade } from "@/components/obras/detalhe-obra";
 import { ListaTarefasSetor, NovaTarefaSetor } from "@/components/tarefas-setor";
 import { carregarTarefasSetor } from "@/lib/tarefas-setor";
+import { carregarSituacaoVistoria, carregarVistoriasEngenharia } from "@/lib/engenharia-vistoria";
 import { carregarDetalheObra, type MarcoDetalheVM } from "@/lib/obras/detalhe";
 import {
   ROTULO_ALERTA_OBRA,
@@ -36,10 +39,13 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
 
   const supabase = await criarClienteServidor();
   // A lista navegável é recalculada aqui, a cada obra: mesma empresa, mesma RLS, mesmos filtros.
-  const [obra, lista, tarefasSetor] = await Promise.all([
+  const [obra, lista, tarefasSetor, vistoria, vistorias] = await Promise.all([
     carregarDetalheObra(supabase, { empresaId: atual.empresaId, papel: atual.papel, obraId: id, membroId: atual.membroId }),
     carregarObras(supabase, { empresaId: atual.empresaId, papel: atual.papel, comResponsaveis: false }),
     carregarTarefasSetor(supabase, { empresaId: atual.empresaId, membroId: atual.membroId, papel: atual.papel, obraId: id, filtro: "todas" }),
+    carregarSituacaoVistoria(supabase, id),
+    // Registros completos só para admin e quem atua em Engenharia ou no Operacional na obra (a RLS devolve vazio aos demais).
+    carregarVistoriasEngenharia(supabase, { empresaId: atual.empresaId, obraId: id }),
   ]);
   if (!obra) notFound();
   const navegacao = montarNavegacao(lista.obras, filtros, id);
@@ -110,6 +116,25 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
             return (
               <CartaoSetor key={s.setor} setor={s}>
                 {/* key pela obra: ao navegar para outra obra, nenhum estado de formulário da anterior sobrevive. */}
+                {/* Vistoria: quem atua no Operacional registra o agendamento, a vistoria feita em campo e a correção de
+                    campo; quem só vê a obra acompanha a situação e as datas. */}
+                {s.setor === "operacional" &&
+                  (g?.permissoes.autorizacao ? (
+                    <VistoriaEngenharia
+                      key={resumo.id}
+                      obraId={resumo.id}
+                      pasta={`${atual.empresaId}/${resumo.id}`}
+                      vistorias={vistorias}
+                      podeAgir={resumo.situacao !== "cancelada"}
+                      // Aqui só a parte do Operacional; pedido, resultado, medidor e conexão ficam no card da Engenharia.
+                      atuo={{ engenharia: false, operacional: true }}
+                      bloqueioPedido={null}
+                      admin={false}
+                      engenhariaConcluida={obra.setores.find((x) => x.setor === "engenharia")?.status === "concluido"}
+                    />
+                  ) : (
+                    vistoria && <ResumoVistoria situacao={vistoria} />
+                  ))}
                 {g && <GestaoSetor key={resumo.id} obraId={resumo.id} setor={s} gestao={g} />}
               </CartaoSetor>
             );

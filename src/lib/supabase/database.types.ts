@@ -3130,6 +3130,173 @@ export type Database = {
           },
         ];
       };
+      obra_engenharia_vistoria_arquivos: {
+        Row: {
+          caminho: string;
+          created_at: string;
+          empresa_id: string;
+          enviado_por: string | null;
+          evento_id: string;
+          id: string;
+          nome: string;
+          obra_id: string;
+          tamanho: number;
+          tipo_mime: string | null;
+        };
+        Insert: {
+          caminho: string;
+          created_at?: string;
+          empresa_id: string;
+          enviado_por?: string | null;
+          evento_id: string;
+          id?: string;
+          nome: string;
+          obra_id: string;
+          tamanho: number;
+          tipo_mime?: string | null;
+        };
+        Update: {
+          caminho?: string;
+          created_at?: string;
+          empresa_id?: string;
+          enviado_por?: string | null;
+          evento_id?: string;
+          id?: string;
+          nome?: string;
+          obra_id?: string;
+          tamanho?: number;
+          tipo_mime?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "obra_engenharia_vistoria_arquivos_empresa_id_evento_id_fkey";
+            columns: ["empresa_id", "evento_id"];
+            isOneToOne: false;
+            referencedRelation: "obra_engenharia_vistoria_eventos";
+            referencedColumns: ["empresa_id", "id"];
+          },
+          {
+            foreignKeyName: "obra_engenharia_vistoria_arquivos_empresa_id_obra_id_fkey";
+            columns: ["empresa_id", "obra_id"];
+            isOneToOne: false;
+            referencedRelation: "obras";
+            referencedColumns: ["empresa_id", "id"];
+          },
+        ];
+      };
+      obra_engenharia_vistoria_eventos: {
+        Row: {
+          autor_membro_id: string | null;
+          created_at: string;
+          descricao: string | null;
+          empresa_id: string;
+          id: string;
+          obra_id: string;
+          ocorrido_em: string;
+          status_de: string | null;
+          status_para: string;
+          tipo: string;
+          vistoria_id: string;
+        };
+        Insert: {
+          autor_membro_id?: string | null;
+          created_at?: string;
+          descricao?: string | null;
+          empresa_id: string;
+          id?: string;
+          obra_id: string;
+          ocorrido_em: string;
+          status_de?: string | null;
+          status_para: string;
+          tipo: string;
+          vistoria_id: string;
+        };
+        Update: {
+          autor_membro_id?: string | null;
+          created_at?: string;
+          descricao?: string | null;
+          empresa_id?: string;
+          id?: string;
+          obra_id?: string;
+          ocorrido_em?: string;
+          status_de?: string | null;
+          status_para?: string;
+          tipo?: string;
+          vistoria_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "obra_engenharia_vistoria_eventos_empresa_id_obra_id_fkey";
+            columns: ["empresa_id", "obra_id"];
+            isOneToOne: false;
+            referencedRelation: "obras";
+            referencedColumns: ["empresa_id", "id"];
+          },
+          {
+            foreignKeyName: "obra_engenharia_vistoria_eventos_empresa_id_vistoria_id_fkey";
+            columns: ["empresa_id", "vistoria_id"];
+            isOneToOne: false;
+            referencedRelation: "obra_engenharia_vistorias";
+            referencedColumns: ["empresa_id", "id"];
+          },
+        ];
+      };
+      obra_engenharia_vistorias: {
+        Row: {
+          agendada_para: string | null;
+          conexao_confirmada_em: string | null;
+          created_at: string;
+          empresa_id: string;
+          id: string;
+          medidor_adequado_em: string | null;
+          numero: string | null;
+          obra_id: string;
+          realizada_em: string | null;
+          registrado_por: string | null;
+          solicitada_em: string;
+          status: string;
+          updated_at: string;
+        };
+        Insert: {
+          agendada_para?: string | null;
+          conexao_confirmada_em?: string | null;
+          created_at?: string;
+          empresa_id: string;
+          id?: string;
+          medidor_adequado_em?: string | null;
+          numero?: string | null;
+          obra_id: string;
+          realizada_em?: string | null;
+          registrado_por?: string | null;
+          solicitada_em: string;
+          status?: string;
+          updated_at?: string;
+        };
+        Update: {
+          agendada_para?: string | null;
+          conexao_confirmada_em?: string | null;
+          created_at?: string;
+          empresa_id?: string;
+          id?: string;
+          medidor_adequado_em?: string | null;
+          numero?: string | null;
+          obra_id?: string;
+          realizada_em?: string | null;
+          registrado_por?: string | null;
+          solicitada_em?: string;
+          status?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "obra_engenharia_vistorias_empresa_id_obra_id_fkey";
+            columns: ["empresa_id", "obra_id"];
+            isOneToOne: false;
+            referencedRelation: "obras";
+            referencedColumns: ["empresa_id", "id"];
+          },
+        ];
+      };
       obra_fixacao: {
         Row: {
           created_at: string;
@@ -5040,6 +5207,10 @@ export type Database = {
       compartilha_empresa: { Args: { p_user_id: string }; Returns: boolean };
       compartilha_empresa_comercial: { Args: { p_user_id: string }; Returns: boolean };
       compartilha_empresa_identidade: { Args: { p_user_id: string }; Returns: boolean };
+      concluir_engenharia_sem_conexao: {
+        Args: { p_motivo: string; p_obra_id: string };
+        Returns: undefined;
+      };
       concluir_tarefa_setor: {
         Args: { p_resposta?: string; p_tarefa_id: string };
         Returns: undefined;
@@ -5463,6 +5634,7 @@ export type Database = {
       pendencias_contrato_contato: { Args: { p_contato_id: string }; Returns: string[] };
       pode_enviar_pasta_engenharia: { Args: { p_caminho: string }; Returns: boolean };
       pode_enviar_pasta_tarefa_setor: { Args: { p_caminho: string }; Returns: boolean };
+      pode_enviar_pasta_vistoria: { Args: { p_caminho: string }; Returns: boolean };
       pode_registrar_pagamento_negocio: { Args: { p_negocio_id: string }; Returns: boolean };
       pode_responder_handoff: { Args: { p_handoff_id: string }; Returns: boolean };
       pode_ver_avatar: { Args: { p_pasta: string }; Returns: boolean };
@@ -5479,6 +5651,7 @@ export type Database = {
       pode_ver_pasta_anexo: { Args: { p_caminho: string }; Returns: boolean };
       pode_ver_pasta_engenharia: { Args: { p_caminho: string }; Returns: boolean };
       pode_ver_pasta_tarefa_setor: { Args: { p_caminho: string }; Returns: boolean };
+      pode_ver_pasta_vistoria: { Args: { p_caminho: string }; Returns: boolean };
       pode_ver_pdf_proposta_emitida: { Args: { p_caminho: string }; Returns: boolean };
       pode_ver_responsavel: {
         Args: { p_empresa_id: string; p_responsavel_id: string };
@@ -5486,6 +5659,7 @@ export type Database = {
       };
       pode_ver_tarefa_setor: { Args: { p_tarefa_id: string }; Returns: boolean };
       pode_ver_valor_vendido_obra: { Args: { p_obra_id: string }; Returns: boolean };
+      pode_ver_vistoria_obra: { Args: { p_obra_id: string }; Returns: boolean };
       precos_eletroposto_validos: {
         Args: { p_modelos: string[]; p_precos: Json };
         Returns: boolean;
@@ -5531,6 +5705,10 @@ export type Database = {
         Args: { p_caminho: string; p_evento_id: string; p_nome: string };
         Returns: string;
       };
+      registrar_arquivo_vistoria_engenharia: {
+        Args: { p_caminho: string; p_evento_id: string; p_nome: string };
+        Returns: string;
+      };
       registrar_documento_engenharia: {
         Args: { p_caminho: string; p_item_id: string; p_nome: string };
         Returns: string;
@@ -5544,6 +5722,10 @@ export type Database = {
           p_protocolo_id: string;
           p_tipo: string;
         };
+        Returns: string;
+      };
+      registrar_evento_vistoria_engenharia: {
+        Args: { p_data: string; p_descricao?: string; p_tipo: string; p_vistoria_id: string };
         Returns: string;
       };
       registrar_historico_obra: {
@@ -5610,7 +5792,22 @@ export type Database = {
           sequencia: number;
         }[];
       };
+      setor_registro_vistoria: {
+        Args: { p_obra_id: string; p_tipo: string };
+        Returns: Database["public"]["Enums"]["setor_obra"];
+      };
       situacao_registro_pagamento: { Args: { p_negocio_id: string }; Returns: string };
+      situacao_vistoria_obra: {
+        Args: { p_obra_id: string };
+        Returns: {
+          agendada_para: string;
+          conexao_confirmada_em: string;
+          medidor_adequado_em: string;
+          realizada_em: string;
+          solicitada_em: string;
+          status: string;
+        }[];
+      };
       solicitar_resgate: {
         Args: { p_recompensa_id: string };
         Returns: {
@@ -5629,6 +5826,15 @@ export type Database = {
           isOneToOne: true;
           isSetofReturn: false;
         };
+      };
+      solicitar_vistoria_engenharia: {
+        Args: {
+          p_numero?: string;
+          p_obra_id: string;
+          p_observacao?: string;
+          p_solicitada_em: string;
+        };
+        Returns: string;
       };
       status_pagamento_contrato: {
         Args: { p_contrato_id: string };

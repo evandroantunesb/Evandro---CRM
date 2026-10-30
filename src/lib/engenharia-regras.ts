@@ -5,8 +5,8 @@ import { STATUS_POR_SETOR } from "@/lib/obras/rotulos";
 /**
  * Central da Engenharia: obras em andamento por etapa, a próxima ação de cada uma e o que espera terceiros. Só
  * fatos registrados (etapa, desde quando, parado, aguardando, responsável principal); a próxima ação é um texto
- * fixo por etapa, explicável, sem prazo, percentual ou semáforo inventados. Checklist, protocolo e exigência entram
- * quando existirem como dado.
+ * fixo por etapa, explicável, sem prazo, percentual ou semáforo inventados. Exigência aberta (P3) e vistoria que pede
+ * ação (P4) trocam o texto e tiram a obra de "aguardando terceiros".
  */
 
 /** Próxima ação por etapa da Engenharia (aprovada pelo Evandro em 29/10/2026). */
@@ -55,12 +55,14 @@ export type CentralEngenharia = {
   grupos: GrupoEngenharia[];
 };
 
-function paraEngenharia(o: ObraListaVM, rotuloStatus: (status: string) => string, exigencias: number): ObraNaEngenharia | null {
+function paraEngenharia(o: ObraListaVM, rotuloStatus: (status: string) => string, exigencias: number, acaoVistoria: string | null): ObraNaEngenharia | null {
   if (o.situacao !== "em_andamento") return null;
   const eng = o.setores.find((s) => s.setor === "engenharia");
   if (!eng?.status || setorConcluido("engenharia", eng.status)) return null;
-  // Com exigência aberta, a próxima movimentação é da Engenharia, mesmo na etapa da concessionária.
-  const comTerceiro = exigencias === 0 && (eng.aguardando != null || ETAPAS_COM_CONCESSIONARIA.has(eng.status));
+  // Exigência aberta ou vistoria que pede ação (não conformidade, conexão confirmada): a próxima movimentação é da
+  // Engenharia, mesmo na etapa da concessionária. Exigência vem primeiro.
+  const acaoRegistro = exigencias > 0 ? acaoExigencia(exigencias) : acaoVistoria;
+  const comTerceiro = acaoRegistro == null && (eng.aguardando != null || ETAPAS_COM_CONCESSIONARIA.has(eng.status));
   return {
     id: o.id,
     numero: o.numero,
@@ -74,11 +76,7 @@ function paraEngenharia(o: ObraListaVM, rotuloStatus: (status: string) => string
     principalNome: eng.principalNome,
     souPrincipal: eng.souPrincipal,
     proximaAcao:
-      eng.principalNome == null
-        ? ACAO_SEM_RESPONSAVEL
-        : exigencias > 0
-          ? acaoExigencia(exigencias)
-          : (PROXIMA_ACAO_ENGENHARIA[eng.status] ?? null),
+      eng.principalNome == null ? ACAO_SEM_RESPONSAVEL : (acaoRegistro ?? PROXIMA_ACAO_ENGENHARIA[eng.status] ?? null),
     comTerceiro,
     desde: eng.aguardandoDesde ?? eng.statusDesde,
   };
@@ -91,7 +89,17 @@ const porAntiguidade = (a: ObraNaEngenharia, b: ObraNaEngenharia) =>
 export function montarCentralEngenharia(
   obras: readonly ObraListaVM[],
   rotuloStatus: (status: string) => string,
-  { coordena, exigencias = new Map() }: { coordena: boolean; /** Exigências abertas por obra (protocolos, P3). */ exigencias?: ReadonlyMap<string, number> },
+  {
+    coordena,
+    exigencias = new Map(),
+    acoesVistoria = new Map(),
+  }: {
+    coordena: boolean;
+    /** Exigências abertas por obra (protocolos, P3). */
+    exigencias?: ReadonlyMap<string, number>;
+    /** Ação que a vistoria mais recente pede, por obra (P4). */
+    acoesVistoria?: ReadonlyMap<string, string>;
+  },
 ): CentralEngenharia {
   const grupos = new Map<string, ObraNaEngenharia[]>(
     STATUS_POR_SETOR.engenharia.filter((s) => !setorConcluido("engenharia", s)).map((s) => [s, []]),
@@ -99,7 +107,7 @@ export function montarCentralEngenharia(
   const acoes: ObraNaEngenharia[] = [];
   const comTerceiros: ObraNaEngenharia[] = [];
   for (const o of obras) {
-    const item = paraEngenharia(o, rotuloStatus, exigencias.get(o.id) ?? 0);
+    const item = paraEngenharia(o, rotuloStatus, exigencias.get(o.id) ?? 0, acoesVistoria.get(o.id) ?? null);
     if (!item) continue;
     // Status que o banco aceite e a lista não conheça ainda vira grupo próprio, no fim: nunca some da tela.
     const lista = grupos.get(item.status) ?? [];

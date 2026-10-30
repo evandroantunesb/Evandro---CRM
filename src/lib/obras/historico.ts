@@ -41,6 +41,9 @@ const ROTULO_TIPO: Record<string, string> = {
   item_engenharia_alterado: "Item do checklist",
   protocolo_engenharia_registrado: "Protocolo registrado",
   protocolo_engenharia_atualizado: "Protocolo atualizado",
+  vistoria_engenharia_solicitada: "Vistoria solicitada",
+  vistoria_engenharia_atualizada: "Vistoria atualizada",
+  engenharia_concluida_excecao: "Engenharia concluída sem conexão",
 };
 
 // Situações e registros do protocolo (mesmos de `engenharia-protocolos-regras`, sem importar regra de tela).
@@ -53,6 +56,17 @@ const ROTULO_PROTOCOLO: Record<string, string> = {
   indeferido: "Indeferido",
   cancelado: "Cancelado",
   encerrado: "Encerrado",
+};
+// Registros da vistoria (mesmos de `engenharia-vistoria-regras`, sem importar regra de tela).
+const ROTULO_REGISTRO_VISTORIA: Record<string, string> = {
+  agendada: "Agendada",
+  realizada: "Vistoria realizada em campo",
+  aprovada: "Aprovada",
+  nao_conformidade: "Não conformidade apontada",
+  correcao_campo: "Correção de campo feita",
+  cancelada: "Pedido cancelado",
+  medidor_adequado: "Medidor adequado",
+  conexao_confirmada: "Conexão confirmada",
 };
 const ROTULO_CANAL_PROTOCOLO: Record<string, string> = { pew: "PEW", caw: "CAW", atendimento: "atendimento comercial", outro: "outro canal" };
 
@@ -203,6 +217,13 @@ function descrever(linha: LinhaHistoricoObra, nomes: ReadonlyMap<string, string>
       if (reenvio) return "Reenviado com correções";
       return de && para ? `${de} → ${para}` : "Situação do protocolo alterada";
     }
+    // Textos da vistoria (apontamentos, motivos) e o motivo da exceção não aparecem.
+    case "vistoria_engenharia_solicitada":
+      return "";
+    case "vistoria_engenharia_atualizada":
+      return rotulo(ROTULO_REGISTRO_VISTORIA, ler(dados, "tipo")) ?? "Situação da vistoria alterada";
+    case "engenharia_concluida_excecao":
+      return "Concluída pelo administrador sem a conexão confirmada";
     default:
       return "Evento registrado";
   }
