@@ -60,8 +60,10 @@ const ROTULO_PROTOCOLO: Record<string, string> = {
 // Registros da vistoria (mesmos de `engenharia-vistoria-regras`, sem importar regra de tela).
 const ROTULO_REGISTRO_VISTORIA: Record<string, string> = {
   agendada: "Agendada",
+  realizada: "Vistoria realizada em campo",
   aprovada: "Aprovada",
   nao_conformidade: "Não conformidade apontada",
+  correcao_campo: "Correção de campo feita",
   cancelada: "Pedido cancelado",
   medidor_adequado: "Medidor adequado",
   conexao_confirmada: "Conexão confirmada",

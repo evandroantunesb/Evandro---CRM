@@ -63,6 +63,8 @@ export default async function CardEngenharia({ params }: PageProps<"/engenharia/
   const gestaoEngenharia = gestao?.setores.find((s) => s.setor === "engenharia") ?? null;
   // Mesma regra de `autorizacao_setor_obra`: admin, coordenador da Engenharia ou participante ativo dela.
   const autorizacaoEngenharia = gestaoEngenharia?.permissoes.autorizacao ?? null;
+  // Na vistoria, quem também atua no Operacional desta obra registra a correção de campo aqui mesmo.
+  const atuaOperacional = (gestao?.setores.find((s) => s.setor === "operacional")?.permissoes.autorizacao ?? null) !== null;
   // Gate G2: obrigatórios ainda não resolvidos (null = checklist não aplicado).
   const pendentesChecklist = checklist.length
     ? checklist.filter((i) => i.obrigatorio && i.status !== "valido" && i.status !== "dispensado").length
@@ -164,6 +166,7 @@ export default async function CardEngenharia({ params }: PageProps<"/engenharia/
             pasta={`${atual.empresaId}/${resumo.id}`}
             vistorias={vistorias}
             podeAgir={resumo.situacao !== "cancelada"}
+            atuo={{ engenharia: true, operacional: atuaOperacional }}
             bloqueioPedido={bloqueioVistoria}
             admin={autorizacaoEngenharia === "admin"}
             engenhariaConcluida={engenharia?.status === "concluido"}

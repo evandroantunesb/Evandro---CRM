@@ -3,8 +3,8 @@ import { acaoVistoria, statusVistoria, tipoEventoVistoria, type SituacaoVistoria
 import type { SupabaseServidor } from "@/lib/supabase/server";
 
 /**
- * Pedidos de vistoria da obra com a linha do tempo e os arquivos, do mais recente para o mais antigo. A RLS decide:
- * só admin e quem atua em Engenharia na obra recebem algo; para os demais, lista vazia.
+ * Pedidos de vistoria da obra com a linha do tempo e os arquivos, do mais recente para o mais antigo. A RLS decide
+ * (`pode_ver_vistoria_obra`): só admin e quem atua em Engenharia ou no Operacional na obra recebem algo; os demais, nada.
  */
 export async function carregarVistoriasEngenharia(
   supabase: SupabaseServidor,

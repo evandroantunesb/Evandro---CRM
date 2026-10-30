@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { montarHistorico } from "@/lib/obras/historico";
-import { acaoVistoria, bloqueioPedidoVistoria, registroExigeDescricao, registrosPossiveis, vistoriaAtiva } from "@/lib/engenharia-vistoria-regras";
+import { acaoVistoria, bloqueioPedidoVistoria, podeRegistrar, registroExigeDescricao, registrosPossiveis, vistoriaAtiva } from "@/lib/engenharia-vistoria-regras";
 
 const v = (status: Parameters<typeof registrosPossiveis>[0]["status"], medidorAdequadoEm: string | null = null, conexaoConfirmadaEm: string | null = null) => ({
   status,
@@ -8,30 +8,53 @@ const v = (status: Parameters<typeof registrosPossiveis>[0]["status"], medidorAd
   conexaoConfirmadaEm,
 });
 
-describe("registrosPossiveis (espelha a RPC)", () => {
-  it("pedida ou agendada: agendar, resultado ou cancelar", () => {
+const eng = { engenharia: true, operacional: false };
+const op = { engenharia: false, operacional: true };
+const ambos = { engenharia: true, operacional: true };
+
+describe("registrosPossiveis (espelha a RPC e quem registra cada parte)", () => {
+  it("pedida ou agendada: a Engenharia agenda, registra a vistoria feita, o resultado ou cancela", () => {
     for (const s of ["solicitada", "agendada"] as const) {
-      expect(registrosPossiveis(v(s))).toEqual(["agendada", "aprovada", "nao_conformidade", "cancelada"]);
+      expect(registrosPossiveis(v(s), eng)).toEqual(["agendada", "realizada", "aprovada", "nao_conformidade", "cancelada"]);
     }
   });
 
-  it("aprovada: medidor, depois conexão, uma vez cada", () => {
-    expect(registrosPossiveis(v("aprovada"))).toEqual(["medidor_adequado"]);
-    expect(registrosPossiveis(v("aprovada", "2026-10-30"))).toEqual(["conexao_confirmada"]);
-    expect(registrosPossiveis(v("aprovada", "2026-10-30", "2026-10-30"))).toEqual([]);
+  it("o Operacional só agenda e registra a vistoria feita em campo; o resultado formal é da Engenharia", () => {
+    expect(registrosPossiveis(v("agendada"), op)).toEqual(["agendada", "realizada"]);
+    expect(registrosPossiveis(v("realizada"), op)).toEqual([]);
+    expect(registrosPossiveis(v("realizada"), eng)).toEqual(["aprovada", "nao_conformidade", "cancelada"]);
+    expect(registrosPossiveis(v("aprovada"), op)).toEqual([]);
   });
 
-  it("não conformidade e cancelada encerram o pedido", () => {
-    expect(registrosPossiveis(v("com_nao_conformidade"))).toEqual([]);
-    expect(registrosPossiveis(v("cancelada"))).toEqual([]);
+  it("aprovada: medidor, depois conexão, uma vez cada (Engenharia)", () => {
+    expect(registrosPossiveis(v("aprovada"), eng)).toEqual(["medidor_adequado"]);
+    expect(registrosPossiveis(v("aprovada", "2026-10-30"), eng)).toEqual(["conexao_confirmada"]);
+    expect(registrosPossiveis(v("aprovada", "2026-10-30", "2026-10-30"), eng)).toEqual([]);
+  });
+
+  it("não conformidade: só o Operacional registra a correção de campo; cancelada encerra", () => {
+    expect(registrosPossiveis(v("com_nao_conformidade"), op)).toEqual(["correcao_campo"]);
+    expect(registrosPossiveis(v("com_nao_conformidade"), eng)).toEqual([]);
+    expect(registrosPossiveis(v("com_nao_conformidade"), ambos)).toEqual(["correcao_campo"]);
+    expect(registrosPossiveis(v("cancelada"), ambos)).toEqual([]);
     expect(vistoriaAtiva("com_nao_conformidade")).toBe(false);
+    expect(vistoriaAtiva("realizada")).toBe(true);
     expect(vistoriaAtiva("aprovada")).toBe(true);
   });
 
-  it("não conformidade e cancelamento pedem descrição", () => {
+  it("quem registra cada parte", () => {
+    expect(podeRegistrar("realizada", op)).toBe(true);
+    expect(podeRegistrar("agendada", eng)).toBe(true);
+    expect(podeRegistrar("correcao_campo", eng)).toBe(false);
+    for (const t of ["aprovada", "nao_conformidade", "cancelada", "medidor_adequado", "conexao_confirmada"] as const) expect(podeRegistrar(t, op), t).toBe(false);
+  });
+
+  it("não conformidade, correção de campo e cancelamento pedem descrição", () => {
     expect(registroExigeDescricao("nao_conformidade")).toBe(true);
+    expect(registroExigeDescricao("correcao_campo")).toBe(true);
     expect(registroExigeDescricao("cancelada")).toBe(true);
     expect(registroExigeDescricao("aprovada")).toBe(false);
+    expect(registroExigeDescricao("realizada")).toBe(false);
   });
 });
 
@@ -44,7 +67,8 @@ describe("bloqueioPedidoVistoria (gate G5)", () => {
 });
 
 describe("acaoVistoria (central)", () => {
-  it("só não conformidade e conexão confirmada pedem ação da Engenharia", () => {
+  it("realizada, não conformidade e conexão confirmada pedem ação da Engenharia", () => {
+    expect(acaoVistoria({ status: "realizada", conexaoConfirmadaEm: null })).toBe("Registrar o resultado da vistoria");
     expect(acaoVistoria({ status: "com_nao_conformidade", conexaoConfirmadaEm: null })).toBe("Corrigir a não conformidade e pedir nova vistoria");
     expect(acaoVistoria({ status: "aprovada", conexaoConfirmadaEm: "2026-10-30" })).toBe("Concluir a Engenharia");
     expect(acaoVistoria({ status: "aprovada", conexaoConfirmadaEm: null })).toBeNull();

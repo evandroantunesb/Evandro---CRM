@@ -18,7 +18,14 @@ export const dataBr = (iso: string) => {
 type RegistrarArquivo = (dados: { obraId: string; eventoId: string; caminho: string; nome: string }) => Promise<ResultadoAcao>;
 
 /** Envia os arquivos à pasta da obra e liga cada um ao evento. Devolve a primeira falha, ou null. */
-async function anexarAoEvento(registrar: RegistrarArquivo, pasta: string, obraId: string, eventoId: string, arquivos: File[]): Promise<string | null> {
+async function anexarAoEvento(
+  registrar: RegistrarArquivo,
+  pasta: string,
+  obraId: string,
+  eventoId: string,
+  arquivos: File[],
+  bucket: string,
+): Promise<string | null> {
   const supabase = criarClienteNavegador();
   let falha: string | null = null;
   for (const arquivo of arquivos) {
@@ -28,7 +35,7 @@ async function anexarAoEvento(registrar: RegistrarArquivo, pasta: string, obraId
       continue;
     }
     const caminho = `${pasta}/${nomeSeguro(arquivo.name)}`;
-    const { error } = await supabase.storage.from(BUCKET_DOCUMENTOS_ENGENHARIA).upload(caminho, arquivo, { contentType: arquivo.type || undefined });
+    const { error } = await supabase.storage.from(bucket).upload(caminho, arquivo, { contentType: arquivo.type || undefined });
     if (error) {
       falha ??= `Não foi possível enviar "${arquivo.name}".`;
       continue;
@@ -48,11 +55,13 @@ export function useEnvioDepois(
   arquivos: File[],
   setErro: (e: string | null) => void,
   atualizar: () => void,
+  // Protocolo: documentos da Engenharia; vistoria: `vistoria-arquivos` (o Operacional também lê e envia).
+  bucket: string = BUCKET_DOCUMENTOS_ENGENHARIA,
 ) {
   useEffect(() => {
     if (!resultado?.ok || !resultado.eventoId || arquivos.length === 0) return;
     let ativo = true;
-    anexarAoEvento(registrar, pasta, obraId, resultado.eventoId, arquivos).then((falha) => {
+    anexarAoEvento(registrar, pasta, obraId, resultado.eventoId, arquivos, bucket).then((falha) => {
       if (!ativo) return;
       setErro(falha);
       atualizar();

@@ -11,8 +11,14 @@
 --    ou "Concluído". Pedir leva a Engenharia para "Aguardando vistoria" sozinho, pelo caminho e histórico da troca manual.
 --  * Gate G6: a Engenharia só entra em "Concluído" com vistoria aprovada e conexão confirmada. Exceção (obra sem conexão
 --    nova, por exemplo): só o admin, por RPC própria, com motivo guardado no histórico (o texto não é exibido).
---  * Leitura dos registros completos: admin e quem atua em Engenharia na obra (`pode_ver_documentos_engenharia`). Quem
---    vê a obra (inclusive o Operacional) lê só a situação e as datas, por `situacao_vistoria_obra`.
+--  * Quem registra (decisão do Evandro de 30/10, "os dois"): a Engenharia pede a vistoria, registra o resultado formal
+--    (aprovada / não conformidade), o medidor, a conexão e o cancelamento; a Engenharia ou o Operacional registram o
+--    agendamento e a vistoria realizada em campo; o Operacional registra a correção de campo depois da não conformidade.
+--    Cada parte pode levar arquivos (fotos, relatório, comprovante).
+--  * Leitura dos registros completos e dos arquivos: admin e quem atua em Engenharia ou no Operacional na obra
+--    (`pode_ver_vistoria_obra`). Os arquivos ficam no bucket privado `vistoria-arquivos` (`empresa/obra/objeto`),
+--    separado dos documentos da Engenharia, que o Operacional continua sem ver. Quem vê a obra sem atuar nesses
+--    setores (vendedor, gestor) lê só a situação e as datas, por `situacao_vistoria_obra`.
 -- Decisões do Evandro em 30/10/2026 (G5, quem lança, G6 com exceção do admin, etapa automática).
 -- Depende de: 20261030120000_engenharia_protocolos.sql (gravar_status_fluxo_obra, hoje_brasilia, protocolos).
 
@@ -30,7 +36,7 @@ create table public.obra_engenharia_vistorias (
   solicitada_em date not null,
   agendada_para date,
   realizada_em date,
-  status text not null default 'solicitada' check (status in ('solicitada', 'agendada', 'aprovada', 'com_nao_conformidade', 'cancelada')),
+  status text not null default 'solicitada' check (status in ('solicitada', 'agendada', 'realizada', 'aprovada', 'com_nao_conformidade', 'cancelada')),
   medidor_adequado_em date,
   conexao_confirmada_em date,
   registrado_por uuid,
@@ -43,7 +49,7 @@ create table public.obra_engenharia_vistorias (
   constraint obra_engenharia_vistorias_conexao check (conexao_confirmada_em is null or medidor_adequado_em is not null)
 );
 create unique index obra_engenharia_vistorias_uma_ativa on public.obra_engenharia_vistorias (obra_id)
-  where status in ('solicitada', 'agendada', 'aprovada');
+  where status in ('solicitada', 'agendada', 'realizada', 'aprovada');
 create index on public.obra_engenharia_vistorias (obra_id, created_at);
 create trigger obra_engenharia_vistorias_updated_at before update on public.obra_engenharia_vistorias
   for each row execute function public.tocar_updated_at();
@@ -54,7 +60,8 @@ create table public.obra_engenharia_vistoria_eventos (
   obra_id uuid not null,
   vistoria_id uuid not null,
   tipo text not null check (tipo in (
-    'solicitada', 'agendada', 'aprovada', 'nao_conformidade', 'cancelada', 'medidor_adequado', 'conexao_confirmada'
+    'solicitada', 'agendada', 'realizada', 'aprovada', 'nao_conformidade', 'correcao_campo', 'cancelada',
+    'medidor_adequado', 'conexao_confirmada'
   )),
   status_de text,
   status_para text not null,
@@ -85,16 +92,56 @@ create table public.obra_engenharia_vistoria_arquivos (
 create index on public.obra_engenharia_vistoria_arquivos (evento_id);
 create index on public.obra_engenharia_vistoria_arquivos (obra_id);
 
--- Leitura: admin e quem atua em Engenharia na obra. Escrita direta revogada (inclusive service_role).
+-- Quem vê os registros completos da vistoria: admin e quem atua em Engenharia ou no Operacional na obra (mesma regra
+-- de `autorizacao_setor_obra`: coordenador do setor ou participante ativo dele).
+create or replace function public.pode_ver_vistoria_obra(p_obra_id uuid)
+returns boolean
+language sql stable security definer set search_path = ''
+as $$
+  select p_obra_id is not null and (
+    public.autorizacao_setor_obra(p_obra_id, 'engenharia') is not null
+    or public.autorizacao_setor_obra(p_obra_id, 'operacional') is not null
+  );
+$$;
+
+-- Leitura: `pode_ver_vistoria_obra`. Escrita direta revogada (inclusive service_role).
 alter table public.obra_engenharia_vistorias enable row level security;
 create policy "ver vistorias da engenharia" on public.obra_engenharia_vistorias for select to authenticated
-  using (public.pode_ver_documentos_engenharia(obra_id));
+  using (public.pode_ver_vistoria_obra(obra_id));
 alter table public.obra_engenharia_vistoria_eventos enable row level security;
 create policy "ver eventos das vistorias" on public.obra_engenharia_vistoria_eventos for select to authenticated
-  using (public.pode_ver_documentos_engenharia(obra_id));
+  using (public.pode_ver_vistoria_obra(obra_id));
 alter table public.obra_engenharia_vistoria_arquivos enable row level security;
 create policy "ver arquivos das vistorias" on public.obra_engenharia_vistoria_arquivos for select to authenticated
-  using (public.pode_ver_documentos_engenharia(obra_id));
+  using (public.pode_ver_vistoria_obra(obra_id));
+
+-- Arquivos da vistoria: bucket próprio, para o Operacional ler e enviar sem acesso aos documentos da Engenharia.
+-- Mesma pasta `empresa/obra/objeto` (lida por `obra_da_pasta_engenharia`, que só confere o formato e a empresa).
+create or replace function public.pode_ver_pasta_vistoria(p_caminho text)
+returns boolean
+language sql stable security definer set search_path = ''
+as $$
+  select coalesce(public.pode_ver_vistoria_obra(public.obra_da_pasta_engenharia(p_caminho)), false);
+$$;
+
+create or replace function public.pode_enviar_pasta_vistoria(p_caminho text)
+returns boolean
+language sql stable security definer set search_path = ''
+as $$
+  select coalesce((
+    select o.cancelada_em is null and public.pode_ver_vistoria_obra(o.id)
+    from public.obras o where o.id = public.obra_da_pasta_engenharia(p_caminho)
+  ), false);
+$$;
+
+insert into storage.buckets (id, name, public, file_size_limit)
+values ('vistoria-arquivos', 'vistoria-arquivos', false, 20971520)
+on conflict (id) do nothing;
+
+create policy "vistoria-arquivos: ler" on storage.objects for select to authenticated
+  using (bucket_id = 'vistoria-arquivos' and public.pode_ver_pasta_vistoria(name));
+create policy "vistoria-arquivos: enviar" on storage.objects for insert to authenticated
+  with check (bucket_id = 'vistoria-arquivos' and public.pode_enviar_pasta_vistoria(name));
 
 revoke all on public.obra_engenharia_vistorias, public.obra_engenharia_vistoria_eventos, public.obra_engenharia_vistoria_arquivos from anon;
 revoke insert, update, delete, truncate on public.obra_engenharia_vistorias, public.obra_engenharia_vistoria_eventos,
@@ -235,7 +282,7 @@ begin
   end if;
   if exists (
     select 1 from public.obra_engenharia_vistorias
-    where obra_id = p_obra_id and status in ('solicitada', 'agendada', 'aprovada')
+    where obra_id = p_obra_id and status in ('solicitada', 'agendada', 'realizada', 'aprovada')
   ) then
     raise exception 'Esta obra já tem uma vistoria em andamento ou aprovada.' using errcode = 'check_violation', hint = 'mensagem_usuario';
   end if;
@@ -257,11 +304,32 @@ begin
 end;
 $$;
 
+-- Setor em nome do qual a pessoa registra cada tipo (ou nulo se não pode): agendamento e vistoria realizada, pela
+-- Engenharia ou pelo Operacional; correção de campo, pelo Operacional; o resto, pela Engenharia. Admin passa em todos.
+create or replace function public.setor_registro_vistoria(p_obra_id uuid, p_tipo text)
+returns public.setor_obra
+language sql stable security definer set search_path = ''
+as $$
+  select case
+    when p_tipo in ('agendada', 'realizada') then
+      case
+        when public.autorizacao_setor_obra(p_obra_id, 'engenharia') is not null then 'engenharia'::public.setor_obra
+        when public.autorizacao_setor_obra(p_obra_id, 'operacional') is not null then 'operacional'::public.setor_obra
+      end
+    when p_tipo = 'correcao_campo' then
+      case when public.autorizacao_setor_obra(p_obra_id, 'operacional') is not null then 'operacional'::public.setor_obra end
+    when public.autorizacao_setor_obra(p_obra_id, 'engenharia') is not null then 'engenharia'::public.setor_obra
+  end;
+$$;
+
 -- Registra o andamento da vistoria. Transições:
---  solicitada | agendada → agendada (ou reagendada) | aprovada | nao_conformidade | cancelada
+--  solicitada | agendada → agendada (ou reagendada) | realizada | aprovada | nao_conformidade | cancelada
+--  realizada → aprovada | nao_conformidade | cancelada (o resultado formal vem da distribuidora)
+--  com_nao_conformidade → correcao_campo (uma ou mais; a situação não muda: a Engenharia pede vistoria nova)
 --  aprovada → medidor_adequado (uma vez) → conexao_confirmada (uma vez)
--- "agendada" leva a data marcada (pode ser futura); as outras, a data do fato (entre o pedido e hoje). Não conformidade
--- e cancelamento exigem descrição. Nenhum registro muda a etapa: concluir a Engenharia segue pela troca manual (G6).
+-- "agendada" leva a data marcada (pode ser futura); as outras, a data do fato (entre o pedido e hoje). Não conformidade,
+-- correção de campo e cancelamento exigem descrição. Nenhum registro muda a etapa: concluir a Engenharia segue pela
+-- troca manual (G6).
 create or replace function public.registrar_evento_vistoria_engenharia(
   p_vistoria_id uuid,
   p_tipo text,
@@ -278,16 +346,23 @@ declare
   v_desc text := nullif(btrim(coalesce(p_descricao, '')), '');
   v_para text;
   v_evento uuid;
+  v_setor public.setor_obra;
 begin
-  select obra_id into v_obra from public.obra_engenharia_vistorias where id = p_vistoria_id;
-  v_aut := public.preparar_escrita_obra(v_obra, 'engenharia', false);
-  select * into v_v from public.obra_engenharia_vistorias where id = p_vistoria_id for update;
-
-  if p_tipo is null or p_tipo not in ('agendada', 'aprovada', 'nao_conformidade', 'cancelada', 'medidor_adequado', 'conexao_confirmada') then
+  if p_tipo is null or p_tipo not in (
+    'agendada', 'realizada', 'aprovada', 'nao_conformidade', 'correcao_campo', 'cancelada', 'medidor_adequado', 'conexao_confirmada'
+  ) then
     raise exception 'Tipo de registro inválido.' using errcode = 'check_violation', hint = 'mensagem_usuario';
   end if;
+  select obra_id into v_obra from public.obra_engenharia_vistorias where id = p_vistoria_id;
+  -- Sem setor autorizado para este tipo, cai na Engenharia: `preparar_escrita_obra` recusa com a mensagem de sempre.
+  v_setor := coalesce(public.setor_registro_vistoria(v_obra, p_tipo), case when p_tipo = 'correcao_campo' then 'operacional' else 'engenharia' end::public.setor_obra);
+  v_aut := public.preparar_escrita_obra(v_obra, v_setor, false);
+  select * into v_v from public.obra_engenharia_vistorias where id = p_vistoria_id for update;
+
   if not (
-    (v_v.status in ('solicitada', 'agendada') and p_tipo in ('agendada', 'aprovada', 'nao_conformidade', 'cancelada'))
+    (v_v.status in ('solicitada', 'agendada') and p_tipo in ('agendada', 'realizada', 'aprovada', 'nao_conformidade', 'cancelada'))
+    or (v_v.status = 'realizada' and p_tipo in ('aprovada', 'nao_conformidade', 'cancelada'))
+    or (v_v.status = 'com_nao_conformidade' and p_tipo = 'correcao_campo')
     or (v_v.status = 'aprovada' and p_tipo = 'medidor_adequado' and v_v.medidor_adequado_em is null)
     or (v_v.status = 'aprovada' and p_tipo = 'conexao_confirmada' and v_v.medidor_adequado_em is not null and v_v.conexao_confirmada_em is null)
   ) then
@@ -296,18 +371,24 @@ begin
   if p_data is null or p_data < v_v.solicitada_em
      or (p_tipo <> 'agendada' and p_data > public.hoje_brasilia())
      or (p_tipo = 'agendada' and p_data > public.hoje_brasilia() + 365)
-     or (p_tipo = 'medidor_adequado' and p_data < v_v.realizada_em)
+     or (p_tipo in ('aprovada', 'nao_conformidade', 'correcao_campo', 'medidor_adequado') and p_data < v_v.realizada_em)
      or (p_tipo = 'conexao_confirmada' and p_data < v_v.medidor_adequado_em) then
     raise exception 'Informe uma data válida (não antes do pedido nem do registro anterior; só a data agendada pode ser futura).' using errcode = 'check_violation', hint = 'mensagem_usuario';
   end if;
   if v_desc is not null and length(v_desc) > 4000 then
     raise exception 'Texto muito longo (máximo 4000 caracteres).' using errcode = 'check_violation', hint = 'mensagem_usuario';
   end if;
-  if p_tipo in ('nao_conformidade', 'cancelada') and (v_desc is null or length(v_desc) < 3) then
-    raise exception 'Descreva o que foi apontado (ou o motivo do cancelamento).' using errcode = 'check_violation', hint = 'mensagem_usuario';
+  if p_tipo in ('nao_conformidade', 'correcao_campo', 'cancelada') and (v_desc is null or length(v_desc) < 3) then
+    raise exception 'Descreva o que foi apontado, o que foi corrigido ou o motivo do cancelamento.' using errcode = 'check_violation', hint = 'mensagem_usuario';
   end if;
 
-  v_para := case p_tipo when 'nao_conformidade' then 'com_nao_conformidade' when 'medidor_adequado' then 'aprovada' when 'conexao_confirmada' then 'aprovada' else p_tipo end;
+  v_para := case p_tipo
+    when 'nao_conformidade' then 'com_nao_conformidade'
+    when 'correcao_campo' then 'com_nao_conformidade'
+    when 'medidor_adequado' then 'aprovada'
+    when 'conexao_confirmada' then 'aprovada'
+    else p_tipo
+  end;
 
   insert into public.obra_engenharia_vistoria_eventos (empresa_id, obra_id, vistoria_id, tipo, status_de, status_para, ocorrido_em, descricao, autor_membro_id)
   values (v_v.empresa_id, v_v.obra_id, v_v.id, p_tipo, v_v.status, v_para, p_data, v_desc, public.meu_membro_id(v_v.empresa_id))
@@ -316,12 +397,17 @@ begin
   update public.obra_engenharia_vistorias
   set status = v_para,
       agendada_para = case when p_tipo = 'agendada' then p_data else agendada_para end,
-      realizada_em = case when p_tipo in ('aprovada', 'nao_conformidade') then p_data else realizada_em end,
+      -- Vistoria realizada em campo marca a data; o resultado formal só a preenche se ninguém registrou antes.
+      realizada_em = case
+        when p_tipo = 'realizada' then p_data
+        when p_tipo in ('aprovada', 'nao_conformidade') then coalesce(realizada_em, p_data)
+        else realizada_em
+      end,
       medidor_adequado_em = case when p_tipo = 'medidor_adequado' then p_data else medidor_adequado_em end,
       conexao_confirmada_em = case when p_tipo = 'conexao_confirmada' then p_data else conexao_confirmada_em end
   where id = v_v.id;
 
-  perform public.registrar_historico_obra(v_v.obra_id, 'vistoria_engenharia_atualizada', 'engenharia', jsonb_build_object(
+  perform public.registrar_historico_obra(v_v.obra_id, 'vistoria_engenharia_atualizada', v_setor, jsonb_build_object(
     'tipo', p_tipo,
     'de', v_v.status,
     'para', v_para,
@@ -331,8 +417,9 @@ begin
 end;
 $$;
 
--- Anexa ao evento um arquivo que o navegador já enviou à pasta da obra (relatório, foto, comprovante). Mesmas
--- conferências dos arquivos do protocolo; nada se apaga.
+-- Anexa ao evento um arquivo que o navegador já enviou à pasta da obra no bucket `vistoria-arquivos` (relatório, foto,
+-- comprovante). Quem pode anexar é quem pode registrar aquele tipo de evento. Mesmas conferências dos arquivos do
+-- protocolo; nada se apaga.
 create or replace function public.registrar_arquivo_vistoria_engenharia(p_evento_id uuid, p_caminho text, p_nome text)
 returns uuid
 language plpgsql security definer set search_path = ''
@@ -344,9 +431,14 @@ declare
   v_objeto record;
   v_id uuid;
 begin
-  select obra_id into v_obra from public.obra_engenharia_vistoria_eventos where id = p_evento_id;
-  v_aut := public.preparar_escrita_obra(v_obra, 'engenharia', false);
   select * into v_e from public.obra_engenharia_vistoria_eventos where id = p_evento_id;
+  v_obra := v_e.obra_id;
+  -- O pedido ("solicitada") é da Engenharia; os demais seguem a regra de quem registra cada tipo.
+  v_aut := public.preparar_escrita_obra(
+    v_obra,
+    coalesce(public.setor_registro_vistoria(v_obra, v_e.tipo), case when v_e.tipo = 'correcao_campo' then 'operacional' else 'engenharia' end::public.setor_obra),
+    false
+  );
 
   if public.obra_da_pasta_engenharia(p_caminho) is distinct from v_e.obra_id then
     raise exception 'O arquivo não está na pasta desta obra.' using errcode = 'check_violation', hint = 'mensagem_usuario';
@@ -356,7 +448,7 @@ begin
   end if;
   select o.metadata into v_objeto
   from storage.objects o
-  where o.bucket_id = 'engenharia-documentos' and o.name = p_caminho and o.owner_id = (select auth.uid())::text;
+  where o.bucket_id = 'vistoria-arquivos' and o.name = p_caminho and o.owner_id = (select auth.uid())::text;
   if not found then
     raise exception 'Arquivo não encontrado no armazenamento. Envie de novo.' using errcode = 'check_violation', hint = 'mensagem_usuario';
   end if;
@@ -392,7 +484,7 @@ as $$
   select v.status, v.solicitada_em, v.agendada_para, v.realizada_em, v.medidor_adequado_em, v.conexao_confirmada_em
   from public.obra_engenharia_vistorias v
   where v.obra_id = p_obra_id
-    and (public.pode_ver_obra(p_obra_id) or public.pode_ver_obra_operacao(p_obra_id) or public.pode_ver_documentos_engenharia(p_obra_id))
+    and (public.pode_ver_obra(p_obra_id) or public.pode_ver_obra_operacao(p_obra_id) or public.pode_ver_vistoria_obra(p_obra_id))
   order by v.created_at desc
   limit 1;
 $$;
@@ -409,5 +501,13 @@ revoke all on function public.registrar_arquivo_vistoria_engenharia(uuid, text, 
 grant execute on function public.registrar_arquivo_vistoria_engenharia(uuid, text, text) to authenticated;
 revoke all on function public.situacao_vistoria_obra(uuid) from public, anon, authenticated, service_role;
 grant execute on function public.situacao_vistoria_obra(uuid) to authenticated;
+-- Usadas nas policies (tabelas e Storage): só `authenticated`. A regra de quem registra é interna.
+revoke all on function public.pode_ver_vistoria_obra(uuid) from public, anon, authenticated, service_role;
+grant execute on function public.pode_ver_vistoria_obra(uuid) to authenticated;
+revoke all on function public.pode_ver_pasta_vistoria(text) from public, anon, authenticated, service_role;
+grant execute on function public.pode_ver_pasta_vistoria(text) to authenticated;
+revoke all on function public.pode_enviar_pasta_vistoria(text) from public, anon, authenticated, service_role;
+grant execute on function public.pode_enviar_pasta_vistoria(text) to authenticated;
+revoke all on function public.setor_registro_vistoria(uuid, text) from public, anon, authenticated, service_role;
 
 reset lock_timeout;

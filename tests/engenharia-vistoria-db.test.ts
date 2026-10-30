@@ -2,8 +2,10 @@
  * Engenharia — vistoria, medição e conexão (20261030140000_engenharia_vistoria.sql): gate G5 (protocolo aprovado e
  * instalação concluída para pedir), pedido com avanço automático para "Aguardando vistoria", transições (agendada,
  * aprovada, não conformidade, cancelada; medidor e conexão só depois da aprovação, nessa ordem), datas, arquivos,
- * gate G6 (concluir exige conexão confirmada) e a exceção do admin, visibilidade (registros completos só para admin e
- * Engenharia; situação para quem vê a obra), escrita direta revogada. Precisa do Supabase local (CI).
+ * gate G6 (concluir exige conexão confirmada) e a exceção do admin, quem registra cada parte (Engenharia: pedido,
+ * resultado, medidor, conexão; Operacional: agendamento, vistoria feita em campo, correção de campo), arquivos no bucket
+ * `vistoria-arquivos`, visibilidade (registros completos para admin, Engenharia e Operacional da obra; situação para
+ * quem só vê a obra), escrita direta revogada. Precisa do Supabase local (CI).
  *
  * Cenário próprio ("Vistoria A/B" + sufixo, usuários "ev-*" + sufixo). Os testes seguem em ordem.
  */
@@ -12,7 +14,7 @@ import { urlBancoLocal } from "./banco-local";
 import { beforeAll, describe, expect, it } from "vitest";
 import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
 
-const BUCKET = "engenharia-documentos";
+const BUCKET = "vistoria-arquivos";
 
 async function noBanco(sql: string, params: unknown[] = []) {
   const banco = new Client({ connectionString: urlBancoLocal() });
@@ -194,42 +196,84 @@ describe("Engenharia: vistoria e conexão (ordem importa)", { concurrent: false,
     expect(v).toEqual({ status: "agendada", agendada_para: dia(7) });
   });
 
-  it("não conformidade guarda o pedido e libera um novo, que a Engenharia leva até a conexão", async () => {
+  it("não conformidade guarda o pedido; o Operacional registra a correção de campo e a Engenharia pede de novo", async () => {
+    expect((await registrar(execOp, vistoria, "nao_conformidade", { p_descricao: "Placa ausente" })).error?.message).toContain("permissão");
     expect((await registrar(coordEng, vistoria, "nao_conformidade", { p_descricao: "Placa de advertência ausente" })).error).toBeNull();
     expect((await registrar(execEng, vistoria, "aprovada")).error?.message).toContain("não cabe");
+    // Correção de campo: só o Operacional, com o que foi corrigido; a situação continua "com não conformidade".
+    expect((await registrar(execEng, vistoria, "correcao_campo", { p_descricao: "Placa instalada" })).error?.message).toContain("permissão");
+    expect((await registrar(execOp, vistoria, "correcao_campo")).error?.message).toContain("Descreva");
+    expect((await registrar(execOp, vistoria, "correcao_campo", { p_descricao: "Placa de advertência instalada" })).error).toBeNull();
+    const { data: corrigida } = await servico.from("obra_engenharia_vistorias").select("status").eq("id", vistoria).single();
+    expect(corrigida!.status).toBe("com_nao_conformidade");
+    const { data: hist } = await servico.from("obra_historico").select("setor, dados").eq("obra_id", obra).order("id", { ascending: false }).limit(1);
+    expect(hist![0]).toMatchObject({ setor: "operacional", dados: expect.objectContaining({ tipo: "correcao_campo" }) });
 
+    // O pedido é da Engenharia; o Operacional não pede.
+    expect((await pedir(execOp)).error?.message).toContain("permissão");
     const novo = await pedir(execEng);
     expect(novo.error).toBeNull();
     vistoria = novo.data as string;
+  });
+
+  it("o Operacional agenda e registra a vistoria feita em campo; o resultado, o medidor e a conexão são da Engenharia", async () => {
+    expect((await registrar(execOp, vistoria, "agendada", { p_data: dia(2) })).error).toBeNull();
+    expect((await registrar(execOp, vistoria, "realizada")).error).toBeNull();
+    expect((await registrar(execOp, vistoria, "aprovada")).error?.message).toContain("permissão");
+    expect((await registrar(execEng, vistoria, "agendada")).error?.message).toContain("não cabe");
     expect((await registrar(execEng, vistoria, "aprovada")).error).toBeNull();
     // Vistoria aprovada não é conexão: G6 ainda bloqueia.
     expect((await etapa(execEng, "engenharia", "concluido")).error?.message).toContain("conexão confirmada");
     expect((await registrar(execEng, vistoria, "conexao_confirmada")).error?.message).toContain("não cabe");
+    expect((await registrar(execOp, vistoria, "medidor_adequado")).error?.message).toContain("permissão");
     expect((await registrar(execEng, vistoria, "medidor_adequado")).error).toBeNull();
     expect((await registrar(execEng, vistoria, "medidor_adequado")).error?.message).toContain("não cabe");
     expect((await etapa(execEng, "engenharia", "concluido")).error?.message).toContain("conexão confirmada");
     expect((await registrar(execEng, vistoria, "conexao_confirmada")).error).toBeNull();
 
-    const { data: v } = await servico.from("obra_engenharia_vistorias").select("status, realizada_em, medidor_adequado_em, conexao_confirmada_em").eq("id", vistoria).single();
-    expect(v).toEqual({ status: "aprovada", realizada_em: hoje(), medidor_adequado_em: hoje(), conexao_confirmada_em: hoje() });
+    const { data: v } = await servico
+      .from("obra_engenharia_vistorias")
+      .select("status, agendada_para, realizada_em, medidor_adequado_em, conexao_confirmada_em")
+      .eq("id", vistoria)
+      .single();
+    expect(v).toEqual({ status: "aprovada", agendada_para: dia(2), realizada_em: hoje(), medidor_adequado_em: hoje(), conexao_confirmada_em: hoje() });
     expect((await pedir(execEng)).error?.message).toContain("já tem uma vistoria");
   });
 
-  it("arquivo do evento: na pasta da obra, de quem chama", async () => {
-    const { data: ev } = await servico.from("obra_engenharia_vistoria_eventos").select("id").eq("vistoria_id", vistoria).eq("tipo", "aprovada").single();
-    const caminho = `${empresa}/${obra}/${Date.now()}-relatorio.pdf`;
-    ok(await execEng.cliente.storage.from(BUCKET).upload(caminho, new Blob([new Uint8Array(64)], { type: "application/pdf" }), { contentType: "application/pdf" }), "upload");
-    const arq = { p_evento_id: ev!.id, p_caminho: caminho, p_nome: "relatorio.pdf" };
-    expect((await coordEng.cliente.rpc("registrar_arquivo_vistoria_engenharia", arq)).error?.message).toContain("não encontrado");
-    expect((await execEng.cliente.rpc("registrar_arquivo_vistoria_engenharia", arq)).error).toBeNull();
-    expect((await execEng.cliente.rpc("registrar_arquivo_vistoria_engenharia", { ...arq, p_caminho: `${empresa}/outra/x.pdf` })).error?.code).toBe("23514");
+  it("arquivos no bucket da vistoria: cada um anexa ao que registrou; o Operacional não envia aos documentos da Engenharia", async () => {
+    const evento = async (tipo: string) =>
+      (await servico.from("obra_engenharia_vistoria_eventos").select("id").eq("vistoria_id", vistoria).eq("tipo", tipo).single()).data!.id;
+    const enviar = async (quem: Usuario, nome: string) => {
+      const caminho = `${empresa}/${obra}/${Date.now()}-${nome}`;
+      ok(await quem.cliente.storage.from(BUCKET).upload(caminho, new Blob([new Uint8Array(64)], { type: "image/jpeg" }), { contentType: "image/jpeg" }), "upload");
+      return caminho;
+    };
+
+    const foto = await enviar(execOp, "foto-campo.jpg");
+    const naRealizada = { p_evento_id: await evento("realizada"), p_caminho: foto, p_nome: "foto-campo.jpg" };
+    expect((await execEng.cliente.rpc("registrar_arquivo_vistoria_engenharia", naRealizada)).error?.message).toContain("não encontrado");
+    expect((await execOp.cliente.rpc("registrar_arquivo_vistoria_engenharia", naRealizada)).error).toBeNull();
+
+    const relatorio = await enviar(execOp, "relatorio.jpg");
+    const naAprovada = { p_evento_id: await evento("aprovada"), p_caminho: relatorio, p_nome: "relatorio.jpg" };
+    expect((await execOp.cliente.rpc("registrar_arquivo_vistoria_engenharia", naAprovada)).error?.message).toContain("permissão");
+    expect((await execEng.cliente.rpc("registrar_arquivo_vistoria_engenharia", { ...naRealizada, p_caminho: `${empresa}/outra/x.jpg` })).error?.code).toBe("23514");
+
+    // A Engenharia lê a foto do Operacional; quem não atua na obra, não.
+    expect((await execEng.cliente.storage.from(BUCKET).download(foto)).error).toBeNull();
+    expect((await vendedor.cliente.storage.from(BUCKET).download(foto)).data).toBeNull();
+    // O Operacional continua sem acesso ao bucket dos documentos da Engenharia.
+    const doc = await execOp.cliente.storage.from("engenharia-documentos").upload(`${empresa}/${obra}/${Date.now()}-x.pdf`, new Blob([new Uint8Array(8)]));
+    expect(doc.error).not.toBeNull();
   });
 
-  it("registros completos só para admin e Engenharia; a situação para quem vê a obra", async () => {
-    for (const quem of [admin, coordEng, execEng]) {
+  it("registros completos para admin, Engenharia e Operacional da obra; a situação para quem só vê a obra", async () => {
+    for (const quem of [admin, coordEng, execEng, execOp]) {
       expect((await quem.cliente.from("obra_engenharia_vistorias").select("id").eq("obra_id", obra)).data, quem.email).toHaveLength(2);
     }
-    for (const quem of [vendedor, execOp, adminB]) {
+    const { data: correcoes } = await execOp.cliente.from("obra_engenharia_vistoria_eventos").select("tipo").eq("obra_id", obra).eq("tipo", "correcao_campo");
+    expect(correcoes).toHaveLength(1);
+    for (const quem of [vendedor, adminB]) {
       expect((await quem.cliente.from("obra_engenharia_vistorias").select("id").eq("obra_id", obra)).data, quem.email).toHaveLength(0);
       expect((await quem.cliente.from("obra_engenharia_vistoria_eventos").select("id").eq("obra_id", obra)).data, quem.email).toHaveLength(0);
     }

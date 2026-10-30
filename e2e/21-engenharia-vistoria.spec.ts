@@ -6,7 +6,8 @@ const cartao = (page: Page, titulo: string): Locator =>
 const hoje = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
 
 // Engenharia (P4): na o10 (só Compras é usado por outro teste), o protocolo aprovado e a instalação concluída são
-// preparados pelas RPCs reais; pela tela, o admin pede a vistoria, registra a não conformidade, pede de novo, aprova,
+// preparados pelas RPCs reais; pela tela, o admin pede a vistoria, registra a não conformidade, registra a correção de
+// campo no card do Operacional (tela da obra), pede de novo, aprova,
 // registra medidor e conexão e só então conclui a Engenharia. O vendedor vê só a situação, no card do Operacional.
 test("vistoria com não conformidade, nova vistoria, medidor, conexão e conclusão", async ({ page }) => {
   test.setTimeout(180_000);
@@ -56,6 +57,18 @@ test("vistoria com não conformidade, nova vistoria, medidor, conexão e conclus
 
   await registrar("nao_conformidade", "Placa de advertência ausente (fictício)");
   await expect(vistoria.getByText(/apontou não conformidade/)).toBeVisible();
+
+  // Correção de campo pela tela da obra, no card do Operacional (o admin atua nos dois setores).
+  await page.goto(`/obras/${obra}`);
+  const campo = page.locator("form").filter({ hasText: "Registrar andamento" });
+  await expect(campo).toHaveCount(1);
+  await campo.getByLabel("O que aconteceu").selectOption("correcao_campo");
+  await campo.getByLabel("O que foi corrigido").fill("Placa de advertência instalada (fictício)");
+  await campo.getByRole("button", { name: "Registrar", exact: true }).click();
+  await expect(page.getByText("Correção de campo feita").first()).toBeVisible();
+  await page.goto(`/engenharia/${obra}`);
+  await expect(vistoria.getByText("Correção de campo feita")).toBeVisible();
+
   await vistoria.getByRole("button", { name: "Registrar pedido de vistoria" }).click();
   await expect(vistoria.getByText("Solicitada", { exact: true })).toBeVisible();
   await expect(vistoria.getByText("Vistorias anteriores (1)")).toBeVisible();
