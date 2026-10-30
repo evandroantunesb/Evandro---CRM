@@ -1,6 +1,6 @@
 # Estado do projeto — Raion CRM
 
-## Engenharia em Obras — P1, P1.5 e P1.6 integradas em 2026-10-29
+## Engenharia em Obras — P1 a P1.6 integradas em 2026-10-29; P2 em 2026-10-30
 
 `main` em `ba2ef0e`. Sem migration: nada a aplicar em produção.
 
@@ -16,7 +16,19 @@
 
 **E2E:** `e2e/18-engenharia-card.spec.ts` escolhe a primeira obra da "Carteira por etapa", porque o 03 troca o responsável da o01 antes dele na suíte completa.
 
-**Próximo (aguarda comando):** P2 checklist e documentos versionados (migration + RLS + Storage, Opus). Faltam as respostas da seção 29 da spec (documentos e formulários por faixa, ART, ambiental, quem dispensa item, segundo revisor, quem registra a vistoria).
+### P2 — checklist de documentos (#257)
+
+**Migration `20261030100000_engenharia_checklist.sql` aplicada em produção em 30/10/2026** pelo `banco-producao.yml` (tag `migracao-pr257-f55d0da`; conferir + aplicar aprovados pelo Evandro; dry-run listou só ela). Enquanto a #257 não for mesclada, **produção fica à frente da `main`** nessa migration.
+
+- **Modelo por empresa** (`/configuracoes/engenharia`, só admin; sem DELETE): nasce com 11 itens da spec v1.3 seção 24.2 (padrão Copel, a revisar com o responsável técnico). Aplicar na obra copia os itens ativos; editar o modelo não muda obra já aplicada; "Trazer itens novos do modelo" só acrescenta.
+- **Documentos versionados** no bucket privado `engenharia-documentos` (`empresa/obra/objeto`); nada se apaga (arquivo errado = nova versão + item inválido). Download por `/documentos-engenharia/[id]`.
+- **Status:** pendente → em conferência (sozinho ao anexar) → válido (exige arquivo) | inválido (motivo); "não se aplica" (motivo). Nova versão de item válido volta para conferência.
+- **Regras padrão (ajustáveis):** anexa e confere quem tem `autorizacao_setor_obra(obra, 'engenharia')` (admin, coordenador, participante ativo); obrigatório só admin ou coordenador dispensa; arquivos só para admin e Engenharia da obra (gestor, comercial e outros setores veem só o status); obra pausada aceita, cancelada recusa; sem segundo revisor.
+- **Histórico:** checklist aplicado, documento anexado (item e versão), item alterado. Sem nome de arquivo nem motivo (o histórico é visto por quem vê a obra).
+- Escrita só pelas RPCs `aplicar_checklist_engenharia`, `registrar_documento_engenharia`, `alterar_item_engenharia` (todas por `preparar_escrita_obra`). Testes: `tests/engenharia-checklist-db.test.ts`, `tests/engenharia-checklist-regras.test.ts`, `e2e/19-engenharia-checklist.spec.ts`.
+- **Lição:** ao trocar `MIGRATIONS_AUTORIZADAS` no workflow, atualizar junto `tests/validar-conjunto-migrations.test.ts` (a autorizada nova e a anterior como "já aplicada").
+
+O engenheiro testou o P2 em 30/10. **Próximo:** P3 protocolos, exigências e bloqueio de etapa (migration + RLS, Opus).
 
 ## Entregas de 2026-10-29 — dados do cliente, sigilo na obra e tarefas dos setores
 
