@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { CHAVES_PRAZO } from "@/lib/engenharia-prazos-regras";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import type { ResultadoAcao } from "@/lib/tipos";
@@ -47,4 +48,62 @@ export async function editarItemModelo(_: ResultadoAcao, formData: FormData): Pr
   if (error) return { ok: false, mensagem: error.code === "23505" ? DUPLICADO : "Não foi possível salvar." };
   revalidatePath(CAMINHO);
   return { ok: true, mensagem: "Salvo." };
+}
+
+// ---------------------------------------------------------------------------
+// Prazos e feriados (P5)
+// ---------------------------------------------------------------------------
+
+const dias = z.union([z.literal(""), z.coerce.number().int("Use dias inteiros").min(1, "Mínimo de 1 dia útil").max(365, "Máximo de 365 dias úteis")]);
+
+/** Vazio = sem prazo. Só os dias mudam: as linhas nascem com a empresa. */
+export async function salvarPrazos(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  const { atual } = await exigirPapel("admin");
+  const valores: { chave: (typeof CHAVES_PRAZO)[number]; dias: number | null }[] = [];
+  for (const chave of CHAVES_PRAZO) {
+    const d = dias.safeParse(String(formData.get(chave) ?? "").trim());
+    if (!d.success) return { ok: false, mensagem: d.error.issues[0].message };
+    valores.push({ chave, dias: d.data === "" ? null : d.data });
+  }
+
+  const supabase = await criarClienteServidor();
+  for (const v of valores) {
+    const { error } = await supabase
+      .from("engenharia_prazos")
+      .update({ dias_uteis: v.dias })
+      .eq("empresa_id", atual.empresaId)
+      .eq("chave", v.chave);
+    if (error) return { ok: false, mensagem: "Não foi possível salvar os prazos." };
+  }
+  revalidatePath(CAMINHO);
+  return { ok: true, mensagem: "Prazos salvos." };
+}
+
+const esquemaFeriado = z.object({
+  data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida"),
+  nome: z.string().trim().min(2, "Nome muito curto").max(80, "Nome muito longo"),
+});
+
+export async function adicionarFeriado(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  const { atual } = await exigirPapel("admin");
+  const d = esquemaFeriado.safeParse({ data: formData.get("data"), nome: formData.get("nome") });
+  if (!d.success) return { ok: false, mensagem: d.error.issues[0].message };
+
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.from("empresa_feriados").insert({ empresa_id: atual.empresaId, ...d.data });
+  if (error) return { ok: false, mensagem: error.code === "23505" ? "Já existe um feriado nessa data." : "Não foi possível adicionar." };
+  revalidatePath(CAMINHO);
+  return { ok: true, mensagem: "Feriado adicionado." };
+}
+
+export async function removerFeriado(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  const { atual } = await exigirPapel("admin");
+  const id = z.string().uuid().safeParse(formData.get("id"));
+  if (!id.success) return { ok: false, mensagem: "Dados inválidos." };
+
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.from("empresa_feriados").delete().eq("id", id.data).eq("empresa_id", atual.empresaId);
+  if (error) return { ok: false, mensagem: "Não foi possível remover." };
+  revalidatePath(CAMINHO);
+  return { ok: true, mensagem: "Feriado removido." };
 }

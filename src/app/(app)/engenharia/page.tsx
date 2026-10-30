@@ -3,6 +3,17 @@ import type { ReactNode } from "react";
 import { ListaTarefasSetor } from "@/components/tarefas-setor";
 import { Cartao, Selo } from "@/components/ui";
 import { diasDesde, montarCentralEngenharia, type ObraNaEngenharia } from "@/lib/engenharia-regras";
+import { carregarIndicadoresEngenharia, carregarPrazosObras } from "@/lib/engenharia-prazos";
+import {
+  PERIODOS_INDICADORES,
+  lerPeriodo,
+  seloPrazo,
+  textoMediana,
+  textoProporcao,
+  type IndicadoresEngenharia,
+  type PeriodoIndicadores,
+  type PrazoObra,
+} from "@/lib/engenharia-prazos-regras";
 import { contarExigenciasAbertas } from "@/lib/engenharia-protocolos";
 import { carregarAcoesVistoria } from "@/lib/engenharia-vistoria";
 import { carregarObras, type ObraListaVM } from "@/lib/obras/dados";
@@ -43,7 +54,8 @@ const paraCard = (t: TarefaSetorVM): TarefaSetorVM =>
  */
 export default async function Engenharia({ searchParams }: PageProps<"/engenharia">) {
   const { atual } = await exigirPapel(...ENGENHARIA);
-  const { ver } = await searchParams;
+  const { ver, periodo: periodoBruto } = await searchParams;
+  const periodo = lerPeriodo(periodoBruto);
   const filtro = (FILTROS as readonly string[]).includes(ver as string) ? (ver as Filtro) : null;
   const supabase = await criarClienteServidor();
 
@@ -65,7 +77,7 @@ export default async function Engenharia({ searchParams }: PageProps<"/engenhari
     );
   }
 
-  const [{ tarefas, membrosPorSetor }, porAba, obras, exigencias, acoesVistoria] = await Promise.all([
+  const [{ tarefas, membrosPorSetor }, porAba, obras, exigencias, acoesVistoria, prazos, indicadores] = await Promise.all([
     carregarTarefasSetor(supabase, {
       empresaId: atual.empresaId,
       membroId: atual.membroId,
@@ -78,6 +90,8 @@ export default async function Engenharia({ searchParams }: PageProps<"/engenhari
     filtro ? null : carregarObras(supabase, { empresaId: atual.empresaId, papel: atual.papel, membroId: atual.membroId }).then((r) => r.obras),
     filtro ? null : contarExigenciasAbertas(supabase, atual.empresaId),
     filtro ? null : carregarAcoesVistoria(supabase, atual.empresaId),
+    filtro ? null : carregarPrazosObras(supabase, atual.empresaId),
+    filtro ? null : carregarIndicadoresEngenharia(supabase, atual.empresaId, periodo),
   ]);
   const listaTarefas = tarefas.map(paraCard);
 
@@ -113,6 +127,9 @@ export default async function Engenharia({ searchParams }: PageProps<"/engenhari
           obras={obras}
           exigencias={exigencias ?? new Map()}
           acoesVistoria={acoesVistoria ?? new Map()}
+          prazos={prazos ?? new Map()}
+          indicadores={indicadores ?? null}
+          periodo={periodo}
           membroId={atual.membroId}
           podeVerObras={pode(atual.papel, OBRAS)}
           // Definir responsável é do admin e do coordenador (quem a RPC deixa gerir a obra); o gestor só acompanha.
@@ -129,6 +146,9 @@ function Central({
   obras,
   exigencias,
   acoesVistoria,
+  prazos,
+  indicadores,
+  periodo,
   membroId,
   podeVerObras,
   coordena,
@@ -138,6 +158,9 @@ function Central({
   obras: ObraListaVM[];
   exigencias: ReadonlyMap<string, number>;
   acoesVistoria: ReadonlyMap<string, string>;
+  prazos: ReadonlyMap<string, PrazoObra[]>;
+  indicadores: IndicadoresEngenharia | null;
+  periodo: PeriodoIndicadores;
   membroId: string;
   podeVerObras: boolean;
   coordena: boolean;
@@ -150,19 +173,22 @@ function Central({
   const totalObras = grupos.reduce((n, g) => n + g.obras.length, 0);
   const paradas = grupos.reduce((n, g) => n + g.obras.filter((o) => o.estado === "parado").length, 0);
   const nada = tarefasMinhas.length === 0 && acoes.length === 0;
+  const prazosVencidos = grupos.reduce((n, g) => n + g.obras.filter((o) => (prazos.get(o.id) ?? []).some((p) => p.diasRestantes < 0)).length, 0);
 
-  const indicadores: [string, number][] = [
-    ["Obras na Engenharia", totalObras],
+  const numeros: [string, number][] = [
+    // Carteira e paradas vêm do banco (sem o limite de linhas da lista); se ele falhar, contam a lista.
+    ["Obras na Engenharia", indicadores?.carteira.total ?? totalObras],
     ["Precisam de você", tarefasMinhas.length + acoes.length],
     ["Aguardando terceiros", comTerceiros.length],
-    ["Paradas", paradas],
+    ["Paradas", indicadores?.carteira.paradas ?? paradas],
+    ["Prazos vencidos", prazosVencidos],
     ["Tarefas atrasadas", atrasadas],
   ];
 
   return (
     <>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        {indicadores.map(([rotulo, valor]) => (
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        {numeros.map(([rotulo, valor]) => (
           <div key={rotulo} className="rounded-xl border border-zinc-200/80 bg-white p-3 shadow-[0_1px_2px_rgba(15,15,16,0.04)]">
             <p className="text-2xl font-semibold text-zinc-900">{valor}</p>
             <p className="text-xs text-zinc-600">{rotulo}</p>
@@ -188,7 +214,7 @@ function Central({
                 <h3 className="mb-2 text-sm font-medium text-texto">
                   Obras <span className="text-zinc-500">({acoes.length})</span>
                 </h3>
-                <ListaObras obras={acoes} acao />
+                <ListaObras obras={acoes} prazos={prazos} acao />
               </section>
             )}
           </div>
@@ -199,7 +225,7 @@ function Central({
         {comTerceiros.length === 0 ? (
           <p className="text-sm text-zinc-500">Nenhuma obra esperando cliente, fornecedor ou concessionária.</p>
         ) : (
-          <ListaObras obras={comTerceiros} acao />
+          <ListaObras obras={comTerceiros} prazos={prazos} acao />
         )}
       </Cartao>
 
@@ -215,7 +241,7 @@ function Central({
                   <h3 className="mb-2 text-sm font-medium text-texto">
                     {g.rotulo} <span className="text-zinc-500">({g.obras.length})</span>
                   </h3>
-                  <ListaObras obras={g.obras} />
+                  <ListaObras obras={g.obras} prazos={prazos} />
                 </section>
               ))}
             {podeVerObras && (
@@ -226,12 +252,75 @@ function Central({
           </div>
         )}
       </Cartao>
+
+      {indicadores && <Desempenho indicadores={indicadores} periodo={periodo} rotuloEtapa={(s) => rotuloStatus("engenharia", s)} />}
     </>
   );
 }
 
+/** Desempenho do período: medianas em dias úteis e proporções, com o tamanho da amostra. Sem amostra, "—". */
+function Desempenho({
+  indicadores,
+  periodo,
+  rotuloEtapa,
+}: {
+  indicadores: IndicadoresEngenharia;
+  periodo: PeriodoIndicadores;
+  rotuloEtapa: (status: string) => string;
+}) {
+  const { etapas, protocoloAprovacao, exigencia, naoConformidade, conexao } = indicadores;
+  const amostra = (n: number, um: string, varios: string) => (n === 0 ? "sem registros no período" : `${n} ${n === 1 ? um : varios}`);
+  const linhas: [string, string, string][] = [
+    ["Do protocolo à aprovação", textoMediana(protocoloAprovacao), amostra(protocoloAprovacao.n, "protocolo aprovado", "protocolos aprovados")],
+    ["Protocolos com exigência", textoProporcao(exigencia), amostra(exigencia.total, "protocolo", "protocolos")],
+    ["Vistorias com não conformidade", textoProporcao(naoConformidade), amostra(naoConformidade.total, "resultado de vistoria", "resultados de vistoria")],
+    ["Da vistoria aprovada à conexão", textoMediana(conexao), amostra(conexao.n, "conexão", "conexões")],
+  ];
+  return (
+    <Cartao titulo="Desempenho">
+      <div className="flex flex-col gap-4">
+        <nav aria-label="Período" className="flex flex-wrap items-center gap-2 text-sm text-zinc-600">
+          Últimos
+          {PERIODOS_INDICADORES.map((p) => (
+            <Aba key={p} href={`/engenharia?periodo=${p}`} atual={p === periodo}>
+              {p} dias
+            </Aba>
+          ))}
+        </nav>
+        <p className="text-xs text-zinc-500">Tempos em mediana de dias úteis, sem contar o dia do marco. Só obras que você pode ver.</p>
+        <dl className="grid gap-3 sm:grid-cols-2">
+          {linhas.map(([rotulo, valor, detalhe]) => (
+            <div key={rotulo} className="rounded-lg border border-linha px-3 py-2">
+              <dt className="text-xs text-zinc-600">{rotulo}</dt>
+              <dd className="text-lg font-semibold text-texto">{valor}</dd>
+              <dd className="text-xs text-zinc-500">{detalhe}</dd>
+            </div>
+          ))}
+        </dl>
+        <section aria-label="Tempo em cada etapa">
+          <h3 className="mb-2 text-sm font-medium text-texto">Tempo em cada etapa</h3>
+          {etapas.length === 0 ? (
+            <p className="text-sm text-zinc-500">Nenhuma obra saiu de uma etapa no período.</p>
+          ) : (
+            <ul className="divide-y divide-linha rounded-lg border border-linha text-sm">
+              {etapas.map((e) => (
+                <li key={e.etapa} className="flex flex-wrap justify-between gap-2 px-3 py-2">
+                  <span className="text-texto">{rotuloEtapa(e.etapa)}</span>
+                  <span className="text-zinc-600">
+                    {textoMediana({ mediana: e.mediana, n: e.n })} · {e.n} {e.n === 1 ? "obra" : "obras"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
+    </Cartao>
+  );
+}
+
 /** Linhas de obra. Com `acao`, destaca a próxima ação e a etapa; na carteira, só os dados da obra. */
-function ListaObras({ obras, acao = false }: { obras: ObraNaEngenharia[]; acao?: boolean }) {
+function ListaObras({ obras, prazos, acao = false }: { obras: ObraNaEngenharia[]; prazos: ReadonlyMap<string, PrazoObra[]>; acao?: boolean }) {
   return (
     <ul className="divide-y divide-linha rounded-lg border border-linha">
       {obras.map((o) => {
@@ -255,6 +344,14 @@ function ListaObras({ obras, acao = false }: { obras: ObraNaEngenharia[]; acao?:
             <div className="flex flex-wrap gap-1.5">
               {o.aguardando && <Selo tom="atencao">{o.aguardando}</Selo>}
               {o.estado === "parado" && <Selo tom="atencao">{ROTULO_ESTADO_SETOR.parado}</Selo>}
+              {(prazos.get(o.id) ?? []).map((p) => {
+                const selo = seloPrazo(p);
+                return (
+                  <Selo key={p.chave} tom={selo.tom}>
+                    {selo.texto}
+                  </Selo>
+                );
+              })}
             </div>
           </li>
         );
