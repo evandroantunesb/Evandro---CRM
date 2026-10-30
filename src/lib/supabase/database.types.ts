@@ -5465,6 +5465,7 @@ export type Database = {
         Args: { p_motivo: string; p_participante_id: string };
         Returns: undefined;
       };
+      engenharia_em_curso: { Args: { p_obra_id: string }; Returns: boolean };
       estornar_confirmacao_pagamento: {
         Args: { p_contrato_id: string; p_motivo: string };
         Returns: {
@@ -5730,6 +5731,10 @@ export type Database = {
       pode_ver_tarefa_setor: { Args: { p_tarefa_id: string }; Returns: boolean };
       pode_ver_valor_vendido_obra: { Args: { p_obra_id: string }; Returns: boolean };
       pode_ver_vistoria_obra: { Args: { p_obra_id: string }; Returns: boolean };
+      prazo_dias_restantes: {
+        Args: { p_empresa_id: string; p_hoje: string; p_limite: string };
+        Returns: number;
+      };
       prazos_engenharia: {
         Args: { p_empresa_id: string };
         Returns: {
