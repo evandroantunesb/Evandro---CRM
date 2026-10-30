@@ -18,7 +18,7 @@ export const dataBr = (iso: string) => {
 type RegistrarArquivo = (dados: { obraId: string; eventoId: string; caminho: string; nome: string }) => Promise<ResultadoAcao>;
 
 /** Envia os arquivos à pasta da obra e liga cada um ao evento. Devolve a primeira falha, ou null. */
-async function anexarAoEvento(
+export async function anexarAoEvento(
   registrar: RegistrarArquivo,
   pasta: string,
   obraId: string,

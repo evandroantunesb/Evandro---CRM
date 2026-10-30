@@ -8,6 +8,7 @@ import {
   registrarArquivoVistoriaEngenharia,
   registrarEventoVistoriaEngenharia,
   solicitarVistoriaEngenharia,
+  type ResultadoEventoProtocolo,
 } from "@/lib/acoes/engenharia";
 import {
   BUCKET_ARQUIVOS_VISTORIA,
@@ -22,7 +23,7 @@ import {
   type TipoRegistroVistoria,
   type VistoriaVM,
 } from "@/lib/engenharia-vistoria-regras";
-import { LinkArquivo, Rotulo, dataBr, hojeBr, useEnvioDepois } from "./eventos-comum";
+import { LinkArquivo, Rotulo, anexarAoEvento, dataBr, hojeBr } from "./eventos-comum";
 
 // Sem verde (WhatsApp); não conformidade é atenção, não erro.
 const TOM: Record<StatusVistoria, "neutro" | "atencao"> = {
@@ -99,12 +100,27 @@ export function VistoriaEngenharia({
   );
 }
 
+type AcaoEvento = (estado: ResultadoEventoProtocolo, dados: FormData) => Promise<ResultadoEventoProtocolo>;
+
+/**
+ * Registra e, com o evento criado, envia os arquivos escolhidos ANTES de a tela atualizar: depois do registro o
+ * formulário pode sumir (o pedido vira vistoria ativa; a conexão encerra os registros) e levaria o envio junto.
+ */
+function comArquivos(acao: AcaoEvento, obraId: string, pasta: string, arquivos: () => File[], aoTerminar: () => void): AcaoEvento {
+  return async (estado, dados) => {
+    const r = await acao(estado, dados);
+    const escolhidos = arquivos();
+    if (!r?.ok || !r.eventoId || escolhidos.length === 0) return r;
+    const falha = await anexarAoEvento(registrarArquivoVistoriaEngenharia, pasta, obraId, r.eventoId, escolhidos, BUCKET_ARQUIVOS_VISTORIA);
+    aoTerminar();
+    return falha ? { ...r, mensagem: `${r.mensagem} Arquivo não anexado: ${falha}` } : r;
+  };
+}
+
 function PedidoVistoria({ obraId, pasta }: { obraId: string; pasta: string }) {
   const router = useRouter();
-  const [resultado, acao, pendente] = useActionState(solicitarVistoriaEngenharia, null);
   const [arquivos, setArquivos] = useState<File[]>([]);
-  const [erroArquivo, setErroArquivo] = useState<string | null>(null);
-  useEnvioDepois(resultado, registrarArquivoVistoriaEngenharia, pasta, obraId, arquivos, setErroArquivo, router.refresh, BUCKET_ARQUIVOS_VISTORIA);
+  const [resultado, acao, pendente] = useActionState(comArquivos(solicitarVistoriaEngenharia, obraId, pasta, () => arquivos, router.refresh), null);
 
   return (
     <form action={acao} className="flex flex-col gap-3 rounded-lg border border-linha p-3">
@@ -130,7 +146,6 @@ function PedidoVistoria({ obraId, pasta }: { obraId: string; pasta: string }) {
         </Botao>
         <Mensagem resultado={resultado} />
       </div>
-      {erroArquivo && <p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-800">{erroArquivo}</p>}
     </form>
   );
 }
@@ -196,11 +211,9 @@ const ROTULO_DATA: Record<TipoRegistroVistoria, string> = {
 
 function NovoRegistro({ obraId, pasta, vistoria, possiveis }: { obraId: string; pasta: string; vistoria: VistoriaVM; possiveis: TipoRegistroVistoria[] }) {
   const router = useRouter();
-  const [resultado, acao, pendente] = useActionState(registrarEventoVistoriaEngenharia, null);
-  const [tipo, setTipo] = useState<TipoRegistroVistoria>(possiveis[0]);
   const [arquivos, setArquivos] = useState<File[]>([]);
-  const [erroArquivo, setErroArquivo] = useState<string | null>(null);
-  useEnvioDepois(resultado, registrarArquivoVistoriaEngenharia, pasta, obraId, arquivos, setErroArquivo, router.refresh, BUCKET_ARQUIVOS_VISTORIA);
+  const [resultado, acao, pendente] = useActionState(comArquivos(registrarEventoVistoriaEngenharia, obraId, pasta, () => arquivos, router.refresh), null);
+  const [tipo, setTipo] = useState<TipoRegistroVistoria>(possiveis[0]);
   const atual = possiveis.includes(tipo) ? tipo : possiveis[0];
 
   return (
@@ -253,7 +266,6 @@ function NovoRegistro({ obraId, pasta, vistoria, possiveis }: { obraId: string; 
         </Botao>
         <Mensagem resultado={resultado} />
       </div>
-      {erroArquivo && <p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-800">{erroArquivo}</p>}
     </form>
   );
 }
