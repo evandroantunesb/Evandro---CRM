@@ -36,6 +36,18 @@ const ROTULO_TIPO: Record<string, string> = {
   fluxo_alterado: "Setor alterado",
   marco_alterado: "Marco alterado",
   fixacao_definida: "Fixação do telhado",
+  checklist_engenharia_aplicado: "Checklist aplicado",
+  documento_engenharia_enviado: "Documento anexado",
+  item_engenharia_alterado: "Item do checklist",
+};
+
+// Rótulos dos status do checklist da Engenharia (mesmos de `ROTULO_STATUS_ITEM`, sem importar regra de tela).
+const ROTULO_ITEM_ENGENHARIA: Record<string, string> = {
+  pendente: "Pendente",
+  em_conferencia: "Em conferência",
+  valido: "Válido",
+  invalido: "Inválido",
+  dispensado: "Não se aplica",
 };
 
 const ROTULO_SETOR_HISTORICO: Record<string, string> = { ...ROTULO_SETOR, comercial: "Comercial" };
@@ -143,6 +155,24 @@ function descrever(linha: LinhaHistoricoObra, nomes: ReadonlyMap<string, string>
       if (para) return `Definida como ${para}`;
       if (de) return `${de} removida`;
       return "Fixação alterada";
+    }
+    // Título do item vem do modelo da empresa; nome do arquivo e motivo (livres, podem ter dado pessoal) não aparecem.
+    case "checklist_engenharia_aplicado": {
+      const n = ler(dados, "itens");
+      return typeof n === "number" && n > 0 ? `${n} ${n === 1 ? "item" : "itens"}` : "";
+    }
+    case "documento_engenharia_enviado": {
+      const item = ler(dados, "item");
+      const versao = ler(dados, "versao");
+      const nome = typeof item === "string" && item.trim() ? item.trim() : "Item do checklist";
+      return typeof versao === "number" ? `${nome}: versão ${versao}` : nome;
+    }
+    case "item_engenharia_alterado": {
+      const item = ler(dados, "item");
+      const nome = typeof item === "string" && item.trim() ? item.trim() : "Item do checklist";
+      const de = rotulo(ROTULO_ITEM_ENGENHARIA, ler(dados, "de"));
+      const para = rotulo(ROTULO_ITEM_ENGENHARIA, ler(dados, "para"));
+      return de && para ? `${nome}: ${de} → ${para}` : nome;
     }
     default:
       return "Evento registrado";

@@ -63,6 +63,7 @@ const GRUPOS: { id: string; titulo: string; itens: Item[] }[] = [
     titulo: "Obras",
     itens: [
       { href: "/configuracoes/fixacoes", titulo: "Tipos de fixação", descricao: "Opções de fixação do telhado escolhidas na obra.", Icone: Wrench },
+      { href: "/configuracoes/engenharia", titulo: "Checklist da Engenharia", descricao: "Documentos que a Engenharia confere em cada obra.", Icone: ListChecks },
     ],
   },
   {
