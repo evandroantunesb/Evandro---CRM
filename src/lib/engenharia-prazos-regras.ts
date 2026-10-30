@@ -36,16 +36,18 @@ export const prazoDaDistribuidora = (c: ChavePrazo) => (CHAVES_PRAZO_DISTRIBUIDO
 
 export type PrazoObra = { chave: ChavePrazo; limite: string; diasRestantes: number };
 
+const diasUteis = (n: number) => (n === 1 ? "1 dia útil" : `${n} dias úteis`);
+
 /** Texto e tom do selo: atrasado, vence hoje ou quantos dias úteis faltam. */
 export function seloPrazo(p: PrazoObra): { texto: string; tom: "negativo" | "atencao" | "neutro" } {
   const quem = prazoDaDistribuidora(p.chave) ? "Prazo da distribuidora" : "Prazo interno";
   if (p.diasRestantes < 0) {
     const n = -p.diasRestantes;
-    return { texto: `${quem} vencido há ${n} dia${n > 1 ? "s" : ""} úte${n > 1 ? "is" : "il"}`, tom: "negativo" };
+    return { texto: `${quem} vencido há ${diasUteis(n)}`, tom: "negativo" };
   }
   if (p.diasRestantes === 0) return { texto: `${quem} vence hoje`, tom: "atencao" };
   const n = p.diasRestantes;
-  return { texto: `${quem}: ${n} dia${n > 1 ? "s" : ""} úte${n > 1 ? "is" : "il"}`, tom: "neutro" };
+  return { texto: `${quem}: ${diasUteis(n)}`, tom: "neutro" };
 }
 
 /** Mais urgente primeiro (menos dias restantes). */
@@ -98,6 +100,6 @@ export function lerIndicadores(bruto: unknown): IndicadoresEngenharia {
 const fmt = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 });
 
 /** "4,5 dias úteis" ou "—" sem amostra. */
-export const textoMediana = (m: Mediana) => (m.n === 0 || m.mediana == null ? "—" : `${fmt.format(m.mediana)} dia${m.mediana === 1 ? "" : "s"} úte${m.mediana === 1 ? "il" : "is"}`);
+export const textoMediana = (m: Mediana) => (m.n === 0 || m.mediana == null ? "—" : `${fmt.format(m.mediana)} ${m.mediana === 1 ? "dia útil" : "dias úteis"}`);
 /** "25%" ou "—" sem amostra. */
 export const textoProporcao = (p: Proporcao) => (p.total === 0 ? "—" : `${Math.round((p.com / p.total) * 100)}%`);
