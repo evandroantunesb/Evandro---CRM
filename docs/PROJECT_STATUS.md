@@ -1,8 +1,8 @@
 # Estado do projeto — Raion CRM
 
-## Engenharia em Obras — P1 a P1.6 integradas em 2026-10-29; P2 e P3 em 2026-10-30
+## Engenharia em Obras — P1 a P1.6 integradas em 2026-10-29; P2 a P5 em 2026-10-30
 
-`main` em `ba2ef0e`. Sem migration: nada a aplicar em produção.
+`main` em `d1652b4` (merge da #263). **Produção e `main` alinhadas** (última `20261030160000_engenharia_prazos_indicadores.sql`).
 
 | PR | O que entrou |
 | --- | --- |
@@ -41,7 +41,25 @@ O engenheiro testou o P2 em 30/10.
 - **Central:** exigência aberta vira ação da equipe, não espera de terceiros. Histórico sem número do protocolo nem texto da distribuidora.
 - Escrita só pelas RPCs `registrar_protocolo_engenharia`, `registrar_evento_protocolo_engenharia`, `registrar_arquivo_protocolo_engenharia`; leitura por `pode_ver_documentos_engenharia`. Testes: `tests/engenharia-protocolos-db.test.ts`, `tests/engenharia-protocolos-regras.test.ts`, `e2e/20-engenharia-protocolo.spec.ts`.
 
-**Próximo:** P4 vistoria e conexão (aguarda comando do Evandro).
+### P4 — vistoria, medição e conexão (#261)
+
+**Migration `20261030140000_engenharia_vistoria.sql` aplicada em produção em 30/10/2026** (tag `migracao-pr261-889186b`; conferir + aplicar aprovados pelo Evandro; dry-run listou só ela). #261 mesclada em 30/10 (`1d77ff2`). **Produção e `main` alinhadas** (última `20261030140000_engenharia_vistoria.sql`).
+
+- **Decisão do Evandro ("os dois"):** Engenharia e Operacional registram, cada um a sua parte. A Engenharia pede a vistoria e registra o resultado (aprovada / não conformidade), o medidor adequado e a conexão confirmada; agendamento e "vistoria realizada" são registrados pela Engenharia se atua na obra, senão pelo Operacional; a correção de campo depois de uma não conformidade é do Operacional. Regra no banco: `setor_registro_vistoria(obra, tipo)`.
+- **Situações:** solicitada → agendada → realizada → aprovada ou com não conformidade (exige descrição) → correção de campo → novo pedido. Uma vistoria ativa por obra; as anteriores ficam no histórico. Cancelar exige motivo.
+- **G5:** pedido de vistoria só com protocolo aprovado e instalação concluída pelo Operacional (a tela explica o que falta).
+- **G6:** Engenharia só conclui com vistoria aprovada e conexão confirmada; o admin pode concluir sem conexão com justificativa (`concluir_engenharia_sem_conexao`).
+- **Telas:** card "Vistoria e conexão" em `/engenharia/[id]`; no card do Operacional da obra (`/obras/[id]`), quem atua no Operacional registra a sua parte; os demais veem só situação e datas (sem número do pedido nem texto da distribuidora).
+- **Arquivos** por evento no bucket privado `vistoria-arquivos` (20 MB), lidos e enviados por Engenharia e Operacional da obra (`pode_ver_vistoria_obra`); download por `/arquivos-vistoria/[id]`. O envio acontece dentro da ação de registro, antes de a tela atualizar.
+- Escrita só pelas RPCs `solicitar_vistoria_engenharia`, `registrar_evento_vistoria_engenharia`, `registrar_arquivo_vistoria_engenharia`. Testes: `tests/engenharia-vistoria-db.test.ts`, `tests/engenharia-vistoria-regras.test.ts`, `e2e/21-engenharia-vistoria.spec.ts`.
+
+### P5 — prazos em dias úteis e indicadores (#263)
+
+Decidido pelo Evandro em 30/10: prazos contam em dias úteis a partir do dia útil seguinte ao marco (sem fins de semana, feriados nacionais — inclusive Carnaval, Sexta-feira Santa e Corpus Christi — e feriados cadastrados pela empresa). Internos com padrão editável pelo admin (A iniciar 2, Projeto em elaboração 5, exigência 3, correção de campo 5); os da distribuidora (análise, vistoria, conexão) nascem vazios e só o engenheiro/Evandro preenche. Prazo vencido só sinaliza. Indicadores (30/90 dias, medianas em dias úteis): tempo em cada etapa, protocolo→aprovação, % protocolos com exigência, % vistorias com não conformidade, vistoria aprovada→conexão.
+
+**Migration `20261030160000_engenharia_prazos_indicadores.sql` aplicada em produção em 30/10/2026** (tag `migracao-pr263-338c513`; conferir + aplicar aprovados pelo Evandro; dry-run listou só ela). #263 mesclada em 30/10 (`d1652b4`), head `338c513` com os ajustes da revisão; CI verde (verificar, navegador, Vercel).
+
+- Pendente: o engenheiro preenche os prazos da Copel/ANEEL em Configurações → Engenharia.
 
 ## Entregas de 2026-10-29 — dados do cliente, sigilo na obra e tarefas dos setores
 
@@ -63,7 +81,7 @@ O engenheiro testou o P2 em 30/10.
 
 **Próximos passos (aguardam comando do Evandro):**
 1. **T3 — tarefas automáticas:** regra por empresa disparada pelo status do setor na obra (ex.: Operacional `instalacao_concluida` → Engenharia "Cadastro do cliente no app e pedido de vistoria"; Compras `faturado_fornecedor` → Operacional "Agendar instalação com o cliente"), uma vez por obra e regra.
-2. **Engenharia em Obras:** P1 a P1.6, P2 (checklist e documentos) e P3 (protocolos, exigências e trava de etapa) entregues e em produção (seção "Engenharia em Obras" acima). Já decidido no P2: item obrigatório só é dispensado por admin ou coordenador; sem segundo revisor por enquanto; o modelo Copel de 11 itens ainda deve ser revisado com o responsável técnico. **Falta:** P4 vistoria e conexão (decidir quem registra e quem confirma a vistoria) → P5 indicadores no servidor (hoje a lista lê até `LIMITE_OBRAS = 500`) e prazos (Copel/ANEEL × internos, só com marco comprovado). Pendências e agenda da Engenharia continuam reutilizando `tarefas_setor`.
+2. **Engenharia em Obras:** P1 a P1.6, P2 (checklist e documentos), P3 (protocolos, exigências e trava de etapa) e P4 (vistoria, medição e conexão) entregues e em produção (seção "Engenharia em Obras" acima). Já decidido no P2: item obrigatório só é dispensado por admin ou coordenador; sem segundo revisor por enquanto; o modelo Copel de 11 itens ainda deve ser revisado com o responsável técnico. **P5** (prazos em dias úteis e indicadores) entregue na #263 e em produção. Pendências e agenda da Engenharia continuam reutilizando `tarefas_setor`.
 3. CNH com preenchimento automático dos dados do cliente (3b); endereço estruturado na ficha do contato (junto da #239).
 4. PRs #234 e #239 precisam de rebase na `main`.
 
