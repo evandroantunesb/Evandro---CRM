@@ -1,8 +1,8 @@
 # Estado do projeto — Raion CRM
 
-## Engenharia em Obras — P1 a P1.6 integradas em 2026-10-29; P2, P3 e P4 em 2026-10-30
+## Engenharia em Obras — P1 a P1.6 integradas em 2026-10-29; P2 a P5 em 2026-10-30
 
-`main` em `ba2ef0e`. Sem migration: nada a aplicar em produção.
+`main` em `d1652b4` (merge da #263). **Produção e `main` alinhadas** (última `20261030160000_engenharia_prazos_indicadores.sql`).
 
 | PR | O que entrou |
 | --- | --- |
@@ -53,14 +53,13 @@ O engenheiro testou o P2 em 30/10.
 - **Arquivos** por evento no bucket privado `vistoria-arquivos` (20 MB), lidos e enviados por Engenharia e Operacional da obra (`pode_ver_vistoria_obra`); download por `/arquivos-vistoria/[id]`. O envio acontece dentro da ação de registro, antes de a tela atualizar.
 - Escrita só pelas RPCs `solicitar_vistoria_engenharia`, `registrar_evento_vistoria_engenharia`, `registrar_arquivo_vistoria_engenharia`. Testes: `tests/engenharia-vistoria-db.test.ts`, `tests/engenharia-vistoria-regras.test.ts`, `e2e/21-engenharia-vistoria.spec.ts`.
 
-### P5 — prazos em dias úteis e indicadores (#263, em andamento)
+### P5 — prazos em dias úteis e indicadores (#263)
 
 Decidido pelo Evandro em 30/10: prazos contam em dias úteis a partir do dia útil seguinte ao marco (sem fins de semana, feriados nacionais — inclusive Carnaval, Sexta-feira Santa e Corpus Christi — e feriados cadastrados pela empresa). Internos com padrão editável pelo admin (A iniciar 2, Projeto em elaboração 5, exigência 3, correção de campo 5); os da distribuidora (análise, vistoria, conexão) nascem vazios e só o engenheiro/Evandro preenche. Prazo vencido só sinaliza. Indicadores (30/90 dias, medianas em dias úteis): tempo em cada etapa, protocolo→aprovação, % protocolos com exigência, % vistorias com não conformidade, vistoria aprovada→conexão.
 
-- PR #263 (`feat/engenharia-prazos`, rascunho), head `be49a26a75ced34048be2c59d2a745311df48e44`, CI verde (verificar, navegador, Vercel).
-- Migration `20261030160000_engenharia_prazos_indicadores.sql` **ainda não aplicada em produção**; a allowlist do `banco-producao.yml` na #263 já aponta para ela. Próximo: tag `migracao-pr263-be49a26` → conferir → aplicar (cada disparo com aprovação do Evandro) → marcar pronta → merge autorizado.
-- Até aplicar, o preview da #263 mostra prazos e indicadores vazios (usa o banco de produção).
-- Depois: o engenheiro preenche os prazos da Copel/ANEEL em Configurações → Engenharia.
+**Migration `20261030160000_engenharia_prazos_indicadores.sql` aplicada em produção em 30/10/2026** (tag `migracao-pr263-338c513`; conferir + aplicar aprovados pelo Evandro; dry-run listou só ela). #263 mesclada em 30/10 (`d1652b4`), head `338c513` com os ajustes da revisão; CI verde (verificar, navegador, Vercel).
+
+- Pendente: o engenheiro preenche os prazos da Copel/ANEEL em Configurações → Engenharia.
 
 ## Entregas de 2026-10-29 — dados do cliente, sigilo na obra e tarefas dos setores
 
@@ -82,7 +81,7 @@ Decidido pelo Evandro em 30/10: prazos contam em dias úteis a partir do dia út
 
 **Próximos passos (aguardam comando do Evandro):**
 1. **T3 — tarefas automáticas:** regra por empresa disparada pelo status do setor na obra (ex.: Operacional `instalacao_concluida` → Engenharia "Cadastro do cliente no app e pedido de vistoria"; Compras `faturado_fornecedor` → Operacional "Agendar instalação com o cliente"), uma vez por obra e regra.
-2. **Engenharia em Obras:** P1 a P1.6, P2 (checklist e documentos), P3 (protocolos, exigências e trava de etapa) e P4 (vistoria, medição e conexão) entregues e em produção (seção "Engenharia em Obras" acima). Já decidido no P2: item obrigatório só é dispensado por admin ou coordenador; sem segundo revisor por enquanto; o modelo Copel de 11 itens ainda deve ser revisado com o responsável técnico. **P5** (prazos e indicadores no servidor) implementada na #263, aguardando migration em produção e merge. Pendências e agenda da Engenharia continuam reutilizando `tarefas_setor`.
+2. **Engenharia em Obras:** P1 a P1.6, P2 (checklist e documentos), P3 (protocolos, exigências e trava de etapa) e P4 (vistoria, medição e conexão) entregues e em produção (seção "Engenharia em Obras" acima). Já decidido no P2: item obrigatório só é dispensado por admin ou coordenador; sem segundo revisor por enquanto; o modelo Copel de 11 itens ainda deve ser revisado com o responsável técnico. **P5** (prazos em dias úteis e indicadores) entregue na #263 e em produção. Pendências e agenda da Engenharia continuam reutilizando `tarefas_setor`.
 3. CNH com preenchimento automático dos dados do cliente (3b); endereço estruturado na ficha do contato (junto da #239).
 4. PRs #234 e #239 precisam de rebase na `main`.
 
