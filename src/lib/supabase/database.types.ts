@@ -952,6 +952,38 @@ export type Database = {
           },
         ];
       };
+      empresa_feriados: {
+        Row: {
+          created_at: string;
+          data: string;
+          empresa_id: string;
+          id: string;
+          nome: string;
+        };
+        Insert: {
+          created_at?: string;
+          data: string;
+          empresa_id: string;
+          id?: string;
+          nome: string;
+        };
+        Update: {
+          created_at?: string;
+          data?: string;
+          empresa_id?: string;
+          id?: string;
+          nome?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "empresa_feriados_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       empresa_membros: {
         Row: {
           ativo: boolean;
@@ -1103,6 +1135,35 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "engenharia_checklist_modelo_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      engenharia_prazos: {
+        Row: {
+          chave: string;
+          dias_uteis: number | null;
+          empresa_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          chave: string;
+          dias_uteis?: number | null;
+          empresa_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          chave?: string;
+          dias_uteis?: number | null;
+          empresa_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "engenharia_prazos_empresa_id_fkey";
             columns: ["empresa_id"];
             isOneToOne: false;
             referencedRelation: "empresas";
@@ -5329,6 +5390,7 @@ export type Database = {
         };
         Returns: string;
       };
+      data_pascoa: { Args: { p_ano: number }; Returns: string };
       decidir_atribuicao_lead: {
         Args: { p_automatico: boolean; p_id: string; p_membro_final_id: string };
         Returns: undefined;
@@ -5379,6 +5441,11 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      dia_util: { Args: { p_data: string; p_empresa_id: string }; Returns: boolean };
+      dias_uteis_entre: {
+        Args: { p_empresa_id: string; p_fim: string; p_inicio: string };
+        Returns: number;
+      };
       e_closer_de_handoff_pendente: { Args: { p_negocio_id: string }; Returns: boolean };
       e_membro_comercial: { Args: { p_empresa_id: string; p_membro_id: string }; Returns: boolean };
       e_plataforma_admin: { Args: Record<PropertyKey, never>; Returns: boolean };
@@ -5398,6 +5465,7 @@ export type Database = {
         Args: { p_motivo: string; p_participante_id: string };
         Returns: undefined;
       };
+      engenharia_em_curso: { Args: { p_obra_id: string }; Returns: boolean };
       estornar_confirmacao_pagamento: {
         Args: { p_contrato_id: string; p_motivo: string };
         Returns: {
@@ -5489,6 +5557,7 @@ export type Database = {
       };
       expirar_atribuicoes_leads: { Args: Record<PropertyKey, never>; Returns: undefined };
       fechar_comissao: { Args: { p_comissao_id: string }; Returns: undefined };
+      feriado_nacional: { Args: { p_data: string }; Returns: boolean };
       garantir_obra: { Args: { p_negocio_id: string }; Returns: string };
       gravar_status_fluxo_obra: {
         Args: {
@@ -5511,8 +5580,10 @@ export type Database = {
       };
       incrementar_preenchimento_formulario: { Args: { p_id: string }; Returns: undefined };
       incrementar_visualizacao_formulario: { Args: { p_id: string }; Returns: undefined };
+      indicadores_engenharia: { Args: { p_desde: string; p_empresa_id: string }; Returns: Json };
       inserir_checklist_engenharia_padrao: { Args: { p_empresa_id: string }; Returns: undefined };
       inserir_fixacoes_telhado_padrao: { Args: { p_empresa_id: string }; Returns: undefined };
+      inserir_prazos_engenharia_padrao: { Args: { p_empresa_id: string }; Returns: undefined };
       inserir_registro_pagamento: {
         Args: {
           p_data: string;
@@ -5660,6 +5731,20 @@ export type Database = {
       pode_ver_tarefa_setor: { Args: { p_tarefa_id: string }; Returns: boolean };
       pode_ver_valor_vendido_obra: { Args: { p_obra_id: string }; Returns: boolean };
       pode_ver_vistoria_obra: { Args: { p_obra_id: string }; Returns: boolean };
+      prazo_dias_restantes: {
+        Args: { p_empresa_id: string; p_hoje: string; p_limite: string };
+        Returns: number;
+      };
+      prazos_engenharia: {
+        Args: { p_empresa_id: string };
+        Returns: {
+          chave: string;
+          dias_restantes: number;
+          inicio: string;
+          limite: string;
+          obra_id: string;
+        }[];
+      };
       precos_eletroposto_validos: {
         Args: { p_modelos: string[]; p_precos: Json };
         Returns: boolean;
@@ -5834,6 +5919,10 @@ export type Database = {
           p_observacao?: string;
           p_solicitada_em: string;
         };
+        Returns: string;
+      };
+      somar_dias_uteis: {
+        Args: { p_dias: number; p_empresa_id: string; p_inicio: string };
         Returns: string;
       };
       status_pagamento_contrato: {
