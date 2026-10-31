@@ -4840,6 +4840,56 @@ export type Database = {
           },
         ];
       };
+      tarefas_automaticas_regras: {
+        Row: {
+          ativa: boolean;
+          created_at: string;
+          descricao: string | null;
+          empresa_id: string;
+          gatilho_setor: Database["public"]["Enums"]["setor_obra"];
+          gatilho_status: string;
+          id: string;
+          prazo_dias_uteis: number;
+          setor: Database["public"]["Enums"]["setor_obra"];
+          titulo: string;
+          updated_at: string;
+        };
+        Insert: {
+          ativa?: boolean;
+          created_at?: string;
+          descricao?: string | null;
+          empresa_id: string;
+          gatilho_setor: Database["public"]["Enums"]["setor_obra"];
+          gatilho_status: string;
+          id?: string;
+          prazo_dias_uteis?: number;
+          setor: Database["public"]["Enums"]["setor_obra"];
+          titulo: string;
+          updated_at?: string;
+        };
+        Update: {
+          ativa?: boolean;
+          created_at?: string;
+          descricao?: string | null;
+          empresa_id?: string;
+          gatilho_setor?: Database["public"]["Enums"]["setor_obra"];
+          gatilho_status?: string;
+          id?: string;
+          prazo_dias_uteis?: number;
+          setor?: Database["public"]["Enums"]["setor_obra"];
+          titulo?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tarefas_automaticas_regras_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       tarefas_setor: {
         Row: {
           cancelada_em: string | null;
@@ -4856,6 +4906,7 @@ export type Database = {
           obra_id: string | null;
           origem: string;
           prazo: string;
+          regra_id: string | null;
           responsavel_id: string | null;
           resposta: string | null;
           setor: Database["public"]["Enums"]["setor_obra"];
@@ -4878,6 +4929,7 @@ export type Database = {
           obra_id?: string | null;
           origem?: string;
           prazo: string;
+          regra_id?: string | null;
           responsavel_id?: string | null;
           resposta?: string | null;
           setor: Database["public"]["Enums"]["setor_obra"];
@@ -4900,6 +4952,7 @@ export type Database = {
           obra_id?: string | null;
           origem?: string;
           prazo?: string;
+          regra_id?: string | null;
           responsavel_id?: string | null;
           resposta?: string | null;
           setor?: Database["public"]["Enums"]["setor_obra"];
@@ -4955,6 +5008,13 @@ export type Database = {
             columns: ["negocio_id"];
             isOneToOne: false;
             referencedRelation: "negocios";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tarefas_setor_regra_id_fkey";
+            columns: ["regra_id"];
+            isOneToOne: false;
+            referencedRelation: "tarefas_automaticas_regras";
             referencedColumns: ["id"];
           },
         ];
@@ -5616,6 +5676,7 @@ export type Database = {
         };
       };
       inserir_regras_temperatura_padrao: { Args: { p_empresa_id: string }; Returns: undefined };
+      inserir_tarefas_automaticas_padrao: { Args: { p_empresa_id: string }; Returns: undefined };
       marcar_parado_fluxo_obra: {
         Args: {
           p_motivo?: string;
@@ -6074,6 +6135,7 @@ export type Database = {
           obra_id: string | null;
           origem: string;
           prazo: string;
+          regra_id: string | null;
           responsavel_id: string | null;
           resposta: string | null;
           setor: Database["public"]["Enums"]["setor_obra"];

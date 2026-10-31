@@ -8,8 +8,11 @@ import { afterAll, describe, expect, it } from "vitest";
 
 const SCRIPT = ".github/scripts/validar-conjunto-migrations.sh";
 const WORKFLOW = ".github/workflows/banco-producao.yml";
-// Prazos e indicadores da Engenharia (P5): só ela, nenhuma a mais ou a menos.
-const AUTORIZADA = "20261030160000_engenharia_prazos_indicadores.sql";
+// Tarefas automáticas de setor (T3): só ela, nenhuma a mais ou a menos.
+const AUTORIZADA = "20261031100000_tarefas_automaticas.sql";
+// Prazos e indicadores da Engenharia (#263): aplicada em 30/10/2026, antes desta. Se voltar a aparecer como pendente,
+// não é autorizada.
+const PRAZOS = "20261030160000_engenharia_prazos_indicadores.sql";
 // Vistoria e conexão da Engenharia (#261): aplicada em 30/10/2026, antes desta. Se voltar a aparecer como pendente, não
 // é autorizada.
 const VISTORIA = "20261030140000_engenharia_vistoria.sql";
@@ -211,7 +214,7 @@ describe("protocolos da Engenharia", () => {
   });
 
   it("checklist, tarefas de setor, dados do cliente, dados pessoais da obra, fixação, validade da proposta, eletroposto SDR, eletroposto, temperatura ou qualquer migration da calculadora pendente junto, ou sozinha, não passa", () => {
-    for (const m of [VISTORIA, PROTOCOLOS, CHECKLIST, NOTIFICACOES, ANEXOS_TAREFA, TAREFAS_SETOR, DADOS_CLIENTE, CLIENTE_OCULTO, FIXACAO, VALIDADE_PROPOSTA, ELETROPOSTO_SDR, ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) {
+    for (const m of [PRAZOS, VISTORIA, PROTOCOLOS, CHECKLIST, NOTIFICACOES, ANEXOS_TAREFA, TAREFAS_SETOR, DADOS_CLIENTE, CLIENTE_OCULTO, FIXACAO, VALIDADE_PROPOSTA, ELETROPOSTO_SDR, ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) {
       expect(validar(dryRunCom(AUTORIZADA, m)).codigo, m).toBe(1);
       expect(validar(dryRunCom(m)).codigo, m).toBe(1);
     }
@@ -226,7 +229,7 @@ describe("protocolos da Engenharia", () => {
     expect(existsSync(`supabase/migrations/${AUTORIZADA}`)).toBe(true);
     const texto = readFileSync(WORKFLOW, "utf8");
     expect(texto).toContain(AUTORIZADA);
-    for (const m of [VISTORIA, PROTOCOLOS, CHECKLIST, NOTIFICACOES, ANEXOS_TAREFA, TAREFAS_SETOR, DADOS_CLIENTE, CLIENTE_OCULTO, FIXACAO, VALIDADE_PROPOSTA, ELETROPOSTO_SDR, ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) expect(texto, m).not.toContain(m);
+    for (const m of [PRAZOS, VISTORIA, PROTOCOLOS, CHECKLIST, NOTIFICACOES, ANEXOS_TAREFA, TAREFAS_SETOR, DADOS_CLIENTE, CLIENTE_OCULTO, FIXACAO, VALIDADE_PROPOSTA, ELETROPOSTO_SDR, ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) expect(texto, m).not.toContain(m);
   });
 });
 
