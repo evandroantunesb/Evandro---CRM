@@ -1,5 +1,5 @@
 import "server-only";
-import { statusItem, type ItemEngenhariaVM } from "@/lib/engenharia-checklist-regras";
+import { resumoChecklist, statusItem, type ItemEngenhariaVM } from "@/lib/engenharia-checklist-regras";
 import type { SupabaseServidor } from "@/lib/supabase/server";
 
 /**
@@ -44,4 +44,37 @@ export async function carregarChecklistEngenharia(
       .filter((d) => d.item_id === i.id)
       .map((d) => ({ id: d.id, nome: d.nome, versao: d.versao, enviadoPor: nome(d.enviado_por), quando: d.created_at })),
   }));
+}
+
+const PAGINA_ITENS = 1000;
+/** Obras por consulta: a lista de ids vai na URL. */
+const BLOCO_OBRAS = 100;
+
+/**
+ * Das obras pedidas, as que passam no gate G2: checklist aplicado e obrigatórios válidos ou dispensados (a mesma
+ * conferência de `registrar_protocolo_engenharia`). Pagina porque cada obra tem vários itens.
+ */
+export async function carregarChecklistsAptos(supabase: SupabaseServidor, empresaId: string, obraIds: readonly string[]): Promise<Set<string>> {
+  const itens = new Map<string, { obrigatorio: boolean; status: ReturnType<typeof statusItem> }[]>();
+  for (let b = 0; b < obraIds.length; b += BLOCO_OBRAS) {
+    const bloco = obraIds.slice(b, b + BLOCO_OBRAS);
+    for (let inicio = 0; ; inicio += PAGINA_ITENS) {
+      const { data, error } = await supabase
+        .from("obra_engenharia_itens")
+        .select("obra_id, obrigatorio, status")
+        .eq("empresa_id", empresaId)
+        .in("obra_id", bloco)
+        .order("id")
+        .range(inicio, inicio + PAGINA_ITENS - 1);
+      if (error) throw error;
+      for (const i of data) itens.set(i.obra_id, [...(itens.get(i.obra_id) ?? []), { obrigatorio: i.obrigatorio, status: statusItem(i.status) }]);
+      if (data.length < PAGINA_ITENS) break;
+    }
+  }
+  const aptos = new Set<string>();
+  for (const [obraId, lista] of itens) {
+    const r = resumoChecklist(lista);
+    if (r.obrigatoriosResolvidos === r.obrigatorios) aptos.add(obraId);
+  }
+  return aptos;
 }

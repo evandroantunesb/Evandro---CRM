@@ -2,7 +2,14 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { ListaTarefasSetor } from "@/components/tarefas-setor";
 import { Cartao, Selo } from "@/components/ui";
-import { diasDesde, montarCentralEngenharia, type ObraNaEngenharia } from "@/lib/engenharia-regras";
+import { carregarChecklistsAptos } from "@/lib/engenharia-checklist";
+import {
+  diasDesde,
+  montarCentralEngenharia,
+  montarKanbanEngenharia,
+  type ColunaKanbanEngenharia,
+  type ObraNaEngenharia,
+} from "@/lib/engenharia-regras";
 import { carregarIndicadoresEngenharia, carregarPrazosObras } from "@/lib/engenharia-prazos";
 import {
   PERIODOS_INDICADORES,
@@ -14,7 +21,8 @@ import {
   type PeriodoIndicadores,
   type PrazoObra,
 } from "@/lib/engenharia-prazos-regras";
-import { contarExigenciasAbertas } from "@/lib/engenharia-protocolos";
+import { carregarStatusProtocolos, contarExigenciasAbertas } from "@/lib/engenharia-protocolos";
+import type { StatusProtocolo } from "@/lib/engenharia-protocolos-regras";
 import { carregarAcoesVistoria } from "@/lib/engenharia-vistoria";
 import { carregarObras, type ObraListaVM } from "@/lib/obras/dados";
 import { ROTULO_ESTADO_SETOR, rotuloStatus } from "@/lib/obras/rotulos";
@@ -43,6 +51,19 @@ const ha = (desde: string | null) => {
   return dias === 0 ? "desde hoje" : `há ${dias} dia${dias > 1 ? "s" : ""}`;
 };
 
+type VisaoCarteira = "lista" | "kanban";
+
+/** Link da Central guardando a visão da carteira e o período dos indicadores (padrões ficam fora da URL). */
+const hrefCentral = ({ carteira, periodo }: { carteira: VisaoCarteira; periodo: PeriodoIndicadores }) => {
+  const q = new URLSearchParams();
+  if (carteira === "kanban") q.set("carteira", "kanban");
+  if (periodo !== 30) q.set("periodo", String(periodo));
+  return q.size ? `/engenharia?${q}` : "/engenharia";
+};
+
+// Etapas em que o checklist decide entre "Pronto para protocolo" e as fases anteriores (antes do protocolo).
+const ETAPAS_ANTES_DO_PROTOCOLO = new Set(["a_iniciar", "projeto_em_elaboracao"]);
+
 // No contexto da Engenharia, a tarefa de obra abre o card da obra para o engenheiro, não a tela de Obras.
 const paraCard = (t: TarefaSetorVM): TarefaSetorVM =>
   t.obraId ? { ...t, referencia: { ...t.referencia, href: `/engenharia/${t.obraId}` } } : t;
@@ -54,8 +75,9 @@ const paraCard = (t: TarefaSetorVM): TarefaSetorVM =>
  */
 export default async function Engenharia({ searchParams }: PageProps<"/engenharia">) {
   const { atual } = await exigirPapel(...ENGENHARIA);
-  const { ver, periodo: periodoBruto } = await searchParams;
+  const { ver, periodo: periodoBruto, carteira: carteiraBruta } = await searchParams;
   const periodo = lerPeriodo(periodoBruto);
+  const carteira: VisaoCarteira = carteiraBruta === "kanban" ? "kanban" : "lista";
   const filtro = (FILTROS as readonly string[]).includes(ver as string) ? (ver as Filtro) : null;
   const supabase = await criarClienteServidor();
 
@@ -95,6 +117,22 @@ export default async function Engenharia({ searchParams }: PageProps<"/engenhari
   ]);
   const listaTarefas = tarefas.map(paraCard);
 
+  // Só o Kanban precisa dos protocolos e do checklist (fases "Pronto para protocolo" e "Conexão / vistoria").
+  const [protocolos, checklistsAptos] =
+    obras && carteira === "kanban"
+      ? await Promise.all([
+          carregarStatusProtocolos(supabase, atual.empresaId),
+          carregarChecklistsAptos(
+            supabase,
+            atual.empresaId,
+            obras
+              .filter((o) => o.situacao === "em_andamento")
+              .filter((o) => ETAPAS_ANTES_DO_PROTOCOLO.has(o.setores.find((s) => s.setor === "engenharia")?.status ?? ""))
+              .map((o) => o.id),
+          ),
+        ])
+      : [null, null];
+
   return (
     <div className="mx-auto flex max-w-[1100px] flex-col gap-4">
       <div>
@@ -130,6 +168,9 @@ export default async function Engenharia({ searchParams }: PageProps<"/engenhari
           prazos={prazos ?? new Map()}
           indicadores={indicadores ?? null}
           periodo={periodo}
+          carteira={carteira}
+          protocolos={protocolos ?? new Map()}
+          checklistsAptos={checklistsAptos ?? new Set()}
           membroId={atual.membroId}
           podeVerObras={pode(atual.papel, OBRAS)}
           // Definir responsável é do admin e do coordenador (quem a RPC deixa gerir a obra); o gestor só acompanha.
@@ -149,6 +190,9 @@ function Central({
   prazos,
   indicadores,
   periodo,
+  carteira,
+  protocolos,
+  checklistsAptos,
   membroId,
   podeVerObras,
   coordena,
@@ -161,6 +205,9 @@ function Central({
   prazos: ReadonlyMap<string, PrazoObra[]>;
   indicadores: IndicadoresEngenharia | null;
   periodo: PeriodoIndicadores;
+  carteira: VisaoCarteira;
+  protocolos: ReadonlyMap<string, readonly StatusProtocolo[]>;
+  checklistsAptos: ReadonlySet<string>;
   membroId: string;
   podeVerObras: boolean;
   coordena: boolean;
@@ -230,8 +277,25 @@ function Central({
         )}
       </Cartao>
 
-      <Cartao titulo={`Obras na Engenharia (${totalObras})`}>
-        {totalObras === 0 ? (
+      <Cartao
+        titulo={`Obras na Engenharia (${totalObras})`}
+        acao={
+          <nav aria-label="Visão da carteira" className="flex gap-2">
+            <Aba href={hrefCentral({ carteira: "lista", periodo })} atual={carteira === "lista"}>
+              Lista
+            </Aba>
+            <Aba href={hrefCentral({ carteira: "kanban", periodo })} atual={carteira === "kanban"}>
+              Kanban
+            </Aba>
+          </nav>
+        }
+      >
+        {carteira === "kanban" ? (
+          <Kanban
+            colunas={montarKanbanEngenharia(obras, (s) => rotuloStatus("engenharia", s), { exigencias, acoesVistoria, protocolos, checklistsAptos })}
+            prazos={prazos}
+          />
+        ) : totalObras === 0 ? (
           <p className="text-sm text-zinc-500">Nenhuma obra em andamento na Engenharia.</p>
         ) : (
           <div role="region" aria-label="Carteira por etapa" className="flex flex-col gap-5">
@@ -254,7 +318,9 @@ function Central({
         )}
       </Cartao>
 
-      {indicadores && <Desempenho indicadores={indicadores} periodo={periodo} rotuloEtapa={(s) => rotuloStatus("engenharia", s)} />}
+      {indicadores && (
+        <Desempenho indicadores={indicadores} periodo={periodo} carteira={carteira} rotuloEtapa={(s) => rotuloStatus("engenharia", s)} />
+      )}
     </>
   );
 }
@@ -263,10 +329,12 @@ function Central({
 function Desempenho({
   indicadores,
   periodo,
+  carteira,
   rotuloEtapa,
 }: {
   indicadores: IndicadoresEngenharia;
   periodo: PeriodoIndicadores;
+  carteira: VisaoCarteira;
   rotuloEtapa: (status: string) => string;
 }) {
   const { etapas, protocoloAprovacao, exigencia, naoConformidade, conexao } = indicadores;
@@ -283,7 +351,7 @@ function Desempenho({
         <nav aria-label="Período" className="flex flex-wrap items-center gap-2 text-sm text-zinc-600">
           Últimos
           {PERIODOS_INDICADORES.map((p) => (
-            <Aba key={p} href={`/engenharia?periodo=${p}`} atual={p === periodo}>
+            <Aba key={p} href={hrefCentral({ carteira, periodo: p })} atual={p === periodo}>
               {p} dias
             </Aba>
           ))}
@@ -317,6 +385,80 @@ function Desempenho({
         </section>
       </div>
     </Cartao>
+  );
+}
+
+/**
+ * Carteira em colunas por fase (spec v1.3, seção 31). Só leitura: o cartão abre o card da obra, onde está o trabalho;
+ * não há arrastar. No celular as fases ficam uma embaixo da outra; da largura média em diante, lado a lado com rolagem
+ * dentro do quadro.
+ */
+function Kanban({ colunas, prazos }: { colunas: ColunaKanbanEngenharia[]; prazos: ReadonlyMap<string, PrazoObra[]> }) {
+  return (
+    <div className="flex flex-col gap-5">
+      <p className="text-xs text-zinc-500">A fase vem do que foi registrado na obra (etapa, checklist, protocolo e exigências). Para mudar, abra a obra.</p>
+      <div role="region" aria-label="Kanban da carteira" className="flex flex-col gap-4 md:flex-row md:overflow-x-auto md:pb-2">
+        {colunas.map((c) => (
+          <section key={c.fase} aria-label={c.rotulo} className="flex flex-col gap-2 md:w-64 md:shrink-0">
+            <h3 className="text-sm font-medium text-texto">
+              {c.rotulo} <span className="text-zinc-500">({c.obras.length})</span>
+            </h3>
+            {c.obras.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-linha px-3 py-2 text-xs text-zinc-500">Nenhuma obra.</p>
+            ) : (
+              <ul className="flex flex-col gap-2">
+                {c.obras.map((o) => (
+                  <li key={o.id}>
+                    <CartaoKanban obra={o} prazos={prazos.get(o.id) ?? []} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CartaoKanban({ obra: o, prazos }: { obra: ObraNaEngenharia; prazos: PrazoObra[] }) {
+  const tempo = ha(o.desde);
+  return (
+    <article className="flex flex-col gap-1.5 rounded-lg border border-linha bg-white px-3 py-2 text-sm">
+      <p className="font-medium break-words text-texto">
+        Obra #{o.numero} · {o.clienteNome}
+      </p>
+      <p className="text-xs text-zinc-500">
+        {o.cidadeUf}
+        {formatarPotencia(o.potenciaKwp)}
+      </p>
+      {o.proximaAcao && <p className="text-zinc-700">{o.proximaAcao}</p>}
+      <p className="text-xs text-zinc-500">
+        {o.principalNome ?? "Sem responsável"}
+        {tempo ? ` · ${o.aguardando ? "aguardando" : "na etapa"} ${tempo}` : ""}
+      </p>
+      {(o.aguardando || o.estado === "parado" || prazos.length > 0) && (
+        <div className="flex flex-wrap gap-1.5">
+          {o.aguardando && <Selo tom="atencao">{o.aguardando}</Selo>}
+          {o.estado === "parado" && <Selo tom="atencao">{ROTULO_ESTADO_SETOR.parado}</Selo>}
+          {prazos.map((p) => {
+            const selo = seloPrazo(p);
+            return (
+              <Selo key={p.chave} tom={selo.tom}>
+                {selo.texto}
+              </Selo>
+            );
+          })}
+        </div>
+      )}
+      <Link
+        href={`/engenharia/${o.id}`}
+        aria-label={`Continuar a obra #${o.numero}`}
+        className="mt-1 w-fit text-sm font-medium text-texto underline decoration-dourado underline-offset-4 hover:decoration-2"
+      >
+        Continuar
+      </Link>
+    </article>
   );
 }
 
