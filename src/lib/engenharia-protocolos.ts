@@ -1,5 +1,5 @@
 import "server-only";
-import { statusExigencia, statusProtocolo, tipoEvento, type ProtocoloVM } from "@/lib/engenharia-protocolos-regras";
+import { statusExigencia, statusProtocolo, tipoEvento, type ProtocoloVM, type StatusProtocolo } from "@/lib/engenharia-protocolos-regras";
 import type { SupabaseServidor } from "@/lib/supabase/server";
 
 /**
@@ -74,6 +74,22 @@ export async function carregarProtocolosEngenharia(
 }
 
 /** Exigências abertas por obra (central da Engenharia). A RLS limita às obras em que a pessoa atua. */
+/**
+ * Status dos protocolos válidos de cada obra (cancelado e indeferido não contam), para a fase do Kanban. Mesma RLS:
+ * quem não vê protocolos recebe o mapa vazio e a fase sai só da etapa.
+ */
+export async function carregarStatusProtocolos(supabase: SupabaseServidor, empresaId: string): Promise<Map<string, StatusProtocolo[]>> {
+  const { data } = await supabase
+    .from("obra_engenharia_protocolos")
+    .select("obra_id, status")
+    .eq("empresa_id", empresaId)
+    .not("status", "in", "(cancelado,indeferido)")
+    .limit(1000);
+  const porObra = new Map<string, StatusProtocolo[]>();
+  for (const p of data ?? []) porObra.set(p.obra_id, [...(porObra.get(p.obra_id) ?? []), statusProtocolo(p.status)]);
+  return porObra;
+}
+
 export async function contarExigenciasAbertas(supabase: SupabaseServidor, empresaId: string): Promise<Map<string, number>> {
   const { data } = await supabase.from("obra_engenharia_exigencias").select("obra_id").eq("empresa_id", empresaId).eq("status", "aberta").limit(1000);
   const contagem = new Map<string, number>();

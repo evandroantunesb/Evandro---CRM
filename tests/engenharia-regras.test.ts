@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { ACAO_SEM_RESPONSAVEL, diasDesde, montarCentralEngenharia } from "@/lib/engenharia-regras";
+import {
+  ACAO_SEM_RESPONSAVEL,
+  FASES_KANBAN_ENGENHARIA,
+  diasDesde,
+  faseKanbanEngenharia,
+  montarCentralEngenharia,
+  montarKanbanEngenharia,
+} from "@/lib/engenharia-regras";
 import type { ObraListaVM, SetorObraVM } from "@/lib/obras/dados";
 import { rotuloStatus } from "@/lib/obras/rotulos";
 
@@ -153,5 +160,78 @@ describe("diasDesde", () => {
     // 02:30 UTC do dia 29 ainda é dia 28 em Brasília.
     expect(diasDesde("2026-10-29T02:30:00Z", agora)).toBe(1);
     expect(diasDesde("2026-10-19T12:00:00Z", agora)).toBe(10);
+  });
+});
+
+describe("faseKanbanEngenharia (P6a)", () => {
+  const sem = { exigencias: 0, protocolos: [], checklistApto: false } as const;
+
+  it("antes do protocolo: conferência inicial, em elaboração e pronto para protocolo pelo checklist", () => {
+    expect(faseKanbanEngenharia("a_iniciar", sem)).toBe("conferencia");
+    expect(faseKanbanEngenharia("projeto_em_elaboracao", sem)).toBe("elaboracao");
+    expect(faseKanbanEngenharia("a_iniciar", { ...sem, checklistApto: true })).toBe("pronto_protocolo");
+    expect(faseKanbanEngenharia("projeto_em_elaboracao", { ...sem, checklistApto: true })).toBe("pronto_protocolo");
+  });
+
+  it("protocolo enviado sem resposta final fica em análise externa", () => {
+    expect(faseKanbanEngenharia("enviado_concessionaria", sem)).toBe("analise_externa");
+    expect(faseKanbanEngenharia("projeto_em_elaboracao", { ...sem, protocolos: ["em_analise"] })).toBe("analise_externa");
+  });
+
+  it("protocolo aprovado leva à conexão mesmo com a etapa ainda em 'enviado'", () => {
+    for (const p of ["aprovado", "orcamento_emitido", "encerrado"] as const) {
+      expect(faseKanbanEngenharia("enviado_concessionaria", { ...sem, protocolos: [p] })).toBe("conexao");
+    }
+    expect(faseKanbanEngenharia("aprovado", sem)).toBe("conexao");
+    expect(faseKanbanEngenharia("aguardando_vistoria", sem)).toBe("conexao");
+  });
+
+  it("exigência aberta vence conexão e análise; Engenharia concluída vence tudo", () => {
+    expect(faseKanbanEngenharia("aguardando_vistoria", { ...sem, exigencias: 1, protocolos: ["com_exigencia"] })).toBe("exigencia");
+    expect(faseKanbanEngenharia("enviado_concessionaria", { ...sem, exigencias: 2 })).toBe("exigencia");
+    expect(faseKanbanEngenharia("concluido", { exigencias: 1, protocolos: ["com_exigencia"], checklistApto: true })).toBe("concluida");
+  });
+});
+
+describe("montarKanbanEngenharia (P6a)", () => {
+  it("todas as colunas na ordem da spec, cada obra numa só, a mais antiga primeiro", () => {
+    const colunas = montarKanbanEngenharia(
+      [obra(4, "a_iniciar"), obra(2, "a_iniciar"), obra(3, "projeto_em_elaboracao"), obra(5, "enviado_concessionaria"), obra(6, "enviado_concessionaria")],
+      rotulo,
+      { exigencias: new Map([["o6", 1]]), checklistsAptos: new Set(["o3"]) },
+    );
+    expect(colunas.map((c) => c.fase)).toEqual([...FASES_KANBAN_ENGENHARIA]);
+    expect(Object.fromEntries(colunas.map((c) => [c.fase, c.obras.map((o) => o.numero)]))).toEqual({
+      conferencia: [2, 4],
+      elaboracao: [],
+      pronto_protocolo: [3],
+      analise_externa: [5],
+      exigencia: [6],
+      conexao: [],
+      concluida: [],
+    });
+    expect(colunas[0].rotulo).toBe("Conferência inicial");
+  });
+
+  it("obra com a Engenharia concluída entra em 'Concluída' sem ação; fora de andamento não entra", () => {
+    const colunas = montarKanbanEngenharia(
+      [obra(1, "concluido"), obra(2, "concluido", { principalNome: null }), obra(3, "a_iniciar", {}, { situacao: "pausada" }), obra(4, null)],
+      rotulo,
+      {},
+    );
+    const concluida = colunas.find((c) => c.fase === "concluida")!;
+    expect(concluida.obras.map((o) => [o.numero, o.proximaAcao, o.comTerceiro])).toEqual([
+      [1, null, false],
+      [2, null, false],
+    ]);
+    expect(colunas.flatMap((c) => c.obras)).toHaveLength(2);
+  });
+
+  it("usa os protocolos da obra: aprovado vai para conexão; cancelado e indeferido não chegam do carregador", () => {
+    const colunas = montarKanbanEngenharia([obra(1, "enviado_concessionaria"), obra(2, "projeto_em_elaboracao")], rotulo, {
+      protocolos: new Map([["o1", ["aprovado"] as const]]),
+    });
+    expect(colunas.find((c) => c.fase === "conexao")?.obras.map((o) => o.numero)).toEqual([1]);
+    expect(colunas.find((c) => c.fase === "elaboracao")?.obras.map((o) => o.numero)).toEqual([2]);
   });
 });
