@@ -61,7 +61,7 @@ Decidido pelo Evandro em 30/10: prazos contam em dias úteis a partir do dia út
 
 - Pendente: o engenheiro preenche os prazos da Copel/ANEEL em Configurações → Engenharia.
 
-## T3 — tarefas automáticas de setor (`feat/tarefas-automaticas`, em andamento)
+## T3 — tarefas automáticas de setor (#264, `feat/tarefas-automaticas`, em andamento)
 
 Autorizada pelo Evandro em 30/10 ("comece a T3 direto"). Regras por empresa em **Configurações → Tarefas automáticas** (admin cria, edita e desativa; sem exclusão): quando o setor X da obra chega ao status Y, nasce uma tarefa de setor (`origem = 'automatica'`, sem "quem pediu") para o setor Z, uma vez por obra e regra (nunca de novo, mesmo cancelada ou com o status voltando). Toda empresa nasce com as duas regras do Evandro. Trigger em `obra_fluxos` (pega todas as RPCs que mudam status); obra cancelada não recebe; obras que já passaram do status antes da migration não recebem nada.
 
