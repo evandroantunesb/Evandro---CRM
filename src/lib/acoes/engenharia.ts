@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { ACOES_PASSO, ehPassoComRegistro } from "@/lib/engenharia-passos-regras";
 import { CANAIS_PROTOCOLO, CATEGORIAS_EXIGENCIA, TIPOS_RESPOSTA, TIPOS_SOLICITACAO } from "@/lib/engenharia-protocolos-regras";
 import { TIPOS_REGISTRO_VISTORIA } from "@/lib/engenharia-vistoria-regras";
 import { mensagemErro } from "@/lib/erros";
@@ -228,6 +229,29 @@ export async function registrarArquivoVistoriaEngenharia(dados: { obraId: string
   if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível registrar o arquivo.") };
   revalidar(d.data.obraId);
   return { ok: true, mensagem: "Arquivo anexado." };
+}
+
+const esquemaPasso = comObra.extend({
+  passo: z.coerce.number().refine(ehPassoComRegistro, "Passo inválido."),
+  acao: z.enum(ACOES_PASSO, { error: "Ação inválida." }),
+  observacao: z.preprocess(vazioComoNada, z.string().trim().min(3, "Mínimo 3 caracteres.").max(500, "Máximo 500 caracteres.").optional()),
+});
+
+/** Confirma, reabre ou marca "não se aplica" um passo da Engenharia (2, 3, 5 ou 7); a RPC confere as travas. */
+export async function registrarPassoEngenharia(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  await exigirPapel(...ENGENHARIA);
+  const d = esquemaPasso.safeParse(Object.fromEntries(formData));
+  if (!d.success) return { ok: false, mensagem: d.error.issues[0]?.message ?? "Dados inválidos." };
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.rpc("registrar_passo_engenharia", {
+    p_obra_id: d.data.obraId,
+    p_passo: d.data.passo,
+    p_acao: d.data.acao,
+    ...(d.data.observacao ? { p_observacao: d.data.observacao } : {}),
+  });
+  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível registrar o passo.") };
+  revalidar(d.data.obraId);
+  return { ok: true, mensagem: d.data.acao === "reaberto" ? "Passo reaberto." : "Passo registrado." };
 }
 
 const esquemaExcecao = comObra.extend({ motivo: z.string().trim().min(10, "Explique o motivo (mínimo 10 caracteres).").max(500, "Motivo muito longo.") });

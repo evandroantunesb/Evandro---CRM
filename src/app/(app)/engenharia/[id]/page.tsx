@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { GestaoFixacao, GestaoSetor } from "@/app/(app)/obras/[id]/gestao";
 import { ChecklistEngenharia } from "@/components/engenharia/checklist";
+import { RegistroPasso, ResumoPassos } from "@/components/engenharia/passos";
 import { ProtocolosEngenharia } from "@/components/engenharia/protocolos";
 import { VistoriaEngenharia } from "@/components/engenharia/vistoria";
 import { Campo, CartaoSetor, ContatoCliente, DadosTecnicos, comUnidade } from "@/components/obras/detalhe-obra";
@@ -9,6 +10,10 @@ import { ListaTarefasSetor, NovaTarefaSetor } from "@/components/tarefas-setor";
 import { Cartao, Selo } from "@/components/ui";
 import { formatarDataHora } from "@/lib/crm";
 import { carregarChecklistEngenharia } from "@/lib/engenharia-checklist";
+import { carregarRegistrosPassos } from "@/lib/engenharia-passos";
+import { acoesPasso, montarPassosEngenharia, passoAtual, type PassoComRegistro } from "@/lib/engenharia-passos-regras";
+import { carregarPrazosObras } from "@/lib/engenharia-prazos";
+import { seloPrazo } from "@/lib/engenharia-prazos-regras";
 import { carregarProtocolosEngenharia } from "@/lib/engenharia-protocolos";
 import { carregarVistoriasEngenharia } from "@/lib/engenharia-vistoria";
 import { bloqueioPedidoVistoria } from "@/lib/engenharia-vistoria-regras";
@@ -28,14 +33,15 @@ const TOM_ALERTA: Record<AlertaObra, Tom> = { estorno: "negativo", venda_alterad
  * Card da obra para a Engenharia: o que o engenheiro precisa para trabalhar numa obra só (etapa do projeto, tarefas
  * do setor, dados técnicos, dados do cliente que a Engenharia pode ver e o histórico). Reaproveita o detalhe da
  * obra: quem decide o que aparece é a RLS e as RPCs, não esta tela. Checklist de documentos (P2), protocolos na
- * concessionária (P3) e vistoria, medição e conexão (P4).
+ * concessionária (P3) e vistoria, medição e conexão (P4), organizados nos oito passos guiados (P6b): o topo diz onde
+ * a obra está e o que fazer; cada passo tem a sua seção, todas acessíveis.
  */
 export default async function CardEngenharia({ params }: PageProps<"/engenharia/[id]">) {
   const { atual } = await exigirPapel(...ENGENHARIA);
   const { id } = await params;
   const supabase = await criarClienteServidor();
 
-  const [obra, tarefas, { data: meusSetores }, checklist, protocolos, vistorias] = await Promise.all([
+  const [obra, tarefas, { data: meusSetores }, checklist, protocolos, vistorias, registros, prazos] = await Promise.all([
     carregarDetalheObra(supabase, { empresaId: atual.empresaId, papel: atual.papel, obraId: id, membroId: atual.membroId }),
     carregarTarefasSetor(supabase, {
       empresaId: atual.empresaId,
@@ -54,6 +60,8 @@ export default async function CardEngenharia({ params }: PageProps<"/engenharia/
     carregarChecklistEngenharia(supabase, { empresaId: atual.empresaId, obraId: id }),
     carregarProtocolosEngenharia(supabase, { empresaId: atual.empresaId, obraId: id }),
     carregarVistoriasEngenharia(supabase, { empresaId: atual.empresaId, obraId: id }),
+    carregarRegistrosPassos(supabase, { empresaId: atual.empresaId, obraId: id }),
+    carregarPrazosObras(supabase, atual.empresaId),
   ]);
   // Operação só entra no card de quem atua em Engenharia (mesma regra da lista).
   if (!obra || (atual.papel === "operacao" && (meusSetores ?? []).length === 0)) notFound();
@@ -76,6 +84,36 @@ export default async function CardEngenharia({ params }: PageProps<"/engenharia/
     instalacaoConcluida: operacional?.status === "instalacao_concluida" || operacional?.status === "concluido",
   });
   const local = [resumo.cidade, resumo.uf].filter(Boolean).join("/");
+
+  // Oito passos (P6b): status de cada um pelos fatos da obra; os passos 2, 3, 5 e 7 pela confirmação registrada.
+  const protocoloAprovado = protocolos.some((p) => p.status === "aprovado" || p.status === "orcamento_emitido" || p.status === "encerrado");
+  const passos = montarPassosEngenharia({
+    temResponsavel: (engenharia?.participantes ?? []).some((p) => p.principal),
+    registros,
+    checklist,
+    protocolos,
+    vistoria: vistorias[0] ?? null,
+    etapa: engenharia?.status ?? null,
+    engenhariaConcluida: engenharia?.status === "concluido",
+  });
+  const atualPasso = passoAtual(passos);
+  // O prazo mais apertado da obra (interno ou da distribuidora), se houver.
+  const prazoMaisProximo = (prazos.get(resumo.id) ?? []).toSorted((a, b) => a.diasRestantes - b.diasRestantes)[0];
+  const registro = (passo: PassoComRegistro) => (
+    <RegistroPasso
+      obraId={resumo.id}
+      passo={passo}
+      registro={registros[passo]}
+      acoes={acoesPasso(passo, {
+        status: passos[passo - 1].status,
+        autorizacao: autorizacaoEngenharia,
+        cancelada: resumo.situacao === "cancelada",
+        checklistApto: pendentesChecklist === 0,
+        protocoloAprovado,
+      })}
+    />
+  );
+  const tituloPasso = (n: number) => `${n}. ${passos[n - 1].titulo}`;
   // Histórico da Engenharia e do que é da obra toda; os outros setores ficam na tela de Obras.
   const historico = obra.historico.filter((h) => !h.setorRotulo || h.setorRotulo === ROTULO_SETOR.engenharia);
 
@@ -120,59 +158,130 @@ export default async function CardEngenharia({ params }: PageProps<"/engenharia/
       )}
       {gestao?.bloqueio && <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-900">{gestao.bloqueio}</p>}
 
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 [&>*]:min-w-0">
-        {engenharia && (
-          <CartaoSetor setor={engenharia}>
-            {gestaoEngenharia && <GestaoSetor key={resumo.id} obraId={resumo.id} setor={engenharia} gestao={gestaoEngenharia} />}
-          </CartaoSetor>
-        )}
-        <Cartao titulo="Resumo">
-          <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-            <Campo rotulo="Cidade/UF">{local || "—"}</Campo>
-            <Campo rotulo="Potência">{comUnidade(resumo.potenciaKwp, "kWp") ?? "—"}</Campo>
-            <Campo rotulo="Tipo de ligação">{resumo.tipoLigacao ?? "—"}</Campo>
-            <Campo rotulo="Unidade consumidora">{resumo.unidadeConsumidora ?? "—"}</Campo>
-          </dl>
-        </Cartao>
-      </div>
-
-      <Cartao titulo="Checklist e documentos">
-        <ChecklistEngenharia
-          obraId={resumo.id}
-          pasta={`${atual.empresaId}/${resumo.id}`}
-          itens={checklist}
-          autorizacao={autorizacaoEngenharia}
-          cancelada={resumo.situacao === "cancelada"}
-          veDocumentos={autorizacaoEngenharia !== null}
+      <Cartao titulo="Passos da Engenharia">
+        <ResumoPassos
+          passos={passos}
+          atual={atualPasso}
+          responsavel={engenharia?.participantes.find((p) => p.principal)?.nome ?? null}
+          prazo={prazoMaisProximo ? seloPrazo(prazoMaisProximo) : null}
         />
       </Cartao>
 
-      {autorizacaoEngenharia !== null && (
-        <Cartao titulo="Protocolo na concessionária">
-          <ProtocolosEngenharia
-            obraId={resumo.id}
-            pasta={`${atual.empresaId}/${resumo.id}`}
-            protocolos={protocolos}
-            podeAgir={resumo.situacao !== "cancelada"}
-            pendentesChecklist={pendentesChecklist}
-          />
-        </Cartao>
-      )}
+      <div id="passo-1" className="flex scroll-mt-4 flex-col gap-3">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 [&>*]:min-w-0">
+          {engenharia && (
+            <CartaoSetor setor={engenharia}>
+              {gestaoEngenharia && <GestaoSetor key={resumo.id} obraId={resumo.id} setor={engenharia} gestao={gestaoEngenharia} />}
+            </CartaoSetor>
+          )}
+          <Cartao titulo="Resumo">
+            <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+              <Campo rotulo="Cidade/UF">{local || "—"}</Campo>
+              <Campo rotulo="Potência">{comUnidade(resumo.potenciaKwp, "kWp") ?? "—"}</Campo>
+              <Campo rotulo="Tipo de ligação">{resumo.tipoLigacao ?? "—"}</Campo>
+              <Campo rotulo="Unidade consumidora">{resumo.unidadeConsumidora ?? "—"}</Campo>
+            </dl>
+          </Cartao>
+        </div>
+      </div>
 
-      {autorizacaoEngenharia !== null && (
-        <Cartao titulo="Vistoria e conexão">
-          <VistoriaEngenharia
+      <div id="passo-2" className="flex scroll-mt-4 flex-col gap-3">
+        <Cartao titulo={tituloPasso(2)}>
+          <p className="mb-3 text-sm text-zinc-600">{passos[1].ajuda}</p>
+          {registro(2)}
+        </Cartao>
+      </div>
+
+      <div id="passo-3" className="flex scroll-mt-4 flex-col gap-3">
+        <Cartao titulo={tituloPasso(3)}>
+          <div className="flex flex-col gap-4">
+            <DadosTecnicos
+              tecnico={obra.tecnico}
+              fixacao={
+                (obra.fixacao.podeEditar || obra.fixacao.atual || obra.tecnico.estruturaTelhado) && (
+                  <div className="flex flex-col gap-2 text-sm">
+                    <dt className="text-xs text-zinc-500">Fixação do telhado</dt>
+                    {!obra.fixacao.podeEditar && <dd className="text-zinc-900">{obra.fixacao.atual?.nome ?? "Não definida"}</dd>}
+                    {obra.fixacao.podeEditar && (
+                      <dd>
+                        <GestaoFixacao key={resumo.id} obraId={resumo.id} fixacao={obra.fixacao} podeConfigurar={atual.papel === "admin"} />
+                      </dd>
+                    )}
+                    {obra.tecnico.estruturaTelhado && <dd className="text-xs text-zinc-500">Informado na venda: {obra.tecnico.estruturaTelhado}</dd>}
+                  </div>
+                )
+              }
+            />
+            {registro(3)}
+          </div>
+        </Cartao>
+      </div>
+
+      <div id="passo-4" className="flex scroll-mt-4 flex-col gap-3">
+        <Cartao titulo={`${tituloPasso(4)}: checklist e documentos`}>
+          <ChecklistEngenharia
             obraId={resumo.id}
             pasta={`${atual.empresaId}/${resumo.id}`}
-            vistorias={vistorias}
-            podeAgir={resumo.situacao !== "cancelada"}
-            atuo={{ engenharia: true, operacional: atuaOperacional }}
-            bloqueioPedido={bloqueioVistoria}
-            admin={autorizacaoEngenharia === "admin"}
-            engenhariaConcluida={engenharia?.status === "concluido"}
+            itens={checklist}
+            autorizacao={autorizacaoEngenharia}
+            cancelada={resumo.situacao === "cancelada"}
+            veDocumentos={autorizacaoEngenharia !== null}
           />
         </Cartao>
-      )}
+      </div>
+
+      <div id="passo-5" className="flex scroll-mt-4 flex-col gap-3">
+        <Cartao titulo={tituloPasso(5)}>
+          <p className="mb-3 text-sm text-zinc-600">{passos[4].ajuda}</p>
+          {registro(5)}
+        </Cartao>
+      </div>
+
+      <div id="passo-6" className="flex scroll-mt-4 flex-col gap-3">
+        {autorizacaoEngenharia !== null ? (
+          <Cartao titulo={`${tituloPasso(6)}: protocolo na concessionária`}>
+            <ProtocolosEngenharia
+              obraId={resumo.id}
+              pasta={`${atual.empresaId}/${resumo.id}`}
+              protocolos={protocolos}
+              podeAgir={resumo.situacao !== "cancelada"}
+              pendentesChecklist={pendentesChecklist}
+            />
+          </Cartao>
+        ) : (
+          <Cartao titulo={tituloPasso(6)}>
+            <p className="text-sm text-zinc-500">O protocolo é visto por quem atua na Engenharia da obra.</p>
+          </Cartao>
+        )}
+      </div>
+
+      <div id="passo-7" className="flex scroll-mt-4 flex-col gap-3">
+        <Cartao titulo={tituloPasso(7)}>
+          <p className="mb-3 text-sm text-zinc-600">{passos[6].ajuda}</p>
+          {registro(7)}
+        </Cartao>
+      </div>
+
+      <div id="passo-8" className="flex scroll-mt-4 flex-col gap-3">
+        {autorizacaoEngenharia !== null ? (
+          <Cartao titulo={`${tituloPasso(8)}: vistoria e conexão`}>
+            <VistoriaEngenharia
+              obraId={resumo.id}
+              pasta={`${atual.empresaId}/${resumo.id}`}
+              vistorias={vistorias}
+              podeAgir={resumo.situacao !== "cancelada"}
+              atuo={{ engenharia: true, operacional: atuaOperacional }}
+              bloqueioPedido={bloqueioVistoria}
+              admin={autorizacaoEngenharia === "admin"}
+              engenhariaConcluida={engenharia?.status === "concluido"}
+            />
+          </Cartao>
+        ) : (
+          <Cartao titulo={tituloPasso(8)}>
+            <p className="text-sm text-zinc-500">A vistoria é vista por quem atua na Engenharia ou no Operacional da obra.</p>
+          </Cartao>
+        )}
+      </div>
 
       <Cartao titulo="Tarefas de Engenharia">
         <div className="flex flex-col gap-4">
@@ -186,26 +295,6 @@ export default async function CardEngenharia({ params }: PageProps<"/engenharia/
             <NovaTarefaSetor obraId={resumo.id} setorPadrao="engenharia" exemplo="O que a Engenharia precisa fazer? Ex.: pedir a vistoria" />
           )}
         </div>
-      </Cartao>
-
-      <Cartao titulo="Dados técnicos">
-        <DadosTecnicos
-          tecnico={obra.tecnico}
-          fixacao={
-            (obra.fixacao.podeEditar || obra.fixacao.atual || obra.tecnico.estruturaTelhado) && (
-              <div className="flex flex-col gap-2 text-sm">
-                <dt className="text-xs text-zinc-500">Fixação do telhado</dt>
-                {!obra.fixacao.podeEditar && <dd className="text-zinc-900">{obra.fixacao.atual?.nome ?? "Não definida"}</dd>}
-                {obra.fixacao.podeEditar && (
-                  <dd>
-                    <GestaoFixacao key={resumo.id} obraId={resumo.id} fixacao={obra.fixacao} podeConfigurar={atual.papel === "admin"} />
-                  </dd>
-                )}
-                {obra.tecnico.estruturaTelhado && <dd className="text-xs text-zinc-500">Informado na venda: {obra.tecnico.estruturaTelhado}</dd>}
-              </div>
-            )
-          }
-        />
       </Cartao>
 
       {obra.contatoCliente && (
