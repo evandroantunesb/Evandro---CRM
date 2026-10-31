@@ -61,6 +61,14 @@ Decidido pelo Evandro em 30/10: prazos contam em dias úteis a partir do dia út
 
 - Pendente: o engenheiro preenche os prazos da Copel/ANEEL em Configurações → Engenharia.
 
+## T3 — tarefas automáticas de setor (#264, `feat/tarefas-automaticas`, em andamento)
+
+Autorizada pelo Evandro em 30/10 ("comece a T3 direto"). Regras por empresa em **Configurações → Tarefas automáticas** (admin cria, edita e desativa; sem exclusão): quando o setor X da obra chega ao status Y, nasce uma tarefa de setor (`origem = 'automatica'`, sem "quem pediu") para o setor Z, uma vez por obra e regra (nunca de novo, mesmo cancelada ou com o status voltando). Toda empresa nasce com as duas regras do Evandro. Trigger em `obra_fluxos` (pega todas as RPCs que mudam status); obra cancelada não recebe; obras que já passaram do status antes da migration não recebem nada.
+
+- Responsável: o principal ativo do setor de destino na obra (avisado no sininho); sem ele, fila do setor. Prazo: N dias úteis a partir de hoje (padrão 2, por regra). Sem gamificação.
+- Cancelar tarefa automática: só coordenador do setor ou admin (não há "quem pediu").
+- Migration `20261031100000_tarefas_automaticas.sql` **ainda não aplicada em produção**; a allowlist do `banco-producao.yml` já aponta para ela. Testes: `tests/tarefas-automaticas-db.test.ts`.
+
 ## Entregas de 2026-10-29 — dados do cliente, sigilo na obra e tarefas dos setores
 
 `main` em `fdd7c2e`. Todas as migrations abaixo foram aplicadas em produção pelo `banco-producao.yml` (conferir + aplicar, aprovados pelo Evandro), antes do merge de cada PR; **produção e `main` alinhadas** (última `20261029235000_tarefas_setor_notificacoes.sql`).
@@ -80,7 +88,7 @@ Decidido pelo Evandro em 30/10: prazos contam em dias úteis a partir do dia út
 **Lição do teste em produção:** um pedido criado num negócio de outra empresa (admin com acesso a mais de uma) não aparece para a Operação da Raion Solar Demo — conferir a empresa embaixo da logo antes de testar. Teste E2E `e2e/17-tarefas-setor.spec.ts` cobre o caminho admin → Engenharia com anexo.
 
 **Próximos passos (aguardam comando do Evandro):**
-1. **T3 — tarefas automáticas:** regra por empresa disparada pelo status do setor na obra (ex.: Operacional `instalacao_concluida` → Engenharia "Cadastro do cliente no app e pedido de vistoria"; Compras `faturado_fornecedor` → Operacional "Agendar instalação com o cliente"), uma vez por obra e regra.
+1. **T3 — tarefas automáticas:** implementada (seção "T3" acima), aguardando migration em produção e merge.
 2. **Engenharia em Obras:** P1 a P1.6, P2 (checklist e documentos), P3 (protocolos, exigências e trava de etapa) e P4 (vistoria, medição e conexão) entregues e em produção (seção "Engenharia em Obras" acima). Já decidido no P2: item obrigatório só é dispensado por admin ou coordenador; sem segundo revisor por enquanto; o modelo Copel de 11 itens ainda deve ser revisado com o responsável técnico. **P5** (prazos em dias úteis e indicadores) entregue na #263 e em produção. Pendências e agenda da Engenharia continuam reutilizando `tarefas_setor`.
 3. CNH com preenchimento automático dos dados do cliente (3b); endereço estruturado na ficha do contato (junto da #239).
 4. PRs #234 e #239 precisam de rebase na `main`.

@@ -17,6 +17,7 @@ import {
   Thermometer,
   UserCog,
   Users,
+  Workflow,
   Wrench,
   type LucideIcon,
 } from "lucide-react";
@@ -64,6 +65,7 @@ const GRUPOS: { id: string; titulo: string; itens: Item[] }[] = [
     itens: [
       { href: "/configuracoes/fixacoes", titulo: "Tipos de fixação", descricao: "Opções de fixação do telhado escolhidas na obra.", Icone: Wrench },
       { href: "/configuracoes/engenharia", titulo: "Engenharia", descricao: "Checklist de documentos, prazos e feriados da empresa.", Icone: ListChecks },
+      { href: "/configuracoes/tarefas-automaticas", titulo: "Tarefas automáticas", descricao: "Tarefas que nascem para um setor quando outro chega a um status.", Icone: Workflow },
     ],
   },
   {
