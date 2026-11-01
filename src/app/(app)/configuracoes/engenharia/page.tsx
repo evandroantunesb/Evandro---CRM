@@ -1,4 +1,5 @@
 import { Cartao, Voltar } from "@/components/ui";
+import { lerCondicoes } from "@/lib/engenharia-enquadramento-regras";
 import { carregarConfigPrazos, carregarFeriadosEmpresa } from "@/lib/engenharia-prazos";
 import { CHAVES_PRAZO_DISTRIBUIDORA, CHAVES_PRAZO_INTERNO, type ChavePrazo } from "@/lib/engenharia-prazos-regras";
 import { exigirPapel } from "@/lib/sessao";
@@ -13,14 +14,14 @@ export default async function ConfigEngenharia() {
   const [{ data }, prazos, feriados] = await Promise.all([
     supabase
       .from("engenharia_checklist_modelo")
-      .select("id, grupo, titulo, obrigatorio, ordem, ativo")
+      .select("id, grupo, titulo, obrigatorio, ordem, ativo, condicoes")
       .eq("empresa_id", atual.empresaId)
       .order("ordem")
       .order("titulo"),
     carregarConfigPrazos(supabase, atual.empresaId),
     carregarFeriadosEmpresa(supabase, atual.empresaId),
   ]);
-  const itens = data ?? [];
+  const itens = (data ?? []).map((i) => ({ ...i, condicoes: lerCondicoes(i.condicoes) }));
   const dias = new Map(prazos.map((p) => [p.chave, p.diasUteis]));
   const linhas = (chaves: readonly ChavePrazo[]) => chaves.filter((c) => dias.has(c)).map((chave) => ({ chave, diasUteis: dias.get(chave) ?? null }));
 
@@ -34,6 +35,12 @@ export default async function ConfigEngenharia() {
         Documentos que a Engenharia confere em cada obra. A lista inicial é um ponto de partida para a Copel: revise com o
         responsável técnico. Cada obra recebe uma cópia ao aplicar o checklist: editar aqui não muda os itens que ela já tem.
         Itens novos entram na obra pelo botão &quot;Trazer itens novos do modelo&quot;. Item desativado não entra mais.
+      </p>
+      <p className="text-sm text-zinc-600">
+        <span className="font-medium">Condições:</span> diga para quais respostas do enquadramento da obra o item vale (ex.:
+        procuração só com &quot;Terceiro com procuração&quot;). Sem condição, vale sempre. Pergunta ainda sem resposta na
+        obra não tira o item. Ao salvar o enquadramento, a obra recebe os itens que passaram a valer e os pendentes que
+        deixaram de valer viram &quot;não se aplica&quot;.
       </p>
       <Cartao titulo="Novo item">
         <NovoItemModelo proximaOrdem={(itens.at(-1)?.ordem ?? 0) + 10} />

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { GestaoFixacao, GestaoSetor } from "@/app/(app)/obras/[id]/gestao";
 import { ChecklistEngenharia } from "@/components/engenharia/checklist";
+import { EnquadramentoEngenharia } from "@/components/engenharia/enquadramento";
 import { RegistroPasso, ResumoPassos } from "@/components/engenharia/passos";
 import { ProtocolosEngenharia } from "@/components/engenharia/protocolos";
 import { VistoriaEngenharia } from "@/components/engenharia/vistoria";
@@ -10,6 +11,8 @@ import { ListaTarefasSetor, NovaTarefaSetor } from "@/components/tarefas-setor";
 import { Cartao, Selo } from "@/components/ui";
 import { formatarDataHora } from "@/lib/crm";
 import { carregarChecklistEngenharia } from "@/lib/engenharia-checklist";
+import { carregarEnquadramento } from "@/lib/engenharia-enquadramento";
+import { enquadramentoCompleto, perguntasSemResposta } from "@/lib/engenharia-enquadramento-regras";
 import { carregarRegistrosPassos } from "@/lib/engenharia-passos";
 import { acoesPasso, montarPassosEngenharia, passoAtual, type PassoComRegistro } from "@/lib/engenharia-passos-regras";
 import { carregarPrazosObras } from "@/lib/engenharia-prazos";
@@ -41,7 +44,7 @@ export default async function CardEngenharia({ params }: PageProps<"/engenharia/
   const { id } = await params;
   const supabase = await criarClienteServidor();
 
-  const [obra, tarefas, { data: meusSetores }, checklist, protocolos, vistorias, registros, prazos] = await Promise.all([
+  const [obra, tarefas, { data: meusSetores }, checklist, protocolos, vistorias, registros, prazos, enquadramento] = await Promise.all([
     carregarDetalheObra(supabase, { empresaId: atual.empresaId, papel: atual.papel, obraId: id, membroId: atual.membroId }),
     carregarTarefasSetor(supabase, {
       empresaId: atual.empresaId,
@@ -62,6 +65,7 @@ export default async function CardEngenharia({ params }: PageProps<"/engenharia/
     carregarVistoriasEngenharia(supabase, { empresaId: atual.empresaId, obraId: id }),
     carregarRegistrosPassos(supabase, { empresaId: atual.empresaId, obraId: id }),
     carregarPrazosObras(supabase, atual.empresaId),
+    carregarEnquadramento(supabase, { empresaId: atual.empresaId, obraId: id }),
   ]);
   // Operação só entra no card de quem atua em Engenharia (mesma regra da lista).
   if (!obra || (atual.papel === "operacao" && (meusSetores ?? []).length === 0)) notFound();
@@ -90,6 +94,7 @@ export default async function CardEngenharia({ params }: PageProps<"/engenharia/
   const passos = montarPassosEngenharia({
     temResponsavel: (engenharia?.participantes ?? []).some((p) => p.principal),
     registros,
+    enquadramento: enquadramento && { completo: enquadramentoCompleto(enquadramento), atualizadoEm: enquadramento.atualizadoEm },
     checklist,
     protocolos,
     vistoria: vistorias[0] ?? null,
@@ -108,12 +113,19 @@ export default async function CardEngenharia({ params }: PageProps<"/engenharia/
         status: passos[passo - 1].status,
         autorizacao: autorizacaoEngenharia,
         cancelada: resumo.situacao === "cancelada",
+        enquadramentoCompleto: enquadramentoCompleto(enquadramento),
         checklistApto: pendentesChecklist === 0,
         protocoloAprovado,
       })}
     />
   );
   const tituloPasso = (n: number) => `${n}. ${passos[n - 1].titulo}`;
+  const semResposta = perguntasSemResposta(enquadramento);
+  // Inversores do kit da venda, para conferir a potência no enquadramento.
+  const inversoresKit = obra.tecnico.kit
+    .filter((k) => /inversor/i.test(k.tipo))
+    .map((k) => `${k.quantidade ?? 1} × ${k.descricao}`)
+    .join("; ");
   // Histórico da Engenharia e do que é da obra toda; os outros setores ficam na tela de Obras.
   const historico = obra.historico.filter((h) => !h.setorRotulo || h.setorRotulo === ROTULO_SETOR.engenharia);
 
@@ -187,8 +199,19 @@ export default async function CardEngenharia({ params }: PageProps<"/engenharia/
 
       <div id="passo-2" className="flex scroll-mt-4 flex-col gap-3">
         <Cartao titulo={tituloPasso(2)}>
-          <p className="mb-3 text-sm text-zinc-600">{passos[1].ajuda}</p>
-          {registro(2)}
+          <div className="flex flex-col gap-4">
+            <p className="text-sm text-zinc-600">{passos[1].ajuda}</p>
+            <EnquadramentoEngenharia
+              obraId={resumo.id}
+              enquadramento={enquadramento}
+              podeEditar={autorizacaoEngenharia !== null && resumo.situacao !== "cancelada"}
+              kit={{ potenciaKwp: obra.tecnico.potenciaKwp, inversores: inversoresKit || null }}
+            />
+            {semResposta.length > 0 && semResposta.length < 9 && (
+              <p className="text-sm text-zinc-600">Sem resposta: {semResposta.join(", ")}.</p>
+            )}
+            {registro(2)}
+          </div>
         </Cartao>
       </div>
 

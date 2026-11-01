@@ -26,6 +26,28 @@ test("executor vê os oito passos, confirma o enquadramento e reabre com motivo"
     await passo2.getByLabel("Por que reabrir?").fill("Reabrindo para o teste");
     await passo2.getByRole("button", { name: "Reabrir passo" }).click();
   }
+
+  // Passo 2 exige o enquadramento completo (P6c): sem ele, o botão não aparece e a tela explica.
+  const respostas: [string, string][] = [
+    ["Tipo de solicitação", "Nova conexão"],
+    ["Categoria", "Microgeração"],
+    ["Faixa do formulário", "Até 10 kW"],
+    ["Tipo de instalação", "Telhado"],
+    ["Modalidade SCEE", "Local"],
+    ["Titularidade", "Pessoa física"],
+    ["Obra de rede", "Não"],
+    ["Inversor verificado", "Verificar"],
+    ["Situação ambiental", "Dispensa"],
+  ];
+  await passo2.getByRole("combobox", { name: /^Titularidade/ }).selectOption({ label: "Sem resposta" });
+  await passo2.getByRole("button", { name: "Salvar enquadramento" }).click();
+  await expect(passo2.getByText("Enquadramento salvo.")).toBeVisible();
+  await expect(passo2.getByText(/Responda todas as perguntas do enquadramento/)).toBeVisible();
+  await expect(passo2.getByRole("button", { name: "Concluir enquadramento" })).toHaveCount(0);
+  for (const [pergunta, resposta] of respostas) await passo2.getByRole("combobox", { name: new RegExp(`^${pergunta}`) }).selectOption({ label: resposta });
+  await passo2.getByRole("button", { name: "Salvar enquadramento" }).click();
+  await expect(passo2.getByText(/^Salvo em /)).toBeVisible();
+
   await passo2.getByLabel("Observação (opcional)").fill("Copel, micro, telhado");
   await passo2.getByRole("button", { name: "Concluir enquadramento" }).click();
   await expect(passo2.getByText(/^Concluído em .* · Copel, micro, telhado$/)).toBeVisible();

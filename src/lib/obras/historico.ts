@@ -45,6 +45,23 @@ const ROTULO_TIPO: Record<string, string> = {
   vistoria_engenharia_atualizada: "Vistoria atualizada",
   engenharia_concluida_excecao: "Engenharia concluída sem conexão",
   passo_engenharia_registrado: "Passo da Engenharia",
+  enquadramento_engenharia_salvo: "Enquadramento salvo",
+};
+
+// Perguntas do enquadramento (mesmas de `engenharia-enquadramento-regras`, sem importar regra de tela).
+const ROTULO_PERGUNTA_ENQUADRAMENTO: Record<string, string> = {
+  tipo_solicitacao: "tipo de solicitação",
+  categoria: "categoria",
+  faixa_formulario: "faixa do formulário",
+  tipo_instalacao: "tipo de instalação",
+  modalidade_scee: "modalidade SCEE",
+  titularidade: "titularidade",
+  obra_rede: "obra de rede",
+  inversor_verificado: "inversor verificado",
+  situacao_ambiental: "situação ambiental",
+  justificativa_ambiental: "justificativa ambiental",
+  potencia_modulos_kwp: "potência dos módulos",
+  potencia_inversores_kw: "potência dos inversores",
 };
 
 // Passos com registro e ações (mesmos de `engenharia-passos-regras`, sem importar regra de tela).
@@ -234,6 +251,12 @@ function descrever(linha: LinhaHistoricoObra, nomes: ReadonlyMap<string, string>
       return rotulo(ROTULO_REGISTRO_VISTORIA, ler(dados, "tipo")) ?? "Situação da vistoria alterada";
     case "engenharia_concluida_excecao":
       return "Concluída pelo administrador sem a conexão confirmada";
+    // Só quais perguntas mudaram; as respostas e a justificativa não aparecem.
+    case "enquadramento_engenharia_salvo": {
+      const campos = ler(dados, "campos");
+      const nomes = Array.isArray(campos) ? campos.map((c) => rotulo(ROTULO_PERGUNTA_ENQUADRAMENTO, c)).filter((c): c is string => !!c) : [];
+      return nomes.length ? `Alterado: ${nomes.join(", ")}` : "";
+    }
     // A observação e o motivo do passo não aparecem.
     case "passo_engenharia_registrado": {
       const passo = ler(dados, "passo");

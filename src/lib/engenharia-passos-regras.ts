@@ -45,6 +45,8 @@ export type FatosPassos = {
   temResponsavel: boolean;
   /** Registro mais recente de cada passo com registro. */
   registros: Partial<Record<PassoComRegistro, RegistroPassoVM>>;
+  /** Ficha de enquadramento (P6c): completa libera o passo 2; mudar depois da confirmação pede revisão. */
+  enquadramento: { completo: boolean; atualizadoEm: string } | null;
   checklist: readonly Pick<ItemEngenhariaVM, "obrigatorio" | "status" | "atualizadoEm" | "documentos">[];
   protocolos: readonly Pick<ProtocoloVM, "status" | "exigencias">[];
   vistoria: Pick<SituacaoVistoria, "status" | "conexaoConfirmadaEm"> | null;
@@ -68,11 +70,13 @@ export function ultimaMudancaChecklist(itens: FatosPassos["checklist"]): string 
   return ultima;
 }
 
+const depois = (a: string, b: string) => new Date(a).getTime() > new Date(b).getTime();
+
 /** Revisão do passo 5 feita antes da última mudança do checklist (OB-07): volta a "necessita revisão". */
 export function revisaoDesatualizada(revisao: RegistroPassoVM | undefined, itens: FatosPassos["checklist"]): boolean {
   if (revisao?.acao !== "confirmado") return false;
   const ultima = ultimaMudancaChecklist(itens);
-  return ultima != null && new Date(ultima).getTime() > new Date(revisao.quando).getTime();
+  return ultima != null && depois(ultima, revisao.quando);
 }
 
 function porRegistro(r: RegistroPassoVM | undefined): Pick<PassoVM, "status" | "detalhe"> {
@@ -120,6 +124,12 @@ export function montarPassosEngenharia(f: FatosPassos): PassoVM[] {
     switch (numero) {
       case 1:
         s = f.temResponsavel ? { status: "concluido", detalhe: null } : { status: "a_fazer", detalhe: "Defina o responsável principal" };
+        break;
+      case 2:
+        s =
+          f.registros[2]?.acao === "confirmado" && f.enquadramento && depois(f.enquadramento.atualizadoEm, f.registros[2].quando)
+            ? { status: "com_pendencia", detalhe: "Necessita revisão: o enquadramento mudou depois da confirmação" }
+            : porRegistro(f.registros[2]);
         break;
       case 4:
         s = porChecklist(f.checklist);
@@ -180,15 +190,16 @@ export const passosComPendencia = (passos: readonly PassoVM[]) => passos.filter(
 
 /**
  * Botões de um passo com registro. Mesmas regras da RPC `registrar_passo_engenharia`, para a tela não oferecer o que o
- * banco recusa: quem atua na Engenharia da obra (ou o admin), obra não cancelada; passo 5 com o checklist apto; passo 7
- * com protocolo aprovado (ou orçamento emitido, ou encerrado).
+ * banco recusa: quem atua na Engenharia da obra (ou o admin), obra não cancelada; passo 2 com o enquadramento completo;
+ * passo 5 com o checklist apto; passo 7 com protocolo aprovado (ou orçamento emitido, ou encerrado).
  */
 export function acoesPasso(
   passo: PassoComRegistro,
-  { status, autorizacao, cancelada, checklistApto, protocoloAprovado }: {
+  { status, autorizacao, cancelada, enquadramentoCompleto, checklistApto, protocoloAprovado }: {
     status: StatusPasso;
     autorizacao: AutorizacaoEngenharia;
     cancelada: boolean;
+    enquadramentoCompleto: boolean;
     checklistApto: boolean;
     protocoloAprovado: boolean;
   },
@@ -196,11 +207,13 @@ export function acoesPasso(
   const nada = { confirmar: false, reabrir: false, naoSeAplica: false, bloqueio: null };
   if (!autorizacao || cancelada) return nada;
   const bloqueio =
-    passo === 5 && !checklistApto
-      ? "Aplique o checklist e resolva os itens obrigatórios antes de concluir a revisão."
-      : passo === 7 && !protocoloAprovado
-        ? "Registre a aprovação ou o orçamento da distribuidora no protocolo antes deste passo."
-        : null;
+    passo === 2 && !enquadramentoCompleto
+      ? "Responda todas as perguntas do enquadramento antes de concluir este passo."
+      : passo === 5 && !checklistApto
+        ? "Aplique o checklist e resolva os itens obrigatórios antes de concluir a revisão."
+        : passo === 7 && !protocoloAprovado
+          ? "Registre a aprovação ou o orçamento da distribuidora no protocolo antes deste passo."
+          : null;
   const fechado = status === "concluido" || status === "nao_se_aplica";
   return {
     // No passo 5 com pendência (revisão desatualizada), confirmar de novo é a nova revisão.
