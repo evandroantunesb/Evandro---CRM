@@ -1,8 +1,8 @@
 # Estado do projeto — Raion CRM
 
-## Engenharia em Obras — P1 a P1.6 integradas em 2026-10-29; P2 a P5 em 2026-10-30
+## Engenharia em Obras — P1 a P1.6 integradas em 2026-10-29; P2 a P5 em 2026-10-30; P6a e P6b em 2026-10-31
 
-`main` em `9ea1f79` (merge da #264). **Produção e `main` alinhadas** (última `20261031100000_tarefas_automaticas.sql`).
+`main` em `465ac2b` (merge da #267). **Produção e `main` alinhadas** (última `20261101100000_engenharia_passos.sql`).
 
 | PR | O que entrou |
 | --- | --- |
@@ -61,6 +61,20 @@ Decidido pelo Evandro em 30/10: prazos contam em dias úteis a partir do dia út
 
 - Pendente: o engenheiro preenche os prazos da Copel/ANEEL em Configurações → Engenharia.
 
+### P6a — Kanban da carteira (#266)
+
+Na central `/engenharia`, a carteira alterna entre Lista e Kanban (`?carteira=kanban`). Sete fases da spec v1.3 (seção 31.2), com a precedência dela: Exigência > Conexão/vistoria > Em análise externa > Pronto para protocolo > Em elaboração > Conferência inicial; Engenharia concluída vence tudo. A fase é derivada (etapa, checklist pelo critério do G2, protocolos válidos, exigências abertas) e nunca gravada; sem arrastar, o cartão abre o card da obra. "Concluída" mostra obras em andamento que já fecharam a Engenharia. Sem migration. #266 mesclada em 31/10 (`bdeb12b`). Quem não lê protocolos (gestor) tem a fase pela etapa e pelo checklist. Testes: `tests/engenharia-regras.test.ts`, `e2e/23-engenharia-kanban.spec.ts`.
+
+### P6b — oito passos guiados no card da obra (#267)
+
+**Migration `20261101100000_engenharia_passos.sql` aplicada em produção em 01/11/2026** (tag `migracao-pr267-cd01ff4`; conferir + aplicar aprovados pelo Evandro; dry-run listou só ela). #267 mesclada em 01/11 (`465ac2b`), head `cd01ff4`; CI verde.
+
+- **Tela:** topo com "Etapa X de 8", próxima ação, pendências, responsável e prazo; barra dos 8 passos com status (A fazer, Em andamento, Concluído, Com pendência, Não se aplica) e navegação livre. Responsável no passo 1, dados técnicos no 3, checklist no 4, protocolo no 6, vistoria no 8.
+- **Passos 2, 3, 5 e 7:** confirmação formal em `obra_engenharia_passo_registros` (só inserção; RPC `registrar_passo_engenharia`, mesma porta do checklist: admin, coordenador ou participante ativo). Reabrir e "não se aplica" (só no 7) exigem motivo. Passo 5 exige checklist apto; passo 7 exige protocolo aprovado/orçamento/encerrado. Histórico registra passo e ação, sem a observação.
+- **Decisões do Evandro (31/10):** revisão do passo 5 volta a "necessita revisão" quando o checklist muda (comparação na tela, nada gravado); o protocolo **não** exige o passo 5 por enquanto; a central continua com a próxima ação por etapa.
+- **Lição:** o disparo do `aplicar` pelo agente foi bloqueado pelo controle de permissões do Claude Code (deploy de produção); o Evandro disparou pelo GitHub. No formulário, `sha` é o hash de 40 caracteres, não o link do run.
+- Testes: `tests/engenharia-passos-db.test.ts`, `tests/engenharia-passos-regras.test.ts`, `e2e/24-engenharia-passos.spec.ts`.
+
 ## T3 — tarefas automáticas de setor (#264) — concluída em 2026-10-31
 
 Autorizada pelo Evandro em 30/10 ("comece a T3 direto"). Regras por empresa em **Configurações → Tarefas automáticas** (admin cria, edita e desativa; sem exclusão): quando o setor X da obra chega ao status Y, nasce uma tarefa de setor (`origem = 'automatica'`, sem "quem pediu") para o setor Z, uma vez por obra e regra (nunca de novo, mesmo cancelada ou com o status voltando). Toda empresa nasce com as duas regras do Evandro. Trigger em `obra_fluxos` (pega todas as RPCs que mudam status); obra cancelada não recebe; obras que já passaram do status antes da migration não recebem nada.
@@ -89,7 +103,7 @@ Autorizada pelo Evandro em 30/10 ("comece a T3 direto"). Regras por empresa em *
 
 **Próximos passos (aguardam comando do Evandro):**
 1. **T3 — tarefas automáticas:** entregue e em produção (seção "T3" acima).
-2. **Engenharia em Obras:** P1 a P1.6, P2 (checklist e documentos), P3 (protocolos, exigências e trava de etapa) e P4 (vistoria, medição e conexão) entregues e em produção (seção "Engenharia em Obras" acima). Já decidido no P2: item obrigatório só é dispensado por admin ou coordenador; sem segundo revisor por enquanto; o modelo Copel de 11 itens ainda deve ser revisado com o responsável técnico. **P5** (prazos em dias úteis e indicadores) entregue na #263 e em produção. Pendências e agenda da Engenharia continuam reutilizando `tarefas_setor`.
+2. **Engenharia em Obras:** P1 a P1.6, P2 (checklist e documentos), P3 (protocolos, exigências e trava de etapa) e P4 (vistoria, medição e conexão) entregues e em produção (seção "Engenharia em Obras" acima). Já decidido no P2: item obrigatório só é dispensado por admin ou coordenador; sem segundo revisor por enquanto; o modelo Copel de 11 itens ainda deve ser revisado com o responsável técnico. **P5** (prazos em dias úteis e indicadores) entregue na #263 e em produção. **P6a** (Kanban da carteira, #266) e **P6b** (oito passos guiados, #267) em produção. Próximo: **P6c**, checklist condicional configurável pelo admin (perguntas de enquadramento exigidas no passo 2), aprovado pelo Evandro em 31/10. Pendências e agenda da Engenharia continuam reutilizando `tarefas_setor`.
 3. CNH com preenchimento automático dos dados do cliente (3b); endereço estruturado na ficha do contato (junto da #239).
 4. PRs #234 e #239 precisam de rebase na `main`.
 
