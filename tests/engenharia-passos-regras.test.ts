@@ -28,6 +28,7 @@ const item = (obrigatorio: boolean, status: FatosPassos["checklist"][number]["st
 const base: FatosPassos = {
   temResponsavel: false,
   registros: {},
+  enquadramento: null,
   checklist: [],
   protocolos: [],
   vistoria: null,
@@ -104,10 +105,19 @@ describe("montarPassosEngenharia (P6b)", () => {
     expect(status({ engenhariaConcluida: true })[7]).toBe("concluido");
   });
 
+  it("passo 2 volta a pendente quando o enquadramento muda depois da confirmação (P6c)", () => {
+    const confirmado = { 2: reg(2, "confirmado", "2026-10-20T12:00:00Z") };
+    expect(status({ registros: confirmado, enquadramento: { completo: true, atualizadoEm: "2026-10-19T12:00:00Z" } })[1]).toBe("concluido");
+    expect(
+      montarPassosEngenharia({ ...base, registros: confirmado, enquadramento: { completo: true, atualizadoEm: "2026-10-21T12:00:00Z" } })[1],
+    ).toMatchObject({ status: "com_pendencia", detalhe: "Necessita revisão: o enquadramento mudou depois da confirmação" });
+  });
+
   it("tudo fechado: sem passo atual", () => {
     const passos = montarPassosEngenharia({
       temResponsavel: true,
       registros: { 2: reg(2, "confirmado"), 3: reg(3, "confirmado"), 5: reg(5, "confirmado"), 7: reg(7, "nao_se_aplica", undefined, "x") },
+      enquadramento: { completo: true, atualizadoEm: "2026-10-19T12:00:00Z" },
       checklist: [item(true, "valido")],
       protocolos: [{ status: "aprovado", exigencias: [] }],
       vistoria: { status: "aprovada", conexaoConfirmadaEm: "2026-10-25" },
@@ -119,7 +129,14 @@ describe("montarPassosEngenharia (P6b)", () => {
 });
 
 describe("acoesPasso (P6b)", () => {
-  const ctx = { status: "a_fazer" as const, autorizacao: "executar" as const, cancelada: false, checklistApto: true, protocoloAprovado: true };
+  const ctx = {
+    status: "a_fazer" as const,
+    autorizacao: "executar" as const,
+    cancelada: false,
+    enquadramentoCompleto: true,
+    checklistApto: true,
+    protocoloAprovado: true,
+  };
 
   it("sem autorização ou obra cancelada: nenhum botão", () => {
     expect(acoesPasso(2, { ...ctx, autorizacao: null })).toEqual({ confirmar: false, reabrir: false, naoSeAplica: false, bloqueio: null });
@@ -134,6 +151,14 @@ describe("acoesPasso (P6b)", () => {
   it("passo 5 sem checklist apto e passo 7 sem protocolo aprovado explicam o bloqueio", () => {
     expect(acoesPasso(5, { ...ctx, checklistApto: false })).toMatchObject({ confirmar: false, bloqueio: expect.stringMatching(/Aplique o checklist/) });
     expect(acoesPasso(7, { ...ctx, protocoloAprovado: false })).toMatchObject({ confirmar: false, naoSeAplica: false, bloqueio: expect.stringMatching(/aprovação/) });
+  });
+
+  it("passo 2 sem o enquadramento completo explica o bloqueio (P6c)", () => {
+    expect(acoesPasso(2, { ...ctx, enquadramentoCompleto: false })).toMatchObject({
+      confirmar: false,
+      bloqueio: expect.stringMatching(/Responda todas as perguntas/),
+    });
+    expect(acoesPasso(2, ctx).confirmar).toBe(true);
   });
 
   it("'não se aplica' só no passo 7", () => {

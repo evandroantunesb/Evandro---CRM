@@ -50,6 +50,18 @@ async function criarVenda(emp: string, responsavel: Usuario, confirmador: Usuari
 const registrar = (quem: Usuario, passo: number, acao: string, observacao?: string) =>
   quem.cliente.rpc("registrar_passo_engenharia", { p_obra_id: obra, p_passo: passo, p_acao: acao, ...(observacao ? { p_observacao: observacao } : {}) });
 
+const ENQUADRAMENTO_COMPLETO = {
+  tipo_solicitacao: "nova_conexao",
+  categoria: "micro",
+  faixa_formulario: "ate_10kw",
+  tipo_instalacao: "telhado",
+  modalidade_scee: "local",
+  titularidade: "pf",
+  obra_rede: "nao",
+  inversor_verificado: "sim",
+  situacao_ambiental: "dispensa",
+};
+
 // Ontem: a data do protocolo não pode ser futura no horário de Brasília.
 const ontem = () => new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
 
@@ -119,6 +131,10 @@ describe("Engenharia: passos guiados (ordem importa)", { concurrent: false, shuf
       const r = await registrar(quem, 2, "confirmado");
       expect(r.error?.code, quem.email).toBe("42501");
     }
+    // Passo 2 exige a ficha de enquadramento completa (P6c).
+    expect((await registrar(execEng, 2, "confirmado")).error?.message).toMatch(/Responda todas as perguntas do enquadramento/);
+    const ficha = await execEng.cliente.rpc("salvar_enquadramento_engenharia", { p_obra_id: obra, p_respostas: ENQUADRAMENTO_COMPLETO });
+    expect(ficha.error).toBeNull();
     expect((await registrar(execEng, 2, "confirmado", "Copel, micro, telhado")).error).toBeNull();
     expect((await registrar(coordEng, 3, "confirmado")).error).toBeNull();
     expect((await registrar(admin, 3, "confirmado")).error).toBeNull();

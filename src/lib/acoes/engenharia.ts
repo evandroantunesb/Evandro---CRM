@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { CHAVES_PERGUNTA, respostaValida } from "@/lib/engenharia-enquadramento-regras";
 import { ACOES_PASSO, ehPassoComRegistro } from "@/lib/engenharia-passos-regras";
 import { CANAIS_PROTOCOLO, CATEGORIAS_EXIGENCIA, TIPOS_RESPOSTA, TIPOS_SOLICITACAO } from "@/lib/engenharia-protocolos-regras";
 import { TIPOS_REGISTRO_VISTORIA } from "@/lib/engenharia-vistoria-regras";
@@ -229,6 +230,37 @@ export async function registrarArquivoVistoriaEngenharia(dados: { obraId: string
   if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível registrar o arquivo.") };
   revalidar(d.data.obraId);
   return { ok: true, mensagem: "Arquivo anexado." };
+}
+
+const potencia = z.preprocess(
+  (v) => (typeof v === "string" ? (v.trim() === "" ? undefined : v.trim().replace(",", ".")) : v),
+  z.coerce.number({ error: "Potência inválida." }).positive("Potência inválida.").max(9_999_999, "Potência inválida.").optional(),
+);
+
+/** Grava a ficha de enquadramento (todas as respostas; vazia = sem resposta). A RPC valida de novo e reconcilia o checklist. */
+export async function salvarEnquadramentoEngenharia(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  await exigirPapel(...ENGENHARIA);
+  const obra = comObra.safeParse({ obraId: formData.get("obraId") });
+  if (!obra.success) return { ok: false, mensagem: "Obra inválida." };
+  const respostas: Record<string, string | number | null> = {};
+  for (const chave of CHAVES_PERGUNTA) {
+    const v = String(formData.get(chave) ?? "").trim();
+    if (v && !respostaValida(chave, v)) return { ok: false, mensagem: "Resposta inválida." };
+    respostas[chave] = v || null;
+  }
+  const modulos = potencia.safeParse(formData.get("potenciaModulosKwp") ?? "");
+  const inversores = potencia.safeParse(formData.get("potenciaInversoresKw") ?? "");
+  if (!modulos.success || !inversores.success) return { ok: false, mensagem: "Potência inválida." };
+  respostas.potencia_modulos_kwp = modulos.data ?? null;
+  respostas.potencia_inversores_kw = inversores.data ?? null;
+  const justificativa = String(formData.get("justificativaAmbiental") ?? "").trim();
+  respostas.justificativa_ambiental = respostas.situacao_ambiental === "nao_aplicavel" ? justificativa || null : null;
+
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.rpc("salvar_enquadramento_engenharia", { p_obra_id: obra.data.obraId, p_respostas: respostas });
+  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível salvar o enquadramento.") };
+  revalidar(obra.data.obraId);
+  return { ok: true, mensagem: "Enquadramento salvo." };
 }
 
 const esquemaPasso = comObra.extend({

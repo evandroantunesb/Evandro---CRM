@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { CHAVES_PERGUNTA, respostaValida, type CondicoesItem } from "@/lib/engenharia-enquadramento-regras";
 import { CHAVES_PRAZO } from "@/lib/engenharia-prazos-regras";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
@@ -48,6 +49,29 @@ export async function editarItemModelo(_: ResultadoAcao, formData: FormData): Pr
   if (error) return { ok: false, mensagem: error.code === "23505" ? DUPLICADO : "Não foi possível salvar." };
   revalidatePath(CAMINHO);
   return { ok: true, mensagem: "Salvo." };
+}
+
+/** Condições do item (P6c): para cada pergunta, as respostas marcadas. Nenhuma marcada = sem condição naquela pergunta. */
+export async function salvarCondicoesModelo(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  const { atual } = await exigirPapel("admin");
+  const id = z.string().uuid().safeParse(formData.get("id"));
+  if (!id.success) return { ok: false, mensagem: "Item inválido." };
+  const condicoes: CondicoesItem = {};
+  for (const chave of CHAVES_PERGUNTA) {
+    const valores = formData.getAll(chave).map(String);
+    if (valores.some((v) => !respostaValida(chave, v))) return { ok: false, mensagem: "Resposta inválida." };
+    if (valores.length) condicoes[chave] = valores;
+  }
+
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase
+    .from("engenharia_checklist_modelo")
+    .update({ condicoes })
+    .eq("id", id.data)
+    .eq("empresa_id", atual.empresaId);
+  if (error) return { ok: false, mensagem: "Não foi possível salvar as condições." };
+  revalidatePath(CAMINHO);
+  return { ok: true, mensagem: "Condições salvas." };
 }
 
 // ---------------------------------------------------------------------------

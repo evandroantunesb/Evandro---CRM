@@ -1098,6 +1098,7 @@ export type Database = {
       engenharia_checklist_modelo: {
         Row: {
           ativo: boolean;
+          condicoes: NonNullable<Json>;
           created_at: string;
           descricao: string | null;
           empresa_id: string;
@@ -1110,6 +1111,7 @@ export type Database = {
         };
         Insert: {
           ativo?: boolean;
+          condicoes?: NonNullable<Json>;
           created_at?: string;
           descricao?: string | null;
           empresa_id: string;
@@ -1122,6 +1124,7 @@ export type Database = {
         };
         Update: {
           ativo?: boolean;
+          condicoes?: NonNullable<Json>;
           created_at?: string;
           descricao?: string | null;
           empresa_id?: string;
@@ -2861,6 +2864,74 @@ export type Database = {
           },
         ];
       };
+      obra_engenharia_enquadramento: {
+        Row: {
+          atualizado_em: string;
+          atualizado_por: string | null;
+          categoria: string | null;
+          created_at: string;
+          empresa_id: string;
+          faixa_formulario: string | null;
+          inversor_verificado: string | null;
+          justificativa_ambiental: string | null;
+          modalidade_scee: string | null;
+          obra_id: string;
+          obra_rede: string | null;
+          potencia_inversores_kw: number | null;
+          potencia_modulos_kwp: number | null;
+          situacao_ambiental: string | null;
+          tipo_instalacao: string | null;
+          tipo_solicitacao: string | null;
+          titularidade: string | null;
+        };
+        Insert: {
+          atualizado_em?: string;
+          atualizado_por?: string | null;
+          categoria?: string | null;
+          created_at?: string;
+          empresa_id: string;
+          faixa_formulario?: string | null;
+          inversor_verificado?: string | null;
+          justificativa_ambiental?: string | null;
+          modalidade_scee?: string | null;
+          obra_id: string;
+          obra_rede?: string | null;
+          potencia_inversores_kw?: number | null;
+          potencia_modulos_kwp?: number | null;
+          situacao_ambiental?: string | null;
+          tipo_instalacao?: string | null;
+          tipo_solicitacao?: string | null;
+          titularidade?: string | null;
+        };
+        Update: {
+          atualizado_em?: string;
+          atualizado_por?: string | null;
+          categoria?: string | null;
+          created_at?: string;
+          empresa_id?: string;
+          faixa_formulario?: string | null;
+          inversor_verificado?: string | null;
+          justificativa_ambiental?: string | null;
+          modalidade_scee?: string | null;
+          obra_id?: string;
+          obra_rede?: string | null;
+          potencia_inversores_kw?: number | null;
+          potencia_modulos_kwp?: number | null;
+          situacao_ambiental?: string | null;
+          tipo_instalacao?: string | null;
+          tipo_solicitacao?: string | null;
+          titularidade?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "obra_engenharia_enquadramento_empresa_id_obra_id_fkey";
+            columns: ["empresa_id", "obra_id"];
+            isOneToOne: false;
+            referencedRelation: "obras";
+            referencedColumns: ["empresa_id", "id"];
+          },
+        ];
+      };
       obra_engenharia_exigencias: {
         Row: {
           categoria: string;
@@ -2939,6 +3010,7 @@ export type Database = {
           obra_id: string;
           obrigatorio: boolean;
           ordem: number;
+          pelo_enquadramento: boolean;
           status: string;
           titulo: string;
         };
@@ -2955,6 +3027,7 @@ export type Database = {
           obra_id: string;
           obrigatorio: boolean;
           ordem: number;
+          pelo_enquadramento?: boolean;
           status?: string;
           titulo: string;
         };
@@ -2971,6 +3044,7 @@ export type Database = {
           obra_id?: string;
           obrigatorio?: boolean;
           ordem?: number;
+          pelo_enquadramento?: boolean;
           status?: string;
           titulo?: string;
         };
@@ -5377,6 +5451,7 @@ export type Database = {
         Args: { p_resposta?: string; p_tarefa_id: string };
         Returns: undefined;
       };
+      condicoes_checklist_validas: { Args: { p: Json }; Returns: boolean };
       confirmar_pagamento: {
         Args: { p_contrato_id: string };
         Returns: {
@@ -5567,6 +5642,8 @@ export type Database = {
         Returns: undefined;
       };
       engenharia_em_curso: { Args: { p_obra_id: string }; Returns: boolean };
+      enquadramento_completo: { Args: { p_obra_id: string }; Returns: boolean };
+      enquadramento_obra_json: { Args: { p_obra_id: string }; Returns: Json };
       estornar_confirmacao_pagamento: {
         Args: { p_contrato_id: string; p_motivo: string };
         Returns: {
@@ -5718,6 +5795,10 @@ export type Database = {
       };
       inserir_regras_temperatura_padrao: { Args: { p_empresa_id: string }; Returns: undefined };
       inserir_tarefas_automaticas_padrao: { Args: { p_empresa_id: string }; Returns: undefined };
+      item_vale_no_enquadramento: {
+        Args: { p_condicoes: Json; p_enquadramento: Json };
+        Returns: boolean;
+      };
       marcar_parado_fluxo_obra: {
         Args: {
           p_motivo?: string;
@@ -5780,6 +5861,7 @@ export type Database = {
           venda_alterada_em: string;
         }[];
       };
+      opcoes_enquadramento_engenharia: { Args: Record<PropertyKey, never>; Returns: Json };
       oportunidades_pendentes_equipe: {
         Args: { p_empresa_id: string };
         Returns: {
@@ -5884,6 +5966,10 @@ export type Database = {
         Args: { p_estornado_por: string; p_evento_won_id: number; p_novo_valor: number };
         Returns: undefined;
       };
+      reconciliar_checklist_engenharia: {
+        Args: { p_aut: string; p_obra_id: string };
+        Returns: undefined;
+      };
       registrar_anexo_tarefa_setor: {
         Args: { p_caminho: string; p_nome: string };
         Returns: string;
@@ -5971,6 +6057,14 @@ export type Database = {
         Returns: string;
       };
       remover_anexo_tarefa_setor: { Args: { p_anexo_id: string }; Returns: string };
+      resposta_enquadramento_valida: {
+        Args: { p_pergunta: string; p_resposta: string };
+        Returns: boolean;
+      };
+      salvar_enquadramento_engenharia: {
+        Args: { p_obra_id: string; p_respostas: Json };
+        Returns: undefined;
+      };
       salvar_regras_temperatura: {
         Args: { p_empresa_id: string; p_regras: Json };
         Returns: undefined;
