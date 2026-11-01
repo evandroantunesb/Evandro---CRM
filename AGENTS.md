@@ -31,6 +31,7 @@ Regras de trabalho (autorização, merges, produção, gamificação) estão no 
 ## Banco e migrations
 
 - `supabase/migrations/` é a **fonte da verdade do banco** (schema, funções, triggers, RLS). Leia a migration mais recente do módulo antes de criar outra.
+- Ao escrever ou revisar migration, política de RLS, índice ou função `security definer`, use a skill `supabase-postgres-best-practices` (no projeto, em `.claude/skills/` e `.agents/skills/`; versão em `skills-lock.json`). Ela orienta; as regras deste arquivo e do `CLAUDE.md` prevalecem.
 - Nome: `AAAAMMDDHHMMSS_nome.sql`. **Confira as migrations das PRs abertas antes de escolher o prefixo** — versões duplicadas quebram o `db push`.
 - `src/lib/supabase/database.types.ts` é **gerado** (`pnpm db:types`). Não edite à mão; o CI compara byte a byte.
 - **Migrations em produção só pelo fluxo existente, sempre manual e aprovado:** `banco-producao.yml` não roda em push. Cada disparo (`workflow_dispatch`) exige a ref (`main` ou tag `migracao-<nome>`, sem `/`), o SHA completo e a aprovação do Evandro no environment `producao-banco`, inclusive para o dry-run. São dois disparos independentes: modo `conferir` (`supabase db push --include-all --dry-run`) e modo `aplicar` (`--include-all`, com a confirmação `aplicar-<sha7>`). `--include-all` aplica **todas** as migrations pendentes da ref, não só a mais recente: o conjunto é o que o dry-run lista. Merge na `main` não aplica nada sozinho. Nunca aplique manualmente.
