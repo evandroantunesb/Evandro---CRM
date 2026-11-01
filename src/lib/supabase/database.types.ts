@@ -2991,6 +2991,47 @@ export type Database = {
           },
         ];
       };
+      obra_engenharia_passo_registros: {
+        Row: {
+          acao: string;
+          autor_membro_id: string | null;
+          created_at: string;
+          empresa_id: string;
+          id: string;
+          obra_id: string;
+          observacao: string | null;
+          passo: number;
+        };
+        Insert: {
+          acao: string;
+          autor_membro_id?: string | null;
+          created_at?: string;
+          empresa_id: string;
+          id?: string;
+          obra_id: string;
+          observacao?: string | null;
+          passo: number;
+        };
+        Update: {
+          acao?: string;
+          autor_membro_id?: string | null;
+          created_at?: string;
+          empresa_id?: string;
+          id?: string;
+          obra_id?: string;
+          observacao?: string | null;
+          passo?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "obra_engenharia_passo_registros_empresa_id_obra_id_fkey";
+            columns: ["empresa_id", "obra_id"];
+            isOneToOne: false;
+            referencedRelation: "obras";
+            referencedColumns: ["empresa_id", "id"];
+          },
+        ];
+      };
       obra_engenharia_protocolo_arquivos: {
         Row: {
           caminho: string;
@@ -5912,6 +5953,10 @@ export type Database = {
           isOneToOne: true;
           isSetofReturn: false;
         };
+      };
+      registrar_passo_engenharia: {
+        Args: { p_acao: string; p_obra_id: string; p_observacao?: string; p_passo: number };
+        Returns: string;
       };
       registrar_protocolo_engenharia: {
         Args: {

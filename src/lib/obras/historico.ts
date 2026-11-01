@@ -44,7 +44,17 @@ const ROTULO_TIPO: Record<string, string> = {
   vistoria_engenharia_solicitada: "Vistoria solicitada",
   vistoria_engenharia_atualizada: "Vistoria atualizada",
   engenharia_concluida_excecao: "Engenharia concluída sem conexão",
+  passo_engenharia_registrado: "Passo da Engenharia",
 };
+
+// Passos com registro e ações (mesmos de `engenharia-passos-regras`, sem importar regra de tela).
+const ROTULO_PASSO_ENGENHARIA: Record<string, string> = {
+  "2": "Enquadrar sistema",
+  "3": "Conferir dados técnicos",
+  "5": "Revisar para protocolo",
+  "7": "Tratar condições de conexão",
+};
+const ROTULO_ACAO_PASSO: Record<string, string> = { confirmado: "concluído", reaberto: "reaberto", nao_se_aplica: "não se aplica" };
 
 // Situações e registros do protocolo (mesmos de `engenharia-protocolos-regras`, sem importar regra de tela).
 const ROTULO_PROTOCOLO: Record<string, string> = {
@@ -224,6 +234,13 @@ function descrever(linha: LinhaHistoricoObra, nomes: ReadonlyMap<string, string>
       return rotulo(ROTULO_REGISTRO_VISTORIA, ler(dados, "tipo")) ?? "Situação da vistoria alterada";
     case "engenharia_concluida_excecao":
       return "Concluída pelo administrador sem a conexão confirmada";
+    // A observação e o motivo do passo não aparecem.
+    case "passo_engenharia_registrado": {
+      const passo = ler(dados, "passo");
+      const nome = rotulo(ROTULO_PASSO_ENGENHARIA, typeof passo === "number" ? String(passo) : passo) ?? "Passo";
+      const acao = rotulo(ROTULO_ACAO_PASSO, ler(dados, "acao"));
+      return acao ? `${nome}: ${acao}` : nome;
+    }
     default:
       return "Evento registrado";
   }
