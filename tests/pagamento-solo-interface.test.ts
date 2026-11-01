@@ -19,6 +19,7 @@ import { PagamentoSolo, type RegistroVisivel } from "@/app/(app)/negocios/[id]/p
 import { formatarDataIso, hojeEmSaoPaulo } from "@/lib/formatacao";
 import { descreverAtividade } from "@/lib/linha-do-tempo";
 import { filtrarLinhasVenda, marcosDaVenda, situacaoPagamentoVenda, type LinhaVenda } from "@/lib/venda";
+import { fichaInteira } from "./fonte-ficha";
 
 const fonte = (...partes: string[]) => readFileSync(join(__dirname, "..", ...partes), "utf8");
 const nomes = { etapa: (i: string) => i, origem: (i: string) => i, membro: (i: string) => i, motivo: (i: string) => i };
@@ -219,7 +220,7 @@ describe("cartão PagamentoSolo", () => {
 });
 
 describe("ficha do negócio: ligação do cartão", () => {
-  const page = fonte("src", "app", "(app)", "negocios", "[id]", "page.tsx");
+  const page = fichaInteira();
   const acoes = fonte("src", "lib", "acoes", "pagamentos.ts");
 
   it("dados de pagamento só para quem já vê contrato e pagamento (SDR fora)", () => {

@@ -17,6 +17,7 @@ import {
 } from "@/lib/anexos-regras";
 import { estadoSalvoDoKit } from "@/lib/kit-formulario";
 import { AVISOS_CRIACAO, avisosDaUrl, completarContato, montarEndereco } from "@/lib/negocio-dados";
+import { fichaInteira } from "./fonte-ficha";
 
 const fonte = (...partes: string[]) => readFileSync(join(__dirname, "..", ...partes), "utf8");
 
@@ -234,7 +235,7 @@ describe("regressões de tela", () => {
   });
 
   it("ficha confere o Storage e avisa quando não conseguiu conferir", () => {
-    const ficha = fonte("src", "app", "(app)", "negocios", "[id]", "page.tsx");
+    const ficha = fichaInteira();
     expect(ficha).toContain("conferirArquivos(supabase, negocio.empresa_id, id, anexos ?? [])");
     expect(ficha).toContain("!conferencia.conferido");
     expect(ficha).toContain("<RegistrarArquivo");
@@ -352,14 +353,14 @@ describe("regressões de tela", () => {
     const kit = fonte("src", "app", "(app)", "negocios", "[id]", "kit-personalizado.tsx");
     // O estado inicial vem de `estadoSalvoDoKit`, que usa os valores do negócio (testado acima).
     expect(kit).toContain("useState(() => salvo().valorFaturaMedio)");
-    const pagina = fonte("src", "app", "(app)", "negocios", "[id]", "page.tsx");
+    const pagina = fichaInteira();
     expect(pagina).toContain("consumoMedioKwhPadrao={negocio.consumo_medio_kwh}");
     expect(pagina).toContain("valorFaturaMedioPadrao={negocio.valor_conta_energia}");
   });
 
   it("endereço do contato é editável e aparece na ficha", () => {
     expect(fonte("src", "app", "(app)", "contatos", "[id]", "edicao.tsx")).toContain('name="endereco"');
-    expect(fonte("src", "app", "(app)", "negocios", "[id]", "page.tsx")).toContain("contato.endereco");
+    expect(fichaInteira()).toContain("contato.endereco");
   });
 
   it("ações delegam ao núcleo testado com banco", () => {

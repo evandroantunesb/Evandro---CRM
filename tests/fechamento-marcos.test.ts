@@ -17,6 +17,7 @@ import { AvisoReabertura, Fechamento } from "@/app/(app)/negocios/[id]/fechament
 import { MarcosVenda, proximoPassoDaVenda } from "@/app/(app)/negocios/[id]/marcos-venda";
 import { PROPOSTA_E_CONTRATO, pode } from "@/lib/permissoes";
 import type { Papel, StatusPagamentoContrato } from "@/lib/tipos";
+import { ABAS_FICHA, fichaInteira, fonteFicha } from "./fonte-ficha";
 import {
   avisoReabertura,
   cartaoFechamento,
@@ -300,7 +301,8 @@ describe("reabertura com confirmação", () => {
 });
 
 describe("ficha do negócio (fonte)", () => {
-  const page = fonte(...PASTA, "page.tsx");
+  // A ficha é dividida em página, dados, cabeçalho e abas: o que vale para a tela vale para os arquivos juntos.
+  const page = fichaInteira();
   const marcos = fonte(...PASTA, "marcos-venda.tsx");
 
   it("um único Fechamento na página: a ação de escrita não é duplicada", () => {
@@ -329,7 +331,8 @@ describe("ficha do negócio (fonte)", () => {
 });
 
 describe("ficha do negócio: posição do cartão de fechamento (jornada da venda)", () => {
-  const page = fonte(...PASTA, "page.tsx");
+  // A página monta cabeçalho, fechamento, navegação e uma aba por vez; cada aba vive no seu arquivo (ABAS_FICHA).
+  const page = fonteFicha("page.tsx");
   const inicioJsx = page.indexOf("\n  return (\n");
   const jsx = page.slice(inicioJsx);
   const pos = (trecho: string) => {
@@ -337,52 +340,58 @@ describe("ficha do negócio: posição do cartão de fechamento (jornada da vend
     expect(i, trecho).toBeGreaterThanOrEqual(0);
     return i;
   };
-  const CARTOES_DAS_ABAS = [
-    '<CartaoRecolhivel titulo="Oportunidade"',
-    '<Cartao titulo="Kit personalizado">',
-    '<CartaoRecolhivel titulo="Perfil do lead"',
-    '<Cartao titulo="Contrato">',
-    '<Cartao titulo="Tarefas">',
-    '<Cartao titulo="Notas e linha do tempo">',
-    '<Cartao titulo="Contato">',
-    '<Cartao titulo="Etiquetas">',
-    "<Cartao titulo={`Arquivos",
+  const COMPONENTE_DA_ABA = { visao: "AbaVisao", sistema: "AbaSistema", proposta: "AbaProposta", atividades: "AbaAtividades", arquivos: "AbaArquivos" };
+  // Cartão → aba onde ele aparece.
+  const CARTOES_DAS_ABAS: [string, keyof typeof ABAS_FICHA][] = [
+    ['<CartaoRecolhivel titulo="Oportunidade"', "visao"],
+    ['<Cartao titulo="Kit personalizado">', "sistema"],
+    ['<CartaoRecolhivel titulo="Perfil do lead"', "visao"],
+    ['<Cartao titulo="Contrato">', "proposta"],
+    ['<Cartao titulo="Tarefas">', "atividades"],
+    ['<Cartao titulo="Notas e linha do tempo">', "atividades"],
+    ['<Cartao titulo="Contato">', "visao"],
+    ['<Cartao titulo="Etiquetas">', "visao"],
+    ["<Cartao titulo={`Arquivos", "arquivos"],
   ];
 
   it("celular e computador: o cartão de fechamento vem logo após o cabeçalho, antes das abas e de todos os outros cartões", () => {
     expect(inicioJsx).toBeGreaterThan(0);
     const fechamento = pos("<Cartao titulo={cartao.titulo}>");
-    expect(fechamento).toBeGreaterThan(pos("</header>"));
+    expect(fechamento).toBeGreaterThan(pos("<Cabecalho "));
     expect(fechamento).toBeLessThan(pos('aria-label="Seções do negócio"'));
-    for (const c of CARTOES_DAS_ABAS) expect(fechamento, c).toBeLessThan(pos(c));
+    for (const a of Object.keys(COMPONENTE_DA_ABA)) expect(fechamento, a).toBeLessThan(pos(`{aba === "${a}" && <`));
     expect(jsx.slice(0, fechamento).match(/<Cartao(Recolhivel)?\b/g)).toBeNull();
+    // Os cartões das abas não ficam na página nem no cabeçalho: só dentro da aba.
+    for (const [c] of CARTOES_DAS_ABAS) expect(page, c).not.toContain(c);
+    expect(fonteFicha("cabecalho.tsx")).not.toMatch(/<Cartao(Recolhivel)?\b/);
   });
 
   it("cada aba renderiza só os seus cartões", () => {
-    const abas = ["visao", "sistema", "proposta", "atividades", "arquivos"].map((a) => ({ a, i: pos(`{aba === "${a}" && (`) }));
-    const abaDe = (trecho: string) => abas.filter(({ i }) => i < pos(trecho)).at(-1)?.a;
-    expect(abaDe('<CartaoRecolhivel titulo="Oportunidade"')).toBe("visao");
-    expect(abaDe('<CartaoRecolhivel titulo="Perfil do lead"')).toBe("visao");
-    expect(abaDe('<Cartao titulo="Contato">')).toBe("visao");
-    expect(abaDe('<Cartao titulo="Kit personalizado">')).toBe("sistema");
-    expect(abaDe('<Cartao titulo="Contrato">')).toBe("proposta");
-    expect(abaDe('<Cartao titulo="Tarefas">')).toBe("atividades");
-    expect(abaDe("<Cartao titulo={`Arquivos")).toBe("arquivos");
+    for (const [a, componente] of Object.entries(COMPONENTE_DA_ABA)) expect(page).toContain(`{aba === "${a}" && <${componente} ficha={ficha}`);
+    for (const [cartao, aba] of CARTOES_DAS_ABAS)
+      for (const [a, arquivo] of Object.entries(ABAS_FICHA))
+        if (a === aba) expect(fonteFicha(arquivo), `${cartao} em ${a}`).toContain(cartao);
+        else expect(fonteFicha(arquivo), `${cartao} fora de ${a}`).not.toContain(cartao);
   });
 
   it("arquivamento: uma única instância, no topo quando arquivado e no fim da Visão geral quando não", () => {
+    expect(fichaInteira().match(/<Arquivamento\b/g)).toHaveLength(1);
     expect(page.match(/<Arquivamento\b/g)).toHaveLength(1);
     expect(pos("{arquivado && arquivamento}")).toBeLessThan(pos("<Cartao titulo={cartao.titulo}>"));
-    expect(pos("{!arquivado && arquivamento}")).toBeGreaterThan(pos('{aba === "visao" && ('));
-    expect(pos("{!arquivado && arquivamento}")).toBeLessThan(pos('{aba === "sistema" && ('));
+    // Sem arquivar, a mesma instância vai à Visão geral, no fim da coluna lateral (depois de contato e etiquetas).
+    expect(page).toContain('{aba === "visao" && <AbaVisao ficha={ficha} arquivamento={!arquivado && arquivamento} />}');
+    const visao = fonteFicha(ABAS_FICHA.visao);
+    expect(visao.match(/\{arquivamento\}/g)).toHaveLength(1);
+    expect(visao.indexOf("{arquivamento}")).toBeGreaterThan(visao.indexOf('<Cartao titulo="Etiquetas">'));
   });
 
   it("uma única instância do cartão e das ações, sem versões escondidas por CSS", () => {
-    expect(page.match(/<Cartao titulo=\{cartao\.titulo\}>/g)).toHaveLength(1);
-    expect(page.match(/<MarcosVenda\b/g)).toHaveLength(1);
-    expect(page.match(/<Fechamento\b/g)).toHaveLength(1);
-    expect(page.match(/\{fechamento\}/g)).toHaveLength(1);
-    expect(page).not.toMatch(/\b(lg|md|sm|xl):hidden\b/);
-    expect(page).not.toMatch(/\bhidden (lg|md|sm|xl):(block|flex|grid)\b/);
+    const ficha = fichaInteira();
+    expect(ficha.match(/<Cartao titulo=\{cartao\.titulo\}>/g)).toHaveLength(1);
+    expect(ficha.match(/<MarcosVenda\b/g)).toHaveLength(1);
+    expect(ficha.match(/<Fechamento\b/g)).toHaveLength(1);
+    expect(ficha.match(/\{fechamento\}/g)).toHaveLength(1);
+    expect(ficha).not.toMatch(/\b(lg|md|sm|xl):hidden\b/);
+    expect(ficha).not.toMatch(/\bhidden (lg|md|sm|xl):(block|flex|grid)\b/);
   });
 });
