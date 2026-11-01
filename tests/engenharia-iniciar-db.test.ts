@@ -23,6 +23,7 @@ let empresaB: string;
 const membro: Record<string, string> = {};
 let obra: string;
 let obraCorrida: string;
+let obraApoio: string;
 
 async function criarVenda(emp: string, responsavel: Usuario, confirmador: Usuario, titulo: string): Promise<string> {
   const { data: f } = await servico.from("funis").select("id").eq("empresa_id", emp).single();
@@ -117,6 +118,7 @@ describe("Engenharia: iniciar atuação (ordem importa)", { concurrent: false, s
 
     obra = await criarVenda(empresa, vendedor, admin, `Iniciar ${sufixo}`);
     obraCorrida = await criarVenda(empresa, vendedor, admin, `Iniciar corrida ${sufixo}`);
+    obraApoio = await criarVenda(empresa, vendedor, admin, `Iniciar apoio ${sufixo}`);
   });
 
   it("a obra nova aparece para quem atua na Engenharia, sem o contato do cliente; Compras e outra empresa não veem", async () => {
@@ -164,5 +166,20 @@ describe("Engenharia: iniciar atuação (ordem importa)", { concurrent: false, s
     expect([a.error, b.error].filter((e) => e === null)).toHaveLength(1);
     expect([a.error, b.error].find((e) => e !== null)?.message).toMatch(/já foi iniciada/);
     expect(await principais(obraCorrida)).toHaveLength(1);
+  });
+
+  it("quem já é responsável (não principal) na obra recebe a mensagem própria, e nada muda", async () => {
+    const { error } = await admin.cliente.rpc("atribuir_participante_obra", {
+      p_obra_id: obraApoio,
+      p_membro_id: membro[eng2.id],
+      p_setor: "engenharia",
+      p_funcao: "responsavel",
+      p_principal: false,
+    });
+    if (error) throw error;
+    const r = await iniciar(eng2, obraApoio);
+    expect(r.error?.message).toMatch(/já está nesta obra como responsável/);
+    expect(await principais(obraApoio)).toHaveLength(0);
+    expect(await etapa(obraApoio)).toBe("a_iniciar");
   });
 });
