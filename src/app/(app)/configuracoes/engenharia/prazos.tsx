@@ -1,11 +1,11 @@
 "use client";
 
 import { useActionState } from "react";
-import { Botao, Mensagem } from "@/components/ui";
+import { Botao, CLASSE_ENTRADA, Mensagem } from "@/components/ui";
 import { MARCO_PRAZO, ROTULO_PRAZO, type ChavePrazo } from "@/lib/engenharia-prazos-regras";
 import { adicionarFeriado, removerFeriado, salvarPrazos } from "./actions";
 
-const entrada = "min-w-0 rounded-md border border-zinc-300 px-3 py-1.5 text-sm";
+const entrada = `min-w-0 text-sm ${CLASSE_ENTRADA}`;
 
 /** Dias úteis de cada prazo. Vazio = sem prazo. */
 export function FormPrazos({ grupos }: { grupos: { titulo: string; ajuda: string; prazos: { chave: ChavePrazo; diasUteis: number | null }[] }[] }) {

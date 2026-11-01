@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
-import { Botao, CLASSE_ENTRADA, Mensagem, Selo } from "@/components/ui";
+import { ChevronDown } from "lucide-react";
+import { useActionState, useEffect, useState, type ReactNode } from "react";
+import { Botao, CLASSE_ENTRADA, FOCO, Mensagem, Selo } from "@/components/ui";
 import { registrarPassoEngenharia } from "@/lib/acoes/engenharia";
 import {
   ROTULO_ACAO_PASSO,
@@ -181,5 +182,57 @@ function FormPasso({ obraId, passo, acao, fechar }: { obraId: string; passo: Pas
         {resultado && !resultado.ok && <Mensagem resultado={resultado} />}
       </div>
     </form>
+  );
+}
+
+/**
+ * Seção de um passo no card, no visual do `CartaoRecolhivel`: só o passo atual vem aberto; os outros mostram número,
+ * nome e status numa linha e abrem com um toque. O link `#passo-N` (barra dos passos) abre a seção. O aberto e fechado
+ * fica com quem usa: registrar um passo muda o passo atual, mas não fecha a seção em que a pessoa está.
+ */
+export function SecaoPasso({
+  passo,
+  titulo,
+  aberto,
+  children,
+}: {
+  passo: PassoVM;
+  titulo: string;
+  aberto: boolean;
+  children: ReactNode;
+}) {
+  const id = `passo-${passo.numero}`;
+  const [aberta, setAberta] = useState(aberto);
+  useEffect(() => {
+    const abrirPeloLink = () => {
+      if (window.location.hash === `#${id}`) setAberta(true);
+    };
+    // Na carga com `#passo-N` no endereço e a cada toque na barra dos passos.
+    const quadro = requestAnimationFrame(abrirPeloLink);
+    window.addEventListener("hashchange", abrirPeloLink);
+    return () => {
+      cancelAnimationFrame(quadro);
+      window.removeEventListener("hashchange", abrirPeloLink);
+    };
+  }, [id]);
+
+  return (
+    <section id={id} className="painel scroll-mt-4">
+      <details open={aberta} onToggle={(e) => setAberta(e.currentTarget.open)} className="group">
+        <summary
+          className={`flex min-h-16 cursor-pointer list-none items-center gap-3 rounded-2xl px-5 py-4 md:px-6 [&::-webkit-details-marker]:hidden ${FOCO}`}
+        >
+          <div className="min-w-0 flex-1">
+            <h2 className="text-lg font-semibold tracking-tight text-texto">{titulo}</h2>
+            <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-texto-2">
+              <Selo tom={TOM_PASSO[passo.status]}>{ROTULO_STATUS_PASSO[passo.status]}</Selo>
+              {passo.detalhe && <span>{passo.detalhe}</span>}
+            </p>
+          </div>
+          <ChevronDown size={18} aria-hidden className="shrink-0 text-texto-2 transition-transform duration-200 ease-raion group-open:rotate-180" />
+        </summary>
+        <div className="px-5 pb-5 md:px-6 md:pb-6">{children}</div>
+      </details>
+    </section>
   );
 }

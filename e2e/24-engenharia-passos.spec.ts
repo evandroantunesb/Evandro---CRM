@@ -16,6 +16,11 @@ test("executor vê os oito passos, confirma o enquadramento e reabre com motivo"
   await expect(passos.getByRole("listitem")).toHaveCount(8);
   await expect(page.getByText(/^Etapa \d de 8 · /).or(page.getByText("Todos os passos concluídos"))).toBeVisible();
 
+  // Só o passo atual vem aberto (nenhum, com todos concluídos); o histórico vem fechado.
+  const todosConcluidos = await page.getByText("Todos os passos concluídos").isVisible();
+  await expect(page.locator('section[id^="passo-"] > details[open]')).toHaveCount(todosConcluidos ? 0 : 1);
+  await expect(page.locator("details").filter({ has: page.getByRole("heading", { name: "Histórico" }) })).not.toHaveAttribute("open");
+
   const passo2 = page.locator("#passo-2");
   await passos.getByRole("link", { name: /^2\. Enquadrar sistema/ }).click();
   await expect(page).toHaveURL(/#passo-2$/);

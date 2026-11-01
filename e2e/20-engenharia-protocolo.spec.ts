@@ -1,5 +1,5 @@
 import { expect, test, type Locator } from "@playwright/test";
-import { entrarComo, lerBase } from "./ajuda";
+import { abrirTodosPassos, entrarComo, lerBase } from "./ajuda";
 
 const cartao = (page: import("@playwright/test").Page, titulo: string): Locator =>
   page.locator("section").filter({ has: page.getByRole("heading", { name: titulo, level: 2 }) });
@@ -11,6 +11,7 @@ test("admin registra o protocolo depois do checklist, recebe exigência e reenvi
   const { usuarios, senha, obras } = lerBase();
   await entrarComo(page, usuarios.admin, senha);
   await page.goto(`/engenharia/${obras.o11}`);
+  await abrirTodosPassos(page);
 
   const protocolo = cartao(page, "Protocolo na concessionária");
   await expect(protocolo.getByText("Aplique o checklist")).toBeVisible();

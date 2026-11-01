@@ -1,11 +1,11 @@
 "use client";
 
 import { useActionState } from "react";
-import { Botao, Mensagem } from "@/components/ui";
+import { Botao, CLASSE_ENTRADA, Mensagem } from "@/components/ui";
 import { PERGUNTAS_ENQUADRAMENTO, textoCondicoes, type CondicoesItem } from "@/lib/engenharia-enquadramento-regras";
 import { criarItemModelo, editarItemModelo, salvarCondicoesModelo } from "./actions";
 
-const entrada = "min-w-0 rounded-md border border-zinc-300 px-3 py-1.5 text-sm";
+const entrada = `min-w-0 text-sm ${CLASSE_ENTRADA}`;
 
 export type ItemModelo = { id: string; grupo: string; titulo: string; obrigatorio: boolean; ordem: number; ativo: boolean; condicoes: CondicoesItem };
 
