@@ -1,8 +1,8 @@
 # Estado do projeto — Raion CRM
 
-## Engenharia em Obras — P1 a P1.6 integradas em 2026-10-29; P2 a P5 em 2026-10-30; P6a e P6b em 2026-10-31
+## Engenharia em Obras — P1 a P1.6 integradas em 2026-10-29; P2 a P5 em 2026-10-30; P6a e P6b em 2026-10-31; P6c e novo fluxo (#270, #271) em 2026-11-01
 
-`main` em `465ac2b` (merge da #267). **Produção e `main` alinhadas** (última `20261101100000_engenharia_passos.sql`).
+`main` em `d26a42e` (merge da #276). **Produção e `main` alinhadas** (última `20261102120000_seguranca_funcoes_sem_login.sql`).
 
 | PR | O que entrou |
 | --- | --- |
@@ -75,6 +75,33 @@ Na central `/engenharia`, a carteira alterna entre Lista e Kanban (`?carteira=ka
 - **Lição:** o disparo do `aplicar` pelo agente foi bloqueado pelo controle de permissões do Claude Code (deploy de produção); o Evandro disparou pelo GitHub. No formulário, `sha` é o hash de 40 caracteres, não o link do run.
 - Testes: `tests/engenharia-passos-db.test.ts`, `tests/engenharia-passos-regras.test.ts`, `e2e/24-engenharia-passos.spec.ts`.
 
+### P6c — enquadramento da obra e checklist condicional (#269)
+
+**Migration `20261101120000_engenharia_enquadramento.sql` aplicada em produção em 01/11/2026** (tag `migracao-pr269-46e530a`; conferir + aplicar aprovados pelo Evandro; o aplicar só aplicou ela). #269 mesclada em 01/11 (`9cc7360`), head `46e530a`.
+
+- **Passo 2:** ficha de enquadramento da spec v1.3 (seção 24.1: tipo de solicitação, categoria, faixa, instalação, modalidade SCEE, titularidade, obra de rede, inversor verificado, situação ambiental; potências opcionais), com os dados do kit ao lado. Confirmar o passo exige todas as perguntas de opção respondidas; mudar a ficha depois devolve o passo a "necessita revisão".
+- **Checklist condicional:** cada item do modelo tem "Condições" (só admin, em Configurações → Engenharia); sem condição vale sempre. **Nenhuma regra da Copel vem pronta.** Decisões E1–E4 (31/10): aplicar copia só o que vale (sem ficha, tudo); salvar a ficha com checklist aplicado acrescenta o que passou a valer e marca "não se aplica — Fora do enquadramento" os pendentes que deixaram de valer (voltam se valerem de novo); item válido ou dispensado não muda.
+- Escrita só pela RPC `salvar_enquadramento_engenharia`. Testes: `tests/engenharia-enquadramento-*`, `e2e/24-engenharia-passos.spec.ts`.
+
+### Novo fluxo da Engenharia (protótipo aprovado em 01/11) — #270 e #271
+
+Protótipo no canvas "Engenharia — novo fluxo" (artifact do Evandro): Central com "Novas obras" e "Iniciar atuação", card curto com passos em cascata. Entregue em duas PRs empilhadas, ambas mescladas em 01/11:
+
+- **#270** (mesclada em `93441c5`, sem migration): card com só o passo atual aberto e os passos seguintes apagados (cascata), dados da venda no topo, histórico recolhido; Central e Configurações › Engenharia no visual novo.
+- **#271** (mesclada em `53e4e06`, head `1491fe6`; **migration `20261102100000_engenharia_iniciar_atuacao.sql` aplicada em produção em 01/11/2026**, tag `migracao-pr271-1491fe6`, conferir + aplicar aprovados pelo Evandro, só ela): quem atua na Engenharia vê as obras em curso sem responsável principal ("Novas obras", também na carteira com "Sem responsável") e assume pela RPC `iniciar_atuacao_engenharia` (vira principal; "A iniciar" → "Projeto em elaboração"; obra travada, só um leva). Indicador "Novas obras" próprio, fora de "Precisam de você" (decisão do Evandro, 01/11). Admin e coordenador continuam com "Definir responsável". `MIGRATIONS_AUTORIZADAS` só com ela. E2E 18 e 24 passam a escolher a primeira obra **com responsável**.
+- **Lição:** os disparos de produção e os merges feitos pelo agente foram bloqueados pelo controle de permissões do Claude Code na primeira tentativa e passaram depois da autorização explícita do Evandro para aquela execução. A base da #271 foi trocada para `main` antes do merge; o CI não roda de novo na troca, então conferiu-se que a árvore da `main` era idêntica à base testada.
+- Sem E2E do clique em "Iniciar atuação" (coberto por `tests/engenharia-iniciar-db.test.ts`).
+
+## Adoção seletiva do vibe-coding-toolkit — Etapas 1 a 4 em 2026-11-01
+
+Só quatro peças do [vibe-coding-toolkit](https://github.com/soumatheusgomes/vibe-coding-toolkit) (commit `21b71b6`, MIT); o processo do Raion (CLAUDE.md, AGENTS.md, Aurora) prevalece. Etapas 1 a 3 sem migration; CI pós-merge verde.
+
+- **Etapa 1 — #273** (`173036d`): regras `quality/max-lines` (350), `quality/no-direct-console` e `quality/no-direct-data-access` em `eslint-rules/` (cópia do toolkit com aviso MIT), todas em **aviso**; o CI não usa `--max-warnings`. Acesso a dados adaptado ao Raion: cliente Supabase cru só em `src/lib/supabase`; `admin` (service_role) em `src/app` só nas rotas por token, `api/` e `(app)/perfil/page.tsx`; `src/components` sem cliente de servidor nem admin. Linha de base: 29 arquivos acima de 350 linhas, 9 `console` diretos, 0 acessos indevidos.
+- **Etapa 2 — #274** (`bf013bd`): `negocios/[id]/page.tsx` (1235 linhas) dividido em página (179), `dados-ficha.ts`, `cabecalho.tsx`, `edicao-dados.tsx` e um arquivo por aba, sem mudar comportamento. Novo `e2e/25-ficha-negocio-abas.spec.ts`; testes que liam `page.tsx` como texto usam `tests/fonte-ficha.ts` (normaliza CRLF). Os outros 28 arquivos grandes viram PRs futuras, uma por vez.
+- **Etapa 3 — #275** (`e7f62e9`): skill `supabase-postgres-best-practices` (supabase/agent-skills `c9be0e9`, v1.1.1, MIT) no projeto para Claude Code e Codex (`skills@1.7.4 --copy`, `skills-lock.json`, `THIRD_PARTY_NOTICES.md`); linha no AGENTS.md. A cópia global do Evandro foi mantida (decisão dele). Teste: revisão da migration `20261102100000` — achado a corrigir em PR futura: o `exception when unique_violation` de `iniciar_atuacao_engenharia` cobre a função inteira e pode devolver mensagem errada (migration nova, com autorização).
+- **Etapa 4** (revisão de segurança de RLS, só leitura; relatório só na conversa com o Evandro, sem issue pública). Correção dos dois achados principais na **#276** (mesclada em `d26a42e`, head `46db124`; **migration `20261102120000_seguranca_funcoes_sem_login.sql` aplicada em produção em 01/11/2026**, tag `migracao-pr276-46db124`, conferir + aplicar aprovados pelo Evandro, só ela): `decidir_atribuicao_lead` e `expirar_atribuicoes_leads` saem da API (decisão só por `aprovar_atribuicao_lead`, que confere admin/gestor, e expiração só pelo pg_cron); nenhuma função do projeto em `public` executa por `PUBLIC`/`anon`, inclusive as que as próximas migrations criarem (privilégios padrão). `authenticated` e `service_role` sem mudança. Teste `tests/seguranca-funcoes-sem-login-db.test.ts`. **Migration nova que precise de função chamável sem login deve conceder `EXECUTE` a `anon` explicitamente.** Os demais achados, de menor gravidade, seguem com o Evandro e viram PRs futuras com autorização.
+- **Ambiente local (Windows):** `pnpm install` em worktree novo pode travar; o Turbopack recusa `node_modules` por junção (o lint aceita). O verify.mjs do toolkit não foi executado (script baixado; bloqueado pelo controle de permissões).
+
 ## T3 — tarefas automáticas de setor (#264) — concluída em 2026-10-31
 
 Autorizada pelo Evandro em 30/10 ("comece a T3 direto"). Regras por empresa em **Configurações → Tarefas automáticas** (admin cria, edita e desativa; sem exclusão): quando o setor X da obra chega ao status Y, nasce uma tarefa de setor (`origem = 'automatica'`, sem "quem pediu") para o setor Z, uma vez por obra e regra (nunca de novo, mesmo cancelada ou com o status voltando). Toda empresa nasce com as duas regras do Evandro. Trigger em `obra_fluxos` (pega todas as RPCs que mudam status); obra cancelada não recebe; obras que já passaram do status antes da migration não recebem nada.
@@ -103,7 +130,7 @@ Autorizada pelo Evandro em 30/10 ("comece a T3 direto"). Regras por empresa em *
 
 **Próximos passos (aguardam comando do Evandro):**
 1. **T3 — tarefas automáticas:** entregue e em produção (seção "T3" acima).
-2. **Engenharia em Obras:** P1 a P1.6, P2 (checklist e documentos), P3 (protocolos, exigências e trava de etapa) e P4 (vistoria, medição e conexão) entregues e em produção (seção "Engenharia em Obras" acima). Já decidido no P2: item obrigatório só é dispensado por admin ou coordenador; sem segundo revisor por enquanto; o modelo Copel de 11 itens ainda deve ser revisado com o responsável técnico. **P5** (prazos em dias úteis e indicadores) entregue na #263 e em produção. **P6a** (Kanban da carteira, #266) e **P6b** (oito passos guiados, #267) em produção. Próximo: **P6c**, checklist condicional configurável pelo admin (perguntas de enquadramento exigidas no passo 2), aprovado pelo Evandro em 31/10. Pendências e agenda da Engenharia continuam reutilizando `tarefas_setor`.
+2. **Engenharia em Obras:** P1 a P1.6, P2 (checklist e documentos), P3 (protocolos, exigências e trava de etapa) e P4 (vistoria, medição e conexão) entregues e em produção (seção "Engenharia em Obras" acima). Já decidido no P2: item obrigatório só é dispensado por admin ou coordenador; sem segundo revisor por enquanto; o modelo Copel de 11 itens ainda deve ser revisado com o responsável técnico. **P5** (prazos em dias úteis e indicadores) entregue na #263 e em produção. **P6a** (Kanban da carteira, #266), **P6b** (oito passos guiados, #267) e **P6c** (enquadramento e checklist condicional, #269) em produção. **Novo fluxo** do protótipo de 01/11 (#270 e #271) em produção. Pendências e agenda da Engenharia continuam reutilizando `tarefas_setor`.
 3. CNH com preenchimento automático dos dados do cliente (3b); endereço estruturado na ficha do contato (junto da #239).
 4. PRs #234 e #239 precisam de rebase na `main`.
 
