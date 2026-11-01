@@ -38,8 +38,8 @@ const simNao = (v: boolean | null) => (v === true ? "Sim" : v === false ? "Não"
 function Info({ rotulo, valor }: { rotulo: string; valor: string }) {
   return (
     <div className="flex flex-col">
-      <dt className="text-xs text-zinc-500">{rotulo}</dt>
-      <dd className="text-sm text-zinc-800">{valor}</dd>
+      <dt className="text-xs text-texto-2">{rotulo}</dt>
+      <dd className="text-sm text-texto">{valor}</dd>
     </div>
   );
 }
@@ -56,15 +56,15 @@ function Item({ o, agoraMs }: { o: OportunidadePendente; agoraMs: number }) {
   const local = [o.contato_cidade, o.contato_uf].filter(Boolean).join("/");
 
   return (
-    <li className="flex flex-col gap-3 border-b border-zinc-100 py-3 last:border-0">
+    <li className="flex flex-col gap-3 border-b border-linha py-3 last:border-0">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="flex min-w-0 flex-col">
-          <span className="text-sm font-medium text-zinc-900">Negócio #{o.negocio_numero}</span>
-          <span className="text-sm text-zinc-600">
+          <span className="text-sm font-medium text-texto">Negócio #{o.negocio_numero}</span>
+          <span className="text-sm text-texto-2">
             {o.contato_nome}
             {local && ` · ${local}`}
           </span>
-          <span className="text-xs text-zinc-500">
+          <span className="text-xs text-texto-2">
             {o.sdr_nome ?? "SDR"} → {o.destinatario_nome ?? "vendedor"} · aguardando {tempoDesde(o.enviado_em, agoraMs)}
           </span>
         </div>
@@ -103,12 +103,12 @@ function Item({ o, agoraMs }: { o: OportunidadePendente; agoraMs: number }) {
           {resultadoAceite && <Mensagem resultado={resultadoAceite} />}
         </div>
       ) : (
-        <form action={acaoDevolver} className="flex flex-col gap-2 rounded-lg border border-zinc-200 p-3">
+        <form action={acaoDevolver} className="flex flex-col gap-2 rounded-lg border border-linha p-3">
           <input type="hidden" name="handoffId" value={o.handoff_id} />
           <input type="hidden" name="negocioId" value={o.negocio_id} />
           <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-zinc-700">Motivo da devolução</span>
-            <textarea name="motivo" rows={2} required className="rounded-lg border border-zinc-200 px-3 py-2 text-sm" />
+            <span className="font-medium text-texto">Motivo da devolução</span>
+            <textarea name="motivo" rows={2} required className="rounded-lg border border-linha px-3 py-2 text-sm" />
           </label>
           <div className="flex flex-wrap items-center gap-2">
             <Botao type="submit" variante="primario" disabled={pendenteDevolver}>
