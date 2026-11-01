@@ -7,7 +7,7 @@ import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAt
  * Ação principal = Dourado Solar com texto carvão. Alvo de toque ≥ 44 px no celular.
  */
 
-const FOCO = "outline-none focus-visible:ring-2 focus-visible:ring-dourado/60 focus-visible:ring-offset-2 focus-visible:ring-offset-fundo";
+export const FOCO = "outline-none focus-visible:ring-2 focus-visible:ring-dourado/60 focus-visible:ring-offset-2 focus-visible:ring-offset-fundo";
 
 export function Botao({
   variante = "primario",

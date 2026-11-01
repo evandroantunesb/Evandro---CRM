@@ -1,7 +1,8 @@
+import { AlarmClock, BellRing, CalendarX, CirclePause, HardHat, Hourglass, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { ListaTarefasSetor } from "@/components/tarefas-setor";
-import { Cartao, Selo } from "@/components/ui";
+import { Cartao, CartaoRecolhivel, Selo } from "@/components/ui";
 import { carregarChecklistsAptos } from "@/lib/engenharia-checklist";
 import {
   diasDesde,
@@ -53,11 +54,14 @@ const ha = (desde: string | null) => {
 
 type VisaoCarteira = "lista" | "kanban";
 
-/** Link da Central guardando a visão da carteira e o período dos indicadores (padrões ficam fora da URL). */
-const hrefCentral = ({ carteira, periodo }: { carteira: VisaoCarteira; periodo: PeriodoIndicadores }) => {
+/**
+ * Link da Central guardando a visão da carteira e o período dos indicadores (padrões ficam fora da URL). `comPeriodo`
+ * põe o período mesmo no padrão: é o que mantém o Desempenho aberto depois de trocar o período.
+ */
+const hrefCentral = ({ carteira, periodo, comPeriodo = false }: { carteira: VisaoCarteira; periodo: PeriodoIndicadores; comPeriodo?: boolean }) => {
   const q = new URLSearchParams();
   if (carteira === "kanban") q.set("carteira", "kanban");
-  if (periodo !== 30) q.set("periodo", String(periodo));
+  if (comPeriodo || periodo !== 30) q.set("periodo", String(periodo));
   return q.size ? `/engenharia?${q}` : "/engenharia";
 };
 
@@ -135,7 +139,8 @@ export default async function Engenharia({ searchParams }: PageProps<"/engenhari
 
   return (
     <div className="mx-auto flex max-w-[1100px] flex-col gap-4">
-      <div>
+      <div className="flex flex-col gap-1">
+        <p className="sobretitulo">Obras · Engenharia</p>
         <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Engenharia</h1>
         <p className="text-sm text-zinc-500">O que precisa de você hoje, o que espera terceiros e as obras por etapa do projeto.</p>
         {atual.papel === "operacao" && (
@@ -168,6 +173,7 @@ export default async function Engenharia({ searchParams }: PageProps<"/engenhari
           prazos={prazos ?? new Map()}
           indicadores={indicadores ?? null}
           periodo={periodo}
+          desempenhoAberto={periodoBruto != null}
           carteira={carteira}
           protocolos={protocolos ?? new Map()}
           checklistsAptos={checklistsAptos ?? new Set()}
@@ -190,6 +196,7 @@ function Central({
   prazos,
   indicadores,
   periodo,
+  desempenhoAberto,
   carteira,
   protocolos,
   checklistsAptos,
@@ -205,6 +212,7 @@ function Central({
   prazos: ReadonlyMap<string, PrazoObra[]>;
   indicadores: IndicadoresEngenharia | null;
   periodo: PeriodoIndicadores;
+  desempenhoAberto: boolean;
   carteira: VisaoCarteira;
   protocolos: ReadonlyMap<string, readonly StatusProtocolo[]>;
   checklistsAptos: ReadonlySet<string>;
@@ -223,25 +231,31 @@ function Central({
   // Como a carteira, vem do banco: obras em curso com algum prazo vencido, sem o limite de linhas da lista.
   const prazosVencidos = [...prazos.values()].filter((lista) => lista.some((p) => p.diasRestantes < 0)).length;
 
-  const numeros: [string, number][] = [
+  const numeros: [string, number, LucideIcon][] = [
     // Carteira e paradas vêm do banco (sem o limite de linhas da lista); se ele falhar, contam a lista.
-    ["Obras na Engenharia", indicadores?.carteira.total ?? totalObras],
-    ["Precisam de você", tarefasMinhas.length + acoes.length],
-    ["Aguardando terceiros", comTerceiros.length],
-    ["Paradas", indicadores?.carteira.paradas ?? paradas],
-    ["Prazos vencidos", prazosVencidos],
-    ["Tarefas atrasadas", atrasadas],
+    ["Obras na Engenharia", indicadores?.carteira.total ?? totalObras, HardHat],
+    ["Precisam de você", tarefasMinhas.length + acoes.length, BellRing],
+    ["Aguardando terceiros", comTerceiros.length, Hourglass],
+    ["Paradas", indicadores?.carteira.paradas ?? paradas, CirclePause],
+    ["Prazos vencidos", prazosVencidos, CalendarX],
+    ["Tarefas atrasadas", atrasadas, AlarmClock],
   ];
 
   return (
     <>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        {numeros.map(([rotulo, valor]) => (
-          <div key={rotulo} className="rounded-xl border border-zinc-200/80 bg-white p-3 shadow-[0_1px_2px_rgba(15,15,16,0.04)]">
-            <p className="text-2xl font-semibold text-zinc-900">{valor}</p>
-            <p className="text-xs text-zinc-600">{rotulo}</p>
-          </div>
-        ))}
+      {/* Indicadores numa superfície só, separados por fios (como no Início), sem um cartão por número. */}
+      <div className="painel overflow-hidden">
+        <dl className="grid grid-cols-2 gap-px bg-linha sm:grid-cols-3 lg:grid-cols-6">
+          {numeros.map(([rotulo, valor, Icone]) => (
+            <div key={rotulo} className="flex min-w-0 flex-col gap-2 bg-superficie p-4 md:p-5">
+              <dt className="flex min-w-0 items-center gap-2 text-xs font-medium text-texto-2">
+                <Icone size={15} className="shrink-0 text-dourado-texto" aria-hidden />
+                <span className="truncate">{rotulo}</span>
+              </dt>
+              <dd className="font-titulo text-3xl font-light tracking-tight text-texto tabular-nums">{valor}</dd>
+            </div>
+          ))}
+        </dl>
       </div>
 
       <Cartao titulo="Precisa de você">
@@ -269,13 +283,16 @@ function Central({
         )}
       </Cartao>
 
-      <Cartao titulo={`Aguardando terceiros (${comTerceiros.length})`}>
+      <CartaoRecolhivel
+        titulo={`Aguardando terceiros (${comTerceiros.length})`}
+        resumo={comTerceiros.length === 0 ? "Nenhuma obra esperando cliente, fornecedor ou concessionária." : "Obras esperando cliente, fornecedor ou concessionária."}
+      >
         {comTerceiros.length === 0 ? (
           <p className="text-sm text-zinc-500">Nenhuma obra esperando cliente, fornecedor ou concessionária.</p>
         ) : (
           <ListaObras obras={comTerceiros} prazos={prazos} acao />
         )}
-      </Cartao>
+      </CartaoRecolhivel>
 
       <Cartao
         titulo={`Obras na Engenharia (${totalObras})`}
@@ -319,7 +336,13 @@ function Central({
       </Cartao>
 
       {indicadores && (
-        <Desempenho indicadores={indicadores} periodo={periodo} carteira={carteira} rotuloEtapa={(s) => rotuloStatus("engenharia", s)} />
+        <Desempenho
+          indicadores={indicadores}
+          periodo={periodo}
+          aberto={desempenhoAberto}
+          carteira={carteira}
+          rotuloEtapa={(s) => rotuloStatus("engenharia", s)}
+        />
       )}
     </>
   );
@@ -329,15 +352,19 @@ function Central({
 function Desempenho({
   indicadores,
   periodo,
+  aberto,
   carteira,
   rotuloEtapa,
 }: {
   indicadores: IndicadoresEngenharia;
   periodo: PeriodoIndicadores;
+  /** Secundário (spec v1.3): vem fechado; abre quando a pessoa escolhe um período. */
+  aberto: boolean;
   carteira: VisaoCarteira;
   rotuloEtapa: (status: string) => string;
 }) {
   const { etapas, protocoloAprovacao, exigencia, naoConformidade, conexao } = indicadores;
+  const maiorMediana = Math.max(1, ...etapas.map((e) => e.mediana));
   const amostra = (n: number, um: string, varios: string) => (n === 0 ? "sem registros no período" : `${n} ${n === 1 ? um : varios}`);
   const linhas: [string, string, string][] = [
     ["Do protocolo à aprovação", textoMediana(protocoloAprovacao), amostra(protocoloAprovacao.n, "protocolo aprovado", "protocolos aprovados")],
@@ -346,22 +373,22 @@ function Desempenho({
     ["Da vistoria aprovada à conexão", textoMediana(conexao), amostra(conexao.n, "conexão", "conexões")],
   ];
   return (
-    <Cartao titulo="Desempenho">
+    <CartaoRecolhivel titulo="Desempenho" resumo={`Tempos e proporções dos últimos ${periodo} dias`} aberto={aberto}>
       <div className="flex flex-col gap-4">
         <nav aria-label="Período" className="flex flex-wrap items-center gap-2 text-sm text-zinc-600">
           Últimos
           {PERIODOS_INDICADORES.map((p) => (
-            <Aba key={p} href={hrefCentral({ carteira, periodo: p })} atual={p === periodo}>
+            <Aba key={p} href={hrefCentral({ carteira, periodo: p, comPeriodo: true })} atual={p === periodo}>
               {p} dias
             </Aba>
           ))}
         </nav>
         <p className="text-xs text-zinc-500">Tempos em mediana de dias úteis, sem contar o dia do marco. Só obras que você pode ver.</p>
-        <dl className="grid gap-3 sm:grid-cols-2">
+        <dl className="grid grid-cols-1 gap-px overflow-hidden rounded-xl bg-linha sm:grid-cols-2">
           {linhas.map(([rotulo, valor, detalhe]) => (
-            <div key={rotulo} className="rounded-lg border border-linha px-3 py-2">
-              <dt className="text-xs text-zinc-600">{rotulo}</dt>
-              <dd className="text-lg font-semibold text-texto">{valor}</dd>
+            <div key={rotulo} className="flex flex-col gap-1 bg-superficie px-4 py-3">
+              <dt className="text-xs font-medium text-texto-2">{rotulo}</dt>
+              <dd className="font-titulo text-2xl font-light tracking-tight text-texto tabular-nums">{valor}</dd>
               <dd className="text-xs text-zinc-500">{detalhe}</dd>
             </div>
           ))}
@@ -371,20 +398,29 @@ function Desempenho({
           {etapas.length === 0 ? (
             <p className="text-sm text-zinc-500">Nenhuma obra saiu de uma etapa no período.</p>
           ) : (
-            <ul className="divide-y divide-linha rounded-lg border border-linha text-sm">
+            // Barras horizontais em dourado (como os gráficos do Início): o comprimento é a mediana da etapa.
+            <ul className="flex flex-col gap-3 text-sm">
               {etapas.map((e) => (
-                <li key={e.etapa} className="flex flex-wrap justify-between gap-2 px-3 py-2">
-                  <span className="text-texto">{rotuloEtapa(e.etapa)}</span>
-                  <span className="text-zinc-600">
-                    {textoMediana({ mediana: e.mediana, n: e.n })} · {e.n} {e.n === 1 ? "obra" : "obras"}
-                  </span>
+                <li key={e.etapa} className="flex flex-col gap-1.5">
+                  <div className="flex flex-wrap justify-between gap-2">
+                    <span className="text-texto">{rotuloEtapa(e.etapa)}</span>
+                    <span className="text-zinc-600 tabular-nums">
+                      {textoMediana({ mediana: e.mediana, n: e.n })} · {e.n} {e.n === 1 ? "obra" : "obras"}
+                    </span>
+                  </div>
+                  <div aria-hidden className="h-1.5 w-full overflow-hidden rounded-full bg-superficie-2">
+                    <div
+                      className="h-full rounded-full bg-dourado transition-[width] duration-700 ease-raion"
+                      style={{ width: `${Math.max(2, (e.mediana / maiorMediana) * 100)}%` }}
+                    />
+                  </div>
                 </li>
               ))}
             </ul>
           )}
         </section>
       </div>
-    </Cartao>
+    </CartaoRecolhivel>
   );
 }
 
@@ -424,7 +460,7 @@ function Kanban({ colunas, prazos }: { colunas: ColunaKanbanEngenharia[]; prazos
 function CartaoKanban({ obra: o, prazos }: { obra: ObraNaEngenharia; prazos: PrazoObra[] }) {
   const tempo = ha(o.desde);
   return (
-    <article className="flex flex-col gap-1.5 rounded-lg border border-linha bg-white px-3 py-2 text-sm">
+    <article className="flex flex-col gap-1.5 rounded-xl border border-linha bg-superficie px-3 py-2.5 text-sm transition-colors duration-200 ease-raion hover:border-dourado/60">
       <p className="font-medium break-words text-texto">
         Obra #{o.numero} · {o.clienteNome}
       </p>

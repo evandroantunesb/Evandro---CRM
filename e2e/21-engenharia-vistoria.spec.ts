@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { clienteDe, entrarComo, lerBase } from "./ajuda";
+import { abrirTodosPassos, clienteDe, entrarComo, lerBase } from "./ajuda";
 
 const cartao = (page: Page, titulo: string): Locator =>
   page.locator("section").filter({ has: page.getByRole("heading", { name: titulo, level: 2 }) });
@@ -32,21 +32,24 @@ test("vistoria com não conformidade, nova vistoria, medidor, conexão e conclus
 
   await entrarComo(page, usuarios.admin, senha);
   await page.goto(`/engenharia/${obra}`);
+  await abrirTodosPassos(page);
   const vistoria = cartao(page, "Vistoria e conexão");
   // Gate G5 explicado na tela.
   await expect(vistoria.getByText(/depois que o protocolo for aprovado/)).toBeVisible();
 
   feito(await admin.rpc("registrar_evento_protocolo_engenharia", { p_protocolo_id: protocolo.data as string, p_tipo: "aprovado", p_ocorrido_em: hoje() }), "aprovar");
   await page.reload();
+  await abrirTodosPassos(page);
   await expect(vistoria.getByText(/depois que o Operacional concluir a instalação/)).toBeVisible();
   feito(await admin.rpc("alterar_status_fluxo_obra", { p_obra_id: obra, p_setor: "operacional", p_status: "instalacao_concluida" }), "instalação");
   await page.reload();
+  await abrirTodosPassos(page);
 
   // Pedido → Engenharia em "Aguardando vistoria".
   await vistoria.getByLabel("Número do pedido (opcional)").fill("VIS-E2E-21");
   await vistoria.getByRole("button", { name: "Registrar pedido de vistoria" }).click();
   await expect(vistoria.getByText("Solicitada", { exact: true })).toBeVisible();
-  await expect(cartao(page, "Engenharia").getByText("Aguardando vistoria").first()).toBeVisible();
+  await expect(page.locator("#passo-1").getByText("Aguardando vistoria").first()).toBeVisible();
 
   const registrar = async (tipo: string, descricao?: string) => {
     await vistoria.getByLabel("O que aconteceu").selectOption(tipo);
@@ -67,6 +70,7 @@ test("vistoria com não conformidade, nova vistoria, medidor, conexão e conclus
   await campo.getByRole("button", { name: "Registrar", exact: true }).click();
   await expect(page.getByText("Correção de campo feita").first()).toBeVisible();
   await page.goto(`/engenharia/${obra}`);
+  await abrirTodosPassos(page);
   await expect(vistoria.locator("li").filter({ hasText: "Correção de campo feita" })).toBeVisible();
 
   await vistoria.getByRole("button", { name: "Registrar pedido de vistoria" }).click();
@@ -90,10 +94,11 @@ test("vistoria com não conformidade, nova vistoria, medidor, conexão e conclus
   await expect(vistoria.getByText(/Conexão confirmada\. Conclua a Engenharia/)).toBeVisible();
 
   await page.reload();
+  await abrirTodosPassos(page);
   await page.locator("summary").filter({ hasText: "Atualizar Engenharia" }).click();
   await page.getByLabel("Status de Engenharia").selectOption("concluido");
   await page.getByRole("button", { name: "Salvar status" }).click();
-  await expect(cartao(page, "Engenharia").getByText("Concluído").first()).toBeVisible();
+  await expect(page.locator("#passo-1").getByText("Concluído").first()).toBeVisible();
 
   // Vendedor: sem o card da Engenharia; no card do Operacional, só situação e datas.
   await page.context().clearCookies();

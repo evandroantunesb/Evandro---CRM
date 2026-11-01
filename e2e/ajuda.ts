@@ -44,6 +44,13 @@ export async function entrarComo(page: Page, usuario: UsuarioE2E, senha: string)
   await page.waitForURL("**/inicio", { timeout: 30_000 });
 }
 
+/** No card da Engenharia só o passo atual vem aberto: abre os outros, para o teste agir em qualquer passo. */
+export async function abrirTodosPassos(page: Page) {
+  await expect(page.locator('section[id^="passo-"]')).toHaveCount(8);
+  const fechado = page.locator('section[id^="passo-"] > details:not([open]) > summary');
+  while ((await fechado.count()) > 0) await fechado.first().click();
+}
+
 /** Captura a página inteira em e2e-capturas/<resolução>/<nome>.png. */
 export async function capturar(page: Page, resolucao: Resolucao, nome: string) {
   await page.waitForLoadState("networkidle");

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { clienteServico, entrarComo, lerBase } from "./ajuda";
+import { abrirTodosPassos, clienteServico, entrarComo, lerBase } from "./ajuda";
 
 // Engenharia: a lista mostra as obras por etapa, o card abre e aceita uma tarefa do setor; quem não atua em Engenharia
 // não entra nem na lista nem no card.
@@ -21,6 +21,7 @@ test("executor de Engenharia abre o card da obra e cria tarefa; Compras não ent
   await link.click();
 
   await page.waitForURL(`**/engenharia/${obraId}`);
+  await abrirTodosPassos(page);
   await expect(page.getByRole("heading", { name: obra!.cliente_nome, level: 1 })).toBeVisible();
   await expect(page.getByText(rotuloEtapa).first()).toBeVisible();
 

@@ -1,5 +1,5 @@
 import { expect, test, type Locator } from "@playwright/test";
-import { entrarComo, lerBase } from "./ajuda";
+import { abrirTodosPassos, entrarComo, lerBase } from "./ajuda";
 
 const cartao = (page: import("@playwright/test").Page, titulo: string): Locator =>
   page.locator("section").filter({ has: page.getByRole("heading", { name: titulo, level: 2 }) });
@@ -11,6 +11,7 @@ test("admin registra o protocolo depois do checklist, recebe exigência e reenvi
   const { usuarios, senha, obras } = lerBase();
   await entrarComo(page, usuarios.admin, senha);
   await page.goto(`/engenharia/${obras.o11}`);
+  await abrirTodosPassos(page);
 
   const protocolo = cartao(page, "Protocolo na concessionária");
   await expect(protocolo.getByText("Aplique o checklist")).toBeVisible();
@@ -33,7 +34,7 @@ test("admin registra o protocolo depois do checklist, recebe exigência e reenvi
   await protocolo.getByLabel("Número do protocolo").fill("E2E-20-001");
   await protocolo.getByRole("button", { name: "Registrar protocolo" }).click();
   await expect(protocolo.getByText("Protocolado", { exact: true })).toBeVisible();
-  await expect(cartao(page, "Engenharia").getByText("Enviado à concessionária").first()).toBeVisible();
+  await expect(page.locator("#passo-1").getByText("Enviado à concessionária").first()).toBeVisible();
 
   await protocolo.getByLabel("O que aconteceu").selectOption("exigencia");
   await protocolo.getByLabel("Categoria da exigência").selectOption("projeto_eletrico");

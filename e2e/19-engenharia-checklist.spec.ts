@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { entrarComo, lerBase } from "./ajuda";
+import { abrirTodosPassos, entrarComo, lerBase } from "./ajuda";
 
 // Engenharia (P2): no card da obra, o admin aplica o checklist, anexa um arquivo (vira versão 1 e vai para
 // conferência), marca válido e dispensa um item opcional com motivo; o arquivo abre pelo link.
@@ -7,6 +7,7 @@ test("admin aplica o checklist, anexa, confere e marca 'não se aplica'", async 
   const { usuarios, senha, obras } = lerBase();
   await entrarComo(page, usuarios.admin, senha);
   await page.goto(`/engenharia/${obras.o01}`);
+  await abrirTodosPassos(page);
 
   const checklist = page.locator("section").filter({ has: page.getByRole("heading", { name: "Checklist e documentos" }) });
   const aplicar = checklist.getByRole("button", { name: "Aplicar checklist" });

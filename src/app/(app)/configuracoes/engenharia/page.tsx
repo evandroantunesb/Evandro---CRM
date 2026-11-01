@@ -28,9 +28,12 @@ export default async function ConfigEngenharia() {
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-4">
       <Voltar href="/configuracoes">Configurações</Voltar>
-      <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Engenharia</h1>
+      <div className="flex flex-col gap-1">
+        <p className="sobretitulo">Configurações · Obras</p>
+        <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Engenharia</h1>
+      </div>
 
-      <h2 className="text-lg font-medium text-texto">Checklist de documentos</h2>
+      <h2 className="sobretitulo mt-4 px-1">Checklist de documentos</h2>
       <p className="text-sm text-zinc-600">
         Documentos que a Engenharia confere em cada obra. A lista inicial é um ponto de partida para a Copel: revise com o
         responsável técnico. Cada obra recebe uma cópia ao aplicar o checklist: editar aqui não muda os itens que ela já tem.
@@ -49,7 +52,7 @@ export default async function ConfigEngenharia() {
         {itens.length === 0 ? <p className="text-sm text-zinc-500">Nenhum item cadastrado.</p> : itens.map((i) => <LinhaItemModelo key={i.id} item={i} />)}
       </Cartao>
 
-      <h2 className="text-lg font-medium text-texto">Prazos</h2>
+      <h2 className="sobretitulo mt-4 px-1">Prazos</h2>
       <p className="text-sm text-zinc-600">
         Contam em dias úteis a partir do dia útil seguinte ao marco: sem sábado, domingo, feriados nacionais (inclusive
         Carnaval, Sexta-feira Santa e Corpus Christi) e os feriados da empresa abaixo. Prazo vencido aparece na Central da
