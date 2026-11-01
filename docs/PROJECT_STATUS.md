@@ -2,7 +2,7 @@
 
 ## Engenharia em Obras — P1 a P1.6 integradas em 2026-10-29; P2 a P5 em 2026-10-30; P6a e P6b em 2026-10-31; P6c e novo fluxo (#270, #271) em 2026-11-01
 
-`main` em `e7f62e9` (merge da #275). **Produção e `main` alinhadas** (última `20261102100000_engenharia_iniciar_atuacao.sql`).
+`main` em `d26a42e` (merge da #276). **Produção e `main` alinhadas** (última `20261102120000_seguranca_funcoes_sem_login.sql`).
 
 | PR | O que entrou |
 | --- | --- |
@@ -92,14 +92,14 @@ Protótipo no canvas "Engenharia — novo fluxo" (artifact do Evandro): Central 
 - **Lição:** os disparos de produção e os merges feitos pelo agente foram bloqueados pelo controle de permissões do Claude Code na primeira tentativa e passaram depois da autorização explícita do Evandro para aquela execução. A base da #271 foi trocada para `main` antes do merge; o CI não roda de novo na troca, então conferiu-se que a árvore da `main` era idêntica à base testada.
 - Sem E2E do clique em "Iniciar atuação" (coberto por `tests/engenharia-iniciar-db.test.ts`).
 
-## Adoção seletiva do vibe-coding-toolkit — Etapas 1 a 3 em 2026-11-01
+## Adoção seletiva do vibe-coding-toolkit — Etapas 1 a 4 em 2026-11-01
 
-Só quatro peças do [vibe-coding-toolkit](https://github.com/soumatheusgomes/vibe-coding-toolkit) (commit `21b71b6`, MIT); o processo do Raion (CLAUDE.md, AGENTS.md, Aurora) prevalece. Sem migration. CI pós-merge verde.
+Só quatro peças do [vibe-coding-toolkit](https://github.com/soumatheusgomes/vibe-coding-toolkit) (commit `21b71b6`, MIT); o processo do Raion (CLAUDE.md, AGENTS.md, Aurora) prevalece. Etapas 1 a 3 sem migration; CI pós-merge verde.
 
 - **Etapa 1 — #273** (`173036d`): regras `quality/max-lines` (350), `quality/no-direct-console` e `quality/no-direct-data-access` em `eslint-rules/` (cópia do toolkit com aviso MIT), todas em **aviso**; o CI não usa `--max-warnings`. Acesso a dados adaptado ao Raion: cliente Supabase cru só em `src/lib/supabase`; `admin` (service_role) em `src/app` só nas rotas por token, `api/` e `(app)/perfil/page.tsx`; `src/components` sem cliente de servidor nem admin. Linha de base: 29 arquivos acima de 350 linhas, 9 `console` diretos, 0 acessos indevidos.
 - **Etapa 2 — #274** (`bf013bd`): `negocios/[id]/page.tsx` (1235 linhas) dividido em página (179), `dados-ficha.ts`, `cabecalho.tsx`, `edicao-dados.tsx` e um arquivo por aba, sem mudar comportamento. Novo `e2e/25-ficha-negocio-abas.spec.ts`; testes que liam `page.tsx` como texto usam `tests/fonte-ficha.ts` (normaliza CRLF). Os outros 28 arquivos grandes viram PRs futuras, uma por vez.
 - **Etapa 3 — #275** (`e7f62e9`): skill `supabase-postgres-best-practices` (supabase/agent-skills `c9be0e9`, v1.1.1, MIT) no projeto para Claude Code e Codex (`skills@1.7.4 --copy`, `skills-lock.json`, `THIRD_PARTY_NOTICES.md`); linha no AGENTS.md. A cópia global do Evandro foi mantida (decisão dele). Teste: revisão da migration `20261102100000` — achado a corrigir em PR futura: o `exception when unique_violation` de `iniciar_atuacao_engenharia` cobre a função inteira e pode devolver mensagem errada (migration nova, com autorização).
-- **Etapa 4** (revisão de segurança de RLS, só leitura, relatório só na conversa): em andamento.
+- **Etapa 4** (revisão de segurança de RLS, só leitura; relatório só na conversa com o Evandro, sem issue pública). Correção dos dois achados principais na **#276** (mesclada em `d26a42e`, head `46db124`; **migration `20261102120000_seguranca_funcoes_sem_login.sql` aplicada em produção em 01/11/2026**, tag `migracao-pr276-46db124`, conferir + aplicar aprovados pelo Evandro, só ela): `decidir_atribuicao_lead` e `expirar_atribuicoes_leads` saem da API (decisão só por `aprovar_atribuicao_lead`, que confere admin/gestor, e expiração só pelo pg_cron); nenhuma função do projeto em `public` executa por `PUBLIC`/`anon`, inclusive as que as próximas migrations criarem (privilégios padrão). `authenticated` e `service_role` sem mudança. Teste `tests/seguranca-funcoes-sem-login-db.test.ts`. **Migration nova que precise de função chamável sem login deve conceder `EXECUTE` a `anon` explicitamente.** Os demais achados, de menor gravidade, seguem com o Evandro e viram PRs futuras com autorização.
 - **Ambiente local (Windows):** `pnpm install` em worktree novo pode travar; o Turbopack recusa `node_modules` por junção (o lint aceita). O verify.mjs do toolkit não foi executado (script baixado; bloqueado pelo controle de permissões).
 
 ## T3 — tarefas automáticas de setor (#264) — concluída em 2026-10-31
