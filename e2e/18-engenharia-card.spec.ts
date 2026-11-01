@@ -11,11 +11,13 @@ test("executor de Engenharia abre o card da obra e cria tarefa; Compras não ent
   await page.getByRole("link", { name: "Engenharia", exact: true }).first().click();
   await page.waitForURL("**/engenharia");
   await expect(page.getByRole("heading", { name: "Engenharia", level: 1 })).toBeVisible();
-  // A primeira obra que o executor vê na carteira: outros testes (03) trocam responsáveis e etapas da base antes deste,
-  // então não se fixa obra nem etapa.
-  const etapa = page.getByRole("region", { name: "Carteira por etapa" }).getByRole("region").first();
+  // A primeira obra com responsável que o executor vê na carteira: outros testes (03) trocam responsáveis e etapas da
+  // base antes deste, então não se fixa obra nem etapa. As obras novas (sem responsável) ficam de fora: nelas ele ainda
+  // não atua, só pode iniciar.
+  const comResponsavel = page.getByRole("listitem").filter({ hasNotText: "Sem responsável" });
+  const etapa = page.getByRole("region", { name: "Carteira por etapa" }).getByRole("region").filter({ has: comResponsavel }).first();
   const rotuloEtapa = (await etapa.getByRole("heading").textContent())!.replace(/\s*\(\d+\)$/, "");
-  const link = etapa.getByRole("link").first();
+  const link = etapa.locator(comResponsavel).first().getByRole("link");
   const obraId = (await link.getAttribute("href"))!.split("/").at(-1)!;
   const { data: obra } = await clienteServico().from("obras").select("numero, cliente_nome").eq("id", obraId).single();
   await link.click();

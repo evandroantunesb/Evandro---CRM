@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { GestaoFixacao, GestaoSetor } from "@/app/(app)/obras/[id]/gestao";
 import { ChecklistEngenharia } from "@/components/engenharia/checklist";
 import { EnquadramentoEngenharia } from "@/components/engenharia/enquadramento";
+import { IniciarAtuacao } from "@/components/engenharia/iniciar-atuacao";
 import { RegistroPasso, ResumoPassos, SecaoPasso } from "@/components/engenharia/passos";
 import { ProtocolosEngenharia } from "@/components/engenharia/protocolos";
 import { VistoriaEngenharia } from "@/components/engenharia/vistoria";
@@ -98,12 +99,16 @@ export default async function CardEngenharia({ params }: PageProps<"/engenharia/
     .filter(Boolean)
     .join(" · ");
   const resumoVenda = [obra.tecnico.kitNome, comUnidade(obra.tecnico.potenciaKwp, "kWp"), obra.tecnico.distribuidora].filter(Boolean).join(" · ");
+  const temResponsavel = (engenharia?.participantes ?? []).some((p) => p.principal);
+  // Obra nova (sem responsável), em curso: quem atua na Engenharia assume por aqui (a RPC confere tudo de novo).
+  const podeIniciar =
+    atual.papel === "operacao" && !temResponsavel && resumo.situacao === "em_andamento" && engenharia != null && engenharia.status !== "concluido";
   const equipe = (engenharia?.participantes ?? []).map((p) => `${p.nome} (${(p.principal ? `${p.funcaoRotulo} principal` : p.funcaoRotulo).toLowerCase()})`);
 
   // Oito passos (P6b): status de cada um pelos fatos da obra; os passos 2, 3, 5 e 7 pela confirmação registrada.
   const protocoloAprovado = protocolos.some((p) => p.status === "aprovado" || p.status === "orcamento_emitido" || p.status === "encerrado");
   const passos = montarPassosEngenharia({
-    temResponsavel: (engenharia?.participantes ?? []).some((p) => p.principal),
+    temResponsavel,
     registros,
     enquadramento: enquadramento && { completo: enquadramentoCompleto(enquadramento), atualizadoEm: enquadramento.atualizadoEm },
     checklist,
@@ -221,6 +226,7 @@ export default async function CardEngenharia({ params }: PageProps<"/engenharia/
             </p>
             {engenharia.paradoMotivo && <p className="text-zinc-700">Motivo da parada: {engenharia.paradoMotivo}</p>}
             <p className="text-zinc-700">Equipe: {equipe.length ? equipe.join(", ") : "ninguém ainda"}</p>
+            {podeIniciar && <IniciarAtuacao obraId={resumo.id} />}
             {gestaoEngenharia && <GestaoSetor key={resumo.id} obraId={resumo.id} setor={engenharia} gestao={gestaoEngenharia} />}
           </div>
         ) : (
