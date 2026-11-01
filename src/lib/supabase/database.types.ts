@@ -462,6 +462,45 @@ export type Database = {
           },
         ];
       };
+      captura_envios: {
+        Row: {
+          created_at: string;
+          empresa_id: string;
+          formulario_id: string;
+          id: number;
+          origem: string;
+        };
+        Insert: {
+          created_at?: string;
+          empresa_id: string;
+          formulario_id: string;
+          id?: never;
+          origem: string;
+        };
+        Update: {
+          created_at?: string;
+          empresa_id?: string;
+          formulario_id?: string;
+          id?: never;
+          origem?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "captura_envios_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "captura_envios_formulario_id_fkey";
+            columns: ["formulario_id"];
+            isOneToOne: false;
+            referencedRelation: "formularios";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       comissoes_calculadas: {
         Row: {
           calculado_por: string | null;
@@ -5986,6 +6025,10 @@ export type Database = {
       registrar_documento_engenharia: {
         Args: { p_caminho: string; p_item_id: string; p_nome: string };
         Returns: string;
+      };
+      registrar_envio_captura: {
+        Args: { p_formulario_id: string; p_origem: string };
+        Returns: boolean;
       };
       registrar_evento_protocolo_engenharia: {
         Args: {
