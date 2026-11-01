@@ -49,6 +49,8 @@ export function FormularioCaptura({ token }: { token: string }) {
       <p className="mb-4 text-xs text-zinc-500">Leva menos de 1 minuto.</p>
       <form action={acao} className="flex flex-col gap-3">
         <input type="hidden" name="token" value={token} />
+        {/* Armadilha para robôs: fora da tela, fora do Tab e escondida de leitores de tela. */}
+        <input name="site" type="text" tabIndex={-1} autoComplete="off" aria-hidden="true" className="absolute -left-[9999px] h-px w-px opacity-0" />
         <CampoComIcone icone={User} rotulo="Nome completo" name="nome" placeholder="Seu nome" required />
         <CampoComIcone
           icone={Phone}

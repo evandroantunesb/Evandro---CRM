@@ -1,5 +1,7 @@
 "use server";
 
+import { createHash } from "node:crypto";
+import { headers } from "next/headers";
 import { z } from "zod";
 import { escolherProximoResponsavel } from "@/lib/distribuicao-leads";
 import { mensagemErro } from "@/lib/erros";
@@ -49,16 +51,29 @@ async function garantirEtiquetaDoFormulario(
 
 const esquema = z.object({
   token: z.string().min(1),
-  nome: z.string().trim().min(2, "Informe seu nome"),
+  nome: z.string().trim().min(2, "Informe seu nome").max(120, "Nome longo demais"),
   telefone: z
     .string()
     .trim()
     .transform((v) => v.replace(/\D/g, ""))
     .refine((v) => v.length === 10 || v.length === 11, "Informe um telefone com DDD"),
-  email: z.union([z.literal(""), z.string().trim().email("E-mail inválido")]).optional(),
+  email: z.union([z.literal(""), z.string().trim().max(254, "E-mail inválido").email("E-mail inválido")]).optional(),
   cidade: z.string().trim().max(120).optional(),
   valor_conta_energia: z.coerce.number({ message: "Informe o valor da sua conta de energia" }).positive("Informe um valor válido"),
+  // Campo-armadilha: invisível para pessoas, robôs preenchem.
+  site: z.string().optional(),
 });
+
+const SUCESSO: ResultadoAcao = { ok: true, mensagem: "Recebemos seus dados! Em breve um de nossos consultores vai falar com você." };
+/** Mesmo telefone no mesmo formulário dentro desta janela é o mesmo lead (clique duplo, reenvio). */
+const JANELA_REPETIDO_MS = 6 * 60 * 60_000;
+
+/** Origem do envio para o limite (registrar_envio_captura): hash do formulário + IP, sem guardar o IP. */
+async function origemDoEnvio(formularioId: string) {
+  const h = await headers();
+  const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip")?.trim() || "desconhecido";
+  return createHash("sha256").update(`${formularioId}:${ip}`).digest("hex");
+}
 
 /**
  * Envio do formulário público de captura (sem login). Cria o contato e o
@@ -70,6 +85,7 @@ export async function enviarCaptura(_: ResultadoAcao, formData: FormData): Promi
   const dados = esquema.safeParse(Object.fromEntries(formData));
   if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
   const d = dados.data;
+  if (d.site) return SUCESSO;
 
   const admin = criarClienteAdmin();
 
@@ -81,6 +97,23 @@ export async function enviarCaptura(_: ResultadoAcao, formData: FormData): Promi
     .eq("token", d.token)
     .maybeSingle();
   if (!formulario || !formulario.ativo) return { ok: false, mensagem: "Este formulário não está mais disponível." };
+
+  const { data: liberado, error: erroLimite } = await admin.rpc("registrar_envio_captura", {
+    p_formulario_id: formulario.id,
+    p_origem: await origemDoEnvio(formulario.id),
+  });
+  if (erroLimite) return { ok: false, mensagem: "Não foi possível registrar seu contato agora. Tente novamente mais tarde." };
+  if (!liberado) return { ok: false, mensagem: "Recebemos muitos envios daqui. Tente novamente em alguns minutos." };
+
+  const { data: repetido } = await admin
+    .from("negocios")
+    .select("id, contatos!inner(telefone)")
+    .eq("empresa_id", formulario.empresa_id)
+    .eq("origem_id", formulario.origem_id)
+    .eq("contatos.telefone", d.telefone)
+    .gte("created_at", new Date(Date.now() - JANELA_REPETIDO_MS).toISOString())
+    .limit(1);
+  if (repetido?.length) return SUCESSO;
 
   const { data: etapaInicial } = await admin
     .from("etapas")
@@ -165,5 +198,5 @@ export async function enviarCaptura(_: ResultadoAcao, formData: FormData): Promi
   const { error: erroMetrica } = await admin.rpc("incrementar_preenchimento_formulario", { p_id: formulario.id });
   if (erroMetrica) console.error("Falha ao contar preenchimento do formulário", formulario.id, erroMetrica);
 
-  return { ok: true, mensagem: "Recebemos seus dados! Em breve um de nossos consultores vai falar com você." };
+  return SUCESSO;
 }
