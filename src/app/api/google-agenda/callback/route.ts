@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { obterEmailConta, trocarCodigoPorTokens } from "@/lib/google-agenda";
+import { cifrarRefreshToken, integracaoConfigurada, obterEmailConta, trocarCodigoPorTokens } from "@/lib/google-agenda";
 import { exigirPapel } from "@/lib/sessao";
 import { GOOGLE_AGENDA } from "@/lib/permissoes";
 import { criarClienteAdmin } from "@/lib/supabase/admin";
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     return resposta;
   }
 
-  if (!code || !state || !stateCookie || state !== stateCookie) return falhar();
+  if (!code || !state || !stateCookie || state !== stateCookie || !integracaoConfigurada()) return falhar();
 
   const redirectUri = new URL("/api/google-agenda/callback", request.url).toString();
   const tokens = await trocarCodigoPorTokens(code, redirectUri);
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
   const { error } = await admin
     .from("google_agenda_conexoes")
     .upsert(
-      { membro_id: atual.membroId, empresa_id: atual.empresaId, refresh_token: tokens.refreshToken, email_google: email },
+      { membro_id: atual.membroId, empresa_id: atual.empresaId, refresh_token: cifrarRefreshToken(tokens.refreshToken, atual.membroId), email_google: email },
       { onConflict: "membro_id" },
     );
   if (error) return falhar();

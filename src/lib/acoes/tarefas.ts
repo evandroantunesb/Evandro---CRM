@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prazoParaIso } from "@/lib/crm";
 import { mensagemErro } from "@/lib/erros";
-import { apagarEvento, criarEvento, obterAccessToken } from "@/lib/google-agenda";
+import { apagarEvento, criarEvento, obterAccessToken, refreshTokenDoMembro } from "@/lib/google-agenda";
 import { exigirPapel } from "@/lib/sessao";
 import { ATRIBUIR_TAREFA_A_OUTROS, TAREFAS, pode } from "@/lib/permissoes";
 import { criarClienteAdmin } from "@/lib/supabase/admin";
@@ -23,15 +23,10 @@ async function sincronizarCriacao(
 ) {
   if (!responsavelId) return;
   try {
-    const admin = criarClienteAdmin();
-    const { data: conexao } = await admin
-      .from("google_agenda_conexoes")
-      .select("refresh_token")
-      .eq("membro_id", responsavelId)
-      .maybeSingle();
-    if (!conexao) return;
+    const refreshToken = await refreshTokenDoMembro(criarClienteAdmin(), responsavelId);
+    if (!refreshToken) return;
 
-    const accessToken = await obterAccessToken(conexao.refresh_token);
+    const accessToken = await obterAccessToken(refreshToken);
     if (!accessToken) return;
 
     const inicio = new Date(venceEmIso);
@@ -51,14 +46,9 @@ async function sincronizarCriacao(
 async function sincronizarExclusao(responsavelId: string | null, eventoId: string | null) {
   if (!responsavelId || !eventoId) return;
   try {
-    const admin = criarClienteAdmin();
-    const { data: conexao } = await admin
-      .from("google_agenda_conexoes")
-      .select("refresh_token")
-      .eq("membro_id", responsavelId)
-      .maybeSingle();
-    if (!conexao) return;
-    const accessToken = await obterAccessToken(conexao.refresh_token);
+    const refreshToken = await refreshTokenDoMembro(criarClienteAdmin(), responsavelId);
+    if (!refreshToken) return;
+    const accessToken = await obterAccessToken(refreshToken);
     if (!accessToken) return;
     await apagarEvento(accessToken, eventoId);
   } catch {
