@@ -2,7 +2,7 @@ import { AlarmClock, BellRing, CalendarX, CirclePause, HardHat, Hourglass, type 
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { ListaTarefasSetor } from "@/components/tarefas-setor";
-import { Cartao, Selo } from "@/components/ui";
+import { Cartao, CartaoRecolhivel, Selo } from "@/components/ui";
 import { carregarChecklistsAptos } from "@/lib/engenharia-checklist";
 import {
   diasDesde,
@@ -54,11 +54,14 @@ const ha = (desde: string | null) => {
 
 type VisaoCarteira = "lista" | "kanban";
 
-/** Link da Central guardando a visão da carteira e o período dos indicadores (padrões ficam fora da URL). */
-const hrefCentral = ({ carteira, periodo }: { carteira: VisaoCarteira; periodo: PeriodoIndicadores }) => {
+/**
+ * Link da Central guardando a visão da carteira e o período dos indicadores (padrões ficam fora da URL). `comPeriodo`
+ * põe o período mesmo no padrão: é o que mantém o Desempenho aberto depois de trocar o período.
+ */
+const hrefCentral = ({ carteira, periodo, comPeriodo = false }: { carteira: VisaoCarteira; periodo: PeriodoIndicadores; comPeriodo?: boolean }) => {
   const q = new URLSearchParams();
   if (carteira === "kanban") q.set("carteira", "kanban");
-  if (periodo !== 30) q.set("periodo", String(periodo));
+  if (comPeriodo || periodo !== 30) q.set("periodo", String(periodo));
   return q.size ? `/engenharia?${q}` : "/engenharia";
 };
 
@@ -170,6 +173,7 @@ export default async function Engenharia({ searchParams }: PageProps<"/engenhari
           prazos={prazos ?? new Map()}
           indicadores={indicadores ?? null}
           periodo={periodo}
+          desempenhoAberto={periodoBruto != null}
           carteira={carteira}
           protocolos={protocolos ?? new Map()}
           checklistsAptos={checklistsAptos ?? new Set()}
@@ -192,6 +196,7 @@ function Central({
   prazos,
   indicadores,
   periodo,
+  desempenhoAberto,
   carteira,
   protocolos,
   checklistsAptos,
@@ -207,6 +212,7 @@ function Central({
   prazos: ReadonlyMap<string, PrazoObra[]>;
   indicadores: IndicadoresEngenharia | null;
   periodo: PeriodoIndicadores;
+  desempenhoAberto: boolean;
   carteira: VisaoCarteira;
   protocolos: ReadonlyMap<string, readonly StatusProtocolo[]>;
   checklistsAptos: ReadonlySet<string>;
@@ -277,13 +283,16 @@ function Central({
         )}
       </Cartao>
 
-      <Cartao titulo={`Aguardando terceiros (${comTerceiros.length})`}>
+      <CartaoRecolhivel
+        titulo={`Aguardando terceiros (${comTerceiros.length})`}
+        resumo={comTerceiros.length === 0 ? "Nenhuma obra esperando cliente, fornecedor ou concessionária." : "Obras esperando cliente, fornecedor ou concessionária."}
+      >
         {comTerceiros.length === 0 ? (
           <p className="text-sm text-zinc-500">Nenhuma obra esperando cliente, fornecedor ou concessionária.</p>
         ) : (
           <ListaObras obras={comTerceiros} prazos={prazos} acao />
         )}
-      </Cartao>
+      </CartaoRecolhivel>
 
       <Cartao
         titulo={`Obras na Engenharia (${totalObras})`}
@@ -327,7 +336,13 @@ function Central({
       </Cartao>
 
       {indicadores && (
-        <Desempenho indicadores={indicadores} periodo={periodo} carteira={carteira} rotuloEtapa={(s) => rotuloStatus("engenharia", s)} />
+        <Desempenho
+          indicadores={indicadores}
+          periodo={periodo}
+          aberto={desempenhoAberto}
+          carteira={carteira}
+          rotuloEtapa={(s) => rotuloStatus("engenharia", s)}
+        />
       )}
     </>
   );
@@ -337,11 +352,14 @@ function Central({
 function Desempenho({
   indicadores,
   periodo,
+  aberto,
   carteira,
   rotuloEtapa,
 }: {
   indicadores: IndicadoresEngenharia;
   periodo: PeriodoIndicadores;
+  /** Secundário (spec v1.3): vem fechado; abre quando a pessoa escolhe um período. */
+  aberto: boolean;
   carteira: VisaoCarteira;
   rotuloEtapa: (status: string) => string;
 }) {
@@ -355,12 +373,12 @@ function Desempenho({
     ["Da vistoria aprovada à conexão", textoMediana(conexao), amostra(conexao.n, "conexão", "conexões")],
   ];
   return (
-    <Cartao titulo="Desempenho">
+    <CartaoRecolhivel titulo="Desempenho" resumo={`Tempos e proporções dos últimos ${periodo} dias`} aberto={aberto}>
       <div className="flex flex-col gap-4">
         <nav aria-label="Período" className="flex flex-wrap items-center gap-2 text-sm text-zinc-600">
           Últimos
           {PERIODOS_INDICADORES.map((p) => (
-            <Aba key={p} href={hrefCentral({ carteira, periodo: p })} atual={p === periodo}>
+            <Aba key={p} href={hrefCentral({ carteira, periodo: p, comPeriodo: true })} atual={p === periodo}>
               {p} dias
             </Aba>
           ))}
@@ -402,7 +420,7 @@ function Desempenho({
           )}
         </section>
       </div>
-    </Cartao>
+    </CartaoRecolhivel>
   );
 }
 

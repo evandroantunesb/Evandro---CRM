@@ -32,6 +32,9 @@ test("prazos configuráveis, feriado da empresa e desempenho na Central", async 
   await page.goto("/engenharia");
   await expect(page.getByText("Prazos vencidos")).toBeVisible();
   const desempenho = page.locator("section").filter({ has: page.getByRole("heading", { name: "Desempenho", level: 2 }) });
+  // Desempenho é secundário: vem fechado e abre com um toque.
+  await expect(desempenho.getByText("Do protocolo à aprovação")).toBeHidden();
+  await desempenho.locator("summary").click();
   await expect(desempenho.getByText("Do protocolo à aprovação")).toBeVisible();
   await desempenho.getByRole("link", { name: "90 dias" }).click();
   await expect(page).toHaveURL(/periodo=90/);

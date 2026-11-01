@@ -34,7 +34,7 @@ test("admin registra o protocolo depois do checklist, recebe exigência e reenvi
   await protocolo.getByLabel("Número do protocolo").fill("E2E-20-001");
   await protocolo.getByRole("button", { name: "Registrar protocolo" }).click();
   await expect(protocolo.getByText("Protocolado", { exact: true })).toBeVisible();
-  await expect(cartao(page, "Engenharia").getByText("Enviado à concessionária").first()).toBeVisible();
+  await expect(page.locator("#passo-1").getByText("Enviado à concessionária").first()).toBeVisible();
 
   await protocolo.getByLabel("O que aconteceu").selectOption("exigencia");
   await protocolo.getByLabel("Categoria da exigência").selectOption("projeto_eletrico");

@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown } from "lucide-react";
+import { Check, ChevronDown } from "lucide-react";
 import { useActionState, useEffect, useState, type ReactNode } from "react";
 import { Botao, CLASSE_ENTRADA, FOCO, Mensagem, Selo } from "@/components/ui";
 import { registrarPassoEngenharia } from "@/lib/acoes/engenharia";
@@ -72,13 +72,13 @@ export function ResumoPassos({
         )}
       </div>
       <nav aria-label="Passos da Engenharia">
-        <ol className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <ol className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
           {passos.map((p) => (
             <li key={p.numero}>
               <a
                 href={`#passo-${p.numero}`}
                 aria-current={atual?.numero === p.numero ? "step" : undefined}
-                className={`flex h-full flex-col gap-1 rounded-lg border px-3 py-2 text-sm hover:border-dourado ${
+                className={`flex h-full flex-col gap-1 rounded-lg border px-2.5 py-1.5 text-xs hover:border-dourado ${
                   atual?.numero === p.numero ? "border-dourado bg-dourado/10" : "border-linha"
                 }`}
               >
@@ -186,21 +186,26 @@ function FormPasso({ obraId, passo, acao, fechar }: { obraId: string; passo: Pas
 }
 
 /**
- * Seção de um passo no card, no visual do `CartaoRecolhivel`: só o passo atual vem aberto; os outros mostram número,
- * nome e status numa linha e abrem com um toque. O link `#passo-N` (barra dos passos) abre a seção. O aberto e fechado
- * fica com quem usa: registrar um passo muda o passo atual, mas não fecha a seção em que a pessoa está.
+ * Seção de um passo no card, no visual do `CartaoRecolhivel`, em cascata: só o passo atual vem aberto; os outros mostram
+ * número, nome e status numa linha e abrem com um toque. Feitos ganham o visto; os que ainda não chegaram ficam
+ * apagados (sem travar a consulta). O link `#passo-N` (barra dos passos) abre a seção. O aberto e fechado fica com quem
+ * usa: registrar um passo muda o passo atual, mas não fecha a seção em que a pessoa está.
  */
 export function SecaoPasso({
   passo,
   titulo,
   aberto,
+  futuro,
   children,
 }: {
   passo: PassoVM;
   titulo: string;
   aberto: boolean;
+  /** Depois do passo atual e ainda sem nada feito. */
+  futuro: boolean;
   children: ReactNode;
 }) {
+  const feito = passo.status === "concluido" || passo.status === "nao_se_aplica";
   const id = `passo-${passo.numero}`;
   const [aberta, setAberta] = useState(aberto);
   useEffect(() => {
@@ -220,18 +225,29 @@ export function SecaoPasso({
     <section id={id} className="painel scroll-mt-4">
       <details open={aberta} onToggle={(e) => setAberta(e.currentTarget.open)} className="group">
         <summary
-          className={`flex min-h-16 cursor-pointer list-none items-center gap-3 rounded-2xl px-5 py-4 md:px-6 [&::-webkit-details-marker]:hidden ${FOCO}`}
+          className={`flex min-h-14 cursor-pointer list-none items-center gap-3 rounded-2xl px-4 py-3 md:px-5 [&::-webkit-details-marker]:hidden ${FOCO}`}
         >
+          <span
+            aria-hidden
+            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold tabular-nums ${
+              feito ? "bg-dourado/15 text-dourado-texto" : aberto && !futuro ? "bg-dourado text-carvao" : "border border-linha text-texto-2"
+            }`}
+          >
+            {feito ? <Check size={16} /> : passo.numero}
+          </span>
           <div className="min-w-0 flex-1">
-            <h2 className="text-lg font-semibold tracking-tight text-texto">{titulo}</h2>
-            <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-texto-2">
+            <h2 className={`text-base font-semibold tracking-tight ${futuro ? "text-texto-2" : "text-texto"}`}>
+              <span className="sr-only">Passo {passo.numero}: </span>
+              {titulo}
+            </h2>
+            <p className="mt-0.5 flex flex-wrap items-center gap-2 text-sm text-texto-2">
               <Selo tom={TOM_PASSO[passo.status]}>{ROTULO_STATUS_PASSO[passo.status]}</Selo>
               {passo.detalhe && <span>{passo.detalhe}</span>}
             </p>
           </div>
           <ChevronDown size={18} aria-hidden className="shrink-0 text-texto-2 transition-transform duration-200 ease-raion group-open:rotate-180" />
         </summary>
-        <div className="px-5 pb-5 md:px-6 md:pb-6">{children}</div>
+        <div className="px-4 pb-4 md:px-5 md:pb-5">{children}</div>
       </details>
     </section>
   );

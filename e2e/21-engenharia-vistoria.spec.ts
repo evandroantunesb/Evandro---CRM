@@ -49,7 +49,7 @@ test("vistoria com não conformidade, nova vistoria, medidor, conexão e conclus
   await vistoria.getByLabel("Número do pedido (opcional)").fill("VIS-E2E-21");
   await vistoria.getByRole("button", { name: "Registrar pedido de vistoria" }).click();
   await expect(vistoria.getByText("Solicitada", { exact: true })).toBeVisible();
-  await expect(cartao(page, "Engenharia").getByText("Aguardando vistoria").first()).toBeVisible();
+  await expect(page.locator("#passo-1").getByText("Aguardando vistoria").first()).toBeVisible();
 
   const registrar = async (tipo: string, descricao?: string) => {
     await vistoria.getByLabel("O que aconteceu").selectOption(tipo);
@@ -98,7 +98,7 @@ test("vistoria com não conformidade, nova vistoria, medidor, conexão e conclus
   await page.locator("summary").filter({ hasText: "Atualizar Engenharia" }).click();
   await page.getByLabel("Status de Engenharia").selectOption("concluido");
   await page.getByRole("button", { name: "Salvar status" }).click();
-  await expect(cartao(page, "Engenharia").getByText("Concluído").first()).toBeVisible();
+  await expect(page.locator("#passo-1").getByText("Concluído").first()).toBeVisible();
 
   // Vendedor: sem o card da Engenharia; no card do Operacional, só situação e datas.
   await page.context().clearCookies();

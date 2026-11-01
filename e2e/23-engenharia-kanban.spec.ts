@@ -40,6 +40,8 @@ test("carteira da Engenharia alterna para Kanban e o cartão abre a obra", async
 
   // O período dos indicadores guarda a visão escolhida.
   await page.goto("/engenharia?carteira=kanban");
+  // O Desempenho vem fechado (secundário): abre para trocar o período.
+  await page.locator("summary").filter({ hasText: "Desempenho" }).click();
   await page.getByRole("link", { name: "90 dias" }).click();
   await expect(page).toHaveURL(/carteira=kanban/);
   await expect(page).toHaveURL(/periodo=90/);
