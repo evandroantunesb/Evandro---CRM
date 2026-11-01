@@ -8,8 +8,12 @@ import { afterAll, describe, expect, it } from "vitest";
 
 const SCRIPT = ".github/scripts/validar-conjunto-migrations.sh";
 const WORKFLOW = ".github/workflows/banco-producao.yml";
-// Iniciar atuação e fila de Novas obras da Engenharia (#271): só ela, nenhuma a mais ou a menos.
-const AUTORIZADA = "20261102100000_engenharia_iniciar_atuacao.sql";
+// Funções do banco sem execução para anon e decisão de atribuição de leads só pela API que confere o papel (revisão de
+// segurança de 01/11): só ela, nenhuma a mais ou a menos.
+const AUTORIZADA = "20261102120000_seguranca_funcoes_sem_login.sql";
+// Iniciar atuação e fila de Novas obras da Engenharia (#271): aplicada em 01/11/2026, antes desta. Se voltar a aparecer
+// como pendente, não é autorizada.
+const INICIAR_ATUACAO = "20261102100000_engenharia_iniciar_atuacao.sql";
 // Enquadramento e checklist condicional da Engenharia (#269): aplicada em 01/11/2026, antes desta. Se voltar a aparecer
 // como pendente, não é autorizada.
 const ENQUADRAMENTO = "20261101120000_engenharia_enquadramento.sql";
@@ -223,11 +227,12 @@ describe("protocolos da Engenharia", () => {
   });
 
   it("checklist, tarefas de setor, dados do cliente, dados pessoais da obra, fixação, validade da proposta, eletroposto SDR, eletroposto, temperatura ou qualquer migration da calculadora pendente junto, ou sozinha, não passa", () => {
-    for (const m of [ENQUADRAMENTO, PASSOS, TAREFAS_AUTOMATICAS, PRAZOS, VISTORIA, PROTOCOLOS, CHECKLIST, NOTIFICACOES, ANEXOS_TAREFA, TAREFAS_SETOR, DADOS_CLIENTE, CLIENTE_OCULTO, FIXACAO, VALIDADE_PROPOSTA, ELETROPOSTO_SDR, ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) {
+    for (const m of [INICIAR_ATUACAO, ENQUADRAMENTO, PASSOS, TAREFAS_AUTOMATICAS, PRAZOS, VISTORIA, PROTOCOLOS, CHECKLIST, NOTIFICACOES, ANEXOS_TAREFA, TAREFAS_SETOR, DADOS_CLIENTE, CLIENTE_OCULTO, FIXACAO, VALIDADE_PROPOSTA, ELETROPOSTO_SDR, ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) {
       expect(validar(dryRunCom(AUTORIZADA, m)).codigo, m).toBe(1);
       expect(validar(dryRunCom(m)).codigo, m).toBe(1);
     }
-  });
+    // Dois `bash` por migration da lista: no Windows, com a suíte inteira rodando, passa dos 20 s padrão.
+  }, 60_000);
 
   it("a calculadora inteira pendente, com ou sem a autorizada, não passa", () => {
     expect(validar(dryRunCom(...CALCULADORA)).codigo).toBe(1);
@@ -238,7 +243,7 @@ describe("protocolos da Engenharia", () => {
     expect(existsSync(`supabase/migrations/${AUTORIZADA}`)).toBe(true);
     const texto = readFileSync(WORKFLOW, "utf8");
     expect(texto).toContain(AUTORIZADA);
-    for (const m of [ENQUADRAMENTO, PASSOS, TAREFAS_AUTOMATICAS, PRAZOS, VISTORIA, PROTOCOLOS, CHECKLIST, NOTIFICACOES, ANEXOS_TAREFA, TAREFAS_SETOR, DADOS_CLIENTE, CLIENTE_OCULTO, FIXACAO, VALIDADE_PROPOSTA, ELETROPOSTO_SDR, ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) expect(texto, m).not.toContain(m);
+    for (const m of [INICIAR_ATUACAO, ENQUADRAMENTO, PASSOS, TAREFAS_AUTOMATICAS, PRAZOS, VISTORIA, PROTOCOLOS, CHECKLIST, NOTIFICACOES, ANEXOS_TAREFA, TAREFAS_SETOR, DADOS_CLIENTE, CLIENTE_OCULTO, FIXACAO, VALIDADE_PROPOSTA, ELETROPOSTO_SDR, ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) expect(texto, m).not.toContain(m);
   });
 });
 
