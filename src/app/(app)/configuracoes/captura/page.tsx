@@ -51,12 +51,12 @@ export default async function ConfigCaptura() {
     <div className="mx-auto flex max-w-2xl flex-col gap-4">
       <Voltar href="/configuracoes">Configurações</Voltar>
       <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Captura de leads</h1>
-      <p className="text-sm text-zinc-600">
+      <p className="text-sm text-texto-2">
         Crie um link (e QR Code) para divulgar. Quem preencher o formulário vira um lead novo, já distribuído
         automaticamente entre os vendedores marcados para receber leads.
       </p>
       <NovoFormularioColapsavel funis={funis.filter((f) => f.ativo)} origens={origens.filter((o) => o.ativa)} />
-      <h2 className="text-sm font-semibold tracking-wide text-zinc-500 uppercase">Formulários ({lista.length})</h2>
+      <h2 className="text-sm font-semibold tracking-wide text-texto-2 uppercase">Formulários ({lista.length})</h2>
       <PainelFormularios itens={lista} />
     </div>
   );

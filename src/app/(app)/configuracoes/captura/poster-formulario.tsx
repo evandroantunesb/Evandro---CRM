@@ -27,18 +27,18 @@ export function PosterFormulario({
         <LogoRaion altura={cheio ? 44 : 26} />
       </div>
       <div className={`bg-dourado ${cheio ? "mt-6 h-px w-24" : "mt-4 h-px w-14"}`} />
-      <h2 className={`leading-tight font-extrabold text-carvao ${cheio ? "mt-8 text-4xl" : "mt-5 text-xl"}`}>
+      <h2 className={`leading-tight font-extrabold text-texto ${cheio ? "mt-8 text-4xl" : "mt-5 text-xl"}`}>
         Fale com um
         <br />
         <span className="text-amber-800">especialista</span>
       </h2>
-      <p className={`leading-snug text-zinc-600 ${cheio ? "mt-5 text-lg" : "mt-3 text-xs"}`}>
+      <p className={`leading-snug text-texto-2 ${cheio ? "mt-5 text-lg" : "mt-3 text-xs"}`}>
         Aponte a câmera do seu celular para o QR Code
         <br />e abra o formulário. É rápido e leva menos de 1 minuto.
       </p>
       <div className="mt-6 flex flex-1 items-center justify-center">
         {qrCode ? (
-          <div className={`rounded-2xl border border-dourado bg-white ${cheio ? "p-6" : "p-3"}`}>
+          <div className={`rounded-2xl border border-dourado bg-superficie ${cheio ? "p-6" : "p-3"}`}>
             {/* eslint-disable-next-line @next/next/no-img-element -- data: URL gerada localmente, sem otimização de imagem remota. */}
             <img
               src={qrCode}
@@ -47,10 +47,10 @@ export function PosterFormulario({
             />
           </div>
         ) : (
-          <p className="text-xs text-zinc-400">QR Code indisponível</p>
+          <p className="text-xs text-texto-2">QR Code indisponível</p>
         )}
       </div>
-      <div className={`flex items-center gap-2 text-zinc-500 ${cheio ? "mt-8 text-sm" : "mt-6 text-[10px]"}`}>
+      <div className={`flex items-center gap-2 text-texto-2 ${cheio ? "mt-8 text-sm" : "mt-6 text-[10px]"}`}>
         <ShieldCheck size={cheio ? 18 : 12} />
         <span className={`bg-dourado/60 ${cheio ? "h-4 w-px" : "h-3 w-px"}`} />
         Seus dados estão seguros com a Raion.

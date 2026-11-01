@@ -22,7 +22,7 @@ export function NovoFormularioColapsavel({
           type="button"
           onClick={() => setAberto((v) => !v)}
           aria-expanded={aberto}
-          className="flex items-center gap-1 rounded-lg border border-zinc-200 px-3 py-1.5 text-sm font-medium text-carvao hover:border-dourado"
+          className="flex items-center gap-1 rounded-lg border border-linha px-3 py-1.5 text-sm font-medium text-texto hover:border-dourado"
         >
           {aberto ? "Fechar" : "Criar formulário"}
           <ChevronDown size={14} className={`transition-transform ${aberto ? "rotate-180" : ""}`} />
@@ -32,7 +32,7 @@ export function NovoFormularioColapsavel({
       {aberto ? (
         <NovoFormulario funis={funis} origens={origens} />
       ) : (
-        <p className="text-sm text-zinc-500">Clique em &ldquo;Criar formulário&rdquo; para cadastrar um novo link de captação.</p>
+        <p className="text-sm text-texto-2">Clique em &ldquo;Criar formulário&rdquo; para cadastrar um novo link de captação.</p>
       )}
     </Cartao>
   );
@@ -90,7 +90,7 @@ function NovaOrigemRapida() {
       <button
         type="button"
         onClick={() => setAberto(true)}
-        className="rounded-lg border border-dashed border-zinc-300 px-3 py-2 text-sm text-zinc-600 hover:border-dourado hover:text-carvao"
+        className="rounded-lg border border-dashed border-linha px-3 py-2 text-sm text-texto-2 hover:border-dourado hover:text-texto"
       >
         + Nova origem
       </button>
@@ -101,7 +101,7 @@ function NovaOrigemRapida() {
     return (
       <div className="flex items-center gap-2 text-sm text-green-700">
         {resultado.mensagem}
-        <button type="button" onClick={() => setAberto(false)} className="text-zinc-500 hover:text-zinc-700">
+        <button type="button" onClick={() => setAberto(false)} className="text-texto-2 hover:text-texto">
           Fechar
         </button>
       </div>
@@ -114,13 +114,13 @@ function NovaOrigemRapida() {
         <input
           name="nome"
           placeholder="Nome da origem"
-          className="min-w-0 rounded-md border border-zinc-300 px-3 py-1.5 text-sm"
+          className="min-w-0 rounded-md border border-linha px-3 py-1.5 text-sm"
           required
         />
         <Botao type="submit" variante="secundario" disabled={pendente}>
           Adicionar
         </Botao>
-        <button type="button" onClick={() => setAberto(false)} className="text-sm text-zinc-500 hover:text-zinc-700">
+        <button type="button" onClick={() => setAberto(false)} className="text-sm text-texto-2 hover:text-texto">
           Cancelar
         </button>
       </form>
