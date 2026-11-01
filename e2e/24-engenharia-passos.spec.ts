@@ -2,13 +2,19 @@ import { expect, test } from "@playwright/test";
 import { entrarComo, lerBase } from "./ajuda";
 
 // Engenharia (P6b): o card mostra os oito passos e onde a obra está; o executor confirma o enquadramento (passo 2) e
-// reabre com motivo. Roda depois dos outros testes da Engenharia, na primeira obra da carteira do executor.
+// reabre com motivo. Roda depois dos outros testes da Engenharia, na primeira obra com responsável da carteira do
+// executor (nas obras novas ele ainda não atua, só pode iniciar).
 test("executor vê os oito passos, confirma o enquadramento e reabre com motivo", async ({ page }) => {
   const { usuarios, senha } = lerBase();
 
   await entrarComo(page, usuarios.execEng, senha);
   await page.goto("/engenharia");
-  const link = page.getByRole("region", { name: "Carteira por etapa" }).getByRole("link", { name: /^Obra #/ }).first();
+  const link = page
+    .getByRole("region", { name: "Carteira por etapa" })
+    .getByRole("listitem")
+    .filter({ hasNotText: "Sem responsável" })
+    .first()
+    .getByRole("link", { name: /^Obra #/ });
   const href = (await link.getAttribute("href"))!;
   await page.goto(href);
 

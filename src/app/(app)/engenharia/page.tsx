@@ -1,6 +1,7 @@
-import { AlarmClock, BellRing, CalendarX, CirclePause, HardHat, Hourglass, type LucideIcon } from "lucide-react";
+import { AlarmClock, BellRing, CalendarX, CirclePause, HardHat, Hourglass, Inbox, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { IniciarAtuacao } from "@/components/engenharia/iniciar-atuacao";
 import { ListaTarefasSetor } from "@/components/tarefas-setor";
 import { Cartao, CartaoRecolhivel, Selo } from "@/components/ui";
 import { carregarChecklistsAptos } from "@/lib/engenharia-checklist";
@@ -181,6 +182,8 @@ export default async function Engenharia({ searchParams }: PageProps<"/engenhari
           podeVerObras={pode(atual.papel, OBRAS)}
           // Definir responsável é do admin e do coordenador (quem a RPC deixa gerir a obra); o gestor só acompanha.
           coordena={atual.papel === "admin" || coordenaSetor}
+          // Iniciar atuação é de quem atua na Engenharia (mesma regra da RPC); admin e gestor não iniciam.
+          podeIniciar={atual.papel === "operacao" && atua}
         />
       )}
     </div>
@@ -203,6 +206,7 @@ function Central({
   membroId,
   podeVerObras,
   coordena,
+  podeIniciar,
 }: {
   tarefas: TarefaSetorVM[];
   membrosPorSetor: Parameters<typeof ListaTarefasSetor>[0]["membrosPorSetor"];
@@ -219,15 +223,21 @@ function Central({
   membroId: string;
   podeVerObras: boolean;
   coordena: boolean;
+  podeIniciar: boolean;
 }) {
-  const { acoes, comTerceiros, grupos } = montarCentralEngenharia(obras, (s) => rotuloStatus("engenharia", s), { coordena, exigencias, acoesVistoria });
+  const { acoes, novas, comTerceiros, grupos } = montarCentralEngenharia(obras, (s) => rotuloStatus("engenharia", s), {
+    coordena,
+    podeIniciar,
+    exigencias,
+    acoesVistoria,
+  });
 
   // Minhas tarefas e as da fila que eu posso assumir; o resto do setor fica nas abas.
   const tarefasMinhas = tarefas.filter((t) => t.responsavel?.id === membroId || (!t.responsavel && t.podeAgir));
   const atrasadas = tarefas.filter((t) => t.atrasada).length;
   const totalObras = grupos.reduce((n, g) => n + g.obras.length, 0);
   const paradas = grupos.reduce((n, g) => n + g.obras.filter((o) => o.estado === "parado").length, 0);
-  const nada = tarefasMinhas.length === 0 && acoes.length === 0;
+  const nada = tarefasMinhas.length === 0 && acoes.length === 0 && novas.length === 0;
   // Como a carteira, vem do banco: obras em curso com algum prazo vencido, sem o limite de linhas da lista.
   const prazosVencidos = [...prazos.values()].filter((lista) => lista.some((p) => p.diasRestantes < 0)).length;
 
@@ -235,6 +245,8 @@ function Central({
     // Carteira e paradas vêm do banco (sem o limite de linhas da lista); se ele falhar, contam a lista.
     ["Obras na Engenharia", indicadores?.carteira.total ?? totalObras, HardHat],
     ["Precisam de você", tarefasMinhas.length + acoes.length, BellRing],
+    // Fila do setor (qualquer um que atua pode iniciar), por isso fora de "Precisam de você"; só para quem inicia.
+    ...(podeIniciar ? [["Novas obras", novas.length, Inbox] as [string, number, LucideIcon]] : []),
     ["Aguardando terceiros", comTerceiros.length, Hourglass],
     ["Paradas", indicadores?.carteira.paradas ?? paradas, CirclePause],
     ["Prazos vencidos", prazosVencidos, CalendarX],
@@ -245,7 +257,7 @@ function Central({
     <>
       {/* Indicadores numa superfície só, separados por fios (como no Início), sem um cartão por número. */}
       <div className="painel overflow-hidden">
-        <dl className="grid grid-cols-2 gap-px bg-linha sm:grid-cols-3 lg:grid-cols-6">
+        <dl className={`grid grid-cols-2 gap-px bg-linha sm:grid-cols-3 ${numeros.length > 6 ? "sm:grid-cols-4 lg:grid-cols-7" : "lg:grid-cols-6"}`}>
           {numeros.map(([rotulo, valor, Icone]) => (
             <div key={rotulo} className="flex min-w-0 flex-col gap-2 bg-superficie p-4 md:p-5">
               <dt className="flex min-w-0 items-center gap-2 text-xs font-medium text-texto-2">
@@ -263,6 +275,14 @@ function Central({
           <p className="text-sm text-zinc-500">Nenhuma ação pendente para você agora.</p>
         ) : (
           <div className="flex flex-col gap-5">
+            {novas.length > 0 && (
+              <section aria-label="Novas obras">
+                <h3 className="mb-2 text-sm font-medium text-texto">
+                  Novas obras <span className="text-zinc-500">({novas.length})</span>
+                </h3>
+                <ListaNovas obras={novas} />
+              </section>
+            )}
             {tarefasMinhas.length > 0 && (
               <section aria-label="Tarefas">
                 <h3 className="mb-2 text-sm font-medium text-texto">
@@ -532,6 +552,34 @@ function ListaObras({ obras, prazos, acao = false }: { obras: ObraNaEngenharia[]
                 );
               })}
             </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** Obras sem responsável na Engenharia, cada uma com "Iniciar atuação" (quem inicia vira o responsável principal). */
+function ListaNovas({ obras }: { obras: ObraNaEngenharia[] }) {
+  return (
+    <ul className="divide-y divide-linha rounded-lg border border-linha">
+      {obras.map((o) => {
+        const tempo = ha(o.desde);
+        return (
+          <li key={o.id} className="flex flex-wrap items-center justify-between gap-3 px-3 py-2 text-sm">
+            <div className="min-w-0">
+              <p className="break-words font-medium text-texto">
+                <Link href={`/engenharia/${o.id}`} className="hover:underline">
+                  Obra #{o.numero} · {o.clienteNome}
+                </Link>
+              </p>
+              <p className="text-xs text-zinc-500">
+                {o.cidadeUf}
+                {formatarPotencia(o.potenciaKwp)}
+                {tempo ? ` · na fila ${tempo}` : ""}
+              </p>
+            </div>
+            <IniciarAtuacao obraId={o.id} rotulo={`Iniciar atuação na obra #${o.numero}`} />
           </li>
         );
       })}

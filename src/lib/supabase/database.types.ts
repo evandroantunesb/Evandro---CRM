@@ -5759,6 +5759,7 @@ export type Database = {
       incrementar_preenchimento_formulario: { Args: { p_id: string }; Returns: undefined };
       incrementar_visualizacao_formulario: { Args: { p_id: string }; Returns: undefined };
       indicadores_engenharia: { Args: { p_desde: string; p_empresa_id: string }; Returns: Json };
+      iniciar_atuacao_engenharia: { Args: { p_obra_id: string }; Returns: string };
       inserir_checklist_engenharia_padrao: { Args: { p_empresa_id: string }; Returns: undefined };
       inserir_fixacoes_telhado_padrao: { Args: { p_empresa_id: string }; Returns: undefined };
       inserir_prazos_engenharia_padrao: { Args: { p_empresa_id: string }; Returns: undefined };

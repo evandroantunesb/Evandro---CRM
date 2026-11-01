@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 import { CHAVES_PERGUNTA, respostaValida } from "@/lib/engenharia-enquadramento-regras";
 import { ACOES_PASSO, ehPassoComRegistro } from "@/lib/engenharia-passos-regras";
@@ -268,6 +269,21 @@ const esquemaPasso = comObra.extend({
   acao: z.enum(ACOES_PASSO, { error: "Ação inválida." }),
   observacao: z.preprocess(vazioComoNada, z.string().trim().min(3, "Mínimo 3 caracteres.").max(500, "Máximo 500 caracteres.").optional()),
 });
+
+/**
+ * "Iniciar atuação": quem atua na Engenharia assume a obra nova (sem responsável principal). A RPC confere o setor,
+ * trava a obra e só um leva; quem iniciou vai direto para o card.
+ */
+export async function iniciarAtuacaoEngenharia(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  await exigirPapel(...ENGENHARIA);
+  const d = comObra.safeParse(Object.fromEntries(formData));
+  if (!d.success) return { ok: false, mensagem: "Obra inválida." };
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.rpc("iniciar_atuacao_engenharia", { p_obra_id: d.data.obraId });
+  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível iniciar a obra.") };
+  revalidar(d.data.obraId);
+  redirect(`/engenharia/${d.data.obraId}`);
+}
 
 /** Confirma, reabre ou marca "não se aplica" um passo da Engenharia (2, 3, 5 ou 7); a RPC confere as travas. */
 export async function registrarPassoEngenharia(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {

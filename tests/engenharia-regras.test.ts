@@ -106,6 +106,18 @@ describe("montarCentralEngenharia", () => {
     expect(exec.acoes).toEqual([]);
     expect(exec.comTerceiros.map((o) => o.numero)).toEqual([6]);
   });
+
+  it("sem responsável, quem pode iniciar vê a obra em 'Novas obras' (a mais antiga primeiro), mesmo coordenando", () => {
+    const nova = obra(7, "a_iniciar", { principalNome: null, souPrincipal: false });
+    const antiga = obra(4, "a_iniciar", { principalNome: null, souPrincipal: false });
+    const minha = obra(9, "projeto_em_elaboracao");
+    for (const coordena of [false, true]) {
+      const central = montarCentralEngenharia([nova, antiga, minha], rotulo, { coordena, podeIniciar: true });
+      expect(central.novas.map((o) => o.numero)).toEqual([4, 7]);
+      expect(central.acoes.map((o) => o.numero)).toEqual([9]);
+    }
+    expect(montarCentralEngenharia([nova], rotulo, { coordena: true }).novas).toEqual([]);
+  });
 });
 
 describe("central com exigência aberta (P3)", () => {

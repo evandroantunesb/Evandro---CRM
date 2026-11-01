@@ -50,6 +50,8 @@ export type GrupoEngenharia = { status: string; rotulo: string; obras: ObraNaEng
 export type CentralEngenharia = {
   /** Obras com ação minha: sou o principal ou, se coordeno, a obra está sem principal. Sem as que esperam terceiro. */
   acoes: ObraNaEngenharia[];
+  /** Novas obras: sem responsável principal, para quem atua na Engenharia iniciar. */
+  novas: ObraNaEngenharia[];
   /** Obras paradas com terceiro (cliente, fornecedor, concessionária…), visíveis a quem vê a carteira. */
   comTerceiros: ObraNaEngenharia[];
   /** Carteira por etapa, na ordem do fluxo, com os grupos vazios. */
@@ -104,10 +106,13 @@ export function montarCentralEngenharia(
   rotuloStatus: (status: string) => string,
   {
     coordena,
+    podeIniciar = false,
     exigencias = new Map(),
     acoesVistoria = new Map(),
   }: {
     coordena: boolean;
+    /** Atua na Engenharia (papel Operação): obra sem responsável vai para "Novas obras", com "Iniciar atuação". */
+    podeIniciar?: boolean;
     /** Exigências abertas por obra (protocolos, P3). */
     exigencias?: ReadonlyMap<string, number>;
     /** Ação que a vistoria mais recente pede, por obra (P4). */
@@ -118,6 +123,7 @@ export function montarCentralEngenharia(
     STATUS_POR_SETOR.engenharia.filter((s) => !setorConcluido("engenharia", s)).map((s) => [s, []]),
   );
   const acoes: ObraNaEngenharia[] = [];
+  const novas: ObraNaEngenharia[] = [];
   const comTerceiros: ObraNaEngenharia[] = [];
   for (const o of obras) {
     const item = paraEngenharia(o, rotuloStatus, exigencias.get(o.id) ?? 0, acoesVistoria.get(o.id) ?? null);
@@ -126,13 +132,15 @@ export function montarCentralEngenharia(
     const lista = grupos.get(item.status) ?? [];
     grupos.set(item.status, lista);
     lista.push(item);
-    // Sem responsável a ação é de quem coordena, mesmo que a etapa espere terceiro.
-    if (item.principalNome == null && coordena) acoes.push(item);
+    // Sem responsável: quem atua na Engenharia pode iniciar (Novas obras); o admin, que não inicia, define o responsável.
+    if (item.principalNome == null && podeIniciar) novas.push(item);
+    else if (item.principalNome == null && coordena) acoes.push(item);
     else if (item.comTerceiro) comTerceiros.push(item);
     else if (item.souPrincipal) acoes.push(item);
   }
   return {
     acoes: acoes.sort(porAntiguidade),
+    novas: novas.sort(porAntiguidade),
     comTerceiros: comTerceiros.sort(porAntiguidade),
     grupos: [...grupos].map(([status, lista]) => ({ status, rotulo: rotuloStatus(status), obras: lista.sort((a, b) => a.numero - b.numero) })),
   };
