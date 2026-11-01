@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import { funcaoAusente, tabelaAusente } from "@/lib/schema-ausente";
 import { carregarLinhasVenda } from "@/lib/venda";
 import type { SupabaseServidor } from "@/lib/supabase/server";
+import { fichaInteira } from "./fonte-ficha";
 
 describe("reconhecimento de schema ausente", () => {
   it("tabela: códigos 42P01/PGRST205 citando a tabela esperada", () => {
@@ -95,7 +96,7 @@ describe("ficha do negócio e lista: sem vazamento para o SDR", () => {
     const { readFileSync } = await import("node:fs");
     const { join } = await import("node:path");
     const lista = readFileSync(join(__dirname, "..", "src/app/(app)/propostas-contratos/page.tsx"), "utf8");
-    const ficha = readFileSync(join(__dirname, "..", "src/app/(app)/negocios/[id]/page.tsx"), "utf8");
+    const ficha = fichaInteira();
     expect(lista).toContain("exigirPapel(...PROPOSTA_E_CONTRATO)");
     expect(ficha).toMatch(/veContratoEPagamento\s*\n?\s*\? await Promise\.all/);
     expect(ficha).toContain("if (!ausente) throw res.error");
