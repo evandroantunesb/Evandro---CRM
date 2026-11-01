@@ -17,7 +17,7 @@ export function BlocoLinha({ modeloId, bloco, posicao, total }: { modeloId: stri
   const [resRemover, acaoRemover] = useActionState(removerBlocoModelo, null);
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-zinc-200 p-3">
+    <div className="flex flex-col gap-2 rounded-lg border border-linha p-3">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-start gap-2">
           <div className="flex flex-col pt-0.5">
@@ -28,7 +28,7 @@ export function BlocoLinha({ modeloId, bloco, posicao, total }: { modeloId: stri
               <button
                 type="submit"
                 disabled={movendo || posicao === 0}
-                className="block text-zinc-400 hover:text-carvao disabled:opacity-30"
+                className="block text-texto-2 hover:text-texto disabled:opacity-30"
                 aria-label="Mover para cima"
               >
                 <ChevronUp size={16} />
@@ -41,7 +41,7 @@ export function BlocoLinha({ modeloId, bloco, posicao, total }: { modeloId: stri
               <button
                 type="submit"
                 disabled={movendo || posicao === total - 1}
-                className="block text-zinc-400 hover:text-carvao disabled:opacity-30"
+                className="block text-texto-2 hover:text-texto disabled:opacity-30"
                 aria-label="Mover para baixo"
               >
                 <ChevronDown size={16} />
@@ -50,11 +50,11 @@ export function BlocoLinha({ modeloId, bloco, posicao, total }: { modeloId: stri
           </div>
           <div>
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-sm font-medium text-zinc-900">{def?.nome ?? bloco.tipo}</span>
+              <span className="text-sm font-medium text-texto">{def?.nome ?? bloco.tipo}</span>
               {def && !def.implementado && <Selo tom="atencao">Em breve no PDF</Selo>}
               {def?.obrigatorioNoComercial && <Selo tom="neutro">Obrigatório p/ publicar</Selo>}
             </div>
-            <p className="text-xs text-zinc-500">
+            <p className="text-xs text-texto-2">
               {def ? NOME_CATEGORIA_BLOCO[def.categoria] : ""}
               {def?.descricao ? ` · ${def.descricao}` : ""}
             </p>
@@ -77,7 +77,7 @@ export function BlocoLinha({ modeloId, bloco, posicao, total }: { modeloId: stri
             <button
               type="submit"
               className={`rounded-lg border px-2.5 py-1.5 text-xs font-medium ${
-                bloco.ativo ? "border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50" : "border-dourado/40 bg-dourado/10 text-dourado"
+                bloco.ativo ? "border-linha bg-superficie text-texto hover:bg-superficie-2" : "border-dourado/40 bg-dourado/10 text-dourado"
               }`}
             >
               {bloco.ativo ? "Ativo" : "Desativado"}
@@ -91,7 +91,7 @@ export function BlocoLinha({ modeloId, bloco, posicao, total }: { modeloId: stri
           >
             <input type="hidden" name="modeloId" value={modeloId} />
             <input type="hidden" name="id" value={bloco.id} />
-            <button type="submit" className="rounded-lg p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-700" aria-label="Remover bloco">
+            <button type="submit" className="rounded-lg p-1.5 text-texto-2 hover:bg-red-50 hover:text-red-700" aria-label="Remover bloco">
               <Trash2 size={16} />
             </button>
           </form>
