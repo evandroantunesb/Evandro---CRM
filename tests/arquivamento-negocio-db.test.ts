@@ -166,7 +166,7 @@ describe("vínculos do negócio arquivado", () => {
       .insert({ empresa_id: empresa, negocio_id: arquivado, membro_sugerido_id: membroVendedor, expira_em: amanha() })
       .select("id")
       .single();
-    expect((await admin.cliente.rpc("decidir_atribuicao_lead", { p_id: decidida!.id, p_membro_final_id: membroVendedor, p_automatico: false })).error).toBeNull();
+    expect((await admin.cliente.rpc("aprovar_atribuicao_lead", { p_id: decidida!.id, p_membro_final_id: membroVendedor })).error).toBeNull();
     expect((await admin.cliente.rpc("arquivar_negocio", { p_negocio_id: arquivado, p_motivo: "Vínculos" })).error).toBeNull();
 
     const { error: devolver } = await servico
@@ -205,7 +205,7 @@ describe("vínculos do negócio arquivado", () => {
       .insert({ empresa_id: empresa, negocio_id: negocio, membro_sugerido_id: membroVendedor, expira_em: amanha() })
       .select("id")
       .single();
-    expect((await gestor.cliente.rpc("decidir_atribuicao_lead", { p_id: atribuicao!.id, p_membro_final_id: membroVendedor, p_automatico: false })).error).toBeNull();
+    expect((await gestor.cliente.rpc("aprovar_atribuicao_lead", { p_id: atribuicao!.id, p_membro_final_id: membroVendedor })).error).toBeNull();
     expect((await admin.cliente.rpc("arquivar_negocio", { p_negocio_id: negocio, p_motivo: "Anulação automática" })).error).toBeNull();
 
     expect((await servico.from("empresa_membros").delete().eq("id", mg!.id)).error).toBeNull();
