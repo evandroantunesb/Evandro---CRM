@@ -1,5 +1,7 @@
 import "server-only";
+import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import { z } from "zod";
+import type { criarClienteAdmin } from "@/lib/supabase/admin";
 
 /**
  * Integração com o Google Agenda: cada membro conecta a própria conta Google
@@ -16,9 +18,70 @@ function credenciais() {
   return { clientId, clientSecret };
 }
 
-/** Se a integração não tiver as variáveis de ambiente configuradas, a tela nem mostra a opção. */
+/** Chave AES-256 do refresh_token: 32 bytes em base64, só nas variáveis do servidor (Vercel), nunca no banco. */
+function chaveToken(): Buffer | null {
+  const valor = process.env.GOOGLE_AGENDA_CHAVE;
+  if (!valor) return null;
+  const chave = Buffer.from(valor, "base64");
+  return chave.length === 32 ? chave : null;
+}
+
+/** Se a integração não tiver as variáveis de ambiente configuradas (inclusive a chave), a tela nem mostra a opção. */
 export function integracaoConfigurada(): boolean {
-  return credenciais() !== null;
+  return credenciais() !== null && chaveToken() !== null;
+}
+
+const PREFIXO_CIFRA = "v1:";
+
+/**
+ * Cifra o refresh_token para gravar (AES-256-GCM, IV aleatório). O id do membro entra como dado autenticado: o valor
+ * de um membro não decifra para outro, mesmo copiado de linha.
+ */
+export function cifrarRefreshToken(token: string, membroId: string): string {
+  const chave = chaveToken();
+  if (!chave) throw new Error("GOOGLE_AGENDA_CHAVE ausente ou inválida.");
+  const iv = randomBytes(12);
+  const cifra = createCipheriv("aes-256-gcm", chave, iv);
+  cifra.setAAD(Buffer.from(membroId));
+  const corpo = Buffer.concat([cifra.update(token, "utf8"), cifra.final()]);
+  return PREFIXO_CIFRA + Buffer.concat([iv, cifra.getAuthTag(), corpo]).toString("base64");
+}
+
+/**
+ * Token em claro a partir do valor gravado. Conexões antigas (texto puro, sem prefixo) voltam como `legado`; valor
+ * cifrado sem a chave certa, de outro membro ou adulterado devolve null.
+ */
+export function decifrarRefreshToken(valor: string, membroId: string): { token: string; legado: boolean } | null {
+  if (!valor.startsWith(PREFIXO_CIFRA)) return { token: valor, legado: true };
+  const chave = chaveToken();
+  if (!chave) return null;
+  try {
+    const bruto = Buffer.from(valor.slice(PREFIXO_CIFRA.length), "base64");
+    const decifra = createDecipheriv("aes-256-gcm", chave, bruto.subarray(0, 12));
+    decifra.setAAD(Buffer.from(membroId));
+    decifra.setAuthTag(bruto.subarray(12, 28));
+    return { token: Buffer.concat([decifra.update(bruto.subarray(28)), decifra.final()]).toString("utf8"), legado: false };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * refresh_token da conexão do membro, ou null se não houver (ou não decifrar). Conexão antiga em texto puro é cifrada
+ * aqui no primeiro uso, sem pedir para o usuário reconectar.
+ */
+export async function refreshTokenDoMembro(admin: ReturnType<typeof criarClienteAdmin>, membroId: string): Promise<string | null> {
+  const { data: conexao } = await admin.from("google_agenda_conexoes").select("refresh_token").eq("membro_id", membroId).maybeSingle();
+  if (!conexao) return null;
+  const lido = decifrarRefreshToken(conexao.refresh_token, membroId);
+  if (lido?.legado && chaveToken()) {
+    await admin
+      .from("google_agenda_conexoes")
+      .update({ refresh_token: cifrarRefreshToken(lido.token, membroId) })
+      .eq("membro_id", membroId)
+      .eq("refresh_token", conexao.refresh_token);
+  }
+  return lido?.token ?? null;
 }
 
 export function urlAutorizacao(redirectUri: string, state: string): string | null {
