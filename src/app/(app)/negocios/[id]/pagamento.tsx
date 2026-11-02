@@ -16,11 +16,14 @@ export function Pagamento({
   contratoId,
   status,
   podeConfirmar,
+  motivoSemConfirmar,
 }: {
   negocioId: string;
   contratoId: string;
   status: StatusPagamentoContrato;
   podeConfirmar: boolean;
+  /** Por que quem vê não confirma (sem papel, ou foi quem fechou a venda); só usado quando `podeConfirmar` é falso. */
+  motivoSemConfirmar: string;
 }) {
   const [resultadoConfirmar, acaoConfirmar, confirmando] = useActionState(confirmarPagamento, null);
   const [resultadoEstornar, acaoEstornar] = useActionState(estornarConfirmacaoPagamento, null);
@@ -33,7 +36,7 @@ export function Pagamento({
       <Selo tom={tom}>{ROTULO_STATUS_PAGAMENTO_CONTRATO[status]}</Selo>
 
       {!podeConfirmar && status !== "confirmado" && (
-        <p className="text-sm text-zinc-600">Só gestor ou admin pode confirmar o pagamento.</p>
+        <p className="text-sm text-zinc-600">{motivoSemConfirmar}</p>
       )}
 
       {podeConfirmar && (status === "pendente" || status === "estornado") && (
