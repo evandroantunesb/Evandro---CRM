@@ -4,6 +4,7 @@ import { hojeEmSaoPaulo } from "@/lib/formatacao";
 import { PAGAMENTO_SOLO, PROPOSTA_E_CONTRATO, VALIDADE_PROPOSTA, pode } from "@/lib/permissoes";
 import { type ModoPreco, type StatusContrato, type StatusPagamentoContrato } from "@/lib/tipos";
 import { Contrato } from "./contrato";
+import { DescontoNegocio } from "./desconto";
 import { DadosCliente } from "./dados-cliente";
 import { mensagemPendenciasContrato } from "@/lib/dados-cliente-contrato";
 import { EletropostoNegocio } from "./eletroposto";
@@ -45,6 +46,7 @@ export function AbaProposta({ ficha }: { ficha: Ficha }) {
     situacaoPagamentoSolo,
     statusPagamento,
     registrosPagamento,
+    desconto,
   } = ficha;
   return ehEletroposto ? (
     <div id="proposta" className="scroll-mt-4">
@@ -115,6 +117,30 @@ export function AbaProposta({ ficha }: { ficha: Ficha }) {
           </Cartao>
           )}
         </>
+      )}
+      {desconto && (
+        <div id="desconto" className="scroll-mt-4">
+          <Cartao titulo="Desconto à vista">
+            <DescontoNegocio
+              negocioId={negocio.id}
+              limite={desconto.limite}
+              souAdmin={souAdmin}
+              possoDecidir={desconto.possoDecidir}
+              podePedir={!arquivado}
+              pedidos={desconto.pedidos.map((p) => ({
+                id: p.id,
+                percentual: Number(p.percentual),
+                motivo: p.motivo,
+                status: p.status as "pendente" | "aprovado" | "recusado" | "cancelado",
+                solicitante: nomes.membro(p.solicitado_por),
+                decisor: p.decidido_por ? nomes.membro(p.decidido_por) : null,
+                decididoEm: p.decidido_em,
+                motivoDecisao: p.motivo_decisao,
+                criadoEm: p.created_at,
+              }))}
+            />
+          </Cartao>
+        </div>
       )}
       {pode(atual.papel, PROPOSTA_E_CONTRATO) && (
         <div id="contrato" className="flex scroll-mt-4 flex-col gap-4">

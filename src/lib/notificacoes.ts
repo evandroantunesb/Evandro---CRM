@@ -20,7 +20,10 @@ export type Notificacao = {
     | "tarefa_setor_concluida"
     | "tarefa_setor_cancelada"
     | "tarefa_setor_atribuida"
-    | "tarefa_setor_reaberta";
+    | "tarefa_setor_reaberta"
+    // Aprovação de desconto (20261102200000_descontos_aprovacao.sql).
+    | "desconto_solicitado"
+    | "desconto_decidido";
   mensagem: string;
   link: string | null;
 };

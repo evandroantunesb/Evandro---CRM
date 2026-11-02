@@ -1,3 +1,4 @@
+import { carregarDescontoNegocio } from "@/lib/descontos";
 import type { Vinculo } from "@/lib/sessao";
 import { notFound } from "next/navigation";
 import { carregarTarefasSetor } from "@/lib/tarefas-setor";
@@ -203,6 +204,8 @@ export async function carregarFicha(atual: Vinculo, id: string, abaParam: string
     !registroPagamentoAtivo &&
     !(situacaoPagamentoSolo === "permitido" && statusPagamento === "pendente");
 
+  const desconto = veContratoEPagamento ? await carregarDescontoNegocio(supabase, atual.empresaId, id) : null;
+
   const { data: ultimoHandoff } = await supabase
     .from("handoffs")
     .select("id, para_membro_id, de_membro_id, status, motivo_devolucao, created_at, qualificacao_snapshot, handoffs_feedback(feedback, autor_id)")
@@ -323,7 +326,7 @@ export async function carregarFicha(atual: Vinculo, id: string, abaParam: string
     registroManualIndisponivel, registrosPagamento, situacaoPagamentoSolo, mostrarPagamentoSolo, mostrarPagamentoPro, ultimoHandoff,
     podeResponderHandoff, obraDoNegocio, arquivado, precoDesatualizado, vigenciaDaTela, contextoEstimativa, historicoCalculo,
     bloqueioProposta, bloqueioEmissao, bloqueioContrato, responsavelInativo, cartao, contato, pendenciasCliente, nomes, souAdmin,
-    etiquetasMarcadas, etiquetasVisiveis, abas, aba, pedidosSetor,
+    etiquetasMarcadas, etiquetasVisiveis, abas, aba, pedidosSetor, desconto,
   };
 }
 
