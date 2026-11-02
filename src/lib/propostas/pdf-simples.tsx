@@ -2,6 +2,7 @@ import { Document, Font, Image, Page, StyleSheet, Text, View } from "@react-pdf/
 import { formatarMoeda } from "@/lib/formatacao";
 import { ROTULO_TIPO_COMPONENTE_KIT } from "@/lib/tipos";
 import { FONTES_PDF } from "./fontes-pdf";
+import { CondicoesPagamentoPdf } from "./pdf-condicoes";
 import { dataBr, linhasCondicoesPagamento, textoPremissaGeracao, type DadosEmissaoSimples } from "./proposta-simples";
 
 // Manrope nos títulos e Inter nos textos (identidade do Raion), embutidas: nada é buscado na rede na hora de gerar.
@@ -274,8 +275,8 @@ function Colunas({ dados, e, p }: { dados: DadosEmissaoSimples; e: ReturnType<ty
   const { incluso, exclusos } = dados.comercial;
   if (!incluso && !exclusos) return null;
   const coluna = (titulo: string, itens: string[], cor: string, fundo: string) => (
-    <View style={{ flex: 1, backgroundColor: fundo, borderWidth: 1, borderColor: p.borda, borderRadius: 8, padding: 11 }}>
-      <Text style={{ fontSize: 8.5, ...NEGRITO, letterSpacing: 0.7, color: cor, marginBottom: 7 }}>{titulo}</Text>
+    <View style={{ flex: 1, backgroundColor: fundo, borderWidth: 1, borderColor: p.borda, borderRadius: 8, padding: 8 }}>
+      <Text style={{ fontSize: 8.5, ...NEGRITO, letterSpacing: 0.7, color: cor, marginBottom: 5 }}>{titulo}</Text>
       <View style={e.lista}>
         {itens.map((item, i) => (
           <View key={i} style={e.itemLista}>
@@ -307,14 +308,17 @@ function PaginaOferta({ dados, imagens, e, p }: { dados: DadosEmissaoSimples; im
 
         <View style={e.cartao} wrap={false}>
           {/* Valor na faixa do título e condições em largura total: as condições por modalidade cabem nas 3 páginas. */}
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderWidth: 1, borderColor: p.acento, backgroundColor: p.acentoSuave, borderRadius: 9, paddingVertical: 7, paddingHorizontal: 10 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderWidth: 1, borderColor: p.acento, backgroundColor: p.acentoSuave, borderRadius: 9, paddingVertical: 5, paddingHorizontal: 10 }}>
             <View>
               <Text style={{ fontSize: 12, ...TITULO }}>Investimento</Text>
               <Text style={{ fontSize: 7, ...NEGRITO, letterSpacing: 1, color: p.suave, marginTop: 2 }}>VALOR DA PROPOSTA</Text>
             </View>
             <Text style={{ fontSize: 22, ...TITULO }}>{formatarMoeda(dados.preco.valor)}</Text>
           </View>
-          {linhasCondicoesPagamento(dados).length > 0 ? (
+          {dados.esquema === 5 ? (
+            <CondicoesPagamentoPdf condicoes={dados.comercial.condicoesPagamento} p={p} />
+          ) : linhasCondicoesPagamento(dados).length > 0 ? (
+            // Esquema 4 (texto livre): uma opção por linha.
             <View style={{ marginTop: 7 }}>
               <Text style={{ fontSize: 7.5, ...NEGRITO, letterSpacing: 0.8, color: p.acento, marginBottom: 4 }}>CONDIÇÕES DE PAGAMENTO</Text>
               <View style={{ gap: 2.5 }}>
@@ -343,13 +347,15 @@ function PaginaOferta({ dados, imagens, e, p }: { dados: DadosEmissaoSimples; im
         ) : null}
 
         <View style={{ borderLeftWidth: 3, borderLeftColor: p.acento, backgroundColor: p.cartao, borderRadius: 9, padding: 9 }} wrap={false}>
-          <Text style={{ fontSize: 11.5, ...TITULO }}>{dados.identidade.nomeExibicao ? `${dados.identidade.nomeExibicao}: próximos passos` : "Próximos passos"}</Text>
-          <Text style={{ fontSize: 9, color: p.suave, marginTop: 3 }}>Fale com seu consultor para tirar dúvidas e avançar com a sua proposta.</Text>
-          {/* WhatsApp e validade na mesma linha (antes, uma linha cada). */}
-          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 5 }}>
-            {dados.identidade.whatsapp ? <Text style={{ fontSize: 11, ...NEGRITO, color: p.verde }}>{`WhatsApp: ${dados.identidade.whatsapp}`}</Text> : <View />}
+          {/* Duas linhas: título e WhatsApp; convite e validade. */}
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+            <Text style={{ fontSize: 11.5, ...TITULO, flexShrink: 1 }}>{dados.identidade.nomeExibicao ? `${dados.identidade.nomeExibicao}: próximos passos` : "Próximos passos"}</Text>
+            {dados.identidade.whatsapp ? <Text style={{ fontSize: 11, ...NEGRITO, color: p.verde }}>{`WhatsApp: ${dados.identidade.whatsapp}`}</Text> : null}
+          </View>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8, marginTop: 4 }}>
+            <Text style={{ fontSize: 9, color: p.suave, flexShrink: 1 }}>Fale com seu consultor para tirar dúvidas e avançar com a sua proposta.</Text>
             <Text style={{ fontSize: 9, color: p.suave }}>
-              {"Proposta válida até "}
+              {"Válida até "}
               <Text style={{ ...NEGRITO, color: p.texto }}>{dataBr(c.validadeAte)}</Text>
             </Text>
           </View>
