@@ -18,6 +18,7 @@ export const PLACEHOLDERS_CONTRATO = [
   { chave: "negocio_titulo", rotulo: "Título do negócio" },
   { chave: "negocio_numero", rotulo: "Número do negócio" },
   { chave: "negocio_valor", rotulo: "Valor do negócio (R$)" },
+  { chave: "condicao_pagamento", rotulo: "Condição de pagamento escolhida" },
   { chave: "negocio_uc", rotulo: "Unidade consumidora" },
   { chave: "distribuidora", rotulo: "Distribuidora de energia" },
   { chave: "vendedor_nome", rotulo: "Nome do vendedor responsável" },
@@ -130,6 +131,8 @@ export type FontesContrato = {
   } | null;
   itensKit: { descricao: string; quantidade: number | null; potencia_w: number | null }[];
   vendedorNome: string | null;
+  /** Condição de pagamento escolhida pelo cliente, por extenso (nula = não registrada). */
+  condicaoPagamento?: string | null;
   agora: Date;
   formatarMoeda: (valor: number) => string;
 };
@@ -170,6 +173,7 @@ export function montarDadosContrato(f: FontesContrato): DadosContrato {
     negocio_titulo: f.negocio.titulo,
     negocio_numero: f.negocio.numero != null ? String(f.negocio.numero) : "",
     negocio_valor: f.negocio.valor != null ? f.formatarMoeda(f.negocio.valor) : "",
+    condicao_pagamento: f.condicaoPagamento ?? "",
     negocio_uc: f.negocio.unidade_consumidora ?? "",
     distribuidora: f.negocio.qualif_distribuidora ?? "",
     vendedor_nome: f.vendedorNome ?? "",

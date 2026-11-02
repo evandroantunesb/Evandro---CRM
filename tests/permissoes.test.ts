@@ -26,6 +26,7 @@ const MATRIZ: Record<string, string[]> = {
   FILTRAR_NEGOCIOS_POR_RESPONSAVEL: ["admin", "gestor"],
   PROPOSTA_E_CONTRATO: ["admin", "gestor", "vendedor"],
   CONFIRMAR_PAGAMENTO: ["admin", "gestor"],
+  CORRIGIR_VALOR_GANHO: ["admin", "gestor"],
   // Registro manual do Solo (PR #186/#188): espelha as RPCs de registro, estorno e correção.
   PAGAMENTO_SOLO: ["admin"],
   EDITAR_MODELO_CONTRATO: ["admin"],

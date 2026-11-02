@@ -39,7 +39,13 @@ export async function gerarContrato(_: ResultadoAcao, formData: FormData): Promi
   if (!id.success) return { ok: false, mensagem: "Negócio inválido." };
 
   const supabase = await criarClienteServidor();
-  const resultado = await gerarContratoComCliente(supabase, { empresaId: atual.empresaId, membroId: atual.membroId, negocioId: id.data });
+  const condicao = z.string().max(40).safeParse(formData.get("condicao") ?? "");
+  const resultado = await gerarContratoComCliente(supabase, {
+    empresaId: atual.empresaId,
+    membroId: atual.membroId,
+    negocioId: id.data,
+    condicao: condicao.success && condicao.data ? condicao.data : null,
+  });
   if (!resultado.ok) return resultado;
 
   revalidatePath(`/negocios/${id.data}`);

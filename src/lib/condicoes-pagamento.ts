@@ -43,6 +43,57 @@ export const esquemaPreferencias = z.object({
   personalizadoAtivo: z.enum(["on"]).optional().transform((v) => v === "on"),
 });
 
+/**
+ * Valor do negócio quando o vendedor registra a condição que o cliente escolheu (migration
+ * 20261103100000_condicao_escolhida_contrato.sql): por modalidade, o preço do sistema da proposta ou o total que o
+ * cliente paga naquela condição.
+ */
+export const MODALIDADES = ["aVista", "parcelado", "financiamento", "personalizado"] as const;
+export type Modalidade = (typeof MODALIDADES)[number];
+export const ROTULO_MODALIDADE: Record<Modalidade, string> = {
+  aVista: "À vista",
+  parcelado: "Parcelado (cartão ou boleto)",
+  financiamento: "Financiamento",
+  personalizado: "Personalizado",
+};
+export const BASES_VALOR_NEGOCIO = ["preco", "total_cliente"] as const;
+export type BaseValorNegocio = (typeof BASES_VALOR_NEGOCIO)[number];
+export type ValorNegocioPorModalidade = Record<Modalidade, BaseValorNegocio>;
+/** Total pago pelo cliente em cada modalidade, para a tela explicar a opção. */
+export const ROTULO_TOTAL_CLIENTE: Record<Modalidade, string> = {
+  aVista: "Total pago pelo cliente (com o desconto)",
+  parcelado: "Total pago pelo cliente (parcelas somadas)",
+  financiamento: "Total pago pelo cliente (entrada + parcelas)",
+  personalizado: "Total pago pelo cliente (soma das partes)",
+};
+
+/** Sem linha gravada: à vista e Personalizado mudam o valor; parcelado e financiamento não (decisão de 02/11/2026). */
+export const VALOR_NEGOCIO_PADRAO: ValorNegocioPorModalidade = { aVista: "total_cliente", parcelado: "preco", financiamento: "preco", personalizado: "total_cliente" };
+
+const base = (v: string | null | undefined, padrao: BaseValorNegocio): BaseValorNegocio => (v === "preco" || v === "total_cliente" ? v : padrao);
+
+export function valorNegocioDaEmpresa(
+  linha:
+    | { valor_negocio_avista: string; valor_negocio_parcelado: string; valor_negocio_financiamento: string; valor_negocio_personalizado: string }
+    | null
+    | undefined,
+): ValorNegocioPorModalidade {
+  const p = VALOR_NEGOCIO_PADRAO;
+  return {
+    aVista: base(linha?.valor_negocio_avista, p.aVista),
+    parcelado: base(linha?.valor_negocio_parcelado, p.parcelado),
+    financiamento: base(linha?.valor_negocio_financiamento, p.financiamento),
+    personalizado: base(linha?.valor_negocio_personalizado, p.personalizado),
+  };
+}
+
+export const esquemaValorNegocio = z.object({
+  aVista: z.enum(BASES_VALOR_NEGOCIO),
+  parcelado: z.enum(BASES_VALOR_NEGOCIO),
+  financiamento: z.enum(BASES_VALOR_NEGOCIO),
+  personalizado: z.enum(BASES_VALOR_NEGOCIO),
+});
+
 export type TaxaParcela = { parcelas: number; taxa: number };
 
 /**

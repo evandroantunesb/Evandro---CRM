@@ -12,7 +12,9 @@ import { calculoEhIncompleto, calculoEhLegado, carregarVigencia, mensagemDeRecus
 import { MENSAGEM_PRECO_DESATUALIZADO, precoDoCalculoDesatualizado } from "@/lib/calculo-preco";
 import { mensagemPendenciasContrato, pendenciasDadosContrato, type DadosClienteContrato } from "@/lib/dados-cliente-contrato";
 import { mensagemErro } from "@/lib/erros";
-import { formatarMoeda } from "@/lib/formatacao";
+import type { CondicaoRegistrada } from "@/lib/condicao-escolhida";
+import { carregarEscolhaCondicao } from "@/lib/condicoes-pagamento-dados";
+import { formatarMoeda, hojeEmSaoPaulo } from "@/lib/formatacao";
 import type { SupabaseServidor } from "@/lib/supabase/server";
 import type { ResultadoAcao, StatusContrato } from "@/lib/tipos";
 
@@ -22,10 +24,27 @@ import type { ResultadoAcao, StatusContrato } from "@/lib/tipos";
  * direto com o cliente de cada usuário). Tudo sob a RLS de quem chama.
  */
 
-/** Gera (ou regera, enquanto ainda for rascunho) o contrato do negócio a partir do modelo da empresa. */
+/**
+ * Gera (ou regera, enquanto ainda for rascunho) o contrato do negócio a partir do modelo da empresa. Com a última
+ * proposta por modalidade dentro da validade, exige a condição que o cliente escolheu (`condicao`, id da opção): o
+ * contrato cita a condição e o valor do negócio passa ao que a regra da empresa define, na mesma transação
+ * (`gerar_contrato_com_condicao`; negócio ganho só por admin ou gestor, como correção de valor).
+ */
 export async function gerarContratoComCliente(
   supabase: SupabaseServidor,
-  { empresaId, membroId, negocioId, agora = new Date() }: { empresaId: string; membroId: string; negocioId: string; agora?: Date },
+  {
+    empresaId,
+    negocioId,
+    condicao = null,
+    agora = new Date(),
+  }: {
+    empresaId: string;
+    /** Mantido por compatibilidade; o autor do contrato vem do banco (`meu_membro_id`). */
+    membroId: string;
+    negocioId: string;
+    condicao?: string | null;
+    agora?: Date;
+  },
 ): Promise<NonNullable<ResultadoAcao>> {
   const [{ data: modelo }, { data: negocio }, { data: calculo }, { data: itensKit }, { data: empresa }, { data: existente }, { data: identidades }] =
     await Promise.all([
@@ -53,12 +72,20 @@ export async function gerarContratoComCliente(
   if (existente && existente.status !== "rascunho") {
     return { ok: false, mensagem: "Este contrato já saiu do rascunho — o texto não muda mais automaticamente." };
   }
+  const { escolha, erro: erroEscolha } = await carregarEscolhaCondicao(supabase, empresaId, negocioId, hojeEmSaoPaulo(agora.getTime()));
+  if (erroEscolha) return { ok: false, mensagem: "Não foi possível ler a proposta do negócio. Tente de novo." };
+  const opcao = escolha?.opcoes.find((o) => o.id === condicao) ?? null;
+  if (escolha && !condicao) return { ok: false, mensagem: "Marque a condição de pagamento que o cliente escolheu." };
+  if (escolha && !opcao) return { ok: false, mensagem: "A condição marcada não está na proposta atual. Atualize a página e marque de novo." };
+  // Com condição, o valor parte sempre do preço da proposta (trocar de condição não acumula desconto).
+  const valorContrato = opcao ? opcao.valorNegocio : negocio.valor;
+  const precoReferencia = escolha ? escolha.emissao.preco : negocio.valor;
   // O contrato usa o valor atual do negócio e a proposta, o preço do cálculo: com os dois diferentes, não gera.
   // Com cálculo legado (fórmula antiga) a proposta não mostra preço nenhum e "Atualizar preço" é recusado: a guarda
   // não protege nada e só travaria o contrato, que segue usando o valor atual do negócio (decisão de Nora, M2-B8).
   // O mesmo vale para o resultado técnico incompleto (sem parte financeira, nunca entra em proposta).
   const legado = !!calculo && (calculoEhLegado(calculo) || calculoEhIncompleto(calculo));
-  if (calculo && !legado && precoDoCalculoDesatualizado(calculo.kit_preco, negocio.valor)) {
+  if (calculo && !legado && precoDoCalculoDesatualizado(calculo.kit_preco, precoReferencia)) {
     return { ok: false, mensagem: MENSAGEM_PRECO_DESATUALIZADO };
   }
   // Potência, consumo e geração do contrato vêm do cálculo: só gera se o que os determina continua valendo (kit,
@@ -78,11 +105,12 @@ export async function gerarContratoComCliente(
 
   const dados = montarDadosContrato({
     empresa,
-    negocio,
+    negocio: { ...negocio, valor: valorContrato },
     contato: negocio.contatos as unknown as FontesContrato["contato"],
     calculo,
     itensKit: itensKit ?? [],
     vendedorNome: (identidades ?? []).find((m) => m.membro_id === negocio.responsavel_id)?.nome ?? null,
+    condicaoPagamento: opcao?.descricao ?? null,
     agora,
     formatarMoeda: (v) => formatarMoeda(v),
   });
@@ -100,10 +128,28 @@ export async function gerarContratoComCliente(
   const pendencias = pendenciasDadosContrato(negocio.contatos as unknown as DadosClienteContrato | null);
   if (pendencias.length) return { ok: false, mensagem: mensagemPendenciasContrato(pendencias) };
 
-  const { error } = await supabase.from("contratos").upsert(
-    { empresa_id: empresaId, negocio_id: negocioId, conteudo: conteudoPreenchido, criado_por: membroId, atualizado_por: membroId },
-    { onConflict: "negocio_id" },
-  );
+  const registrada: CondicaoRegistrada | null =
+    escolha && opcao
+      ? {
+          emissaoId: escolha.emissao.id,
+          versao: escolha.emissao.versao,
+          opcao: opcao.id,
+          modalidade: opcao.modalidade,
+          descricao: opcao.descricao,
+          precoProposta: escolha.emissao.preco,
+          valorNegocio: opcao.valorNegocio,
+          base: opcao.base,
+        }
+      : null;
+  // Texto, condição e valor do negócio na mesma transação (o banco confere rascunho, RLS e negócio ganho).
+  const { error } = await supabase.rpc("gerar_contrato_com_condicao", {
+    p_negocio_id: negocioId,
+    p_conteudo: conteudoPreenchido,
+    p_condicao: registrada,
+    // Sem condição o banco ignora o valor (o negócio fica como está).
+    p_valor: registrada ? registrada.valorNegocio : 0,
+    p_motivo: registrada ? `Condição escolhida pelo cliente: ${registrada.descricao}` : "",
+  });
   if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível gerar o contrato.") };
   return { ok: true, mensagem: "Contrato pronto." };
 }

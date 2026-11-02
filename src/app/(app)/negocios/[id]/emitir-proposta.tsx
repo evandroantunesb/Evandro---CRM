@@ -21,6 +21,7 @@ export function EmitirProposta({
   regrasCondicoes,
   geracaoConfirmada,
   bloqueio,
+  avisoValor = null,
   emissoes,
   siteUrl,
 }: {
@@ -41,6 +42,8 @@ export function EmitirProposta({
   geracaoConfirmada: boolean;
   /** Motivo pelo qual não dá para emitir agora (o servidor confere de novo); nulo = liberada. */
   bloqueio: string | null;
+  /** O valor do negócio já foi ajustado por uma condição escolhida no contrato: conferir o preço antes de emitir. */
+  avisoValor?: string | null;
   emissoes: EmissaoListada[];
   siteUrl: string;
 }) {
@@ -59,6 +62,11 @@ export function EmitirProposta({
         {bloqueio && (
           <p role="status" data-testid="emissao-bloqueada" className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900">
             {bloqueio}
+          </p>
+        )}
+        {avisoValor && (
+          <p role="status" data-testid="aviso-valor-condicao" className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            {avisoValor}
           </p>
         )}
         <Campo
