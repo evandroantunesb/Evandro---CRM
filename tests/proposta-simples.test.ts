@@ -444,9 +444,7 @@ describe("PDF da proposta simples", () => {
     expect(paginasDe(await gerarPdfPropostaSimples(piorCaso(PIOR_CASO_CONDICOES, SEM_CONTEUDO), SEM_IMAGENS))).toBe(3);
   });
 
-  // PENDENTE NA PR 3b: as condições ainda saem em linhas de texto; com todas as modalidades E o modelo no limite, a
-  // proposta passa de 3 páginas. O bloco organizado por modalidade da 3b precisa caber (aí este teste vira `it`).
-  it.fails("com todas as modalidades e o modelo no limite, continua em 3 páginas (PR 3b)", async () => {
+  it("com todas as modalidades e o modelo no limite, continua em 3 páginas", async () => {
     expect(paginasDe(await gerarPdfPropostaSimples(piorCaso(PIOR_CASO_CONDICOES), SEM_IMAGENS))).toBe(3);
   });
 });

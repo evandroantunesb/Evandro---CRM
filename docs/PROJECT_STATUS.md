@@ -10,7 +10,7 @@
 | 3b | a fazer | Bloco organizado por modalidade no PDF e na página do cliente |
 | 4 | a fazer | No contrato, o cliente escolhe a condição e o valor do negócio muda |
 
-- **3a e 3b entram juntas em produção.** Na 3a o PDF e a página mostram as condições em linhas de texto (`linhasCondicoesEmitidas`). **Pendente da 3b:** com todas as modalidades no limite **e** o modelo da empresa no limite (inclusos, exclusos, garantias, etapas), o PDF passa de 3 páginas (`it.fails` em `tests/proposta-simples.test.ts`); com o modelo enxuto ou só à vista + observação de 240, cabe.
+- **3a e 3b entram juntas em produção.** Na 3a o PDF e a página mostram as condições em linhas de texto (`linhasCondicoesEmitidas`). A proposta **continua em 3 páginas** (pedido do Evandro, 02/11) mesmo com todas as modalidades e o modelo no limite: na página 3 o valor foi para a faixa do título "Investimento" e as condições ocupam a largura toda; "Próximos passos" ficou mais baixo; **Garantias passou para a página 2**, junto dos equipamentos.
 - Decisões do Evandro (02/11): o vendedor marca quais parcelas aparecem (padrão: todas); entrada opcional no financiamento; o texto de condições do modelo pré-preenche a "Observação". Propostas já emitidas (esquema 4, texto livre) continuam legíveis. O valor do negócio não muda na emissão.
 
 ## Engenharia em Obras — P1 a P1.6 integradas em 2026-10-29; P2 a P5 em 2026-10-30; P6a e P6b em 2026-10-31; P6c e novo fluxo (#270, #271) em 2026-11-01
