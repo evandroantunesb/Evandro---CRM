@@ -2,8 +2,8 @@ import "server-only";
 import type { PlanejamentoObra } from "./tipos";
 
 /**
- * DEMONSTRAÇÃO LOCAL da Apresentação (dados FICTÍCIOS). O banco ainda não tem avanço físico,
- * custos nem margem; estes dados existem só para avaliar a interface. O cronograma é sempre o real.
+ * DEMONSTRAÇÃO LOCAL da Apresentação (dados FICTÍCIOS). O banco ainda não tem avanço físico;
+ * este dado existe só para avaliar a interface. Cronograma, custos e lucro são sempre os reais.
  *
  * Liga apenas com as DUAS condições, checadas no servidor a cada requisição:
  *   1. RAION_DEMO_APRESENTACAO=1 (variável de servidor; não é NEXT_PUBLIC);
@@ -24,46 +24,17 @@ export function demonstracaoAtiva(env: Record<string, string | undefined> = proc
   }
 }
 
-/**
- * Planejamento fictício por cliente. Números coerentes entre si:
- * Fazenda Modelo — orçado 130.000 (soma das categorias), realizado 92.000 (soma), projetado
- * 135.000 (≥ realizado), receita líquida 180.000 → margem 45.000 = 25%; planejada 27,8%
- * (180.000 − 130.000), logo −2,8 p.p.
- */
+/** Avanço físico fictício por cliente. */
 function planejamentos(): Record<string, PlanejamentoObra> {
   return {
     "Usina Solar Fazenda Modelo (fictícia)": {
       avancoFisico: 68,
-      custos: [
-        { categoria: "material_ca", orcado: 14_000, realizado: 16_000 },
-        { categoria: "material_cc", orcado: 72_000, realizado: 52_000 },
-        { categoria: "mao_de_obra", orcado: 22_000, realizado: 14_000 },
-        { categoria: "equipamentos", orcado: 9_000, realizado: 6_000 },
-        { categoria: "servicos", orcado: 8_000, realizado: 2_500 },
-        { categoria: "logistica", orcado: 5_000, realizado: 1_500 },
-      ],
-      financeiro: { receitaLiquida: 180_000, custoOrcado: 130_000, custoRealizado: 92_000, custoFinalProjetado: 135_000, margemPlanejadaPct: (50_000 / 180_000) * 100 },
     },
-    // Custo ainda dentro do orçado.
     "Mercado Bom Preço (fictício)": {
       avancoFisico: 41,
-      custos: [
-        { categoria: "material_ca", orcado: 3_500, realizado: 3_200 },
-        { categoria: "material_cc", orcado: 21_000, realizado: 20_400 },
-        { categoria: "mao_de_obra", orcado: 6_000, realizado: 0 },
-        { categoria: "logistica", orcado: 1_500, realizado: 900 },
-      ],
-      financeiro: { receitaLiquida: 44_000, custoOrcado: 32_000, custoRealizado: 24_500, custoFinalProjetado: 31_800, margemPlanejadaPct: (12_000 / 44_000) * 100 },
     },
-    // Quase concluída, sem desvio relevante.
     "Clínica Vida (fictícia)": {
       avancoFisico: 92,
-      custos: [
-        { categoria: "material_ca", orcado: 2_800, realizado: 2_750 },
-        { categoria: "material_cc", orcado: 18_500, realizado: 18_500 },
-        { categoria: "mao_de_obra", orcado: 4_700, realizado: 4_300 },
-      ],
-      financeiro: { receitaLiquida: 36_000, custoOrcado: 26_000, custoRealizado: 25_550, custoFinalProjetado: 26_100, margemPlanejadaPct: (10_000 / 36_000) * 100 },
     },
   };
 }

@@ -76,6 +76,7 @@ export function FormularioParametros({
     custoMaterialCaPorKwp: number;
     custoEngenharia: number;
     comissaoPercentual: number;
+    custoFrete: number;
   };
 }) {
   const [resultado, acao, pendente] = useActionState(editarParametros, null);
@@ -139,6 +140,13 @@ export function FormularioParametros({
           defaultValue={percentualParaCampo(parametros.comissaoPercentual)}
           placeholder="0"
         />
+      </div>
+      <p className="mt-2 text-sm font-medium text-zinc-700">Orçamento da obra</p>
+      <p className="-mt-2 text-xs text-zinc-500">
+        Só entra no custo planejado da obra (categoria Frete), não no preço sugerido: normalmente o frete já vem embutido no preço.
+      </p>
+      <div className="grid grid-cols-2 gap-2">
+        <Campo rotulo="Frete (R$, fixo por obra)" name="custo_frete" inputMode="decimal" defaultValue={String(parametros.custoFrete).replace(".", ",")} placeholder="0" />
       </div>
       <Botao type="submit" disabled={pendente} className="self-start">
         Salvar parâmetros

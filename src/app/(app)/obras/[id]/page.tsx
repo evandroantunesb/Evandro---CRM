@@ -8,6 +8,7 @@ import { formatarDataHora, formatarMoeda } from "@/lib/crm";
 import { carregarObras } from "@/lib/obras/dados";
 import { filtrosDeParams, hrefObra, montarNavegacao, queryDosFiltros, temFiltroAtivo } from "@/lib/obras/navegacao";
 import { AjusteEntregaContratada, GestaoFixacao, GestaoMarco, GestaoSetor } from "./gestao";
+import { CustosObraFicha } from "./custos";
 import { VistoriaEngenharia } from "@/components/engenharia/vistoria";
 import { ResumoVistoria } from "@/components/engenharia/vistoria-resumo";
 import { Campo, CartaoSetor, ContatoCliente, DadosTecnicos, ListaParticipantes, comUnidade } from "@/components/obras/detalhe-obra";
@@ -21,7 +22,9 @@ import {
   type AlertaObra,
   type SituacaoObra,
 } from "@/lib/obras/rotulos";
-import { OBRAS, PRAZOS_OBRA, pode } from "@/lib/permissoes";
+import { FINANCEIRO_OBRA, OBRAS, PRAZOS_OBRA, pode } from "@/lib/permissoes";
+import { ehCategoriaCusto, montarCustos, type CategoriaCustoObra } from "@/lib/obras/custos";
+import { hojeEmSaoPaulo } from "@/lib/formatacao";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 
@@ -40,7 +43,7 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
 
   const supabase = await criarClienteServidor();
   // A lista navegável é recalculada aqui, a cada obra: mesma empresa, mesma RLS, mesmos filtros.
-  const [obra, lista, tarefasSetor, vistoria, vistorias, cronograma] = await Promise.all([
+  const [obra, lista, tarefasSetor, vistoria, vistorias, cronograma, orcamento, lancamentos] = await Promise.all([
     carregarDetalheObra(supabase, { empresaId: atual.empresaId, papel: atual.papel, obraId: id, membroId: atual.membroId }),
     carregarObras(supabase, { empresaId: atual.empresaId, papel: atual.papel, comResponsaveis: false }),
     carregarTarefasSetor(supabase, { empresaId: atual.empresaId, membroId: atual.membroId, papel: atual.papel, obraId: id, filtro: "todas" }),
@@ -49,6 +52,9 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
     carregarVistoriasEngenharia(supabase, { empresaId: atual.empresaId, obraId: id }),
     // Zero linhas para quem não vê a obra; cada linha repete a entrega contratada e a previsão do material.
     supabase.rpc("cronograma_obra", { p_obra_id: id }),
+    // A RLS devolve orçamento e lançamentos só a quem vê os custos da obra (admin, gestor que vê a obra, Operacional dela).
+    supabase.from("obra_orcamento").select("categoria, planejado").eq("obra_id", id),
+    supabase.from("obra_custos").select("id, categoria, valor, ocorrido_em, descricao, estorna_id, created_at").eq("obra_id", id).order("created_at", { ascending: false }),
   ]);
   if (!obra) notFound();
   const navegacao = montarNavegacao(lista.obras, filtros, id);
@@ -57,6 +63,14 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
   const local = [resumo.cidade, resumo.uf].filter(Boolean).join("/");
   const gestaoDoSetor = (setor: string) => gestao?.setores.find((s) => s.setor === setor) ?? null;
   const etapas = cronograma.data ?? [];
+  const custos = (orcamento.data ?? []).length
+    ? montarCustos({
+        orcamento: orcamento.data ?? [],
+        lancamentos: lancamentos.data ?? [],
+        etapasConcluidas: new Set(etapas.filter((e) => e.situacao === "concluida").map((e) => e.etapa)),
+      })
+    : null;
+  const estornados = new Set((lancamentos.data ?? []).map((l) => l.estorna_id).filter(Boolean));
   const entrega = etapas[0] ? { contratada: etapas[0].entrega_contratada, prevista: etapas.at(-1)!.previsao_fim, material: etapas[0].entrega_material_prevista } : null;
 
   return (
@@ -121,6 +135,30 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
               <AjusteEntregaContratada key={resumo.id} obraId={resumo.id} data={entrega.contratada} />
             )}
           </div>
+        </Cartao>
+      )}
+
+      {custos && (
+        <Cartao titulo="Custos da obra">
+          <CustosObraFicha
+            key={resumo.id}
+            obraId={resumo.id}
+            custos={custos}
+            lancamentos={(lancamentos.data ?? [])
+              .filter((l) => ehCategoriaCusto(l.categoria))
+              .map((l) => ({
+                id: l.id,
+                categoria: l.categoria as CategoriaCustoObra,
+                valor: Number(l.valor),
+                data: l.ocorrido_em,
+                descricao: l.descricao,
+                estornaId: l.estorna_id,
+                estornado: estornados.has(l.id),
+              }))}
+            podeAjustar={pode(atual.papel, FINANCEIRO_OBRA) && resumo.situacao !== "cancelada"}
+            podeLancar={gestaoDoSetor("operacional")?.permissoes.autorizacao != null && resumo.situacao !== "cancelada"}
+            hoje={hojeEmSaoPaulo()}
+          />
         </Cartao>
       )}
 

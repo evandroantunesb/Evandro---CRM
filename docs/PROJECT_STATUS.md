@@ -7,7 +7,7 @@ Telas aprovadas no canvas "Raion — Nova interface": `ObrasCompleta.dc.html` (p
 | PR | Escopo | Estado |
 | --- | --- | --- |
 | 1 | Prazos das etapas, entrega contratada, "material entregue" e cronograma calculado | PR #290; migration `20261104100000_obras_cronograma.sql` aplicada em produção em 02/11/2026 (tag `migracao-pr290-a960dc4`); merge pendente |
-| 2 | Custos (orçamento por categoria pré-preenchido pela calculadora, lançamentos sem apagar) e deduções do lucro | a fazer |
+| 2 | Custos (orçamento por categoria pré-preenchido pela calculadora, lançamentos sem apagar) e deduções do lucro | branch `feat/obras-opr-custos`, migration `20261105100000_obras_custos.sql` (não aplicada) |
 | 3 | Visão Completa, semáforo, justificativa de atraso e escalonamento (gestor e Operacional abrem e fecham); gestor vê todas as obras | a fazer |
 
 Decisões da PR 1:
@@ -15,6 +15,12 @@ Decisões da PR 1:
 - Compras termina em "material entregue". Compras informa a previsão de entrega do material. Na migração, obras em "faturado" com a instalação já iniciada viram "material entregue" na data do início da instalação (deduzida, registrada no histórico); as demais voltam a esperar a entrega.
 - A tarefa automática "Agendar instalação" continua nascendo em "faturado".
 - A previsão corre em cascata; atraso só herdado mostra a etapa causadora ("Calculado pelo sistema").
+Decisões da PR 2 (lógica do desenho "Obras — Apresentação"):
+- Cinco categorias: equipamentos (preço do kit do cálculo), estrutura e materiais (material CA por kWp), mão de obra (instalação por módulo), homologação (engenharia) e frete (parâmetro novo da calculadora, zerado; não entra no preço sugerido). O planejado nasce com a obra com os parâmetros daquele momento; as obras que já existiam receberam o mesmo cálculo. Admin e gestor ajustam.
+- Custo real: lançamentos do admin ou de quem atua no Operacional da obra; ninguém apaga, erro se corrige com estorno único.
+- A categoria encerra quando a etapa dela termina (equipamentos e estrutura: compra; frete: entrega do material; homologação; mão de obra: instalação). Custo projetado = realizado das encerradas + maior entre planejado e realizado das em andamento.
+- Lucro líquido previsto = venda − custo projetado − impostos e comissões (% da venda, em Configurações › Impostos e comissões, admin e gestor).
+- Custos: admin, gestor que vê a obra e o Operacional dela. Venda, lucro e margem: quem vê o valor vendido. Nenhum valor vai para o histórico da obra.
 - Pendente: o setor Compras ainda não existe. Hoje a previsão do material é do admin ou de quem é da Operação com Compras na obra; o gestor não escreve em Compras.
 
 ## Condições de pagamento na proposta — plano em 4 PRs (aprovado pelo Evandro em 01/11/2026; concluído em 02/11/2026)

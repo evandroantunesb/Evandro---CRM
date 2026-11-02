@@ -1,11 +1,10 @@
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
-import { CustosPorCategoria, ResultadoFinanceiro } from "@/components/obras/apresentacao/financeiro";
+import { CustosObra, LucroPrevisto } from "@/components/obras/apresentacao/financeiro";
 import { Gantt, LegendaGantt } from "@/components/obras/apresentacao/gantt";
 import { PalcoApresentacao } from "@/components/obras/apresentacao/palco";
 import { ModosObras } from "@/components/obras/modos-obras";
 import { NavegacaoObras } from "@/components/obras/navegacao-obras";
-import { formatarMoeda } from "@/lib/crm";
 import { carregarApresentacaoObra, hojeBrasilia } from "@/lib/obras/apresentacao/dados";
 import type { ApresentacaoObraVM } from "@/lib/obras/apresentacao/tipos";
 import { carregarObras } from "@/lib/obras/dados";
@@ -22,8 +21,8 @@ const kwp = (v: number | null) => (v == null ? null : `${new Intl.NumberFormat("
 /**
  * Modo Apresentação (OPR 3B, V1): visão executiva de UMA obra, somente leitura, navegável como
  * slides pela lista filtrada (mesma empresa, RLS e filtros da listagem). O cronograma e a entrega
- * contratada vêm do banco; blocos sem fonte real (avanço, custos, margem) mostram estado vazio e o
- * conteúdo fictício só aparece com a demonstração local ligada, sempre com o selo "Dados fictícios".
+ * contratada, os custos e o lucro vêm do banco; o avanço, sem fonte real, mostra estado vazio e o
+ * valor fictício só aparece com a demonstração local ligada, sempre com o selo "Dados fictícios".
  */
 export default async function ApresentacaoObra({ params, searchParams }: PageProps<"/obras/apresentacao/[id]">) {
   const { atual } = await exigirPapel(...OBRAS);
@@ -66,8 +65,7 @@ function Slide({ obra, hoje }: { obra: ApresentacaoObraVM; hoje: string }) {
     <article aria-label={`Apresentação da obra ${obra.numero}`} className="flex flex-col gap-4">
       {obra.demonstracao && (
         <p role="note" className="rounded-lg border border-dashed border-zinc-300 bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
-          <span className="font-semibold text-zinc-800">Dados fictícios</span> — avanço, custos e margem desta obra são de demonstração local e não existem no
-          banco.
+          <span className="font-semibold text-zinc-800">Dados fictícios</span> — o avanço físico desta obra é de demonstração local e não existe no banco.
         </p>
       )}
 
@@ -163,26 +161,12 @@ function Slide({ obra, hoje }: { obra: ApresentacaoObraVM; hoje: string }) {
         )}
       </Bloco>
 
-      {obra.financeiro.estado !== "sem_permissao" && (
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 [&>*]:min-w-0">
-          <Bloco titulo="Custos por categoria">
-            {obra.financeiro.estado === "disponivel" ? <CustosPorCategoria custos={obra.financeiro.custos} /> : <Vazio>Orçamento e custos ainda não cadastrados.</Vazio>}
+      {obra.financeiro.estado === "disponivel" && (
+        <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] [&>*]:min-w-0">
+          <Bloco titulo="Custos: planejado × realizado">
+            <CustosObra custos={obra.financeiro.custos} />
           </Bloco>
-          <Bloco titulo="Resultado financeiro">
-            {obra.financeiro.estado === "disponivel" ? (
-              <ResultadoFinanceiro entrada={obra.financeiro.resultado} valorVendido={obra.financeiro.valorVendido} />
-            ) : (
-              <div className="flex flex-col gap-3">
-                {obra.financeiro.valorVendido != null && (
-                  <p className="flex flex-wrap items-baseline justify-between gap-x-3 text-sm">
-                    <span className="text-zinc-600">Valor vendido (contrato)</span>
-                    <span className="font-medium text-zinc-900 tabular-nums">{formatarMoeda(obra.financeiro.valorVendido)}</span>
-                  </p>
-                )}
-                <Vazio>Receita líquida, custo projetado e margem dependem do orçamento da obra, ainda não cadastrado.</Vazio>
-              </div>
-            )}
-          </Bloco>
+          {obra.financeiro.resultado && <LucroPrevisto resultado={obra.financeiro.resultado} />}
         </div>
       )}
     </article>

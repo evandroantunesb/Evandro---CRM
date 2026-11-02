@@ -4,8 +4,8 @@ import type { BaseFicticia } from "./base-ficticia";
 
 /**
  * OPR 3B — modo Apresentação, contra o app real e o Supabase LOCAL, com a demonstração local
- * ligada (dados fictícios de avanço/custos para 3 obras; as demais mostram estados vazios). O cronograma
- * das etapas é sempre o real, calculado pelo banco.
+ * ligada (avanço físico fictício para 3 obras; as demais mostram estado vazio). Cronograma, custos e
+ * lucro são sempre os reais, do banco.
  */
 
 let usuarios: BaseFicticia["usuarios"];
@@ -31,6 +31,9 @@ for (const [resolucao, tamanho] of Object.entries(RESOLUCOES) as [Resolucao, { w
       await expect(titulo(page)).toHaveText(FAZENDA);
       await expect(page.getByText("Dados fictícios")).toBeVisible();
       await expect(page.getByText("68%").first()).toBeVisible();
+      // Admin vê os custos e o lucro (orçamento nascido com a obra, venda do contrato).
+      await expect(page.getByRole("heading", { name: "Custos: planejado × realizado" })).toBeVisible();
+      await expect(page.getByRole("region", { name: "Lucro previsto da obra" })).toBeVisible();
       await semRolagemHorizontal(page, "apresentação Fazenda");
       await capturar(page, resolucao, "20-apresentacao-fazenda-modelo");
 
@@ -58,7 +61,6 @@ for (const [resolucao, tamanho] of Object.entries(RESOLUCOES) as [Resolucao, { w
       await expect(page.getByText("Dados fictícios")).toHaveCount(0);
       await expect(page.getByText("Sem medição registrada")).toBeVisible();
       await expect(page.getByRole("region", { name: /Etapas da obra/ }).getByText("Chegada na Engenharia e projeto")).toBeVisible();
-      await expect(page.getByText("Orçamento e custos ainda não cadastrados.")).toBeVisible();
       await semRolagemHorizontal(page, "apresentação sem dados");
       await capturar(page, resolucao, "23-apresentacao-obra-sem-planejamento");
 
@@ -73,14 +75,16 @@ for (const [resolucao, tamanho] of Object.entries(RESOLUCOES) as [Resolucao, { w
       await entrarComo(page, usuarios.execOp, senha);
       await page.goto(`/obras/apresentacao/${obras.o06}`);
       await expect(titulo(page)).toHaveText(FAZENDA);
-      await expect(page.getByRole("heading", { name: "Resultado financeiro" })).toHaveCount(0);
-      await expect(page.getByRole("heading", { name: "Custos por categoria" })).toHaveCount(0);
+      // Operação não vê o valor vendido: nada de lucro.
+      await expect(page.getByRole("region", { name: "Lucro previsto da obra" })).toHaveCount(0);
       await semRolagemHorizontal(page, "apresentação Operação");
       await capturar(page, resolucao, "25-apresentacao-visao-operacao-sem-financeiro");
 
       await entrarComo(page, usuarios.vendedor, senha);
       await page.goto(`/obras/apresentacao/${obras.o06}`);
-      await expect(page.getByRole("heading", { name: "Resultado financeiro" })).toBeVisible();
+      // O vendedor vê o valor vendido, mas não os custos da obra: nem custos nem lucro.
+      await expect(page.getByRole("heading", { name: "Custos: planejado × realizado" })).toHaveCount(0);
+      await expect(page.getByRole("region", { name: "Lucro previsto da obra" })).toHaveCount(0);
       await capturar(page, resolucao, "26-apresentacao-visao-vendedor");
     });
   });
@@ -137,7 +141,7 @@ test.describe("apresentação — funcionamento", () => {
     await entrarComo(page, usuarios.execOp, senha);
     const resposta = await page.goto(`/obras/apresentacao/${obras.o06}`);
     const html = (await resposta?.text()) ?? "";
-    for (const proibido of ["180.000", "135.000", "45.000", "Receita líquida", "Margem líquida", "Valor vendido"]) {
+    for (const proibido of ["Lucro líquido previsto", "Custo projetado da obra", "Impostos e comissões", "Valor vendido"]) {
       expect(html, proibido).not.toContain(proibido);
     }
   });

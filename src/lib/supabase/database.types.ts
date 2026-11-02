@@ -2955,6 +2955,60 @@ export type Database = {
           },
         ];
       };
+      obra_custos: {
+        Row: {
+          categoria: string;
+          created_at: string;
+          descricao: string;
+          empresa_id: string;
+          estorna_id: string | null;
+          id: string;
+          obra_id: string;
+          ocorrido_em: string;
+          registrado_por: string | null;
+          valor: number;
+        };
+        Insert: {
+          categoria: string;
+          created_at?: string;
+          descricao: string;
+          empresa_id: string;
+          estorna_id?: string | null;
+          id?: string;
+          obra_id: string;
+          ocorrido_em: string;
+          registrado_por?: string | null;
+          valor: number;
+        };
+        Update: {
+          categoria?: string;
+          created_at?: string;
+          descricao?: string;
+          empresa_id?: string;
+          estorna_id?: string | null;
+          id?: string;
+          obra_id?: string;
+          ocorrido_em?: string;
+          registrado_por?: string | null;
+          valor?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "obra_custos_empresa_id_obra_id_fkey";
+            columns: ["empresa_id", "obra_id"];
+            isOneToOne: false;
+            referencedRelation: "obras";
+            referencedColumns: ["empresa_id", "id"];
+          },
+          {
+            foreignKeyName: "obra_custos_estorna_id_fkey";
+            columns: ["estorna_id"];
+            isOneToOne: false;
+            referencedRelation: "obra_custos";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       obra_dados_comerciais: {
         Row: {
           created_at: string;
@@ -2990,6 +3044,35 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "obras";
             referencedColumns: ["empresa_id", "id"];
+          },
+        ];
+      };
+      obra_deducoes: {
+        Row: {
+          comissoes_percentual: number;
+          empresa_id: string;
+          impostos_percentual: number;
+          updated_at: string;
+        };
+        Insert: {
+          comissoes_percentual?: number;
+          empresa_id: string;
+          impostos_percentual?: number;
+          updated_at?: string;
+        };
+        Update: {
+          comissoes_percentual?: number;
+          empresa_id?: string;
+          impostos_percentual?: number;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "obra_deducoes_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: true;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
           },
         ];
       };
@@ -3845,6 +3928,38 @@ export type Database = {
           },
         ];
       };
+      obra_orcamento: {
+        Row: {
+          categoria: string;
+          empresa_id: string;
+          obra_id: string;
+          planejado: number;
+          updated_at: string;
+        };
+        Insert: {
+          categoria: string;
+          empresa_id: string;
+          obra_id: string;
+          planejado: number;
+          updated_at?: string;
+        };
+        Update: {
+          categoria?: string;
+          empresa_id?: string;
+          obra_id?: string;
+          planejado?: number;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "obra_orcamento_empresa_id_obra_id_fkey";
+            columns: ["empresa_id", "obra_id"];
+            isOneToOne: false;
+            referencedRelation: "obras";
+            referencedColumns: ["empresa_id", "id"];
+          },
+        ];
+      };
       obra_participantes: {
         Row: {
           created_at: string;
@@ -4102,6 +4217,7 @@ export type Database = {
         Row: {
           comissao_percentual: number;
           custo_engenharia: number;
+          custo_frete: number;
           custo_instalacao_por_modulo: number;
           custo_material_ca_por_kwp: number;
           disponibilidade_bi_kwh: number;
@@ -4120,6 +4236,7 @@ export type Database = {
         Insert: {
           comissao_percentual?: number;
           custo_engenharia?: number;
+          custo_frete?: number;
           custo_instalacao_por_modulo?: number;
           custo_material_ca_por_kwp?: number;
           disponibilidade_bi_kwh?: number;
@@ -4138,6 +4255,7 @@ export type Database = {
         Update: {
           comissao_percentual?: number;
           custo_engenharia?: number;
+          custo_frete?: number;
           custo_instalacao_por_modulo?: number;
           custo_material_ca_por_kwp?: number;
           disponibilidade_bi_kwh?: number;
@@ -5599,6 +5717,10 @@ export type Database = {
         Args: { p_data: string; p_motivo: string; p_obra_id: string };
         Returns: undefined;
       };
+      ajustar_orcamento_obra: {
+        Args: { p_categoria: string; p_obra_id: string; p_planejado: number };
+        Returns: undefined;
+      };
       alterar_item_engenharia: {
         Args: { p_item_id: string; p_motivo?: string; p_status: string };
         Returns: undefined;
@@ -5975,6 +6097,7 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      estornar_custo_obra: { Args: { p_custo_id: string; p_motivo: string }; Returns: undefined };
       estornar_lancamentos_do_evento: {
         Args: { p_estornado_por: string; p_evento_id: number };
         Returns: undefined;
@@ -6116,6 +6239,16 @@ export type Database = {
         Args: { p_condicoes: Json; p_enquadramento: Json };
         Returns: boolean;
       };
+      lancar_custo_obra: {
+        Args: {
+          p_categoria: string;
+          p_data: string;
+          p_descricao: string;
+          p_obra_id: string;
+          p_valor: number;
+        };
+        Returns: string;
+      };
       limite_desconto_membro: { Args: { p_membro_id: string }; Returns: number };
       marcar_parado_fluxo_obra: {
         Args: {
@@ -6205,6 +6338,13 @@ export type Database = {
           tipo_cliente: string;
         }[];
       };
+      orcamento_inicial_obra: {
+        Args: { p_obra_id: string };
+        Returns: {
+          categoria: string;
+          planejado: number;
+        }[];
+      };
       pendencias_contrato_contato: { Args: { p_contato_id: string }; Returns: string[] };
       pode_decidir_desconto: {
         Args: {
@@ -6224,6 +6364,7 @@ export type Database = {
         Args: { p_contato_id: string; p_criado_por: string; p_empresa_id: string };
         Returns: boolean;
       };
+      pode_ver_custos_obra: { Args: { p_obra_id: string }; Returns: boolean };
       pode_ver_documentos_engenharia: { Args: { p_obra_id: string }; Returns: boolean };
       pode_ver_financeiro_negocio: { Args: { p_negocio_id: string }; Returns: boolean };
       pode_ver_negocio: { Args: { p_negocio_id: string }; Returns: boolean };
