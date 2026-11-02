@@ -1,9 +1,9 @@
 import { Cartao, Voltar } from "@/components/ui";
-import { MEIOS_PARCELAMENTO, ROTULO_MEIO_PARCELAMENTO, preferenciasDaEmpresa } from "@/lib/condicoes-pagamento";
+import { MEIOS_PARCELAMENTO, ROTULO_MEIO_PARCELAMENTO, preferenciasDaEmpresa, valorNegocioDaEmpresa } from "@/lib/condicoes-pagamento";
 import { CONDICOES_PAGAMENTO } from "@/lib/permissoes";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { FormularioPreferencias, FormularioTaxas } from "./formularios";
+import { FormularioPreferencias, FormularioTaxas, FormularioValorNegocio } from "./formularios";
 
 /** Condições de pagamento da empresa: admin e gestor definem descontos sem aprovação, Personalizado e parcelas/taxas. */
 export default async function CondicoesPagamento() {
@@ -12,7 +12,9 @@ export default async function CondicoesPagamento() {
   const [{ data: preferencias, error: erroPreferencias }, { data: taxas, error: erroTaxas }] = await Promise.all([
     supabase
       .from("condicoes_pagamento_preferencias")
-      .select("desconto_max_vendedor, desconto_max_gestor, personalizado_ativo")
+      .select(
+        "desconto_max_vendedor, desconto_max_gestor, personalizado_ativo, valor_negocio_avista, valor_negocio_parcelado, valor_negocio_financiamento, valor_negocio_personalizado",
+      )
       .eq("empresa_id", atual.empresaId)
       .maybeSingle(),
     supabase.from("taxas_parcelamento").select("meio, parcelas, taxa_percentual").eq("empresa_id", atual.empresaId).order("parcelas"),
@@ -42,6 +44,9 @@ export default async function CondicoesPagamento() {
           />
         </Cartao>
       ))}
+      <Cartao titulo="Valor do negócio pela condição escolhida">
+        <FormularioValorNegocio valores={valorNegocioDaEmpresa(preferencias)} />
+      </Cartao>
     </div>
   );
 }

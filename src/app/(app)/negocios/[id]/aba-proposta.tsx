@@ -1,7 +1,7 @@
 import { Cartao } from "@/components/ui";
 import { env } from "@/lib/env";
-import { hojeEmSaoPaulo } from "@/lib/formatacao";
-import { PAGAMENTO_SOLO, PROPOSTA_E_CONTRATO, VALIDADE_PROPOSTA, pode } from "@/lib/permissoes";
+import { formatarMoeda, hojeEmSaoPaulo } from "@/lib/formatacao";
+import { CORRIGIR_VALOR_GANHO, PAGAMENTO_SOLO, PROPOSTA_E_CONTRATO, VALIDADE_PROPOSTA, pode } from "@/lib/permissoes";
 import { type ModoPreco, type StatusContrato, type StatusPagamentoContrato } from "@/lib/tipos";
 import { Contrato } from "./contrato";
 import { DescontoNegocio } from "./desconto";
@@ -35,6 +35,9 @@ export function AbaProposta({ ficha }: { ficha: Ficha }) {
     bloqueioEmissao,
     proposta,
     precoDesatualizado,
+    precoContratoDesatualizado,
+    escolhaCondicao,
+    condicaoRegistrada,
     bloqueioProposta,
     modelosProposta,
     aberturas,
@@ -89,6 +92,11 @@ export function AbaProposta({ ficha }: { ficha: Ficha }) {
               regrasCondicoes={regrasCondicoes}
               geracaoConfirmada={geracaoConfirmada}
               bloqueio={arquivado ? "Negócio arquivado: não é possível emitir proposta." : bloqueioEmissao}
+              avisoValor={
+                condicaoRegistrada && negocio.valor !== condicaoRegistrada.precoProposta
+                  ? `O valor do negócio (${formatarMoeda(negocio.valor)}) foi ajustado pela condição escolhida no contrato; a proposta v${condicaoRegistrada.versao} era de ${formatarMoeda(condicaoRegistrada.precoProposta)}. Confira o preço antes de emitir uma nova.`
+                  : null
+              }
               siteUrl={env.siteUrl}
               emissoes={emissoes.map((e) => ({ versao: e.versao, token: e.token, validadeAte: e.validade_ate, emitidaEm: e.emitida_em }))}
             />
@@ -156,11 +164,19 @@ export function AbaProposta({ ficha }: { ficha: Ficha }) {
             <Contrato
               negocioId={negocio.id}
               siteUrl={env.siteUrl}
-              precoDesatualizado={precoDesatualizado}
+              precoDesatualizado={precoContratoDesatualizado}
               bloqueio={
-                bloqueioContrato ?? (!precoDesatualizado && pendenciasCliente.length ? mensagemPendenciasContrato(pendenciasCliente) : null)
+                bloqueioContrato ?? (!precoContratoDesatualizado && pendenciasCliente.length ? mensagemPendenciasContrato(pendenciasCliente) : null)
               }
               contrato={contrato ? { token: contrato.token, status: contrato.status as StatusContrato } : null}
+              escolha={
+                escolhaCondicao
+                  ? { versao: escolhaCondicao.emissao.versao, validadeAte: escolhaCondicao.emissao.validadeAte, opcoes: escolhaCondicao.opcoes }
+                  : null
+              }
+              condicaoRegistrada={condicaoRegistrada}
+              valorNegocio={negocio.valor}
+              ganhoSemPermissao={negocio.status === "ganho" && !pode(atual.papel, CORRIGIR_VALOR_GANHO)}
             />
           </Cartao>
         </div>

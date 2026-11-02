@@ -2,7 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { MEIOS_PARCELAMENTO, ROTULO_MEIO_PARCELAMENTO, esquemaPreferencias, lerTaxasDoFormulario } from "@/lib/condicoes-pagamento";
+import {
+  MEIOS_PARCELAMENTO,
+  ROTULO_MEIO_PARCELAMENTO,
+  esquemaPreferencias,
+  esquemaValorNegocio,
+  lerTaxasDoFormulario,
+} from "@/lib/condicoes-pagamento";
 import { mensagemErro } from "@/lib/erros";
 import { CONDICOES_PAGAMENTO } from "@/lib/permissoes";
 import { exigirPapel } from "@/lib/sessao";
@@ -53,4 +59,27 @@ export async function salvarTaxasParcelamento(_: ResultadoAcao, formData: FormDa
     ok: true,
     mensagem: lidas.taxas.length ? `${rotulo}: ${lidas.taxas.length} opções de parcelamento salvas.` : `${rotulo} fica indisponível para os vendedores.`,
   };
+}
+
+/** Valor do negócio pela condição escolhida no contrato, por modalidade (admin e gestor; o banco confere de novo). */
+export async function salvarValorNegocioCondicoes(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  const { atual } = await exigirPapel(...CONDICOES_PAGAMENTO);
+  const dados = esquemaValorNegocio.safeParse(Object.fromEntries(formData));
+  if (!dados.success) return { ok: false, mensagem: "Escolha uma opção para cada modalidade." };
+
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.from("condicoes_pagamento_preferencias").upsert(
+    {
+      empresa_id: atual.empresaId,
+      valor_negocio_avista: dados.data.aVista,
+      valor_negocio_parcelado: dados.data.parcelado,
+      valor_negocio_financiamento: dados.data.financiamento,
+      valor_negocio_personalizado: dados.data.personalizado,
+    },
+    { onConflict: "empresa_id" },
+  );
+  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível salvar.") };
+
+  revalidatePath("/configuracoes/condicoes-pagamento");
+  return { ok: true, mensagem: "Salvo. Vale para as próximas escolhas; o que já foi registrado não muda." };
 }

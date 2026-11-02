@@ -1,9 +1,19 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { Botao, CLASSE_ENTRADA, Campo, Mensagem } from "@/components/ui";
-import { MAX_PARCELAS, ROTULO_MEIO_PARCELAMENTO, type MeioParcelamento, type PreferenciasCondicoes, type TaxaParcela } from "@/lib/condicoes-pagamento";
-import { salvarPreferenciasCondicoes, salvarTaxasParcelamento } from "./actions";
+import { Botao, CLASSE_ENTRADA, Campo, Mensagem, Selecao } from "@/components/ui";
+import {
+  MAX_PARCELAS,
+  MODALIDADES,
+  ROTULO_MEIO_PARCELAMENTO,
+  ROTULO_MODALIDADE,
+  ROTULO_TOTAL_CLIENTE,
+  type MeioParcelamento,
+  type PreferenciasCondicoes,
+  type TaxaParcela,
+  type ValorNegocioPorModalidade,
+} from "@/lib/condicoes-pagamento";
+import { salvarPreferenciasCondicoes, salvarTaxasParcelamento, salvarValorNegocioCondicoes } from "./actions";
 
 const formatar = (n: number) => String(n).replace(".", ",");
 
@@ -95,6 +105,38 @@ export function FormularioTaxas({ meio, taxas }: { meio: MeioParcelamento; taxas
       <div className="flex items-center gap-3">
         <Botao type="submit" disabled={salvando}>
           {salvando ? "Salvando..." : `Salvar ${rotulo.toLowerCase()}`}
+        </Botao>
+        <Mensagem resultado={resultado} />
+      </div>
+    </form>
+  );
+}
+
+/** O que o valor do negócio passa a ser quando o vendedor registra a condição escolhida pelo cliente no contrato. */
+export function FormularioValorNegocio({ valores }: { valores: ValorNegocioPorModalidade }) {
+  const [resultado, acao, salvando] = useActionState(salvarValorNegocioCondicoes, null);
+  return (
+    <form action={acao} className="flex flex-col gap-4">
+      <p className="text-xs text-texto-2">
+        Quando o vendedor registra no contrato a condição que o cliente escolheu, o valor do negócio (usado em metas e comissões) passa a ser:
+      </p>
+      <div className="flex flex-col gap-3">
+        {MODALIDADES.map((m) => (
+          <div key={m} className="grid items-center gap-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] sm:gap-3">
+            <label htmlFor={`valor-${m}`} className="text-sm font-medium text-texto">
+              {ROTULO_MODALIDADE[m]}
+            </label>
+            <Selecao id={`valor-${m}`} name={m} defaultValue={valores[m]}>
+              <option value="preco">Preço do sistema</option>
+              <option value="total_cliente">{ROTULO_TOTAL_CLIENTE[m]}</option>
+            </Selecao>
+          </div>
+        ))}
+      </div>
+      <p className="text-xs text-texto-2">Vale para as próximas escolhas; o que já foi registrado não muda.</p>
+      <div className="flex items-center gap-3">
+        <Botao type="submit" disabled={salvando}>
+          {salvando ? "Salvando..." : "Salvar"}
         </Botao>
         <Mensagem resultado={resultado} />
       </div>

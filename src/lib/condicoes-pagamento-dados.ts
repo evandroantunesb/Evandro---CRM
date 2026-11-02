@@ -1,6 +1,8 @@
 import "server-only";
-import { MEIOS_PARCELAMENTO, preferenciasDaEmpresa } from "@/lib/condicoes-pagamento";
+import { opcoesDeEscolha, type OpcaoEscolha } from "@/lib/condicao-escolhida";
+import { MEIOS_PARCELAMENTO, preferenciasDaEmpresa, valorNegocioDaEmpresa } from "@/lib/condicoes-pagamento";
 import type { RegrasCondicoes } from "@/lib/condicoes-pagamento-proposta";
+import { lerDadosDaEmissao } from "@/lib/propostas/proposta-simples";
 import type { criarClienteServidor } from "@/lib/supabase/server";
 
 /**
@@ -38,5 +40,49 @@ export async function carregarRegrasCondicoes(
     taxas,
     limiteDesconto: Number(limiteR.data ?? 0),
     descontoAprovado: Number(aprovadoR.data?.percentual ?? 0),
+  };
+}
+
+export type EscolhaCondicao = {
+  emissao: { id: string; versao: number; validadeAte: string; preco: number };
+  opcoes: OpcaoEscolha[];
+};
+
+/**
+ * O que o vendedor pode registrar como condição escolhida: as opções da ÚLTIMA proposta emitida do negócio, se ela for
+ * do esquema 5 (por modalidade), estiver íntegra e dentro da validade; nulo = sem escolha (o contrato segue como
+ * antes). `erro` = não foi possível ler.
+ */
+export async function carregarEscolhaCondicao(
+  supabase: Awaited<ReturnType<typeof criarClienteServidor>>,
+  empresaId: string,
+  negocioId: string,
+  hoje: string,
+): Promise<{ escolha: EscolhaCondicao | null; erro: boolean }> {
+  const [emissaoR, preferenciasR] = await Promise.all([
+    supabase
+      .from("propostas_emissoes")
+      .select("id, versao, dados, dados_sha256")
+      .eq("negocio_id", negocioId)
+      .order("versao", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("condicoes_pagamento_preferencias")
+      .select("valor_negocio_avista, valor_negocio_parcelado, valor_negocio_financiamento, valor_negocio_personalizado")
+      .eq("empresa_id", empresaId)
+      .maybeSingle(),
+  ]);
+  if (emissaoR.error || preferenciasR.error) return { escolha: null, erro: true };
+  if (!emissaoR.data) return { escolha: null, erro: false };
+  const lida = lerDadosDaEmissao(emissaoR.data.dados, emissaoR.data.dados_sha256);
+  if (!lida.ok || lida.dados.esquema !== 5 || lida.dados.comercial.validadeAte < hoje) return { escolha: null, erro: false };
+  const preco = lida.dados.preco.valor;
+  return {
+    escolha: {
+      emissao: { id: emissaoR.data.id, versao: emissaoR.data.versao, validadeAte: lida.dados.comercial.validadeAte, preco },
+      opcoes: opcoesDeEscolha(lida.dados.comercial.condicoesPagamento, preco, valorNegocioDaEmpresa(preferenciasR.data)),
+    },
+    erro: false,
   };
 }
