@@ -94,7 +94,7 @@ test.describe("proposta simples emitida", () => {
     await expect(pagina.getByRole("heading", { name: "Cliente emissão (fictício)" })).toBeVisible();
     // 5,5 kWp × 120 (produtividade confirmada pela fixture acima; não é parâmetro de proposta real).
     await expect(pagina.getByText("660 kWh/mês", { exact: true })).toBeVisible();
-    await expect(pagina.getByText("R$ 24.900,00", { exact: true })).toBeVisible();
+    await expect(pagina.getByTestId("preco-proposta")).toHaveText("R$ 24.900,00");
     await expect(pagina.getByText("Esta proposta apresenta o sistema e sua geração estimada. Não inclui estimativa de economia ou prazo de retorno.")).toBeVisible();
 
     const resposta1 = await request.get(`/proposta/${v1.token}/pdf`);
@@ -110,7 +110,7 @@ test.describe("proposta simples emitida", () => {
     await n.cliente.from("kit_componentes").update({ quantidade: 40 }).eq("negocio_id", n.id).eq("tipo", "modulo");
 
     await pagina.reload();
-    await expect(pagina.getByText("R$ 24.900,00", { exact: true })).toBeVisible();
+    await expect(pagina.getByTestId("preco-proposta")).toHaveText("R$ 24.900,00");
     await expect(pagina.getByText("R$ 99.999,00")).toHaveCount(0);
     const resposta2 = await request.get(`/proposta/${v1.token}/pdf`);
     expect(sha256(new Uint8Array(await resposta2.body()))).toBe(v1.pdf_sha256);

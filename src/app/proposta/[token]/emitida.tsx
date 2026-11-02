@@ -115,7 +115,7 @@ export function PropostaEmitida({ token, dados }: { token: string; dados: DadosE
       )}
 
       <Cartao titulo="Investimento">
-        <p className="text-2xl font-semibold text-carvao tabular-nums">{formatarMoeda(dados.preco.valor)}</p>
+        <p data-testid="preco-proposta" className="text-2xl font-semibold text-carvao tabular-nums">{formatarMoeda(dados.preco.valor)}</p>
         {dados.esquema === 5 ? (
           <CondicoesPagamento condicoes={dados.comercial.condicoesPagamento} validadeAte={dados.comercial.validadeAte} />
         ) : (
