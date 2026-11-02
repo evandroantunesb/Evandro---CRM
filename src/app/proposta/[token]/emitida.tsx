@@ -1,6 +1,8 @@
 import { LogoRaion } from "@/components/marca";
 import { Cartao } from "@/components/ui";
 import { formatarDataHora, formatarMoeda, hojeEmSaoPaulo } from "@/lib/formatacao";
+import { secoesCondicoesEmitidas } from "@/lib/condicoes-pagamento-exibicao";
+import type { CondicoesEmitidas } from "@/lib/condicoes-pagamento-proposta";
 import { dataBr, textoCondicoesComerciais, textoPremissaGeracao, type DadosEmissaoSimples } from "@/lib/propostas/proposta-simples";
 import { ROTULO_TIPO_COMPONENTE_KIT } from "@/lib/tipos";
 
@@ -113,11 +115,56 @@ export function PropostaEmitida({ token, dados }: { token: string; dados: DadosE
       )}
 
       <Cartao titulo="Investimento">
-        <p className="text-2xl font-semibold text-carvao">{formatarMoeda(dados.preco.valor)}</p>
-        <p className="mt-3 text-sm whitespace-pre-wrap text-zinc-700">{textoCondicoesComerciais(dados)}</p>
+        <p className="text-2xl font-semibold text-carvao tabular-nums">{formatarMoeda(dados.preco.valor)}</p>
+        {dados.esquema === 5 ? (
+          <CondicoesPagamento condicoes={dados.comercial.condicoesPagamento} validadeAte={dados.comercial.validadeAte} />
+        ) : (
+          <p className="mt-3 text-sm whitespace-pre-wrap text-zinc-700">{textoCondicoesComerciais(dados)}</p>
+        )}
       </Cartao>
 
       <p className="text-xs text-zinc-500">{dados.rodape}</p>
     </main>
+  );
+}
+
+/** Condições por modalidade (esquema 5), no mesmo arranjo do PDF: à vista e parcelado lado a lado; financiamento e
+ * Personalizado em largura total; no celular, um embaixo do outro. */
+function CondicoesPagamento({ condicoes, validadeAte }: { condicoes: CondicoesEmitidas; validadeAte: string }) {
+  return (
+    <div className="mt-4 flex flex-col gap-3" data-testid="condicoes-pagamento">
+      <p className="text-xs font-medium tracking-wide text-dourado-texto uppercase">Condições de pagamento</p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {secoesCondicoesEmitidas(condicoes).map((s) => (
+          <div
+            key={s.modalidade}
+            className={`flex min-w-0 flex-col gap-1.5 rounded-lg border border-zinc-200 p-3 ${s.modalidade === "financiamento" || s.modalidade === "personalizado" ? "sm:col-span-2" : ""}`}
+          >
+            <p className="text-xs font-medium tracking-wide text-dourado-texto uppercase">{s.titulo}</p>
+            {s.subtitulo && <p className="text-xs text-zinc-500">{s.subtitulo}</p>}
+            {s.modalidade === "aVista" ? (
+              <p className="text-xl font-semibold text-carvao tabular-nums">{s.itens[0]!.valor}</p>
+            ) : s.modalidade === "parcelado" ? (
+              <ul className="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-x-3 gap-y-0.5 text-sm text-zinc-800 tabular-nums">
+                {s.itens.map((it) => (
+                  <li key={it.valor}>{it.valor}</li>
+                ))}
+              </ul>
+            ) : (
+              <ul className="grid grid-cols-[repeat(auto-fit,minmax(11rem,1fr))] gap-x-4 gap-y-2 text-sm">
+                {s.itens.map((it, i) => (
+                  <li key={i}>
+                    <span className="font-medium text-zinc-900 tabular-nums">{it.valor}</span>
+                    {it.detalhe && <span className="block text-xs text-zinc-500">{it.detalhe}</span>}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ))}
+      </div>
+      {condicoes.observacao && <p className="text-sm text-zinc-600">{condicoes.observacao}</p>}
+      <p className="text-xs text-zinc-500">Proposta válida até {dataBr(validadeAte)}.</p>
+    </div>
   );
 }

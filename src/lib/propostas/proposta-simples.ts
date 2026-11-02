@@ -20,12 +20,12 @@ import { z } from "zod";
 import { nomeKitPersonalizado, potenciaKitPersonalizadoKwp, type ComponenteKit } from "@/lib/calculadora";
 import {
   esquemaCondicoesEmitidas,
-  linhasCondicoesEmitidas,
   MENSAGEM_NENHUMA_CONDICAO,
   montarCondicoesPagamento,
   type EntradaCondicoes,
   type RegrasCondicoes,
 } from "@/lib/condicoes-pagamento-proposta";
+import { linhasCondicoesEmitidas } from "@/lib/condicoes-pagamento-exibicao";
 import { valorComoPersistido } from "@/lib/consumo-persistido";
 import { TIPOS_COMPONENTE_KIT } from "@/lib/tipos";
 

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { MAX_PARCELAS, MEIOS_PARCELAMENTO, ROTULO_MEIO_PARCELAMENTO, type MeioParcelamento, type TaxaParcela } from "@/lib/condicoes-pagamento";
-import { formatarMoeda, lerNumeroBr } from "@/lib/formatacao";
+import { lerNumeroBr } from "@/lib/formatacao";
 
 /**
  * Condições de pagamento na proposta (PR 3 do plano aprovado pelo Evandro em 01/11/2026): o que o vendedor escolhe na
@@ -157,7 +157,7 @@ export const valorAVista = (preco: number, descontoPercentual: number) => emReai
 /** Desconto (%) que uma soma abaixo do preço representa, com 1 casa (só para exibir). */
 export const descontoDaSoma = (preco: number, soma: number) => Math.round((1 - soma / preco) * 1000) / 10;
 
-const formatarPercentual = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+export const formatarPercentual = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
 
 function dataValida(texto: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(texto)) return false;
@@ -274,37 +274,4 @@ export function montarCondicoesPagamento(entrada: EntradaCondicoes, regras: Regr
   const analisado = esquemaCondicoesEmitidas.safeParse({ aVista, parcelado, financiamento, personalizado, observacao: observacao || null });
   if (!analisado.success) return { ok: false, pendencias: ["As condições de pagamento não passaram na conferência. Revise os valores."] };
   return { ok: true, condicoes: analisado.data };
-}
-
-const moeda = formatarMoeda;
-const dataBr = (iso: string) => iso.split("-").reverse().join("/");
-
-/**
- * As condições emitidas em linhas de texto, uma por modalidade (e a observação por último). Usado pelo PDF e pela
- * página do cliente até o bloco organizado por modalidade (PR 3b).
- */
-export function linhasCondicoesEmitidas(c: CondicoesEmitidas): string[] {
-  const linhas: string[] = [];
-  if (c.aVista) {
-    linhas.push(`À vista: ${moeda(c.aVista.valor)}${c.aVista.descontoPercentual > 0 ? ` (${formatarPercentual(c.aVista.descontoPercentual)}% de desconto)` : ""}`);
-  }
-  if (c.parcelado) {
-    linhas.push(`${ROTULO_MEIO_PARCELAMENTO[c.parcelado.meio]}: ${c.parcelado.opcoes.map((o) => `${o.parcelas}x de ${moeda(o.valorParcela)}`).join(" · ")}`);
-  }
-  if (c.financiamento) {
-    const titulo = c.financiamento.instituicao ? `Financiamento (${c.financiamento.instituicao})` : "Financiamento";
-    for (const o of c.financiamento.opcoes) {
-      const entrada = o.entrada > 0 ? `entrada de ${moeda(o.entrada)} + ` : "";
-      linhas.push(`${titulo}: ${entrada}${o.parcelas}x de ${moeda(o.valorParcela)}, carência de ${o.carenciaDias} dias`);
-    }
-  }
-  if (c.personalizado) {
-    const partes = c.personalizado.partes.map((x) => {
-      const quando = x.momento === "data" && x.data ? `em ${dataBr(x.data)}` : ROTULO_MOMENTO[x.momento].toLowerCase();
-      return `${moeda(x.valor)} (${ROTULO_FORMA[x.forma]}) ${quando}${x.observacao ? ` — ${x.observacao}` : ""}`;
-    });
-    linhas.push(`Personalizado, total de ${moeda(c.personalizado.total)}: ${partes.join("; ")}`);
-  }
-  if (c.observacao) linhas.push(c.observacao);
-  return linhas;
 }

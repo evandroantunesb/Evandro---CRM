@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   MENSAGEM_NENHUMA_CONDICAO,
   ORIENTACAO_APROVACAO,
-  linhasCondicoesEmitidas,
   montarCondicoesPagamento,
   valorParcela,
   type EntradaCondicoes,
   type RegrasCondicoes,
 } from "@/lib/condicoes-pagamento-proposta";
+import { linhasCondicoesEmitidas, secoesCondicoesEmitidas } from "@/lib/condicoes-pagamento-exibicao";
 
 const PRECO = 30000;
 const HOJE = "2026-11-02";
@@ -156,6 +156,51 @@ describe("texto das condições emitidas (PDF e página até a PR 3b)", () => {
       `Financiamento (Banco X): entrada de R$${nbsp}1.000,00 + 60x de R$${nbsp}690,00, carência de 90 dias`,
       `Personalizado, total de R$${nbsp}30.000,00: R$${nbsp}30.000,00 (PIX) em 01/12/2026`,
       "Valores válidos até a validade",
+    ]);
+  });
+});
+
+describe("condições por modalidade (PDF e página, PR 3b)", () => {
+  it("uma seção por modalidade marcada, na ordem da tela, com títulos e opções prontos para exibir", () => {
+    const r = montar({
+      aVista: { desconto: "5" },
+      parcelado: { meio: "cartao", parcelas: [1, 3], repassarTaxas: false },
+      financiamento: { instituicao: "", opcoes: [{ entrada: "", parcelas: "60", valorParcela: "690", carenciaDias: 90 }] },
+      personalizado: { partes: [{ valor: "30.000", forma: "transferencia", momento: "conexao", data: "", observacao: "após a vistoria" }] },
+    });
+    if (!r.ok) throw new Error(r.pendencias.join(" "));
+    const nbsp = " ";
+    expect(secoesCondicoesEmitidas(r.condicoes)).toEqual([
+      { modalidade: "aVista", titulo: "À vista", subtitulo: "5% de desconto", itens: [{ valor: `R$${nbsp}28.500,00`, detalhe: null }] },
+      {
+        modalidade: "parcelado",
+        titulo: "Cartão de crédito",
+        subtitulo: null,
+        itens: [
+          { valor: `1x de R$${nbsp}30.000,00`, detalhe: null },
+          { valor: `3x de R$${nbsp}10.000,00`, detalhe: null },
+        ],
+      },
+      {
+        modalidade: "financiamento",
+        titulo: "Financiamento",
+        subtitulo: null,
+        itens: [{ valor: `60x de R$${nbsp}690,00`, detalhe: "Sem entrada · carência de 90 dias" }],
+      },
+      {
+        modalidade: "personalizado",
+        titulo: "Personalizado",
+        subtitulo: `Total de R$${nbsp}30.000,00`,
+        itens: [{ valor: `R$${nbsp}30.000,00 · Transferência`, detalhe: "Na conexão — após a vistoria" }],
+      },
+    ]);
+  });
+
+  it("modalidade não marcada não aparece; à vista sem desconto fica sem linha de apoio", () => {
+    const r = montar({ aVista: { desconto: "0" } });
+    if (!r.ok) throw new Error(r.pendencias.join(" "));
+    expect(secoesCondicoesEmitidas(r.condicoes)).toEqual([
+      { modalidade: "aVista", titulo: "À vista", subtitulo: null, itens: [{ valor: "R$ 30.000,00", detalhe: null }] },
     ]);
   });
 });
