@@ -1,119 +1,124 @@
-import { atividadeAtrasada, escalaCronograma, posicaoAtividade } from "@/lib/obras/apresentacao/calculos";
-import type { AtividadeCronograma } from "@/lib/obras/apresentacao/tipos";
-import { ROTULO_SETOR } from "@/lib/obras/rotulos";
+import type { CronogramaVM, EtapaGanttVM, Faixa, Tom } from "@/lib/obras/cronograma";
+import { ddmm } from "@/lib/obras/cronograma";
 
-/** Pixels por dia na linha do tempo (a área rola na horizontal dentro do cartão). */
-const PX_DIA = 18;
-const LARGURA_ROTULO = 190;
+const TOM: Record<Tom, string> = { erro: "text-erro", atencao: "text-dourado-texto", ok: "text-energia", neutro: "text-texto-2" };
+const NUM: Record<EtapaGanttVM["estado"], string> = {
+  ok: "bg-energia/12 text-energia",
+  and: "bg-dourado text-carvao",
+  pend: "bg-superficie-2 text-texto-2",
+};
 
-const ddmm = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
+/** Ao trocar de obra, as barras deslizam até o novo lugar, em cascata pela linha. */
+const barra = (f: Faixa, linha: number) => ({ left: `${f[0]}%`, width: `${f[1]}%`, transitionDelay: `${linha * 70}ms` });
+const TRANSICAO = "absolute transition-[left,width] duration-700 ease-[cubic-bezier(.16,1,.3,1)] motion-reduce:transition-none";
 
 /**
- * Cronograma estilo construtora: uma linha por atividade, barra do previsto (início → fim) com o
- * progresso informado pela fonte por cima, losango para marcos, linha vertical de hoje e
- * atividade atrasada (fim passou, < 100%) em âmbar. Rolagem horizontal SÓ dentro do cartão
- * (a página nunca estoura) e coluna de nomes fixa à esquerda.
+ * Gantt do desenho aprovado "Obras — Apresentação": uma linha por etapa com o previsto (fino), o realizado (dourado)
+ * e a previsão (tracejada), a linha de hoje, o losango da entrega contratada na última etapa e, à direita, o tempo na
+ * etapa e o desvio. Atraso só herdado mostra o motivo calculado ao passar o mouse ou focar.
  */
-export function Gantt({ atividades, hojeIso }: { atividades: AtividadeCronograma[]; hojeIso: string }) {
-  const escala = escalaCronograma(atividades, hojeIso);
-  if (!escala) return null;
-  const largura = escala.totalDias * PX_DIA;
-
+export function Gantt({ cronograma }: { cronograma: CronogramaVM }) {
+  const { meses, hoje, contratada, etapas } = cronograma;
+  const separadores = meses.slice(0, -1).reduce<number[]>((acc, m) => [...acc, (acc.at(-1) ?? 0) + m.largura], []);
   return (
-    <div
-      role="region"
-      aria-label="Cronograma da obra (role na horizontal para ver todo o período)"
-      tabIndex={0}
-      data-sem-gesto
-      className="max-w-full overflow-x-auto overscroll-x-contain rounded-lg border border-zinc-200 outline-none focus-visible:ring-2 focus-visible:ring-dourado/40"
-    >
-      <div className="relative" style={{ width: LARGURA_ROTULO + largura }}>
-        {/* Cabeçalho: semanas (segunda-feira) */}
-        <div className="flex border-b border-zinc-200 bg-zinc-50 text-[11px] text-zinc-500">
-          <div className="sticky left-0 z-20 shrink-0 border-r border-zinc-200 bg-zinc-50 px-3 py-2 font-medium" style={{ width: LARGURA_ROTULO }}>
-            Atividade
-          </div>
-          <div className="relative h-8" style={{ width: largura }}>
-            {escala.semanas.map((s) => (
-              <span key={s.inicio} className="absolute top-0 h-full border-l border-zinc-200 pt-2 pl-1" style={{ left: s.deslocamento * PX_DIA }}>
-                {ddmm(s.inicio)}
+    <div role="region" aria-label="Etapas da obra (role na horizontal para ver todo o período)" tabIndex={0} data-sem-gesto className="max-w-full overflow-x-auto overscroll-x-contain outline-none focus-visible:ring-2 focus-visible:ring-dourado/40">
+      <div className="min-w-[760px]">
+        <div className="grid grid-cols-[240px_minmax(0,1fr)_150px] text-[11px] font-medium tracking-[0.08em] text-texto-2 uppercase">
+          <div className="py-2">Etapa</div>
+          <div className="flex py-2">
+            {meses.map((m) => (
+              <span key={m.rotulo + m.largura} className="truncate pl-1" style={{ width: `${m.largura}%` }}>
+                {m.rotulo}
               </span>
             ))}
-            {escala.hoje != null && (
-              <span className="absolute top-0 z-10 -translate-x-1/2 rounded bg-carvao px-1.5 py-0.5 text-[10px] font-medium text-offwhite" style={{ left: escala.hoje * PX_DIA + PX_DIA / 2 }}>
-                Hoje
-              </span>
-            )}
           </div>
+          <div className="py-2 text-right">Tempo na etapa</div>
         </div>
-
-        <ul>
-          {atividades.map((a) => {
-            const { deslocamento, duracao } = posicaoAtividade(a, escala);
-            const atrasada = atividadeAtrasada(a, hojeIso);
-            const periodo = a.marco ? ddmm(a.inicio) : `${ddmm(a.inicio)} – ${ddmm(a.fim)}`;
-            return (
-              <li key={a.id} className="flex border-b border-zinc-100 last:border-b-0">
-                <div className="sticky left-0 z-20 shrink-0 border-r border-zinc-200 bg-white px-3 py-2" style={{ width: LARGURA_ROTULO }}>
-                  <p className="truncate text-xs font-medium text-zinc-900" title={a.nome}>
-                    {a.nome}
-                  </p>
-                  <p className="truncate text-[11px] text-zinc-500">
-                    {a.setor ? `${ROTULO_SETOR[a.setor]} · ` : ""}
-                    {periodo}
-                  </p>
+        <ol>
+          {etapas.map((e, i) => (
+            <li key={e.chave} className="grid min-h-12 grid-cols-[240px_minmax(0,1fr)_150px]">
+              <div className="flex items-center gap-2.5 border-b border-linha py-2 pr-3">
+                <span aria-hidden className={`grid size-6 shrink-0 place-items-center rounded-full text-[11px] font-semibold transition-colors ${NUM[e.estado]}`}>
+                  {e.estado === "ok" ? "✓" : e.num}
+                </span>
+                <div className="min-w-0">
+                  <p className="truncate text-[13.5px] font-semibold text-texto">{e.nome}</p>
+                  <p className="truncate text-[11.5px] text-texto-2">{e.sub}</p>
                 </div>
-                <div className="relative h-12" style={{ width: largura }}>
-                  {escala.semanas.map((s) => (
-                    <span key={s.inicio} aria-hidden className="absolute top-0 h-full border-l border-zinc-100" style={{ left: s.deslocamento * PX_DIA }} />
-                  ))}
-                  {escala.hoje != null && (
-                    <span aria-hidden className="absolute top-0 z-10 h-full w-px bg-carvao/60" style={{ left: escala.hoje * PX_DIA + PX_DIA / 2 }} />
-                  )}
-                  {a.marco ? (
+              </div>
+              <div className="relative border-b border-linha" aria-hidden>
+                {separadores.map((s) => (
+                  <span key={s} className="absolute inset-y-0 w-px bg-linha" style={{ left: `${s}%` }} />
+                ))}
+                <span className={`${TRANSICAO} top-[calc(50%-10px)] h-1.5 rounded-full bg-[#d9d5cb]`} style={barra(e.previsto, i)} />
+                {e.real && <span className={`${TRANSICAO} top-[calc(50%-1px)] h-2.5 rounded-full bg-dourado`} style={barra(e.real, i)} />}
+                {e.previsao && (
+                  <span
+                    className={`${TRANSICAO} top-[calc(50%-1px)] box-border h-2.5 rounded-full border-[1.5px] border-dashed border-acao-forte bg-dourado/25`}
+                    style={barra(e.previsao, i)}
+                  />
+                )}
+                {i === etapas.length - 1 && (
+                  <span className={`${TRANSICAO} top-[calc(50%-5px)] -ml-[5px] size-[11px] rotate-45 rounded-[2px] bg-texto`} style={{ left: `${contratada.pos}%` }} />
+                )}
+                {hoje != null && <span className="absolute inset-y-0 z-[2] w-0.5 bg-texto" style={{ left: `${hoje}%` }} />}
+              </div>
+              <div className="flex flex-col items-end justify-center border-b border-linha py-2 text-right tabular-nums">
+                <span className="text-[13.5px] font-semibold text-texto">{e.tempo}</span>
+                {e.motivo ? (
+                  <span
+                    tabIndex={0}
+                    className={`group relative inline-flex cursor-help items-center gap-1 border-b border-dashed border-current text-[11.5px] font-semibold outline-none focus-visible:rounded focus-visible:ring-2 focus-visible:ring-dourado ${TOM[e.desvio.tom]}`}
+                  >
+                    {e.desvio.texto}
+                    <span className="sr-only">. Motivo: {e.motivo}</span>
                     <span
-                      className={`absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rotate-45 ${a.progresso >= 100 ? "bg-carvao" : "border-2 border-carvao bg-white"}`}
-                      style={{ left: deslocamento * PX_DIA + PX_DIA / 2 }}
-                      title={`${a.nome}: ${periodo}`}
-                    />
-                  ) : (
-                    <div
-                      className={`absolute top-1/2 h-5 -translate-y-1/2 overflow-hidden rounded ${atrasada ? "bg-amber-100 ring-1 ring-amber-400" : "bg-zinc-200"}`}
-                      style={{ left: deslocamento * PX_DIA + 2, width: duracao * PX_DIA - 4 }}
-                      title={`${a.nome}: ${periodo} · ${a.progresso}%${atrasada ? " · atrasada" : ""}`}
+                      aria-hidden
+                      className="absolute right-0 bottom-[calc(100%+8px)] z-20 hidden w-[300px] rounded-xl bg-carvao px-3.5 py-3 text-left font-normal text-offwhite shadow-[0_10px_28px_rgb(0_0_0/30%)] group-hover:block group-focus:block"
                     >
-                      <div className={`h-full ${atrasada ? "bg-amber-400" : "bg-dourado"}`} style={{ width: `${Math.max(0, Math.min(100, a.progresso))}%` }} />
-                      <span className="absolute inset-0 flex items-center px-1.5 text-[10px] font-medium text-carvao">{a.progresso}%</span>
-                    </div>
-                  )}
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+                      <b className="mb-1 block text-[11px] font-semibold tracking-[0.1em] text-dourado uppercase">Motivo</b>
+                      <span className="block text-[12.5px] leading-[1.45]">{e.motivo}</span>
+                      <small className="mt-1.5 block text-[11px] text-offwhite/60">Calculado pelo sistema</small>
+                    </span>
+                  </span>
+                ) : (
+                  <span className={`text-[11.5px] font-semibold ${TOM[e.desvio.tom]}`}>{e.desvio.texto}</span>
+                )}
+              </div>
+            </li>
+          ))}
+        </ol>
       </div>
     </div>
   );
 }
 
-export function LegendaGantt() {
+const LEGENDA = "mr-1.5 inline-block h-[7px] w-5 rounded-full align-[1px]";
+
+export function LegendaGantt({ hoje, entregaContratada }: { hoje: string; entregaContratada: string }) {
   return (
-    <ul className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-zinc-500">
-      <li className="flex items-center gap-1.5">
-        <span className="inline-block h-2.5 w-5 rounded-sm bg-zinc-200" /> Previsto
-      </li>
-      <li className="flex items-center gap-1.5">
-        <span className="inline-block h-2.5 w-5 rounded-sm bg-dourado" /> Executado
-      </li>
-      <li className="flex items-center gap-1.5">
-        <span className="inline-block h-2.5 w-5 rounded-sm bg-amber-400" /> Atrasada
-      </li>
-      <li className="flex items-center gap-1.5">
-        <span className="inline-block size-2.5 rotate-45 border-2 border-carvao" /> Marco
-      </li>
-      <li className="flex items-center gap-1.5">
-        <span className="inline-block h-3 w-px bg-carvao" /> Hoje
-      </li>
-    </ul>
+    <div className="flex flex-wrap gap-x-[18px] gap-y-1 text-[11.5px] text-texto-2">
+      <span>
+        <i aria-hidden className={`${LEGENDA} bg-[#d9d5cb]`} />
+        Previsto
+      </span>
+      <span>
+        <i aria-hidden className={`${LEGENDA} bg-dourado`} />
+        Realizado
+      </span>
+      <span>
+        <i aria-hidden className={`${LEGENDA} box-border border-[1.5px] border-dashed border-acao-forte bg-dourado/25`} />
+        Previsão
+      </span>
+      <span>
+        <i aria-hidden className="mr-1.5 inline-block h-3 w-0.5 bg-texto align-[-2px]" />
+        Hoje ({ddmm(hoje)})
+      </span>
+      <span>
+        <i aria-hidden className="mr-1.5 inline-block size-[9px] rotate-45 rounded-[2px] bg-texto" />
+        Entrega contratada ({ddmm(entregaContratada)})
+      </span>
+      <span className="sm:ml-auto">Passe o mouse num atraso sublinhado para ver o motivo</span>
+    </div>
   );
 }

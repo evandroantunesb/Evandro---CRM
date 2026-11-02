@@ -47,6 +47,8 @@ const MATRIZ: Record<string, string[]> = {
   // Validade padrão da proposta: mesma barreira das políticas de `proposta_preferencias`.
   VALIDADE_PROPOSTA: ["admin", "gestor"],
   CONDICOES_PAGAMENTO: ["admin", "gestor"],
+  // Prazos das etapas e entrega contratada da obra: mesma barreira das políticas e da RPC.
+  PRAZOS_OBRA: ["admin", "gestor"],
   GAMIFICACAO: ["admin", "gestor", "vendedor", "sdr"],
   PARTICIPANTES_GAMIFICACAO: ["vendedor", "sdr"],
   OBRAS: ["admin", "gestor", "vendedor", "sdr", "operacao"],

@@ -698,7 +698,10 @@ describe(
         expect(inicial.iniciado_em).not.toBeNull(); // saiu de a_comprar no teste do admin
         const iniciado = inicial.iniciado_em;
 
+        // Faturado não conclui Compras; o fim é o material entregue.
         expect((await status(admin, obraX, "compras", "faturado_fornecedor")).error).toBeNull();
+        expect((await fluxo(obraX, "compras")).concluido_em).toBeNull();
+        expect((await status(admin, obraX, "compras", "material_entregue")).error).toBeNull();
         const final = await fluxo(obraX, "compras");
         expect(final.concluido_em).not.toBeNull();
         expect(final.iniciado_em).toBe(iniciado);
@@ -720,7 +723,7 @@ describe(
           autor_user_id: admin.id,
           dados: {
             campo: "status",
-            de: "faturado_fornecedor",
+            de: "material_entregue",
             para: "a_comprar",
             autorizacao: "admin",
           },

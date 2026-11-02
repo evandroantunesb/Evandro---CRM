@@ -3912,6 +3912,35 @@ export type Database = {
           },
         ];
       };
+      obra_prazos_etapas: {
+        Row: {
+          chave: string;
+          dias_uteis: number;
+          empresa_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          chave: string;
+          dias_uteis: number;
+          empresa_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          chave?: string;
+          dias_uteis?: number;
+          empresa_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "obra_prazos_etapas_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       obras: {
         Row: {
           alerta_pagamento_estornado_em: string | null;
@@ -3923,6 +3952,8 @@ export type Database = {
           contrato_id: string;
           created_at: string;
           empresa_id: string;
+          entrega_contratada: string;
+          entrega_material_prevista: string | null;
           id: string;
           negocio_id: string;
           numero: number;
@@ -3949,6 +3980,8 @@ export type Database = {
           contrato_id: string;
           created_at?: string;
           empresa_id: string;
+          entrega_contratada: string;
+          entrega_material_prevista?: string | null;
           id?: string;
           negocio_id: string;
           numero: number;
@@ -3975,6 +4008,8 @@ export type Database = {
           contrato_id?: string;
           created_at?: string;
           empresa_id?: string;
+          entrega_contratada?: string;
+          entrega_material_prevista?: string | null;
           id?: string;
           negocio_id?: string;
           numero?: number;
@@ -5560,6 +5595,10 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      ajustar_entrega_contratada_obra: {
+        Args: { p_data: string; p_motivo: string; p_obra_id: string };
+        Returns: undefined;
+      };
       alterar_item_engenharia: {
         Args: { p_item_id: string; p_motivo?: string; p_status: string };
         Returns: undefined;
@@ -5650,6 +5689,10 @@ export type Database = {
           responsavel_nome: string;
           visivel: boolean;
         }[];
+      };
+      calcular_entrega_contratada: {
+        Args: { p_chegada: string; p_empresa_id: string };
+        Returns: string;
       };
       calcular_realizado_meta: {
         Args: {
@@ -5800,6 +5843,26 @@ export type Database = {
         };
         Returns: string;
       };
+      cronograma_obra: {
+        Args: { p_obra_id: string };
+        Returns: {
+          atraso_dias: number;
+          atraso_proprio: number;
+          causa_etapa: string;
+          dias_na_etapa: number;
+          entrega_contratada: string;
+          entrega_material_prevista: string;
+          etapa: string;
+          ordem: number;
+          previsao_fim: string;
+          previsao_inicio: string;
+          previsto_fim: string;
+          previsto_inicio: string;
+          real_fim: string;
+          real_inicio: string;
+          situacao: string;
+        }[];
+      };
       data_pascoa: { Args: { p_ano: number }; Returns: string };
       decidir_atribuicao_lead: {
         Args: { p_automatico: boolean; p_id: string; p_membro_final_id: string };
@@ -5815,6 +5878,10 @@ export type Database = {
           p_obra_id: string;
           p_setor: Database["public"]["Enums"]["setor_obra"];
         };
+        Returns: undefined;
+      };
+      definir_entrega_material_prevista: {
+        Args: { p_data?: string; p_obra_id: string };
         Returns: undefined;
       };
       definir_fixacao_obra: {
@@ -6011,6 +6078,7 @@ export type Database = {
       inserir_checklist_engenharia_padrao: { Args: { p_empresa_id: string }; Returns: undefined };
       inserir_fixacoes_telhado_padrao: { Args: { p_empresa_id: string }; Returns: undefined };
       inserir_prazos_engenharia_padrao: { Args: { p_empresa_id: string }; Returns: undefined };
+      inserir_prazos_etapas_obra_padrao: { Args: { p_empresa_id: string }; Returns: undefined };
       inserir_registro_pagamento: {
         Args: {
           p_data: string;

@@ -451,7 +451,7 @@ const fluxo = (setor: string, status: string, extra: Linha = {}): Linha => ({
 
 const filhas = (): Record<string, Linha[]> => ({
   obra_fluxos: [
-    fluxo("compras", "faturado_fornecedor"),
+    fluxo("compras", "material_entregue"),
     fluxo("engenharia", "aprovado", { parado: true, parado_motivo: "Falta documento" }),
     fluxo("operacional", "agendada", { aguardando: "cliente" }),
     // Outra obra e outra empresa: nunca devem aparecer.
@@ -671,7 +671,7 @@ describe("carregarDetalheObra: view model", () => {
     });
 
     expect(vm.setores.map((s) => s.setor)).toEqual(["compras", "engenharia", "operacional"]);
-    expect(vm.setores.map((s) => s.statusRotulo)).toEqual(["Faturado pelo fornecedor", "Aprovado", "Agendada"]);
+    expect(vm.setores.map((s) => s.statusRotulo)).toEqual(["Material entregue", "Aprovado", "Agendada"]);
     expect(vm.setores.map((s) => s.estado)).toEqual(["concluido", "parado", "aguardando"]);
     expect(vm.setores.map((s) => s.paradoMotivo)).toEqual([null, "Falta documento", null]);
     expect(vm.setores[2].aguardando).toBe("Aguardando cliente");
@@ -701,7 +701,7 @@ describe("carregarDetalheObra: view model", () => {
   it("marcos ausentes aparecem como 'Sem informação'; obra concluída exige os 2 marcos", async () => {
     const tabelas = filhas();
     tabelas.obra_marcos = [];
-    tabelas.obra_fluxos = [fluxo("compras", "faturado_fornecedor"), fluxo("engenharia", "concluido"), fluxo("operacional", "concluido")];
+    tabelas.obra_fluxos = [fluxo("compras", "material_entregue"), fluxo("engenharia", "concluido"), fluxo("operacional", "concluido")];
     const f = criarFake({ tabelas: { obras: [obraTabela()], ...tabelas }, rpcs: { identidade_membros: identidades } });
     const vm = await carregarDetalheObra(f.cliente, { empresaId: EMPRESA, papel: "gestor", obraId: OBRA });
     expect(vm?.marcos.map((m) => [m.marco, m.statusRotulo, m.motivo])).toEqual([

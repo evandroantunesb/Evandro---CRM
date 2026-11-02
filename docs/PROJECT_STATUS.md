@@ -1,5 +1,22 @@
 # Estado do projeto — Raion CRM
 
+## Obras = One Page Result (OPR) — plano em 3 PRs (aprovado pelo Evandro em 02/11/2026)
+
+Telas aprovadas no canvas "Raion — Nova interface": `ObrasCompleta.dc.html` (painel de todas as obras) e `ObrasApresentacao.dc.html` (uma obra por tela). Regra: **sempre seguir os desenhos**.
+
+| PR | Escopo | Estado |
+| --- | --- | --- |
+| 1 | Prazos das etapas, entrega contratada, "material entregue" e cronograma calculado | PR #290; migration `20261104100000_obras_cronograma.sql` aplicada em produção em 02/11/2026 (tag `migracao-pr290-a960dc4`); merge pendente |
+| 2 | Custos (orçamento por categoria pré-preenchido pela calculadora, lançamentos sem apagar) e deduções do lucro | a fazer |
+| 3 | Visão Completa, semáforo, justificativa de atraso e escalonamento (gestor e Operacional abrem e fecham); gestor vê todas as obras | a fazer |
+
+Decisões da PR 1:
+- Sete etapas em sequência, com prazo padrão em dias úteis que admin ou gestor editam em Configurações › Prazos das etapas: projeto 7, homologação 15, compra 5, entrega do material 7, instalação 5, vistoria 7, conexão 5. A entrega contratada é a chegada da obra mais 51 dias úteis; fica gravada na obra e admin ou gestor ajustam com motivo.
+- Compras termina em "material entregue". Compras informa a previsão de entrega do material. Na migração, obras em "faturado" com a instalação já iniciada viram "material entregue" na data do início da instalação (deduzida, registrada no histórico); as demais voltam a esperar a entrega.
+- A tarefa automática "Agendar instalação" continua nascendo em "faturado".
+- A previsão corre em cascata; atraso só herdado mostra a etapa causadora ("Calculado pelo sistema").
+- Pendente: o setor Compras ainda não existe. Hoje a previsão do material é do admin ou de quem é da Operação com Compras na obra; o gestor não escreve em Compras.
+
 ## Condições de pagamento na proposta — plano em 4 PRs (aprovado pelo Evandro em 01/11/2026; concluído em 02/11/2026)
 
 | PR | Situação | O que entra |

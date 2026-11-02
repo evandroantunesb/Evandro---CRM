@@ -115,6 +115,9 @@ export const CONDICOES_PAGAMENTO = ["admin", "gestor"] as const satisfies ListaP
 
 // --- Obras -------------------------------------------------------------------
 
+// Prazos das etapas da obra e ajuste da entrega contratada: mesma barreira das políticas e da RPC no banco.
+export const PRAZOS_OBRA = ["admin", "gestor"] as const satisfies ListaPapeis;
+
 /**
  * Tela de Obras (somente leitura). Os quatro papéis comerciais leem as tabelas sob RLS
  * (`pode_ver_obra`); `operacao` lê só pela RPC `obras_operacao` e pelas tabelas filhas

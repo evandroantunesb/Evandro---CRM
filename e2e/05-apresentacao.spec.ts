@@ -4,7 +4,8 @@ import type { BaseFicticia } from "./base-ficticia";
 
 /**
  * OPR 3B — modo Apresentação, contra o app real e o Supabase LOCAL, com a demonstração local
- * ligada (dados fictícios de cronograma/custos para 3 obras; as demais mostram estados vazios).
+ * ligada (dados fictícios de avanço/custos para 3 obras; as demais mostram estados vazios). O cronograma
+ * das etapas é sempre o real, calculado pelo banco.
  */
 
 let usuarios: BaseFicticia["usuarios"];
@@ -34,7 +35,7 @@ for (const [resolucao, tamanho] of Object.entries(RESOLUCOES) as [Resolucao, { w
       await capturar(page, resolucao, "20-apresentacao-fazenda-modelo");
 
       // O Gantt rola por dentro no celular/tablet; a página não.
-      const gantt = page.getByRole("region", { name: /Cronograma da obra/ });
+      const gantt = page.getByRole("region", { name: /Etapas da obra/ });
       await expect(gantt).toBeVisible();
       if (tamanho.width < 1000) {
         const { rola } = await gantt.evaluate((el) => ({ rola: el.scrollWidth > el.clientWidth }));
@@ -52,11 +53,11 @@ for (const [resolucao, tamanho] of Object.entries(RESOLUCOES) as [Resolucao, { w
       await expect(titulo(page)).toHaveText("Clínica Vida (fictícia)");
       await capturar(page, resolucao, "22-apresentacao-clinica-quase-concluida");
 
-      // Obra sem planejamento: estados vazios, nada inventado (avanço não vem do status).
+      // Obra sem custos: estados vazios, nada inventado (avanço não vem do status); o cronograma é o real.
       await page.goto(`/obras/apresentacao/${obras.o01}`);
       await expect(page.getByText("Dados fictícios")).toHaveCount(0);
       await expect(page.getByText("Sem medição registrada")).toBeVisible();
-      await expect(page.getByText("Cronograma ainda não cadastrado para esta obra.")).toBeVisible();
+      await expect(page.getByRole("region", { name: /Etapas da obra/ }).getByText("Chegada na Engenharia e projeto")).toBeVisible();
       await expect(page.getByText("Orçamento e custos ainda não cadastrados.")).toBeVisible();
       await semRolagemHorizontal(page, "apresentação sem dados");
       await capturar(page, resolucao, "23-apresentacao-obra-sem-planejamento");

@@ -16,7 +16,7 @@ export const ROTULO_SETOR: Record<SetorObra, string> = {
 
 /** Status válidos de cada setor, na ordem do fluxo (só para listar; a posição não indica progresso). */
 export const STATUS_POR_SETOR: Record<SetorObra, readonly string[]> = {
-  compras: ["a_comprar", "cotando", "pedido_realizado", "faturado_fornecedor"],
+  compras: ["a_comprar", "cotando", "pedido_realizado", "faturado_fornecedor", "material_entregue"],
   engenharia: ["a_iniciar", "projeto_em_elaboracao", "enviado_concessionaria", "aprovado", "aguardando_vistoria", "concluido"],
   operacional: ["aguardando_liberacao", "liberada_agendamento", "agendada", "em_instalacao", "instalacao_concluida", "concluido"],
 };
@@ -27,6 +27,7 @@ const ROTULO_STATUS: Record<SetorObra, Record<string, string>> = {
     cotando: "Cotando",
     pedido_realizado: "Pedido realizado",
     faturado_fornecedor: "Faturado pelo fornecedor",
+    material_entregue: "Material entregue",
   },
   engenharia: {
     a_iniciar: "A iniciar",

@@ -35,6 +35,7 @@ describe("rótulos de Obras", () => {
 
   it("rótulos em português simples", () => {
     expect(rotuloStatus("compras", "faturado_fornecedor")).toBe("Faturado pelo fornecedor");
+    expect(rotuloStatus("compras", "material_entregue")).toBe("Material entregue");
     expect(rotuloStatus("engenharia", "enviado_concessionaria")).toBe("Enviado à concessionária");
     expect(rotuloStatus("operacional", "liberada_agendamento")).toBe("Liberada para agendamento");
     expect(ROTULO_SETOR).toEqual({ compras: "Compras", engenharia: "Engenharia", operacional: "Operacional" });
@@ -66,14 +67,15 @@ describe("rótulos de Obras", () => {
 // --- derivados -----------------------------------------------------------------
 
 const FLUXOS_FINAIS = [
-  { setor: "compras", status: "faturado_fornecedor" },
+  { setor: "compras", status: "material_entregue" },
   { setor: "engenharia", status: "concluido" },
   { setor: "operacional", status: "concluido" },
 ] as const;
 
 describe("derivados de Obras", () => {
   it("status final por setor", () => {
-    expect(setorConcluido("compras", "faturado_fornecedor")).toBe(true);
+    expect(setorConcluido("compras", "material_entregue")).toBe(true);
+    expect(setorConcluido("compras", "faturado_fornecedor")).toBe(false);
     expect(setorConcluido("compras", "concluido")).toBe(false);
     expect(setorConcluido("engenharia", "concluido")).toBe(true);
     expect(setorConcluido("engenharia", "aprovado")).toBe(false);
@@ -88,7 +90,7 @@ describe("derivados de Obras", () => {
     expect(estadoSetor({ ...base, aguardando: "cliente" })).toBe("aguardando");
     expect(estadoSetor({ ...base, aguardando: "cliente", parado: true })).toBe("parado");
     expect(estadoSetor({ ...base, status: "concluido", parado: true, aguardando: "cliente" })).toBe("concluido");
-    expect(estadoSetor({ setor: "compras", status: "faturado_fornecedor", parado: false, aguardando: null })).toBe("concluido");
+    expect(estadoSetor({ setor: "compras", status: "material_entregue", parado: false, aguardando: null })).toBe("concluido");
   });
 
   const marcosOk = [
@@ -235,10 +237,10 @@ const fluxo = (obra: string, setor: string, status: string, extra: Linha = {}): 
 
 const tabelasFilhas = {
   obra_fluxos: [
-    fluxo("o1", "compras", "faturado_fornecedor"),
+    fluxo("o1", "compras", "material_entregue"),
     fluxo("o1", "engenharia", "aprovado", { parado: true }),
     fluxo("o1", "operacional", "agendada", { aguardando: "cliente" }),
-    fluxo("o2", "compras", "faturado_fornecedor"),
+    fluxo("o2", "compras", "material_entregue"),
     fluxo("o2", "engenharia", "concluido"),
     fluxo("o2", "operacional", "concluido"),
   ],
@@ -328,7 +330,7 @@ describe("carregarObras", () => {
     const [o2, o1] = obras;
 
     expect(o1.setores.map((s) => s.setor)).toEqual(["compras", "engenharia", "operacional"]);
-    expect(o1.setores.map((s) => s.statusRotulo)).toEqual(["Faturado pelo fornecedor", "Aprovado", "Agendada"]);
+    expect(o1.setores.map((s) => s.statusRotulo)).toEqual(["Material entregue", "Aprovado", "Agendada"]);
     expect(o1.setores.map((s) => s.estado)).toEqual(["concluido", "parado", "aguardando"]);
     expect(o1.setores[2].aguardando).toBe("Aguardando cliente");
     // Só o principal ativo vale: Bia encerrada e Caio não principal ficam de fora.
