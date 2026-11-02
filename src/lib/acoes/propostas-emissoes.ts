@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { esquemaEntradaCondicoes, type EntradaCondicoes } from "@/lib/condicoes-pagamento-proposta";
+import { carregarRegrasCondicoes } from "@/lib/condicoes-pagamento-dados";
 import { hojeEmSaoPaulo } from "@/lib/formatacao";
 import { NEGOCIOS, PROPOSTA_E_CONTRATO, pode } from "@/lib/permissoes";
 import { ultimaVersaoDoNegocio } from "@/lib/propostas/emissoes-dados";
@@ -16,10 +18,23 @@ import type { ResultadoAcao } from "@/lib/tipos";
 const esquema = z.object({
   negocioId: z.string().uuid(),
   validadeAte: z.string().trim(),
-  condicoesPagamento: z.string().trim().max(2000).optional(), // o limite da proposta (600) é conferido na montagem
+  // JSON com o que o vendedor marcou; o formato e as regras são conferidos na montagem (condicoes-pagamento.ts).
+  condicoes: z.string().max(20000),
   // O que o vendedor VIU na tela: se a confirmação da produtividade mudou antes do clique, a emissão é recusada.
   geracaoEsperada: z.enum(["sim", "nao"]),
+  // Preço que a tela usou nas contas das condições (desconto, parcelas): se mudou, o vendedor revê antes de emitir.
+  precoEsperado: z.coerce.number(),
 });
+
+/** JSON das condições enviado pela tela; malformado = nenhuma condição (a montagem pede para marcar uma). */
+function lerEntradaCondicoes(texto: string): EntradaCondicoes | null {
+  try {
+    const lida = esquemaEntradaCondicoes.safeParse(JSON.parse(texto));
+    return lida.success ? lida.data : null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Emite uma proposta simples (sem economia, payback, Fio B nem tipo de ligação): congela os dados exibidos, gera o
@@ -29,7 +44,8 @@ const esquema = z.object({
  * Nada vem do cálculo salvo (`calculos_solares`, legado): potência = módulos do kit atual; geração = potência ×
  * produtividade da empresa, SÓ se o admin confirmou esse valor (senão a proposta sai sem geração); consumo e preço
  * = os do negócio. Ver `proposta-simples.ts`. Não depende da estimativa
- * financeira nem exige recálculo do preço.
+ * financeira nem exige recálculo do preço. As condições de pagamento são conferidas aqui contra as regras da empresa e
+ * o desconto permitido a quem emite (`montarCondicoesPagamento`); o valor do negócio não muda na emissão.
  */
 export async function emitirPropostaSimples(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
   const { atual } = await exigirPapel(...NEGOCIOS);
@@ -37,15 +53,16 @@ export async function emitirPropostaSimples(_: ResultadoAcao, formData: FormData
   const dados = esquema.safeParse({
     negocioId: formData.get("negocioId"),
     validadeAte: formData.get("validadeAte") ?? "",
-    condicoesPagamento: formData.get("condicoesPagamento") ?? undefined,
+    condicoes: formData.get("condicoes") ?? "",
     geracaoEsperada: formData.get("geracaoEsperada"),
+    precoEsperado: formData.get("precoEsperado") ?? "",
   });
   if (!dados.success) return { ok: false, mensagem: "Dados inválidos." };
   const { negocioId } = dados.data;
 
   const supabase = await criarClienteServidor();
 
-  const [negocioR, componentesR, parametrosR, identidadeR, modeloR, ultima] = await Promise.all([
+  const [negocioR, componentesR, parametrosR, identidadeR, modeloR, ultima, regrasCondicoes] = await Promise.all([
     supabase
       .from("negocios")
       .select("empresa_id, valor, consumo_medio_kwh, arquivado_em, contatos(nome, endereco, cidade, uf)")
@@ -67,8 +84,9 @@ export async function emitirPropostaSimples(_: ResultadoAcao, formData: FormData
       .eq("padrao", true)
       .maybeSingle(),
     ultimaVersaoDoNegocio(supabase, negocioId),
+    carregarRegrasCondicoes(supabase, atual.empresaId, negocioId),
   ]);
-  if (negocioR.error || componentesR.error || parametrosR.error || identidadeR.error || modeloR.error || ultima.erro) {
+  if (negocioR.error || componentesR.error || parametrosR.error || identidadeR.error || modeloR.error || ultima.erro || !regrasCondicoes) {
     return { ok: false, mensagem: "Não foi possível ler os dados do negócio. Tente de novo." };
   }
   const negocio = negocioR.data;
@@ -84,6 +102,11 @@ export async function emitirPropostaSimples(_: ResultadoAcao, formData: FormData
     return { ok: false, mensagem: "A confirmação da produtividade mudou desde que a tela abriu. Confira o aviso de geração e emita de novo. Nada foi emitido." };
   }
 
+  if (Math.round((negocio.valor ?? 0) * 100) !== Math.round(dados.data.precoEsperado * 100)) {
+    revalidatePath(`/negocios/${negocioId}`);
+    return { ok: false, mensagem: "O valor do negócio mudou desde que a tela abriu. Confira as condições de pagamento e emita de novo. Nada foi emitido." };
+  }
+
   const versao = ultima.versao + 1;
   const emitidaEm = new Date().toISOString();
   const montagem = montarDadosEmissaoSimples({
@@ -95,7 +118,7 @@ export async function emitirPropostaSimples(_: ResultadoAcao, formData: FormData
     // Sem confirmação do admin para o valor ATUAL da produtividade, a proposta sai sem o número de geração.
     produtividadeConfirmada: produtividadeConfirmada(parametrosR.data),
     validadeAte: dados.data.validadeAte || null,
-    condicoesPagamento: dados.data.condicoesPagamento ?? null,
+    condicoes: { entrada: lerEntradaCondicoes(dados.data.condicoes), regras: regrasCondicoes },
     conteudo,
     identidade: {
       nomeExibicao: identidade?.nome_exibicao ?? "",

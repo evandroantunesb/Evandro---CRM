@@ -1,3 +1,4 @@
+import { carregarRegrasCondicoes } from "@/lib/condicoes-pagamento-dados";
 import { carregarDescontoNegocio } from "@/lib/descontos";
 import type { Vinculo } from "@/lib/sessao";
 import { notFound } from "next/navigation";
@@ -148,6 +149,8 @@ export async function carregarFicha(atual: Vinculo, id: string, abaParam: string
         .maybeSingle()
     : { data: null };
   const geracaoConfirmada = produtividadeConfirmada(parametrosEmissao) != null;
+  const regrasCondicoes = emissoesRes && !emissoesAusente ? await carregarRegrasCondicoes(supabase, atual.empresaId, id) : null;
+  if (emissoesRes && !emissoesAusente && !regrasCondicoes) throw new Error("Não foi possível ler as condições de pagamento.");
   const { data: aberturas } = proposta
     ? await supabase
         .from("propostas_aberturas")
@@ -322,7 +325,7 @@ export async function carregarFicha(atual: Vinculo, id: string, abaParam: string
   return {
     atual, negocio, config, parametros, temperatura, atividades, notas, tarefas, anexos, calculo, conferencia, semArquivo,
     componentes, ehEletroposto, eletroposto, propostaEletroposto, outrosNegocios, eletropostoNaEmpresa, proposta, modelosProposta,
-    emissoesAusente, emissoes, conteudoModelo, validadePadraoDias, geracaoConfirmada, aberturas, contrato, statusPagamento,
+    emissoesAusente, emissoes, conteudoModelo, regrasCondicoes, validadePadraoDias, geracaoConfirmada, aberturas, contrato, statusPagamento,
     registroManualIndisponivel, registrosPagamento, situacaoPagamentoSolo, mostrarPagamentoSolo, mostrarPagamentoPro, ultimoHandoff,
     podeResponderHandoff, obraDoNegocio, arquivado, precoDesatualizado, vigenciaDaTela, contextoEstimativa, historicoCalculo,
     bloqueioProposta, bloqueioEmissao, bloqueioContrato, responsavelInativo, cartao, contato, pendenciasCliente, nomes, souAdmin,

@@ -2,7 +2,7 @@ import { Document, Font, Image, Page, StyleSheet, Text, View } from "@react-pdf/
 import { formatarMoeda } from "@/lib/formatacao";
 import { ROTULO_TIPO_COMPONENTE_KIT } from "@/lib/tipos";
 import { FONTES_PDF } from "./fontes-pdf";
-import { dataBr, opcoesDePagamento, textoPremissaGeracao, type DadosEmissaoSimples } from "./proposta-simples";
+import { dataBr, linhasCondicoesPagamento, textoPremissaGeracao, type DadosEmissaoSimples } from "./proposta-simples";
 
 // Manrope nos títulos e Inter nos textos (identidade do Raion), embutidas: nada é buscado na rede na hora de gerar.
 for (const fonte of FONTES_PDF) Font.register({ family: fonte.family, src: fonte.src, fontWeight: fonte.fontWeight });
@@ -310,14 +310,14 @@ function PaginaOferta({ dados, imagens, e, p }: { dados: DadosEmissaoSimples; im
             <Text style={{ fontSize: 8, ...NEGRITO, letterSpacing: 1, color: p.suave }}>VALOR DA PROPOSTA</Text>
             <Text style={{ fontSize: 26, ...TITULO, marginTop: 3 }}>{formatarMoeda(dados.preco.valor)}</Text>
           </View>
-          {opcoesDePagamento(c.condicoesPagamento).length > 0 ? (
+          {linhasCondicoesPagamento(dados).length > 0 ? (
             <View style={{ marginTop: 10 }}>
               <Text style={{ fontSize: 8, ...NEGRITO, letterSpacing: 0.8, color: p.acento, marginBottom: 5 }}>CONDIÇÕES DE PAGAMENTO</Text>
-              {opcoesDePagamento(c.condicoesPagamento).length === 1 ? (
-                <Text style={{ fontSize: 9.5, lineHeight: 1.4 }}>{opcoesDePagamento(c.condicoesPagamento)[0]}</Text>
+              {linhasCondicoesPagamento(dados).length === 1 ? (
+                <Text style={{ fontSize: 9.5, lineHeight: 1.4 }}>{linhasCondicoesPagamento(dados)[0]}</Text>
               ) : (
                 <View style={e.lista}>
-                  {opcoesDePagamento(c.condicoesPagamento).map((opcao, i) => (
+                  {linhasCondicoesPagamento(dados).map((opcao, i) => (
                     <View key={i} style={e.itemLista}>
                       <View style={[e.ponto, { backgroundColor: p.acento }]} />
                       <Text style={{ flex: 1, fontSize: 9.5, lineHeight: 1.35 }}>{opcao}</Text>

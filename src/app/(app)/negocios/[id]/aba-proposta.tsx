@@ -30,6 +30,7 @@ export function AbaProposta({ ficha }: { ficha: Ficha }) {
     emissoes,
     validadePadraoDias,
     conteudoModelo,
+    regrasCondicoes,
     geracaoConfirmada,
     bloqueioEmissao,
     proposta,
@@ -76,7 +77,7 @@ export function AbaProposta({ ficha }: { ficha: Ficha }) {
     <div id="proposta" className="mx-auto flex w-full max-w-3xl scroll-mt-4 flex-col gap-4 [&>*]:min-w-0">
       {pode(atual.papel, PROPOSTA_E_CONTRATO) && (
         <>
-          {!emissoesAusente && (
+          {!emissoesAusente && regrasCondicoes && (
             <Cartao titulo="Proposta">
             <EmitirProposta
               negocioId={negocio.id}
@@ -84,6 +85,8 @@ export function AbaProposta({ ficha }: { ficha: Ficha }) {
               validadePadraoDias={validadePadraoDias}
               podeAjustarValidade={pode(atual.papel, VALIDADE_PROPOSTA)}
               conteudoModelo={conteudoModelo}
+              preco={negocio.valor}
+              regrasCondicoes={regrasCondicoes}
               geracaoConfirmada={geracaoConfirmada}
               bloqueio={arquivado ? "Negócio arquivado: não é possível emitir proposta." : bloqueioEmissao}
               siteUrl={env.siteUrl}

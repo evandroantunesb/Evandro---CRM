@@ -18,11 +18,19 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { nomeKitPersonalizado, potenciaKitPersonalizadoKwp, type ComponenteKit } from "@/lib/calculadora";
+import {
+  esquemaCondicoesEmitidas,
+  linhasCondicoesEmitidas,
+  MENSAGEM_NENHUMA_CONDICAO,
+  montarCondicoesPagamento,
+  type EntradaCondicoes,
+  type RegrasCondicoes,
+} from "@/lib/condicoes-pagamento-proposta";
 import { valorComoPersistido } from "@/lib/consumo-persistido";
 import { TIPOS_COMPONENTE_KIT } from "@/lib/tipos";
 
 /** Identificação do layout que gera o PDF; muda quando o conteúdo/estrutura do modelo simples mudar. */
-export const RENDERIZADOR_SIMPLES = "simples-v4";
+export const RENDERIZADOR_SIMPLES = "simples-v5";
 
 /** Rodapé aprovado (proposta COM a geração estimada). */
 export const RODAPE_SIMPLES =
@@ -142,9 +150,7 @@ const numeroPositivo = z.number().finite().positive();
 const dataIso = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const listaDeItens = z.array(z.string().trim().min(1).max(300)).min(1).max(20).nullable();
 
-export const esquemaDadosEmissaoSimples = z
-  .object({
-  esquema: z.literal(4),
+const comum = {
   cliente: z.object({ nome: textoCurto, endereco: z.string().max(400).nullable() }),
   sistema: z.object({
     kitNome: textoCurto,
@@ -179,20 +185,6 @@ export const esquemaDadosEmissaoSimples = z
       .min(1),
   }),
   preco: z.object({ valor: numeroPositivo }),
-  comercial: z.object({
-    validadeAte: dataIso,
-    /** Obrigatória: a proposta só é congelada com as condições de pagamento confirmadas (uma opção por linha). */
-    condicoesPagamento: z.string().trim().min(1).max(LIMITES_SIMPLES.condicoes),
-    /** Conteúdo confirmado pela empresa no modelo; nulo = bloco omitido na proposta. */
-    incluso: listaDeItens,
-    exclusos: listaDeItens,
-    garantias: listaDeItens,
-    etapas: z
-      .array(z.object({ titulo: z.string().trim().min(1).max(100), prazo: z.string().max(100).nullable(), descricao: z.string().max(300).nullable() }))
-      .min(1)
-      .max(8)
-      .nullable(),
-  }),
   identidade: z.object({
     nomeExibicao: z.string().max(200),
     corPrimaria: z.string().max(7),
@@ -201,11 +193,44 @@ export const esquemaDadosEmissaoSimples = z
   }),
   emissao: z.object({ versao: z.number().int().positive(), emitidaEm: z.string().min(10) }),
   rodape: z.string(),
-})
+};
+
+const comercialComum = {
+  validadeAte: dataIso,
+  /** Conteúdo confirmado pela empresa no modelo; nulo = bloco omitido na proposta. */
+  incluso: listaDeItens,
+  exclusos: listaDeItens,
+  garantias: listaDeItens,
+  etapas: z
+    .array(z.object({ titulo: z.string().trim().min(1).max(100), prazo: z.string().max(100).nullable(), descricao: z.string().max(300).nullable() }))
+    .min(1)
+    .max(8)
+    .nullable(),
+};
+
+/** Esquema 4 (até a PR 3 das condições de pagamento): condições em texto livre, uma opção por linha. Só leitura. */
+const esquemaV4 = z.object({
+  esquema: z.literal(4),
+  ...comum,
+  comercial: z.object({ ...comercialComum, condicoesPagamento: z.string().trim().min(1).max(LIMITES_SIMPLES.condicoes) }),
+});
+
+/** Esquema 5: condições escolhidas por modalidade e conferidas no servidor (ver `montarCondicoesPagamento`). */
+const esquemaV5 = z.object({
+  esquema: z.literal(5),
+  ...comum,
+  comercial: z.object({ ...comercialComum, condicoesPagamento: esquemaCondicoesEmitidas }),
+});
+
+export const esquemaDadosEmissaoSimples = z
+  .discriminatedUnion("esquema", [esquemaV4, esquemaV5])
   // O rodapé acompanha a geração: com o número, o aprovado; sem ele, a variante que não o promete.
   .refine((d) => d.rodape === rodapeDaProposta(d.sistema.geracao != null), { path: ["rodape"], message: "Rodapé não confere com a proposta." });
 
+/** Qualquer versão já emitida (leitura). */
 export type DadosEmissaoSimples = z.infer<typeof esquemaDadosEmissaoSimples>;
+/** O que uma emissão nova grava. */
+export type DadosEmissaoAtual = z.infer<typeof esquemaV5>;
 
 /** JSON canônico (chaves ordenadas): o mesmo conteúdo gera sempre os mesmos bytes, não importa a ordem do jsonb. */
 export function jsonCanonico(valor: unknown): string {
@@ -285,7 +310,8 @@ export type EntradaEmissaoSimples = {
   produtividadeConfirmada: ProdutividadeConfirmada | null;
   /** Informada pelo vendedor (AAAA-MM-DD); sem padrão. */
   validadeAte: string | null;
-  condicoesPagamento: string | null;
+  /** O que o vendedor escolheu (nulo = não veio) e o que a empresa permite a quem emite, lido no servidor. */
+  condicoes: { entrada: EntradaCondicoes | null; regras: RegrasCondicoes };
   conteudo: Pick<ConteudoDoModelo, "incluso" | "exclusos" | "garantias" | "etapas">;
   identidade: { nomeExibicao: string; corPrimaria: string; corDestaque: string; whatsapp: string };
   versao: number;
@@ -295,10 +321,9 @@ export type EntradaEmissaoSimples = {
 };
 
 export const MENSAGEM_VALIDADE_OBRIGATORIA = "Informe até quando a proposta é válida.";
-export const MENSAGEM_CONDICOES_OBRIGATORIAS = "Informe as condições de pagamento (uma opção por linha): a proposta só é emitida com elas confirmadas.";
 export const MENSAGEM_VALIDADE_PASSADA = "A validade não pode ser anterior a hoje.";
 
-/** Uma opção de pagamento por linha do texto das condições; texto de uma linha só vira parágrafo na proposta. */
+/** Esquema 4: uma opção de pagamento por linha do texto das condições; texto de uma linha só vira parágrafo na proposta. */
 export const opcoesDePagamento = (texto: string | null | undefined): string[] =>
   (texto ?? "")
     .split(/\r?\n/)
@@ -337,7 +362,7 @@ export function sistemaDoKit(componentes: EntradaEmissaoSimples["componentes"], 
   };
 }
 
-export type ResultadoMontagem = { ok: true; dados: DadosEmissaoSimples } | { ok: false; pendencias: string[] };
+export type ResultadoMontagem = { ok: true; dados: DadosEmissaoAtual } | { ok: false; pendencias: string[] };
 
 /** Confere os requisitos e monta os dados congelados. Nunca completa dado ausente com padrão ou zero. */
 export function montarDadosEmissaoSimples(e: EntradaEmissaoSimples): ResultadoMontagem {
@@ -353,8 +378,6 @@ export function montarDadosEmissaoSimples(e: EntradaEmissaoSimples): ResultadoMo
   }
   if ((e.contatoNome?.trim().length ?? 0) > L.clienteNome) pendencias.push(`O nome do contato passa de ${L.clienteNome} caracteres.`);
   if ((e.contatoEndereco?.trim().length ?? 0) > L.clienteEndereco) pendencias.push(`O endereço do contato passa de ${L.clienteEndereco} caracteres.`);
-  if (opcoesDePagamento(e.condicoesPagamento).length === 0) pendencias.push(MENSAGEM_CONDICOES_OBRIGATORIAS);
-  if ((e.condicoesPagamento?.trim().length ?? 0) > L.condicoes) pendencias.push(`As condições de pagamento passam de ${L.condicoes} caracteres. Resuma o texto.`);
   for (const [nome, itens, max] of [
     ["Incluso", e.conteudo.incluso, L.incluso],
     ["Não incluso", e.conteudo.exclusos, L.exclusos],
@@ -370,12 +393,20 @@ export function montarDadosEmissaoSimples(e: EntradaEmissaoSimples): ResultadoMo
       pendencias.push(`Há etapa com texto acima do limite (título ${L.etapaTitulo}, prazo ${L.etapaPrazo}, descrição ${L.etapaDescricao} caracteres). Encurte no modelo.`);
     }
   }
-  if (!(typeof e.valorNegocio === "number" && e.valorNegocio > 0)) pendencias.push("Informe o valor do negócio (preço da proposta).");
+  const temPreco = typeof e.valorNegocio === "number" && e.valorNegocio > 0;
+  if (!temPreco) pendencias.push("Informe o valor do negócio (preço da proposta).");
+  // As condições dependem do preço (desconto, parcelas): sem preço, só a pendência dele.
+  const condicoes = !temPreco
+    ? null
+    : e.condicoes.entrada
+      ? montarCondicoesPagamento(e.condicoes.entrada, e.condicoes.regras, e.valorNegocio!, e.hoje)
+      : ({ ok: false, pendencias: [MENSAGEM_NENHUMA_CONDICAO] } as const);
+  if (condicoes && !condicoes.ok) pendencias.push(...condicoes.pendencias);
   if (!(typeof e.consumoMedioKwhNegocio === "number" && e.consumoMedioKwhNegocio > 0)) pendencias.push("Informe o consumo médio do cliente no negócio.");
   if (!e.validadeAte) pendencias.push(MENSAGEM_VALIDADE_OBRIGATORIA);
   else if (!dataIsoValida(e.validadeAte)) pendencias.push("Validade inválida.");
   else if (e.validadeAte < e.hoje) pendencias.push(MENSAGEM_VALIDADE_PASSADA);
-  if (pendencias.length || !sistema) return { ok: false, pendencias };
+  if (pendencias.length || !sistema || !condicoes?.ok) return { ok: false, pendencias };
 
   const componentes = e.componentes.map((c) => ({
     tipo: c.tipo,
@@ -383,9 +414,8 @@ export function montarDadosEmissaoSimples(e: EntradaEmissaoSimples): ResultadoMo
     quantidade: c.quantidade,
     potenciaW: c.potencia_w != null && c.potencia_w > 0 ? c.potencia_w : null,
   }));
-  const condicoes = e.condicoesPagamento!.trim();
   const candidato = {
-    esquema: 4 as const,
+    esquema: 5 as const,
     cliente: { nome: e.contatoNome!.trim(), endereco: e.contatoEndereco?.trim() || null },
     sistema: {
       kitNome: nomeKitPersonalizado(
@@ -400,7 +430,7 @@ export function montarDadosEmissaoSimples(e: EntradaEmissaoSimples): ResultadoMo
     preco: { valor: e.valorNegocio! },
     comercial: {
       validadeAte: e.validadeAte!,
-      condicoesPagamento: condicoes,
+      condicoesPagamento: condicoes.condicoes,
       incluso: e.conteudo.incluso,
       exclusos: e.conteudo.exclusos,
       garantias: e.conteudo.garantias,
@@ -410,8 +440,8 @@ export function montarDadosEmissaoSimples(e: EntradaEmissaoSimples): ResultadoMo
     emissao: { versao: e.versao, emitidaEm: e.emitidaEm },
     rodape: rodapeDaProposta(sistema.geracao != null),
   };
-  const analisado = esquemaDadosEmissaoSimples.safeParse(candidato);
-  if (!analisado.success) return { ok: false, pendencias: ["Os dados do negócio não passaram na conferência da proposta. Revise o kit e o cliente."] };
+  const analisado = esquemaV5.safeParse(candidato);
+  if (!analisado.success || analisado.data.rodape !== rodapeDaProposta(analisado.data.sistema.geracao != null)) return { ok: false, pendencias: ["Os dados do negócio não passaram na conferência da proposta. Revise o kit e o cliente."] };
   return { ok: true, dados: analisado.data };
 }
 
@@ -442,9 +472,15 @@ export function textoPremissaGeracao(dados: DadosEmissaoSimples): string {
   );
 }
 
+/** As condições de pagamento da versão emitida, uma opção por linha (texto livre no esquema 4, por modalidade no 5). */
+export function linhasCondicoesPagamento(dados: DadosEmissaoSimples): string[] {
+  return dados.esquema === 4 ? opcoesDePagamento(dados.comercial.condicoesPagamento) : linhasCondicoesEmitidas(dados.comercial.condicoesPagamento);
+}
+
 /** Texto das condições comerciais na página web da proposta emitida. */
 export function textoCondicoesComerciais(dados: DadosEmissaoSimples): string {
   const partes = [`Proposta válida até ${dataBr(dados.comercial.validadeAte)}.`];
-  if (dados.comercial.condicoesPagamento) partes.push(`Condições de pagamento: ${dados.comercial.condicoesPagamento}`);
+  const linhas = linhasCondicoesPagamento(dados);
+  if (linhas.length) partes.push(`Condições de pagamento: ${linhas.join("\n")}`);
   return partes.join("\n\n");
 }

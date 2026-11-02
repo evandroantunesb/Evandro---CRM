@@ -1,5 +1,18 @@
 # Estado do projeto — Raion CRM
 
+## Condições de pagamento na proposta — plano em 4 PRs (aprovado pelo Evandro em 01/11/2026)
+
+| PR | Situação | O que entra |
+| --- | --- | --- |
+| 1 (#285) | mesclada | Configuração da empresa (`/configuracoes/condicoes-pagamento`): desconto à vista sem aprovação (vendedor, gestor), Personalizado sim/não, parcelas e taxas de cartão e boleto |
+| 2 (#286) | mesclada | Pedido e aprovação de desconto acima do limite (cartão "Desconto à vista" na aba Proposta) |
+| 3a | branch `feature/condicoes-pagamento-proposta` | Bloco "Condições de pagamento" na emissão (à vista, parcelado, financiamento, Personalizado, observação), regras conferidas no servidor (`src/lib/condicoes-pagamento-proposta.ts`) e gravação no esquema 5 da emissão. Sem migration |
+| 3b | a fazer | Bloco organizado por modalidade no PDF e na página do cliente |
+| 4 | a fazer | No contrato, o cliente escolhe a condição e o valor do negócio muda |
+
+- **3a e 3b entram juntas em produção.** Na 3a o PDF e a página mostram as condições em linhas de texto (`linhasCondicoesEmitidas`). **Pendente da 3b:** com todas as modalidades no limite **e** o modelo da empresa no limite (inclusos, exclusos, garantias, etapas), o PDF passa de 3 páginas (`it.fails` em `tests/proposta-simples.test.ts`); com o modelo enxuto ou só à vista + observação de 240, cabe.
+- Decisões do Evandro (02/11): o vendedor marca quais parcelas aparecem (padrão: todas); entrada opcional no financiamento; o texto de condições do modelo pré-preenche a "Observação". Propostas já emitidas (esquema 4, texto livre) continuam legíveis. O valor do negócio não muda na emissão.
+
 ## Engenharia em Obras — P1 a P1.6 integradas em 2026-10-29; P2 a P5 em 2026-10-30; P6a e P6b em 2026-10-31; P6c e novo fluxo (#270, #271) em 2026-11-01
 
 `main` em `d27b9d8` (merge da #281). **Produção e `main` alinhadas** (última `20261102160000_captura_limite_envios.sql`).
