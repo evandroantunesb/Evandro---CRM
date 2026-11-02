@@ -82,6 +82,7 @@ function LinkContrato({
   setCopiado: (v: boolean) => void;
 }) {
   const link = `${siteUrl}/contrato/${token}`;
+  const linkWhatsapp = `https://wa.me/?text=${encodeURIComponent(`Segue o contrato: ${link}`)}`;
   return (
     <div className="flex flex-col gap-1">
       <span className="text-sm font-medium text-zinc-700">Link do contrato</span>
@@ -103,6 +104,14 @@ function LinkContrato({
         >
           {copiado ? "Copiado!" : "Copiar"}
         </Botao>
+        <a href={linkWhatsapp} target="_blank" rel="noopener noreferrer">
+          <Botao type="button">Enviar no WhatsApp</Botao>
+        </a>
+        <a href={`/contrato/${token}/pdf`} target="_blank" rel="noopener noreferrer">
+          <Botao type="button" variante="secundario">
+            Baixar PDF
+          </Botao>
+        </a>
       </div>
     </div>
   );

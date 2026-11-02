@@ -37,9 +37,19 @@ export default async function ContratoPublico({ params }: PageProps<"/contrato/[
 
       {/* Contrato com campo sem resolver (gerado antes da validação) não é mostrado ao cliente. */}
       {contratoProntoParaCliente(contrato.conteudo) ? (
-        <article className="rounded-xl border border-zinc-200/80 bg-white p-6 whitespace-pre-wrap text-sm text-zinc-800 shadow-[0_1px_2px_rgba(15,15,16,0.04)]">
-          {contrato.conteudo}
-        </article>
+        <>
+          <article className="rounded-xl border border-zinc-200/80 bg-white p-6 whitespace-pre-wrap text-sm text-zinc-800 shadow-[0_1px_2px_rgba(15,15,16,0.04)]">
+            {contrato.conteudo}
+          </article>
+          <a
+            href={`/contrato/${token}/pdf`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="self-start rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-carvao hover:border-dourado"
+          >
+            Baixar PDF
+          </a>
+        </>
       ) : (
         <p className="rounded-xl border border-zinc-200/80 bg-white p-6 text-sm text-zinc-600">
           Este contrato ainda está sendo preparado pela empresa. Fale com o vendedor.
