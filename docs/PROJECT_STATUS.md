@@ -6,7 +6,7 @@ Telas aprovadas no canvas "Raion — Nova interface": `ObrasCompleta.dc.html` (p
 
 | PR | Escopo | Estado |
 | --- | --- | --- |
-| 1 | Prazos das etapas, entrega contratada, "material entregue" e cronograma calculado | branch `feat/obras-opr-prazos`, migration `20261104100000_obras_cronograma.sql` (não aplicada) |
+| 1 | Prazos das etapas, entrega contratada, "material entregue" e cronograma calculado | PR #290; migration `20261104100000_obras_cronograma.sql` aplicada em produção em 02/11/2026 (tag `migracao-pr290-a960dc4`); merge pendente |
 | 2 | Custos (orçamento por categoria pré-preenchido pela calculadora, lançamentos sem apagar) e deduções do lucro | a fazer |
 | 3 | Visão Completa, semáforo, justificativa de atraso e escalonamento (gestor e Operacional abrem e fecham); gestor vê todas as obras | a fazer |
 
