@@ -1,100 +1,91 @@
-import { formatarMoeda } from "@/lib/crm";
-import { desvioCusto, resultadoFinanceiro, totaisCustos } from "@/lib/obras/apresentacao/calculos";
-import { ROTULO_CATEGORIA_CUSTO, type CustoCategoria, type EntradaFinanceiro } from "@/lib/obras/apresentacao/tipos";
+import { formatarMoeda } from "@/lib/formatacao";
+import type { CustosObraVM, ResultadoObraVM } from "@/lib/obras/custos";
 
-const numero1 = (v: number) => new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1, minimumFractionDigits: 1 }).format(v);
-const pct = (v: number | null) => (v == null ? "—" : `${numero1(v)}%`);
-const comSinal = (v: number) => (v > 0 ? `+${formatarMoeda(v)}` : v < 0 ? `−${formatarMoeda(-v)}` : formatarMoeda(0));
+const umaCasa = (v: number) => new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(v);
+const inteiro = (v: number) => new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 }).format(v);
+const reais = (v: number) => `R$ ${inteiro(Math.abs(v))}`;
+const desvio = (pct: number) => (pct > 0 ? `+${umaCasa(pct)}%` : pct < 0 ? `−${umaCasa(-pct)}%` : "0,0%");
 
 /**
- * Custos por categoria: orçado × realizado e desvio. Estouro (realizado acima do orçado) em âmbar
- * discreto; vermelho fica reservado para perda/erro. Tabela no desktop, lista no celular.
+ * "Custos: planejado × realizado" do desenho aprovado: o planejado ocupa 85% da trilha (com a marca no fim) e o
+ * realizado é proporcional a ele; acima do planejado, em vermelho. Categoria ainda em andamento não mostra desvio.
  */
-export function CustosPorCategoria({ custos }: { custos: CustoCategoria[] }) {
-  const linhas = custos.map(desvioCusto);
-  const total = totaisCustos(custos);
-  const totalDesvio = desvioCusto({ categoria: "material_ca", ...total });
-  const maior = Math.max(...custos.flatMap((c) => [c.orcado, c.realizado]), 1);
-
+export function CustosObra({ custos }: { custos: CustosObraVM }) {
   return (
-    <div className="flex flex-col gap-3">
-      <ul className="flex flex-col gap-3">
-        {linhas.map((l) => {
-          const estouro = l.desvio > 0;
-          return (
-            <li key={l.categoria} className="flex flex-col gap-1">
-              <div className="flex flex-wrap items-baseline justify-between gap-x-3 text-sm">
-                <span className="font-medium text-zinc-900">{ROTULO_CATEGORIA_CUSTO[l.categoria]}</span>
-                <span className={`tabular-nums ${estouro ? "font-medium text-amber-700" : "text-zinc-500"}`}>
-                  {comSinal(l.desvio)} ({l.desvioPct == null ? "—" : `${l.desvioPct > 0 ? "+" : ""}${pct(l.desvioPct)}`})
-                </span>
-              </div>
-              {/* Orçado (cinza) e realizado (carvão/âmbar) na mesma escala. */}
-              <div className="flex flex-col gap-0.5" aria-hidden>
-                <div className="h-1.5 rounded-full bg-zinc-200" style={{ width: `${(l.orcado / maior) * 100}%` }} />
-                <div className={`h-1.5 rounded-full ${estouro ? "bg-amber-500" : "bg-carvao"}`} style={{ width: `${(l.realizado / maior) * 100}%` }} />
-              </div>
-              <p className="flex flex-wrap justify-between gap-x-3 text-xs text-zinc-500 tabular-nums">
-                <span>Orçado {formatarMoeda(l.orcado)}</span>
-                <span>Realizado {formatarMoeda(l.realizado)}</span>
-              </p>
-            </li>
-          );
-        })}
-      </ul>
-      <div className="flex flex-wrap justify-between gap-x-3 border-t border-zinc-200 pt-2 text-sm tabular-nums">
-        <span className="font-medium text-zinc-900">Total</span>
-        <span className="text-zinc-600">
-          {formatarMoeda(total.orcado)} orçado · {formatarMoeda(total.realizado)} realizado ·{" "}
-          <span className={totalDesvio.desvio > 0 ? "font-medium text-amber-700" : ""}>{comSinal(totalDesvio.desvio)}</span>
+    <div className="flex flex-col gap-1">
+      <div className="mb-1 flex flex-wrap gap-3 text-[11px] text-texto-2">
+        <span>
+          <i aria-hidden className="mr-1.5 inline-block h-1.5 w-3.5 rounded-full bg-[#d9d5cb] align-[1px]" />
+          Planejado
+        </span>
+        <span>
+          <i aria-hidden className="mr-1.5 inline-block h-1.5 w-3.5 rounded-full bg-dourado align-[1px]" />
+          Realizado
+        </span>
+        <span>
+          <i aria-hidden className="mr-1.5 inline-block h-1.5 w-3.5 rounded-full bg-erro align-[1px]" />
+          Acima do planejado
         </span>
       </div>
-      <p className="flex items-center gap-3 text-[11px] text-zinc-500">
-        <span className="flex items-center gap-1">
-          <span className="inline-block h-1.5 w-4 rounded-full bg-zinc-200" /> Orçado
+      <ul className="flex flex-col">
+        {custos.categorias.map((c, k) => (
+          <li key={c.categoria} className="py-1">
+            <div className="flex flex-wrap justify-between gap-x-2 text-xs tabular-nums">
+              <span>
+                <strong className="font-semibold text-texto">{c.nome}</strong>
+                {!c.encerrada && <span className="ml-1 text-texto-2">em andamento</span>}
+              </span>
+              <span className="text-texto-2">
+                Planejado {formatarMoeda(c.planejado)} · Realizado{" "}
+                <strong className={`font-semibold ${c.acima ? "text-erro" : "text-texto"}`}>{formatarMoeda(c.realizado)}</strong>
+                {c.desvioPct != null && <span className={`ml-1 ${c.desvioPct > 0 ? "text-erro" : "text-energia"}`}>{desvio(c.desvioPct)}</span>}
+              </span>
+            </div>
+            <div className="relative mt-[3px] h-2.5 rounded-full bg-superficie-2" aria-hidden>
+              <span className="absolute inset-y-0 left-0 w-[85%] rounded-full bg-[#d9d5cb]" />
+              <span
+                className={`absolute inset-y-0.5 left-0 rounded-full transition-[width] duration-700 ease-[cubic-bezier(.16,1,.3,1)] motion-reduce:transition-none ${c.acima ? "bg-erro" : "bg-dourado"}`}
+                style={{ width: `${c.largura}%`, transitionDelay: `${k * 70}ms` }}
+              />
+              <span className="absolute -inset-y-[3px] left-[85%] w-0.5 rounded-sm bg-texto" />
+            </div>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-1 flex flex-wrap justify-between gap-x-2 border-t border-linha pt-1.5 text-xs tabular-nums">
+        <strong className="font-semibold text-texto">Total</strong>
+        <span className="text-texto-2">
+          Planejado {formatarMoeda(custos.planejado)} · Realizado {formatarMoeda(custos.realizado)}
+          {custos.realizadoPct != null && ` (${inteiro(custos.realizadoPct)}%)`}
         </span>
-        <span className="flex items-center gap-1">
-          <span className="inline-block h-1.5 w-4 rounded-full bg-carvao" /> Realizado
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="inline-block h-1.5 w-4 rounded-full bg-amber-500" /> Acima do orçado
-        </span>
-      </p>
+      </div>
     </div>
   );
 }
 
-/**
- * Resultado financeiro. Separa o confirmado/realizado (gasto até hoje) do projetado (custo
- * FINAL estimado) e calcula a margem sempre sobre o projetado.
- */
-export function ResultadoFinanceiro({ entrada, valorVendido }: { entrada: EntradaFinanceiro; valorVendido: number | null }) {
-  const r = resultadoFinanceiro(entrada);
-  const linha = (rotulo: string, valor: string, detalhe?: string, destaque?: boolean) => (
-    <div className={`flex flex-wrap items-baseline justify-between gap-x-3 py-2 ${destaque ? "" : "border-b border-zinc-100"}`}>
-      <dt className="text-sm text-zinc-600">
-        {rotulo}
-        {detalhe && <span className="block text-[11px] text-zinc-400">{detalhe}</span>}
-      </dt>
-      <dd className={`tabular-nums ${destaque ? "text-2xl font-semibold text-zinc-900" : "text-sm font-medium text-zinc-900"}`}>{valor}</dd>
-    </div>
-  );
+/** "Lucro líquido previsto" do desenho: valor, % da venda, diferença para o planejado e a conta. */
+export function LucroPrevisto({ resultado }: { resultado: ResultadoObraVM }) {
+  const { lucro, lucroPct, diferenca, venda, custoProjetado, deducoes } = resultado;
   return (
-    <dl className="flex flex-col">
-      {valorVendido != null && linha("Valor vendido (contrato)", formatarMoeda(valorVendido), "Registrado na venda")}
-      {linha("Receita líquida estimada", formatarMoeda(r.receitaLiquida), "Após tributos e comissões")}
-      {linha("Custo orçado", formatarMoeda(r.custoOrcado))}
-      {linha("Custo realizado até hoje", formatarMoeda(r.custoRealizado), "Já gasto — não é o custo final")}
-      {linha("Custo final projetado", formatarMoeda(r.custoFinalProjetado), `Realizado + ${formatarMoeda(r.aRealizar)} a realizar · ${comSinal(r.desvioProjetado)} vs. orçado`)}
-      <div className="mt-2 rounded-lg bg-zinc-50 px-3">
-        {linha("Margem líquida estimada", `${formatarMoeda(r.margemLiquida)} · ${pct(r.margemLiquidaPct)}`, undefined, true)}
-        {r.variacaoMargemPp != null && (
-          <p className={`pb-2 text-xs ${r.variacaoMargemPp < 0 ? "text-amber-700" : "text-zinc-500"}`}>
-            {r.variacaoMargemPp > 0 ? "+" : r.variacaoMargemPp < 0 ? "−" : ""}
-            {numero1(Math.abs(r.variacaoMargemPp))} p.p. em relação à margem planejada ({pct(r.margemPlanejadaPct)})
-          </p>
-        )}
-      </div>
-    </dl>
+    <section aria-label="Lucro previsto da obra" className="rounded-2xl border border-dourado/55 bg-dourado/12 px-4 py-3">
+      <span className="block text-[11px] font-semibold tracking-[0.1em] text-dourado-texto uppercase">Lucro líquido previsto</span>
+      <b className={`mt-1.5 block font-titulo text-[32px] leading-none font-light tracking-[-0.03em] tabular-nums ${lucro < 0 ? "text-erro" : "text-texto"}`}>
+        {lucro < 0 ? `−${reais(lucro)}` : reais(lucro)}
+      </b>
+      <p className="mt-1 text-xs text-texto-2">
+        {lucroPct == null ? "—" : `${umaCasa(lucroPct)}% da venda`} ·{" "}
+        <strong className={`font-semibold ${diferenca < 0 ? "text-erro" : "text-energia"}`}>
+          {diferenca < 0 ? "▼" : "▲"} {reais(diferenca)} vs. planejado
+        </strong>
+      </p>
+      <dl className="mt-2 grid grid-cols-[auto_auto] gap-x-2.5 gap-y-0.5 border-t border-linha pt-1.5 text-[11.5px] text-texto-2">
+        <dt>Venda</dt>
+        <dd className="text-right text-texto tabular-nums">{reais(venda)}</dd>
+        <dt>Custo projetado da obra</dt>
+        <dd className="text-right text-texto tabular-nums">− {reais(custoProjetado)}</dd>
+        <dt>Impostos e comissões</dt>
+        <dd className="text-right text-texto tabular-nums">− {reais(deducoes)}</dd>
+      </dl>
+    </section>
   );
 }

@@ -45,6 +45,7 @@ export default async function ConfigCalculadora() {
               custoMaterialCaPorKwp: parametros.custo_material_ca_por_kwp,
               custoEngenharia: parametros.custo_engenharia,
               comissaoPercentual: parametros.comissao_percentual,
+              custoFrete: parametros.custo_frete,
             }}
           />
         )}

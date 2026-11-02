@@ -1,3 +1,4 @@
+import { ROTULO_CATEGORIA_CUSTO, ehCategoriaCusto } from "./custos";
 import { AGUARDANDO_OBRA, ROTULO_MARCO_OBRA, ROTULO_SETOR, ROTULO_STATUS_MARCO_OBRA, STATUS_POR_SETOR, rotuloAguardando, rotuloStatus, type SetorObra } from "./rotulos";
 
 /**
@@ -48,6 +49,9 @@ const ROTULO_TIPO: Record<string, string> = {
   enquadramento_engenharia_salvo: "Enquadramento salvo",
   entrega_contratada_ajustada: "Entrega contratada ajustada",
   entrega_material_prevista: "Previsão de entrega do material",
+  orcamento_ajustado: "Orçamento ajustado",
+  custo_lancado: "Custo lançado",
+  custo_estornado: "Custo estornado",
 };
 
 // Perguntas do enquadramento (mesmas de `engenharia-enquadramento-regras`, sem importar regra de tela).
@@ -276,6 +280,13 @@ function descrever(linha: LinhaHistoricoObra, nomes: ReadonlyMap<string, string>
     case "entrega_material_prevista": {
       const para = dataHistorico(ler(dados, "para"));
       return para ? `Previsão: ${para}` : "Previsão removida";
+    }
+    // Custos: só a categoria (o valor nunca vai para o histórico).
+    case "orcamento_ajustado":
+    case "custo_lancado":
+    case "custo_estornado": {
+      const categoria = ler(dados, "categoria");
+      return typeof categoria === "string" && ehCategoriaCusto(categoria) ? ROTULO_CATEGORIA_CUSTO[categoria] : "";
     }
     default:
       return "Evento registrado";

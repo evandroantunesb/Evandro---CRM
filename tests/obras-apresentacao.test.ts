@@ -1,45 +1,72 @@
 /**
- * OPR 3B — Apresentação de Obras, sem banco: cálculos (custos, margem sobre o custo FINAL
- * projetado), as linhas do Gantt a partir do cronograma do banco, a trava da demonstração local (só com a variável E Supabase
+ * OPR 3B — Apresentação de Obras, sem banco: custos e lucro pela lógica do desenho (custo
+ * projetado por categoria encerrada ou em andamento, lucro depois de impostos e comissões), as linhas do Gantt a partir do cronograma do banco, a trava da demonstração local (só com a variável E Supabase
  * local) e o carregamento por papel — dinheiro nunca sai do servidor para quem não pode ver.
  */
 import { describe, expect, it } from "vitest";
-import { desvioCusto, inconsistenciasFinanceiro, resultadoFinanceiro, totaisCustos } from "@/lib/obras/apresentacao/calculos";
 import { carregarApresentacaoObra } from "@/lib/obras/apresentacao/dados";
 import { demonstracaoAtiva, planejamentoDemonstracao } from "@/lib/obras/apresentacao/demo";
 import { montarCronograma, tomAtraso, type LinhaCronograma } from "@/lib/obras/cronograma";
+import { montarCustos, resultadoObra } from "@/lib/obras/custos";
 import type { SupabaseServidor } from "@/lib/supabase/server";
 
 const LOCAL = { RAION_DEMO_APRESENTACAO: "1", NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321" };
 const HOJE = "2026-10-14";
 const FAZENDA = "Usina Solar Fazenda Modelo (fictícia)";
 
-describe("cálculos financeiros", () => {
-  it("desvio por categoria (positivo = acima do orçado) e totais", () => {
-    expect(desvioCusto({ categoria: "material_ca", orcado: 14_000, realizado: 16_000 })).toMatchObject({ desvio: 2_000 });
-    expect(desvioCusto({ categoria: "material_ca", orcado: 14_000, realizado: 16_000 }).desvioPct).toBeCloseTo(14.2857, 3);
-    expect(desvioCusto({ categoria: "servicos", orcado: 0, realizado: 100 }).desvioPct).toBeNull();
-    expect(totaisCustos([{ categoria: "material_ca", orcado: 1, realizado: 2 }, { categoria: "logistica", orcado: 3, realizado: 4 }])).toEqual({ orcado: 4, realizado: 6 });
+// Obra #211 do desenho aprovado: compra e homologação concluídas (equipamentos, estrutura e homologação encerradas);
+// mão de obra e frete em andamento.
+const CUSTOS_211 = {
+  orcamento: [
+    { categoria: "equipamentos", planejado: 31_000 },
+    { categoria: "estrutura_materiais", planejado: 9_800 },
+    { categoria: "mao_de_obra", planejado: 12_000 },
+    { categoria: "homologacao", planejado: 3_500 },
+    { categoria: "frete", planejado: 2_200 },
+  ],
+  lancamentos: [
+    { categoria: "equipamentos", valor: 33_000 },
+    { categoria: "equipamentos", valor: 234.3 },
+    { categoria: "estrutura_materiais", valor: 9_212 },
+    { categoria: "mao_de_obra", valor: 8_280 },
+    { categoria: "homologacao", valor: 4_270 },
+    { categoria: "frete", valor: 1_500 },
+    { categoria: "frete", valor: -268 }, // estorno parcial de um lançamento errado
+  ],
+  etapasConcluidas: new Set(["projeto", "homologacao", "compra"]),
+};
+
+describe("custos e lucro (lógica do desenho)", () => {
+  const custos = montarCustos(CUSTOS_211);
+
+  it("encerrada vale o realizado; em andamento, o maior entre planejado e realizado", () => {
+    expect(custos.categorias.map((c) => [c.categoria, c.realizado, c.encerrada, c.projetado])).toEqual([
+      ["equipamentos", 33_234.3, true, 33_234.3],
+      ["estrutura_materiais", 9_212, true, 9_212],
+      ["mao_de_obra", 8_280, false, 12_000],
+      ["homologacao", 4_270, true, 4_270],
+      ["frete", 1_232, false, 2_200],
+    ]);
+    expect([custos.planejado, custos.realizado, custos.projetado]).toEqual([58_500, 56_228.3, 60_916.3]);
+    expect(custos.realizadoPct).toBeCloseTo(96.12, 2);
   });
 
-  it("margem é receita líquida − custo FINAL projetado (nunca − gasto até hoje)", () => {
-    const r = resultadoFinanceiro({ receitaLiquida: 180_000, custoOrcado: 130_000, custoRealizado: 92_000, custoFinalProjetado: 135_000, margemPlanejadaPct: (50_000 / 180_000) * 100 });
-    expect(r.margemLiquida).toBe(45_000);
-    expect(r.margemLiquidaPct).toBeCloseTo(25, 10);
-    expect(r.margemLiquida).not.toBe(180_000 - 92_000);
-    expect(r.aRealizar).toBe(43_000);
-    expect(r.desvioProjetado).toBe(5_000);
-    expect(r.variacaoMargemPp).toBeCloseTo(-2.7778, 3);
+  it("barra do desenho: planejado em 85% da trilha, realizado proporcional e no máximo 100%; desvio só encerrada", () => {
+    const [equip, , mao, homolog] = custos.categorias;
+    expect(equip.largura).toBeCloseTo(91.13, 2);
+    expect(mao.largura).toBeCloseTo(58.65, 2);
+    expect(homolog.largura).toBe(100);
+    expect([equip.desvioPct, mao.desvioPct]).toEqual([expect.closeTo(7.21, 2), null]);
+    expect([equip.acima, mao.acima]).toEqual([true, false]);
   });
 
-  it("inconsistências bloqueiam o resultado", () => {
-    const custos = [{ categoria: "material_ca" as const, orcado: 100, realizado: 50 }];
-    const base = { receitaLiquida: 200, custoOrcado: 100, custoRealizado: 50, custoFinalProjetado: 120, margemPlanejadaPct: null };
-    expect(inconsistenciasFinanceiro(base, custos)).toEqual([]);
-    expect(inconsistenciasFinanceiro({ ...base, custoOrcado: 99 }, custos)).toContain("custo orçado ≠ soma das categorias");
-    expect(inconsistenciasFinanceiro({ ...base, custoRealizado: 51 }, custos)).toContain("custo realizado ≠ soma das categorias");
-    expect(inconsistenciasFinanceiro({ ...base, custoFinalProjetado: 40 }, custos)).toContain("custo final projetado menor que o já realizado");
-    expect(inconsistenciasFinanceiro({ ...base, receitaLiquida: -1 }, custos)).toContain("valor negativo ou inválido");
+  it("lucro = venda − custo projetado − impostos e comissões; diferença para o planejado e margens", () => {
+    const r = resultadoObra(76_500, custos, 11);
+    expect(r).toMatchObject({ deducoes: 8_415, lucro: 7_168.7, lucroPlanejado: 9_585, diferenca: -2_416.3 });
+    expect(r.lucroPct).toBeCloseTo(9.37, 2);
+    expect(r.margemProjetadaPct).toBeCloseTo(20.37, 2);
+    expect(r.margemPlanejadaPct).toBeCloseTo(23.53, 2);
+    expect(resultadoObra(0, custos, 0).lucroPct).toBeNull();
   });
 });
 
@@ -120,23 +147,10 @@ describe("demonstração local (dados fictícios)", () => {
     expect(planejamentoDemonstracao(FAZENDA, { ...LOCAL, NEXT_PUBLIC_SUPABASE_URL: "https://x.supabase.co" })).toBeNull();
   });
 
-  it("Fazenda Modelo: números pedidos e coerentes", () => {
-    const p = planejamentoDemonstracao(FAZENDA, LOCAL)!;
-    expect(p.avancoFisico).toBe(68);
-    expect(p.custos.find((c) => c.categoria === "material_ca")).toMatchObject({ orcado: 14_000, realizado: 16_000 });
-    expect(inconsistenciasFinanceiro(p.financeiro!, p.custos)).toEqual([]);
-    const r = resultadoFinanceiro(p.financeiro!);
-    expect(r.receitaLiquida).toBe(180_000);
-    expect(r.custoFinalProjetado).toBe(135_000);
-    expect(r.margemLiquida).toBe(45_000);
-    expect(r.margemLiquidaPct).toBeCloseTo(25, 10);
-  });
-
-  it("todas as obras demonstrativas são coerentes", () => {
+  it("só o avanço físico é fictício", () => {
+    expect(planejamentoDemonstracao(FAZENDA, LOCAL)).toEqual({ avancoFisico: 68 });
     for (const nome of [FAZENDA, "Mercado Bom Preço (fictício)", "Clínica Vida (fictícia)"]) {
-      const p = planejamentoDemonstracao(nome, LOCAL)!;
-      expect(p, nome).not.toBeNull();
-      expect(inconsistenciasFinanceiro(p.financeiro!, p.custos), nome).toEqual([]);
+      expect(planejamentoDemonstracao(nome, LOCAL), nome).not.toBeNull();
     }
     expect(planejamentoDemonstracao("Cliente qualquer", LOCAL)).toBeNull();
   });
@@ -209,6 +223,10 @@ function cenario(papel: "admin" | "operacao" | "sdr", { comValor }: { comValor: 
       obra_historico: [],
       // A RLS de obra_dados_comerciais só devolve a linha a quem pode ver dinheiro.
       obra_dados_comerciais: comValor ? [{ obra_id: OBRA, empresa_id: EMPRESA, valor_vendido: 175_000 }] : [],
+      // A RLS do orçamento e dos lançamentos só devolve linhas a quem vê os custos da obra.
+      obra_orcamento: comValor ? [{ obra_id: OBRA, categoria: "equipamentos", planejado: 100_000 }, { obra_id: OBRA, categoria: "frete", planejado: 5_000 }] : [],
+      obra_custos: comValor ? [{ obra_id: OBRA, categoria: "equipamentos", valor: 20_000 }] : [],
+      obra_deducoes: [{ empresa_id: EMPRESA, impostos_percentual: 8, comissoes_percentual: 2 }],
     },
     rpcs: { identidade_membros: [], obras_operacao: [{ ...linhaObra, obra_id: OBRA }] },
   });
@@ -220,7 +238,8 @@ describe("carregarApresentacaoObra", () => {
   it("sem demonstração: planejamento vazio e avanço NÃO derivado dos setores concluídos", async () => {
     const vm = await carregarApresentacaoObra(cenario("admin", { comValor: true }).cliente, { empresaId: EMPRESA, papel: "admin", obraId: OBRA, hojeIso: HOJE, env: {} });
     expect(vm).toMatchObject({ avancoFisico: null, entregaContratada: null, cronograma: null, demonstracao: false, potenciaKwp: 75, local: "Toledo/PR" });
-    expect(vm?.financeiro).toEqual({ estado: "sem_dados", valorVendido: 175_000 });
+    // Sem cronograma nenhuma categoria encerra: projetado = maior entre planejado e realizado (100.000 + 5.000).
+    expect(vm?.financeiro.estado === "disponivel" && vm.financeiro.resultado).toMatchObject({ venda: 175_000, custoProjetado: 105_000, deducoes: 17_500, lucro: 52_500 });
   });
 
   it("cronograma e entrega contratada vêm do banco, com o setor e o responsável em cada etapa", async () => {
@@ -233,7 +252,7 @@ describe("carregarApresentacaoObra", () => {
     expect(vm?.cronograma?.etapas.map((e) => e.sub)).toEqual(["Engenharia", "Engenharia · contratada 10/12"]);
   });
 
-  it("admin com demonstração: custos e resultado disponíveis", async () => {
+  it("admin com demonstração: o avanço é fictício; custos e resultado continuam os do banco", async () => {
     const vm = await carregarApresentacaoObra(cenario("admin", { comValor: true }).cliente, { empresaId: EMPRESA, papel: "admin", obraId: OBRA, hojeIso: HOJE, env: LOCAL });
     expect(vm?.demonstracao).toBe(true);
     expect(vm?.avancoFisico).toBe(68);

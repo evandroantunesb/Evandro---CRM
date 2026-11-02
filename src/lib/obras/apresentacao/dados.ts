@@ -1,10 +1,10 @@
 import "server-only";
 import type { SupabaseServidor } from "@/lib/supabase/server";
 import { ddmm, montarCronograma, SETOR_ETAPA } from "../cronograma";
+import { montarCustos, resultadoObra } from "../custos";
 import { carregarDetalheObra } from "../detalhe";
 import { setorConcluido } from "../derivados";
 import { ROTULO_ALERTA_OBRA, ROTULO_SETOR } from "../rotulos";
-import { inconsistenciasFinanceiro } from "./calculos";
 import { planejamentoDemonstracao } from "./demo";
 import type { ApresentacaoObraVM, FinanceiroVM, PendenciaVM, PlanejamentoObra } from "./tipos";
 
@@ -15,13 +15,14 @@ export const hojeBrasilia = (agora = new Date()) => new Intl.DateTimeFormat("en-
  * Apresentação de uma obra (somente leitura). Lê pelo mesmo caminho do detalhe (RLS, empresa
  * atual, `obras_operacao` para o papel operacao) e devolve um VM próprio, montado campo a campo.
  *
- * Dinheiro: só entra no VM de quem a RLS deixa ler o valor vendido DESTA obra
- * (`obra_dados_comerciais`: admin, vendedor da venda, gestor da equipe dele). Para os demais
- * (operacao, SDR, gestor de outra equipe) o bloco é `sem_permissao` e nenhum valor sai do servidor.
+ * Dinheiro: os custos entram no VM de quem a RLS deixa ler o orçamento DESTA obra (admin, gestor
+ * que vê a obra, quem atua no Operacional dela); venda, lucro e margem só para quem lê o valor
+ * vendido (`obra_dados_comerciais`: admin, vendedor da venda, gestor da equipe dele). Para os
+ * demais o bloco é `sem_permissao` e nenhum valor sai do servidor.
  *
  * Cronograma e entrega contratada: sempre do banco (`cronograma_obra`, que devolve zero linhas a
- * quem não vê a obra). Avanço físico, custos e margem: o banco ainda não tem; sem a demonstração
- * local, ficam null/vazios. Avanço nunca é derivado do status dos setores.
+ * quem não vê a obra). Avanço físico: o banco ainda não tem; sem a demonstração local, fica null.
+ * Avanço nunca é derivado do status dos setores.
  */
 export async function carregarApresentacaoObra(
   supabase: SupabaseServidor,
@@ -70,14 +71,25 @@ export async function carregarApresentacaoObra(
     : null;
 
   const plano: PlanejamentoObra | null = planejamentoDemonstracao(resumo.clienteNome, entrada.env);
-  // Só o caminho comercial consulta o valor vendido, e a RLS devolve a linha apenas a quem pode ver.
-  const podeVerDinheiro = obra.valorVendido !== null;
 
-  let financeiro: FinanceiroVM;
-  if (!podeVerDinheiro) financeiro = { estado: "sem_permissao" };
-  else if (plano?.financeiro && inconsistenciasFinanceiro(plano.financeiro, plano.custos).length === 0) {
-    financeiro = { estado: "disponivel", valorVendido: obra.valorVendido, custos: plano.custos, resultado: plano.financeiro };
-  } else financeiro = { estado: "sem_dados", valorVendido: obra.valorVendido };
+  // A RLS devolve orçamento e lançamentos só a quem vê os custos da obra.
+  const [orcamento, lancamentos, deducoes] = await Promise.all([
+    supabase.from("obra_orcamento").select("categoria, planejado").eq("obra_id", entrada.obraId),
+    supabase.from("obra_custos").select("categoria, valor").eq("obra_id", entrada.obraId),
+    supabase.from("obra_deducoes").select("impostos_percentual, comissoes_percentual").eq("empresa_id", entrada.empresaId).maybeSingle(),
+  ]);
+  for (const r of [orcamento, lancamentos, deducoes]) if (r.error) throw r.error;
+  let financeiro: FinanceiroVM = { estado: "sem_permissao" };
+  if ((orcamento.data ?? []).length > 0) {
+    const custos = montarCustos({
+      orcamento: orcamento.data ?? [],
+      lancamentos: lancamentos.data ?? [],
+      etapasConcluidas: new Set((linhas ?? []).filter((l) => l.situacao === "concluida").map((l) => l.etapa)),
+    });
+    const deducoesPct = Number(deducoes.data?.impostos_percentual ?? 0) + Number(deducoes.data?.comissoes_percentual ?? 0);
+    // Só o caminho comercial consulta o valor vendido, e a RLS devolve a linha apenas a quem pode ver.
+    financeiro = { estado: "disponivel", custos, resultado: obra.valorVendido !== null ? resultadoObra(obra.valorVendido, custos, deducoesPct) : null };
+  }
 
   return {
     id: resumo.id,

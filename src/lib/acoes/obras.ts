@@ -3,9 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { mensagemErro } from "@/lib/erros";
+import { MENSAGEM_NUMERO_BR, lerNumeroBr } from "@/lib/formatacao";
+import { CATEGORIAS_CUSTO_OBRA } from "@/lib/obras/custos";
 import { FUNCOES_OPERACIONAIS } from "@/lib/obras/gestao";
 import { AGUARDANDO_OBRA, SETORES_OBRA, STATUS_POR_SETOR } from "@/lib/obras/rotulos";
-import { GERIR_OBRAS, PRAZOS_OBRA } from "@/lib/permissoes";
+import { FINANCEIRO_OBRA, GERIR_OBRAS, PRAZOS_OBRA } from "@/lib/permissoes";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import type { ResultadoAcao } from "@/lib/tipos";
@@ -231,4 +233,68 @@ export async function ajustarEntregaContratadaObra(_: ResultadoAcao, formData: F
   });
   if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível ajustar a entrega.") };
   return concluir(dados.data.obraId, "Entrega contratada ajustada.");
+}
+
+const valorBr = z
+  .string()
+  .trim()
+  .transform((v) => lerNumeroBr(v))
+  .pipe(z.number({ message: `Valor inválido. ${MENSAGEM_NUMERO_BR}` }).nonnegative("Valor inválido."));
+const categoriaCusto = z.enum(CATEGORIAS_CUSTO_OBRA);
+
+const esquemaOrcamento = z.object({ obraId: uuid, categoria: categoriaCusto, planejado: valorBr });
+
+/** Admin ou gestor ajusta o planejado de uma categoria do orçamento da obra. */
+export async function ajustarOrcamentoObra(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  await exigirPapel(...FINANCEIRO_OBRA);
+  const dados = esquemaOrcamento.safeParse(Object.fromEntries(formData));
+  if (!dados.success) return { ok: false, mensagem: dados.error.issues[0]?.message ?? "Dados inválidos." };
+
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.rpc("ajustar_orcamento_obra", {
+    p_obra_id: dados.data.obraId,
+    p_categoria: dados.data.categoria,
+    p_planejado: dados.data.planejado,
+  });
+  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível ajustar o orçamento.") };
+  return concluir(dados.data.obraId, "Orçamento ajustado.");
+}
+
+const esquemaCusto = z.object({
+  obraId: uuid,
+  categoria: categoriaCusto,
+  valor: valorBr.refine((v) => v > 0, "Informe um valor maior que zero."),
+  data,
+  descricao: z.string().trim().min(3, "Descreva o custo.").max(300, "Descrição muito longa."),
+});
+
+/** Admin ou quem atua no Operacional da obra lança um custo real (sem apagar: erro se corrige com estorno). */
+export async function lancarCustoObra(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  await exigirPapel(...GERIR_OBRAS);
+  const dados = esquemaCusto.safeParse(Object.fromEntries(formData));
+  if (!dados.success) return { ok: false, mensagem: dados.error.issues[0]?.message ?? "Dados inválidos." };
+
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.rpc("lancar_custo_obra", {
+    p_obra_id: dados.data.obraId,
+    p_categoria: dados.data.categoria,
+    p_valor: dados.data.valor,
+    p_data: dados.data.data,
+    p_descricao: dados.data.descricao,
+  });
+  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível lançar o custo.") };
+  return concluir(dados.data.obraId, "Custo lançado.");
+}
+
+const esquemaEstorno = z.object({ obraId: uuid, custoId: uuid, motivo: z.string().trim().min(3, "Explique o motivo do estorno.").max(300, "Motivo muito longo.") });
+
+export async function estornarCustoObra(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  await exigirPapel(...GERIR_OBRAS);
+  const dados = esquemaEstorno.safeParse(Object.fromEntries(formData));
+  if (!dados.success) return { ok: false, mensagem: dados.error.issues[0]?.message ?? "Dados inválidos." };
+
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.rpc("estornar_custo_obra", { p_custo_id: dados.data.custoId, p_motivo: dados.data.motivo });
+  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível estornar.") };
+  return concluir(dados.data.obraId, "Lançamento estornado.");
 }
