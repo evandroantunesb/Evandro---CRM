@@ -1,28 +1,15 @@
+import type { CronogramaVM } from "../cronograma";
 import type { AlertaObra, SetorObra, SituacaoObra } from "../rotulos";
 
 /**
  * Modo Apresentação de Obras (OPR 3B, V1). Somente leitura.
  *
  * Fontes reais HOJE (banco): identificação da obra, situação, status/parado/aguardando de cada
- * setor, responsáveis, marcos, alertas e o valor vendido (RLS própria). NÃO existem no banco:
- * prazo, cronograma, avanço físico, custos por categoria, receita líquida e margem. Esses blocos
- * chegam `null` (estado vazio na tela) e só ganham conteúdo pela demonstração local
- * (`demo.ts`), que nunca liga fora do Supabase local.
+ * setor, responsáveis, marcos, alertas, o valor vendido (RLS própria) e o cronograma das etapas
+ * com a entrega contratada (`cronograma_obra`). NÃO existem no banco: avanço físico, custos por
+ * categoria, receita líquida e margem. Esses blocos chegam `null` (estado vazio na tela) e só
+ * ganham conteúdo pela demonstração local (`demo.ts`), que nunca liga fora do Supabase local.
  */
-
-export type AtividadeCronograma = {
-  id: string;
-  nome: string;
-  /** Setor da obra a que a atividade pertence (opcional). */
-  setor: SetorObra | null;
-  /** Datas ISO (AAAA-MM-DD), inclusivas. */
-  inicio: string;
-  fim: string;
-  /** 0–100, informado pela fonte. Nunca derivado do status do setor. */
-  progresso: number;
-  /** Marco pontual (desenhado como losango, sem barra). */
-  marco?: boolean;
-};
 
 export const CATEGORIAS_CUSTO = ["material_ca", "material_cc", "mao_de_obra", "equipamentos", "servicos", "logistica"] as const;
 export type CategoriaCusto = (typeof CATEGORIAS_CUSTO)[number];
@@ -51,13 +38,10 @@ export type EntradaFinanceiro = {
   margemPlanejadaPct: number | null;
 };
 
-/** Dados de planejamento/custo de uma obra. Hoje só existem na demonstração local. */
+/** Avanço e custos de uma obra. Hoje só existem na demonstração local. */
 export type PlanejamentoObra = {
-  /** Data de término prevista (ISO). */
-  prazo: string | null;
   /** 0–100, informado pela fonte. */
   avancoFisico: number | null;
-  cronograma: AtividadeCronograma[];
   custos: CustoCategoria[];
   financeiro: EntradaFinanceiro | null;
 };
@@ -86,13 +70,15 @@ export type ApresentacaoObraVM = {
   pendencias: PendenciaVM[];
   /** Fatos do banco: marcos ainda pendentes e setores não concluídos (status atual). */
   proximasEntregas: string[];
-  /** Planejamento: null = sem fonte (estado vazio). */
-  prazo: string | null;
+  /** Datas ISO (AAAA-MM-DD) do cronograma; null = sem acesso ao cronograma. */
+  entregaContratada: string | null;
+  entregaPrevista: string | null;
+  /** Avanço: null = sem fonte (estado vazio). */
   avancoFisico: number | null;
-  cronograma: AtividadeCronograma[] | null;
+  cronograma: CronogramaVM | null;
   /** Custos e resultado: só para quem pode ver dinheiro desta obra. */
   financeiro: FinanceiroVM;
-  /** true quando o conteúdo de planejamento/custos veio da demonstração local (fictícia). */
+  /** true quando o avanço e os custos vieram da demonstração local (fictícia). */
   demonstracao: boolean;
 };
 

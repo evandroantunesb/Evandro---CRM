@@ -67,6 +67,7 @@ const GRUPOS: { id: string; titulo: string; itens: Item[] }[] = [
     itens: [
       { href: "/configuracoes/fixacoes", titulo: "Tipos de fixação", descricao: "Opções de fixação do telhado escolhidas na obra.", Icone: Wrench },
       { href: "/configuracoes/engenharia", titulo: "Engenharia", descricao: "Checklist de documentos, prazos e feriados da empresa.", Icone: ListChecks },
+      { href: "/configuracoes/prazos-obras", titulo: "Prazos das etapas", descricao: "Dias úteis de cada etapa da obra e da entrega contratada (o gestor também edita).", Icone: CalendarClock },
       { href: "/configuracoes/tarefas-automaticas", titulo: "Tarefas automáticas", descricao: "Tarefas que nascem para um setor quando outro chega a um status.", Icone: Workflow },
     ],
   },

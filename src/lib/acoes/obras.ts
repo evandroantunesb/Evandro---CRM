@@ -5,7 +5,7 @@ import { z } from "zod";
 import { mensagemErro } from "@/lib/erros";
 import { FUNCOES_OPERACIONAIS } from "@/lib/obras/gestao";
 import { AGUARDANDO_OBRA, SETORES_OBRA, STATUS_POR_SETOR } from "@/lib/obras/rotulos";
-import { GERIR_OBRAS } from "@/lib/permissoes";
+import { GERIR_OBRAS, PRAZOS_OBRA } from "@/lib/permissoes";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import type { ResultadoAcao } from "@/lib/tipos";
@@ -25,6 +25,7 @@ const motivo = z.string().trim().max(MAX_MOTIVO, "Motivo muito longo.");
 
 function concluir(obraId: string, mensagem: string): ResultadoAcao {
   revalidatePath(`/obras/${obraId}`);
+  revalidatePath(`/obras/apresentacao/${obraId}`);
   revalidatePath(`/engenharia/${obraId}`);
   revalidatePath("/obras");
   return { ok: true, mensagem };
@@ -189,4 +190,45 @@ export async function definirFixacaoObra(_: ResultadoAcao, formData: FormData): 
   });
   if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível salvar a fixação.") };
   return concluir(dados.data.obraId, dados.data.fixacaoId ? "Fixação salva." : "Fixação removida.");
+}
+
+const data = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida.");
+const esquemaPrevisaoMaterial = z.object({ obraId: uuid, data: z.union([z.literal(""), data]) });
+
+/** Compras informa (ou limpa) a previsão de entrega do material. Quem pode é a mesma regra dos status de Compras. */
+export async function definirEntregaMaterialPrevista(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  await exigirPapel(...GERIR_OBRAS);
+  const dados = esquemaPrevisaoMaterial.safeParse(Object.fromEntries(formData));
+  if (!dados.success) return { ok: false, mensagem: dados.error.issues[0]?.message ?? "Dados inválidos." };
+
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.rpc("definir_entrega_material_prevista", {
+    p_obra_id: dados.data.obraId,
+    // Sem o parâmetro, a RPC recebe nulo: limpa a previsão.
+    ...(dados.data.data ? { p_data: dados.data.data } : {}),
+  });
+  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível salvar a previsão.") };
+  return concluir(dados.data.obraId, dados.data.data ? "Previsão salva." : "Previsão removida.");
+}
+
+const esquemaEntregaContratada = z.object({
+  obraId: uuid,
+  data,
+  motivo: z.string().trim().min(3, "Explique o motivo do ajuste.").max(500, "Motivo muito longo."),
+});
+
+/** Admin ou gestor ajusta a entrega contratada da obra, com motivo (fica no histórico). */
+export async function ajustarEntregaContratadaObra(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  await exigirPapel(...PRAZOS_OBRA);
+  const dados = esquemaEntregaContratada.safeParse(Object.fromEntries(formData));
+  if (!dados.success) return { ok: false, mensagem: dados.error.issues[0]?.message ?? "Dados inválidos." };
+
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.rpc("ajustar_entrega_contratada_obra", {
+    p_obra_id: dados.data.obraId,
+    p_data: dados.data.data,
+    p_motivo: dados.data.motivo,
+  });
+  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível ajustar a entrega.") };
+  return concluir(dados.data.obraId, "Entrega contratada ajustada.");
 }

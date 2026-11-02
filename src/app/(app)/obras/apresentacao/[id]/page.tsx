@@ -21,9 +21,9 @@ const kwp = (v: number | null) => (v == null ? null : `${new Intl.NumberFormat("
 
 /**
  * Modo Apresentação (OPR 3B, V1): visão executiva de UMA obra, somente leitura, navegável como
- * slides pela lista filtrada (mesma empresa, RLS e filtros da listagem). Blocos sem fonte real
- * (prazo, avanço, cronograma, custos, margem) mostram estado vazio; o conteúdo fictício só
- * aparece com a demonstração local ligada, sempre com o selo "Dados fictícios".
+ * slides pela lista filtrada (mesma empresa, RLS e filtros da listagem). O cronograma e a entrega
+ * contratada vêm do banco; blocos sem fonte real (avanço, custos, margem) mostram estado vazio e o
+ * conteúdo fictício só aparece com a demonstração local ligada, sempre com o selo "Dados fictícios".
  */
 export default async function ApresentacaoObra({ params, searchParams }: PageProps<"/obras/apresentacao/[id]">) {
   const { atual } = await exigirPapel(...OBRAS);
@@ -66,8 +66,8 @@ function Slide({ obra, hoje }: { obra: ApresentacaoObraVM; hoje: string }) {
     <article aria-label={`Apresentação da obra ${obra.numero}`} className="flex flex-col gap-4">
       {obra.demonstracao && (
         <p role="note" className="rounded-lg border border-dashed border-zinc-300 bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
-          <span className="font-semibold text-zinc-800">Dados fictícios</span> — cronograma, avanço, custos e margem desta obra são de demonstração local e não
-          existem no banco.
+          <span className="font-semibold text-zinc-800">Dados fictícios</span> — avanço, custos e margem desta obra são de demonstração local e não existem no
+          banco.
         </p>
       )}
 
@@ -83,7 +83,7 @@ function Slide({ obra, hoje }: { obra: ApresentacaoObraVM; hoje: string }) {
         <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-4">
           <Dado rotulo="Potência">{kwp(obra.potenciaKwp) ?? "Não informada"}</Dado>
           <Dado rotulo="Local">{obra.local ?? "Não informado"}</Dado>
-          <Dado rotulo="Prazo">{obra.prazo ? dataBr(obra.prazo) : <SemFonte>A definir</SemFonte>}</Dado>
+          <Dado rotulo="Entrega contratada">{obra.entregaContratada ? dataBr(obra.entregaContratada) : <SemFonte>A definir</SemFonte>}</Dado>
           <Dado rotulo="Responsáveis">
             {responsaveis.length ? responsaveis.map((s) => `${ROTULO_SETOR[s.setor]}: ${s.responsavel}`).join(" · ") : <SemFonte>Não definidos</SemFonte>}
           </Dado>
@@ -104,8 +104,8 @@ function Slide({ obra, hoje }: { obra: ApresentacaoObraVM; hoje: string }) {
             <SemFonte>Sem medição registrada</SemFonte>
           )}
         </Indicador>
-        <Indicador rotulo="Prazo">
-          {obra.prazo ? <span className="text-xl font-semibold text-zinc-900 tabular-nums">{dataBr(obra.prazo)}</span> : <SemFonte>A definir</SemFonte>}
+        <Indicador rotulo="Entrega prevista">
+          {obra.entregaPrevista ? <span className="text-xl font-semibold text-zinc-900 tabular-nums">{dataBr(obra.entregaPrevista)}</span> : <SemFonte>A definir</SemFonte>}
         </Indicador>
         <Indicador rotulo="Pendências críticas">
           <span className={`text-3xl font-semibold tabular-nums ${obra.pendencias.length ? "text-amber-700" : "text-zinc-900"}`}>{obra.pendencias.length}</span>
@@ -152,14 +152,14 @@ function Slide({ obra, hoje }: { obra: ApresentacaoObraVM; hoje: string }) {
         </Bloco>
       </div>
 
-      <Bloco titulo="Cronograma">
-        {obra.cronograma ? (
+      <Bloco titulo="Etapas da obra">
+        {obra.cronograma && obra.entregaContratada ? (
           <div className="flex flex-col gap-2">
-            <Gantt atividades={obra.cronograma} hojeIso={hoje} />
-            <LegendaGantt />
+            <Gantt cronograma={obra.cronograma} />
+            <LegendaGantt hoje={hoje} entregaContratada={obra.entregaContratada} />
           </div>
         ) : (
-          <Vazio>Cronograma ainda não cadastrado para esta obra.</Vazio>
+          <Vazio>Cronograma indisponível para esta obra.</Vazio>
         )}
       </Bloco>
 

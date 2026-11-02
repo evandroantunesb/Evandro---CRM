@@ -314,7 +314,7 @@ export async function criarBaseFicticia(): Promise<BaseFicticia> {
   await aguardando(obras.o04, "operacional", "cliente");
   await atribuir(obras.o04, "execOp", "operacional", "responsavel", true);
   // o05: concluída (3 setores finais + marcos resolvidos).
-  await status(obras.o05, "compras", "faturado_fornecedor");
+  await status(obras.o05, "compras", "material_entregue");
   await protocolar(obras.o05);
   await status(obras.o05, "operacional", "concluido");
   await conectar(obras.o05);
@@ -322,7 +322,7 @@ export async function criarBaseFicticia(): Promise<BaseFicticia> {
   await marco(obras.o05, "nf_cliente", "concluido");
   await marco(obras.o05, "garantia", "nao_se_aplica", "Garantia direta do fabricante (fictício)");
   // o06: Usina Solar Fazenda Modelo — obra principal da Apresentação (instalação em andamento, NF concluída).
-  await status(obras.o06, "compras", "faturado_fornecedor");
+  await status(obras.o06, "compras", "material_entregue");
   await protocolar(obras.o06);
   await status(obras.o06, "engenharia", "aprovado");
   await status(obras.o06, "operacional", "em_instalacao");

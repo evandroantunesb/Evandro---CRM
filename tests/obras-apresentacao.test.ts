@@ -1,21 +1,13 @@
 /**
  * OPR 3B — Apresentação de Obras, sem banco: cálculos (custos, margem sobre o custo FINAL
- * projetado, escala do Gantt), a trava da demonstração local (só com a variável E Supabase
+ * projetado), as linhas do Gantt a partir do cronograma do banco, a trava da demonstração local (só com a variável E Supabase
  * local) e o carregamento por papel — dinheiro nunca sai do servidor para quem não pode ver.
  */
 import { describe, expect, it } from "vitest";
-import {
-  atividadeAtrasada,
-  desvioCusto,
-  escalaCronograma,
-  inconsistenciasFinanceiro,
-  posicaoAtividade,
-  resultadoFinanceiro,
-  totaisCustos,
-} from "@/lib/obras/apresentacao/calculos";
+import { desvioCusto, inconsistenciasFinanceiro, resultadoFinanceiro, totaisCustos } from "@/lib/obras/apresentacao/calculos";
 import { carregarApresentacaoObra } from "@/lib/obras/apresentacao/dados";
 import { demonstracaoAtiva, planejamentoDemonstracao } from "@/lib/obras/apresentacao/demo";
-import type { AtividadeCronograma } from "@/lib/obras/apresentacao/tipos";
+import { montarCronograma, tomAtraso, type LinhaCronograma } from "@/lib/obras/cronograma";
 import type { SupabaseServidor } from "@/lib/supabase/server";
 
 const LOCAL = { RAION_DEMO_APRESENTACAO: "1", NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321" };
@@ -51,31 +43,64 @@ describe("cálculos financeiros", () => {
   });
 });
 
-describe("cronograma", () => {
-  const atividades: AtividadeCronograma[] = [
-    { id: "a", nome: "A", setor: "engenharia", inicio: "2026-10-05", fim: "2026-10-09", progresso: 100 },
-    { id: "b", nome: "B", setor: "operacional", inicio: "2026-10-12", fim: "2026-10-20", progresso: 30 },
-    { id: "c", nome: "C", setor: null, inicio: "2026-10-22", fim: "2026-10-22", progresso: 0, marco: true },
-  ];
+/** Linha do cronograma como o banco devolve; o padrão é etapa a iniciar, sem atraso. */
+const linha = (ordem: number, etapa: string, extra: Partial<LinhaCronograma> = {}): LinhaCronograma =>
+  ({
+    ordem,
+    etapa,
+    previsto_inicio: "2026-10-01",
+    previsto_fim: "2026-10-10",
+    real_inicio: null,
+    real_fim: null,
+    previsao_inicio: "2026-10-01",
+    previsao_fim: "2026-10-10",
+    situacao: "a_iniciar",
+    dias_na_etapa: null,
+    atraso_dias: 0,
+    atraso_proprio: 0,
+    causa_etapa: null,
+    entrega_contratada: "2026-12-10",
+    entrega_material_prevista: null,
+    ...extra,
+  }) as LinhaCronograma;
 
-  it("escala com folga de 1 dia, semanas na segunda e hoje", () => {
-    const e = escalaCronograma(atividades, HOJE)!;
-    expect(e.inicio).toBe("2026-10-04");
-    expect(e.fim).toBe("2026-10-23");
-    expect(e.totalDias).toBe(20);
-    expect(e.semanas.map((s) => s.inicio)).toEqual(["2026-10-05", "2026-10-12", "2026-10-19"]);
-    expect(e.hoje).toBe(10);
-    expect(escalaCronograma(atividades, "2027-01-01")!.hoje).toBeNull();
-    expect(escalaCronograma([], HOJE)).toBeNull();
+describe("cronograma (linhas do Gantt)", () => {
+  const linhas = [
+    linha(1, "projeto", { situacao: "concluida", real_inicio: "2026-10-01", real_fim: "2026-10-13", previsao_fim: "2026-10-13", dias_na_etapa: 8, atraso_dias: 3, atraso_proprio: 3 }),
+    linha(2, "homologacao", { situacao: "andamento", previsto_inicio: "2026-10-10", previsto_fim: "2026-10-20", real_inicio: "2026-10-13", previsao_inicio: "2026-10-13", previsao_fim: "2026-10-23", dias_na_etapa: 1, atraso_dias: 3 }),
+    linha(3, "compra", { previsto_inicio: "2026-10-20", previsto_fim: "2026-11-30", previsao_inicio: "2026-10-23", previsao_fim: "2026-12-14", atraso_dias: 2, causa_etapa: "projeto" }),
+    linha(9, "desconhecida"),
+  ];
+  const vm = montarCronograma(linhas, { hoje: HOJE, entregaContratada: "2026-12-10", subtitulo: (e) => `sub ${e}` })!;
+
+  it("meses inteiros do primeiro ao último dia, hoje e entrega contratada em % da faixa", () => {
+    expect(vm.meses.map((m) => m.rotulo)).toEqual(["Outubro", "Novembro", "Dezembro"]);
+    expect(vm.meses.reduce((t, m) => t + m.largura, 0)).toBeCloseTo(100, 10);
+    expect(vm.hoje).toBeCloseTo((13 / 92) * 100, 10);
+    expect(vm.contratada.pos).toBeCloseTo((70 / 92) * 100, 10);
+    expect(vm.entregaPrevista).toBe("2026-12-14");
   });
 
-  it("posição e duração inclusivas; atraso só com fim no passado e < 100%", () => {
-    const e = escalaCronograma(atividades, HOJE)!;
-    expect(posicaoAtividade(atividades[1], e)).toEqual({ deslocamento: 8, duracao: 9 });
-    expect(posicaoAtividade(atividades[2], e)).toEqual({ deslocamento: 18, duracao: 1 });
-    expect(atividadeAtrasada(atividades[0], HOJE)).toBe(false);
-    expect(atividadeAtrasada(atividades[1], HOJE)).toBe(false);
-    expect(atividadeAtrasada(atividades[1], "2026-10-21")).toBe(true);
+  it("etapa desconhecida some; texto de tempo e desvio por situação", () => {
+    expect(vm.etapas.map((e) => [e.nome, e.estado, e.tempo, e.desvio.texto, e.sub])).toEqual([
+      ["Chegada na Engenharia e projeto", "ok", "8 dias", "+3 dias", "sub projeto"],
+      ["Homologação na concessionária", "and", "há 1 dia", "+3 dias prev.", "sub homologacao"],
+      ["Compra de equipamentos", "pend", "a iniciar", "prev. 14/12 · +2 dias", "sub compra"],
+    ]);
+  });
+
+  it("em andamento: realizado até hoje e previsão daí em diante; atraso herdado mostra a causa", () => {
+    const [projeto, homologacao, compra] = vm.etapas;
+    expect(projeto.previsao).toBeNull();
+    expect(homologacao.real![0]).toBeCloseTo((12 / 92) * 100, 10);
+    expect(homologacao.previsao![0]).toBeCloseTo(vm.hoje!, 10);
+    expect(compra.real).toBeNull();
+    expect([projeto.motivo, compra.motivo]).toEqual([null, "Consequência do atraso na etapa 1 (chegada e projeto)."]);
+  });
+
+  it("tom do atraso pela régua do semáforo e sem linhas não há cronograma", () => {
+    expect([0, 1, 5, 6].map(tomAtraso)).toEqual(["ok", "atencao", "atencao", "erro"]);
+    expect(montarCronograma([], { hoje: HOJE, entregaContratada: "2026-12-10" })).toBeNull();
   });
 });
 
@@ -91,12 +116,12 @@ describe("demonstração local (dados fictícios)", () => {
   });
 
   it("sem a demonstração, nenhuma obra recebe planejamento", () => {
-    expect(planejamentoDemonstracao(FAZENDA, HOJE, {})).toBeNull();
-    expect(planejamentoDemonstracao(FAZENDA, HOJE, { ...LOCAL, NEXT_PUBLIC_SUPABASE_URL: "https://x.supabase.co" })).toBeNull();
+    expect(planejamentoDemonstracao(FAZENDA, {})).toBeNull();
+    expect(planejamentoDemonstracao(FAZENDA, { ...LOCAL, NEXT_PUBLIC_SUPABASE_URL: "https://x.supabase.co" })).toBeNull();
   });
 
   it("Fazenda Modelo: números pedidos e coerentes", () => {
-    const p = planejamentoDemonstracao(FAZENDA, HOJE, LOCAL)!;
+    const p = planejamentoDemonstracao(FAZENDA, LOCAL)!;
     expect(p.avancoFisico).toBe(68);
     expect(p.custos.find((c) => c.categoria === "material_ca")).toMatchObject({ orcado: 14_000, realizado: 16_000 });
     expect(inconsistenciasFinanceiro(p.financeiro!, p.custos)).toEqual([]);
@@ -105,18 +130,15 @@ describe("demonstração local (dados fictícios)", () => {
     expect(r.custoFinalProjetado).toBe(135_000);
     expect(r.margemLiquida).toBe(45_000);
     expect(r.margemLiquidaPct).toBeCloseTo(25, 10);
-    // Cronograma em volta de hoje (a linha "Hoje" sempre aparece).
-    expect(escalaCronograma(p.cronograma, HOJE)!.hoje).not.toBeNull();
   });
 
   it("todas as obras demonstrativas são coerentes", () => {
     for (const nome of [FAZENDA, "Mercado Bom Preço (fictício)", "Clínica Vida (fictícia)"]) {
-      const p = planejamentoDemonstracao(nome, HOJE, LOCAL)!;
+      const p = planejamentoDemonstracao(nome, LOCAL)!;
       expect(p, nome).not.toBeNull();
       expect(inconsistenciasFinanceiro(p.financeiro!, p.custos), nome).toEqual([]);
-      for (const a of p.cronograma) expect(a.inicio <= a.fim, `${nome}: ${a.nome}`).toBe(true);
     }
-    expect(planejamentoDemonstracao("Cliente qualquer", HOJE, LOCAL)).toBeNull();
+    expect(planejamentoDemonstracao("Cliente qualquer", LOCAL)).toBeNull();
   });
 });
 
@@ -172,7 +194,7 @@ const linhaObra: Linha = {
 };
 // Todos os setores concluídos: mesmo assim o avanço físico NÃO pode ser derivado disso.
 const fluxos = [
-  ["compras", "faturado_fornecedor"],
+  ["compras", "material_entregue"],
   ["engenharia", "concluido"],
   ["operacional", "concluido"],
 ].map(([setor, status]) => ({ obra_id: OBRA, empresa_id: EMPRESA, setor, status, status_desde: null, parado: false, parado_motivo: null, aguardando: null }));
@@ -197,8 +219,18 @@ const DINHEIRO = /180000|135000|45000|175000|receitaLiquida|custoFinalProjetado|
 describe("carregarApresentacaoObra", () => {
   it("sem demonstração: planejamento vazio e avanço NÃO derivado dos setores concluídos", async () => {
     const vm = await carregarApresentacaoObra(cenario("admin", { comValor: true }).cliente, { empresaId: EMPRESA, papel: "admin", obraId: OBRA, hojeIso: HOJE, env: {} });
-    expect(vm).toMatchObject({ avancoFisico: null, prazo: null, cronograma: null, demonstracao: false, potenciaKwp: 75, local: "Toledo/PR" });
+    expect(vm).toMatchObject({ avancoFisico: null, entregaContratada: null, cronograma: null, demonstracao: false, potenciaKwp: 75, local: "Toledo/PR" });
     expect(vm?.financeiro).toEqual({ estado: "sem_dados", valorVendido: 175_000 });
+  });
+
+  it("cronograma e entrega contratada vêm do banco, com o setor e o responsável em cada etapa", async () => {
+    const { cliente } = criarFake({
+      tabelas: { obras: [linhaObra], obra_fluxos: fluxos, obra_marcos: [], obra_participantes: [], obra_historico: [], obra_dados_comerciais: [] },
+      rpcs: { identidade_membros: [], cronograma_obra: [linha(1, "projeto", { situacao: "andamento", real_inicio: "2026-10-01" }), linha(7, "conexao")] },
+    });
+    const vm = await carregarApresentacaoObra(cliente, { empresaId: EMPRESA, papel: "admin", obraId: OBRA, hojeIso: HOJE, env: {} });
+    expect(vm).toMatchObject({ entregaContratada: "2026-12-10", entregaPrevista: "2026-10-10", demonstracao: false });
+    expect(vm?.cronograma?.etapas.map((e) => e.sub)).toEqual(["Engenharia", "Engenharia · contratada 10/12"]);
   });
 
   it("admin com demonstração: custos e resultado disponíveis", async () => {

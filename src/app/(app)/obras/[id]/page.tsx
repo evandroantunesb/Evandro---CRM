@@ -7,7 +7,7 @@ import { Cartao, Selo } from "@/components/ui";
 import { formatarDataHora, formatarMoeda } from "@/lib/crm";
 import { carregarObras } from "@/lib/obras/dados";
 import { filtrosDeParams, hrefObra, montarNavegacao, queryDosFiltros, temFiltroAtivo } from "@/lib/obras/navegacao";
-import { GestaoFixacao, GestaoMarco, GestaoSetor } from "./gestao";
+import { AjusteEntregaContratada, GestaoFixacao, GestaoMarco, GestaoSetor } from "./gestao";
 import { VistoriaEngenharia } from "@/components/engenharia/vistoria";
 import { ResumoVistoria } from "@/components/engenharia/vistoria-resumo";
 import { Campo, CartaoSetor, ContatoCliente, DadosTecnicos, ListaParticipantes, comUnidade } from "@/components/obras/detalhe-obra";
@@ -21,13 +21,14 @@ import {
   type AlertaObra,
   type SituacaoObra,
 } from "@/lib/obras/rotulos";
-import { OBRAS } from "@/lib/permissoes";
+import { OBRAS, PRAZOS_OBRA, pode } from "@/lib/permissoes";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 
 type Tom = "neutro" | "negativo" | "atencao";
 // Sem verde (reservado ao WhatsApp): "Concluída" fica neutra. Vermelho só para o que é perda/erro.
 const TOM_SITUACAO: Record<SituacaoObra, Tom> = { em_andamento: "neutro", concluida: "neutro", pausada: "atencao", cancelada: "negativo" };
+const dataBr = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
 const TOM_ALERTA: Record<AlertaObra, Tom> = { estorno: "negativo", venda_alterada: "atencao", parado: "atencao", aguardando: "neutro" };
 
 export default async function DetalheObra({ params, searchParams }: PageProps<"/obras/[id]">) {
@@ -39,13 +40,15 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
 
   const supabase = await criarClienteServidor();
   // A lista navegável é recalculada aqui, a cada obra: mesma empresa, mesma RLS, mesmos filtros.
-  const [obra, lista, tarefasSetor, vistoria, vistorias] = await Promise.all([
+  const [obra, lista, tarefasSetor, vistoria, vistorias, cronograma] = await Promise.all([
     carregarDetalheObra(supabase, { empresaId: atual.empresaId, papel: atual.papel, obraId: id, membroId: atual.membroId }),
     carregarObras(supabase, { empresaId: atual.empresaId, papel: atual.papel, comResponsaveis: false }),
     carregarTarefasSetor(supabase, { empresaId: atual.empresaId, membroId: atual.membroId, papel: atual.papel, obraId: id, filtro: "todas" }),
     carregarSituacaoVistoria(supabase, id),
     // Registros completos só para admin e quem atua em Engenharia ou no Operacional na obra (a RLS devolve vazio aos demais).
     carregarVistoriasEngenharia(supabase, { empresaId: atual.empresaId, obraId: id }),
+    // Zero linhas para quem não vê a obra; cada linha repete a entrega contratada e a previsão do material.
+    supabase.rpc("cronograma_obra", { p_obra_id: id }),
   ]);
   if (!obra) notFound();
   const navegacao = montarNavegacao(lista.obras, filtros, id);
@@ -53,6 +56,8 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
   const { resumo, gestao } = obra;
   const local = [resumo.cidade, resumo.uf].filter(Boolean).join("/");
   const gestaoDoSetor = (setor: string) => gestao?.setores.find((s) => s.setor === setor) ?? null;
+  const etapas = cronograma.data ?? [];
+  const entrega = etapas[0] ? { contratada: etapas[0].entrega_contratada, prevista: etapas.at(-1)!.previsao_fim, material: etapas[0].entrega_material_prevista } : null;
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-4">
@@ -105,6 +110,20 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
         )}
       </Cartao>
 
+      {entrega && (
+        <Cartao titulo="Entrega ao cliente">
+          <div className="flex flex-col gap-3">
+            <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+              <Campo rotulo="Entrega contratada">{dataBr(entrega.contratada)}</Campo>
+              <Campo rotulo="Entrega prevista">{dataBr(entrega.prevista)}</Campo>
+            </dl>
+            {pode(atual.papel, PRAZOS_OBRA) && resumo.situacao !== "cancelada" && (
+              <AjusteEntregaContratada key={resumo.id} obraId={resumo.id} data={entrega.contratada} />
+            )}
+          </div>
+        </Cartao>
+      )}
+
       {gestao?.bloqueio && <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-900">{gestao.bloqueio}</p>}
 
       <section className="flex flex-col gap-2">
@@ -135,7 +154,15 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
                   ) : (
                     vistoria && <ResumoVistoria situacao={vistoria} />
                   ))}
-                {g && <GestaoSetor key={resumo.id} obraId={resumo.id} setor={s} gestao={g} />}
+                {g && (
+                  <GestaoSetor
+                    key={resumo.id}
+                    obraId={resumo.id}
+                    setor={s}
+                    gestao={g}
+                    previsaoMaterial={s.setor === "compras" && entrega ? { data: entrega.material } : undefined}
+                  />
+                )}
               </CartaoSetor>
             );
           })}

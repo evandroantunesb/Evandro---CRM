@@ -3,14 +3,14 @@ import type { AlertaObra, EstadoSetor, SetorObra, SituacaoObra } from "./rotulos
 /**
  * Derivações puras e factuais da lista de Obras, a partir de campos que o banco já guarda.
  *
- * Decisão de produto: aqui não existe percentual de progresso (geral ou por setor), posição do
- * status tratada como progresso, SLA, semáforo, contagem de dias/atraso nem cor por tempo.
- * Só se afirma o que está registrado: concluído, parado, aguardando, pausada, cancelada.
+ * Aqui não existe percentual de progresso (geral ou por setor) nem posição do status tratada como
+ * progresso: só se afirma o que está registrado (concluído, parado, aguardando, pausada, cancelada).
+ * Prazos, atrasos e previsão das etapas vêm do cronograma calculado no banco (`cronograma.ts`).
  */
 
-/** Status final de cada setor: compras termina em `faturado_fornecedor`; os demais, em `concluido`. */
+/** Status final de cada setor: compras termina em `material_entregue`; os demais, em `concluido`. */
 export function setorConcluido(setor: SetorObra, status: string | null | undefined): boolean {
-  return status === (setor === "compras" ? "faturado_fornecedor" : "concluido");
+  return status === (setor === "compras" ? "material_entregue" : "concluido");
 }
 
 /** Estado factual do setor. Concluído vence; depois parado; depois aguardando. */

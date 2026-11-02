@@ -5,10 +5,12 @@ import { useActionState, useState, type ReactNode } from "react";
 import { Botao, Mensagem, Selecao } from "@/components/ui";
 import { useEnvioSemReset } from "@/components/envio-sem-reset";
 import {
+  ajustarEntregaContratadaObra,
   alterarStatusFluxoObra,
   atribuirParticipanteObra,
   atualizarMarcoObra,
   definirAguardandoFluxoObra,
+  definirEntregaMaterialPrevista,
   definirFixacaoObra,
   encerrarParticipanteObra,
   marcarParadoFluxoObra,
@@ -35,8 +37,18 @@ function Bloco({ titulo, children }: { titulo: string; children: ReactNode }) {
   );
 }
 
-/** Painel recolhível com as ações de um setor. */
-export function GestaoSetor({ obraId, setor, gestao }: { obraId: string; setor: SetorDetalheVM; gestao: SetorGestaoVM }) {
+/** Painel recolhível com as ações de um setor. Em Compras, `previsaoMaterial` liga o campo da previsão de entrega. */
+export function GestaoSetor({
+  obraId,
+  setor,
+  gestao,
+  previsaoMaterial,
+}: {
+  obraId: string;
+  setor: SetorDetalheVM;
+  gestao: SetorGestaoVM;
+  previsaoMaterial?: { data: string | null };
+}) {
   const { alterarFluxo, gerirParticipantes } = gestao.permissoes;
   if (!alterarFluxo && !gerirParticipantes) return null;
   return (
@@ -48,6 +60,7 @@ export function GestaoSetor({ obraId, setor, gestao }: { obraId: string; setor: 
         {alterarFluxo && (
           <>
             <FormStatus obraId={obraId} setor={setor} />
+            {previsaoMaterial && <FormPrevisaoMaterial obraId={obraId} data={previsaoMaterial.data} />}
             <FormParado obraId={obraId} setor={setor} />
             <FormAguardando obraId={obraId} setor={setor} aguardandoCodigo={gestao.aguardandoCodigo} />
           </>
@@ -112,6 +125,55 @@ function FormStatus({ obraId, setor }: { obraId: string; setor: SetorDetalheVM }
       </form>
       <Mensagem resultado={resultado} />
     </Bloco>
+  );
+}
+
+/** Previsão de entrega do material: entra no cronograma no lugar do prazo padrão da etapa. Vazio limpa. */
+function FormPrevisaoMaterial({ obraId, data }: { obraId: string; data: string | null }) {
+  const [resultado, acao, pendente] = useActionState(definirEntregaMaterialPrevista, null);
+  const enviar = useEnvioSemReset(acao);
+  return (
+    <Bloco titulo="Previsão de entrega do material">
+      <form onSubmit={enviar} className="flex flex-col gap-2">
+        <input type="hidden" name="obraId" value={obraId} />
+        <input name="data" type="date" defaultValue={data ?? ""} aria-label="Previsão de entrega do material" className={CAMPO_TEXTO} />
+        <Botao type="submit" variante="secundario" disabled={pendente}>
+          {pendente ? "Salvando..." : "Salvar previsão"}
+        </Botao>
+      </form>
+      <Mensagem resultado={resultado} />
+    </Bloco>
+  );
+}
+
+/** Ajuste da entrega contratada (admin e gestor), sempre com motivo. */
+export function AjusteEntregaContratada({ obraId, data }: { obraId: string; data: string }) {
+  const [resultado, acao, pendente] = useActionState(ajustarEntregaContratadaObra, null);
+  const enviar = useEnvioSemReset(acao);
+  return (
+    <details className="group w-full min-w-0 rounded-lg border border-zinc-200 bg-zinc-50/60 text-sm">
+      <summary className="cursor-pointer list-none px-3 py-2 font-medium text-zinc-800 select-none group-open:border-b group-open:border-zinc-200">
+        <span className="inline-block transition-transform group-open:rotate-90">›</span> Ajustar entrega contratada
+      </summary>
+      <form onSubmit={enviar} className="flex flex-col gap-2 p-3">
+        <input type="hidden" name="obraId" value={obraId} />
+        <label className="flex flex-col gap-1 text-xs text-zinc-600">
+          Nova data
+          <input name="data" type="date" defaultValue={data} required className={CAMPO_TEXTO} />
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-zinc-600">
+          Motivo
+          <textarea name="motivo" required minLength={3} maxLength={500} rows={2} placeholder="Ex.: cliente pediu para adiar a instalação" className={CAMPO_TEXTO} />
+        </label>
+        <Botao type="submit" variante="secundario" disabled={pendente}>
+          {pendente ? "Salvando..." : "Salvar nova data"}
+        </Botao>
+        <Mensagem resultado={resultado} />
+        <Link href="/configuracoes/prazos-obras" className="w-fit text-xs text-zinc-600 underline hover:text-zinc-900">
+          Prazos padrão das etapas
+        </Link>
+      </form>
+    </details>
   );
 }
 

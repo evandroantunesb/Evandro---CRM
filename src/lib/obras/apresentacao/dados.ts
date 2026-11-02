@@ -1,5 +1,6 @@
 import "server-only";
 import type { SupabaseServidor } from "@/lib/supabase/server";
+import { ddmm, montarCronograma, SETOR_ETAPA } from "../cronograma";
 import { carregarDetalheObra } from "../detalhe";
 import { setorConcluido } from "../derivados";
 import { ROTULO_ALERTA_OBRA, ROTULO_SETOR } from "../rotulos";
@@ -18,8 +19,9 @@ export const hojeBrasilia = (agora = new Date()) => new Intl.DateTimeFormat("en-
  * (`obra_dados_comerciais`: admin, vendedor da venda, gestor da equipe dele). Para os demais
  * (operacao, SDR, gestor de outra equipe) o bloco é `sem_permissao` e nenhum valor sai do servidor.
  *
- * Planejamento (prazo, avanço físico, cronograma, custos, margem): o banco ainda não tem. Sem
- * a demonstração local, tudo fica null/vazio. Avanço nunca é derivado do status dos setores.
+ * Cronograma e entrega contratada: sempre do banco (`cronograma_obra`, que devolve zero linhas a
+ * quem não vê a obra). Avanço físico, custos e margem: o banco ainda não tem; sem a demonstração
+ * local, ficam null/vazios. Avanço nunca é derivado do status dos setores.
  */
 export async function carregarApresentacaoObra(
   supabase: SupabaseServidor,
@@ -50,7 +52,24 @@ export async function carregarApresentacaoObra(
     ...obra.marcos.filter((m) => m.status !== "concluido" && m.status !== "nao_se_aplica").map((m) => `${m.rotulo} (pendente)`),
   ];
 
-  const plano: PlanejamentoObra | null = planejamentoDemonstracao(resumo.clienteNome, hoje, entrada.env);
+  const { data: linhas, error } = await supabase.rpc("cronograma_obra", { p_obra_id: entrada.obraId });
+  if (error) throw error;
+  const entregaContratada = linhas?.[0]?.entrega_contratada ?? null;
+  const responsavel = new Map(setores.map((s) => [s.setor, s.responsavel]));
+  const cronograma = entregaContratada
+    ? montarCronograma(linhas ?? [], {
+        hoje,
+        entregaContratada,
+        subtitulo: (etapa) => {
+          const setor = SETOR_ETAPA[etapa];
+          if (etapa === "conexao") return `${ROTULO_SETOR[setor]} · contratada ${ddmm(entregaContratada)}`;
+          const nome = responsavel.get(setor);
+          return nome ? `${ROTULO_SETOR[setor]} · ${nome}` : ROTULO_SETOR[setor];
+        },
+      })
+    : null;
+
+  const plano: PlanejamentoObra | null = planejamentoDemonstracao(resumo.clienteNome, entrada.env);
   // Só o caminho comercial consulta o valor vendido, e a RLS devolve a linha apenas a quem pode ver.
   const podeVerDinheiro = obra.valorVendido !== null;
 
@@ -71,9 +90,10 @@ export async function carregarApresentacaoObra(
     setores,
     pendencias,
     proximasEntregas,
-    prazo: plano?.prazo ?? null,
+    entregaContratada,
+    entregaPrevista: cronograma?.entregaPrevista ?? null,
     avancoFisico: plano?.avancoFisico ?? null,
-    cronograma: plano && plano.cronograma.length > 0 ? plano.cronograma : null,
+    cronograma,
     financeiro,
     demonstracao: plano !== null,
   };

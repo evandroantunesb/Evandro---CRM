@@ -46,6 +46,8 @@ const ROTULO_TIPO: Record<string, string> = {
   engenharia_concluida_excecao: "Engenharia concluída sem conexão",
   passo_engenharia_registrado: "Passo da Engenharia",
   enquadramento_engenharia_salvo: "Enquadramento salvo",
+  entrega_contratada_ajustada: "Entrega contratada ajustada",
+  entrega_material_prevista: "Previsão de entrega do material",
 };
 
 // Perguntas do enquadramento (mesmas de `engenharia-enquadramento-regras`, sem importar regra de tela).
@@ -133,7 +135,8 @@ function descreverFluxo(setor: string | null, dados: Registro | null): string {
     const conhecido = (c: unknown) => (ehSetorFluxo(setor) && typeof c === "string" && STATUS_POR_SETOR[setor].includes(c) ? rotuloStatus(setor, c) : null);
     const rotuloDe = conhecido(de);
     const rotuloPara = conhecido(para);
-    if (rotuloDe && rotuloPara) return `Status: ${rotuloDe} → ${rotuloPara}`;
+    const deduzida = ler(dados, "data_deduzida") === true ? " (data deduzida na migração: a instalação já tinha começado)" : "";
+    if (rotuloDe && rotuloPara) return `Status: ${rotuloDe} → ${rotuloPara}${deduzida}`;
     if (rotuloPara) return `Status alterado para ${rotuloPara}`;
     return "Status alterado";
   }
@@ -264,9 +267,24 @@ function descrever(linha: LinhaHistoricoObra, nomes: ReadonlyMap<string, string>
       const acao = rotulo(ROTULO_ACAO_PASSO, ler(dados, "acao"));
       return acao ? `${nome}: ${acao}` : nome;
     }
+    // O motivo do ajuste é texto livre: não aparece.
+    case "entrega_contratada_ajustada": {
+      const de = dataHistorico(ler(dados, "de"));
+      const para = dataHistorico(ler(dados, "para"));
+      return de && para ? `${de} → ${para}` : "Data alterada";
+    }
+    case "entrega_material_prevista": {
+      const para = dataHistorico(ler(dados, "para"));
+      return para ? `Previsão: ${para}` : "Previsão removida";
+    }
     default:
       return "Evento registrado";
   }
+}
+
+/** Data AAAA-MM-DD do histórico em DD/MM/AAAA; qualquer outro valor é ignorado. */
+function dataHistorico(v: unknown): string | null {
+  return typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? `${v.slice(8, 10)}/${v.slice(5, 7)}/${v.slice(0, 4)}` : null;
 }
 
 const instante = (iso: string): number => {

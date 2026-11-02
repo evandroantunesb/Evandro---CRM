@@ -54,7 +54,7 @@ Este arquivo contém só regras duráveis. Estado atual em `docs/PROJECT_STATUS.
 
 - **Português** é o idioma padrão do produto (interface, rotas, nomes, commits) e da comunicação com o Evandro.
 - Mobile é prioridade; reutilize `src/components/ui.tsx`.
-- **Identidade visual (não alterar):** Carvão `#0F0F10`, Dourado Solar `#D4AF37`, Off-white `#FAF8F3`, Cinza `#6B7280`, Cinza claro `#E5E7EB` (`src/app/globals.css`); Manrope nos títulos, Inter nos textos; logo em `src/components/marca.tsx` + `public/marca/`. Verde só no WhatsApp, vermelho só para perda e erro. **Exceção (só no módulo de gamificação — `/gamificacao` e `/configuracoes/{metas,comissoes,resgates}`):** tema escuro, verde como cor contextual principal, dourado reservado a prestígio/conquistas, vermelho limitado a alertas.
+- **Identidade visual (não alterar):** Carvão `#0F0F10`, Dourado Solar `#D4AF37`, Off-white `#FAF8F3`, Cinza `#6B7280`, Cinza claro `#E5E7EB` (`src/app/globals.css`); Manrope nos títulos, Inter nos textos; logo em `src/components/marca.tsx` + `public/marca/`. Verde só no WhatsApp, vermelho só para perda e erro. **Exceção (só no módulo de gamificação — `/gamificacao` e `/configuracoes/{metas,comissoes,resgates}`):** tema escuro, verde como cor contextual principal, dourado reservado a prestígio/conquistas, vermelho limitado a alertas. **Exceção em Obras (prazo e semáforo, decisão de 02/11/2026):** verde `energia` (`#1f7a4d`) para no prazo, dourado para atenção e vermelho `erro` (`#b42318`) para atraso ou margem negativa.
 - Respostas objetivas: o que mudou, arquivos, testes feitos e pendências.
 
 ## Andamento atual (27/10/2026, a pedido do Evandro)
