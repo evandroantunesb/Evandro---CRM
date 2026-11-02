@@ -1039,6 +1039,77 @@ export type Database = {
           },
         ];
       };
+      descontos_solicitacoes: {
+        Row: {
+          created_at: string;
+          decidido_em: string | null;
+          decidido_por: string | null;
+          empresa_id: string;
+          id: string;
+          motivo: string;
+          motivo_decisao: string | null;
+          negocio_id: string;
+          percentual: number;
+          solicitado_por: string;
+          status: string;
+        };
+        Insert: {
+          created_at?: string;
+          decidido_em?: string | null;
+          decidido_por?: string | null;
+          empresa_id: string;
+          id?: string;
+          motivo: string;
+          motivo_decisao?: string | null;
+          negocio_id: string;
+          percentual: number;
+          solicitado_por: string;
+          status?: string;
+        };
+        Update: {
+          created_at?: string;
+          decidido_em?: string | null;
+          decidido_por?: string | null;
+          empresa_id?: string;
+          id?: string;
+          motivo?: string;
+          motivo_decisao?: string | null;
+          negocio_id?: string;
+          percentual?: number;
+          solicitado_por?: string;
+          status?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "descontos_solicitacoes_decidido_por_fkey";
+            columns: ["decidido_por"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "descontos_solicitacoes_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "descontos_solicitacoes_negocio_id_fkey";
+            columns: ["negocio_id"];
+            isOneToOne: false;
+            referencedRelation: "negocios";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "descontos_solicitacoes_solicitado_por_fkey";
+            columns: ["solicitado_por"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       empresa_feriados: {
         Row: {
           created_at: string;
@@ -5706,6 +5777,10 @@ export type Database = {
         Args: { p_automatico: boolean; p_id: string; p_membro_final_id: string };
         Returns: undefined;
       };
+      decidir_desconto: {
+        Args: { p_aprovar: boolean; p_id: string; p_motivo: string };
+        Returns: undefined;
+      };
       definir_aguardando_fluxo_obra: {
         Args: {
           p_aguardando?: Database["public"]["Enums"]["aguardando_obra"];
@@ -5935,6 +6010,7 @@ export type Database = {
         Args: { p_condicoes: Json; p_enquadramento: Json };
         Returns: boolean;
       };
+      limite_desconto_membro: { Args: { p_membro_id: string }; Returns: number };
       marcar_parado_fluxo_obra: {
         Args: {
           p_motivo?: string;
@@ -5961,6 +6037,7 @@ export type Database = {
           membro_id: string;
         }[];
       };
+      meu_limite_desconto: { Args: { p_empresa_id: string }; Returns: number };
       meu_membro_id: { Args: { p_empresa_id: string }; Returns: string };
       obra_da_pasta_engenharia: { Args: { p_caminho: string }; Returns: string };
       obra_snapshot_comercial: { Args: { p_negocio_id: string }; Returns: Json };
@@ -6023,6 +6100,13 @@ export type Database = {
         }[];
       };
       pendencias_contrato_contato: { Args: { p_contato_id: string }; Returns: string[] };
+      pode_decidir_desconto: {
+        Args: {
+          p_membro_id: string;
+          p_solicitacao: Database["public"]["Tables"]["descontos_solicitacoes"]["Row"];
+        };
+        Returns: boolean;
+      };
       pode_enviar_pasta_engenharia: { Args: { p_caminho: string }; Returns: boolean };
       pode_enviar_pasta_tarefa_setor: { Args: { p_caminho: string }; Returns: boolean };
       pode_enviar_pasta_vistoria: { Args: { p_caminho: string }; Returns: boolean };
@@ -6051,6 +6135,7 @@ export type Database = {
       pode_ver_tarefa_setor: { Args: { p_tarefa_id: string }; Returns: boolean };
       pode_ver_valor_vendido_obra: { Args: { p_obra_id: string }; Returns: boolean };
       pode_ver_vistoria_obra: { Args: { p_obra_id: string }; Returns: boolean };
+      posso_decidir_desconto: { Args: { p_id: string }; Returns: boolean };
       prazo_dias_restantes: {
         Args: { p_empresa_id: string; p_hoje: string; p_limite: string };
         Returns: number;
@@ -6236,6 +6321,10 @@ export type Database = {
           solicitada_em: string;
           status: string;
         }[];
+      };
+      solicitar_desconto: {
+        Args: { p_motivo: string; p_negocio_id: string; p_percentual: number };
+        Returns: string;
       };
       solicitar_resgate: {
         Args: { p_recompensa_id: string };
