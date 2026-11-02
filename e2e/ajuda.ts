@@ -140,9 +140,9 @@ export async function preencherNovoNegocio(page: Page, nome: string, whatsapp: s
 export const escolher = (page: Page, grupo: string, opcao: string | RegExp) =>
   page.getByRole("group", { name: grupo, exact: true }).getByRole("button", { name: opcao }).click();
 
-/** Condições de pagamento da proposta: recolhidas quando o modelo da empresa já tem texto ("Editar condições"). */
+/** Condições de pagamento da proposta: "À vista" já vem marcado (sem desconto); o texto vai na observação. */
 export async function preencherCondicoes(page: Page, texto: string) {
-  const editar = page.getByText("Editar condições", { exact: true });
-  if (await editar.isVisible()) await editar.click();
-  await page.getByLabel("Condições de pagamento").fill(texto);
+  const condicoes = page.getByTestId("condicoes-pagamento");
+  await expect(condicoes.getByRole("checkbox", { name: "À vista" })).toBeChecked();
+  await condicoes.getByLabel("Observação (opcional)", { exact: true }).fill(texto);
 }
