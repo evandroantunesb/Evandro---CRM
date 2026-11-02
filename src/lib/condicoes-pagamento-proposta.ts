@@ -46,7 +46,8 @@ export const ORIENTACAO_APROVACAO = "Peça aprovação no cartão Desconto à vi
 
 /** O que a tela envia (JSON num campo escondido). Números como digitados ("1.234,56"); o servidor lê e confere tudo. */
 export const esquemaEntradaCondicoes = z.object({
-  aVista: z.object({ desconto: z.string().max(20) }).nullable(),
+  // Desconto em % ou o valor à vista em R$ (o vendedor digita um dos dois; com `valor` preenchido, vale o valor).
+  aVista: z.object({ desconto: z.string().max(20), valor: z.string().max(30).optional() }).nullable(),
   parcelado: z
     .object({ meio: z.enum(MEIOS_PARCELAMENTO), parcelas: z.array(z.number().int()).max(MAX_PARCELAS), repassarTaxas: z.boolean() })
     .nullable(),
@@ -154,6 +155,12 @@ export function valorParcela(preco: number, parcelas: number, taxaPercentual: nu
 /** Valor à vista com o desconto, em centavos arredondados. */
 export const valorAVista = (preco: number, descontoPercentual: number) => emReais(Math.round(preco * (100 - descontoPercentual)));
 
+/**
+ * Desconto (%) de um valor à vista digitado em reais, arredondado PARA CIMA em 2 casas: é o percentual a pedir para
+ * que a aprovação cubra o valor digitado.
+ */
+export const descontoDoValor = (preco: number, valor: number) => Math.ceil(Math.round((1 - valor / preco) * 1000000) / 100) / 100;
+
 /** Desconto (%) que uma soma abaixo do preço representa, com 1 casa (só para exibir). */
 export const descontoDaSoma = (preco: number, soma: number) => Math.round((1 - soma / preco) * 1000) / 10;
 
@@ -182,7 +189,13 @@ export function montarCondicoesPagamento(entrada: EntradaCondicoes, regras: Regr
     `Desconto de ${formatarPercentual(percentual)}% passa do permitido neste negócio (${formatarPercentual(maxDesconto)}%). ${ORIENTACAO_APROVACAO}`;
 
   let aVista: CondicoesEmitidas["aVista"] = null;
-  if (entrada.aVista) {
+  if (entrada.aVista?.valor?.trim()) {
+    // Valor à vista digitado em reais: grava o valor exato e o desconto que ele representa (2 casas, só para exibir).
+    const v = lerNumeroBr(entrada.aVista.valor);
+    if (v == null || !Number.isFinite(v) || centavos(v) <= 0 || centavos(v) > centavos(preco)) p.push("À vista: informe um valor maior que zero e até o preço.");
+    else if (centavos(v) < Math.round(preco * (100 - maxDesconto))) p.push(passouDoLimite(descontoDoValor(preco, v)));
+    else aVista = { descontoPercentual: Math.round((1 - centavos(v) / centavos(preco)) * 10000) / 100, valor: emReais(centavos(v)) };
+  } else if (entrada.aVista) {
     const d = lerNumeroBr(entrada.aVista.desconto) ?? 0;
     if (!Number.isFinite(d) || d < 0 || d >= 100) p.push("À vista: informe um desconto de 0 a 99,99%.");
     else {

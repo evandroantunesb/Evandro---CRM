@@ -11,6 +11,7 @@ import {
   ROTULO_FORMA,
   ROTULO_MOMENTO,
   descontoDaSoma,
+  descontoDoValor,
   descontoPermitido,
   valorAVista,
   valorParcela,
@@ -18,11 +19,14 @@ import {
   type RegrasCondicoes,
 } from "@/lib/condicoes-pagamento-proposta";
 import { formatarMoeda, lerNumeroBr } from "@/lib/formatacao";
+import { AvisoDesconto, SolicitarAoGestor } from "./solicitar-ao-gestor";
 
 type Financiamento = NonNullable<EntradaCondicoes["financiamento"]>;
 type Parte = NonNullable<EntradaCondicoes["personalizado"]>["partes"][number];
 
 const percentual = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+/** "28.500,00": formato que `lerNumeroBr` lê de volta. */
+const reaisEditaveis = (n: number) => n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const opcaoVazia = (): Financiamento["opcoes"][number] => ({ entrada: "", parcelas: "", valorParcela: "", carenciaDias: 90 });
 const parteVazia = (): Parte => ({ valor: "", forma: "pix", momento: "assinatura", data: "", observacao: "" });
 
@@ -32,11 +36,13 @@ const parteVazia = (): Parte => ({ valor: "", forma: "pix", momento: "assinatura
  * tudo de novo na emissão (`montarCondicoesPagamento`).
  */
 export function CondicoesPagamento({
+  negocioId,
   preco,
   regras,
   observacaoSugerida,
   hoje,
 }: {
+  negocioId: string;
   /** Valor do negócio (preço da proposta); nulo = ainda sem valor (a emissão aponta a pendência). */
   preco: number | null;
   regras: RegrasCondicoes;
@@ -49,6 +55,8 @@ export function CondicoesPagamento({
 
   const [aVista, setAVista] = useState(true);
   const [desconto, setDesconto] = useState("0");
+  // Valor à vista digitado em R$ (nulo = calculado a partir do %).
+  const [valorDigitado, setValorDigitado] = useState<string | null>(null);
   const [parcelado, setParcelado] = useState(meiosDisponiveis.length > 0);
   const [meio, setMeio] = useState<MeioParcelamento>(meiosDisponiveis[0] ?? "cartao");
   // Por meio: as parcelas marcadas para aparecer (padrão: todas as configuradas).
@@ -63,7 +71,7 @@ export function CondicoesPagamento({
   const [observacao, setObservacao] = useState(observacaoSugerida.trim().slice(0, LIMITES_CONDICOES.observacao));
 
   const entrada: EntradaCondicoes = {
-    aVista: aVista ? { desconto } : null,
+    aVista: aVista ? { desconto, ...(valorDigitado != null ? { valor: valorDigitado } : {}) } : null,
     parcelado: parcelado ? { meio, parcelas: parcelasMarcadas[meio], repassarTaxas } : null,
     financiamento: financiamento ? dadosFinanciamento : null,
     personalizado: personalizado && regras.personalizadoAtivo ? { partes } : null,
@@ -71,7 +79,9 @@ export function CondicoesPagamento({
   };
 
   const temPreco = preco != null && preco > 0;
-  const descontoLido = lerNumeroBr(desconto) ?? 0;
+  const descontoBruto = lerNumeroBr(desconto) ?? 0;
+  const descontoValido = Number.isFinite(descontoBruto) && descontoBruto >= 0 && descontoBruto < 100;
+  const descontoLido = descontoValido ? Math.round(descontoBruto * 100) / 100 : 0;
   const somaPartes = partes.reduce((s, p) => s + Math.round((lerNumeroBr(p.valor) || 0) * 100), 0) / 100;
   const nenhuma = !aVista && !parcelado && !financiamento && !personalizado;
 
@@ -89,20 +99,50 @@ export function CondicoesPagamento({
       </p>
 
       <Modalidade rotulo="À vista" marcada={aVista} aoMarcar={setAVista}>
+        {/* Dois campos ligados: digitar um calcula o outro. Vale o último digitado (o valor em R$ vai exato). */}
         <div className="flex flex-wrap items-end gap-3">
           <label className="flex flex-col gap-1 text-sm">
             <span className="font-medium text-texto-2">Desconto (%)</span>
-            <input value={desconto} onChange={(e) => setDesconto(e.target.value)} inputMode="decimal" className={`${CLASSE_ENTRADA} w-24`} />
+            <input
+              value={desconto}
+              onChange={(e) => {
+                setDesconto(e.target.value);
+                setValorDigitado(null);
+              }}
+              inputMode="decimal"
+              className={`${CLASSE_ENTRADA} w-24`}
+            />
           </label>
-          {temPreco && Number.isFinite(descontoLido) && descontoLido >= 0 && descontoLido < 100 && (
-            <span className="pb-2 text-sm text-texto">→ {formatarMoeda(valorAVista(preco, Math.round(descontoLido * 100) / 100))}</span>
-          )}
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-medium text-texto-2">Valor à vista (R$)</span>
+            <input
+              value={valorDigitado ?? (temPreco && descontoValido ? reaisEditaveis(valorAVista(preco, descontoLido)) : "")}
+              onChange={(e) => {
+                const texto = e.target.value;
+                setValorDigitado(texto);
+                const v = lerNumeroBr(texto);
+                if (temPreco && v != null && Number.isFinite(v) && v > 0 && v <= preco) setDesconto(percentual(descontoDoValor(preco, v)));
+              }}
+              inputMode="decimal"
+              className={`${CLASSE_ENTRADA} w-36`}
+            />
+          </label>
         </div>
         <p className="text-xs text-texto-2">
           Seu limite: {percentual(regras.limiteDesconto)}%
           {regras.descontoAprovado > 0 && ` · Aprovado neste negócio: ${percentual(regras.descontoAprovado)}%`}
         </p>
-        {descontoLido > maxDesconto && <AvisoDesconto />}
+        {descontoValido && descontoLido > maxDesconto && (
+          <SolicitarAoGestor
+            negocioId={negocioId}
+            desconto={descontoLido}
+            maximo={maxDesconto}
+            aoUsarMaximo={() => {
+              setDesconto(percentual(maxDesconto));
+              setValorDigitado(null);
+            }}
+          />
+        )}
       </Modalidade>
 
       {meiosDisponiveis.length > 0 && (
@@ -292,18 +332,6 @@ function Modalidade({ rotulo, marcada, aoMarcar, children }: { rotulo: string; m
       </label>
       {marcada && <div className="flex flex-col gap-2 pl-6">{children}</div>}
     </div>
-  );
-}
-
-function AvisoDesconto() {
-  return (
-    <p role="status" className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900">
-      Esse desconto passa do permitido neste negócio. Peça aprovação no cartão{" "}
-      <a href="#desconto" className="font-medium underline">
-        Desconto à vista
-      </a>
-      .
-    </p>
   );
 }
 
