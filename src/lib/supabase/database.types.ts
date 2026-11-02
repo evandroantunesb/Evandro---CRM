@@ -600,6 +600,54 @@ export type Database = {
           },
         ];
       };
+      condicoes_pagamento_preferencias: {
+        Row: {
+          atualizado_por: string | null;
+          created_at: string;
+          desconto_max_gestor: number;
+          desconto_max_vendedor: number;
+          empresa_id: string;
+          id: string;
+          personalizado_ativo: boolean;
+          updated_at: string;
+        };
+        Insert: {
+          atualizado_por?: string | null;
+          created_at?: string;
+          desconto_max_gestor?: number;
+          desconto_max_vendedor?: number;
+          empresa_id: string;
+          id?: string;
+          personalizado_ativo?: boolean;
+          updated_at?: string;
+        };
+        Update: {
+          atualizado_por?: string | null;
+          created_at?: string;
+          desconto_max_gestor?: number;
+          desconto_max_vendedor?: number;
+          empresa_id?: string;
+          id?: string;
+          personalizado_ativo?: boolean;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "condicoes_pagamento_preferencias_atualizado_por_fkey";
+            columns: ["atualizado_por"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "condicoes_pagamento_preferencias_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: true;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       confirmacoes_pagamento: {
         Row: {
           beneficiario_membro_id: string;
@@ -5334,6 +5382,54 @@ export type Database = {
         };
         Relationships: [];
       };
+      taxas_parcelamento: {
+        Row: {
+          atualizado_por: string | null;
+          created_at: string;
+          empresa_id: string;
+          id: string;
+          meio: string;
+          parcelas: number;
+          taxa_percentual: number;
+          updated_at: string;
+        };
+        Insert: {
+          atualizado_por?: string | null;
+          created_at?: string;
+          empresa_id: string;
+          id?: string;
+          meio: string;
+          parcelas: number;
+          taxa_percentual: number;
+          updated_at?: string;
+        };
+        Update: {
+          atualizado_por?: string | null;
+          created_at?: string;
+          empresa_id?: string;
+          id?: string;
+          meio?: string;
+          parcelas?: number;
+          taxa_percentual?: number;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "taxas_parcelamento_atualizado_por_fkey";
+            columns: ["atualizado_por"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "taxas_parcelamento_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -6111,6 +6207,10 @@ export type Database = {
       };
       salvar_regras_temperatura: {
         Args: { p_empresa_id: string; p_regras: Json };
+        Returns: undefined;
+      };
+      salvar_taxas_parcelamento: {
+        Args: { p_empresa_id: string; p_meio: string; p_taxas: Json };
         Returns: undefined;
       };
       semear_regras_eletroposto: { Args: { p_empresa_id: string }; Returns: undefined };

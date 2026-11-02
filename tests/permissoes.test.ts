@@ -45,6 +45,7 @@ const MATRIZ: Record<string, string[]> = {
   REGRAS_TEMPERATURA: ["admin", "gestor"],
   // Validade padrão da proposta: mesma barreira das políticas de `proposta_preferencias`.
   VALIDADE_PROPOSTA: ["admin", "gestor"],
+  CONDICOES_PAGAMENTO: ["admin", "gestor"],
   GAMIFICACAO: ["admin", "gestor", "vendedor", "sdr"],
   PARTICIPANTES_GAMIFICACAO: ["vendedor", "sdr"],
   OBRAS: ["admin", "gestor", "vendedor", "sdr", "operacao"],

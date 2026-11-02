@@ -107,6 +107,8 @@ export const GESTAO_COMERCIAL = ["admin", "gestor"] as const satisfies ListaPape
 export const REGRAS_TEMPERATURA = ["admin", "gestor"] as const satisfies ListaPapeis;
 // Validade padrão da proposta: mesma barreira das políticas de `proposta_preferencias`.
 export const VALIDADE_PROPOSTA = ["admin", "gestor"] as const satisfies ListaPapeis;
+// Condições de pagamento (descontos, Personalizado, parcelas e taxas): mesma barreira das políticas no banco.
+export const CONDICOES_PAGAMENTO = ["admin", "gestor"] as const satisfies ListaPapeis;
 
 // --- Obras -------------------------------------------------------------------
 
