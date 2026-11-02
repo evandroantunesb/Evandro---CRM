@@ -34,7 +34,10 @@ async function dadosAtuais(versao: number) {
     componentes: comps ?? [],
     produtividadeConfirmada: produtividadeConfirmada(par),
     validadeAte: "2099-12-31",
-    condicoesPagamento: conteudo.condicoes || "À vista por Pix ou transferência\nCartão em até 12x",
+    condicoes: {
+      entrada: { aVista: { desconto: "0" }, parcelado: null, financiamento: null, personalizado: null, observacao: conteudo.condicoes },
+      regras: { personalizadoAtivo: true, taxas: { cartao: [], boleto: [] }, limiteDesconto: 0, descontoAprovado: 0 },
+    },
     conteudo,
     identidade: { nomeExibicao: "Solar Teste", corPrimaria: "#0F0F10", corDestaque: "#D4AF37", whatsapp: "45999990000" },
     versao,

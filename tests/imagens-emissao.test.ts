@@ -78,7 +78,10 @@ describe("foto da capa: fallback definido", () => {
       ],
       produtividadeConfirmada: null,
       validadeAte: "2026-11-30",
-      condicoesPagamento: "À vista por Pix\nCartão em até 12x",
+      condicoes: {
+        entrada: { aVista: { desconto: "0" }, parcelado: null, financiamento: null, personalizado: null, observacao: "" },
+        regras: { personalizadoAtivo: true, taxas: { cartao: [], boleto: [] }, limiteDesconto: 0, descontoAprovado: 0 },
+      },
       conteudo: { incluso: null, exclusos: null, garantias: null, etapas: null },
       identidade: { nomeExibicao: "Solar Teste", corPrimaria: "#0E2A47", corDestaque: "#F2A900", whatsapp: "45999990000" },
       versao: 1,

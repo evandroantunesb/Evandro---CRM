@@ -223,7 +223,7 @@ test.describe("calculadora GD II integrada", () => {
     await pagina.goto(`/proposta/${v1.token}`);
     await expect(pagina.getByRole("heading", { name: "Cliente GD II Copel (fictício)" })).toBeVisible();
     await expect(pagina.getByText("300 kWh/mês", { exact: true })).toBeVisible();
-    await expect(pagina.getByText("R$ 19.900,00")).toBeVisible();
+    await expect(pagina.getByTestId("preco-proposta")).toHaveText("R$ 19.900,00");
     await anonimo.close();
     const pdf2 = new Uint8Array(await (await request.get(`/proposta/${v1.token}/pdf`)).body());
     expect(sha256(pdf2)).toBe(v1.pdf_sha256);

@@ -5,7 +5,9 @@ import { useActionState, useState } from "react";
 import { Botao, Campo, Mensagem } from "@/components/ui";
 import { emitirPropostaSimples } from "@/lib/acoes/propostas-emissoes";
 import { formatarDataHora, formatarDataIso } from "@/lib/formatacao";
-import { LIMITES_SIMPLES, somarDias, type ConteudoDoModelo } from "@/lib/propostas/proposta-simples";
+import type { RegrasCondicoes } from "@/lib/condicoes-pagamento-proposta";
+import { somarDias, type ConteudoDoModelo } from "@/lib/propostas/proposta-simples";
+import { CondicoesPagamento } from "./condicoes-pagamento";
 
 export type EmissaoListada = { versao: number; token: string; validadeAte: string; emitidaEm: string };
 
@@ -15,8 +17,11 @@ export function EmitirProposta({
   validadePadraoDias,
   podeAjustarValidade = false,
   conteudoModelo,
+  preco,
+  regrasCondicoes,
   geracaoConfirmada,
   bloqueio,
+  avisoValor = null,
   emissoes,
   siteUrl,
 }: {
@@ -27,12 +32,18 @@ export function EmitirProposta({
   validadePadraoDias: number;
   /** Admin e gestor: a dica leva à tela onde se muda a validade padrão. */
   podeAjustarValidade?: boolean;
-  /** Conteúdo que a empresa escreveu no modelo padrão publicado (só leitura): sugestão de condições e blocos com conteúdo. */
+  /** Conteúdo que a empresa escreveu no modelo padrão publicado (só leitura): observação sugerida das condições e blocos com conteúdo. */
   conteudoModelo: ConteudoDoModelo;
+  /** Valor do negócio: base das contas das condições de pagamento. */
+  preco: number | null;
+  /** O que a empresa permite a quem emite nas condições de pagamento (o servidor confere de novo). */
+  regrasCondicoes: RegrasCondicoes;
   /** O admin confirmou a produtividade atual da calculadora: só então a proposta mostra a geração estimada. */
   geracaoConfirmada: boolean;
   /** Motivo pelo qual não dá para emitir agora (o servidor confere de novo); nulo = liberada. */
   bloqueio: string | null;
+  /** O valor do negócio já foi ajustado por uma condição escolhida no contrato: conferir o preço antes de emitir. */
+  avisoValor?: string | null;
   emissoes: EmissaoListada[];
   siteUrl: string;
 }) {
@@ -53,6 +64,11 @@ export function EmitirProposta({
             {bloqueio}
           </p>
         )}
+        {avisoValor && (
+          <p role="status" data-testid="aviso-valor-condicao" className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            {avisoValor}
+          </p>
+        )}
         <Campo
           rotulo="Válida até"
           type="date"
@@ -69,7 +85,7 @@ export function EmitirProposta({
             </Link>
           )}
         </p>
-        <CondicoesPagamento sugeridas={conteudoModelo.condicoes} />
+        <CondicoesPagamento negocioId={negocioId} preco={preco} regras={regrasCondicoes} observacaoSugerida={conteudoModelo.condicoes} hoje={hoje} />
         <ul className="flex flex-col gap-1 rounded-md bg-zinc-50 px-3 py-2 text-xs text-zinc-600" data-testid="conteudo-confirmado">
           <li data-testid="geracao-status">
             Geração estimada:{" "}
@@ -141,51 +157,6 @@ export function EmitirProposta({
           })}
         </ul>
       )}
-    </div>
-  );
-}
-
-/**
- * Condições de pagamento: com o texto do modelo da empresa, aparecem resumidas e recolhidas ("Editar
- * condições"); sem texto no modelo, o campo já vem aberto para preencher. O que estiver no campo na
- * emissão fica congelado na versão (o campo segue no formulário mesmo recolhido).
- */
-function CondicoesPagamento({ sugeridas }: { sugeridas: string }) {
-  const linhas = sugeridas
-    .split("\n")
-    .map((l) => l.trim())
-    .filter(Boolean);
-  const campo = (
-    <label className="flex flex-col gap-1 text-sm">
-      <span className="font-medium text-zinc-700">Condições de pagamento</span>
-      <textarea
-        name="condicoesPagamento"
-        defaultValue={sugeridas}
-        rows={3}
-        required
-        maxLength={LIMITES_SIMPLES.condicoes}
-        className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-carvao outline-none focus:border-dourado focus:ring-2 focus:ring-dourado/20"
-      />
-      <span className="text-xs text-zinc-500">
-        Uma opção por linha: cada linha vira um item da lista na proposta. O que estiver aqui na emissão fica congelado na versão enviada.
-      </span>
-    </label>
-  );
-  if (linhas.length === 0) return campo;
-  return (
-    <div className="flex flex-col gap-2 rounded-lg border border-linha px-3 py-2 text-sm" data-testid="condicoes-resumo">
-      <span className="font-medium text-texto">Condições de pagamento (do modelo da empresa)</span>
-      <ul className="list-disc pl-5 text-texto-2">
-        {linhas.map((l, i) => (
-          <li key={i}>{l}</li>
-        ))}
-      </ul>
-      <details className="group">
-        <summary className="w-fit cursor-pointer text-sm font-medium text-dourado-texto underline-offset-2 hover:underline">
-          Editar condições
-        </summary>
-        <div className="pt-2">{campo}</div>
-      </details>
     </div>
   );
 }

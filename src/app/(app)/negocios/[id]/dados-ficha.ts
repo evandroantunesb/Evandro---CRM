@@ -1,3 +1,6 @@
+import { lerCondicaoRegistrada } from "@/lib/condicao-escolhida";
+import { hojeEmSaoPaulo } from "@/lib/formatacao";
+import { carregarEscolhaCondicao, carregarRegrasCondicoes } from "@/lib/condicoes-pagamento-dados";
 import { carregarDescontoNegocio } from "@/lib/descontos";
 import type { Vinculo } from "@/lib/sessao";
 import { notFound } from "next/navigation";
@@ -148,6 +151,8 @@ export async function carregarFicha(atual: Vinculo, id: string, abaParam: string
         .maybeSingle()
     : { data: null };
   const geracaoConfirmada = produtividadeConfirmada(parametrosEmissao) != null;
+  const regrasCondicoes = emissoesRes && !emissoesAusente ? await carregarRegrasCondicoes(supabase, atual.empresaId, id) : null;
+  if (emissoesRes && !emissoesAusente && !regrasCondicoes) throw new Error("Não foi possível ler as condições de pagamento.");
   const { data: aberturas } = proposta
     ? await supabase
         .from("propostas_aberturas")
@@ -158,7 +163,7 @@ export async function carregarFicha(atual: Vinculo, id: string, abaParam: string
 
   const { data: contrato } = await supabase
     .from("contratos")
-    .select("id, token, status, responsavel_assinatura_id")
+    .select("id, token, status, responsavel_assinatura_id, condicao_pagamento")
     .eq("negocio_id", id)
     .maybeSingle();
   const { data: statusPagamento } = contrato
@@ -205,6 +210,11 @@ export async function carregarFicha(atual: Vinculo, id: string, abaParam: string
     !(situacaoPagamentoSolo === "permitido" && statusPagamento === "pendente");
 
   const desconto = veContratoEPagamento ? await carregarDescontoNegocio(supabase, atual.empresaId, id) : null;
+  // Condição escolhida pelo cliente: opções da última proposta por modalidade (PR 4) e a já registrada no contrato.
+  const escolhaRes = veContratoEPagamento ? await carregarEscolhaCondicao(supabase, atual.empresaId, id, hojeEmSaoPaulo()) : null;
+  if (escolhaRes?.erro) throw new Error("Não foi possível ler a proposta do negócio.");
+  const escolhaCondicao = escolhaRes?.escolha ?? null;
+  const condicaoRegistrada = lerCondicaoRegistrada(contrato?.condicao_pagamento);
 
   const { data: ultimoHandoff } = await supabase
     .from("handoffs")
@@ -230,6 +240,11 @@ export async function carregarFicha(atual: Vinculo, id: string, abaParam: string
   // Resultado técnico incompleto também fica de fora: não tem payback para atualizar com o preço.
   const precoDesatualizado =
     !!calculo && !calculoEhLegado(calculo) && !calculoEhIncompleto(calculo) && precoDoCalculoDesatualizado(calculo.kit_preco, negocio.valor);
+  // No contrato, com condição a escolher, a referência é o preço da proposta: o valor do negócio pode já ter mudado
+  // pela condição registrada (mesma regra de contratos-geracao.ts).
+  const precoContratoDesatualizado = escolhaCondicao
+    ? !!calculo && !calculoEhLegado(calculo) && !calculoEhIncompleto(calculo) && precoDoCalculoDesatualizado(calculo.kit_preco, escolhaCondicao.emissao.preco)
+    : precoDesatualizado;
   // Vigência do cálculo salvo: toda linha existente é legada (fórmula antiga, não validada) e nunca vale como resultado
   // atual. Falha de leitura também nunca vale como vigente: cai no motivo `legado`, que vale para toda linha hoje.
   const [carregamento, contextoEstimativa, { data: historicoCalculo }] = await Promise.all([
@@ -322,9 +337,9 @@ export async function carregarFicha(atual: Vinculo, id: string, abaParam: string
   return {
     atual, negocio, config, parametros, temperatura, atividades, notas, tarefas, anexos, calculo, conferencia, semArquivo,
     componentes, ehEletroposto, eletroposto, propostaEletroposto, outrosNegocios, eletropostoNaEmpresa, proposta, modelosProposta,
-    emissoesAusente, emissoes, conteudoModelo, validadePadraoDias, geracaoConfirmada, aberturas, contrato, statusPagamento,
+    emissoesAusente, emissoes, conteudoModelo, regrasCondicoes, validadePadraoDias, geracaoConfirmada, aberturas, contrato, statusPagamento,
     registroManualIndisponivel, registrosPagamento, situacaoPagamentoSolo, mostrarPagamentoSolo, mostrarPagamentoPro, ultimoHandoff,
-    podeResponderHandoff, obraDoNegocio, arquivado, precoDesatualizado, vigenciaDaTela, contextoEstimativa, historicoCalculo,
+    podeResponderHandoff, obraDoNegocio, arquivado, precoDesatualizado, precoContratoDesatualizado, escolhaCondicao, condicaoRegistrada, vigenciaDaTela, contextoEstimativa, historicoCalculo,
     bloqueioProposta, bloqueioEmissao, bloqueioContrato, responsavelInativo, cartao, contato, pendenciasCliente, nomes, souAdmin,
     etiquetasMarcadas, etiquetasVisiveis, abas, aba, pedidosSetor, desconto,
   };

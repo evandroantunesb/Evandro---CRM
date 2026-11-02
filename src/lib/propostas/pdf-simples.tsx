@@ -2,7 +2,8 @@ import { Document, Font, Image, Page, StyleSheet, Text, View } from "@react-pdf/
 import { formatarMoeda } from "@/lib/formatacao";
 import { ROTULO_TIPO_COMPONENTE_KIT } from "@/lib/tipos";
 import { FONTES_PDF } from "./fontes-pdf";
-import { dataBr, opcoesDePagamento, textoPremissaGeracao, type DadosEmissaoSimples } from "./proposta-simples";
+import { CondicoesPagamentoPdf } from "./pdf-condicoes";
+import { dataBr, linhasCondicoesPagamento, textoPremissaGeracao, type DadosEmissaoSimples } from "./proposta-simples";
 
 // Manrope nos títulos e Inter nos textos (identidade do Raion), embutidas: nada é buscado na rede na hora de gerar.
 for (const fonte of FONTES_PDF) Font.register({ family: fonte.family, src: fonte.src, fontWeight: fonte.fontWeight });
@@ -249,6 +250,21 @@ function PaginaSistema({ dados, imagens, e, p }: { dados: DadosEmissaoSimples; i
             </View>
           ))}
         </View>
+
+        {/* Garantias junto dos equipamentos: a página de oferta fica livre para as condições de pagamento. */}
+        {dados.comercial.garantias ? (
+          <View style={e.cartao} wrap={false}>
+            <Text style={e.tituloCartao}>Garantias</Text>
+            <View style={e.lista}>
+              {dados.comercial.garantias.map((g, i) => (
+                <View key={i} style={e.itemLista}>
+                  <View style={[e.ponto, { backgroundColor: p.acento }]} />
+                  <Text style={{ flex: 1, fontSize: 9, lineHeight: 1.3 }}>{g}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : null}
       </View>
       <Rodape dados={dados} pagina={2} e={e} />
     </Page>
@@ -259,8 +275,8 @@ function Colunas({ dados, e, p }: { dados: DadosEmissaoSimples; e: ReturnType<ty
   const { incluso, exclusos } = dados.comercial;
   if (!incluso && !exclusos) return null;
   const coluna = (titulo: string, itens: string[], cor: string, fundo: string) => (
-    <View style={{ flex: 1, backgroundColor: fundo, borderWidth: 1, borderColor: p.borda, borderRadius: 8, padding: 11 }}>
-      <Text style={{ fontSize: 8.5, ...NEGRITO, letterSpacing: 0.7, color: cor, marginBottom: 7 }}>{titulo}</Text>
+    <View style={{ flex: 1, backgroundColor: fundo, borderWidth: 1, borderColor: p.borda, borderRadius: 8, padding: 8 }}>
+      <Text style={{ fontSize: 8.5, ...NEGRITO, letterSpacing: 0.7, color: cor, marginBottom: 5 }}>{titulo}</Text>
       <View style={e.lista}>
         {itens.map((item, i) => (
           <View key={i} style={e.itemLista}>
@@ -290,41 +306,29 @@ function PaginaOferta({ dados, imagens, e, p }: { dados: DadosEmissaoSimples; im
       <View style={e.miolo}>
         <Colunas dados={dados} e={e} p={p} />
 
-        {c.garantias ? (
-          <View style={e.cartao} wrap={false}>
-            <Text style={e.tituloCartao}>Garantias</Text>
-            <View style={e.lista}>
-              {c.garantias.map((g, i) => (
-                <View key={i} style={e.itemLista}>
-                  <View style={[e.ponto, { backgroundColor: p.acento }]} />
-                  <Text style={{ flex: 1, fontSize: 9, lineHeight: 1.3 }}>{g}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        ) : null}
-
         <View style={e.cartao} wrap={false}>
-          <Text style={e.tituloCartao}>Investimento</Text>
-          <View style={{ borderWidth: 1, borderColor: p.acento, backgroundColor: p.acentoSuave, borderRadius: 9, padding: 11 }}>
-            <Text style={{ fontSize: 8, ...NEGRITO, letterSpacing: 1, color: p.suave }}>VALOR DA PROPOSTA</Text>
-            <Text style={{ fontSize: 26, ...TITULO, marginTop: 3 }}>{formatarMoeda(dados.preco.valor)}</Text>
+          {/* Valor na faixa do título e condições em largura total: as condições por modalidade cabem nas 3 páginas. */}
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderWidth: 1, borderColor: p.acento, backgroundColor: p.acentoSuave, borderRadius: 9, paddingVertical: 5, paddingHorizontal: 10 }}>
+            <View>
+              <Text style={{ fontSize: 12, ...TITULO }}>Investimento</Text>
+              <Text style={{ fontSize: 7, ...NEGRITO, letterSpacing: 1, color: p.suave, marginTop: 2 }}>VALOR DA PROPOSTA</Text>
+            </View>
+            <Text style={{ fontSize: 22, ...TITULO }}>{formatarMoeda(dados.preco.valor)}</Text>
           </View>
-          {opcoesDePagamento(c.condicoesPagamento).length > 0 ? (
-            <View style={{ marginTop: 10 }}>
-              <Text style={{ fontSize: 8, ...NEGRITO, letterSpacing: 0.8, color: p.acento, marginBottom: 5 }}>CONDIÇÕES DE PAGAMENTO</Text>
-              {opcoesDePagamento(c.condicoesPagamento).length === 1 ? (
-                <Text style={{ fontSize: 9.5, lineHeight: 1.4 }}>{opcoesDePagamento(c.condicoesPagamento)[0]}</Text>
-              ) : (
-                <View style={e.lista}>
-                  {opcoesDePagamento(c.condicoesPagamento).map((opcao, i) => (
-                    <View key={i} style={e.itemLista}>
-                      <View style={[e.ponto, { backgroundColor: p.acento }]} />
-                      <Text style={{ flex: 1, fontSize: 9.5, lineHeight: 1.35 }}>{opcao}</Text>
-                    </View>
-                  ))}
-                </View>
-              )}
+          {dados.esquema === 5 ? (
+            <CondicoesPagamentoPdf condicoes={dados.comercial.condicoesPagamento} p={p} />
+          ) : linhasCondicoesPagamento(dados).length > 0 ? (
+            // Esquema 4 (texto livre): uma opção por linha.
+            <View style={{ marginTop: 7 }}>
+              <Text style={{ fontSize: 7.5, ...NEGRITO, letterSpacing: 0.8, color: p.acento, marginBottom: 4 }}>CONDIÇÕES DE PAGAMENTO</Text>
+              <View style={{ gap: 2.5 }}>
+                {linhasCondicoesPagamento(dados).map((opcao, i) => (
+                  <View key={i} style={e.itemLista}>
+                    <View style={[e.ponto, { backgroundColor: p.acento, marginTop: 3.5 }]} />
+                    <Text style={{ flex: 1, fontSize: 8.5, lineHeight: 1.3 }}>{opcao}</Text>
+                  </View>
+                ))}
+              </View>
             </View>
           ) : null}
         </View>
@@ -342,14 +346,19 @@ function PaginaOferta({ dados, imagens, e, p }: { dados: DadosEmissaoSimples; im
           </View>
         ) : null}
 
-        <View style={{ borderLeftWidth: 3, borderLeftColor: p.acento, backgroundColor: p.cartao, borderRadius: 9, padding: 10 }} wrap={false}>
-          <Text style={{ fontSize: 11.5, ...TITULO }}>{dados.identidade.nomeExibicao ? `${dados.identidade.nomeExibicao}: próximos passos` : "Próximos passos"}</Text>
-          <Text style={{ fontSize: 9, color: p.suave, marginTop: 4 }}>Fale com seu consultor para tirar dúvidas e avançar com a sua proposta.</Text>
-          {dados.identidade.whatsapp ? <Text style={{ fontSize: 11, ...NEGRITO, color: p.verde, marginTop: 6 }}>{`WhatsApp: ${dados.identidade.whatsapp}`}</Text> : null}
-          <Text style={{ fontSize: 9, color: p.suave, marginTop: 6 }}>
-            {"Proposta válida até "}
-            <Text style={{ ...NEGRITO, color: p.texto }}>{dataBr(c.validadeAte)}</Text>
-          </Text>
+        <View style={{ borderLeftWidth: 3, borderLeftColor: p.acento, backgroundColor: p.cartao, borderRadius: 9, padding: 9 }} wrap={false}>
+          {/* Duas linhas: título e WhatsApp; convite e validade. */}
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+            <Text style={{ fontSize: 11.5, ...TITULO, flexShrink: 1 }}>{dados.identidade.nomeExibicao ? `${dados.identidade.nomeExibicao}: próximos passos` : "Próximos passos"}</Text>
+            {dados.identidade.whatsapp ? <Text style={{ fontSize: 11, ...NEGRITO, color: p.verde }}>{`WhatsApp: ${dados.identidade.whatsapp}`}</Text> : null}
+          </View>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8, marginTop: 4 }}>
+            <Text style={{ fontSize: 9, color: p.suave, flexShrink: 1 }}>Fale com seu consultor para tirar dúvidas e avançar com a sua proposta.</Text>
+            <Text style={{ fontSize: 9, color: p.suave }}>
+              {"Válida até "}
+              <Text style={{ ...NEGRITO, color: p.texto }}>{dataBr(c.validadeAte)}</Text>
+            </Text>
+          </View>
         </View>
       </View>
       <Rodape dados={dados} pagina={3} e={e} texto={dados.rodape} />

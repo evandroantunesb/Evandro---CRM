@@ -610,6 +610,10 @@ export type Database = {
           id: string;
           personalizado_ativo: boolean;
           updated_at: string;
+          valor_negocio_avista: string;
+          valor_negocio_financiamento: string;
+          valor_negocio_parcelado: string;
+          valor_negocio_personalizado: string;
         };
         Insert: {
           atualizado_por?: string | null;
@@ -620,6 +624,10 @@ export type Database = {
           id?: string;
           personalizado_ativo?: boolean;
           updated_at?: string;
+          valor_negocio_avista?: string;
+          valor_negocio_financiamento?: string;
+          valor_negocio_parcelado?: string;
+          valor_negocio_personalizado?: string;
         };
         Update: {
           atualizado_por?: string | null;
@@ -630,6 +638,10 @@ export type Database = {
           id?: string;
           personalizado_ativo?: boolean;
           updated_at?: string;
+          valor_negocio_avista?: string;
+          valor_negocio_financiamento?: string;
+          valor_negocio_parcelado?: string;
+          valor_negocio_personalizado?: string;
         };
         Relationships: [
           {
@@ -954,6 +966,9 @@ export type Database = {
       contratos: {
         Row: {
           atualizado_por: string | null;
+          condicao_pagamento: Json | null;
+          condicao_registrada_em: string | null;
+          condicao_registrada_por: string | null;
           conteudo: string;
           created_at: string;
           criado_por: string | null;
@@ -968,6 +983,9 @@ export type Database = {
         };
         Insert: {
           atualizado_por?: string | null;
+          condicao_pagamento?: Json | null;
+          condicao_registrada_em?: string | null;
+          condicao_registrada_por?: string | null;
           conteudo: string;
           created_at?: string;
           criado_por?: string | null;
@@ -982,6 +1000,9 @@ export type Database = {
         };
         Update: {
           atualizado_por?: string | null;
+          condicao_pagamento?: Json | null;
+          condicao_registrada_em?: string | null;
+          condicao_registrada_por?: string | null;
           conteudo?: string;
           created_at?: string;
           criado_por?: string | null;
@@ -998,6 +1019,13 @@ export type Database = {
           {
             foreignKeyName: "contratos_atualizado_por_fkey";
             columns: ["atualizado_por"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "contratos_condicao_registrada_por_fkey";
+            columns: ["condicao_registrada_por"];
             isOneToOne: false;
             referencedRelation: "empresa_membros";
             referencedColumns: ["id"];
@@ -5947,6 +5975,16 @@ export type Database = {
       fechar_comissao: { Args: { p_comissao_id: string }; Returns: undefined };
       feriado_nacional: { Args: { p_data: string }; Returns: boolean };
       garantir_obra: { Args: { p_negocio_id: string }; Returns: string };
+      gerar_contrato_com_condicao: {
+        Args: {
+          p_condicao: Json;
+          p_conteudo: string;
+          p_motivo: string;
+          p_negocio_id: string;
+          p_valor: number;
+        };
+        Returns: undefined;
+      };
       gravar_status_fluxo_obra: {
         Args: {
           p_aut: string;
