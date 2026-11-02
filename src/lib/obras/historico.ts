@@ -1,3 +1,4 @@
+import { ETAPAS_OBRA, ROTULO_ETAPA, type EtapaObra } from "./cronograma";
 import { ROTULO_CATEGORIA_CUSTO, ehCategoriaCusto } from "./custos";
 import { AGUARDANDO_OBRA, ROTULO_MARCO_OBRA, ROTULO_SETOR, ROTULO_STATUS_MARCO_OBRA, STATUS_POR_SETOR, rotuloAguardando, rotuloStatus, type SetorObra } from "./rotulos";
 
@@ -52,6 +53,11 @@ const ROTULO_TIPO: Record<string, string> = {
   orcamento_ajustado: "Orçamento ajustado",
   custo_lancado: "Custo lançado",
   custo_estornado: "Custo estornado",
+  justificativa_atraso_pedida: "Justificativa de atraso pedida",
+  justificativa_atraso_cobrada: "Justificativa de atraso cobrada",
+  justificativa_atraso_respondida: "Justificativa de atraso respondida",
+  escalonamento_aberto: "Escalonamento aberto",
+  escalonamento_fechado: "Escalonamento fechado",
 };
 
 // Perguntas do enquadramento (mesmas de `engenharia-enquadramento-regras`, sem importar regra de tela).
@@ -288,6 +294,15 @@ function descrever(linha: LinhaHistoricoObra, nomes: ReadonlyMap<string, string>
       const categoria = ler(dados, "categoria");
       return typeof categoria === "string" && ehCategoriaCusto(categoria) ? ROTULO_CATEGORIA_CUSTO[categoria] : "";
     }
+    case "justificativa_atraso_pedida":
+    case "justificativa_atraso_cobrada":
+    case "justificativa_atraso_respondida": {
+      const etapa = ler(dados, "etapa");
+      return typeof etapa === "string" && (ETAPAS_OBRA as readonly string[]).includes(etapa) ? ROTULO_ETAPA[etapa as EtapaObra] : "";
+    }
+    case "escalonamento_aberto":
+    case "escalonamento_fechado":
+      return "";
     default:
       return "Evento registrado";
   }

@@ -165,14 +165,16 @@ describe("detalhe da obra com RLS real", () => {
     }
   });
 
-  it("outro vendedor, gestor fora da equipe e SDR que não originou a venda: 404", async () => {
+  it("outro vendedor e SDR que não originou a venda: 404; gestor fora da equipe vê, com o valor (OPR)", async () => {
     for (const [usuario, papel] of [
       [vendedor2, "vendedor"],
-      [gestorFora, "gestor"],
       [sdr, "sdr"],
     ] as const) {
       expect(await detalhe(usuario, papel), papel).toBeNull();
     }
+    const vm = await detalhe(gestorFora, "gestor");
+    expect(vm).not.toBeNull();
+    expect(vm!.valorVendido).not.toBeNull();
   });
 
   it("operacao participante do operacional: endereço e telefone; sem documento, valor ou negócio", async () => {

@@ -64,8 +64,17 @@ export type EtapaGanttVM = {
   previsao: Faixa | null;
   tempo: string;
   desvio: { texto: string; tom: Tom };
-  /** Motivo calculado do atraso herdado (sem justificativa a pedir). */
-  motivo: string | null;
+  /** O que aparece ao passar o mouse no atraso: a justificativa (respondida ou pendente) do atraso próprio ou o motivo
+   * calculado do atraso herdado. */
+  dica: DicaAtraso | null;
+};
+
+export type DicaAtraso = {
+  titulo: string;
+  texto: string;
+  rodape: string;
+  /** Justificativa pedida e ainda sem resposta. */
+  pendente: boolean;
 };
 
 export type CronogramaVM = {
@@ -103,7 +112,13 @@ function desvio(l: LinhaCronograma, ultima: boolean): EtapaGanttVM["desvio"] {
  */
 export function montarCronograma(
   linhas: readonly LinhaCronograma[],
-  entrada: { hoje: string; entregaContratada: string; subtitulo?: (etapa: EtapaObra, l: LinhaCronograma) => string },
+  entrada: {
+    hoje: string;
+    entregaContratada: string;
+    subtitulo?: (etapa: EtapaObra, l: LinhaCronograma) => string;
+    /** Justificativa de cada etapa com atraso próprio (respondida ou pendente). */
+    justificativas?: Partial<Record<EtapaObra, DicaAtraso>>;
+  },
 ): CronogramaVM | null {
   const validas = [...linhas].filter((l) => ehEtapa(l.etapa)).sort((a, b) => a.ordem - b.ordem);
   if (validas.length === 0) return null;
@@ -144,9 +159,16 @@ export function montarCronograma(
       previsao: !concluida && dia(l.previsao_fim) > dia(previsaoIni) ? faixa(previsaoIni, l.previsao_fim) : null,
       tempo: concluida ? dias(l.dias_na_etapa) : andamento ? `há ${dias(l.dias_na_etapa)}` : "a iniciar",
       desvio: desvio(l, i === validas.length - 1),
-      motivo: causa
-        ? `Consequência do atraso na etapa ${ETAPAS_OBRA.indexOf(causa) + 1} (${ROTULO_ETAPA_CURTO[causa].toLowerCase()}).`
-        : null,
+      dica:
+        (l.atraso_proprio > 0 ? entrada.justificativas?.[chave] : undefined) ??
+        (causa
+          ? {
+              titulo: "Motivo",
+              texto: `Consequência do atraso na etapa ${ETAPAS_OBRA.indexOf(causa) + 1} (${ROTULO_ETAPA_CURTO[causa].toLowerCase()}).`,
+              rodape: "Calculado pelo sistema",
+              pendente: false,
+            }
+          : null),
     };
   });
 

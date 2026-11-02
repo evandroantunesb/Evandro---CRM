@@ -5,18 +5,12 @@ import type { AlertaObra, SetorObra, SituacaoObra } from "../rotulos";
 /**
  * Modo Apresentação de Obras (OPR 3B, V1). Somente leitura.
  *
- * Fontes reais HOJE (banco): identificação da obra, situação, status/parado/aguardando de cada
- * setor, responsáveis, marcos, alertas, o valor vendido (RLS própria), o cronograma das etapas
- * com a entrega contratada (`cronograma_obra`) e os custos com o lucro (`obra_orcamento`,
- * `obra_custos`, `obra_deducoes`). NÃO existe no banco: o avanço físico, que chega `null` e só
- * ganha conteúdo pela demonstração local (`demo.ts`), que nunca liga fora do Supabase local.
+ * Tudo vem do banco: identificação da obra, situação, status/parado/aguardando de cada setor,
+ * responsáveis, marcos, alertas, o valor vendido (RLS própria), o cronograma das etapas com a
+ * entrega contratada e as justificativas de atraso (`cronograma_obra`, `obra_justificativas_atraso`),
+ * o progresso (`prazos_obras`) e os custos com o lucro (`obra_orcamento`, `obra_custos`,
+ * `obra_deducoes`).
  */
-
-/** Avanço de uma obra. Hoje só existe na demonstração local. */
-export type PlanejamentoObra = {
-  /** 0–100, informado pela fonte. */
-  avancoFisico: number | null;
-};
 
 export type SetorApresentacaoVM = {
   setor: SetorObra;
@@ -45,13 +39,11 @@ export type ApresentacaoObraVM = {
   /** Datas ISO (AAAA-MM-DD) do cronograma; null = sem acesso ao cronograma. */
   entregaContratada: string | null;
   entregaPrevista: string | null;
-  /** Avanço: null = sem fonte (estado vazio). */
-  avancoFisico: number | null;
+  /** Progresso pelos prazos das etapas (0–100); null = sem cronograma. */
+  progresso: number | null;
   cronograma: CronogramaVM | null;
   /** Custos (quem vê custos) e lucro (quem vê o valor vendido). */
   financeiro: FinanceiroVM;
-  /** true quando o avanço veio da demonstração local (fictícia). */
-  demonstracao: boolean;
 };
 
 /**

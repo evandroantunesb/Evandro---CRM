@@ -80,7 +80,7 @@ export const KPIS_OBRAS_ZERADOS: KpisObras = {
 export const LIMITE_OBRAS = 500;
 
 /** Ids por consulta nas tabelas filhas: mantém a URL curta e cada resposta abaixo de 1000 linhas. */
-const TAMANHO_LOTE = 100;
+export const TAMANHO_LOTE = 100;
 
 /** Colunas lidas de `obras` no caminho comercial (explícitas: nunca `*`, nunca `snapshot`). */
 const COLUNAS_OBRAS = "id, numero, cliente_nome, cidade, uf, potencia_kwp, pausada_em, cancelada_em, alerta_pagamento_estornado_em, venda_alterada_em, created_at";
@@ -123,7 +123,7 @@ function porObra<T extends { obra_id: string }>(linhas: readonly T[]): Map<strin
   return mapa;
 }
 
-function lotes<T>(itens: readonly T[], tamanho: number): T[][] {
+export function lotes<T>(itens: readonly T[], tamanho: number): T[][] {
   const resultado: T[][] = [];
   for (let i = 0; i < itens.length; i += tamanho) resultado.push(itens.slice(i, i + tamanho));
   return resultado;

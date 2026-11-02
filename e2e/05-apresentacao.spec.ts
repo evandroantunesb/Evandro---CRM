@@ -3,9 +3,8 @@ import { RESOLUCOES, capturar, entrarComo, lerBase, semRolagemHorizontal, type R
 import type { BaseFicticia } from "./base-ficticia";
 
 /**
- * OPR 3B — modo Apresentação, contra o app real e o Supabase LOCAL, com a demonstração local
- * ligada (avanço físico fictício para 3 obras; as demais mostram estado vazio). Cronograma, custos e
- * lucro são sempre os reais, do banco.
+ * OPR — modo Apresentação, contra o app real e o Supabase LOCAL. Cronograma, progresso, justificativas,
+ * custos e lucro vêm do banco. Para admin e gestor, a navegação segue a ordem da visão Completa.
  */
 
 let usuarios: BaseFicticia["usuarios"];
@@ -24,13 +23,13 @@ for (const [resolucao, tamanho] of Object.entries(RESOLUCOES) as [Resolucao, { w
   test.describe(`apresentação — capturas ${resolucao} (${tamanho.width}×${tamanho.height})`, () => {
     test.use({ viewport: tamanho });
 
-    test("Fazenda Modelo, outras obras demonstrativas, obra sem dados e navegação", async ({ page }) => {
+    test("Fazenda Modelo, outras obras, obra sem custos e navegação", async ({ page }) => {
       await entrarComo(page, usuarios.admin, senha);
 
       await page.goto(`/obras/apresentacao/${obras.o06}`);
       await expect(titulo(page)).toHaveText(FAZENDA);
-      await expect(page.getByText("Dados fictícios")).toBeVisible();
-      await expect(page.getByText("68%").first()).toBeVisible();
+      // Progresso pelos prazos das etapas, do banco.
+      await expect(page.getByText("Progresso", { exact: true })).toBeVisible();
       // Admin vê os custos e o lucro (orçamento nascido com a obra, venda do contrato).
       await expect(page.getByRole("heading", { name: "Custos: planejado × realizado" })).toBeVisible();
       await expect(page.getByRole("region", { name: "Lucro previsto da obra" })).toBeVisible();
@@ -56,18 +55,18 @@ for (const [resolucao, tamanho] of Object.entries(RESOLUCOES) as [Resolucao, { w
       await expect(titulo(page)).toHaveText("Clínica Vida (fictícia)");
       await capturar(page, resolucao, "22-apresentacao-clinica-quase-concluida");
 
-      // Obra sem custos: estados vazios, nada inventado (avanço não vem do status); o cronograma é o real.
+      // Outra obra: o cronograma é o real.
       await page.goto(`/obras/apresentacao/${obras.o01}`);
-      await expect(page.getByText("Dados fictícios")).toHaveCount(0);
-      await expect(page.getByText("Sem medição registrada")).toBeVisible();
+      await expect(page.getByText("Progresso", { exact: true })).toBeVisible();
       await expect(page.getByRole("region", { name: /Etapas da obra/ }).getByText("Chegada na Engenharia e projeto")).toBeVisible();
       await semRolagemHorizontal(page, "apresentação sem dados");
       await capturar(page, resolucao, "23-apresentacao-obra-sem-planejamento");
 
-      // Navegação como slides a partir da Fazenda.
-      await page.goto(`/obras/apresentacao/${obras.o06}`);
+      // Navegação como slides, na ordem da visão Completa (vermelhas primeiro).
+      await page.goto("/obras/apresentacao");
+      await expect(nav(page)).toContainText(/Obra 1 de \d+/);
       await nav(page).getByRole("link", { name: "Próxima obra" }).click();
-      await expect(page).toHaveURL(new RegExp(`/obras/apresentacao/${obras.o05}`));
+      await expect(nav(page)).toContainText(/Obra 2 de \d+/);
       await capturar(page, resolucao, "24-apresentacao-proxima-obra");
     });
 
@@ -93,20 +92,20 @@ for (const [resolucao, tamanho] of Object.entries(RESOLUCOES) as [Resolucao, { w
 test.describe("apresentação — funcionamento", () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 
-  test("entra pelo modo Apresentação da listagem e percorre como slides (botões, teclado, seletor)", async ({ page }) => {
+  test("entra pelo modo Apresentação da visão Completa e percorre como slides (botões, teclado, seletor)", async ({ page }) => {
     await entrarComo(page, usuarios.admin, senha);
     await page.goto("/obras");
     await page.getByRole("navigation", { name: "Modo de visualização" }).getByRole("link", { name: "Apresentação" }).click();
-    await expect(page).toHaveURL(new RegExp(`/obras/apresentacao/${obras.o12}`));
-    await expect(nav(page)).toContainText("Obra 1 de 12");
+    await expect(page).toHaveURL(/\/obras\/apresentacao\/[0-9a-f-]{36}/);
+    await expect(nav(page)).toContainText(/Obra 1 de \d+/);
 
     await nav(page).getByRole("link", { name: "Próxima obra" }).click();
-    await expect(nav(page)).toContainText("Obra 2 de 12");
+    await expect(nav(page)).toContainText(/Obra 2 de \d+/);
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
     await page.keyboard.press("ArrowRight");
-    await expect(nav(page)).toContainText("Obra 3 de 12");
+    await expect(nav(page)).toContainText(/Obra 3 de \d+/);
     await page.keyboard.press("ArrowLeft");
-    await expect(nav(page)).toContainText("Obra 2 de 12");
+    await expect(nav(page)).toContainText(/Obra 2 de \d+/);
 
     await page.getByLabel("Ir para a obra").selectOption(obras.o06);
     await expect(page).toHaveURL(new RegExp(`/obras/apresentacao/${obras.o06}`));
@@ -158,7 +157,10 @@ test.describe("apresentação — toque no celular", () => {
 
   test("deslizar troca de obra; deslizar dentro do Gantt não", async ({ page }) => {
     await entrarComo(page, usuarios.admin, senha);
-    await page.goto(`/obras/apresentacao/${obras.o06}`);
+    // A 1ª obra da visão Completa: sempre tem a próxima.
+    await page.goto("/obras/apresentacao");
+    await expect(nav(page)).toContainText(/Obra 1 de \d+/);
+    const primeira = idAtual(page);
     const deslizar = (seletor: string, de: number, para: number) =>
       page.evaluate(
         ({ seletor, de, para }) => {
@@ -173,12 +175,12 @@ test.describe("apresentação — toque no celular", () => {
     // Dentro do Gantt: nada muda.
     await deslizar("[data-sem-gesto]", 300, 60);
     await page.waitForTimeout(800);
-    expect(idAtual(page)).toBe(obras.o06);
+    expect(idAtual(page)).toBe(primeira);
 
-    // Fora dele: próxima obra.
+    // Fora dele: próxima obra (na ordem da visão Completa) e, deslizando de volta, a mesma de antes.
     await deslizar("article h1", 300, 60);
-    await expect(page).toHaveURL(new RegExp(`/obras/apresentacao/${obras.o05}`));
+    await expect(nav(page)).toContainText(/Obra 2 de \d+/);
     await deslizar("article h1", 60, 300);
-    await expect(page).toHaveURL(new RegExp(`/obras/apresentacao/${obras.o06}`));
+    await expect(page).toHaveURL(new RegExp(`/obras/apresentacao/${primeira}`));
   });
 });

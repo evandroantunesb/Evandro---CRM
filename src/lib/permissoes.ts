@@ -119,6 +119,10 @@ export const CONDICOES_PAGAMENTO = ["admin", "gestor"] as const satisfies ListaP
 export const PRAZOS_OBRA = ["admin", "gestor"] as const satisfies ListaPapeis;
 // Orçamento da obra e deduções do lucro (impostos e comissões): mesma barreira da RPC e das políticas no banco.
 export const FINANCEIRO_OBRA = ["admin", "gestor"] as const satisfies ListaPapeis;
+// Visão Completa (semáforo de todas as obras) e pedido de justificativa de atraso: mesma barreira da RPC no banco.
+export const OPR_COMPLETA = ["admin", "gestor"] as const satisfies ListaPapeis;
+// Abrir e fechar escalonamento: gestor, admin e o Operacional da obra (a RPC decide qual obra).
+export const ESCALONAMENTO_OBRA = ["admin", "gestor", "operacao"] as const satisfies ListaPapeis;
 
 /**
  * Tela de Obras (somente leitura). Os quatro papéis comerciais leem as tabelas sob RLS

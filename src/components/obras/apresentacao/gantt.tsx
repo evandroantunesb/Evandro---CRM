@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { CronogramaVM, EtapaGanttVM, Faixa, Tom } from "@/lib/obras/cronograma";
 import { ddmm } from "@/lib/obras/cronograma";
 
@@ -15,9 +16,11 @@ const TRANSICAO = "absolute transition-[left,width] duration-700 ease-[cubic-bez
 /**
  * Gantt do desenho aprovado "Obras — Apresentação": uma linha por etapa com o previsto (fino), o realizado (dourado)
  * e a previsão (tracejada), a linha de hoje, o losango da entrega contratada na última etapa e, à direita, o tempo na
- * etapa e o desvio. Atraso só herdado mostra o motivo calculado ao passar o mouse ou focar.
+ * etapa e o desvio. Atraso com justificativa (ou com o motivo calculado do atraso herdado) fica sublinhado e mostra o
+ * texto ao passar o mouse ou focar; a justificativa pendente oferece "Cobrar justificativa" a quem pode cobrar
+ * (`cobrarHref`, a ficha da obra).
  */
-export function Gantt({ cronograma }: { cronograma: CronogramaVM }) {
+export function Gantt({ cronograma, cobrarHref = null }: { cronograma: CronogramaVM; cobrarHref?: string | null }) {
   const { meses, hoje, contratada, etapas } = cronograma;
   const separadores = meses.slice(0, -1).reduce<number[]>((acc, m) => [...acc, (acc.at(-1) ?? 0) + m.largura], []);
   return (
@@ -65,20 +68,37 @@ export function Gantt({ cronograma }: { cronograma: CronogramaVM }) {
               </div>
               <div className="flex flex-col items-end justify-center border-b border-linha py-2 text-right tabular-nums">
                 <span className="text-[13.5px] font-semibold text-texto">{e.tempo}</span>
-                {e.motivo ? (
+                {e.dica ? (
                   <span
                     tabIndex={0}
                     className={`group relative inline-flex cursor-help items-center gap-1 border-b border-dashed border-current text-[11.5px] font-semibold outline-none focus-visible:rounded focus-visible:ring-2 focus-visible:ring-dourado ${TOM[e.desvio.tom]}`}
                   >
                     {e.desvio.texto}
-                    <span className="sr-only">. Motivo: {e.motivo}</span>
+                    {e.dica.pendente && " · pendente"}
+                    <span className="sr-only">
+                      . {e.dica.titulo}: {e.dica.texto} {e.dica.rodape}
+                    </span>
                     <span
-                      aria-hidden
-                      className="absolute right-0 bottom-[calc(100%+8px)] z-20 hidden w-[300px] rounded-xl bg-carvao px-3.5 py-3 text-left font-normal text-offwhite shadow-[0_10px_28px_rgb(0_0_0/30%)] group-hover:block group-focus:block"
+                      role="tooltip"
+                      className="absolute right-0 bottom-[calc(100%+8px)] z-20 hidden w-[300px] rounded-xl bg-carvao px-3.5 py-3 text-left font-normal text-offwhite shadow-[0_10px_28px_rgb(0_0_0/30%)] group-focus-within:block group-hover:block"
                     >
-                      <b className="mb-1 block text-[11px] font-semibold tracking-[0.1em] text-dourado uppercase">Motivo</b>
-                      <span className="block text-[12.5px] leading-[1.45]">{e.motivo}</span>
-                      <small className="mt-1.5 block text-[11px] text-offwhite/60">Calculado pelo sistema</small>
+                      <b aria-hidden className="mb-1 block text-[11px] font-semibold tracking-[0.1em] text-dourado uppercase">
+                        {e.dica.titulo}
+                      </b>
+                      <span aria-hidden className="block text-[12.5px] leading-[1.45]">
+                        {e.dica.texto}
+                      </span>
+                      <small aria-hidden className="mt-1.5 block text-[11px] text-offwhite/60">
+                        {e.dica.rodape}
+                      </small>
+                      {e.dica.pendente && cobrarHref && (
+                        <Link
+                          href={cobrarHref}
+                          className="mt-2 inline-block rounded-md bg-dourado px-2.5 py-1 text-[11.5px] font-semibold text-carvao hover:bg-dourado/90"
+                        >
+                          Cobrar justificativa
+                        </Link>
+                      )}
                     </span>
                   </span>
                 ) : (
@@ -118,7 +138,7 @@ export function LegendaGantt({ hoje, entregaContratada }: { hoje: string; entreg
         <i aria-hidden className="mr-1.5 inline-block size-[9px] rotate-45 rounded-[2px] bg-texto" />
         Entrega contratada ({ddmm(entregaContratada)})
       </span>
-      <span className="sm:ml-auto">Passe o mouse num atraso sublinhado para ver o motivo</span>
+      <span className="sm:ml-auto">Passe o mouse num atraso sublinhado para ver a justificativa</span>
     </div>
   );
 }

@@ -62,7 +62,12 @@ type ObraNavegavel = Parameters<typeof filtrarObras>[0][number] & { id: string }
  * levam ao fim e ao início da lista, para o usuário voltar a percorrê-la sem ir à listagem.
  */
 export function montarNavegacao(obras: readonly ObraNavegavel[], filtros: FiltrosObras, atualId: string): NavegacaoObra {
-  const itens = filtrarObras(obras, filtros).map((o) => ({ id: o.id, rotulo: `#${o.numero} ${o.clienteNome}` }));
+  return navegacaoDaLista(filtrarObras(obras, filtros), atualId);
+}
+
+/** A mesma navegação sobre uma lista já filtrada e ordenada (a da visão Completa, por exemplo). */
+export function navegacaoDaLista(obras: readonly { id: string; numero: number; clienteNome: string }[], atualId: string): NavegacaoObra {
+  const itens = obras.map((o) => ({ id: o.id, rotulo: `#${o.numero} ${o.clienteNome}` }));
   const total = itens.length;
   const indice = itens.findIndex((i) => i.id === atualId);
   if (indice === -1) {

@@ -3742,6 +3742,53 @@ export type Database = {
           },
         ];
       };
+      obra_escalonamentos: {
+        Row: {
+          aberto_em: string;
+          aberto_por: string | null;
+          empresa_id: string;
+          fechado_em: string | null;
+          fechado_por: string | null;
+          id: string;
+          obra_id: string;
+          resolucao: string | null;
+          titulo: string;
+          valor: number | null;
+        };
+        Insert: {
+          aberto_em?: string;
+          aberto_por?: string | null;
+          empresa_id: string;
+          fechado_em?: string | null;
+          fechado_por?: string | null;
+          id?: string;
+          obra_id: string;
+          resolucao?: string | null;
+          titulo: string;
+          valor?: number | null;
+        };
+        Update: {
+          aberto_em?: string;
+          aberto_por?: string | null;
+          empresa_id?: string;
+          fechado_em?: string | null;
+          fechado_por?: string | null;
+          id?: string;
+          obra_id?: string;
+          resolucao?: string | null;
+          titulo?: string;
+          valor?: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "obra_escalonamentos_empresa_id_obra_id_fkey";
+            columns: ["empresa_id", "obra_id"];
+            isOneToOne: false;
+            referencedRelation: "obras";
+            referencedColumns: ["empresa_id", "id"];
+          },
+        ];
+      };
       obra_fixacao: {
         Row: {
           created_at: string;
@@ -3877,6 +3924,62 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "obra_historico_empresa_id_obra_id_fkey";
+            columns: ["empresa_id", "obra_id"];
+            isOneToOne: false;
+            referencedRelation: "obras";
+            referencedColumns: ["empresa_id", "id"];
+          },
+        ];
+      };
+      obra_justificativas_atraso: {
+        Row: {
+          cobrado_em: string | null;
+          created_at: string;
+          empresa_id: string;
+          etapa: string;
+          id: string;
+          obra_id: string;
+          pedido_a: string;
+          pedido_em: string;
+          pedido_por: string | null;
+          prazo: string;
+          respondido_em: string | null;
+          respondido_por: string | null;
+          texto: string | null;
+        };
+        Insert: {
+          cobrado_em?: string | null;
+          created_at?: string;
+          empresa_id: string;
+          etapa: string;
+          id?: string;
+          obra_id: string;
+          pedido_a: string;
+          pedido_em?: string;
+          pedido_por?: string | null;
+          prazo: string;
+          respondido_em?: string | null;
+          respondido_por?: string | null;
+          texto?: string | null;
+        };
+        Update: {
+          cobrado_em?: string | null;
+          created_at?: string;
+          empresa_id?: string;
+          etapa?: string;
+          id?: string;
+          obra_id?: string;
+          pedido_a?: string;
+          pedido_em?: string;
+          pedido_por?: string | null;
+          prazo?: string;
+          respondido_em?: string | null;
+          respondido_por?: string | null;
+          texto?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "obra_justificativas_atraso_empresa_id_obra_id_fkey";
             columns: ["empresa_id", "obra_id"];
             isOneToOne: false;
             referencedRelation: "obras";
@@ -5687,6 +5790,10 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      abrir_escalonamento_obra: {
+        Args: { p_obra_id: string; p_titulo: string; p_valor?: number };
+        Returns: string;
+      };
       aceitar_handoff: {
         Args: { p_handoff_id: string };
         Returns: {
@@ -6163,6 +6270,10 @@ export type Database = {
       };
       expirar_atribuicoes_leads: { Args: Record<PropertyKey, never>; Returns: undefined };
       fechar_comissao: { Args: { p_comissao_id: string }; Returns: undefined };
+      fechar_escalonamento_obra: {
+        Args: { p_escalonamento_id: string; p_resolucao: string };
+        Returns: undefined;
+      };
       feriado_nacional: { Args: { p_data: string }; Returns: boolean };
       garantir_obra: { Args: { p_negocio_id: string }; Returns: string };
       gerar_contrato_com_condicao: {
@@ -6345,6 +6456,7 @@ export type Database = {
           planejado: number;
         }[];
       };
+      pedir_justificativa_atraso: { Args: { p_etapa: string; p_obra_id: string }; Returns: string };
       pendencias_contrato_contato: { Args: { p_contato_id: string }; Returns: string[] };
       pode_decidir_desconto: {
         Args: {
@@ -6356,6 +6468,7 @@ export type Database = {
       pode_enviar_pasta_engenharia: { Args: { p_caminho: string }; Returns: boolean };
       pode_enviar_pasta_tarefa_setor: { Args: { p_caminho: string }; Returns: boolean };
       pode_enviar_pasta_vistoria: { Args: { p_caminho: string }; Returns: boolean };
+      pode_escalonar_obra: { Args: { p_obra_id: string }; Returns: boolean };
       pode_registrar_pagamento_negocio: { Args: { p_negocio_id: string }; Returns: boolean };
       pode_responder_handoff: { Args: { p_handoff_id: string }; Returns: boolean };
       pode_ver_avatar: { Args: { p_pasta: string }; Returns: boolean };
@@ -6395,6 +6508,23 @@ export type Database = {
           inicio: string;
           limite: string;
           obra_id: string;
+        }[];
+      };
+      prazos_obras: {
+        Args: { p_obra_ids: string[] };
+        Returns: {
+          atraso_entrega: number;
+          concluida_em: string;
+          entrega_contratada: string;
+          entrega_prevista: string;
+          etapa_atual: string;
+          etapas_concluidas: string[];
+          maior_atraso: number;
+          maior_atraso_etapa: string;
+          obra_id: string;
+          progresso: number;
+          vence_em: number;
+          vence_etapa: string;
         }[];
       };
       precos_eletroposto_validos: {
@@ -6529,6 +6659,10 @@ export type Database = {
         Returns: string;
       };
       remover_anexo_tarefa_setor: { Args: { p_anexo_id: string }; Returns: string };
+      responder_justificativa_atraso: {
+        Args: { p_justificativa_id: string; p_texto: string };
+        Returns: undefined;
+      };
       resposta_enquadramento_valida: {
         Args: { p_pergunta: string; p_resposta: string };
         Returns: boolean;
@@ -6552,6 +6686,10 @@ export type Database = {
           semana: Json;
           sequencia: number;
         }[];
+      };
+      setor_etapa_obra: {
+        Args: { p_etapa: string };
+        Returns: Database["public"]["Enums"]["setor_obra"];
       };
       setor_registro_vistoria: {
         Args: { p_obra_id: string; p_tipo: string };

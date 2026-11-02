@@ -109,7 +109,7 @@ export type ObraDetalheVM = {
   /** Sempre os 2 marcos fixos. */
   marcos: MarcoDetalheVM[];
   tecnico: DadosTecnicosVM;
-  /** Só quem a RLS libera (admin, vendedor da venda, gestor da equipe). */
+  /** Só quem a RLS libera (admin, gestor e o vendedor da venda). */
   valorVendido: number | null;
   historico: ItemHistoricoVM[];
   /** Controles do modo Gestão; null para quem não tem nenhuma autorização de escrita (gestor, vendedor, SDR...). */

@@ -17,7 +17,8 @@ for (const [resolucao, tamanho] of Object.entries(RESOLUCOES) as [Resolucao, { w
       const { usuarios, obras, senha } = lerBase();
       await entrarComo(page, usuarios.admin, senha);
 
-      await page.goto("/obras");
+      // Admin abre na visão Completa; a lista por setor continua a um clique.
+      await page.goto("/obras?visao=setores");
       await expect(page.getByText("12 de 12 obras")).toBeVisible();
       await semRolagemHorizontal(page, "listagem");
       await capturar(page, resolucao, "01-listagem-12-obras");
@@ -44,7 +45,7 @@ for (const [resolucao, tamanho] of Object.entries(RESOLUCOES) as [Resolucao, { w
       await capturar(page, resolucao, "05-gestao-obra-cancelada");
 
       // Navegação: entra pela listagem (filtros vazios) e avança uma obra.
-      await page.goto("/obras");
+      await page.goto("/obras?visao=setores");
       await page.getByRole("link", { name: /Percorrer as 12 obras/ }).click();
       await page.getByRole("link", { name: "Próxima obra" }).click();
       await expect(page.getByRole("navigation", { name: "Navegação entre obras" })).toContainText("Obra 2 de 12");

@@ -1,16 +1,15 @@
 /**
  * OPR 3B — Apresentação de Obras, sem banco: custos e lucro pela lógica do desenho (custo
- * projetado por categoria encerrada ou em andamento, lucro depois de impostos e comissões), as linhas do Gantt a partir do cronograma do banco, a trava da demonstração local (só com a variável E Supabase
- * local) e o carregamento por papel — dinheiro nunca sai do servidor para quem não pode ver.
+ * projetado por categoria encerrada ou em andamento, lucro depois de impostos e comissões), as linhas do Gantt a
+ * partir do cronograma do banco (com as justificativas de atraso) e o carregamento por papel — dinheiro nunca sai do
+ * servidor para quem não pode ver.
  */
 import { describe, expect, it } from "vitest";
 import { carregarApresentacaoObra } from "@/lib/obras/apresentacao/dados";
-import { demonstracaoAtiva, planejamentoDemonstracao } from "@/lib/obras/apresentacao/demo";
 import { montarCronograma, tomAtraso, type LinhaCronograma } from "@/lib/obras/cronograma";
 import { montarCustos, resultadoObra } from "@/lib/obras/custos";
 import type { SupabaseServidor } from "@/lib/supabase/server";
 
-const LOCAL = { RAION_DEMO_APRESENTACAO: "1", NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321" };
 const HOJE = "2026-10-14";
 const FAZENDA = "Usina Solar Fazenda Modelo (fictícia)";
 
@@ -122,37 +121,18 @@ describe("cronograma (linhas do Gantt)", () => {
     expect(homologacao.real![0]).toBeCloseTo((12 / 92) * 100, 10);
     expect(homologacao.previsao![0]).toBeCloseTo(vm.hoje!, 10);
     expect(compra.real).toBeNull();
-    expect([projeto.motivo, compra.motivo]).toEqual([null, "Consequência do atraso na etapa 1 (chegada e projeto)."]);
+    expect(projeto.dica).toBeNull();
+    expect(compra.dica).toEqual({
+      titulo: "Motivo",
+      texto: "Consequência do atraso na etapa 1 (chegada e projeto).",
+      rodape: "Calculado pelo sistema",
+      pendente: false,
+    });
   });
 
   it("tom do atraso pela régua do semáforo e sem linhas não há cronograma", () => {
     expect([0, 1, 5, 6].map(tomAtraso)).toEqual(["ok", "atencao", "atencao", "erro"]);
     expect(montarCronograma([], { hoje: HOJE, entregaContratada: "2026-12-10" })).toBeNull();
-  });
-});
-
-describe("demonstração local (dados fictícios)", () => {
-  it("só liga com a variável E Supabase local", () => {
-    expect(demonstracaoAtiva({})).toBe(false);
-    expect(demonstracaoAtiva({ NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321" })).toBe(false);
-    expect(demonstracaoAtiva({ RAION_DEMO_APRESENTACAO: "1", NEXT_PUBLIC_SUPABASE_URL: "https://abcdefgh.supabase.co" })).toBe(false);
-    expect(demonstracaoAtiva({ RAION_DEMO_APRESENTACAO: "true", NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321" })).toBe(false);
-    expect(demonstracaoAtiva({ RAION_DEMO_APRESENTACAO: "1", NEXT_PUBLIC_SUPABASE_URL: "lixo" })).toBe(false);
-    expect(demonstracaoAtiva(LOCAL)).toBe(true);
-    expect(demonstracaoAtiva({ ...LOCAL, NEXT_PUBLIC_SUPABASE_URL: "http://localhost:54321" })).toBe(true);
-  });
-
-  it("sem a demonstração, nenhuma obra recebe planejamento", () => {
-    expect(planejamentoDemonstracao(FAZENDA, {})).toBeNull();
-    expect(planejamentoDemonstracao(FAZENDA, { ...LOCAL, NEXT_PUBLIC_SUPABASE_URL: "https://x.supabase.co" })).toBeNull();
-  });
-
-  it("só o avanço físico é fictício", () => {
-    expect(planejamentoDemonstracao(FAZENDA, LOCAL)).toEqual({ avancoFisico: 68 });
-    for (const nome of [FAZENDA, "Mercado Bom Preço (fictício)", "Clínica Vida (fictícia)"]) {
-      expect(planejamentoDemonstracao(nome, LOCAL), nome).not.toBeNull();
-    }
-    expect(planejamentoDemonstracao("Cliente qualquer", LOCAL)).toBeNull();
   });
 });
 
@@ -206,7 +186,7 @@ const linhaObra: Linha = {
   venda_alterada_em: null,
   created_at: "2026-10-01T00:00:00Z",
 };
-// Todos os setores concluídos: mesmo assim o avanço físico NÃO pode ser derivado disso.
+// Todos os setores concluídos: mesmo assim o progresso NÃO pode ser derivado disso.
 const fluxos = [
   ["compras", "material_entregue"],
   ["engenharia", "concluido"],
@@ -235,9 +215,9 @@ function cenario(papel: "admin" | "operacao" | "sdr", { comValor }: { comValor: 
 const DINHEIRO = /180000|135000|45000|175000|receitaLiquida|custoFinalProjetado|valorVendido|custos/;
 
 describe("carregarApresentacaoObra", () => {
-  it("sem demonstração: planejamento vazio e avanço NÃO derivado dos setores concluídos", async () => {
-    const vm = await carregarApresentacaoObra(cenario("admin", { comValor: true }).cliente, { empresaId: EMPRESA, papel: "admin", obraId: OBRA, hojeIso: HOJE, env: {} });
-    expect(vm).toMatchObject({ avancoFisico: null, entregaContratada: null, cronograma: null, demonstracao: false, potenciaKwp: 75, local: "Toledo/PR" });
+  it("sem cronograma: progresso vazio, NÃO derivado dos setores concluídos", async () => {
+    const vm = await carregarApresentacaoObra(cenario("admin", { comValor: true }).cliente, { empresaId: EMPRESA, papel: "admin", obraId: OBRA, hojeIso: HOJE });
+    expect(vm).toMatchObject({ progresso: null, entregaContratada: null, cronograma: null, potenciaKwp: 75, local: "Toledo/PR" });
     // Sem cronograma nenhuma categoria encerra: projetado = maior entre planejado e realizado (100.000 + 5.000).
     expect(vm?.financeiro.estado === "disponivel" && vm.financeiro.resultado).toMatchObject({ venda: 175_000, custoProjetado: 105_000, deducoes: 17_500, lucro: 52_500 });
   });
@@ -247,21 +227,51 @@ describe("carregarApresentacaoObra", () => {
       tabelas: { obras: [linhaObra], obra_fluxos: fluxos, obra_marcos: [], obra_participantes: [], obra_historico: [], obra_dados_comerciais: [] },
       rpcs: { identidade_membros: [], cronograma_obra: [linha(1, "projeto", { situacao: "andamento", real_inicio: "2026-10-01" }), linha(7, "conexao")] },
     });
-    const vm = await carregarApresentacaoObra(cliente, { empresaId: EMPRESA, papel: "admin", obraId: OBRA, hojeIso: HOJE, env: {} });
-    expect(vm).toMatchObject({ entregaContratada: "2026-12-10", entregaPrevista: "2026-10-10", demonstracao: false });
+    const vm = await carregarApresentacaoObra(cliente, { empresaId: EMPRESA, papel: "admin", obraId: OBRA, hojeIso: HOJE });
+    expect(vm).toMatchObject({ entregaContratada: "2026-12-10", entregaPrevista: "2026-10-10" });
     expect(vm?.cronograma?.etapas.map((e) => e.sub)).toEqual(["Engenharia", "Engenharia · contratada 10/12"]);
   });
 
-  it("admin com demonstração: o avanço é fictício; custos e resultado continuam os do banco", async () => {
-    const vm = await carregarApresentacaoObra(cenario("admin", { comValor: true }).cliente, { empresaId: EMPRESA, papel: "admin", obraId: OBRA, hojeIso: HOJE, env: LOCAL });
-    expect(vm?.demonstracao).toBe(true);
-    expect(vm?.avancoFisico).toBe(68);
-    expect(vm?.financeiro.estado).toBe("disponivel");
+  it("progresso e justificativas de atraso vêm do banco", async () => {
+    const PEDIDO = "33333333-3333-4333-8333-333333333333";
+    const { cliente } = criarFake({
+      tabelas: {
+        obras: [linhaObra],
+        obra_fluxos: fluxos,
+        obra_marcos: [],
+        obra_participantes: [],
+        obra_historico: [],
+        obra_dados_comerciais: [],
+        obra_justificativas_atraso: [
+          { obra_id: OBRA, id: "j1", etapa: "projeto", pedido_a: PEDIDO, pedido_em: "2026-10-05T12:00:00Z", cobrado_em: null, prazo: "2026-10-07", texto: "Cliente atrasou a documentação.", respondido_por: PEDIDO, respondido_em: "2026-10-06T12:00:00Z" },
+          { obra_id: OBRA, id: "j2", etapa: "homologacao", pedido_a: PEDIDO, pedido_em: "2026-10-13T12:00:00Z", cobrado_em: null, prazo: "2026-10-15", texto: null, respondido_por: null, respondido_em: null },
+        ],
+      },
+      rpcs: {
+        identidade_membros: [{ membro_id: PEDIDO, nome: "Lucas Prado" }],
+        prazos_obras: [{ obra_id: OBRA, progresso: 42 }],
+        cronograma_obra: [
+          linha(1, "projeto", { situacao: "concluida", real_inicio: "2026-10-01", real_fim: "2026-10-12", atraso_dias: 3, atraso_proprio: 3 }),
+          linha(2, "homologacao", { situacao: "andamento", real_inicio: "2026-10-12", atraso_dias: 5, atraso_proprio: 2 }),
+          linha(7, "conexao"),
+        ],
+      },
+    });
+    const vm = await carregarApresentacaoObra(cliente, { empresaId: EMPRESA, papel: "admin", obraId: OBRA, hojeIso: HOJE });
+    expect(vm?.progresso).toBe(42);
+    const [projeto, homologacao] = vm!.cronograma!.etapas;
+    expect(projeto.dica).toMatchObject({ titulo: "Justificativa", texto: "Cliente atrasou a documentação.", rodape: "Lucas Prado · respondeu em 06/10", pendente: false });
+    expect(homologacao.dica).toMatchObject({
+      titulo: "Justificativa pendente",
+      texto: "Pedida a Lucas Prado (Engenharia) em 13/10. Ainda sem resposta.",
+      rodape: "Prazo para responder: 15/10",
+      pendente: true,
+    });
   });
 
-  it("operacao e SDR: nenhum valor em dinheiro sai do servidor, mesmo com demonstração", async () => {
+  it("operacao e SDR: nenhum valor em dinheiro sai do servidor", async () => {
     for (const papel of ["operacao", "sdr"] as const) {
-      const vm = await carregarApresentacaoObra(cenario(papel, { comValor: false }).cliente, { empresaId: EMPRESA, papel, obraId: OBRA, hojeIso: HOJE, env: LOCAL });
+      const vm = await carregarApresentacaoObra(cenario(papel, { comValor: false }).cliente, { empresaId: EMPRESA, papel, obraId: OBRA, hojeIso: HOJE });
       expect(vm?.financeiro, papel).toEqual({ estado: "sem_permissao" });
       expect(JSON.stringify(vm), papel).not.toMatch(DINHEIRO);
     }
@@ -269,13 +279,13 @@ describe("carregarApresentacaoObra", () => {
 
   it("operacao nunca consulta obra_dados_comerciais; Apresentação não monta gestão", async () => {
     const { cliente, chamadas } = cenario("operacao", { comValor: false });
-    await carregarApresentacaoObra(cliente, { empresaId: EMPRESA, papel: "operacao", obraId: OBRA, hojeIso: HOJE, env: LOCAL });
+    await carregarApresentacaoObra(cliente, { empresaId: EMPRESA, papel: "operacao", obraId: OBRA, hojeIso: HOJE });
     expect(chamadas).not.toContain("from:obra_dados_comerciais");
     expect(chamadas).not.toContain("from:membro_setores_obra");
   });
 
   it("obra inexistente ou sem acesso: null", async () => {
     const { cliente } = criarFake({ tabelas: { obras: [] } });
-    expect(await carregarApresentacaoObra(cliente, { empresaId: EMPRESA, papel: "admin", obraId: OBRA, hojeIso: HOJE, env: LOCAL })).toBeNull();
+    expect(await carregarApresentacaoObra(cliente, { empresaId: EMPRESA, papel: "admin", obraId: OBRA, hojeIso: HOJE })).toBeNull();
   });
 });
