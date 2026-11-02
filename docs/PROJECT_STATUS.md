@@ -11,6 +11,7 @@
 | 4 | a fazer | No contrato, o cliente escolhe a condição e o valor do negócio muda |
 
 - **3a e 3b entram juntas em produção.** A proposta **continua em 3 páginas** (pedido do Evandro, 02/11) mesmo com todas as modalidades e o modelo no limite (teste em `tests/proposta-simples.test.ts`). Para caber: Garantias foi para a página 2, junto dos equipamentos; na página 3, o valor fica na faixa do título "Investimento", as condições vão em quadros (à vista ao lado do parcelado; financiamento e Personalizado em largura total) e "Próximos passos" tem duas linhas.
+- **Desconto à vista na emissão** (pedido do Evandro, 02/11): o vendedor digita o % ou o valor à vista em R$ (um calcula o outro; o valor digitado vai exato). Acima do permitido, abre o painel "Solicitar ao gestor" (mesmo pedido do cartão Desconto à vista), opcional: "Usar meu máximo" volta ao limite.
 - Decisões do Evandro (02/11): o vendedor marca quais parcelas aparecem (padrão: todas); entrada opcional no financiamento; o texto de condições do modelo pré-preenche a "Observação". Propostas já emitidas (esquema 4, texto livre) continuam legíveis. O valor do negócio não muda na emissão.
 
 ## Engenharia em Obras — P1 a P1.6 integradas em 2026-10-29; P2 a P5 em 2026-10-30; P6a e P6b em 2026-10-31; P6c e novo fluxo (#270, #271) em 2026-11-01

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   MENSAGEM_NENHUMA_CONDICAO,
   ORIENTACAO_APROVACAO,
+  descontoDoValor,
   montarCondicoesPagamento,
   valorParcela,
   type EntradaCondicoes,
@@ -110,6 +111,32 @@ describe("modalidades", () => {
       expect(montar({ personalizado: { partes: [{ ...partes[0]!, ...ruim }, partes[1]!] } }).ok, JSON.stringify(ruim)).toBe(false);
     }
     expect(montar({ personalizado: { partes } }, { personalizadoAtivo: false }).ok).toBe(false);
+  });
+});
+
+describe("à vista: o vendedor digita o desconto em % ou o valor em R$", () => {
+  it("valor digitado vale exato; o desconto é calculado (2 casas)", () => {
+    const r = montar({ aVista: { desconto: "5,56", valor: "28.333,00" } }, { descontoAprovado: 6 });
+    expect(r.ok && r.condicoes.aVista).toEqual({ descontoPercentual: 5.56, valor: 28333 });
+    const redondo = montar({ aVista: { desconto: "", valor: "28.500" } });
+    expect(redondo.ok && redondo.condicoes.aVista).toEqual({ descontoPercentual: 5, valor: 28500 });
+  });
+
+  it("o % para pedir aprovação arredonda para cima, para cobrir o valor digitado", () => {
+    expect(descontoDoValor(PRECO, 28500)).toBe(5);
+    expect(descontoDoValor(PRECO, 28333)).toBe(5.56); // 5,5567%
+    expect(descontoDoValor(PRECO, 27000)).toBe(10);
+  });
+
+  it("valor abaixo do permitido bloqueia com a orientação; acima do preço, zero ou fora do padrão é recusado", () => {
+    expect(pendencias(montar({ aVista: { desconto: "", valor: "28.499,99" } })).join(" ")).toContain(ORIENTACAO_APROVACAO);
+    expect(montar({ aVista: { desconto: "", valor: "28.499,99" } }, { descontoAprovado: 5.01 }).ok).toBe(true);
+    for (const ruim of ["30.000,01", "0", "28.500.00", "abc"]) expect(montar({ aVista: { desconto: "", valor: ruim } }).ok, ruim).toBe(false);
+  });
+
+  it("sem valor digitado, vale o %", () => {
+    const r = montar({ aVista: { desconto: "4,75", valor: "" } });
+    expect(r.ok && r.condicoes.aVista).toEqual({ descontoPercentual: 4.75, valor: 28575 });
   });
 });
 

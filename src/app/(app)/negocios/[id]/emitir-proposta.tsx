@@ -77,7 +77,7 @@ export function EmitirProposta({
             </Link>
           )}
         </p>
-        <CondicoesPagamento preco={preco} regras={regrasCondicoes} observacaoSugerida={conteudoModelo.condicoes} hoje={hoje} />
+        <CondicoesPagamento negocioId={negocioId} preco={preco} regras={regrasCondicoes} observacaoSugerida={conteudoModelo.condicoes} hoje={hoje} />
         <ul className="flex flex-col gap-1 rounded-md bg-zinc-50 px-3 py-2 text-xs text-zinc-600" data-testid="conteudo-confirmado">
           <li data-testid="geracao-status">
             Geração estimada:{" "}
