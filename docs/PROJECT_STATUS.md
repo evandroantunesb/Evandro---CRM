@@ -1,5 +1,20 @@
 # Estado do projeto — Raion CRM
 
+## Retomada em 03/11/2026 (troca de PC e de conta)
+
+**Mescladas e no ar em 03/11/2026:**
+- #292 OPR de Obras (visão Completa, semáforo, justificativa e escalonamento; migration `20261106100000` aplicada, tag `migracao-pr292-c1aa167`).
+- #295 aviso no sininho da justificativa de atraso (pedido/cobrança: responsável + gestor da equipe dele; resposta: quem pediu; migration `20261107100000` aplicada, tag `migracao-pr295-762ad80`). #294 documentação.
+- Nova interface (faixa escura do canvas): #284 Painel; #296 Negócios, Contatos, Tarefas, Propostas e contratos, Leads (botão Forecast no lugar de Temperatura; `/forecast` provisória; regras de temperatura num ícone para admin e gestor); #297 fichas do negócio, do contato e da obra (variante "detalhe"); #298 Configurações e 17 telas internas, Tarefas dos setores, Engenharia (lista e obra), Meu perfil, Super-admin; #299 faixa `gf` nas 13 telas da Gamificação.
+- #300 início do engenheiro, PR 1 (tela sem migration): **autorizada pelo Evandro**; mesclar quando o CI terminar verde, se ainda não estiver.
+
+**Próximos passos (cada um com o ok do Evandro):**
+1. Início do engenheiro, PR 2: "Sua trajetória" e "Engenharia concluída no mês". Exige RPC nova `security definer` (migration só com função) que agrega, por mês, obras e kWp com a Engenharia concluída (1ª conclusão, `obra_historico` fluxo_alterado engenharia→concluido) em que a pessoa foi registrada (`obra_participantes`) antes da conclusão; a RLS de `operacao` esconderia obras antigas. Marcos padrão 25 obras / 250 kWp, editáveis; filtros de 12 e 6 meses escondidos até haver histórico. Prévia aprovada: https://claude.ai/artifact/Xw2gMkRm5HMybtc3Kob5BH
+2. Tela Forecast (decisões em `docs/memoria-claude/projeto-forecast.md`).
+3. Gamificação: conteúdo dinâmico dos desenhos (títulos com dados, menu interno, tabelas).
+
+**Backups do trabalho local do PC antigo (no GitHub):** `backup/wt-calendario-operacional-20261103-wip`, `backup/wt-temperatura-20261103-wip`, `backup/wt-ui-fundacao-20261103-wip`, `backup/wt-m2-{b1,b2,f1,q1}-20261103-wip` e `backup/wt-m2-p0-{calc,d1d2,int,lf,retomada}-20261103-wip` (Time Aurora, cálculo solar M2); branches `feat/compras-orcamento-obra`, `feat/levantamento-tecnico` e `feat/roteamento-automatico-obras` (commits que só existiam localmente). Cada backup é um commit sobre o HEAD do worktree, sem alterar o branch original. Revisar antes de reaproveitar.
+
 ## Obras = One Page Result (OPR) — plano em 3 PRs (aprovado pelo Evandro em 02/11/2026; concluído em 03/11/2026)
 
 Telas aprovadas no canvas "Raion — Nova interface": `ObrasCompleta.dc.html` (painel de todas as obras) e `ObrasApresentacao.dc.html` (uma obra por tela). Regra: **sempre seguir os desenhos**.

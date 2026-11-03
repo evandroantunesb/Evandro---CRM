@@ -1,0 +1,7 @@
+- [Prévia antes de UI](feedback_previa_antes_de_ui.md) — mostrar canvas antes × depois e só codar interface após o ok do Evandro
+- [Canvas da nova interface](referencia-canvas-nova-interface.md) — links das prévias aprovadas e do design system (desatualizado)
+- [Nova interface: decisões](projeto-nova-interface.md) — faixa escura em toda tela, PR #284, Engenharia aprovada e perguntas em aberto
+- [Forecast](projeto-forecast.md) — tela nova abaixo de Negócios; botão substitui "Temperatura"; regra da chance pendente
+- [Onboarding Solo e PRO](projeto-onboarding-solo-pro.md) — assistente do admin; cores (destaque + barra), telas, setores, pagamento; Solo só vende + checklist da obra
+- [Seguir os desenhos](feedback_seguir_desenhos.md) — desenho aprovado no canvas vence proposta minha e código atual
+- [Obras = OPR](projeto-obras-opr.md) — concluída em 03/11 (#290–#292, aviso #295): visão Completa e Apresentação (Gantt) para o CEO
