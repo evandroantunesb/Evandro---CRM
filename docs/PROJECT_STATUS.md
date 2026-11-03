@@ -1,6 +1,6 @@
 # Estado do projeto — Raion CRM
 
-## Obras = One Page Result (OPR) — plano em 3 PRs (aprovado pelo Evandro em 02/11/2026)
+## Obras = One Page Result (OPR) — plano em 3 PRs (aprovado pelo Evandro em 02/11/2026; concluído em 03/11/2026)
 
 Telas aprovadas no canvas "Raion — Nova interface": `ObrasCompleta.dc.html` (painel de todas as obras) e `ObrasApresentacao.dc.html` (uma obra por tela). Regra: **sempre seguir os desenhos**.
 
@@ -8,7 +8,7 @@ Telas aprovadas no canvas "Raion — Nova interface": `ObrasCompleta.dc.html` (p
 | --- | --- | --- |
 | 1 | Prazos das etapas, entrega contratada, "material entregue" e cronograma calculado | #290 mesclada em 02/11/2026; migration `20261104100000_obras_cronograma.sql` aplicada (tag `migracao-pr290-a960dc4`) |
 | 2 | Custos (orçamento por categoria pré-preenchido pela calculadora, lançamentos sem apagar) e deduções do lucro | #291 mesclada em 02/11/2026; migration `20261105100000_obras_custos.sql` aplicada (tag `migracao-pr291-f48ad81`) |
-| 3 | Visão Completa, semáforo, justificativa de atraso e escalonamento (gestor e Operacional abrem e fecham); gestor vê todas as obras | branch `feat/obras-opr-completa`, migration `20261106100000_obras_opr_completa.sql` (não aplicada) |
+| 3 | Visão Completa, semáforo, justificativa de atraso e escalonamento (gestor e Operacional abrem e fecham); gestor vê todas as obras | #292 mesclada em 03/11/2026; migration `20261106100000_obras_opr_completa.sql` aplicada (tag `migracao-pr292-c1aa167`) |
 
 Decisões da PR 1:
 - Sete etapas em sequência, com prazo padrão em dias úteis que admin ou gestor editam em Configurações › Prazos das etapas: projeto 7, homologação 15, compra 5, entrega do material 7, instalação 5, vistoria 7, conexão 5. A entrega contratada é a chegada da obra mais 51 dias úteis; fica gravada na obra e admin ou gestor ajustam com motivo.
@@ -29,7 +29,8 @@ Decisões da PR 3 (desenho "Obras — Completa"):
 - Progresso = dias úteis previstos das etapas concluídas + o já corrido da etapa em andamento (até o prazo dela), sobre o total previsto; 100% só com todas concluídas. Substitui o avanço físico de demonstração da Apresentação (removido).
 - Justificativa de atraso: admin ou gestor pede a justificativa de uma etapa com atraso próprio ao responsável principal do setor da etapa (Projeto, Homologação, Vistoria e Conexão: Engenharia; Compra e Entrega do material: Compras; Instalação: Operacional, como no cronograma), com 2 dias úteis; pedir de novo a pendente é "cobrar" (renova o prazo). Responde quem recebeu o pedido, o admin ou quem coordena o setor, na ficha (cartão "Atrasos e justificativas"). Na Apresentação, o atraso sublinhado mostra a justificativa ou "pendente" com "Cobrar justificativa". Atraso só herdado continua com o motivo calculado.
 - Escalonamento: gestor, admin e quem atua no Operacional da obra abrem (título e valor opcional fora do programado) e fecham (com a decisão), na ficha (cartão "Escalonamentos"); vê quem vê os custos da obra. O histórico registra o fato, sem valores.
-- Pendente: quem recebe o pedido de justificativa ainda não é avisado (não há notificação); ele vê o pedido no cartão da ficha.
+- Aviso no sininho (#295, mesclada em 03/11/2026; migration `20261107100000_obras_justificativa_aviso.sql` aplicada, tag `migracao-pr295-762ad80`): pedido e cobrança avisam quem recebeu o pedido e o gestor da equipe dele; a resposta avisa quem pediu. Ninguém é avisado da própria ação.
+- Pendente (revisão de 03/11): cobrar uma justificativa pendente mantém quem recebeu o primeiro pedido, mesmo que o responsável principal do setor tenha mudado; admin e quem coordena o setor continuam podendo responder.
 
 ## Condições de pagamento na proposta — plano em 4 PRs (aprovado pelo Evandro em 01/11/2026; concluído em 02/11/2026)
 
