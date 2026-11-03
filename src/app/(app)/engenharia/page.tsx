@@ -1,4 +1,4 @@
-import { AlarmClock, BellRing, CalendarClock, CalendarX, CirclePause, HardHat, Hourglass, Inbox, type LucideIcon } from "lucide-react";
+import { AlarmClock, BadgeCheck, BellRing, CalendarClock, CalendarX, CirclePause, HardHat, Hourglass, Inbox, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { CabecalhoPagina, CLASSE_ACAO_CABECALHO, CLASSE_SEGMENTO_CABECALHO, classeItemSegmentoCabecalho } from "@/components/cabecalho-pagina";
 import { IniciarAtuacao } from "@/components/engenharia/iniciar-atuacao";
@@ -9,6 +9,7 @@ import { agendaPrazos, cargaPorResponsavel, montarMeuDia, resumoFaixa, type Just
 import { carregarIndicadoresEngenharia, carregarPrazosObras } from "@/lib/engenharia-prazos";
 import { lerPeriodo } from "@/lib/engenharia-prazos-regras";
 import { carregarStatusProtocolos, contarExigenciasAbertas } from "@/lib/engenharia-protocolos";
+import { concluidasNoMes, lerMetrica, lerTrajetoria } from "@/lib/engenharia-trajetoria";
 import { montarCentralEngenharia, montarKanbanEngenharia, type ObraNaEngenharia } from "@/lib/engenharia-regras";
 import { carregarAcoesVistoria } from "@/lib/engenharia-vistoria";
 import { hojeEmSaoPaulo, saudacao } from "@/lib/formatacao";
@@ -24,6 +25,7 @@ import { Aba, Kanban, ListaObras, ListaPorEtapa, ResumoFases } from "./carteira"
 import { Desempenho } from "./desempenho";
 import { FILTROS, hrefEngenharia, lerCarteira, lerFiltro, type EstadoEngenharia, type Filtro, type VisaoEngenharia } from "./estado";
 import { MeuDia, ProximosPrazos } from "./meu-dia";
+import { Trajetoria } from "./trajetoria";
 
 const VAZIO: Record<Filtro, string> = {
   abertas: "Nenhuma tarefa de Engenharia aberta.",
@@ -89,6 +91,7 @@ export default async function Engenharia({ searchParams }: PageProps<"/engenhari
     periodo: lerPeriodo(params.periodo),
     periodoNaUrl: params.periodo != null,
     ver: lerFiltro(params.ver),
+    metrica: lerMetrica(params.trajetoria),
   };
   const pessoal = estado.visao === "pessoal";
   // Definir responsável é do admin e do coordenador (quem a RPC deixa gerir a obra); o gestor só acompanha.
@@ -97,7 +100,7 @@ export default async function Engenharia({ searchParams }: PageProps<"/engenhari
   const podeIniciar = atual.papel === "operacao" && atua;
   const filtroTarefas = { empresaId: atual.empresaId, membroId: atual.membroId, papel: atual.papel, setor: "engenharia" as const };
 
-  const [abertas, daAba, porAba, obras, exigencias, acoesVistoria, prazos, indicadores, protocolos, participacoes, pedidos] = await Promise.all([
+  const [abertas, daAba, porAba, obras, exigencias, acoesVistoria, prazos, indicadores, protocolos, participacoes, pedidos, trajetoria] = await Promise.all([
     carregarTarefasSetor(supabase, { ...filtroTarefas, filtro: "abertas" }),
     estado.ver === "abertas" ? null : carregarTarefasSetor(supabase, { ...filtroTarefas, filtro: estado.ver }),
     contarAbasTarefasSetor(supabase, atual.empresaId, atual.membroId, "engenharia"),
@@ -111,8 +114,14 @@ export default async function Engenharia({ searchParams }: PageProps<"/engenhari
     supabase.from("obra_participantes").select("obra_id").eq("empresa_id", atual.empresaId).eq("membro_id", atual.membroId).eq("setor", "engenharia").is("fim", null),
     // Pedidos de justificativa de atraso ainda sem resposta, feitos a mim.
     supabase.from("obra_justificativas_atraso").select("id, obra_id, etapa, prazo").eq("empresa_id", atual.empresaId).eq("pedido_a", atual.membroId).is("respondido_em", null),
+    // Obras e kWp com a Engenharia concluída, por mês (a minha e, para quem vê a equipe, a do setor).
+    supabase.rpc("trajetoria_engenharia", { p_empresa_id: atual.empresaId }),
   ]);
   for (const r of [participacoes, pedidos]) if (r.error) throw r.error;
+  // Sem a trajetória, a tela segue sem o painel (como o Desempenho sem os indicadores).
+  const historico = trajetoria.error ? null : lerTrajetoria(trajetoria.data);
+  const mesAtual = hojeEmSaoPaulo().slice(0, 7);
+  const noMes = historico ? concluidasNoMes(historico.pessoal, mesAtual) : null;
   // Fases "Pronto para protocolo" e anteriores dependem do checklist (Resumo e Kanban).
   const checklistsAptos = await carregarChecklistsAptos(
     supabase,
@@ -191,6 +200,7 @@ export default async function Engenharia({ searchParams }: PageProps<"/engenhari
                 CalendarClock,
               ],
               ["Aguardando terceiros", daVisao.comTerceiros.length, "cliente, fornecedor ou concessionária", Hourglass],
+              ...(noMes ? [["Engenharia concluída no mês", noMes.atual, noMes.comparacao, BadgeCheck] as Numero] : []),
             ]}
           />
           <div className="grid items-start gap-4 lg:grid-cols-[3fr_2fr]">
@@ -255,6 +265,13 @@ export default async function Engenharia({ searchParams }: PageProps<"/engenhari
         </Cartao>
       </section>
 
+      {historico &&
+        (pessoal ? (
+          <Trajetoria meses={historico.pessoal} empresaNome={atual.empresaNome} estado={estado} mesAtual={mesAtual} />
+        ) : (
+          historico.equipe && <Trajetoria meses={historico.equipe.meses} pessoas={historico.equipe.pessoas} empresaNome={atual.empresaNome} estado={estado} mesAtual={mesAtual} />
+        ))}
+
       <CartaoRecolhivel
         titulo={`Aguardando terceiros (${daVisao.comTerceiros.length})`}
         resumo={daVisao.comTerceiros.length === 0 ? "Nenhuma obra esperando cliente, fornecedor ou concessionária." : "Obras esperando cliente, fornecedor ou concessionária."}
@@ -276,7 +293,8 @@ type Numero = [rotulo: string, valor: number, rodape: string | null, Icone: Luci
 /** Indicadores numa superfície só, separados por fios (como no Início), sem um cartão por número. */
 function Indicadores({ numeros }: { numeros: Numero[] }) {
   // Três números: um por linha no celular (dois por linha deixaria um buraco); mais que isso, em duas colunas.
-  const colunas = numeros.length <= 3 ? "grid-cols-1 sm:grid-cols-3" : numeros.length > 6 ? "grid-cols-2 sm:grid-cols-4 lg:grid-cols-7" : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-6";
+  const colunas =
+    numeros.length <= 3 ? "grid-cols-1 sm:grid-cols-3" : numeros.length === 4 ? "grid-cols-2 lg:grid-cols-4" : numeros.length > 6 ? "grid-cols-2 sm:grid-cols-4 lg:grid-cols-7" : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-6";
   return (
     <div className="painel overflow-hidden">
       <dl className={`grid gap-px bg-linha ${colunas}`}>

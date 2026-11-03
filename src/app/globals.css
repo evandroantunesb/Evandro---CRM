@@ -67,6 +67,7 @@
   --ease-raion: cubic-bezier(0.16, 1, 0.3, 1);
   --animate-entrar: entrar 520ms var(--ease-raion) both;
   --animate-subir: subir 380ms var(--ease-raion) both;
+  --animate-crescer: crescer 700ms var(--ease-raion) both;
 
   @keyframes entrar {
     from {
@@ -80,6 +81,13 @@
     from {
       opacity: 0;
       transform: translateY(32px);
+    }
+  }
+
+  /* Barras de gráfico: crescem da base ao abrir a tela. */
+  @keyframes crescer {
+    from {
+      transform: scaleY(0);
     }
   }
 }
