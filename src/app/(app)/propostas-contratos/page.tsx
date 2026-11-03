@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CabecalhoPagina, CLASSE_SEGMENTO_CABECALHO, CLASSE_VIDRO_CABECALHO, classeItemSegmentoCabecalho } from "@/components/cabecalho-pagina";
 import type { ReactNode } from "react";
 import { Botao, Selecao, Selo } from "@/components/ui";
 import { carregarConfiguracao, formatarDataHora, formatarMoeda } from "@/lib/crm";
@@ -93,45 +94,38 @@ export default async function PropostasContratos({ searchParams }: PageProps<"/p
 
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Propostas e contratos</h1>
-          <p className="text-sm text-zinc-500">
-            {visao === "propostas"
-              ? "Propostas enviadas e se o cliente já viu."
-              : "Contratos, assinatura e pagamento de cada venda."}
-          </p>
-        </div>
-        {visao === "contratos" && pode(atual.papel, EDITAR_MODELO_CONTRATO) && (
-          <Link
-            href="/configuracoes/contrato"
-            className="inline-flex min-h-10 items-center rounded-lg border border-zinc-200 bg-white px-3.5 py-2 text-sm font-medium text-carvao hover:bg-offwhite"
-          >
-            Editar modelo
-          </Link>
-        )}
-      </div>
+      <CabecalhoPagina
+        sobretitulo="Venda"
+        titulo="Propostas e contratos"
+        descricao={visao === "propostas" ? "Propostas enviadas e se o cliente já viu." : "Contratos, assinatura e pagamento de cada venda."}
+        acoes={
+          <>
+            <nav aria-label="Documento" className={CLASSE_SEGMENTO_CABECALHO}>
+              {VISOES_VENDA.map((v) => (
+                <Link
+                  key={v}
+                  href={`/propostas-contratos?visao=${v}`}
+                  aria-current={v === visao ? "page" : undefined}
+                  className={classeItemSegmentoCabecalho(v === visao)}
+                >
+                  {ROTULO_VISAO_VENDA[v]} ({linhasDaVisao(linhas, v).length})
+                </Link>
+              ))}
+            </nav>
+            {visao === "contratos" && pode(atual.papel, EDITAR_MODELO_CONTRATO) && (
+              <Link href="/configuracoes/contrato" className={CLASSE_VIDRO_CABECALHO}>
+                Editar modelo
+              </Link>
+            )}
+          </>
+        }
+      />
 
       {registroManualIndisponivel && (
         <p className="text-xs text-zinc-500" role="status">
           Registro manual de pagamento temporariamente indisponível: a situação de pagamento mostra só as confirmações do contrato.
         </p>
       )}
-
-      <nav className="flex gap-1 border-b border-zinc-200" aria-label="Visão">
-        {VISOES_VENDA.map((v) => (
-          <Link
-            key={v}
-            href={`/propostas-contratos?visao=${v}`}
-            aria-current={v === visao ? "page" : undefined}
-            className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
-              v === visao ? "border-dourado text-zinc-900" : "border-transparent text-zinc-500 hover:text-zinc-800"
-            }`}
-          >
-            {ROTULO_VISAO_VENDA[v]} ({linhasDaVisao(linhas, v).length})
-          </Link>
-        ))}
-      </nav>
 
       <div className="flex flex-wrap gap-2">
         {atalhos.map((a) => (

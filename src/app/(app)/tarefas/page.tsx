@@ -1,7 +1,8 @@
-import { AlertTriangle, CalendarClock, CheckCircle2, Clock3, type LucideIcon } from "lucide-react";
+import { AlertTriangle, CalendarClock, CheckCircle2, ChevronDown, Clock3, Plus, type LucideIcon } from "lucide-react";
+import { CabecalhoPagina, CLASSE_ACAO_CABECALHO, CLASSE_VIDRO_CABECALHO } from "@/components/cabecalho-pagina";
 import { ListaTarefas, type TarefaLista } from "@/components/lista-tarefas";
 import { NovaTarefa } from "@/components/nova-tarefa";
-import { Botao, Cartao, Selecao } from "@/components/ui";
+import { Cartao } from "@/components/ui";
 import { carregarConfiguracao, fimDaSemana, inicioDoDia, situacaoPrazo } from "@/lib/crm";
 import { exigirPapel } from "@/lib/sessao";
 import { ATRIBUIR_TAREFA_A_OUTROS, RESPONSAVEL_COMERCIAL, TAREFAS, VER_TAREFAS_DE_OUTROS, pode } from "@/lib/permissoes";
@@ -76,30 +77,45 @@ export default async function Tarefas({ searchParams }: PageProps<"/tarefas">) {
 
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Tarefas</h1>
-          <p className="text-sm text-zinc-500">Acompanhe suas atividades do dia e próximos compromissos.</p>
-        </div>
-        {podeVerOutros && (
-          <form action="/tarefas" className="flex gap-2">
-            <Selecao name="responsavel" defaultValue={responsavel} aria-label="De quem">
-              <option value={atual.membroId}>Minhas tarefas</option>
-              <option value="">Todos que eu acompanho</option>
-              {config.membros
-                .filter((m) => m.ativo && m.id !== atual.membroId && pode(m.papel, RESPONSAVEL_COMERCIAL))
-                .map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.nome}
-                  </option>
-                ))}
-            </Selecao>
-            <Botao type="submit" variante="secundario">
-              Ver
-            </Botao>
-          </form>
-        )}
-      </div>
+      <CabecalhoPagina
+        sobretitulo="Agenda"
+        titulo="Tarefas"
+        descricao="Acompanhe suas atividades do dia e próximos compromissos."
+        acoes={
+          <>
+            {podeVerOutros && (
+              <form action="/tarefas" className="flex gap-2">
+                <label className="relative">
+                  <span className="sr-only">De quem</span>
+                  <select
+                    name="responsavel"
+                    defaultValue={responsavel}
+                    className={`${CLASSE_VIDRO_CABECALHO} appearance-none pr-10 [&>option]:text-carvao`}
+                  >
+                    <option value={atual.membroId}>Minhas tarefas</option>
+                    <option value="">Todos que eu acompanho</option>
+                    {config.membros
+                      .filter((m) => m.ativo && m.id !== atual.membroId && pode(m.papel, RESPONSAVEL_COMERCIAL))
+                      .map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.nome}
+                        </option>
+                      ))}
+                  </select>
+                  <ChevronDown size={16} className="pointer-events-none absolute top-1/2 right-4 -translate-y-1/2 text-offwhite/80" aria-hidden />
+                </label>
+                <button type="submit" className={CLASSE_VIDRO_CABECALHO}>
+                  Ver
+                </button>
+              </form>
+            )}
+            <a href="#nova-tarefa" className={CLASSE_ACAO_CABECALHO}>
+              <Plus size={16} aria-hidden />
+              Nova tarefa
+            </a>
+          </>
+        }
+      />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <KpiTarefa
@@ -136,13 +152,15 @@ export default async function Tarefas({ searchParams }: PageProps<"/tarefas">) {
         <Cartao titulo="Minhas prioridades">
           <ListaTarefas tarefas={prioridades} vazio="Nenhuma prioridade pendente. Sua operação está em dia." />
         </Cartao>
-        <Cartao titulo="Nova tarefa avulsa">
-          <p className="mb-2 text-sm text-zinc-600">Para tarefas de um cliente, crie pela tela do negócio.</p>
-          <NovaTarefa
-            responsaveis={pode(atual.papel, ATRIBUIR_TAREFA_A_OUTROS) ? config.membros.filter((m) => m.ativo && pode(m.papel, RESPONSAVEL_COMERCIAL)) : []}
-            responsavelPadrao={atual.membroId}
-          />
-        </Cartao>
+        <div id="nova-tarefa" className="scroll-mt-4">
+          <Cartao titulo="Nova tarefa avulsa">
+            <p className="mb-2 text-sm text-zinc-600">Para tarefas de um cliente, crie pela tela do negócio.</p>
+            <NovaTarefa
+              responsaveis={pode(atual.papel, ATRIBUIR_TAREFA_A_OUTROS) ? config.membros.filter((m) => m.ativo && pode(m.papel, RESPONSAVEL_COMERCIAL)) : []}
+              responsavelPadrao={atual.membroId}
+            />
+          </Cartao>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">

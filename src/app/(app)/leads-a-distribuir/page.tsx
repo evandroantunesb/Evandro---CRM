@@ -1,3 +1,4 @@
+import { CabecalhoPagina } from "@/components/cabecalho-pagina";
 import { Cartao } from "@/components/ui";
 import { carregarConfiguracao } from "@/lib/crm";
 import { candidatosDistribuicao, carregarAtribuicoesPendentes, responsavelPadrao } from "@/lib/distribuicao-leads";
@@ -15,14 +16,11 @@ export default async function LeadsADistribuir() {
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-4">
-      <div>
-        <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Leads a distribuir</h1>
-        <p className="text-sm text-zinc-500">
-          Leads que chegaram pela captura com um responsável sugerido pelo rodízio. Confirme a sugestão ou escolha outra
-          pessoa. Sem decisão, o lead é atribuído automaticamente ao sugerido quando vence o prazo de auto-aprovação da
-          origem.
-        </p>
-      </div>
+      <CabecalhoPagina
+        sobretitulo="Comercial · Aquisição"
+        titulo="Leads a distribuir"
+        descricao="Confirme o responsável sugerido pelo rodízio ou escolha outra pessoa."
+      />
 
       <Cartao titulo={`Aguardando distribuição (${atribuicoes.length})`}>
         {atribuicoes.length === 0 ? (
