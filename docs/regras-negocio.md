@@ -15,6 +15,7 @@ Não altere nenhuma destas regras sem pedido explícito do Evandro.
 - **Imagem da recompensa:** opcional; só admin adiciona, edita, substitui ou remove. Arquivo de até 3 MB, somente JPEG, PNG ou WebP (SVG recusado), sempre recortado em 4:3 antes do envio.
 - **WhatsApp:** só botão `wa.me` + registro manual (sem API oficial).
 - **Cobrança:** super-admin define plano/valor por empresa; sem gateway de pagamento.
+- **Confirmação de pagamento (03/11/2026):** só admin ou gestor confirma o pagamento de um contrato assinado, no Solo e no Pro, **inclusive o da própria venda**; o vendedor não confirma. A autoconfirmação conta normalmente para pontos e comissão (o crédito vai ao responsável congelado na assinatura), fica registrada com quem confirmou e qualquer admin ou gestor pode estorná-la. O registro sozinho do Solo (antes do contrato) continua só para o admin único.
 - **Proposta e contrato** "fotografam" o modelo na geração; editar o modelo depois não muda o documento já gerado. Contrato só pode ser regerado em rascunho.
 - CNH e documentos pessoais são dado sensível (LGPD): acesso restrito.
 - **Dados de teste (legado):** Equipe Cascavel em produção (Camila, Rafael, Bruno; e-mails `*.teste@raioncrm-demo.com.br`), criada por `scripts/seed-equipe-cascavel.mjs`. A base de demonstração da PR #132 (`scripts/seed-base-demo.mjs`) não a substitui nem apaga: cria uma empresa separada, "Raion Solar Demo". O repositório é público: senhas não ficam aqui.

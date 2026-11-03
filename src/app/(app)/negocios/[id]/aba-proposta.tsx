@@ -215,12 +215,8 @@ export function AbaProposta({ ficha }: { ficha: Ficha }) {
                   negocioId={negocio.id}
                   contratoId={contrato.id}
                   status={statusPagamento as StatusPagamentoContrato}
-                  podeConfirmar={(souAdmin || atual.papel === "gestor") && contrato.responsavel_assinatura_id !== atual.membroId}
-                  motivoSemConfirmar={
-                    souAdmin || atual.papel === "gestor"
-                      ? "Quem fechou a venda não confirma o próprio pagamento: peça a outro admin ou gestor."
-                      : "Só gestor ou admin pode confirmar o pagamento."
-                  }
+                  podeConfirmar={souAdmin || atual.papel === "gestor"}
+                  motivoSemConfirmar="Só gestor ou admin pode confirmar o pagamento."
                 />
               )}
             </div>

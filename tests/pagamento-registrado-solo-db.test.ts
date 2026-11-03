@@ -404,10 +404,6 @@ describe("Pro intacto e um pagamento por negócio", () => {
     const status = async () => (await servico.rpc("status_pagamento_contrato", { p_contrato_id: contratoId })).data;
     expect(await status()).toBe("pendente");
 
-    // Quem assinou como responsável não confirma o próprio pagamento.
-    const { error: autoconfirmacao } = await original.cliente.rpc("confirmar_pagamento", { p_contrato_id: contratoId });
-    expect(autoconfirmacao?.message).toContain("assinou como responsável");
-
     const { error: erroConf } = await financeiro.cliente.rpc("confirmar_pagamento", { p_contrato_id: contratoId });
     expect(erroConf).toBeNull();
     expect(await status()).toBe("confirmado");
@@ -443,6 +439,23 @@ describe("Pro intacto e um pagamento por negócio", () => {
     expect(erroEstornoConf).toBeNull();
     expect(await status()).toBe("estornado");
     expect(await registrosDo(negocioId)).toEqual(regs);
+  });
+
+  it("Solo com equipe: o admin não registra sozinho, mas confirma a própria venda pela confirmação (03/11/2026)", async () => {
+    const [dono, vendedor] = await Promise.all(["se-dono", "se-vendedor"].map(criarUsuario));
+    const emp = await criarEmpresa("Solo com equipe", "solo", [
+      { u: dono, papel: "admin" },
+      { u: vendedor, papel: "vendedor" },
+    ]);
+    const negocioId = await criarNegocio(emp, "Venda do dono", dono);
+    const contratoId = await gerarContrato(emp, negocioId, dono);
+    await assinar(contratoId, dono);
+
+    expect((await registrar(dono, negocioId)).error).not.toBeNull();
+    const { data: conf, error } = await dono.cliente.rpc("confirmar_pagamento", { p_contrato_id: contratoId });
+    expect(error).toBeNull();
+    expect(conf).toMatchObject({ confirmado_por_user_id: dono.id, beneficiario_user_id: dono.id });
+    expect((await servico.rpc("status_pagamento_contrato", { p_contrato_id: contratoId })).data).toBe("confirmado");
   });
 
   it("confirmação do Pro recusa negócio com registro ativo (mensagem do registro)", async () => {

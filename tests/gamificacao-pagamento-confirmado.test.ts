@@ -1,7 +1,7 @@
 /**
  * Pagamento confirmado (Evandro, 2026-10-01): marco operacional auditável — "Aguardando
  * pagamento" → "Pagamento confirmado" — sem módulo financeiro completo. Só gestor/admin
- * confirma, nunca o closer que assinou o contrato (beneficiário congelado na assinatura,
+ * confirma, inclusive a própria venda desde 03/11/2026; o vendedor nunca (beneficiário congelado na assinatura,
  * via `contratos.responsavel_assinatura_id` — nunca `negocios.responsavel_id` atual, que
  * pode mudar por redistribuição). Desenho revisado em Opus antes de codar
  * (20261001250000_gamificacao_pagamento_confirmado.sql).
@@ -106,23 +106,6 @@ describe("confirmar_pagamento", () => {
     expect(error!.message).toContain("gestor ou admin");
   });
 
-  it("gestor responsável pelo próprio negócio não pode autoconfirmar", async () => {
-    const negocioId = await criarNegocio("Gestor é o responsável", membro[gestorResponsavel.id]);
-    const contratoId = await criarEAssinarContrato(negocioId, gestorResponsavel.cliente);
-
-    const { error } = await gestorResponsavel.cliente.rpc("confirmar_pagamento", { p_contrato_id: contratoId });
-    expect(error).not.toBeNull();
-    expect(error!.message).toContain("assinou como responsável");
-  });
-
-  it("admin responsável pelo próprio negócio não pode autoconfirmar", async () => {
-    const negocioId = await criarNegocio("Admin é o responsável", membro[admin.id]);
-    const contratoId = await criarEAssinarContrato(negocioId, admin.cliente);
-
-    const { error } = await admin.cliente.rpc("confirmar_pagamento", { p_contrato_id: contratoId });
-    expect(error).not.toBeNull();
-  });
-
   it("gestor confirma: evento ator=gestor beneficiário=closer, só o closer pontua", async () => {
     const negocioId = await criarNegocio("Fluxo feliz", membro[closer.id]);
     const contratoId = await criarEAssinarContrato(negocioId, closer.cliente);
@@ -152,6 +135,34 @@ describe("confirmar_pagamento", () => {
     expect(ledger).toHaveLength(1);
     expect(ledger![0].membro_id).toBe(membro[closer.id]);
   });
+
+  // Autoconfirmação (Evandro, 03/11/2026): admin e gestor confirmam a própria venda, que conta normalmente
+  // (a regra de "Pagamento confirmado" já existe, criada no teste anterior).
+  for (const [quem, titulo] of [
+    [() => gestorResponsavel, "Gestor é o responsável"],
+    [() => admin, "Admin é o responsável"],
+  ] as const) {
+    it(`${titulo.split(" ")[0].toLowerCase()} confirma a própria venda: ator e beneficiário são ele, e ele pontua`, async () => {
+      const eu = quem();
+      const negocioId = await criarNegocio(titulo, membro[eu.id]);
+      const contratoId = await criarEAssinarContrato(negocioId, eu.cliente);
+
+      const { data: conf, error } = await eu.cliente.rpc("confirmar_pagamento", { p_contrato_id: contratoId });
+      expect(error).toBeNull();
+      expect(conf).toMatchObject({ confirmado_por_user_id: eu.id, beneficiario_user_id: eu.id });
+
+      const { data: ev } = await servico
+        .from("eventos")
+        .select("id, ator_id, beneficiario_id")
+        .eq("entidade_id", negocioId)
+        .eq("tipo", "pagamento.confirmado")
+        .single();
+      expect(ev).toMatchObject({ ator_id: eu.id, beneficiario_id: eu.id });
+
+      const { data: ledger } = await servico.from("point_ledger").select("membro_id, xp").eq("evento_id", ev!.id);
+      expect(ledger).toEqual([{ membro_id: membro[eu.id], xp: 25 }]);
+    });
+  }
 
   it("confirmação duplicada: erro, sem segundo evento nem segundo lançamento", async () => {
     const negocioId = await criarNegocio("Duplicada", membro[closer.id]);

@@ -127,7 +127,7 @@ describe("a assinatura nasce do UPDATE, com responsável e eventos do banco", ()
     expect((await servico.from("contratos").select("id").eq("negocio_id", n)).data).toHaveLength(0);
   });
 
-  it("o gestor dono do negócio não consegue apontar um colega como beneficiário para se autoconfirmar", async () => {
+  it("o gestor dono do negócio não consegue apontar um colega como beneficiário; ao se autoconfirmar, o crédito é dele", async () => {
     const n = await criarNegocio(A, "ic-autoconfirma", gestorA);
     const forjado = await gestorA.cliente
       .from("contratos")
@@ -136,13 +136,15 @@ describe("a assinatura nasce do UPDATE, com responsável e eventos do banco", ()
       .single();
     expect(forjado.error).not.toBeNull();
 
-    // Caminho legítimo: o banco congela o próprio gestor como responsável, e ele não confirma o que assinou.
+    // Caminho legítimo: o banco congela o próprio gestor como responsável; desde 03/11/2026 ele confirma o que
+    // assinou, e o beneficiário é ele mesmo, nunca o colega.
     const id = await rascunho(gestorA, A, n);
     expect((await gestorA.cliente.from("contratos").update({ status: "assinado" }).eq("id", id)).error).toBeNull();
     expect((await contratoNoBanco(id)).responsavel_assinatura_id).toBe(m(A, gestorA));
     const conf = await gestorA.cliente.rpc("confirmar_pagamento", { p_contrato_id: id });
-    expect(conf.error).not.toBeNull();
-    expect((await eventosDo(n)).filter((e) => e.tipo === "pagamento.confirmado")).toHaveLength(0);
+    expect(conf.error).toBeNull();
+    expect(conf.data).toMatchObject({ beneficiario_membro_id: m(A, gestorA), confirmado_por_membro_id: m(A, gestorA) });
+    expect((await eventosDo(n)).filter((e) => e.tipo === "pagamento.confirmado")).toHaveLength(1);
   });
 });
 
@@ -206,9 +208,9 @@ describe("responsável e perfil da assinatura só pelo congelamento do banco", (
       responsavel_assinatura_id: congelado.responsavel_assinatura_id,
       perfil_assinatura: congelado.perfil_assinatura,
     });
-    // O gestor segue sem poder confirmar o que ele mesmo assinou como responsável.
-    expect((await gestorA.cliente.rpc("confirmar_pagamento", { p_contrato_id: id })).error).not.toBeNull();
-    expect((await eventosDo(n)).filter((e) => e.tipo === "pagamento.confirmado")).toHaveLength(0);
+    // Desde 03/11/2026 o gestor confirma o que ele mesmo assinou como responsável; o crédito vai ao responsável congelado.
+    expect((await gestorA.cliente.rpc("confirmar_pagamento", { p_contrato_id: id })).error).toBeNull();
+    expect((await eventosDo(n)).filter((e) => e.tipo === "pagamento.confirmado")).toHaveLength(1);
   });
 
   it("assinar enviando o responsável junto é recusado; assinar só com o status congela o responsável do negócio", async () => {
