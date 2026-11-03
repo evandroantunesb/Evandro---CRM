@@ -23,7 +23,11 @@ export type Notificacao = {
     | "tarefa_setor_reaberta"
     // Aprovação de desconto (20261102200000_descontos_aprovacao.sql).
     | "desconto_solicitado"
-    | "desconto_decidido";
+    | "desconto_decidido"
+    // Justificativa de atraso das obras (20261107100000_obras_justificativa_aviso.sql).
+    | "justificativa_atraso_pedida"
+    | "justificativa_atraso_cobrada"
+    | "justificativa_atraso_respondida";
   mensagem: string;
   link: string | null;
 };
