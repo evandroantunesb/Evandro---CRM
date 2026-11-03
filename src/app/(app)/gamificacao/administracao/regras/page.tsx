@@ -3,7 +3,7 @@ import { EVENTOS_GAMIFICACAO, EVENTOS_GAMIFICACAO_SELECIONAVEIS } from "@/lib/ga
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import type { OperadorCondicao, PerfilGamificacao, PeriodoLimiteRegra } from "@/lib/tipos";
-import { CabecalhoPaginaGf, CartaoGf, EstadoVazioGf, PaginaGf, VoltarGf } from "../../_compartilhado/ui";
+import { CabecalhoPaginaGf, CartaoGf, EstadoVazioGf, PaginaGf } from "../../_compartilhado/ui";
 import { LinhaRegra, NovaRegra } from "../_compartilhado/formularios";
 
 export default async function RegrasDePontos() {
@@ -17,8 +17,9 @@ export default async function RegrasDePontos() {
 
   return (
     <PaginaGf largura="formulario">
-      <VoltarGf href="/configuracoes#gamificacao">Configurações</VoltarGf>
       <CabecalhoPaginaGf
+        voltar={{ href: "/configuracoes#gamificacao", rotulo: "Configurações" }}
+        sobretitulo="Gamificação e metas · admin"
         titulo="Regras de pontos"
         descricao="Cada regra associa um evento do CRM a XP (progressão: ranking, nível, conquistas) e/ou moedas (saldo gastável na loja). Sempre que o evento acontecer (e a condição, se houver, for satisfeita), o lançamento entra automaticamente no extrato do responsável. Cada regra vale só para negócios do seu tipo (energia solar ou eletroposto)."
       />

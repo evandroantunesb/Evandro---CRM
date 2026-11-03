@@ -2,7 +2,7 @@ import { PackageCheck } from "lucide-react";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import type { StatusResgate } from "@/lib/tipos";
-import { CabecalhoPaginaGf, CartaoGf, EstadoVazioGf, PaginaGf, VoltarGf } from "../../gamificacao/_compartilhado/ui";
+import { CabecalhoPaginaGf, CartaoGf, EstadoVazioGf, PaginaGf } from "../../gamificacao/_compartilhado/ui";
 import { LinhaResgate } from "./formulario";
 
 export default async function ConfigResgates() {
@@ -17,8 +17,9 @@ export default async function ConfigResgates() {
 
   return (
     <PaginaGf largura="formulario">
-      <VoltarGf href="/configuracoes#gamificacao">Configurações</VoltarGf>
       <CabecalhoPaginaGf
+        voltar={{ href: "/configuracoes#gamificacao", rotulo: "Configurações" }}
+        sobretitulo="Gamificação e metas · admin"
         titulo="Resgates"
         descricao="Pedidos de troca de moedas por recompensas. Cancelar um pedido devolve as moedas ao colaborador."
       />

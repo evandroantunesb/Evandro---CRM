@@ -2,7 +2,7 @@ import { Gift } from "lucide-react";
 import { exigirPapel } from "@/lib/sessao";
 import { assinarImagensEmLote } from "@/lib/storage-imagens";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { CabecalhoPaginaGf, CartaoGf, EstadoVazioGf, PaginaGf, VoltarGf } from "../../_compartilhado/ui";
+import { CabecalhoPaginaGf, CartaoGf, EstadoVazioGf, PaginaGf } from "../../_compartilhado/ui";
 import { LinhaRecompensa, NovaRecompensa } from "../_compartilhado/formularios";
 
 export default async function Recompensas() {
@@ -21,8 +21,9 @@ export default async function Recompensas() {
 
   return (
     <PaginaGf largura="formulario">
-      <VoltarGf href="/configuracoes#gamificacao">Configurações</VoltarGf>
       <CabecalhoPaginaGf
+        voltar={{ href: "/configuracoes#gamificacao", rotulo: "Configurações" }}
+        sobretitulo="Gamificação e metas · admin"
         titulo="Recompensas"
         descricao="A loja de recompensas deixa o colaborador trocar moedas por prêmios. O saldo é debitado assim que ele resgata; cancelar um resgate devolve as moedas."
       />
