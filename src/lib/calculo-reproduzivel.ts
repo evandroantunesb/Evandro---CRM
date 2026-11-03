@@ -2,11 +2,21 @@
  * Cálculo solar reproduzível a partir do que fica gravado (funções puras, sem Supabase e sem "server-only").
  *
  * As entradas usadas em `calcular` (consumo, tarifa, potência, preço, fatura) são as MESMAS que serão persistidas
- * em `calculos_solares`, na escala das colunas. Assim, refazer o cálculo a partir da linha salva reproduz os resultados salvos.
- * As fórmulas de `calcular` não são tocadas aqui.
+ * em `calculos_solares`, na escala das colunas.
+ *
+ * ATENÇÃO (M2-B8): o motor `calcular` devolve hoje SEMPRE estimativa incompleta; `linhaDeCalculo` repassa isso como
+ * `{ ok: false, incompleta: true, pendencias }` e NENHUMA linha nova é gravada. Linhas já existentes foram geradas pela
+ * fórmula antiga (não validada) e não são reproduzíveis por `calcular`.
  */
 import { calcular, DISPONIBILIDADE_PADRAO, type EntradaCalculo } from "@/lib/calculadora";
 import { consumoComoPersistido, valorComoPersistido } from "@/lib/consumo-persistido";
+import {
+  avaliarEstimativa,
+  ENQUADRAMENTO_NAO_INFORMADO,
+  hojeIso,
+  listaDePendencias,
+  type Pendencia,
+} from "@/lib/estimativa-financeira";
 import type { Database } from "@/lib/supabase/database.types";
 import type { TipoLigacao } from "@/lib/tipos";
 
@@ -53,10 +63,45 @@ export type ParametrosCalculo = {
  * conta em R$, sem consumo em kWh nem tarifa efetiva confiável. O cálculo financeiro não é gerado; quem chama pode
  * salvar negócio e kit e repassar `mensagem` como aviso.
  */
-export type ResultadoLinha = { ok: true; linha: LinhaCalculo } | { ok: false; mensagem: string; incompleta?: true };
+export type ResultadoLinha =
+  | { ok: true; linha: LinhaCalculo }
+  | { ok: false; mensagem: string; incompleta?: undefined }
+  | {
+      ok: false;
+      mensagem: string;
+      incompleta: true;
+      pendencias: Pendencia[];
+      potenciaKwp: number | null;
+      geracaoEstimadaKwhMes: number | null;
+    };
 
 export const MENSAGEM_ESTIMATIVA_INCOMPLETA =
   "Estimativa financeira incompleta: informe o consumo em kWh ou a tarifa efetiva da conta.";
+
+/** Texto do aviso de estimativa incompleta (kit salvo, nenhuma linha gravada em `calculos_solares`). */
+export function mensagemEstimativaIncompleta(pendencias: Pendencia[]): string {
+  return `Estimativa financeira incompleta: ${listaDePendencias(pendencias)}.`;
+}
+
+/** Pendências de uma entrada que nem chega a ter parâmetros/potência (ex.: kit ainda sem módulo). */
+export function pendenciasDaEntrada(entrada: {
+  consumoMedioKwh: number | null;
+  valorFaturaMedio: number | null;
+  tarifaKwh: number | null;
+}): Pendencia[] {
+  return avaliarEstimativa({
+    enquadramento: ENQUADRAMENTO_NAO_INFORMADO,
+    tarifaBaseRsKwh: entrada.tarifaKwh,
+    tarifaBaseBaseTributaria: null,
+    consumoMedioKwh: entrada.consumoMedioKwh,
+    consumoOrigem: entrada.consumoMedioKwh == null && entrada.valorFaturaMedio != null ? "estimado_conta" : "informado",
+    tarifaEfetivaContaRsKwh: null,
+    parametrosFioB: null,
+    dataReferencia: hojeIso(),
+    potenciaKwp: null,
+    produtividadeKwhKwpMes: null,
+  }).pendencias;
+}
 
 /** Validações da entrada (antes de consultar parâmetros). `null` = entrada aceita. */
 export function problemaDaEntrada(entrada: Pick<EntradaLinhaCalculo, "consumoMedioKwh" | "valorFaturaMedio" | "potenciaKwp">): string | null {
@@ -92,7 +137,17 @@ export function linhaDeCalculo(empresaId: string, entrada: EntradaLinhaCalculo, 
 
   // Conta em R$ sem consumo em kWh: dividir pela tarifa BASE misturaria tarifa efetiva com tarifa base.
   // Não há tarifa efetiva confiável nesta entrada, então o cálculo financeiro não é gerado.
-  if (entrada.consumoMedioKwh == null) return { ok: false, mensagem: MENSAGEM_ESTIMATIVA_INCOMPLETA, incompleta: true };
+  if (entrada.consumoMedioKwh == null) {
+    const pendencias = pendenciasDaEntrada({ consumoMedioKwh: null, valorFaturaMedio, tarifaKwh });
+    return {
+      ok: false,
+      mensagem: mensagemEstimativaIncompleta(pendencias),
+      incompleta: true,
+      pendencias,
+      potenciaKwp,
+      geracaoEstimadaKwhMes: parametros ? valorComoPersistido(potenciaKwp * parametros.produtividade_kwh_kwp_mes, 2) : null,
+    };
+  }
 
   const consumoMedioKwh = consumoComoPersistido(entrada.consumoMedioKwh);
   if (!Number.isFinite(consumoMedioKwh) || consumoMedioKwh <= 0) return { ok: false, mensagem: MENSAGEM_CONSUMO };
@@ -111,6 +166,19 @@ export function linhaDeCalculo(empresaId: string, entrada: EntradaLinhaCalculo, 
     disponibilidadeKwh,
   });
 
+  // Hoje o motor só devolve "incompleta": nenhuma linha nova em `calculos_solares`.
+  if (resultado.estado === "incompleta") {
+    return {
+      ok: false,
+      mensagem: mensagemEstimativaIncompleta(resultado.pendencias),
+      incompleta: true,
+      pendencias: resultado.pendencias,
+      potenciaKwp: resultado.potenciaKwp,
+      geracaoEstimadaKwhMes: resultado.geracaoEstimadaKwhMes,
+    };
+  }
+
+  // Ponto de extensão: ramo "completa" (só existirá após a validação da fórmula; exigirá também coluna de método).
   return {
     ok: true,
     linha: {

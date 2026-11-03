@@ -4,7 +4,10 @@ import { ANEXOS_CRIACAO, problemaArquivo } from "@/lib/anexos-regras";
 import { arquivoMetaSchema } from "@/lib/anexos-servidor";
 import { componentesJsonSchema, nomeKitPersonalizado, potenciaKitPersonalizadoKwp, type ComponenteKit } from "@/lib/calculadora";
 import { paybackComPreco, precoDoCalculoDesatualizado } from "@/lib/calculo-preco";
+import { pendenciasDaEntrada, mensagemEstimativaIncompleta } from "@/lib/calculo-reproduzivel";
+import { carregarVigencia, mensagemDeRecusa, motivosDaAcao } from "@/lib/calculo-vigencia";
 import { montarLinhaCalculo } from "@/lib/calculo-servidor";
+import type { Pendencia } from "@/lib/estimativa-financeira";
 import { mensagemErro } from "@/lib/erros";
 import { lerNumeroBr, MENSAGEM_NUMERO_BR } from "@/lib/formatacao";
 import {
@@ -112,8 +115,14 @@ const esquemaNovo = z.object({
 });
 
 /** Os arquivos vão depois, do navegador direto ao Storage (`enviarArquivos`), para `empresaId/negocioId`. */
+export type EstimativaCriacao = { estado: "incompleta"; mensagem: string; pendencias: Pendencia[] };
+
+/**
+ * `estimativa` (opcional) = informação de que a estimativa financeira ficou incompleta (não é falha nem aviso de erro):
+ * negócio e kit foram salvos e nenhuma linha foi gravada em `calculos_solares`.
+ */
 export type ResultadoCriacao =
-  | { ok: true; negocioId: string; empresaId: string; avisos: AvisoCriacao[] }
+  | { ok: true; negocioId: string; empresaId: string; avisos: AvisoCriacao[]; estimativa?: EstimativaCriacao }
   | { ok: false; mensagem: string; contatoId?: string };
 
 async function inserirItensKit(supabase: SupabaseServidor, empresaId: string, negocioId: string, componentes: ComponenteKit[]) {
@@ -226,7 +235,8 @@ export async function criarNegocioComCliente(supabase: SupabaseServidor, atual: 
     };
   }
 
-  // Itens do kit são gravados com ou sem tarifa; o cálculo só quando há tarifa.
+  // Itens do kit são gravados com ou sem tarifa; a estimativa só é avaliada quando há tarifa (hoje sempre incompleta).
+  let estimativa: EstimativaCriacao | undefined;
   if (d.componentes.length) {
     const { error: erroKit } = await inserirItensKit(supabase, atual.empresaId, negocio.id, d.componentes);
     if (erroKit) {
@@ -241,18 +251,21 @@ export async function criarNegocioComCliente(supabase: SupabaseServidor, atual: 
         valorFaturaMedio: d.valor_fatura_medio,
         tarifaKwh: d.tarifa_kwh,
       });
-      const erroCalculo = montado.ok
-        ? (
-            await supabase
-              .from("calculos_solares")
-              .insert({ ...montado.linha, negocio_id: negocio.id, atualizado_por: atual.membroId, criado_por: atual.membroId })
-          ).error
-        : true;
-      if (erroCalculo) avisos.push("calculo");
+      if (montado.ok) {
+        const { error: erroCalculo } = await supabase
+          .from("calculos_solares")
+          .insert({ ...montado.linha, negocio_id: negocio.id, atualizado_por: atual.membroId, criado_por: atual.membroId });
+        if (erroCalculo) avisos.push("calculo");
+      } else if (montado.incompleta) {
+        // Informação, não falha: kit e negócio salvos, nenhuma linha em `calculos_solares`.
+        estimativa = { estado: "incompleta", mensagem: montado.mensagem, pendencias: montado.pendencias };
+      } else {
+        avisos.push("calculo");
+      }
     }
   }
 
-  return { ok: true, negocioId: negocio.id, empresaId: atual.empresaId, avisos };
+  return { ok: true, negocioId: negocio.id, empresaId: atual.empresaId, avisos, ...(estimativa ? { estimativa } : {}) };
 }
 
 // A etapa não é editada aqui: mudar de etapa é só pelo "Mover etapa"/Kanban (`moverEtapa`),
@@ -367,13 +380,13 @@ export async function salvarKitComCliente(
   supabase: SupabaseServidor,
   atual: Atual,
   formData: FormData,
-): Promise<NonNullable<ResultadoAcao> & { negocioId?: string }> {
+): Promise<NonNullable<ResultadoAcao> & { negocioId?: string; pendencias?: Pendencia[] }> {
   const dados = esquemaKit.safeParse(Object.fromEntries(formData));
   if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
   const d = dados.data;
 
   const [{ data: negocio }, { data: calculoAtual, error: erroCalculo }, { data: itensAntigos, error: erroAntigos }] = await Promise.all([
-    supabase.from("negocios").select("valor").eq("id", d.negocioId).maybeSingle(),
+    supabase.from("negocios").select("valor, consumo_medio_kwh, valor_conta_energia").eq("id", d.negocioId).maybeSingle(),
     supabase.from("calculos_solares").select("id").eq("negocio_id", d.negocioId).maybeSingle(),
     supabase
       .from("kit_componentes")
@@ -384,6 +397,10 @@ export async function salvarKitComCliente(
   if (erroAntigos || !itensAntigos) return { ok: false, mensagem: "Não foi possível ler o kit atual. Nada foi alterado." };
   // Falha ao ler o cálculo nunca vale como "sem cálculo": abriria a remoção do kit protegido.
   if (erroCalculo) return { ok: false, mensagem: MENSAGEM_CALCULO_NAO_CONFERIDO };
+  // kWh e fatura vazios no kit não apagam o que já está no negócio: vale o gravado (estimativa, pendências e gravação).
+  // Só "Dados do negócio" limpa esses campos.
+  const consumoMedioKwh = d.consumoMedioKwh ?? negocio.consumo_medio_kwh;
+  const valorFaturaMedio = d.valorFaturaMedio ?? negocio.valor_conta_energia;
 
   // Lista vazia com kit salvo = remover o kit: nunca com cálculo associado e sempre com confirmação.
   if (!d.componentes.length && itensAntigos.length) {
@@ -398,14 +415,14 @@ export async function salvarKitComCliente(
       potenciaKwp: potenciaKitPersonalizadoKwp(d.componentes),
       precoKit: negocio.valor ?? 0,
       tipoLigacao: d.tipoLigacao,
-      consumoMedioKwh: d.consumoMedioKwh,
-      valorFaturaMedio: d.valorFaturaMedio,
+      consumoMedioKwh,
+      valorFaturaMedio,
       tarifaKwh: d.tarifaKwh,
     });
     if (!montado.ok && !montado.incompleta) return { ok: false, mensagem: `${montado.mensagem} Nada foi alterado.` };
-  } else if (calculoAtual) {
-    return { ok: false, mensagem: "Informe a tarifa para recalcular — sem ela o cálculo salvo ficaria desatualizado. Nada foi alterado." };
   }
+  // Sem tarifa o kit também é salvo: com a linha legada (fórmula antiga) o salvamento a mantém intocada e o aviso diz
+  // que ela não vale como resultado atual (ver `calculo-vigencia`, motivo `legado`).
 
   // Substitui a lista de itens: novos primeiro (uma inserção, tudo ou nada), antigos depois.
   if (d.componentes.length) {
@@ -448,9 +465,15 @@ export async function salvarKitComCliente(
     }
   }
 
+  // Consumo e fatura efetivos vão ao negócio: são a fonte atual que a vigência compara. Campo vazio no kit
+  // mantém o já gravado (ver `consumoMedioKwh` e `valorFaturaMedio` acima).
   const { data: estrutura, error: erroEstrutura } = await supabase
     .from("negocios")
-    .update({ estrutura_telhado: d.estruturaTelhado || null })
+    .update({
+      estrutura_telhado: d.estruturaTelhado || null,
+      consumo_medio_kwh: consumoMedioKwh,
+      valor_conta_energia: valorFaturaMedio,
+    })
     .eq("id", d.negocioId)
     .select("id");
   if (erroEstrutura || !estrutura?.length) {
@@ -461,19 +484,20 @@ export async function salvarKitComCliente(
     };
   }
 
-  // Estimativa incompleta: itens salvos, cálculo NÃO gerado e o cálculo anterior (se houver) fica como estava.
-  if (montado && !montado.ok) {
-    return {
-      ok: true,
-      negocioId: d.negocioId,
-      mensagem: `Itens do kit salvos. ${montado.mensagem}${calculoAtual ? " O cálculo anterior foi mantido e pode estar desatualizado." : ""}`,
-    };
-  }
+  if (montado?.ok) return { ok: true, negocioId: d.negocioId, mensagem: "Kit e cálculo salvos." };
 
+  // Estimativa incompleta (hoje, sempre): itens salvos, nenhuma linha gerada e o cálculo anterior (se houver) fica como estava.
+  const pendencias =
+    montado && !montado.ok && montado.incompleta
+      ? montado.pendencias
+      : pendenciasDaEntrada({ consumoMedioKwh, valorFaturaMedio, tarifaKwh: d.tarifaKwh ?? null });
   return {
     ok: true,
     negocioId: d.negocioId,
-    mensagem: montado ? "Kit e cálculo salvos." : "Itens do kit salvos. Informe a tarifa para calcular geração e economia.",
+    pendencias,
+    mensagem: `Itens do kit salvos. ${mensagemEstimativaIncompleta(pendencias)}${
+      calculoAtual ? " O cálculo anterior foi mantido, mas foi feito pela fórmula antiga (não validada) e não vale como resultado atual." : ""
+    }`,
   };
 }
 
@@ -487,16 +511,20 @@ export async function atualizarPrecoCalculoComCliente(
   atual: Atual,
   negocioId: string,
 ): Promise<NonNullable<ResultadoAcao> & { negocioId?: string }> {
-  const [{ data: negocio, error: erroNegocio }, { data: calculo, error: erroCalculo }] = await Promise.all([
-    supabase.from("negocios").select("valor").eq("id", negocioId).maybeSingle(),
-    supabase.from("calculos_solares").select("id, kit_preco, economia_mensal").eq("negocio_id", negocioId).maybeSingle(),
-  ]);
-  if (erroNegocio || erroCalculo) return { ok: false, mensagem: "Não foi possível conferir o cálculo. Nada foi alterado." };
-  if (!negocio) return { ok: false, mensagem: "Negócio não encontrado." };
+  const lido = await carregarVigencia(supabase, negocioId);
+  if (!lido.ok) {
+    return { ok: false, mensagem: lido.negocioAusente ? "Negócio não encontrado." : "Não foi possível conferir o cálculo. Nada foi alterado." };
+  }
+  const calculo = lido.calculo;
   if (!calculo) return { ok: false, mensagem: "Este negócio ainda não tem cálculo." };
-  if (!precoDoCalculoDesatualizado(calculo.kit_preco, negocio.valor)) return { ok: true, negocioId, mensagem: "O preço do cálculo já está em dia." };
+  // Payback novo sobre economia velha seria inconsistente: com linha legada (fórmula antiga, não validada) ou qualquer
+  // OUTRO dado desatualizado (kit, consumo, parâmetros, não comprovado), nada é alterado. O preço é o próprio assunto
+  // desta ação e fica de fora (`motivosDaAcao`).
+  const motivos = motivosDaAcao(lido.vigencia.motivos, "preco");
+  if (motivos.length) return { ok: false, mensagem: mensagemDeRecusa(motivos, "preco") };
+  if (!precoDoCalculoDesatualizado(calculo.kit_preco, lido.valorNegocio)) return { ok: true, negocioId, mensagem: "O preço do cálculo já está em dia." };
 
-  const preco = negocio.valor ?? 0;
+  const preco = lido.valorNegocio ?? 0;
   // Só grava se o cálculo continua com o preço lido (outra edição no meio não é sobrescrita em silêncio).
   const { data, error } = await supabase
     .from("calculos_solares")

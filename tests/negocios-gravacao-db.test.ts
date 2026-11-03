@@ -17,6 +17,8 @@ import {
 } from "@/lib/negocios-gravacao";
 import { conferirArquivos } from "@/lib/anexos-servidor";
 import { linhasParaComponentes } from "@/components/kit-componentes";
+import { mensagemEstimativaIncompleta, pendenciasDaEntrada } from "@/lib/calculo-reproduzivel";
+import { MENSAGEM_PRECO_CALCULO_LEGADO } from "@/lib/calculo-vigencia";
 import { MENSAGEM_NUMERO_BR } from "@/lib/formatacao";
 import { estadoSalvoDoKit } from "@/lib/kit-formulario";
 import { MENSAGEM_CALCULO_NAO_CONFERIDO, MENSAGEM_REMOCAO_COM_CALCULO, MENSAGEM_REMOCAO_SEM_CONFIRMACAO } from "@/lib/negocio-dados";
@@ -109,6 +111,48 @@ async function reabrir(u: Usuario, negocioId: string) {
   ]);
   const contato = negocio!.contatos as unknown as { id: string; nome: string; endereco: string | null; cidade: string | null; uf: string | null; documento: string | null };
   return { negocio: negocio!, contato, calculo, kit: kit ?? [], anexos: anexos ?? [] };
+}
+
+const SO_MODULO = JSON.stringify([{ tipo: "modulo", descricao: "Módulo 550 W", potenciaW: 550, quantidade: 12 }]);
+
+const SUFIXO_LEGADO = " O cálculo anterior foi mantido, mas foi feito pela fórmula antiga (não validada) e não vale como resultado atual.";
+
+async function contarCalculos(negocioId: string): Promise<number> {
+  const { count, error } = await servico.from("calculos_solares").select("id", { count: "exact", head: true }).eq("negocio_id", negocioId);
+  if (error) throw error;
+  return count ?? 0;
+}
+
+/**
+ * Linha LEGADA (fórmula antiga, não validada) inserida direto como fixture: o motor atual não gera mais linhas.
+ * Valores já derivados à mão (5,5 kWp = 10 x 550 W, 120 kWh/kWp/mês): geração 660; consumo 700, tarifa 0,95 =>
+ * conta sem solar 665; os demais resultados são só fixture (nenhum teste os recalcula).
+ */
+async function inserirLinhaLegada(negocioId: string, extra: Record<string, number | string | null> = {}) {
+  const { error } = await servico.from("calculos_solares").insert({
+    empresa_id: empresa,
+    negocio_id: negocioId,
+    kit_nome: "Kit personalizado · 5,5 kWp",
+    kit_potencia_kwp: 5.5,
+    kit_preco: 25000,
+    tipo_ligacao: "trifasico",
+    consumo_medio_kwh: 700,
+    valor_fatura_medio: null,
+    tarifa_kwh: 0.95,
+    produtividade_kwh_kwp_mes: 120,
+    percentual_fio_b: 0.45,
+    disponibilidade_kwh: 100,
+    geracao_estimada_kwh_mes: 660,
+    kwh_faturado: 100,
+    kwh_compensado: 560,
+    custo_fio_b: 239.4,
+    conta_sem_solar: 665,
+    conta_com_solar: 334.4,
+    economia_mensal: 330.6,
+    payback_meses: 75.6,
+    ...extra,
+  });
+  if (error) throw error;
 }
 
 /** O que a tela de edição manda de volta (valores atuais nos campos). */
@@ -234,22 +278,226 @@ describe("kit", () => {
     expect(f.calculo).toBeNull();
 
     const kitForm = (extra: Record<string, string> = {}) =>
-      fd({ negocioId: r.negocioId, tipoLigacao: "trifasico", consumoMedioKwh: "", valorFaturaMedio: "300,00", tarifaKwh: "0,95", estruturaTelhado: "gancho", componentes: KIT, observacoes: "", ...extra });
-    expect(await salvarKitComCliente(cliente(vendedor), atual[vendedor.id], kitForm())).toMatchObject({ ok: true, mensagem: "Kit e cálculo salvos." });
+      // consumo informado (300 / 0,95 = 315,79 kWh, o valor que antes era derivado da fatura): conta em R$ sozinha é estimativa incompleta.
+      fd({ negocioId: r.negocioId, tipoLigacao: "trifasico", consumoMedioKwh: "315,79", valorFaturaMedio: "300,00", tarifaKwh: "0,95", estruturaTelhado: "gancho", componentes: KIT, observacoes: "", ...extra });
+    // ANTES: com tarifa o salvamento criava o cálculo ("Kit e cálculo salvos."). AGORA: a estimativa é sempre incompleta,
+    // os itens são salvos, consumo e fatura vão ao negócio e NENHUMA linha é criada em calculos_solares.
+    const pendencias = pendenciasDaEntrada({ consumoMedioKwh: 315.79, valorFaturaMedio: 300, tarifaKwh: 0.95 });
+    const salvo = await salvarKitComCliente(cliente(vendedor), atual[vendedor.id], kitForm());
+    expect(salvo).toMatchObject({ ok: true, negocioId: r.negocioId, mensagem: `Itens do kit salvos. ${mensagemEstimativaIncompleta(pendencias)}` });
+    expect(salvo.mensagem).toContain("Estimativa financeira incompleta: Informe o enquadramento");
+    expect(salvo.mensagem).toContain("A regra de cálculo da economia ainda não foi validada.");
+    expect(salvo.mensagem).not.toContain("O cálculo anterior");
+    expect(salvo.pendencias?.map((p) => p.codigo)).toEqual([
+      "enquadramento_ausente",
+      "distribuidora_ausente",
+      "fio_b_ausente",
+      "base_tributaria_divergente",
+      "formula_nao_validada",
+    ]);
     f = await reabrir(vendedor, r.negocioId);
-    expect(f.calculo).toMatchObject({ tarifa_kwh: 0.95, valor_fatura_medio: 300, kit_potencia_kwp: 5.5 });
-
-    // Reabrir e salvar de novo (a tela agora traz o valor da conta salvo no cálculo).
-    expect((await salvarKitComCliente(cliente(vendedor), atual[vendedor.id], kitForm())).ok).toBe(true);
-    f = await reabrir(vendedor, r.negocioId);
-    expect(f.calculo).toMatchObject({ valor_fatura_medio: 300 });
+    expect(f.calculo).toBeNull();
+    expect(await contarCalculos(r.negocioId)).toBe(0);
     expect(f.kit).toHaveLength(2);
-    expect(f.negocio.estrutura_telhado).toBe("gancho");
+    expect(f.negocio).toMatchObject({ consumo_medio_kwh: 315.79, valor_conta_energia: 300, estrutura_telhado: "gancho" });
 
-    // Sem tarifa com cálculo já salvo: recusa sem mexer em nada.
-    const semTarifa = await salvarKitComCliente(cliente(vendedor), atual[vendedor.id], kitForm({ tarifaKwh: "", componentes: "[]" }));
-    expect(semTarifa.ok).toBe(false);
-    expect((await reabrir(vendedor, r.negocioId)).kit).toHaveLength(2);
+    // Salvar de novo (a tela traz consumo e conta do negócio): mesmo resultado, ainda sem linha.
+    const de_novo = await salvarKitComCliente(cliente(vendedor), atual[vendedor.id], kitForm());
+    expect(de_novo).toMatchObject({ ok: true, mensagem: salvo.mensagem });
+    f = await reabrir(vendedor, r.negocioId);
+    expect(f.calculo).toBeNull();
+    expect(f.kit).toHaveLength(2);
+    expect(f.negocio).toMatchObject({ consumo_medio_kwh: 315.79, valor_conta_energia: 300 });
+
+    // ANTES: sem tarifa com cálculo salvo era recusado. AGORA: sem tarifa também salva (os itens trocam; sem linha criada).
+    const semTarifa = await salvarKitComCliente(cliente(vendedor), atual[vendedor.id], kitForm({ tarifaKwh: "", componentes: SO_MODULO }));
+    expect(semTarifa.ok).toBe(true);
+    expect(semTarifa.mensagem).toBe(
+      `Itens do kit salvos. ${mensagemEstimativaIncompleta(pendenciasDaEntrada({ consumoMedioKwh: 315.79, valorFaturaMedio: 300, tarifaKwh: null }))}`,
+    );
+    const depois = await reabrir(vendedor, r.negocioId);
+    expect(depois.kit).toEqual([{ tipo: "modulo", descricao: "Módulo 550 W", potencia_w: 550, quantidade: 12 }]);
+    expect(depois.calculo).toBeNull();
+    expect(await contarCalculos(r.negocioId)).toBe(0);
+  });
+
+  it("conta em R$ sem consumo em kWh: salva o kit, não cria cálculo e, havendo cálculo prévio, o mantém intacto (estimativa incompleta)", async () => {
+    const kitForm = (negocioId: string, extra: Record<string, string> = {}) =>
+      fd({ negocioId, tipoLigacao: "trifasico", consumoMedioKwh: "", valorFaturaMedio: "300,00", tarifaKwh: "0,95", estruturaTelhado: "", componentes: KIT, observacoes: "", ...extra });
+    const calculoCompleto = async (negocioId: string) => {
+      const { data } = await servico.from("calculos_solares").select("*").eq("negocio_id", negocioId).maybeSingle();
+      return data;
+    };
+
+    // Negócio sem cálculo prévio: itens gravados, nenhum cálculo criado.
+    const r1 = await criar(vendedor, novoNegocio());
+    const sem = await salvarKitComCliente(cliente(vendedor), atual[vendedor.id], kitForm(r1.negocioId));
+    const pendenciasSem = pendenciasDaEntrada({ consumoMedioKwh: null, valorFaturaMedio: 300, tarifaKwh: 0.95 });
+    expect(sem).toEqual({
+      ok: true,
+      negocioId: r1.negocioId,
+      pendencias: pendenciasSem,
+      mensagem: `Itens do kit salvos. ${mensagemEstimativaIncompleta(pendenciasSem)}`,
+    });
+    // Pendências do vendedor (consumo) e da empresa (enquadramento, distribuidora, Fio B, base tributária, fórmula).
+    expect(pendenciasSem.map((p) => p.codigo)).toEqual([
+      "enquadramento_ausente",
+      "distribuidora_ausente",
+      "consumo_ausente",
+      "consumo_estimado_pela_tarifa_base",
+      "fio_b_ausente",
+      "base_tributaria_divergente",
+      "formula_nao_validada",
+    ]);
+    const f1 = await reabrir(vendedor, r1.negocioId);
+    expect(f1.kit).toHaveLength(2);
+    expect(f1.calculo).toBeNull();
+    expect(await calculoCompleto(r1.negocioId)).toBeNull();
+    expect(f1.negocio).toMatchObject({ consumo_medio_kwh: null, valor_conta_energia: 300 });
+
+    // Negócio com linha LEGADA (fixture): reenvio incompleto troca o kit, mas não toca na linha.
+    const r2 = await criar(vendedor, novoNegocio({ componentes: KIT })); // o banco exige o kit antes de aceitar a linha
+    await inserirLinhaLegada(r2.negocioId);
+    const antes = await calculoCompleto(r2.negocioId);
+    expect(antes).not.toBeNull();
+    expect(antes!.kit_potencia_kwp).toBe(5.5);
+
+    const outroKit = JSON.stringify([
+      { tipo: "modulo", descricao: "Módulo 550 W", potenciaW: 550, quantidade: 20 },
+      { tipo: "inversor", descricao: "Inversor 10 kW", potenciaW: 10000, quantidade: 1 },
+    ]);
+    const com = await salvarKitComCliente(cliente(vendedor), atual[vendedor.id], kitForm(r2.negocioId, { componentes: outroKit }));
+    expect(com).toEqual({
+      ok: true,
+      negocioId: r2.negocioId,
+      pendencias: pendenciasSem,
+      mensagem: `Itens do kit salvos. ${mensagemEstimativaIncompleta(pendenciasSem)}${SUFIXO_LEGADO}`,
+    });
+    const f2 = await reabrir(vendedor, r2.negocioId);
+    expect(f2.kit).toEqual([
+      { tipo: "modulo", descricao: "Módulo 550 W", potencia_w: 550, quantidade: 20 },
+      { tipo: "inversor", descricao: "Inversor 10 kW", potencia_w: 10000, quantidade: 1 },
+    ]);
+    expect(await calculoCompleto(r2.negocioId)).toEqual(antes);
+  });
+
+  describe("kWh e fatura do kit: vazio preserva o gravado no negócio (contrato M2-P0-K1)", () => {
+    const salvarKit = (negocioId: string, extra: Record<string, string> = {}) =>
+      salvarKitComCliente(
+        cliente(vendedor),
+        atual[vendedor.id],
+        fd({ negocioId, tipoLigacao: "trifasico", consumoMedioKwh: "", valorFaturaMedio: "", tarifaKwh: "0,95", estruturaTelhado: "", componentes: KIT, observacoes: "", ...extra }),
+      );
+    /** Saída esperada: as pendências refletem os valores efetivos (nunca o campo cru). */
+    const esperada = (negocioId: string, consumoMedioKwh: number | null, valorFaturaMedio: number | null, tarifaKwh: number | null) => {
+      const pendencias = pendenciasDaEntrada({ consumoMedioKwh, valorFaturaMedio, tarifaKwh });
+      return { ok: true, negocioId, pendencias, mensagem: `Itens do kit salvos. ${mensagemEstimativaIncompleta(pendencias)}` };
+    };
+
+    it("kWh e fatura vazios no kit (com e sem tarifa) preservam 450 e 300 do negócio; pendências usam os efetivos; nenhuma linha de cálculo", async () => {
+      const r = await criar(vendedor, novoNegocio({ consumo_medio_kwh: "450", valor_fatura_medio: "300,00" }));
+      expect((await reabrir(vendedor, r.negocioId)).negocio).toMatchObject({ consumo_medio_kwh: 450, valor_conta_energia: 300 });
+      for (const tarifaKwh of ["0,95", ""]) {
+        const esp = esperada(r.negocioId, 450, 300, tarifaKwh ? 0.95 : null);
+        expect(esp.pendencias.map((p) => p.codigo)).not.toContain("consumo_ausente");
+        expect(await salvarKit(r.negocioId, { tarifaKwh })).toEqual(esp);
+        const f = await reabrir(vendedor, r.negocioId);
+        expect(f.negocio).toMatchObject({ consumo_medio_kwh: 450, valor_conta_energia: 300 });
+        expect(f.kit).toHaveLength(2);
+        expect(f.calculo).toBeNull();
+        expect(await contarCalculos(r.negocioId)).toBe(0);
+      }
+    });
+
+    it("kWh e fatura preenchidos substituem; depois, kit vazio de novo mantém os novos valores", async () => {
+      const r = await criar(vendedor, novoNegocio({ consumo_medio_kwh: "450", valor_fatura_medio: "300,00" }));
+      expect(await salvarKit(r.negocioId, { consumoMedioKwh: "520", valorFaturaMedio: "410,50" })).toEqual(esperada(r.negocioId, 520, 410.5, 0.95));
+      expect((await reabrir(vendedor, r.negocioId)).negocio).toMatchObject({ consumo_medio_kwh: 520, valor_conta_energia: 410.5 });
+      expect(await salvarKit(r.negocioId)).toEqual(esperada(r.negocioId, 520, 410.5, 0.95));
+      expect((await reabrir(vendedor, r.negocioId)).negocio).toMatchObject({ consumo_medio_kwh: 520, valor_conta_energia: 410.5 });
+      expect(await contarCalculos(r.negocioId)).toBe(0);
+    });
+
+    it("limpeza explícita em Dados do negócio zera os dois; kit vazio depois não os recria e as pendências incluem consumo_ausente", async () => {
+      const r = await criar(vendedor, novoNegocio({ consumo_medio_kwh: "450", valor_fatura_medio: "300,00" }));
+      const antes = await reabrir(vendedor, r.negocioId);
+      const res = await editarNegocioComCliente(
+        cliente(vendedor),
+        atual[vendedor.id],
+        edicaoAtual(r.negocioId, antes.negocio, { consumo_medio_kwh: "", valor_conta_energia: "" }),
+      );
+      expect(res.ok).toBe(true);
+      expect((await reabrir(vendedor, r.negocioId)).negocio).toMatchObject({ consumo_medio_kwh: null, valor_conta_energia: null });
+
+      // Com tarifa e sem consumo nem fatura (nem no negócio), o kit é recusado como antes desta rodada: nada muda.
+      expect(await salvarKit(r.negocioId)).toEqual({ ok: false, mensagem: "Informe o consumo médio ou o valor médio da fatura. Nada foi alterado." });
+      expect((await reabrir(vendedor, r.negocioId)).kit).toHaveLength(0);
+
+      // Sem tarifa, o kit é salvo; consumo e fatura continuam vazios e a pendência de consumo aparece.
+      const esp = esperada(r.negocioId, null, null, null);
+      expect(esp.pendencias.map((p) => p.codigo)).toContain("consumo_ausente");
+      expect(await salvarKit(r.negocioId, { tarifaKwh: "" })).toEqual(esp);
+      const f = await reabrir(vendedor, r.negocioId);
+      expect(f.negocio).toMatchObject({ consumo_medio_kwh: null, valor_conta_energia: null });
+      expect(f.kit).toHaveLength(2);
+      expect(await contarCalculos(r.negocioId)).toBe(0);
+    });
+
+    it("só um dos dois vazio: kWh vazio preserva o consumo e a fatura nova substitui; e o inverso", async () => {
+      const r = await criar(vendedor, novoNegocio({ consumo_medio_kwh: "450", valor_fatura_medio: "300,00" }));
+      expect(await salvarKit(r.negocioId, { valorFaturaMedio: "410,50" })).toEqual(esperada(r.negocioId, 450, 410.5, 0.95));
+      expect((await reabrir(vendedor, r.negocioId)).negocio).toMatchObject({ consumo_medio_kwh: 450, valor_conta_energia: 410.5 });
+
+      expect(await salvarKit(r.negocioId, { consumoMedioKwh: "520" })).toEqual(esperada(r.negocioId, 520, 410.5, 0.95));
+      expect((await reabrir(vendedor, r.negocioId)).negocio).toMatchObject({ consumo_medio_kwh: 520, valor_conta_energia: 410.5 });
+      expect(await contarCalculos(r.negocioId)).toBe(0);
+    });
+
+    // Abre como a ficha (estadoSalvoDoKit com a linha legada e os valores atuais do negócio) e salva sem editar.
+    const abrirESalvarSemEditar = async (negocioId: string) => {
+      const f = await reabrir(vendedor, negocioId);
+      const { data: linha } = await servico.from("calculos_solares").select("consumo_medio_kwh, valor_fatura_medio, tarifa_kwh").eq("negocio_id", negocioId).single();
+      const estado = estadoSalvoDoKit({
+        componentesSalvos: f.kit.map((i) => ({ tipo: i.tipo, descricao: i.descricao, potenciaW: i.potencia_w, quantidade: i.quantidade })),
+        calculo: { tipoLigacao: "trifasico", consumoMedioKwh: linha!.consumo_medio_kwh, valorFaturaMedio: linha!.valor_fatura_medio, tarifaKwh: linha!.tarifa_kwh },
+        estruturaTelhado: null,
+        consumoMedioKwhPadrao: f.negocio.consumo_medio_kwh,
+        valorFaturaMedioPadrao: f.negocio.valor_conta_energia,
+      });
+      const res = await salvarKit(negocioId, {
+        consumoMedioKwh: estado.consumoMedioKwh,
+        valorFaturaMedio: estado.valorFaturaMedio,
+        tarifaKwh: estado.tarifaKwh,
+        componentes: JSON.stringify(linhasParaComponentes(estado.linhas)),
+      });
+      return { estado, res };
+    };
+    const linhaLegada = async (negocioId: string) =>
+      (await servico.from("calculos_solares").select("consumo_medio_kwh, valor_fatura_medio").eq("negocio_id", negocioId).single()).data;
+
+    it("negócio 450 kWh / R$ 300 e cálculo legado 700 kWh / R$ 900: abrir mostra 450 e 300; salvar sem editar mantém 450 e 300", async () => {
+      const r = await criar(vendedor, novoNegocio({ componentes: KIT, consumo_medio_kwh: "450", valor_fatura_medio: "300,00" }));
+      await inserirLinhaLegada(r.negocioId, { consumo_medio_kwh: 700, valor_fatura_medio: 900 });
+
+      const { estado, res } = await abrirESalvarSemEditar(r.negocioId);
+      expect(estado).toMatchObject({ consumoMedioKwh: "450", valorFaturaMedio: "300" });
+      expect(res.ok).toBe(true);
+      expect((await reabrir(vendedor, r.negocioId)).negocio).toMatchObject({ consumo_medio_kwh: 450, valor_conta_energia: 300 });
+      // A linha legada continua intocada (histórico).
+      expect(await linhaLegada(r.negocioId)).toEqual({ consumo_medio_kwh: 700, valor_fatura_medio: 900 });
+    });
+
+    it("negócio sem kWh nem fatura e cálculo legado 700 / 900: os campos abrem vazios e nada do cálculo vai ao negócio", async () => {
+      const r = await criar(vendedor, novoNegocio({ componentes: KIT }));
+      await inserirLinhaLegada(r.negocioId, { consumo_medio_kwh: 700, valor_fatura_medio: 900 });
+
+      const { estado, res } = await abrirESalvarSemEditar(r.negocioId);
+      expect(estado).toMatchObject({ consumoMedioKwh: "", valorFaturaMedio: "" });
+      // A tarifa reabre do cálculo; sem consumo nem fatura, o servidor recusa como antes e nada muda.
+      expect(res).toEqual({ ok: false, mensagem: "Informe o consumo médio ou o valor médio da fatura. Nada foi alterado." });
+      expect((await reabrir(vendedor, r.negocioId)).negocio).toMatchObject({ consumo_medio_kwh: null, valor_conta_energia: null });
+      expect(await linhaLegada(r.negocioId)).toEqual({ consumo_medio_kwh: 700, valor_fatura_medio: 900 });
+    });
   });
 
   it("números no padrão brasileiro: 1.200 kWh grava 1200; reabrir e salvar sem editar mantém tudo (M2-a)", async () => {
@@ -267,10 +515,17 @@ describe("kit", () => {
     const kitForm = (campos: Record<string, string>) =>
       fd({ negocioId: r.negocioId, tipoLigacao: "trifasico", valorFaturaMedio: "", estruturaTelhado: "", componentes: KIT, observacoes: "", ...campos });
 
+    // ANTES: salvar criava a linha (consumo 1200, tarifa 0,9512, geração 660). AGORA: o salvamento só grava o consumo no
+    // negócio e nenhuma linha nasce; a escala 1.200 -> 1200 vale no negócio. A linha abaixo é fixture LEGADA (valores
+    // derivados à mão: 5,5 kWp x 120 = 660; 1200 x 0,9512 = 1141,44), usada para conferir que reabrir e salvar sem editar
+    // mantém tudo, inclusive a linha.
     expect((await salvarKitComCliente(cliente(vendedor), atual[vendedor.id], kitForm({ consumoMedioKwh: "1.200", tarifaKwh: "0,9512" }))).ok).toBe(true);
+    expect((await reabrir(vendedor, r.negocioId)).negocio.consumo_medio_kwh).toBe(1200);
+    const { data: semLinha } = await servico.from("calculos_solares").select("id").eq("negocio_id", r.negocioId);
+    expect(semLinha).toEqual([]);
+    await inserirLinhaLegada(r.negocioId, { consumo_medio_kwh: 1200, tarifa_kwh: 0.9512, conta_sem_solar: 1141.44 });
     const primeiro = await calculo();
     expect(primeiro).toMatchObject({ consumo_medio_kwh: 1200, tarifa_kwh: 0.9512, kit_potencia_kwp: 5.5, geracao_estimada_kwh_mes: 660 });
-    expect(primeiro.economia_mensal).toBeGreaterThan(0);
 
     // Reabre como a ficha (estadoSalvoDoKit) e salva de novo o que os campos mostram, sem editar.
     const { data: itens } = await vendedor.cliente.from("kit_componentes").select("tipo, descricao, potencia_w, quantidade").eq("negocio_id", r.negocioId).order("ordem");
@@ -278,7 +533,8 @@ describe("kit", () => {
       componentesSalvos: itens!.map((i) => ({ tipo: i.tipo, descricao: i.descricao, potenciaW: i.potencia_w, quantidade: i.quantidade })),
       calculo: { tipoLigacao: "trifasico", consumoMedioKwh: primeiro.consumo_medio_kwh, valorFaturaMedio: primeiro.valor_fatura_medio, tarifaKwh: primeiro.tarifa_kwh },
       estruturaTelhado: null,
-      consumoMedioKwhPadrao: null,
+      // A ficha passa os valores atuais do negócio (1200 kWh, sem conta); o editor não herda o cálculo.
+      consumoMedioKwhPadrao: 1200,
       valorFaturaMedioPadrao: null,
     });
     expect(estado.consumoMedioKwh).toBe("1.200");
@@ -297,6 +553,7 @@ describe("kit", () => {
     const ambiguo = await salvarKitComCliente(cliente(vendedor), atual[vendedor.id], kitForm({ consumoMedioKwh: "1.2", tarifaKwh: "0,9512" }));
     expect(ambiguo).toMatchObject({ ok: false, mensagem: MENSAGEM_NUMERO_BR });
     expect(await calculo()).toEqual(primeiro);
+    expect((await reabrir(vendedor, r.negocioId)).negocio.consumo_medio_kwh).toBe(1200);
   });
 
   it("falha ao gravar itens não apaga o kit anterior e não mostra sucesso", async () => {
@@ -317,22 +574,25 @@ describe("kit", () => {
     expect((await reabrir(vendedor, r2.negocioId)).kit).toEqual([]);
   });
 
-  it("cálculo recusado pelo banco restaura o kit anterior e só então diz que nada mudou", async () => {
+  // ANTES ("cálculo recusado pelo banco restaura o kit anterior e só então diz que nada mudou"): a tarifa 100000 fazia o
+  // banco recusar a linha e o kit era restaurado. AGORA nenhuma linha é gravada, então esse caminho não ocorre; o
+  // equivalente que continua valendo é a restauração do kit quando a troca dos itens falha (teste "falha ao apagar...").
+  // Aqui: a mesma entrada (tarifa fora do limite da coluna) não é recusada, não toca na linha legada e salva o kit.
+  it("tarifa acima do limite da coluna: nenhuma linha é gravada, o banco não recusa nada e a linha legada fica intocada", async () => {
     const r = await criar(vendedor, novoNegocio({ componentes: KIT, consumo_medio_kwh: "450" }));
+    await inserirLinhaLegada(r.negocioId);
     const kitForm = (extra: Record<string, string>) =>
       fd({ negocioId: r.negocioId, tipoLigacao: "trifasico", consumoMedioKwh: "450", tarifaKwh: "0,95", componentes: KIT, ...extra });
-    expect((await salvarKitComCliente(cliente(vendedor), atual[vendedor.id], kitForm({}))).ok).toBe(true);
-    const { data: antes } = await servico.from("kit_componentes").select("id, descricao").eq("negocio_id", r.negocioId).order("ordem");
-    const calculoAntes = (await reabrir(vendedor, r.negocioId)).calculo;
+    const { data: linhaAntes } = await servico.from("calculos_solares").select("*").eq("negocio_id", r.negocioId).single();
 
-    // Tarifa acima do limite da coluna: o cálculo é montado, mas o banco recusa a gravação.
     const outroKit = JSON.stringify([{ tipo: "modulo", descricao: "Módulo 600 W", potenciaW: 600, quantidade: 8 }]);
     const res = await salvarKitComCliente(cliente(vendedor), atual[vendedor.id], kitForm({ tarifaKwh: "100000", componentes: outroKit }));
-    expect(res.ok).toBe(false);
-    expect(res.mensagem).toContain("Nada foi alterado");
-    const { data: depois } = await servico.from("kit_componentes").select("id, descricao").eq("negocio_id", r.negocioId).order("ordem");
-    expect(depois).toEqual(antes);
-    expect((await reabrir(vendedor, r.negocioId)).calculo).toEqual(calculoAntes);
+    expect(res.ok).toBe(true);
+    expect(res.mensagem).toContain("Itens do kit salvos. Estimativa financeira incompleta:");
+    expect(res.mensagem).not.toContain("Nada foi alterado");
+    expect((await reabrir(vendedor, r.negocioId)).kit.map((k) => k.descricao)).toEqual(["Módulo 600 W"]);
+    const { data: linhaDepois } = await servico.from("calculos_solares").select("*").eq("negocio_id", r.negocioId).single();
+    expect(linhaDepois).toEqual(linhaAntes);
   });
 
   it("reenviar é seguro: substitui a lista inteira, mesmo com itens repetidos de uma falha anterior", async () => {
@@ -382,6 +642,8 @@ describe("kit", () => {
 
     // Com cálculo associado: recusa mesmo com confirmação e mesmo informando a tarifa.
     const c = await criar(vendedor, novoNegocio({ componentes: KIT, consumo_medio_kwh: "450", tarifa_kwh: "0,95" }));
+    expect((await reabrir(vendedor, c.negocioId)).calculo).toBeNull(); // criar não gera mais linha
+    await inserirLinhaLegada(c.negocioId); // fixture: linha legada associada
     const antes = await reabrir(vendedor, c.negocioId);
     expect(antes.calculo).not.toBeNull();
     const tentativas: Record<string, string>[] = [{ confirmarRemocao: "sim" }, { confirmarRemocao: "sim", tarifaKwh: "0,95", consumoMedioKwh: "450" }];
@@ -395,6 +657,7 @@ describe("kit", () => {
 
   it("falha ao ler o cálculo: recusa antes de gravar ou apagar; kit e cálculo intactos", async () => {
     const c = await criar(vendedor, novoNegocio({ componentes: KIT, consumo_medio_kwh: "450", tarifa_kwh: "0,95" }));
+    await inserirLinhaLegada(c.negocioId); // fixture: criar não gera mais linha
     const antes = await reabrir(vendedor, c.negocioId);
     expect(antes.calculo).not.toBeNull();
     const outroKit = JSON.stringify([{ tipo: "modulo", descricao: "Módulo 550 W", potenciaW: 550, quantidade: 12 }]);
@@ -419,6 +682,19 @@ describe("kit", () => {
     const res = await salvarKitComCliente(cliente(vendedor), atual[vendedor.id], fd({ negocioId: r.negocioId, tipoLigacao: "trifasico", tarifaKwh: "", componentes: soModulo }));
     expect(res.ok).toBe(true);
     expect((await reabrir(vendedor, r.negocioId)).kit).toEqual([{ tipo: "modulo", descricao: "Módulo 550 W", potencia_w: 550, quantidade: 12 }]);
+  });
+
+  it("criar com kit, consumo e tarifa: estimativa incompleta é informação, não aviso de falha; kit e consumo salvos, nenhuma linha", async () => {
+    const r = await criar(vendedor, novoNegocio({ componentes: KIT, tarifa_kwh: "0,95", consumo_medio_kwh: "450", valor_fatura_medio: "300,00" }));
+    expect(r.avisos).toEqual([]);
+    expect(r.estimativa?.estado).toBe("incompleta");
+    expect(r.estimativa?.mensagem).toBe(mensagemEstimativaIncompleta(pendenciasDaEntrada({ consumoMedioKwh: 450, valorFaturaMedio: 300, tarifaKwh: 0.95 })));
+    expect(r.estimativa?.pendencias.map((p) => p.codigo)).toContain("formula_nao_validada");
+    const f = await reabrir(vendedor, r.negocioId);
+    expect(f.kit).toHaveLength(2);
+    expect(f.calculo).toBeNull();
+    expect(await contarCalculos(r.negocioId)).toBe(0);
+    expect(f.negocio).toMatchObject({ consumo_medio_kwh: 450, valor_conta_energia: 300 });
   });
 
   it("cálculo que não fecha na criação vira aviso; os itens ficam salvos", async () => {
@@ -531,6 +807,7 @@ describe("etapa fora do formulário de edição", () => {
 describe("preço do cálculo x valor do negócio", () => {
   async function negocioComCalculo() {
     const r = await criar(vendedor, novoNegocio({ componentes: KIT, valor: "25.000,00", consumo_medio_kwh: "700", tipo_ligacao: "trifasico", tarifa_kwh: "0,95" }));
+    await inserirLinhaLegada(r.negocioId); // fixture legada: criar não gera mais linha
     const { data: calculo } = await servico.from("calculos_solares").select("id, kit_preco, economia_mensal, payback_meses, geracao_estimada_kwh_mes").eq("negocio_id", r.negocioId).single();
     expect(calculo).toMatchObject({ kit_preco: 25000 });
     return { negocioId: r.negocioId, calculo: calculo! };
@@ -538,7 +815,10 @@ describe("preço do cálculo x valor do negócio", () => {
   const lerCalculo = async (negocioId: string) =>
     (await servico.from("calculos_solares").select("kit_preco, payback_meses, economia_mensal, geracao_estimada_kwh_mes").eq("negocio_id", negocioId).single()).data!;
 
-  it("editar o valor do negócio não mexe no cálculo; atualizar leva só preço e payback", async () => {
+  // ANTES: "atualizar leva só preço e payback" (kit_preco 28000, payback recalculado). AGORA: com linha legada (fórmula
+  // antiga, não validada) atualizar o preço é recusado com a mensagem exata e a linha não muda; editar o valor continua
+  // sem mexer no cálculo.
+  it("editar o valor do negócio não mexe no cálculo; atualizar o preço de linha legada é recusado e nada muda", async () => {
     const { negocioId, calculo } = await negocioComCalculo();
     const editado = await editarNegocioComCliente(
       cliente(admin),
@@ -548,17 +828,17 @@ describe("preço do cálculo x valor do negócio", () => {
     expect(editado.ok).toBe(true);
     expect(await lerCalculo(negocioId)).toMatchObject({ kit_preco: 25000, payback_meses: calculo.payback_meses });
 
-    const r = await atualizarPrecoCalculoComCliente(cliente(vendedor), atual[vendedor.id], negocioId);
-    expect(r).toMatchObject({ ok: true, mensagem: "Preço do cálculo atualizado." });
-    const depois = await lerCalculo(negocioId);
-    expect(depois.kit_preco).toBe(28000);
-    expect(depois.payback_meses).toBe(Math.round((28000 / calculo.economia_mensal) * 10) / 10);
-    // Geração e economia continuam as do cálculo salvo.
-    expect(depois.economia_mensal).toBe(calculo.economia_mensal);
-    expect(depois.geracao_estimada_kwh_mes).toBe(calculo.geracao_estimada_kwh_mes);
-
-    // Sem divergência, repetir não muda nada.
-    expect(await atualizarPrecoCalculoComCliente(cliente(vendedor), atual[vendedor.id], negocioId)).toMatchObject({ ok: true, mensagem: "O preço do cálculo já está em dia." });
+    // Preço divergente (28000 x 25000) e linha legada: recusa, sem alterar preço, payback, economia nem geração.
+    for (let i = 0; i < 2; i++) {
+      const r = await atualizarPrecoCalculoComCliente(cliente(vendedor), atual[vendedor.id], negocioId);
+      expect(r).toEqual({ ok: false, mensagem: MENSAGEM_PRECO_CALCULO_LEGADO });
+    }
+    expect(await lerCalculo(negocioId)).toEqual({
+      kit_preco: 25000,
+      payback_meses: calculo.payback_meses,
+      economia_mensal: calculo.economia_mensal,
+      geracao_estimada_kwh_mes: calculo.geracao_estimada_kwh_mes,
+    });
   });
 
   it("negócio sem cálculo: recusa sem criar nada", async () => {

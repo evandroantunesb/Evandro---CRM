@@ -74,13 +74,14 @@ describe("formatarNumeroBr ↔ lerNumeroBr (reabrir e salvar sem editar)", () =>
   });
 
   it("o estado reaberto do kit relido dá os mesmos números gravados (1200 kWh não vira 1,2)", () => {
-    const calculo = { tipoLigacao: "trifasico" as const, consumoMedioKwh: 1200, valorFaturaMedio: 1234.56, tarifaKwh: 0.9512 };
+    // Consumo e conta vêm do negócio; o cálculo só fornece a tarifa.
+    const calculo = { tipoLigacao: "trifasico" as const, consumoMedioKwh: 700, valorFaturaMedio: 900, tarifaKwh: 0.9512 };
     const estado = estadoSalvoDoKit({
       componentesSalvos: [{ tipo: "modulo", descricao: "Módulo 550 W", potenciaW: 550, quantidade: 10 }],
       calculo,
       estruturaTelhado: null,
-      consumoMedioKwhPadrao: null,
-      valorFaturaMedioPadrao: null,
+      consumoMedioKwhPadrao: 1200,
+      valorFaturaMedioPadrao: 1234.56,
     });
     expect(estado.consumoMedioKwh).toBe("1.200");
     expect(lerNumeroBr(estado.consumoMedioKwh)).toBe(1200);

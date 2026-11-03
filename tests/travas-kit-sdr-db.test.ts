@@ -155,9 +155,17 @@ async function criarNegocio(u: Usuario, extra: Record<string, string> = {}) {
   return r.negocioId;
 }
 
-/** Negócio do vendedor com kit de 2 itens e cálculo solar salvo (pelo fluxo do app). */
+/**
+ * Negócio do vendedor com kit de 2 itens e uma linha de cálculo LEGADA (fórmula antiga, não validada) inserida como
+ * fixture. ANTES o app gerava a linha ao criar o negócio com consumo e tarifa; AGORA o motor não gera mais linhas
+ * (estimativa sempre incompleta), então o cálculo existente é fixture. A trava do kit independe de como a linha nasceu.
+ */
 async function negocioComCalculo(u: Usuario = vendedor) {
   const negocioId = await criarNegocio(u, { componentes: KIT, consumo_medio_kwh: "450", tarifa_kwh: "0,95" });
+  expect(await temCalculo(negocioId)).toBe(false); // criar não gera linha
+  // Com autor registrado (como o app gravava): a RLS de exclusão do cálculo libera o próprio autor.
+  const { error } = await servico.from("calculos_solares").insert({ ...linhaCalculo(negocioId), criado_por: atual[u.id].membroId, atualizado_por: atual[u.id].membroId });
+  expect(error).toBeNull();
   const { data: calculo } = await servico.from("calculos_solares").select("id").eq("negocio_id", negocioId).single();
   expect(calculo).not.toBeNull();
   return negocioId;
@@ -255,20 +263,24 @@ describe("kit com cálculo solar nunca fica vazio", () => {
     }
   });
 
-  it("restauração após falha no cálculo devolve o kit anterior com a trava ligada", async () => {
+  // ANTES ("restauração após falha no cálculo devolve o kit anterior com a trava ligada"): a tarifa 100000 fazia o banco
+  // recusar a linha e o app restaurava o kit. AGORA nenhuma linha é gravada pelo app; a restauração por falha na troca
+  // dos itens continua coberta pelo teste seguinte. Aqui: com a mesma entrada o app troca os itens (a trava deixa:
+  // novos antes dos antigos) e a linha legada segue intacta.
+  it("tarifa acima do limite da coluna com linha legada: o app troca os itens, não grava linha e não restaura nada", async () => {
     const negocioId = await negocioComCalculo();
-    const antes = await lerKit(negocioId);
+    const { data: linhaAntes } = await servico.from("calculos_solares").select("*").eq("negocio_id", negocioId).single();
     const novo = JSON.stringify([{ tipo: "modulo", descricao: "Módulo 600 W", potenciaW: 600, quantidade: 8 }]);
-    // Tarifa acima do limite da coluna: itens trocados, cálculo recusado → restaura (reinserir antes de apagar).
     const r = await salvarKitComCliente(
       cliente(vendedor),
       atual[vendedor.id],
       fd({ negocioId, tipoLigacao: "trifasico", consumoMedioKwh: "450", tarifaKwh: "100000", componentes: novo }),
     );
-    expect(r.ok).toBe(false);
-    expect(r.mensagem).toContain("Nada foi alterado");
-    expect(await lerKit(negocioId)).toEqual(antes);
-    expect(await temCalculo(negocioId)).toBe(true);
+    expect(r.ok).toBe(true);
+    expect(r.mensagem).not.toContain("Nada foi alterado");
+    expect((await lerKit(negocioId)).map((k) => k.descricao)).toEqual(["Módulo 600 W"]);
+    const { data: linhaDepois } = await servico.from("calculos_solares").select("*").eq("negocio_id", negocioId).single();
+    expect(linhaDepois).toEqual(linhaAntes);
   });
 
   it("falha parcial com cálculo: exclusão falha → restaura; restauração falha → avisa; reenvio corrige", async () => {
@@ -447,7 +459,9 @@ describe("cálculo solar só é criado com kit", () => {
     expect(await temCalculo(await negocioComCalculo())).toBe(true);
   });
 
-  it("recálculo de cálculo existente: pelo app, por upsert e por update direto", async () => {
+  // ANTES: "recálculo de cálculo existente: pelo app, ..." (o app regravava a tarifa 1,05). AGORA o app não recalcula nem
+  // grava linha (estimativa incompleta): a tarifa da linha legada fica em 0,95; upsert e update diretos seguem valendo.
+  it("cálculo existente: o app não o recalcula (fica 0,95); upsert e update direto continuam permitidos", async () => {
     const negocioId = await negocioComCalculo();
     const r = await salvarKitComCliente(
       cliente(vendedor),
@@ -455,7 +469,7 @@ describe("cálculo solar só é criado com kit", () => {
       fd({ negocioId, tipoLigacao: "trifasico", consumoMedioKwh: "450", tarifaKwh: "1,05", componentes: KIT }),
     );
     expect(r.ok).toBe(true);
-    expect(await tarifaSalva(negocioId)).toBeCloseTo(1.05);
+    expect(await tarifaSalva(negocioId)).toBeCloseTo(0.95);
     const { error: erroUpsert } = await vendedor.cliente.from("calculos_solares").upsert(linhaCalculo(negocioId, 1.1), { onConflict: "negocio_id" });
     expect(erroUpsert).toBeNull();
     expect(await tarifaSalva(negocioId)).toBeCloseTo(1.1);

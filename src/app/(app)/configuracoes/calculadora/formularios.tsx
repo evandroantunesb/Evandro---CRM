@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useRef } from "react";
 import { Botao, Campo, Mensagem } from "@/components/ui";
-import { criarKit, editarKit, editarParametros } from "@/lib/acoes/calculadora";
+import { confirmarProdutividade, criarKit, editarKit, editarParametros } from "@/lib/acoes/calculadora";
 import { percentualParaCampo } from "@/lib/percentual-exibicao";
 
 const inputClasse = "min-w-0 flex-1 rounded-md border border-zinc-300 px-3 py-1.5 text-sm";
@@ -156,6 +156,51 @@ export function FormularioParametros({
       <Botao type="submit" disabled={pendente} className="self-start">
         Salvar parâmetros
       </Botao>
+      <Mensagem resultado={resultado} />
+    </form>
+  );
+}
+
+/** Confirmação da produtividade: sem ela, a proposta emitida não mostra a geração estimada. */
+export function ConfirmarProdutividade({
+  valor,
+  confirmadaEm,
+  confirmadaFonte,
+  confirmadaResponsavel,
+}: {
+  valor: number;
+  confirmadaEm: string | null;
+  confirmadaFonte: string | null;
+  confirmadaResponsavel: string | null;
+}) {
+  const [resultado, acao, pendente] = useActionState(confirmarProdutividade, null);
+  return (
+    <form action={acao} className="mt-4 flex flex-col gap-2 rounded-lg border border-zinc-200 p-3" data-testid="confirmar-produtividade">
+      <p className="text-sm font-medium text-zinc-800">Confirmação da produtividade ({valor.toLocaleString("pt-BR")} kWh/kWp/mês)</p>
+      {confirmadaEm ? (
+        <p className="text-xs text-green-800" data-testid="produtividade-confirmada">
+          Confirmada em {new Date(confirmadaEm).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}. Fonte: {confirmadaFonte}. Responsável pela validação:{" "}
+          {confirmadaResponsavel}.
+        </p>
+      ) : (
+        <p className="text-xs text-amber-900" data-testid="produtividade-nao-confirmada">
+          Não confirmada: as propostas emitidas saem sem o número de geração estimada. O padrão de fábrica (120) é uma simplificação que precisa ser
+          calibrada pelo responsável técnico.
+        </p>
+      )}
+      <input type="hidden" name="valor" value={valor} />
+      <label className="flex flex-col gap-1 text-sm">
+        <span className="text-zinc-700">Fonte do valor (de onde ele vem; fica registrada)</span>
+        <input name="fonte" maxLength={120} required minLength={10} placeholder="Ex.: estudo de irradiação da região, relatório de geração real" className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm" />
+      </label>
+      <label className="flex flex-col gap-1 text-sm">
+        <span className="text-zinc-700">Responsável pela validação (quem calibrou este valor)</span>
+        <input name="responsavel" maxLength={60} required minLength={3} className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm" />
+      </label>
+      <Botao type="submit" disabled={pendente} className="self-start">
+        Confirmar este valor
+      </Botao>
+      <p className="text-xs text-zinc-500">Alterar a produtividade depois apaga a confirmação.</p>
       <Mensagem resultado={resultado} />
     </form>
   );

@@ -2776,6 +2776,11 @@ export type Database = {
           disponibilidade_tri_kwh: number;
           empresa_id: string;
           percentual_fio_b: number;
+          produtividade_confirmada_em: string | null;
+          produtividade_confirmada_fonte: string | null;
+          produtividade_confirmada_por: string | null;
+          produtividade_confirmada_responsavel: string | null;
+          produtividade_confirmada_valor: number | null;
           produtividade_kwh_kwp_mes: number;
           updated_at: string;
         };
@@ -2789,6 +2794,11 @@ export type Database = {
           disponibilidade_tri_kwh?: number;
           empresa_id: string;
           percentual_fio_b?: number;
+          produtividade_confirmada_em?: string | null;
+          produtividade_confirmada_fonte?: string | null;
+          produtividade_confirmada_por?: string | null;
+          produtividade_confirmada_responsavel?: string | null;
+          produtividade_confirmada_valor?: number | null;
           produtividade_kwh_kwp_mes?: number;
           updated_at?: string;
         };
@@ -2802,6 +2812,11 @@ export type Database = {
           disponibilidade_tri_kwh?: number;
           empresa_id?: string;
           percentual_fio_b?: number;
+          produtividade_confirmada_em?: string | null;
+          produtividade_confirmada_fonte?: string | null;
+          produtividade_confirmada_por?: string | null;
+          produtividade_confirmada_responsavel?: string | null;
+          produtividade_confirmada_valor?: number | null;
           produtividade_kwh_kwp_mes?: number;
           updated_at?: string;
         };
@@ -2811,6 +2826,13 @@ export type Database = {
             columns: ["empresa_id"];
             isOneToOne: true;
             referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "parametros_calculadora_produtividade_confirmada_por_fkey";
+            columns: ["produtividade_confirmada_por"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
             referencedColumns: ["id"];
           },
         ];
@@ -3357,6 +3379,82 @@ export type Database = {
           },
         ];
       };
+      propostas_emissoes: {
+        Row: {
+          dados: NonNullable<Json>;
+          dados_sha256: string;
+          emitida_em: string;
+          emitida_por: string;
+          empresa_id: string;
+          id: string;
+          negocio_id: string;
+          pdf_bytes: number;
+          pdf_caminho: string;
+          pdf_sha256: string;
+          renderizador: string;
+          tipo: string;
+          token: string;
+          validade_ate: string;
+          versao: number;
+        };
+        Insert: {
+          dados: NonNullable<Json>;
+          dados_sha256: string;
+          emitida_em?: string;
+          emitida_por: string;
+          empresa_id: string;
+          id?: string;
+          negocio_id: string;
+          pdf_bytes: number;
+          pdf_caminho: string;
+          pdf_sha256: string;
+          renderizador: string;
+          tipo?: string;
+          token?: string;
+          validade_ate: string;
+          versao: number;
+        };
+        Update: {
+          dados?: NonNullable<Json>;
+          dados_sha256?: string;
+          emitida_em?: string;
+          emitida_por?: string;
+          empresa_id?: string;
+          id?: string;
+          negocio_id?: string;
+          pdf_bytes?: number;
+          pdf_caminho?: string;
+          pdf_sha256?: string;
+          renderizador?: string;
+          tipo?: string;
+          token?: string;
+          validade_ate?: string;
+          versao?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "propostas_emissoes_emitida_por_fkey";
+            columns: ["emitida_por"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "propostas_emissoes_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "propostas_emissoes_negocio_id_fkey";
+            columns: ["negocio_id"];
+            isOneToOne: false;
+            referencedRelation: "negocios";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       recompensas: {
         Row: {
           ativa: boolean;
@@ -3801,6 +3899,10 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      confirmar_produtividade_calculadora: {
+        Args: { p_empresa_id: string; p_fonte: string; p_responsavel: string; p_valor: number };
+        Returns: undefined;
+      };
       contar_marco_membro: {
         Args: {
           p_ativa_desde: string;
@@ -4138,6 +4240,7 @@ export type Database = {
       pode_ver_obra: { Args: { p_obra_id: string }; Returns: boolean };
       pode_ver_obra_operacao: { Args: { p_obra_id: string }; Returns: boolean };
       pode_ver_pasta_anexo: { Args: { p_caminho: string }; Returns: boolean };
+      pode_ver_pdf_proposta_emitida: { Args: { p_caminho: string }; Returns: boolean };
       pode_ver_responsavel: {
         Args: { p_empresa_id: string; p_responsavel_id: string };
         Returns: boolean;
