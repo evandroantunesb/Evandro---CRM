@@ -62,8 +62,8 @@ describe("acoesItem", () => {
     expect(acoesItem(item({ status: "valido", documentos: [doc] }), "executar", false)).toMatchObject({ validar: false, invalidar: true, reabrir: true });
   });
 
-  it("obrigatório só admin ou coordenador dispensa; opcional, qualquer um da Engenharia", () => {
-    expect(acoesItem(item(), "executar", false).dispensar).toBe(false);
+  it("qualquer um da Engenharia marca \"não se aplica\", obrigatório ou opcional", () => {
+    expect(acoesItem(item(), "executar", false).dispensar).toBe(true);
     expect(acoesItem(item(), "coordenar", false).dispensar).toBe(true);
     expect(acoesItem(item({ obrigatorio: false }), "executar", false).dispensar).toBe(true);
     expect(acoesItem(item({ status: "dispensado", motivo: "x" }), "admin", false)).toMatchObject({ anexar: false, dispensar: false, reabrir: true });

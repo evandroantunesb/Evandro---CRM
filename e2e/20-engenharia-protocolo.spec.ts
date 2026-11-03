@@ -20,7 +20,7 @@ test("admin registra o protocolo depois do checklist, recebe exigência e reenvi
   await checklist.getByRole("button", { name: "Aplicar checklist" }).click();
   await expect(protocolo.getByText(/Faltam \d+ itens obrigatórios/)).toBeVisible();
 
-  // O admin marca todos como "não se aplica" (só para o teste: obrigatório só admin ou coordenador dispensa).
+  // O admin marca todos como "não se aplica" (só para o teste; qualquer um da Engenharia dispensa, com motivo).
   const dispensar = checklist.getByRole("button", { name: "Não se aplica" });
   // O botão some ao abrir o formulário: espera o formulário fechar (gravou) antes do próximo item.
   const motivo = checklist.getByLabel("Por que não se aplica?");

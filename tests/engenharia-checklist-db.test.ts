@@ -217,12 +217,16 @@ describe("Engenharia: checklist e documentos (ordem importa)", { concurrent: fal
     expect(await historico("documento_engenharia_enviado")).toHaveLength(2);
   });
 
-  it("inválido e dispensado exigem motivo; obrigatório só admin ou coordenador dispensa", async () => {
+  it("inválido e dispensado exigem motivo; qualquer engenheiro dispensa, inclusive o obrigatório", async () => {
     expect((await alterar(execEng, obrigatorio, "invalido")).error?.code).toBe("23514");
     expect((await alterar(execEng, obrigatorio, "invalido", "Ilegível")).error).toBeNull();
     expect((await itens()).find((i) => i.id === obrigatorio)).toMatchObject({ status: "invalido", motivo: "Ilegível" });
 
-    expect((await alterar(execEng, obrigatorio, "dispensado", "Cliente sem fatura")).error?.code).toBe("42501");
+    // Desde 03/11/2026 o executor também dispensa o obrigatório (com motivo); o coordenador continua podendo.
+    expect((await alterar(execEng, obrigatorio, "dispensado")).error?.code).toBe("23514");
+    expect((await alterar(execEng, obrigatorio, "dispensado", "Cliente sem fatura")).error).toBeNull();
+    expect((await itens()).find((i) => i.id === obrigatorio)).toMatchObject({ status: "dispensado", motivo: "Cliente sem fatura" });
+    expect((await alterar(execEng, obrigatorio, "pendente")).error).toBeNull();
     expect((await alterar(coordEng, obrigatorio, "dispensado", "Cliente sem fatura")).error).toBeNull();
     // Opcional: o executor marca "não se aplica".
     expect((await alterar(execEng, opcional, "dispensado", "Titular assina pessoalmente")).error).toBeNull();

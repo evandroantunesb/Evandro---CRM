@@ -8,11 +8,27 @@
 | #302 | Início do engenheiro, PR 2: "Sua trajetória", "Trajetória da equipe" e "Engenharia concluída no mês" (função `trajetoria_engenharia`) | Mesclada em 03/11/2026; migration `20261108100000_engenharia_trajetoria.sql` aplicada |
 | #303 | Admin e gestor confirmam o pagamento da própria venda, no Solo e no Pro, contando normalmente para pontos e comissão | Mesclada em 03/11/2026; migration `20261109100000_autoconfirmacao_pagamento.sql` aplicada |
 | #304 | Lista de migrations autorizadas do `banco-producao.yml` para a #302 e a #303 | Mesclada; aplicação em 03/11/2026 (run 41682703029, `main` em `29acf00`) |
+| #306 | Marcos da trajetória editáveis (Configurações › Engenharia, padrão 25 obras / 250 kWp) e "Concluída no mês" como última fase do Resumo, como no desenho | Mesclada em 03/11/2026; migration `20261110100000_engenharia_marcos.sql` aplicada (autorização #307) |
+| #308 | Correção: o admin não gravava dias para considerar parado, horas sem contato e distribuição de leads (a RLS de `empresas` só aceita o super-admin; a tela dizia "Salvo."). Função `salvar_configuracoes_empresa` | Mesclada em 03/11/2026; migration `20261111100000_configuracoes_empresa_admin.sql` aplicada (autorização #309). Os admins precisam salvar de novo essas configurações: todas as empresas estavam nos padrões |
 
 Pendências (decisão do Evandro):
-- **"Concluída no mês" no Resumo da Engenharia:** no desenho, a última fase se chama assim; no código, a coluna mostra as obras com a Engenharia concluída que ainda seguem nos outros setores. Manter ou trocar pelo número do mês.
 - **Pagamento no Pro:** o vendedor não tem como avisar que o cliente pagou, e ninguém é avisado dos pagamentos a confirmar (só quem abre o negócio vê). Ideias: "o cliente pagou" pelo vendedor (data e comprovante opcional, sem confirmar), aviso ou lista "Pagamentos a confirmar" para admin e gestor e, se o Evandro quiser, confirmação por um setor (Operacional ou Financeiro), com setor específico, porque a confirmação libera pontos e cria a Obra.
 - **Solo:** o registro sozinho do pagamento (antes do contrato) continua só para a empresa Solo com 1 pessoa ativa; com equipe, o dono confirma a própria venda pela confirmação (#303), depois do contrato assinado. O registro do Solo também não cria Obra.
+- **Teste instável:** `tests/gamificacao-ranking-historico.test.ts` usa cortes com `Date.now()` e às vezes falha sob carga (passa sozinho).
+
+## Engenharia × respostas do engenheiro (03/11/2026) — falta ajustar (pedido do Evandro: não esquecer)
+
+O engenheiro respondeu o levantamento de documentos, ART, protocolo, exigências, orçamento de conexão, vistoria e prazos da Copel. Já bate: mesmo número de protocolo na correção (reenvio no mesmo protocolo), PEW como canal, categoria "cadastral" das exigências (troca de titularidade para CNPJ, resolvida com IPTU), vistoria reprovada → correção → novo pedido, "orçamento emitido" no protocolo, revisão do passo 5 sem exigir segundo engenheiro ("depende do que precisa ser revisto") e o "Meu dia" (hoje ele usa uma lista no computador).
+
+Feito: **"não se aplica" por qualquer engenheiro**, inclusive em documento obrigatório, sempre com motivo (migration `20261112100000_engenharia_nao_se_aplica.sql`).
+
+Falta, numa PR "enquadramento Copel" (confirmar a lista de tipos com o Evandro antes):
+1. **Tipos de pedido** além de nova conexão, ampliação e regularização: troca de titularidade (site da Copel, mesmos documentos), aumento de carga e ligação nova em baixa tensão (+ DCA), aumento de carga e ligação nova em média tensão (+ DCA e unifilar), cadastro de compensação (+ fatura ou faturas cadastradas). Canal: projetos, padrão individual e aumento de carga em BT pelo PEW; os demais pelos sites da Copel.
+2. **Perguntas novas no enquadramento:** baixa × média tensão e zona rural (muda documentos e prazos).
+3. **Prazos em dias corridos:** aprovação do projeto em 15 dias corridos (30 na zona rural); hoje só há dias úteis e os prazos da distribuidora estão vazios na configuração.
+4. **Prazos informados que faltam:** ART (TRT) ~1 dia após o pagamento, necessária para dar entrada no PEW; vistoria em 7 dias úteis (pode prorrogar por tempo ou pela Copel); obra de rede 30/60/90 dias em BT e ~6 meses em MT.
+5. **Obra de rede com custo:** documentação enviada ao e-mail do cliente, pagamento à Copel conforme negociado, obra e só então a vistoria do padrão novo (montado). Sem custo, vai direto para a ligação. Hoje há só a pergunta "obra de rede: sim/não".
+6. **Checklist padrão** (o admin já pode editar em Configurações › Engenharia): e-mail e celular do cliente; documento com foto do titular (legível, com CPF); inversor e painéis (potência, modelo e marca, novos e existentes na ampliação); localização; PJ: cartão CNPJ, QSA e possivelmente IPTU; procuração pelo modelo da Engenharia (documentos do cliente). Hoje a lista padrão é genérica (datasheets, memorial).
 
 ## Obras = One Page Result (OPR) — plano em 3 PRs (aprovado pelo Evandro em 02/11/2026; concluído em 03/11/2026)
 

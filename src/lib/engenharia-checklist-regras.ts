@@ -68,8 +68,8 @@ export function acoesItem(item: Pick<ItemEngenhariaVM, "status" | "obrigatorio" 
     anexar: age && item.status !== "dispensado",
     validar: age && item.documentos.length > 0 && item.status !== "valido" && item.status !== "dispensado",
     invalidar: age && item.documentos.length > 0 && item.status !== "invalido" && item.status !== "dispensado",
-    // Obrigatório só admin ou coordenador dispensa (decisão padrão, ajustável).
-    dispensar: age && item.status !== "dispensado" && (!item.obrigatorio || autorizacao === "admin" || autorizacao === "coordenar"),
+    // Qualquer um que age na Engenharia marca "não se aplica", inclusive o obrigatório, sempre com motivo (engenheiro, 03/11/2026).
+    dispensar: age && item.status !== "dispensado",
     reabrir: age && item.status !== "pendente" && item.status !== "em_conferencia",
   };
 }
