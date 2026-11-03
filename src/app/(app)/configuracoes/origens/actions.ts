@@ -75,10 +75,12 @@ export async function definirDistribuicaoLeads(_: ResultadoAcao, formData: FormD
   if (!dados.success) return { ok: false, mensagem: "Dados inválidos." };
 
   const supabase = await criarClienteServidor();
-  const { error } = await supabase
-    .from("empresas")
-    .update({ modo_distribuicao_leads: dados.data.modo, percentual_leads_sdr: dados.data.percentual })
-    .eq("id", atual.empresaId);
+  // `empresas` só aceita UPDATE do super-admin: a configuração passa pela função, que limita ao admin e a estas colunas.
+  const { error } = await supabase.rpc("salvar_configuracoes_empresa", {
+    p_empresa_id: atual.empresaId,
+    p_modo_distribuicao_leads: dados.data.modo,
+    p_percentual_leads_sdr: dados.data.percentual,
+  });
   if (error) return { ok: false, mensagem: "Não foi possível salvar." };
 
   revalidatePath(CAMINHO);
