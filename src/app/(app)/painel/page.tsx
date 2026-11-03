@@ -1,4 +1,6 @@
+import { AlarmClock, Banknote, CircleX, Inbox, Trophy, type LucideIcon } from "lucide-react";
 import Link from "next/link";
+import { CabecalhoPagina, CLASSE_ACAO_CABECALHO } from "@/components/cabecalho-pagina";
 import { Cartao, Selo } from "@/components/ui";
 import { carregarConfiguracao, formatarMoeda, tempoDesde } from "@/lib/crm";
 import { contarAtribuicoesPendentes } from "@/lib/distribuicao-leads";
@@ -36,26 +38,38 @@ export default async function Painel() {
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-4">
-      <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Painel</h1>
+      <CabecalhoPagina
+        sobretitulo="Gestão · Comercial"
+        titulo="Painel"
+        descricao={
+          leadsADistribuir > 0
+            ? `${leadsADistribuir} lead${leadsADistribuir === 1 ? "" : "s"} aguardando distribuição.`
+            : "Resultados da equipe e o que precisa de atenção."
+        }
+        acoes={
+          leadsADistribuir > 0 && (
+            <Link href="/leads-a-distribuir" className={CLASSE_ACAO_CABECALHO}>
+              <Inbox size={16} aria-hidden />
+              Distribuir leads
+            </Link>
+          )
+        }
+      />
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <Estatistica rotulo="Negócios ganhos" valor={indicadores.ganhos.total} destaque="positivo" />
-        <Estatistica rotulo="Valor ganho" valor={formatarMoeda(indicadores.ganhos.valor)} destaque="positivo" />
-        <Estatistica rotulo="Negócios perdidos" valor={indicadores.perdidos.total} destaque="negativo" />
-        <Estatistica rotulo="Tarefas atrasadas" valor={indicadores.tarefasAtrasadas} destaque={indicadores.tarefasAtrasadas ? "negativo" : "neutro"} />
+      {/* Indicadores numa superfície só, separados por fios (como no Início e na Engenharia). */}
+      <div className="painel overflow-hidden">
+        <dl className="grid grid-cols-2 gap-px bg-linha sm:grid-cols-4">
+          <Indicador Icone={Trophy} rotulo="Negócios ganhos" valor={indicadores.ganhos.total} destaque="positivo" />
+          <Indicador Icone={Banknote} rotulo="Valor ganho" valor={formatarMoeda(indicadores.ganhos.valor)} destaque="positivo" />
+          <Indicador Icone={CircleX} rotulo="Negócios perdidos" valor={indicadores.perdidos.total} destaque="negativo" />
+          <Indicador
+            Icone={AlarmClock}
+            rotulo="Tarefas atrasadas"
+            valor={indicadores.tarefasAtrasadas}
+            destaque={indicadores.tarefasAtrasadas ? "negativo" : "neutro"}
+          />
+        </dl>
       </div>
-
-      {leadsADistribuir > 0 && (
-        <Link
-          href="/leads-a-distribuir"
-          className="flex items-center justify-between gap-3 rounded-xl border border-dourado/40 bg-dourado/5 px-4 py-3 text-sm text-zinc-900 hover:border-dourado"
-        >
-          <span>
-            <strong>{leadsADistribuir}</strong> lead{leadsADistribuir === 1 ? "" : "s"} aguardando distribuição
-          </span>
-          <span className="shrink-0 font-medium text-dourado">Distribuir →</span>
-        </Link>
-      )}
 
       {pendentes.error && (
         <Cartao titulo="Oportunidades aguardando aceite">
@@ -209,12 +223,30 @@ export default async function Painel() {
   );
 }
 
-function Estatistica({ rotulo, valor, destaque }: { rotulo: string; valor: string | number; destaque: "positivo" | "negativo" | "neutro" }) {
-  const cor = { positivo: "text-green-700", negativo: "text-red-700", neutro: "text-zinc-900" }[destaque];
+function Indicador({
+  Icone,
+  rotulo,
+  valor,
+  destaque,
+}: {
+  Icone: LucideIcon;
+  rotulo: string;
+  valor: string | number;
+  destaque: "positivo" | "negativo" | "neutro";
+}) {
+  const cor = { positivo: "text-energia", negativo: "text-erro", neutro: "text-texto" }[destaque];
+  const texto = String(valor);
+  // Valores longos (dinheiro) encolhem para caber numa linha da célula; 0,6em é a largura média de um caractere.
+  const tamanho = { fontSize: `min(1.875rem, calc(100cqi / ${(texto.length * 0.6).toFixed(2)}))` };
   return (
-    <div className="rounded-xl border border-zinc-200/80 bg-white p-4 shadow-[0_1px_2px_rgba(15,15,16,0.04)]">
-      <p className={`text-2xl font-semibold ${cor}`}>{valor}</p>
-      <p className="text-sm text-zinc-600">{rotulo}</p>
+    <div className="@container flex min-w-0 flex-col gap-2 bg-superficie p-4 md:p-5">
+      <dt className="flex min-w-0 items-center gap-2 text-xs font-medium text-texto-2">
+        <Icone size={15} className="shrink-0 text-dourado-texto" aria-hidden />
+        <span className="truncate">{rotulo}</span>
+      </dt>
+      <dd className={`font-titulo font-light tracking-tight whitespace-nowrap tabular-nums ${cor}`} style={tamanho}>
+        {texto}
+      </dd>
     </div>
   );
 }
