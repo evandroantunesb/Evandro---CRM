@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Cartao, Voltar } from "@/components/ui";
+import { Cartao } from "@/components/ui";
 import { AVISOS_CRIACAO, avisosDaUrl } from "@/lib/negocio-dados";
 import { formatarDataHora } from "@/lib/crm";
 import { exigirPapel } from "@/lib/sessao";
@@ -94,7 +94,6 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
 
   return (
     <div className="mx-auto flex max-w-6xl animate-entrar flex-col gap-5">
-      <Voltar href={`/negocios?funil=${negocio.funil_id}`}>Negócios</Voltar>
       <Cabecalho ficha={ficha} />
       {negocio.status === "perdido" && negocio.motivo_perda_id && (
         <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800">
