@@ -1,25 +1,32 @@
 import Link from "next/link";
+import { Plus } from "lucide-react";
 import { notFound } from "next/navigation";
+import { CabecalhoPagina, CLASSE_ACAO_CABECALHO, CLASSE_VIDRO_CABECALHO } from "@/components/cabecalho-pagina";
+import { NovoNegocio } from "@/components/novo-negocio";
+import { iniciais } from "@/components/avatar";
 import { Cartao, Selo } from "@/components/ui";
 import { carregarConfiguracao, formatarDataHora, formatarMoeda } from "@/lib/crm";
+import { eletropostoDisponivel } from "@/lib/eletroposto-servidor";
+import { formatarMesAno } from "@/lib/formatacao";
 import { exigirPapel } from "@/lib/sessao";
 import { FICHA_CONTATO } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { EdicaoContato } from "./edicao";
-import { ExcluirContato } from "./excluir";
+import { OpcoesContato } from "./excluir";
 
 export default async function DetalheContato({ params }: PageProps<"/contatos/[id]">) {
   const { atual } = await exigirPapel(...FICHA_CONTATO);
   const { id } = await params;
   const supabase = await criarClienteServidor();
 
-  const [{ data: contato }, config] = await Promise.all([
+  const [{ data: contato }, config, eletroposto] = await Promise.all([
     supabase
       .from("contatos")
-      .select("id, tipo, nome, telefone, telefone2, email, documento, endereco, cidade, uf")
+      .select("id, tipo, nome, telefone, telefone2, email, documento, endereco, cidade, uf, created_at")
       .eq("id", id)
       .maybeSingle(),
     carregarConfiguracao(atual.empresaId),
+    eletropostoDisponivel(supabase, atual),
   ]);
   if (!contato) notFound();
 
@@ -30,16 +37,43 @@ export default async function DetalheContato({ params }: PageProps<"/contatos/[i
     .eq("contato_id", id)
     .order("created_at", { ascending: false });
   const etapas = new Map(config.etapas.map((e) => [e.id, e.nome]));
+  const whatsapp = contato.telefone?.replace(/\D/g, "");
+  const local = [contato.cidade, contato.uf].filter(Boolean).join(" / ");
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-4">
-      <Link href="/contatos" className="text-sm text-zinc-600 hover:underline">
-        ← Contatos
-      </Link>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">{contato.nome}</h1>
-        {(atual.papel === "admin" || atual.papel === "gestor") && <ExcluirContato contatoId={contato.id} />}
-      </div>
+      <CabecalhoPagina
+        detalhe
+        voltar={{ href: "/contatos", rotulo: "Contatos" }}
+        inicio={
+          <span className="hidden size-[72px] shrink-0 items-center justify-center rounded-full bg-dourado font-titulo text-2xl font-semibold text-carvao sm:flex" aria-hidden>
+            {iniciais(contato.nome) || "?"}
+          </span>
+        }
+        sobretitulo={[contato.tipo === "pj" ? "Pessoa jurídica" : "Pessoa física", local, `cliente desde ${formatarMesAno(contato.created_at)}`]
+          .filter(Boolean)
+          .join(" · ")}
+        titulo={contato.nome}
+        acoes={
+          <>
+            {whatsapp && whatsapp.length >= 10 && (
+              <a
+                href={`https://wa.me/${whatsapp.startsWith("55") ? whatsapp : `55${whatsapp}`}`}
+                target="_blank"
+                rel="noreferrer"
+                className={`${CLASSE_VIDRO_CABECALHO} border-[#5cc796]/60 text-[#5cc796]`}
+              >
+                WhatsApp
+              </a>
+            )}
+            {(atual.papel === "admin" || atual.papel === "gestor") && <OpcoesContato contatoId={contato.id} />}
+            <NovoNegocio href={`/negocios/novo?${new URLSearchParams({ contato: contato.id })}`} eletroposto={eletroposto} className={CLASSE_ACAO_CABECALHO}>
+              <Plus size={16} aria-hidden />
+              Novo negócio para este cliente
+            </NovoNegocio>
+          </>
+        }
+      />
       <Cartao titulo="Dados do contato">
         <EdicaoContato contato={{ ...contato, email: contato.email as string | null }} />
       </Cartao>

@@ -1,23 +1,32 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
+import { ChevronDown, Trash2 } from "lucide-react";
+import { CLASSE_VIDRO_CABECALHO } from "@/components/cabecalho-pagina";
+import { CLASSE_ITEM_MENU, MenuSuspenso } from "@/components/menu-suspenso";
 import { excluirContato } from "@/lib/acoes/contatos";
 
-export function ExcluirContato({ contatoId }: { contatoId: string }) {
+/** "Opções" da faixa da ficha do contato (admin e gestor): por enquanto, só excluir. */
+export function OpcoesContato({ contatoId }: { contatoId: string }) {
   return (
-    <form
-      action={excluirContato}
-      onSubmit={(e) => {
-        if (!confirm("Excluir este contato? Isso não pode ser desfeito.")) e.preventDefault();
-      }}
+    <MenuSuspenso
+      trigger={({ alternar }) => (
+        <button type="button" aria-haspopup="menu" onClick={alternar} className={CLASSE_VIDRO_CABECALHO}>
+          Opções
+          <ChevronDown size={16} aria-hidden />
+        </button>
+      )}
     >
-      <input type="hidden" name="contatoId" value={contatoId} />
-      <button
-        type="submit"
-        className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
+      <form
+        action={excluirContato}
+        onSubmit={(e) => {
+          if (!confirm("Excluir este contato? Isso não pode ser desfeito.")) e.preventDefault();
+        }}
       >
-        <Trash2 size={15} /> Excluir contato
-      </button>
-    </form>
+        <input type="hidden" name="contatoId" value={contatoId} />
+        <button type="submit" role="menuitem" className={`${CLASSE_ITEM_MENU} gap-2 text-erro`}>
+          <Trash2 size={15} aria-hidden /> Excluir contato
+        </button>
+      </form>
+    </MenuSuspenso>
   );
 }

@@ -7,6 +7,7 @@ import { alternarEtiqueta } from "@/lib/acoes/negocios";
 import { Janela } from "@/components/janela";
 import { CLASSE_ITEM_MENU, ItemMenuSuspenso, MenuSuspenso, RotuloMenuSuspenso, SeparadorMenuSuspenso } from "@/components/menu-suspenso";
 import { ModalComentarioEtapa } from "@/components/comentario-etapa";
+import { CLASSE_VIDRO_CABECALHO } from "@/components/cabecalho-pagina";
 
 type EtiquetaDisponivel = { id: string; nome: string; cor: string | null };
 type MotivoDisponivel = { id: string; nome: string };
@@ -15,6 +16,7 @@ type MotivoDisponivel = { id: string; nome: string };
  * Menu "Mover para": alternativa ao arrastar no Kanban, essencial no celular
  * (onde arrastar cards é difícil) e útil na página do negócio pra trocar de etapa sem editar o card inteiro.
  * No card do Kanban (compacto) também abre o negócio e, se houver etiquetas cadastradas, edita as etiquetas do negócio.
+ * `naFaixa`: na faixa escura da ficha, vira o botão de vidro "Opções do negócio" (desenho aprovado).
  */
 export function MoverEtapa({
   negocioId,
@@ -24,6 +26,7 @@ export function MoverEtapa({
   etiquetas = [],
   etiquetasMarcadas = [],
   motivos = [],
+  naFaixa = false,
 }: {
   negocioId: string;
   etapaAtualId: string;
@@ -32,6 +35,7 @@ export function MoverEtapa({
   etiquetas?: EtiquetaDisponivel[];
   etiquetasMarcadas?: string[];
   motivos?: MotivoDisponivel[];
+  naFaixa?: boolean;
 }) {
   const [editandoEtiquetas, setEditandoEtiquetas] = useState(false);
   const [destinoPendente, setDestinoPendente] = useState<{ id: string; nome: string; fechaComo?: "ganho" | "perdido" | null } | null>(
@@ -54,6 +58,11 @@ export function MoverEtapa({
               className="grid h-9 w-9 place-items-center rounded-full text-texto-2 transition-colors hover:bg-superficie-2 hover:text-texto disabled:opacity-50 md:h-7 md:w-7"
             >
               <MoreVertical size={16} />
+            </button>
+          ) : naFaixa ? (
+            <button type="button" aria-haspopup="menu" onClick={alternar} className={CLASSE_VIDRO_CABECALHO}>
+              Opções do negócio
+              <ChevronDown size={16} aria-hidden />
             </button>
           ) : (
             <button
@@ -81,7 +90,7 @@ export function MoverEtapa({
         )}
         {destinos.length > 0 && (
           <>
-            {compacto && <RotuloMenuSuspenso>Mover para</RotuloMenuSuspenso>}
+            {(compacto || naFaixa) && <RotuloMenuSuspenso>Mover para</RotuloMenuSuspenso>}
             {destinos.map((e) => (
               <ItemMenuSuspenso key={e.id} onClick={() => setDestinoPendente({ id: e.id, nome: e.nome, fechaComo: e.fechaComo })}>
                 {e.nome}

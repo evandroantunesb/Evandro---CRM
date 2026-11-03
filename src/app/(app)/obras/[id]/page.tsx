@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
+import { Plus } from "lucide-react";
+import { CabecalhoPagina, CLASSE_ACAO_CABECALHO, CLASSE_VIDRO_CABECALHO, SeloCabecalho } from "@/components/cabecalho-pagina";
 import { ModosObras } from "@/components/obras/modos-obras";
 import { NavegacaoObras } from "@/components/obras/navegacao-obras";
 import { Cartao, Selo } from "@/components/ui";
@@ -24,17 +26,21 @@ import {
   type SituacaoObra,
 } from "@/lib/obras/rotulos";
 import { ESCALONAMENTO_OBRA, FINANCEIRO_OBRA, OBRAS, OPR_COMPLETA, PRAZOS_OBRA, pode } from "@/lib/permissoes";
-import { ehCategoriaCusto, montarCustos, type CategoriaCustoObra } from "@/lib/obras/custos";
+import { ehCategoriaCusto, montarCustos, resultadoObra, type CategoriaCustoObra } from "@/lib/obras/custos";
+import { prazosDaLinha, ROTULO_COR, semaforoObra, type CorSemaforo } from "@/lib/obras/semaforo";
 import { COLUNAS_JUSTIFICATIVA, atrasosDaObra, justificativasPorEtapa } from "@/lib/obras/justificativas";
 import { hojeEmSaoPaulo } from "@/lib/formatacao";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 
-type Tom = "neutro" | "negativo" | "atencao";
+type Tom = "neutro" | "positivo" | "negativo" | "atencao";
 // Sem verde (reservado ao WhatsApp): "Concluída" fica neutra. Vermelho só para o que é perda/erro.
 const TOM_SITUACAO: Record<SituacaoObra, Tom> = { em_andamento: "neutro", concluida: "neutro", pausada: "atencao", cancelada: "negativo" };
 const dataBr = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
 const TOM_ALERTA: Record<AlertaObra, Tom> = { estorno: "negativo", venda_alterada: "atencao", parado: "atencao", aguardando: "neutro" };
+// Exceção de cor das Obras (CLAUDE.md): verde `energia` no prazo, dourado para atenção, vermelho `erro` para atraso.
+const TOM_COR: Record<CorSemaforo, Tom> = { verde: "positivo", amarela: "atencao", vermelha: "negativo" };
+const COR_SEMAFORO: Record<CorSemaforo, string> = { verde: "#5cc796", amarela: "#d4af37", vermelha: "#f2867d" };
 
 export default async function DetalheObra({ params, searchParams }: PageProps<"/obras/[id]">) {
   // Lista positiva (OBRAS): os quatro papéis comerciais e `operacao`. A RLS decide o que cada um vê.
@@ -45,7 +51,7 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
 
   const supabase = await criarClienteServidor();
   // A lista navegável é recalculada aqui, a cada obra: mesma empresa, mesma RLS, mesmos filtros.
-  const [obra, lista, tarefasSetor, vistoria, vistorias, cronograma, orcamento, lancamentos, justificativasRes, escalonamentosRes, identidades] = await Promise.all([
+  const [obra, lista, tarefasSetor, vistoria, vistorias, cronograma, orcamento, lancamentos, justificativasRes, escalonamentosRes, identidades, prazosRes] = await Promise.all([
     carregarDetalheObra(supabase, { empresaId: atual.empresaId, papel: atual.papel, obraId: id, membroId: atual.membroId }),
     carregarObras(supabase, { empresaId: atual.empresaId, papel: atual.papel, comResponsaveis: false }),
     carregarTarefasSetor(supabase, { empresaId: atual.empresaId, membroId: atual.membroId, papel: atual.papel, obraId: id, filtro: "todas" }),
@@ -65,9 +71,11 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
       .eq("obra_id", id)
       .order("aberto_em", { ascending: false }),
     supabase.rpc("identidade_membros", { p_empresa_id: atual.empresaId }),
+    // Semáforo da faixa: os mesmos prazos em dias úteis da visão Completa.
+    supabase.rpc("prazos_obras", { p_obra_ids: [id] }),
   ]);
   if (!obra) notFound();
-  for (const r of [justificativasRes, escalonamentosRes, identidades]) if (r.error) throw r.error;
+  for (const r of [justificativasRes, escalonamentosRes, identidades, prazosRes]) if (r.error) throw r.error;
   const navegacao = montarNavegacao(lista.obras, filtros, id);
 
   const { resumo, gestao } = obra;
@@ -108,29 +116,76 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
   const podeEscalonar =
     !cancelada && pode(atual.papel, ESCALONAMENTO_OBRA) && (atual.papel === "gestor" || gestaoDoSetor("operacional")?.permissoes.autorizacao != null);
 
+  // Faixa: semáforo e margem pelas regras da Completa (orçamento todo zerado e nada lançado = sem orçamento; o motivo
+  // é a justificativa respondida mais recente, senão a regra que deu a cor). Só para a obra em execução.
+  const custosValidos = custos && (custos.planejado > 0 || custos.realizado > 0) ? custos : null;
+  const margemPct = custosValidos && obra.valorVendido != null ? resultadoObra(obra.valorVendido, custosValidos, 0).margemProjetadaPct : null;
+  const linhaPrazos = prazosRes.data?.[0];
+  const semaforo =
+    resumo.situacao === "em_andamento" && linhaPrazos
+      ? semaforoObra({ prazos: prazosDaLinha(linhaPrazos), custos: custosValidos, margemProjetadaPct: margemPct })
+      : null;
+  const ultimaJustificativa = [...(justificativasRes.data ?? [])]
+    .filter((j) => j.texto && j.respondido_em)
+    .sort((a, b) => (b.respondido_em ?? "").localeCompare(a.respondido_em ?? ""))[0]?.texto;
+  const motivoSemaforo = semaforo && semaforo.cor !== "verde" ? (ultimaJustificativa ?? semaforo.motivo) : null;
+
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <ModosObras modo="gestao" hrefGestao={hrefObra("/obras", id, query)} hrefApresentacao={hrefObra("/obras/apresentacao", id, query)} />
-        {temFiltroAtivo(filtros) && <span className="text-xs text-zinc-500">Navegando pela lista filtrada</span>}
-      </div>
-      <NavegacaoObras navegacao={navegacao} atualId={id} base="/obras" query={query} />
-
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">{resumo.clienteNome}</h1>
-        <Selo>Obra #{resumo.numero}</Selo>
-        <Selo tom={TOM_SITUACAO[resumo.situacao]}>{ROTULO_SITUACAO_OBRA[resumo.situacao]}</Selo>
-        {resumo.alertas.map((a) => (
-          <Selo key={a} tom={TOM_ALERTA[a]}>
-            {ROTULO_ALERTA_OBRA[a]}
-          </Selo>
-        ))}
-      </div>
-      {resumo.negocioId && (
-        <Link href={`/negocios/${resumo.negocioId}`} className="w-fit text-sm text-zinc-600 underline hover:text-zinc-900">
-          Ver negócio
-        </Link>
-      )}
+      <CabecalhoPagina
+        detalhe
+        voltar={{ href: `/obras${query ? `?${query}` : ""}`, rotulo: temFiltroAtivo(filtros) ? "Obras · lista filtrada" : "Obras" }}
+        sobretitulo={[`Obra nº ${resumo.numero}`, local].filter(Boolean).join(" · ")}
+        titulo={[resumo.clienteNome, comUnidade(resumo.potenciaKwp, "kWp")].filter(Boolean).join(" · ")}
+        selos={
+          <>
+            {semaforo ? (
+              <SeloCabecalho tom={TOM_COR[semaforo.cor]}>
+                <span className="size-2 rounded-full" style={{ background: COR_SEMAFORO[semaforo.cor] }} aria-hidden />
+                {ROTULO_COR[semaforo.cor]}
+                {motivoSemaforo && <> · {motivoSemaforo}</>}
+              </SeloCabecalho>
+            ) : (
+              <SeloCabecalho tom={TOM_SITUACAO[resumo.situacao]}>{ROTULO_SITUACAO_OBRA[resumo.situacao]}</SeloCabecalho>
+            )}
+            {entrega && resumo.situacao !== "concluida" && resumo.situacao !== "cancelada" && (
+              <SeloCabecalho>Entrega prevista {dataBr(entrega.prevista).slice(0, 5)}</SeloCabecalho>
+            )}
+            {resumo.alertas.map((a) => (
+              <SeloCabecalho key={a} tom={TOM_ALERTA[a]}>
+                {ROTULO_ALERTA_OBRA[a]}
+              </SeloCabecalho>
+            ))}
+          </>
+        }
+        acoes={
+          <>
+            <NavegacaoObras navegacao={navegacao} atualId={id} base="/obras" query={query} escuro />
+            <ModosObras modo="gestao" hrefGestao={hrefObra("/obras", id, query)} hrefApresentacao={hrefObra("/obras/apresentacao", id, query)} escuro />
+            {resumo.negocioId && (
+              <Link href={`/negocios/${resumo.negocioId}`} className={CLASSE_VIDRO_CABECALHO}>
+                Ver negócio
+              </Link>
+            )}
+            {!cancelada && (
+              <a href="#tarefas-setor" className={CLASSE_ACAO_CABECALHO}>
+                <Plus size={16} aria-hidden />
+                Pedir ao setor
+              </a>
+            )}
+          </>
+        }
+        valor={
+          obra.valorVendido != null && (
+            <>
+              {formatarMoeda(obra.valorVendido)}
+              <span className="block font-sans text-xs tracking-normal text-offwhite/65">
+                valor vendido{margemPct != null && <> · margem projetada {margemPct.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%</>}
+              </span>
+            </>
+          )
+        }
+      />
 
       <Cartao titulo="Resumo">
         <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
@@ -259,19 +314,21 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
         </div>
       </section>
 
-      <Cartao titulo="Tarefas dos setores">
-        <div className="flex flex-col gap-4">
-          <ListaTarefasSetor
-            tarefas={tarefasSetor.tarefas.filter((t) => t.status !== "cancelada")}
-            membrosPorSetor={tarefasSetor.membrosPorSetor}
-            vazio="Nenhuma tarefa nesta obra."
-            mostrarReferencia={false}
-          />
-          {resumo.situacao !== "cancelada" && (
-            <NovaTarefaSetor obraId={resumo.id} exemplo="O que o setor precisa fazer? Ex.: comprar a estrutura de fixação" />
-          )}
-        </div>
-      </Cartao>
+      <div id="tarefas-setor" className="scroll-mt-4">
+        <Cartao titulo="Tarefas dos setores">
+          <div className="flex flex-col gap-4">
+            <ListaTarefasSetor
+              tarefas={tarefasSetor.tarefas.filter((t) => t.status !== "cancelada")}
+              membrosPorSetor={tarefasSetor.membrosPorSetor}
+              vazio="Nenhuma tarefa nesta obra."
+              mostrarReferencia={false}
+            />
+            {resumo.situacao !== "cancelada" && (
+              <NovaTarefaSetor obraId={resumo.id} exemplo="O que o setor precisa fazer? Ex.: comprar a estrutura de fixação" />
+            )}
+          </div>
+        </Cartao>
+      </div>
 
       <Cartao titulo="Marcos">
         <ul className="flex flex-col gap-3 text-sm">
