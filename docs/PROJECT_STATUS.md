@@ -1,5 +1,13 @@
 # Estado do projeto — Raion CRM
 
+## Operação e pós-vendas — especificação de 2026-10-26
+
+Decisões da conversa consolidadas em [ESPECIFICACAO-OPERACIONAL-POS-VENDAS-2026-10-26.md](ESPECIFICACAO-OPERACIONAL-POS-VENDAS-2026-10-26.md): responsabilidades por função, engenharia antes/depois da venda, compras, parcelas por marco, instalação, Gantt, tickets, encerramento, comissões e estornos. O vendedor faz o contato com o cliente; Vinicius coordena execução e tickets. Documento distingue decisões de produto, propostas técnicas e pendências. Nenhum fluxo novo implementado nesta etapa. Reconciliar com a ADR Pedido + Obra antes de definir migrations e preservar a separação entre liberação operacional pela entrada e pontuação somente na quitação.
+
+## Calendário operacional — pesquisa de 2026-10-26
+
+Feriados brasileiros de 2026 e expediente definido na conversa registrados em [CALENDARIO-OPERACIONAL-BRASIL-2026.md](CALENDARIO-OPERACIONAL-BRASIL-2026.md), com fontes oficiais e distinção entre feriados nacionais, Sexta-feira Santa conforme abrangência local e pontos facultativos federais. Alteração somente documental: calendário operacional, onboarding e cálculo de prazos ainda não implementados; nenhum cadastro ou alteração em produção.
+
 ## Calculadora GD II — revisão de 2026-10-23
 
 `main` em `3ee53b8`: cálculo GD II já integrado (#214–#216), limitado ao enquadramento Copel B1 residencial e ao período oficial disponível (2026/27). Sem economia financeira comprovada, a proposta com economia continua bloqueada; payback segue indisponível. A antiga PR draft #209 conflita com a linha atual e não deve ser mesclada integralmente.
