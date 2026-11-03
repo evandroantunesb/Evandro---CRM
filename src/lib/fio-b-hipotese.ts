@@ -12,7 +12,18 @@
  *       tributária de T. Este módulo não aplica fator tributário (tratamento tributário do Fio B é pendência legal).
  * Fórmulas:
  *   K = min(E, C, max(0, ((C − D) × T) / (T − N)))
- *   conta com solar = max(D × T, (C − K) × T + K × N);  conta sem solar = C × T
+ *   conta SEM solar = max(consumo total, D) × T          (piso sobre todo o consumo; sem solar não há autoconsumo)
+ *   conta COM solar = max(D × T, (C − K) × T + K × N)    (piso sobre o faturamento TOTAL)
+ * Sem solar, toda a energia vem da rede: o autoconsumo instantâneo só existe depois de instalar o sistema, por
+ * isso a conta sem solar usa o consumo TOTAL e não depende de autoconsumo nem de geração.
+ * Por que as duas diferem: sem solar não existe energia compensada, então o faturamento é consumo total × T e o piso
+ * é comparado a ele. Com solar o faturamento já inclui a parcela compensada (K × N) e é ESSE total que
+ * se compara ao piso (REN 1.000/2021, art. 655-I e §2º); nunca se soma o Fio B por fora de uma parcela
+ * já elevada ao piso. Por isso a expressão sem solar NÃO é reaplicada ao lado com solar.
+ * Parcelas representadas: só energia (TE + TUSD) ao piso/tarifa cheia T; ficam fora iluminação pública,
+ * bandeiras e tributos que T não inclua. É estimativa, não a fatura.
+ * Economia = sem − com, calculada sobre as contas JÁ arredondadas (os números exibidos fecham; contas iguais => economia 0). Regra aprovada pelo Evandro em 21/10/2026 (não valida a fórmula regulatória nem a Copel): ver .aurora/contratos/m2-p0-arredondamento-economia.md. `paybackDisponivel` = economiaMensal > 0
+ * (quando consumo total <= D as duas contas coincidem, economia 0 e payback indisponível; nenhuma fórmula de payback aqui).
  * Arredondamento: só no resultado final; monetário e energia em 2 casas, meio para longe de zero
  * (como o numeric do Postgres). Cálculos intermediários usam o valor sem arredondar.
  */
@@ -46,6 +57,8 @@ export type ResultadoFioBHipotese =
       contaSemSolar: number;
       contaComSolar: number;
       economiaMensal: number;
+      /** true somente se economiaMensal > 0 (após arredondamento). Sem economia, payback é indisponível. */
+      paybackDisponivel: boolean;
     }
   | { ok: false; motivo: string };
 
@@ -77,13 +90,13 @@ export function calcularFioBHipotese(entrada: EntradaFioBHipotese): ResultadoFio
   const E = geracaoTotalKwh - autoconsumo;
 
   const K = Math.min(E, C, Math.max(0, ((C - D) * T) / (T - N)));
-  const contaSemSolar = C * T;
+  const contaSemSolar = Math.max(consumoTotalKwh, D) * T;
   const contaComSolar = Math.max(D * T, (C - K) * T + K * N);
 
   const resultado = {
     contaSemSolar: arredondar2(contaSemSolar),
     contaComSolar: arredondar2(contaComSolar),
-    economiaMensal: arredondar2(contaSemSolar - contaComSolar),
+    economiaMensal: arredondar2(arredondar2(contaSemSolar) - arredondar2(contaComSolar)),
   };
   if (![resultado.contaSemSolar, resultado.contaComSolar, resultado.economiaMensal, K].every(Number.isFinite)) {
     return erro("O cálculo não produziu um resultado finito.");
@@ -101,5 +114,6 @@ export function calcularFioBHipotese(entrada: EntradaFioBHipotese): ResultadoFio
     energiaDisponivelNaoCompensadaKwh: arredondar2(E - K),
     consumoDaRedeKwh: arredondar2(C),
     ...resultado,
+    paybackDisponivel: resultado.economiaMensal > 0,
   };
 }

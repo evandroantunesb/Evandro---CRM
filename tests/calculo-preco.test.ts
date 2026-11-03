@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { paybackComPreco, precoDoCalculoDesatualizado } from "@/lib/calculo-preco";
-import { calcular } from "@/lib/calculadora";
+import { fecharEconomia } from "@/lib/calculadora";
 
 describe("precoDoCalculoDesatualizado", () => {
   it("igual não é desatualizado, diferente é", () => {
@@ -26,11 +26,24 @@ describe("paybackComPreco", () => {
     expect(paybackComPreco(28000, 0)).toBeNull();
     expect(paybackComPreco(28000, -10)).toBeNull();
   });
-  it("bate exatamente com o payback que a calculadora daria com o preço novo", () => {
-    const base = { potenciaKwp: 6.6, tipoLigacao: "bifasico" as const, consumoMedioKwh: 700, tarifaKwh: 0.95, produtividadeKwhKwpMes: 120, percentualFioB: 0.45, disponibilidadeKwh: 50 };
-    const antigo = calcular({ ...base, precoKit: 25000 });
-    for (const preco of [28000, 19999.99, 41234.5]) {
-      expect(paybackComPreco(preco, antigo.economiaMensal)).toBe(calcular({ ...base, precoKit: preco }).paybackMeses);
+  it("bate exatamente com o payback da aritmética aprovada (fecharEconomia) com o preço novo", () => {
+    // Contas fictícias (a fórmula das contas não está validada): só a aritmética de fechamento é exercida.
+    const contas = [
+      [412.37, 118.52],
+      [360, 252],
+      [100.004, 99.4],
+    ];
+    for (const [sem, com] of contas) {
+      const antigo = fecharEconomia(sem, com, 25000);
+      for (const preco of [28000, 19999.99, 41234.5]) {
+        expect(paybackComPreco(preco, antigo.economiaMensal)).toBe(fecharEconomia(sem, com, preco).paybackMeses);
+      }
     }
+  });
+  it("com economia zerada pelo arredondamento, o payback com preço novo também fica em aberto", () => {
+    const r = fecharEconomia(20.004, 19.996, 25000);
+    expect(r.economiaMensal).toBe(0);
+    expect(paybackComPreco(28000, r.economiaMensal)).toBeNull();
+    expect(fecharEconomia(20.004, 19.996, 28000).paybackMeses).toBeNull();
   });
 });

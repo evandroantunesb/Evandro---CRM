@@ -1,0 +1,1281 @@
+diff --git a/supabase/migrations/20261023100000_proposta_condicoes_comerciais.sql b/supabase/migrations/20261023100000_proposta_condicoes_comerciais.sql
+new file mode 100644
+index 0000000..de7b39f
+--- /dev/null
++++ b/supabase/migrations/20261023100000_proposta_condicoes_comerciais.sql
+@@ -0,0 +1,40 @@
++-- Condições comerciais da proposta simples (M2 P0, decisões D1 e D2 do Evandro, 22/10/2026).
++--
++-- D1: a validade da proposta é de 7, 15 ou 30 dias, configurada pela empresa e calculada na emissão (dia da emissão em
++--     São Paulo + prazo). O vendedor não informa a data de vencimento.
++-- D2: a proposta mostra juntas as três formas de pagamento (à vista, cartão e financiamento) com o texto que a empresa
++--     configurou. O vendedor não escolhe uma modalidade nem edita o texto.
++--
++-- Quem configura: admin e gestor da empresa. Todos os membros ativos leem (o vendedor vê a prévia antes de emitir).
++-- Sem a linha, sem o prazo ou sem qualquer uma das três condições, a emissão é bloqueada pelo app.
++--
++-- Migration aditiva: tabela nova e vazia. Nenhuma linha existente muda; `propostas_emissoes` e o gatilho de emissão
++-- ficam como estão. Propostas já emitidas guardam prazo, condições e PDF congelados nos próprios `dados`: mudar esta
++-- configuração depois nunca altera link nem PDF emitidos.
++
++create table public.proposta_condicoes_comerciais (
++  empresa_id uuid primary key references public.empresas (id) on delete cascade,
++  validade_dias smallint check (validade_dias in (7, 15, 30)),
++  pagamento_avista text check (pagamento_avista is null or length(btrim(pagamento_avista)) between 1 and 80),
++  pagamento_cartao text check (pagamento_cartao is null or length(btrim(pagamento_cartao)) between 1 and 80),
++  pagamento_financiamento text check (pagamento_financiamento is null or length(btrim(pagamento_financiamento)) between 1 and 80),
++  atualizado_por uuid references public.empresa_membros (id) on delete set null,
++  created_at timestamptz not null default now(),
++  updated_at timestamptz not null default now()
++);
++
++create trigger proposta_condicoes_comerciais_updated_at before update on public.proposta_condicoes_comerciais
++  for each row execute function public.tocar_updated_at();
++
++alter table public.proposta_condicoes_comerciais enable row level security;
++
++create policy "ver condições comerciais da proposta" on public.proposta_condicoes_comerciais for select to authenticated
++  using (public.membro_ativo(empresa_id));
++create policy "admin e gestor criam condições comerciais" on public.proposta_condicoes_comerciais for insert to authenticated
++  with check (public.tem_papel(empresa_id, '{admin,gestor}'));
++create policy "admin e gestor editam condições comerciais" on public.proposta_condicoes_comerciais for update to authenticated
++  using (public.tem_papel(empresa_id, '{admin,gestor}'))
++  with check (public.tem_papel(empresa_id, '{admin,gestor}'));
++-- Sem política de DELETE: limpar = gravar nulo nos campos (a emissão fica bloqueada até completar de novo).
++
++revoke all on table public.proposta_condicoes_comerciais from anon;
+diff --git a/R:/wt-m2-p0-retomada/src/lib/propostas/proposta-simples.ts b/src/lib/propostas/proposta-simples.ts
+index e8d2ab0..3d567c4 100644
+--- a/R:/wt-m2-p0-retomada/src/lib/propostas/proposta-simples.ts
++++ b/src/lib/propostas/proposta-simples.ts
+@@ -22,7 +22,7 @@ import { valorComoPersistido } from "@/lib/consumo-persistido";
+ import { TIPOS_COMPONENTE_KIT } from "@/lib/tipos";
+ 
+ /** Identificação do layout que gera o PDF; muda quando o conteúdo/estrutura do modelo simples mudar. */
+-export const RENDERIZADOR_SIMPLES = "simples-v4";
++export const RENDERIZADOR_SIMPLES = "simples-v5";
+ 
+ /** Rodapé aprovado (proposta COM a geração estimada). */
+ export const RODAPE_SIMPLES =
+@@ -51,7 +51,10 @@ export const LIMITES_SIMPLES = {
+   etapaDescricao: 50,
+   componentes: 8,
+   descricaoComponente: 70,
++  /** Texto livre das condições (formato v4, só leitura de emissões antigas). */
+   condicoes: 240,
++  /** Cada uma das três formas de pagamento configuradas pela empresa (formato v5). */
++  pagamento: 80,
+   clienteNome: 60,
+   clienteEndereco: 100,
+ } as const;
+@@ -115,9 +118,39 @@ const numeroPositivo = z.number().finite().positive();
+ const dataIso = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+ const listaDeItens = z.array(z.string().trim().min(1).max(300)).min(1).max(20).nullable();
+ 
+-export const esquemaDadosEmissaoSimples = z
+-  .object({
+-  esquema: z.literal(4),
++const etapasCongeladas = z
++  .array(z.object({ titulo: z.string().trim().min(1).max(100), prazo: z.string().max(100).nullable(), descricao: z.string().max(300).nullable() }))
++  .min(1)
++  .max(8)
++  .nullable();
++
++/** Formato 4 (emissões até 22/10/2026): validade digitada pelo vendedor e condições em texto livre. Só leitura. */
++const comercialV4 = z.object({
++  validadeAte: dataIso,
++  /** Obrigatória: a proposta só é congelada com as condições de pagamento confirmadas (uma opção por linha). */
++  condicoesPagamento: z.string().trim().min(1).max(LIMITES_SIMPLES.condicoes),
++  /** Conteúdo confirmado pela empresa no modelo; nulo = bloco omitido na proposta. */
++  incluso: listaDeItens,
++  exclusos: listaDeItens,
++  garantias: listaDeItens,
++  etapas: etapasCongeladas,
++});
++
++const textoPagamento = z.string().trim().min(1).max(LIMITES_SIMPLES.pagamento);
++
++/** Formato 5 (D1/D2): prazo e as três formas de pagamento vêm da configuração da empresa, congelados na emissão. */
++const comercialV5 = z.object({
++  validadeDias: z.union([z.literal(7), z.literal(15), z.literal(30)]),
++  /** Dia da emissão em São Paulo + `validadeDias`. */
++  validadeAte: dataIso,
++  pagamento: z.object({ avista: textoPagamento, cartao: textoPagamento, financiamento: textoPagamento }),
++  incluso: listaDeItens,
++  exclusos: listaDeItens,
++  garantias: listaDeItens,
++  etapas: etapasCongeladas,
++});
++
++const camposComuns = {
+   cliente: z.object({ nome: textoCurto, endereco: z.string().max(400).nullable() }),
+   sistema: z.object({
+     kitNome: textoCurto,
+@@ -152,20 +185,6 @@ export const esquemaDadosEmissaoSimples = z
+       .min(1),
+   }),
+   preco: z.object({ valor: numeroPositivo }),
+-  comercial: z.object({
+-    validadeAte: dataIso,
+-    /** Obrigatória: a proposta só é congelada com as condições de pagamento confirmadas (uma opção por linha). */
+-    condicoesPagamento: z.string().trim().min(1).max(LIMITES_SIMPLES.condicoes),
+-    /** Conteúdo confirmado pela empresa no modelo; nulo = bloco omitido na proposta. */
+-    incluso: listaDeItens,
+-    exclusos: listaDeItens,
+-    garantias: listaDeItens,
+-    etapas: z
+-      .array(z.object({ titulo: z.string().trim().min(1).max(100), prazo: z.string().max(100).nullable(), descricao: z.string().max(300).nullable() }))
+-      .min(1)
+-      .max(8)
+-      .nullable(),
+-  }),
+   identidade: z.object({
+     nomeExibicao: z.string().max(200),
+     corPrimaria: z.string().max(7),
+@@ -174,11 +193,19 @@ export const esquemaDadosEmissaoSimples = z
+   }),
+   emissao: z.object({ versao: z.number().int().positive(), emitidaEm: z.string().min(10) }),
+   rodape: z.string(),
+-})
++};
++
++/** Lê os dois formatos: emissões v4 continuam abrindo como foram emitidas; novas emissões são sempre v5. */
++export const esquemaDadosEmissaoSimples = z
++  .discriminatedUnion("esquema", [
++    z.object({ esquema: z.literal(4), ...camposComuns, comercial: comercialV4 }),
++    z.object({ esquema: z.literal(5), ...camposComuns, comercial: comercialV5 }),
++  ])
+   // O rodapé acompanha a geração: com o número, o aprovado; sem ele, a variante que não o promete.
+   .refine((d) => d.rodape === rodapeDaProposta(d.sistema.geracao != null), { path: ["rodape"], message: "Rodapé não confere com a proposta." });
+ 
+ export type DadosEmissaoSimples = z.infer<typeof esquemaDadosEmissaoSimples>;
++export type DadosEmissaoSimplesV5 = Extract<DadosEmissaoSimples, { esquema: 5 }>;
+ 
+ /** JSON canônico (chaves ordenadas): o mesmo conteúdo gera sempre os mesmos bytes, não importa a ordem do jsonb. */
+ export function jsonCanonico(valor: unknown): string {
+@@ -256,9 +283,8 @@ export type EntradaEmissaoSimples = {
+   componentes: { tipo: string; descricao: string; quantidade: number; potencia_w: number | null }[];
+   /** Produtividade confirmada pelo admin (ver `produtividadeConfirmada`); nulo = geração fora da proposta. */
+   produtividadeConfirmada: ProdutividadeConfirmada | null;
+-  /** Informada pelo vendedor (AAAA-MM-DD); sem padrão. */
+-  validadeAte: string | null;
+-  condicoesPagamento: string | null;
++  /** Configuração comercial da empresa (gestor/admin); nula = não configurada. O vendedor não informa nada disso. */
++  condicoesComerciais: CondicoesComerciais | null;
+   conteudo: Pick<ConteudoDoModelo, "incluso" | "exclusos" | "garantias" | "etapas">;
+   identidade: { nomeExibicao: string; corPrimaria: string; corDestaque: string; whatsapp: string };
+   versao: number;
+@@ -267,9 +293,57 @@ export type EntradaEmissaoSimples = {
+   hoje: string;
+ };
+ 
+-export const MENSAGEM_VALIDADE_OBRIGATORIA = "Informe até quando a proposta é válida.";
+-export const MENSAGEM_CONDICOES_OBRIGATORIAS = "Informe as condições de pagamento (uma opção por linha): a proposta só é emitida com elas confirmadas.";
+-export const MENSAGEM_VALIDADE_PASSADA = "A validade não pode ser anterior a hoje.";
++// ---------------------------------------------------------------------------
++// Condições comerciais da empresa (D1/D2): prazo de validade e as três formas de pagamento
++// ---------------------------------------------------------------------------
++
++export const PRAZOS_VALIDADE = [7, 15, 30] as const;
++export type PrazoValidade = (typeof PRAZOS_VALIDADE)[number];
++
++export const FORMAS_PAGAMENTO = [
++  ["avista", "À vista"],
++  ["cartao", "Cartão"],
++  ["financiamento", "Financiamento"],
++] as const;
++
++export type CondicoesComerciais = { validadeDias: number | null; avista: string | null; cartao: string | null; financiamento: string | null };
++
++/** Linha de `proposta_condicoes_comerciais` (ou a falta dela) no formato da montagem. */
++export function condicoesComerciaisDaEmpresa(
++  linha: { validade_dias: number | null; pagamento_avista: string | null; pagamento_cartao: string | null; pagamento_financiamento: string | null } | null | undefined,
++): CondicoesComerciais | null {
++  if (!linha) return null;
++  const t = (v: string | null) => v?.trim() || null;
++  return { validadeDias: linha.validade_dias, avista: t(linha.pagamento_avista), cartao: t(linha.pagamento_cartao), financiamento: t(linha.pagamento_financiamento) };
++}
++
++export const MENSAGEM_CONDICOES_NAO_CONFIGURADAS =
++  "A empresa ainda não configurou a validade e as formas de pagamento da proposta. Um gestor ou admin precisa completar em Configurações › Condições da proposta.";
++
++/** O que falta na configuração para emitir (vazio = completa). */
++export function pendenciasDasCondicoes(c: CondicoesComerciais | null): string[] {
++  if (!c) return [MENSAGEM_CONDICOES_NAO_CONFIGURADAS];
++  const faltam: string[] = [];
++  if (!PRAZOS_VALIDADE.includes(c.validadeDias as PrazoValidade)) faltam.push("o prazo de validade");
++  for (const [chave, rotulo] of FORMAS_PAGAMENTO) if (!c[chave]) faltam.push(`a condição "${rotulo}"`);
++  const longas = FORMAS_PAGAMENTO.filter(([chave]) => (c[chave]?.length ?? 0) > LIMITES_SIMPLES.pagamento).map(([, rotulo]) => `"${rotulo}"`);
++  const pendencias: string[] = [];
++  if (faltam.length) pendencias.push(`Configuração da proposta incompleta: falta ${faltam.join(", ")}. Um gestor ou admin precisa completar em Configurações › Condições da proposta.`);
++  if (longas.length) pendencias.push(`A condição ${longas.join(", ")} passa de ${LIMITES_SIMPLES.pagamento} caracteres. Um gestor ou admin precisa resumir em Configurações › Condições da proposta.`);
++  return pendencias;
++}
++
++/** AAAA-MM-DD + n dias, no calendário (sem fuso: a data de partida já é a de São Paulo). */
++export function somarDias(dataIso: string, dias: number): string {
++  const [a, m, d] = dataIso.split("-").map(Number) as [number, number, number];
++  return new Date(Date.UTC(a, m - 1, d + dias)).toISOString().slice(0, 10);
++}
++
++/** Formas de pagamento da emissão, para PDF e página: v5 com rótulo; v4 (texto livre) uma linha por opção. */
++export function opcoesPagamentoDaEmissao(dados: DadosEmissaoSimples): { rotulo: string | null; texto: string }[] {
++  if (dados.esquema === 4) return opcoesDePagamento(dados.comercial.condicoesPagamento).map((texto) => ({ rotulo: null, texto }));
++  return FORMAS_PAGAMENTO.map(([chave, rotulo]) => ({ rotulo, texto: dados.comercial.pagamento[chave] }));
++}
+ 
+ /** Uma opção de pagamento por linha do texto das condições; texto de uma linha só vira parágrafo na proposta. */
+ export const opcoesDePagamento = (texto: string | null | undefined): string[] =>
+@@ -326,8 +400,7 @@ export function montarDadosEmissaoSimples(e: EntradaEmissaoSimples): ResultadoMo
+   }
+   if ((e.contatoNome?.trim().length ?? 0) > L.clienteNome) pendencias.push(`O nome do contato passa de ${L.clienteNome} caracteres.`);
+   if ((e.contatoEndereco?.trim().length ?? 0) > L.clienteEndereco) pendencias.push(`O endereço do contato passa de ${L.clienteEndereco} caracteres.`);
+-  if (opcoesDePagamento(e.condicoesPagamento).length === 0) pendencias.push(MENSAGEM_CONDICOES_OBRIGATORIAS);
+-  if ((e.condicoesPagamento?.trim().length ?? 0) > L.condicoes) pendencias.push(`As condições de pagamento passam de ${L.condicoes} caracteres. Resuma o texto.`);
++  pendencias.push(...pendenciasDasCondicoes(e.condicoesComerciais));
+   for (const [nome, itens, max] of [
+     ["Incluso", e.conteudo.incluso, L.incluso],
+     ["Não incluso", e.conteudo.exclusos, L.exclusos],
+@@ -345,10 +418,9 @@ export function montarDadosEmissaoSimples(e: EntradaEmissaoSimples): ResultadoMo
+   }
+   if (!(typeof e.valorNegocio === "number" && e.valorNegocio > 0)) pendencias.push("Informe o valor do negócio (preço da proposta).");
+   if (!(typeof e.consumoMedioKwhNegocio === "number" && e.consumoMedioKwhNegocio > 0)) pendencias.push("Informe o consumo médio do cliente no negócio.");
+-  if (!e.validadeAte) pendencias.push(MENSAGEM_VALIDADE_OBRIGATORIA);
+-  else if (!dataIsoValida(e.validadeAte)) pendencias.push("Validade inválida.");
+-  else if (e.validadeAte < e.hoje) pendencias.push(MENSAGEM_VALIDADE_PASSADA);
+-  if (pendencias.length || !sistema) return { ok: false, pendencias };
++  if (!dataIsoValida(e.hoje)) pendencias.push("Data de emissão inválida.");
++  if (pendencias.length || !sistema || !e.condicoesComerciais) return { ok: false, pendencias };
++  const cc = e.condicoesComerciais;
+ 
+   const componentes = e.componentes.map((c) => ({
+     tipo: c.tipo,
+@@ -356,9 +428,8 @@ export function montarDadosEmissaoSimples(e: EntradaEmissaoSimples): ResultadoMo
+     quantidade: c.quantidade,
+     potenciaW: c.potencia_w != null && c.potencia_w > 0 ? c.potencia_w : null,
+   }));
+-  const condicoes = e.condicoesPagamento!.trim();
+   const candidato = {
+-    esquema: 4 as const,
++    esquema: 5 as const,
+     cliente: { nome: e.contatoNome!.trim(), endereco: e.contatoEndereco?.trim() || null },
+     sistema: {
+       kitNome: nomeKitPersonalizado(
+@@ -372,8 +443,10 @@ export function montarDadosEmissaoSimples(e: EntradaEmissaoSimples): ResultadoMo
+     },
+     preco: { valor: e.valorNegocio! },
+     comercial: {
+-      validadeAte: e.validadeAte!,
+-      condicoesPagamento: condicoes,
++      validadeDias: cc.validadeDias,
++      // Calculada na emissão: dia da emissão em São Paulo (fuso usado pela empresa e pelo gatilho do banco) + prazo.
++      validadeAte: somarDias(e.hoje, cc.validadeDias!),
++      pagamento: { avista: cc.avista!, cartao: cc.cartao!, financiamento: cc.financiamento! },
+       incluso: e.conteudo.incluso,
+       exclusos: e.conteudo.exclusos,
+       garantias: e.conteudo.garantias,
+@@ -418,6 +491,7 @@ export function textoPremissaGeracao(dados: DadosEmissaoSimples): string {
+ /** Texto das condições comerciais na página web da proposta emitida. */
+ export function textoCondicoesComerciais(dados: DadosEmissaoSimples): string {
+   const partes = [`Proposta válida até ${dataBr(dados.comercial.validadeAte)}.`];
+-  if (dados.comercial.condicoesPagamento) partes.push(`Condições de pagamento: ${dados.comercial.condicoesPagamento}`);
++  const opcoes = opcoesPagamentoDaEmissao(dados).map((o) => (o.rotulo ? `${o.rotulo}: ${o.texto}` : o.texto));
++  if (opcoes.length) partes.push(`Condições de pagamento:\n${opcoes.join("\n")}`);
+   return partes.join("\n\n");
+ }
+diff --git a/R:/wt-m2-p0-retomada/src/lib/propostas/pdf-simples.tsx b/src/lib/propostas/pdf-simples.tsx
+index 2bd55c8..06df7c4 100644
+--- a/R:/wt-m2-p0-retomada/src/lib/propostas/pdf-simples.tsx
++++ b/src/lib/propostas/pdf-simples.tsx
+@@ -2,7 +2,7 @@ import { Document, Font, Image, Page, StyleSheet, Text, View } from "@react-pdf/
+ import { formatarMoeda } from "@/lib/formatacao";
+ import { ROTULO_TIPO_COMPONENTE_KIT } from "@/lib/tipos";
+ import { FONTES_PDF } from "./fontes-pdf";
+-import { dataBr, opcoesDePagamento, textoPremissaGeracao, type DadosEmissaoSimples } from "./proposta-simples";
++import { dataBr, opcoesPagamentoDaEmissao, textoPremissaGeracao, type DadosEmissaoSimples } from "./proposta-simples";
+ 
+ // Manrope nos títulos e Inter nos textos (identidade do Raion), embutidas: nada é buscado na rede na hora de gerar.
+ for (const fonte of FONTES_PDF) Font.register({ family: fonte.family, src: fonte.src, fontWeight: fonte.fontWeight });
+@@ -284,6 +284,8 @@ function Colunas({ dados, e, p }: { dados: DadosEmissaoSimples; e: ReturnType<ty
+ 
+ function PaginaOferta({ dados, imagens, e, p }: { dados: DadosEmissaoSimples; imagens: ImagensDoPdf; e: ReturnType<typeof criarEstilos>; p: ReturnType<typeof paletaDaEmpresa> }) {
+   const c = dados.comercial;
++  // As três formas configuradas pela empresa (v5), cada uma com o rótulo; nenhuma é escolhida pelo vendedor.
++  const pagamento = opcoesPagamentoDaEmissao(dados);
+   return (
+     <Page size="A4" style={e.pagina}>
+       <Cabecalho dados={dados} imagens={imagens} e={e} />
+@@ -310,21 +312,20 @@ function PaginaOferta({ dados, imagens, e, p }: { dados: DadosEmissaoSimples; im
+             <Text style={{ fontSize: 8, ...NEGRITO, letterSpacing: 1, color: p.suave }}>VALOR DA PROPOSTA</Text>
+             <Text style={{ fontSize: 26, ...TITULO, marginTop: 3 }}>{formatarMoeda(dados.preco.valor)}</Text>
+           </View>
+-          {opcoesDePagamento(c.condicoesPagamento).length > 0 ? (
++          {pagamento.length > 0 ? (
+             <View style={{ marginTop: 10 }}>
+               <Text style={{ fontSize: 8, ...NEGRITO, letterSpacing: 0.8, color: p.acento, marginBottom: 5 }}>CONDIÇÕES DE PAGAMENTO</Text>
+-              {opcoesDePagamento(c.condicoesPagamento).length === 1 ? (
+-                <Text style={{ fontSize: 9.5, lineHeight: 1.4 }}>{opcoesDePagamento(c.condicoesPagamento)[0]}</Text>
+-              ) : (
+-                <View style={e.lista}>
+-                  {opcoesDePagamento(c.condicoesPagamento).map((opcao, i) => (
+-                    <View key={i} style={e.itemLista}>
+-                      <View style={[e.ponto, { backgroundColor: p.acento }]} />
+-                      <Text style={{ flex: 1, fontSize: 9.5, lineHeight: 1.35 }}>{opcao}</Text>
+-                    </View>
+-                  ))}
+-                </View>
+-              )}
++              <View style={e.lista}>
++                {pagamento.map((opcao, i) => (
++                  <View key={i} style={e.itemLista}>
++                    <View style={[e.ponto, { backgroundColor: p.acento }]} />
++                    <Text style={{ flex: 1, fontSize: 9.5, lineHeight: 1.35 }}>
++                      {opcao.rotulo ? <Text style={NEGRITO}>{`${opcao.rotulo}: `}</Text> : null}
++                      {opcao.texto}
++                    </Text>
++                  </View>
++                ))}
++              </View>
+             </View>
+           ) : null}
+         </View>
+diff --git a/R:/wt-m2-p0-retomada/src/lib/acoes/propostas-emissoes.ts b/src/lib/acoes/propostas-emissoes.ts
+index 0fcbe67..7870a28 100644
+--- a/R:/wt-m2-p0-retomada/src/lib/acoes/propostas-emissoes.ts
++++ b/src/lib/acoes/propostas-emissoes.ts
+@@ -7,7 +7,7 @@ import { NEGOCIOS, PROPOSTA_E_CONTRATO, pode } from "@/lib/permissoes";
+ import { ultimaVersaoDoNegocio } from "@/lib/propostas/emissoes-dados";
+ import { gravarEmissaoSimples } from "@/lib/propostas/emissoes-gravacao";
+ import { prepararImagensDaEmissao } from "@/lib/propostas/imagens-emissao";
+-import { extrairConteudoDoModelo, montarDadosEmissaoSimples, produtividadeConfirmada } from "@/lib/propostas/proposta-simples";
++import { condicoesComerciaisDaEmpresa, extrairConteudoDoModelo, montarDadosEmissaoSimples, produtividadeConfirmada } from "@/lib/propostas/proposta-simples";
+ import { exigirPapel } from "@/lib/sessao";
+ import { criarClienteAdmin } from "@/lib/supabase/admin";
+ import { criarClienteServidor } from "@/lib/supabase/server";
+@@ -15,10 +15,10 @@ import type { ResultadoAcao } from "@/lib/tipos";
+ 
+ const esquema = z.object({
+   negocioId: z.string().uuid(),
+-  validadeAte: z.string().trim(),
+-  condicoesPagamento: z.string().trim().max(2000).optional(), // o limite da proposta (600) é conferido na montagem
+   // O que o vendedor VIU na tela: se a confirmação da produtividade mudou antes do clique, a emissão é recusada.
+   geracaoEsperada: z.enum(["sim", "nao"]),
++  // Idem para as condições comerciais da empresa (prazo e formas de pagamento): versão vista = `updated_at` da linha.
++  condicoesVistas: z.string().max(64),
+ });
+ 
+ /**
+@@ -36,16 +36,15 @@ export async function emitirPropostaSimples(_: ResultadoAcao, formData: FormData
+   if (!pode(atual.papel, PROPOSTA_E_CONTRATO)) return { ok: false, mensagem: "SDR não pode emitir proposta." };
+   const dados = esquema.safeParse({
+     negocioId: formData.get("negocioId"),
+-    validadeAte: formData.get("validadeAte") ?? "",
+-    condicoesPagamento: formData.get("condicoesPagamento") ?? undefined,
+     geracaoEsperada: formData.get("geracaoEsperada"),
++    condicoesVistas: formData.get("condicoesVistas") ?? "",
+   });
+   if (!dados.success) return { ok: false, mensagem: "Dados inválidos." };
+   const { negocioId } = dados.data;
+ 
+   const supabase = await criarClienteServidor();
+ 
+-  const [negocioR, componentesR, parametrosR, identidadeR, modeloR, ultima] = await Promise.all([
++  const [negocioR, componentesR, parametrosR, identidadeR, modeloR, condicoesR, ultima] = await Promise.all([
+     supabase
+       .from("negocios")
+       .select("empresa_id, valor, consumo_medio_kwh, arquivado_em, contatos(nome, endereco, cidade, uf)")
+@@ -66,9 +65,15 @@ export async function emitirPropostaSimples(_: ResultadoAcao, formData: FormData
+       .eq("status", "publicado")
+       .eq("padrao", true)
+       .maybeSingle(),
++    // Prazo de validade e formas de pagamento: configurados por gestor/admin; o vendedor não os informa nem escolhe.
++    supabase
++      .from("proposta_condicoes_comerciais")
++      .select("validade_dias, pagamento_avista, pagamento_cartao, pagamento_financiamento, updated_at")
++      .eq("empresa_id", atual.empresaId)
++      .maybeSingle(),
+     ultimaVersaoDoNegocio(supabase, negocioId),
+   ]);
+-  if (negocioR.error || componentesR.error || parametrosR.error || identidadeR.error || modeloR.error || ultima.erro) {
++  if (negocioR.error || componentesR.error || parametrosR.error || identidadeR.error || modeloR.error || condicoesR.error || ultima.erro) {
+     return { ok: false, mensagem: "Não foi possível ler os dados do negócio. Tente de novo." };
+   }
+   const negocio = negocioR.data;
+@@ -84,6 +89,11 @@ export async function emitirPropostaSimples(_: ResultadoAcao, formData: FormData
+     return { ok: false, mensagem: "A confirmação da produtividade mudou desde que a tela abriu. Confira o aviso de geração e emita de novo. Nada foi emitido." };
+   }
+ 
++  if ((condicoesR.data?.updated_at ?? "") !== dados.data.condicoesVistas) {
++    revalidatePath(`/negocios/${negocioId}`);
++    return { ok: false, mensagem: "A validade ou as formas de pagamento da empresa mudaram desde que a tela abriu. Confira e emita de novo. Nada foi emitido." };
++  }
++
+   const versao = ultima.versao + 1;
+   const emitidaEm = new Date().toISOString();
+   const montagem = montarDadosEmissaoSimples({
+@@ -94,8 +104,7 @@ export async function emitirPropostaSimples(_: ResultadoAcao, formData: FormData
+     componentes: componentesR.data ?? [],
+     // Sem confirmação do admin para o valor ATUAL da produtividade, a proposta sai sem o número de geração.
+     produtividadeConfirmada: produtividadeConfirmada(parametrosR.data),
+-    validadeAte: dados.data.validadeAte || null,
+-    condicoesPagamento: dados.data.condicoesPagamento ?? null,
++    condicoesComerciais: condicoesComerciaisDaEmpresa(condicoesR.data),
+     conteudo,
+     identidade: {
+       nomeExibicao: identidade?.nome_exibicao ?? "",
+diff --git a/src/lib/acoes/propostas-condicoes.ts b/src/lib/acoes/propostas-condicoes.ts
+new file mode 100644
+index 0000000..5738008
+--- /dev/null
++++ b/src/lib/acoes/propostas-condicoes.ts
+@@ -0,0 +1,55 @@
++"use server";
++
++import { revalidatePath } from "next/cache";
++import { z } from "zod";
++import { mensagemErro } from "@/lib/erros";
++import { LIMITES_SIMPLES } from "@/lib/propostas/proposta-simples";
++import { exigirPapel } from "@/lib/sessao";
++import { criarClienteServidor } from "@/lib/supabase/server";
++import type { ResultadoAcao } from "@/lib/tipos";
++
++const texto = z
++  .string()
++  .trim()
++  .max(LIMITES_SIMPLES.pagamento, `Cada condição de pagamento tem no máximo ${LIMITES_SIMPLES.pagamento} caracteres.`)
++  .transform((v) => v || null);
++
++const esquema = z.object({
++  validadeDias: z.enum(["", "7", "15", "30"]).transform((v) => (v ? Number(v) : null)),
++  pagamentoAvista: texto,
++  pagamentoCartao: texto,
++  pagamentoFinanciamento: texto,
++});
++
++/**
++ * Gestor ou admin define o prazo de validade (7, 15 ou 30 dias) e as três formas de pagamento da proposta simples
++ * (D1/D2). Vale só para as próximas emissões: o que já foi emitido guarda prazo, condições e PDF congelados.
++ * Campo vazio grava nulo e bloqueia a emissão até ser completado. A RLS confere o papel de novo no banco.
++ */
++export async function salvarCondicoesComerciais(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
++  const { atual } = await exigirPapel("admin", "gestor");
++  const dados = esquema.safeParse({
++    validadeDias: formData.get("validadeDias") ?? "",
++    pagamentoAvista: formData.get("pagamentoAvista") ?? "",
++    pagamentoCartao: formData.get("pagamentoCartao") ?? "",
++    pagamentoFinanciamento: formData.get("pagamentoFinanciamento") ?? "",
++  });
++  if (!dados.success) return { ok: false, mensagem: dados.error.issues[0]?.message ?? "Dados inválidos." };
++
++  const supabase = await criarClienteServidor();
++  const { error } = await supabase.from("proposta_condicoes_comerciais").upsert(
++    {
++      empresa_id: atual.empresaId,
++      validade_dias: dados.data.validadeDias,
++      pagamento_avista: dados.data.pagamentoAvista,
++      pagamento_cartao: dados.data.pagamentoCartao,
++      pagamento_financiamento: dados.data.pagamentoFinanciamento,
++      atualizado_por: atual.membroId,
++    },
++    { onConflict: "empresa_id" },
++  );
++  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível salvar as condições da proposta.") };
++
++  revalidatePath("/configuracoes/condicoes-proposta");
++  return { ok: true, mensagem: "Condições salvas. Valem para as próximas propostas; as já emitidas não mudam." };
++}
+diff --git a/src/app/(app)/configuracoes/condicoes-proposta/page.tsx b/src/app/(app)/configuracoes/condicoes-proposta/page.tsx
+new file mode 100644
+index 0000000..e724d2c
+--- /dev/null
++++ b/src/app/(app)/configuracoes/condicoes-proposta/page.tsx
+@@ -0,0 +1,35 @@
++import { Cartao } from "@/components/ui";
++import { exigirPapel } from "@/lib/sessao";
++import { criarClienteServidor } from "@/lib/supabase/server";
++import { FormularioCondicoes } from "./formulario";
++
++/** Prazo de validade e formas de pagamento da proposta simples (D1/D2): gestor e admin configuram. */
++export default async function ConfigCondicoesProposta() {
++  const { atual } = await exigirPapel("admin", "gestor");
++  const supabase = await criarClienteServidor();
++  const { data } = await supabase
++    .from("proposta_condicoes_comerciais")
++    .select("validade_dias, pagamento_avista, pagamento_cartao, pagamento_financiamento")
++    .eq("empresa_id", atual.empresaId)
++    .maybeSingle();
++
++  return (
++    <div className="mx-auto flex max-w-3xl flex-col gap-4">
++      <h1 className="text-2xl font-semibold text-zinc-900">Condições da proposta</h1>
++      <Cartao titulo="Validade e formas de pagamento">
++        <p className="mb-3 text-sm text-zinc-600">
++          Valem para as próximas propostas emitidas. A data de vencimento é calculada na emissão (dia da emissão + prazo). Propostas já
++          emitidas não mudam.
++        </p>
++        <FormularioCondicoes
++          inicial={{
++            validadeDias: data?.validade_dias ?? null,
++            avista: data?.pagamento_avista ?? "",
++            cartao: data?.pagamento_cartao ?? "",
++            financiamento: data?.pagamento_financiamento ?? "",
++          }}
++        />
++      </Cartao>
++    </div>
++  );
++}
+diff --git a/src/app/(app)/configuracoes/condicoes-proposta/formulario.tsx b/src/app/(app)/configuracoes/condicoes-proposta/formulario.tsx
+new file mode 100644
+index 0000000..a964637
+--- /dev/null
++++ b/src/app/(app)/configuracoes/condicoes-proposta/formulario.tsx
+@@ -0,0 +1,41 @@
++"use client";
++
++import { useActionState } from "react";
++import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
++import { salvarCondicoesComerciais } from "@/lib/acoes/propostas-condicoes";
++import { LIMITES_SIMPLES, PRAZOS_VALIDADE } from "@/lib/propostas/proposta-simples";
++
++export type CondicoesIniciais = { validadeDias: number | null; avista: string; cartao: string; financiamento: string };
++
++export function FormularioCondicoes({ inicial }: { inicial: CondicoesIniciais }) {
++  const [resultado, acao, salvando] = useActionState(salvarCondicoesComerciais, null);
++  return (
++    <form action={acao} className="flex flex-col gap-3" data-testid="form-condicoes-proposta">
++      <Selecao rotulo="Validade da proposta" name="validadeDias" defaultValue={inicial.validadeDias?.toString() ?? ""}>
++        <option value="">Não configurada (emissão bloqueada)</option>
++        {PRAZOS_VALIDADE.map((d) => (
++          <option key={d} value={d}>
++            {d} dias a partir da emissão
++          </option>
++        ))}
++      </Selecao>
++      <Campo rotulo="À vista" name="pagamentoAvista" defaultValue={inicial.avista} maxLength={LIMITES_SIMPLES.pagamento} placeholder="ex.: Pix ou transferência" />
++      <Campo rotulo="Cartão" name="pagamentoCartao" defaultValue={inicial.cartao} maxLength={LIMITES_SIMPLES.pagamento} placeholder="ex.: em até 12x" />
++      <Campo
++        rotulo="Financiamento"
++        name="pagamentoFinanciamento"
++        defaultValue={inicial.financiamento}
++        maxLength={LIMITES_SIMPLES.pagamento}
++        placeholder="ex.: bancário, sujeito a análise de crédito"
++      />
++      <p className="text-xs text-zinc-500">
++        As três formas aparecem juntas em toda proposta; o vendedor não escolhe uma nem edita o texto. Até {LIMITES_SIMPLES.pagamento} caracteres
++        cada. Com qualquer campo vazio, a emissão fica bloqueada.
++      </p>
++      <Mensagem resultado={resultado} />
++      <Botao type="submit" disabled={salvando} className="self-start">
++        {salvando ? "Salvando..." : "Salvar"}
++      </Botao>
++    </form>
++  );
++}
+diff --git a/R:/wt-m2-p0-retomada/src/app/(app)/negocios/[id]/emitir-proposta.tsx b/src/app/(app)/negocios/[id]/emitir-proposta.tsx
+index 0e96af6..2281593 100644
+--- a/R:/wt-m2-p0-retomada/src/app/(app)/negocios/[id]/emitir-proposta.tsx
++++ b/src/app/(app)/negocios/[id]/emitir-proposta.tsx
+@@ -1,16 +1,18 @@
+ "use client";
+ 
+ import { useActionState, useState } from "react";
+-import { Botao, Campo, Mensagem } from "@/components/ui";
++import { Botao, Mensagem } from "@/components/ui";
+ import { emitirPropostaSimples } from "@/lib/acoes/propostas-emissoes";
+ import { formatarDataHora, formatarDataIso } from "@/lib/formatacao";
+-import { LIMITES_SIMPLES, type ConteudoDoModelo } from "@/lib/propostas/proposta-simples";
++import { FORMAS_PAGAMENTO, type CondicoesComerciais, type ConteudoDoModelo } from "@/lib/propostas/proposta-simples";
+ 
+ export type EmissaoListada = { versao: number; token: string; validadeAte: string; emitidaEm: string };
+ 
+ export function EmitirProposta({
+   negocioId,
+-  hoje,
++  condicoes,
++  condicoesVistas,
++  validadePrevista,
+   conteudoModelo,
+   geracaoConfirmada,
+   bloqueio,
+@@ -18,9 +20,13 @@ export function EmitirProposta({
+   siteUrl,
+ }: {
+   negocioId: string;
+-  /** AAAA-MM-DD de hoje em São Paulo: a validade não pode ser anterior. */
+-  hoje: string;
+-  /** Conteúdo que a empresa escreveu no modelo padrão publicado (só leitura): sugestão de condições e blocos com conteúdo. */
++  /** Prazo e formas de pagamento configurados pela empresa (gestor/admin); só leitura para o vendedor. */
++  condicoes: CondicoesComerciais | null;
++  /** `updated_at` da configuração vista: se mudar antes do clique, o servidor recusa a emissão. */
++  condicoesVistas: string;
++  /** AAAA-MM-DD que a emissão de hoje terá como validade (hoje em São Paulo + prazo); nulo sem prazo configurado. */
++  validadePrevista: string | null;
++  /** Conteúdo que a empresa escreveu no modelo padrão publicado (só leitura): blocos com conteúdo. */
+   conteudoModelo: ConteudoDoModelo;
+   /** O admin confirmou a produtividade atual da calculadora: só então a proposta mostra a geração estimada. */
+   geracaoConfirmada: boolean;
+@@ -37,6 +43,7 @@ export function EmitirProposta({
+       <form action={acao} className="flex flex-col gap-3">
+         <input type="hidden" name="negocioId" value={negocioId} />
+         <input type="hidden" name="geracaoEsperada" value={geracaoConfirmada ? "sim" : "nao"} />
++        <input type="hidden" name="condicoesVistas" value={condicoesVistas} />
+         <p className="text-sm text-zinc-600">
+           Proposta simples: o sistema, a geração estimada, o preço e as condições. Não inclui economia nem prazo de retorno. Depois de
+           emitida não muda: para corrigir, emita uma nova versão.
+@@ -46,22 +53,24 @@ export function EmitirProposta({
+             {bloqueio}
+           </p>
+         )}
+-        <Campo rotulo="Válida até" type="date" name="validadeAte" required min={hoje} />
+-        <label className="flex flex-col gap-1 text-sm">
+-          <span className="font-medium text-zinc-700">Condições de pagamento</span>
+-          <textarea
+-            name="condicoesPagamento"
+-            defaultValue={conteudoModelo.condicoes}
+-            rows={3}
+-            required
+-            maxLength={LIMITES_SIMPLES.condicoes}
+-            className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-carvao outline-none focus:border-dourado focus:ring-2 focus:ring-dourado/20"
+-          />
+-          <span className="text-xs text-zinc-500">
+-            Uma opção por linha: cada linha vira um item da lista na proposta. Sugerido pelo modelo da empresa; o que estiver aqui na emissão fica congelado
+-            na versão enviada. Obrigatório: a proposta só é emitida com as condições de pagamento confirmadas.
+-          </span>
+-        </label>
++        {/* Definidos pela empresa (gestor/admin): o vendedor não informa o vencimento nem escolhe a forma de pagamento. */}
++        <dl className="flex flex-col gap-1 rounded-md border border-zinc-200 px-3 py-2 text-sm" data-testid="condicoes-da-empresa">
++          <div className="flex flex-wrap gap-x-2">
++            <dt className="font-medium text-zinc-700">Validade:</dt>
++            <dd data-testid="validade-prevista">
++              {condicoes?.validadeDias && validadePrevista
++                ? `${condicoes.validadeDias} dias, até ${formatarDataIso(validadePrevista)} se emitida hoje`
++                : "não configurada"}
++            </dd>
++          </div>
++          {FORMAS_PAGAMENTO.map(([chave, rotulo]) => (
++            <div key={chave} className="flex flex-wrap gap-x-2">
++              <dt className="font-medium text-zinc-700">{rotulo}:</dt>
++              <dd>{condicoes?.[chave] ?? "não configurado"}</dd>
++            </div>
++          ))}
++          <dd className="text-xs text-zinc-500">Configurado pela empresa em Configurações › Condições da proposta. Fica congelado na versão emitida.</dd>
++        </dl>
+         <ul className="flex flex-col gap-1 rounded-md bg-zinc-50 px-3 py-2 text-xs text-zinc-600" data-testid="conteudo-confirmado">
+           <li data-testid="geracao-status">
+             Geração estimada:{" "}
+diff --git a/R:/wt-m2-p0-retomada/src/app/(app)/negocios/[id]/page.tsx b/src/app/(app)/negocios/[id]/page.tsx
+index edd0929..9072e50 100644
+--- a/R:/wt-m2-p0-retomada/src/app/(app)/negocios/[id]/page.tsx
++++ b/src/app/(app)/negocios/[id]/page.tsx
+@@ -18,7 +18,13 @@ import { descreverAtividade } from "@/lib/linha-do-tempo";
+ import { exigirPapel } from "@/lib/sessao";
+ import { ARQUIVAR_NEGOCIO, ATRIBUIR_TAREFA_A_OUTROS, EDITAR_VALOR_NEGOCIO, ESCOLHER_RESPONSAVEL_NEGOCIO, NEGOCIOS, PAGAMENTO_SOLO, PROPOSTA_E_CONTRATO, RESPONSAVEL_COMERCIAL, pode } from "@/lib/permissoes";
+ import { listarEmissoesDoNegocio } from "@/lib/propostas/emissoes-dados";
+-import { extrairConteudoDoModelo, produtividadeConfirmada } from "@/lib/propostas/proposta-simples";
++import {
++  condicoesComerciaisDaEmpresa,
++  extrairConteudoDoModelo,
++  pendenciasDasCondicoes,
++  produtividadeConfirmada,
++  somarDias,
++} from "@/lib/propostas/proposta-simples";
+ import { avisarSchemaAusente, funcaoAusente, tabelaAusente } from "@/lib/schema-ausente";
+ import { criarClienteServidor } from "@/lib/supabase/server";
+ import { cartaoFechamento } from "@/lib/venda";
+@@ -153,6 +159,15 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
+         .maybeSingle()
+     : { data: null };
+   const geracaoConfirmada = produtividadeConfirmada(parametrosEmissao) != null;
++  // Prazo de validade e formas de pagamento da empresa (D1/D2): o vendedor só vê; a emissão congela o que estiver aqui.
++  const { data: condicoesLinha } = emissoesRes && !emissoesAusente
++    ? await supabase
++        .from("proposta_condicoes_comerciais")
++        .select("validade_dias, pagamento_avista, pagamento_cartao, pagamento_financiamento, updated_at")
++        .eq("empresa_id", atual.empresaId)
++        .maybeSingle()
++    : { data: null };
++  const condicoesEmissao = condicoesComerciaisDaEmpresa(condicoesLinha);
+   const { data: aberturas } = proposta
+     ? await supabase
+         .from("propostas_aberturas")
+@@ -256,9 +271,9 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
+       : null;
+   // Emissão da proposta simples: não usa o cálculo salvo (legado). Potência e geração saem do kit atual e da produtividade
+   // da empresa; consumo e preço, do negócio. O servidor confere tudo de novo; aqui só o aviso mais comum.
+-  const bloqueioEmissao = (componentes ?? []).some((c) => c.tipo === "modulo" && c.potencia_w)
+-    ? null
+-    : "Cadastre ao menos um módulo com potência no kit do negócio antes de emitir.";
++  const bloqueioEmissao = !(componentes ?? []).some((c) => c.tipo === "modulo" && c.potencia_w)
++    ? "Cadastre ao menos um módulo com potência no kit do negócio antes de emitir."
++    : (pendenciasDasCondicoes(condicoesEmissao)[0] ?? null);
+   const motivosContrato = motivosDaAcao(motivosCalculo, "contrato").filter((m) => m !== "preco");
+   const bloqueioContrato = calculo && leituraOk && motivosContrato.length > 0 ? mensagemDeRecusa(motivosContrato, "contrato") : null;
+   const responsavelAtual = config.membros.find((m) => m.id === negocio.responsavel_id);
+@@ -570,7 +585,11 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
+                 <Cartao titulo="Proposta simples">
+                 <EmitirProposta
+                   negocioId={negocio.id}
+-                  hoje={hojeEmSaoPaulo()}
++                  condicoes={condicoesEmissao}
++                  condicoesVistas={condicoesLinha?.updated_at ?? ""}
++                  validadePrevista={
++                    condicoesEmissao?.validadeDias ? somarDias(hojeEmSaoPaulo(), condicoesEmissao.validadeDias) : null
++                  }
+                   conteudoModelo={conteudoModelo}
+                   geracaoConfirmada={geracaoConfirmada}
+                   bloqueio={arquivado ? "Negócio arquivado: não é possível emitir proposta." : bloqueioEmissao}
+diff --git a/R:/wt-m2-p0-retomada/src/lib/supabase/database.types.ts b/src/lib/supabase/database.types.ts
+index 79a9214..92c858b 100644
+--- a/R:/wt-m2-p0-retomada/src/lib/supabase/database.types.ts
++++ b/src/lib/supabase/database.types.ts
+@@ -3089,6 +3089,54 @@ export type Database = {
+           },
+         ];
+       };
++      proposta_condicoes_comerciais: {
++        Row: {
++          atualizado_por: string | null;
++          created_at: string;
++          empresa_id: string;
++          pagamento_avista: string | null;
++          pagamento_cartao: string | null;
++          pagamento_financiamento: string | null;
++          updated_at: string;
++          validade_dias: number | null;
++        };
++        Insert: {
++          atualizado_por?: string | null;
++          created_at?: string;
++          empresa_id: string;
++          pagamento_avista?: string | null;
++          pagamento_cartao?: string | null;
++          pagamento_financiamento?: string | null;
++          updated_at?: string;
++          validade_dias?: number | null;
++        };
++        Update: {
++          atualizado_por?: string | null;
++          created_at?: string;
++          empresa_id?: string;
++          pagamento_avista?: string | null;
++          pagamento_cartao?: string | null;
++          pagamento_financiamento?: string | null;
++          updated_at?: string;
++          validade_dias?: number | null;
++        };
++        Relationships: [
++          {
++            foreignKeyName: "proposta_condicoes_comerciais_atualizado_por_fkey";
++            columns: ["atualizado_por"];
++            isOneToOne: false;
++            referencedRelation: "empresa_membros";
++            referencedColumns: ["id"];
++          },
++          {
++            foreignKeyName: "proposta_condicoes_comerciais_empresa_id_fkey";
++            columns: ["empresa_id"];
++            isOneToOne: true;
++            referencedRelation: "empresas";
++            referencedColumns: ["id"];
++          },
++        ];
++      };
+       proposta_identidades: {
+         Row: {
+           atualizado_por: string | null;
+diff --git a/R:/wt-m2-p0-retomada/tests/proposta-simples.test.ts b/tests/proposta-simples.test.ts
+index 1a2427a..8060967 100644
+--- a/R:/wt-m2-p0-retomada/tests/proposta-simples.test.ts
++++ b/tests/proposta-simples.test.ts
+@@ -3,7 +3,7 @@ import { linkSolicitarNovaProposta } from "@/lib/propostas/emissao-preservada";
+ import { gerarPdfPropostaSimples } from "@/lib/propostas/emissao-simples-pdf";
+ import {
+   LIMITES_SIMPLES,
+-  MENSAGEM_CONDICOES_OBRIGATORIAS,
++  MENSAGEM_CONDICOES_NAO_CONFIGURADAS,
+   RODAPE_SIMPLES,
+   RODAPE_SIMPLES_SEM_GERACAO,
+   extrairConteudoDoModelo,
+@@ -12,15 +12,20 @@ import {
+   lerDadosDaEmissao,
+   montarDadosEmissaoSimples,
+   opcoesDePagamento,
++  opcoesPagamentoDaEmissao,
+   produtividadeConfirmada,
+   sistemaDoKit,
++  somarDias,
+   textoCondicoesComerciais,
+   textoPremissaGeracao,
++  type CondicoesComerciais,
+   type EntradaEmissaoSimples,
+ } from "@/lib/propostas/proposta-simples";
+ 
+ const L = LIMITES_SIMPLES;
+ const CONFIRMADA = { valor: 120, em: "2026-10-20T12:00:00.000Z", fonte: "Relatório de geração real das usinas da região", responsavel: "Eng. Ana Prado (CREA 12345)" };
++/** Configuração FICTÍCIA da empresa (D1/D2): não são condições reais de nenhuma empresa. */
++const CONDICOES: CondicoesComerciais = { validadeDias: 15, avista: "Pix ou transferência", cartao: "Em até 12x", financiamento: "Bancário, sujeito a análise" };
+ const SEM_IMAGENS = { logoUrl: null, fotoCapaUrl: null };
+ /** Texto de exatamente `n` caracteres, em palavras (quebra de linha realista, ao contrário de uma palavra gigante). */
+ const palavras = (n: number) => "Palavra comprida de exemplo ".repeat(Math.ceil(n / 5)).slice(0, n).trim().padEnd(n, "z");
+@@ -37,8 +42,7 @@ function entrada(sobrescrever: Partial<EntradaEmissaoSimples> = {}): EntradaEmis
+       { tipo: "inversor", descricao: "Inversor 5 kW", quantidade: 1, potencia_w: null },
+     ],
+     produtividadeConfirmada: CONFIRMADA,
+-    validadeAte: "2026-11-30",
+-    condicoesPagamento: "50% na assinatura e 50% na instalação",
++    condicoesComerciais: CONDICOES,
+     conteudo: {
+       incluso: ["Projeto e homologação", "Instalação"],
+       exclusos: ["Obra civil no telhado"],
+@@ -232,18 +236,35 @@ describe("montarDadosEmissaoSimples", () => {
+     expect(jsonCanonico(dados)).not.toMatch(/"(economia|payback|conta|fio)/i);
+   });
+ 
+-  it("exige a validade informada pelo vendedor: sem padrão", () => {
+-    for (const validadeAte of [null, ""]) {
+-      const r = montarDadosEmissaoSimples(entrada({ validadeAte }));
+-      expect(r.ok).toBe(false);
+-      if (!r.ok) expect(r.pendencias).toContain("Informe até quando a proposta é válida.");
++  it("D1: a validade é calculada na emissão (hoje em São Paulo + prazo da empresa) e o prazo fica congelado", () => {
++    for (const [dias, ate] of [
++      [7, "2026-10-29"],
++      [15, "2026-11-06"],
++      [30, "2026-11-21"],
++    ] as const) {
++      const dados = dadosValidos({ condicoesComerciais: { ...CONDICOES, validadeDias: dias } });
++      expect(dados.esquema).toBe(5);
++      if (dados.esquema !== 5) throw new Error("formato");
++      expect(dados.comercial.validadeDias).toBe(dias);
++      expect(dados.comercial.validadeAte).toBe(ate);
+     }
+   });
+ 
+-  it("recusa validade passada ou inexistente, aceita hoje", () => {
+-    expect(montarDadosEmissaoSimples(entrada({ validadeAte: "2026-10-21" })).ok).toBe(false);
+-    expect(montarDadosEmissaoSimples(entrada({ validadeAte: "2026-02-30" })).ok).toBe(false);
+-    expect(montarDadosEmissaoSimples(entrada({ validadeAte: "2026-10-22" })).ok).toBe(true);
++  it("D1: a conta atravessa mês e ano pelo calendário", () => {
++    expect(somarDias("2026-12-25", 7)).toBe("2027-01-01");
++    expect(somarDias("2028-02-20", 15)).toBe("2028-03-06");
++    expect(somarDias("2026-01-31", 30)).toBe("2026-03-02");
++  });
++
++  it("D1: sem configuração ou com prazo fora de 7, 15 e 30 dias, a emissão é bloqueada", () => {
++    const sem = montarDadosEmissaoSimples(entrada({ condicoesComerciais: null }));
++    expect(sem.ok).toBe(false);
++    if (!sem.ok) expect(sem.pendencias).toContain(MENSAGEM_CONDICOES_NAO_CONFIGURADAS);
++    for (const validadeDias of [null, 0, 10, 31]) {
++      const r = montarDadosEmissaoSimples(entrada({ condicoesComerciais: { ...CONDICOES, validadeDias } }));
++      expect(r.ok, String(validadeDias)).toBe(false);
++      if (!r.ok) expect(r.pendencias.join(" ")).toContain("o prazo de validade");
++    }
+   });
+ 
+   it("recusa dado ausente em vez de completar com zero ou padrão", () => {
+@@ -258,22 +279,79 @@ describe("montarDadosEmissaoSimples", () => {
+     for (const c of casos) expect(montarDadosEmissaoSimples(entrada(c)).ok, JSON.stringify(c)).toBe(false);
+   });
+ 
+-  it("condição de pagamento é OBRIGATÓRIA: vazia, só espaços ou só marcadores não congela a proposta", () => {
+-    for (const vazio of [null, "", "   ", "\n\n", " • \n - "]) {
+-      const r = montarDadosEmissaoSimples(entrada({ condicoesPagamento: vazio }));
+-      expect(r.ok, JSON.stringify(vazio)).toBe(false);
+-      if (!r.ok) expect(r.pendencias).toContain(MENSAGEM_CONDICOES_OBRIGATORIAS);
++  it("D2: sem qualquer uma das três condições, a emissão é bloqueada e a mensagem diz qual falta", () => {
++    for (const [chave, rotulo] of [
++      ["avista", "À vista"],
++      ["cartao", "Cartão"],
++      ["financiamento", "Financiamento"],
++    ] as const) {
++      const r = montarDadosEmissaoSimples(entrada({ condicoesComerciais: { ...CONDICOES, [chave]: null } }));
++      expect(r.ok, chave).toBe(false);
++      if (!r.ok) expect(r.pendencias.join(" ")).toContain(`a condição "${rotulo}"`);
+     }
+   });
+ 
+-  it("uma opção por linha: marcadores saem e cada linha vira um item", () => {
++  it("D2: as três formas aparecem juntas, com rótulo, na ordem à vista, cartão e financiamento", () => {
++    const dados = dadosValidos();
++    expect(opcoesPagamentoDaEmissao(dados)).toEqual([
++      { rotulo: "À vista", texto: "Pix ou transferência" },
++      { rotulo: "Cartão", texto: "Em até 12x" },
++      { rotulo: "Financiamento", texto: "Bancário, sujeito a análise" },
++    ]);
++    expect(textoCondicoesComerciais(dados)).toBe(
++      "Proposta válida até 06/11/2026.\n\nCondições de pagamento:\nÀ vista: Pix ou transferência\nCartão: Em até 12x\nFinanciamento: Bancário, sujeito a análise",
++    );
++  });
++
++  it("D1/D2: mudar a configuração da empresa depois não muda os dados já montados", () => {
++    const cc = { ...CONDICOES };
++    const antes = montarDadosEmissaoSimples(entrada({ condicoesComerciais: cc }));
++    cc.validadeDias = 30;
++    cc.cartao = "OUTRO";
++    if (!antes.ok || antes.dados.esquema !== 5) throw new Error("falhou");
++    expect(antes.dados.comercial.validadeDias).toBe(15);
++    expect(antes.dados.comercial.pagamento.cartao).toBe("Em até 12x");
++  });
++
++  it("v4 (texto livre do vendedor): uma opção por linha, marcadores saem", () => {
+     expect(opcoesDePagamento("À vista por Pix\n• Financiamento bancário\r\n- Cartão em até 12x\n\n")).toEqual([
+       "À vista por Pix",
+       "Financiamento bancário",
+       "Cartão em até 12x",
+     ]);
+-    const dados = dadosValidos({ condicoesPagamento: "À vista por Pix\nCartão em até 12x" });
+-    expect(textoCondicoesComerciais(dados)).toContain("Condições de pagamento: À vista por Pix\nCartão em até 12x");
++  });
++});
++
++/** Emissão no formato 4 (como as gravadas até 22/10/2026), derivada de uma v5 só para o teste de leitura. */
++function dadosV4() {
++  const v5 = dadosValidos();
++  if (v5.esquema !== 5) throw new Error("formato");
++  const { incluso, exclusos, garantias, etapas } = v5.comercial;
++  return {
++    ...v5,
++    esquema: 4 as const,
++    comercial: { validadeAte: "2026-11-30", condicoesPagamento: "À vista por Pix\nCartão em até 12x", incluso, exclusos, garantias, etapas },
++  };
++}
++
++describe("leitura das emissões já gravadas (v4) ao lado das novas (v5)", () => {
++  it("v4 continua abrindo: hash e formato conferem, pagamento sai como foi emitido (sem rótulo)", () => {
++    const v4 = dadosV4();
++    const lido = lerDadosDaEmissao(JSON.parse(JSON.stringify(v4)), hashDosDados(v4));
++    expect(lido.ok).toBe(true);
++    if (!lido.ok) return;
++    expect(opcoesPagamentoDaEmissao(lido.dados)).toEqual([
++      { rotulo: null, texto: "À vista por Pix" },
++      { rotulo: null, texto: "Cartão em até 12x" },
++    ]);
++    expect(textoCondicoesComerciais(lido.dados)).toBe("Proposta válida até 30/11/2026.\n\nCondições de pagamento:\nÀ vista por Pix\nCartão em até 12x");
++  });
++
++  it("v5 abre com o prazo e as três formas; misturar campos dos dois formatos é recusado", () => {
++    const v5 = dadosValidos();
++    expect(lerDadosDaEmissao(JSON.parse(JSON.stringify(v5)), hashDosDados(v5)).ok).toBe(true);
++    const misturado = { ...dadosV4(), esquema: 5 };
++    expect(lerDadosDaEmissao(misturado, hashDosDados(misturado))).toEqual({ ok: false });
+   });
+ });
+ 
+@@ -334,7 +412,7 @@ describe("limites que seguram a proposta em 3 páginas", () => {
+       { componentes: [{ tipo: "modulo", descricao: palavras(L.descricaoComponente + 1), quantidade: 1, potencia_w: 540 }] },
+       { contatoNome: "n".repeat(L.clienteNome + 1) },
+       { contatoEndereco: "e".repeat(L.clienteEndereco + 1) },
+-      { condicoesPagamento: "y".repeat(L.condicoes + 1) },
++      { condicoesComerciais: { ...CONDICOES, financiamento: "y".repeat(L.pagamento + 1) } },
+     ];
+     for (const c of casos) expect(montarDadosEmissaoSimples(entrada(c)).ok, JSON.stringify(c).slice(0, 70)).toBe(false);
+   });
+@@ -381,7 +459,7 @@ describe("PDF da proposta simples", () => {
+         garantias: Array.from({ length: L.garantias }, () => item),
+         etapas: Array.from({ length: L.etapas }, () => ({ titulo: palavras(L.etapaTitulo), prazo: palavras(L.etapaPrazo), descricao: palavras(L.etapaDescricao) })),
+       },
+-      condicoesPagamento: palavras(L.condicoes),
++      condicoesComerciais: { validadeDias: 30, avista: palavras(L.pagamento), cartao: palavras(L.pagamento), financiamento: palavras(L.pagamento) },
+       contatoNome: palavras(L.clienteNome),
+       contatoEndereco: palavras(L.clienteEndereco),
+     });
+diff --git a/R:/wt-m2-p0-retomada/tests/imagens-emissao.test.ts b/tests/imagens-emissao.test.ts
+index 9abf20c..5f222ba 100644
+--- a/R:/wt-m2-p0-retomada/tests/imagens-emissao.test.ts
++++ b/tests/imagens-emissao.test.ts
+@@ -77,8 +77,8 @@ describe("foto da capa: fallback definido", () => {
+         { tipo: "inversor", descricao: "Inversor 5 kW", quantidade: 1, potencia_w: null },
+       ],
+       produtividadeConfirmada: null,
+-      validadeAte: "2026-11-30",
+-      condicoesPagamento: "À vista por Pix\nCartão em até 12x",
++      // Configuração FICTÍCIA da empresa (D1/D2).
++      condicoesComerciais: { validadeDias: 15, avista: "Pix ou transferência", cartao: "Em até 12x", financiamento: "Bancário, sujeito a análise" },
+       conteudo: { incluso: null, exclusos: null, garantias: null, etapas: null },
+       identidade: { nomeExibicao: "Solar Teste", corPrimaria: "#0E2A47", corDestaque: "#F2A900", whatsapp: "45999990000" },
+       versao: 1,
+diff --git a/R:/wt-m2-p0-retomada/tests/propostas-emissoes-fluxo-db.test.ts b/tests/propostas-emissoes-fluxo-db.test.ts
+index 719cdfb..75b7ebc 100644
+--- a/R:/wt-m2-p0-retomada/tests/propostas-emissoes-fluxo-db.test.ts
++++ b/tests/propostas-emissoes-fluxo-db.test.ts
+@@ -7,14 +7,21 @@
+ import { beforeAll, describe, expect, it } from "vitest";
+ import { gravarEmissaoSimples, lerEmissaoPorToken } from "@/lib/propostas/emissoes-gravacao";
+ import { ultimaVersaoDoNegocio } from "@/lib/propostas/emissoes-dados";
+-import { extrairConteudoDoModelo, montarDadosEmissaoSimples, produtividadeConfirmada, sha256Hex } from "@/lib/propostas/proposta-simples";
++import { hojeEmSaoPaulo } from "@/lib/formatacao";
++import {
++  condicoesComerciaisDaEmpresa,
++  extrairConteudoDoModelo,
++  montarDadosEmissaoSimples,
++  produtividadeConfirmada,
++  sha256Hex,
++} from "@/lib/propostas/proposta-simples";
+ import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
+ 
+ let vendedor: Usuario, adminUser: Usuario;
+ let empresaId: string, negocioId: string, membroId: string, modeloId: string;
+ 
+ async function dadosAtuais(versao: number) {
+-  const [{ data: n }, { data: comps }, { data: par }, { data: modelo }] = await Promise.all([
++  const [{ data: n }, { data: comps }, { data: par }, { data: modelo }, { data: cond }] = await Promise.all([
+     servico.from("negocios").select("valor, consumo_medio_kwh, contatos(nome, endereco, cidade, uf)").eq("id", negocioId).single(),
+     servico.from("kit_componentes").select("tipo, descricao, potencia_w, quantidade").eq("negocio_id", negocioId).order("ordem"),
+     servico
+@@ -23,6 +30,11 @@ async function dadosAtuais(versao: number) {
+       .eq("empresa_id", empresaId)
+       .single(),
+     servico.from("proposta_modelos").select("proposta_modelo_blocos(tipo, ativo, config)").eq("id", modeloId).single(),
++    servico
++      .from("proposta_condicoes_comerciais")
++      .select("validade_dias, pagamento_avista, pagamento_cartao, pagamento_financiamento")
++      .eq("empresa_id", empresaId)
++      .maybeSingle(),
+   ]);
+   const contato = n!.contatos as unknown as { nome: string; endereco: string | null; cidade: string | null; uf: string | null };
+   const conteudo = extrairConteudoDoModelo(modelo!.proposta_modelo_blocos);
+@@ -33,13 +45,13 @@ async function dadosAtuais(versao: number) {
+     consumoMedioKwhNegocio: n!.consumo_medio_kwh,
+     componentes: comps ?? [],
+     produtividadeConfirmada: produtividadeConfirmada(par),
+-    validadeAte: "2099-12-31",
+-    condicoesPagamento: conteudo.condicoes || "À vista por Pix ou transferência\nCartão em até 12x",
++    // Como a ação: prazo e formas de pagamento vêm da configuração da empresa (D1/D2).
++    condicoesComerciais: condicoesComerciaisDaEmpresa(cond),
+     conteudo,
+     identidade: { nomeExibicao: "Solar Teste", corPrimaria: "#0F0F10", corDestaque: "#D4AF37", whatsapp: "45999990000" },
+     versao,
+     emitidaEm: new Date().toISOString(),
+-    hoje: "2026-10-22",
++    hoje: hojeEmSaoPaulo(),
+   });
+   if (!r.ok) throw new Error(r.pendencias.join(" "));
+   return r.dados;
+@@ -99,6 +111,15 @@ beforeAll(async () => {
+     .single();
+   if (erroModelo) throw erroModelo;
+   modeloId = mod!.id;
++  // Configuração FICTÍCIA da empresa, gravada pelo admin (RLS de admin/gestor).
++  const { error: erroCondicoes } = await adminUser.cliente.from("proposta_condicoes_comerciais").insert({
++    empresa_id: empresaId,
++    validade_dias: 15,
++    pagamento_avista: "Pix ou transferência",
++    pagamento_cartao: "Em até 12x",
++    pagamento_financiamento: "Bancário, sujeito a análise",
++  });
++  if (erroCondicoes) throw erroCondicoes;
+   await servico.from("proposta_modelo_blocos").insert([
+     { modelo_id: modeloId, tipo: "included_services", ordem: 1, config: { itens: ["Projeto e homologação", "Instalação"] } },
+     { modelo_id: modeloId, tipo: "warranties", ordem: 2, config: { itens: ["Módulos: 12 anos"] } },
+@@ -125,7 +146,12 @@ describe("emissão preservada: emitir, baixar, reabrir", () => {
+     hashV1 = sha256Hex(lida.pdf);
+   });
+ 
+-  it("depois de mudar preço, consumo, kit, produtividade e modelo, o mesmo link entrega o mesmo PDF e os mesmos dados", async () => {
++  it("depois de mudar preço, consumo, kit, produtividade, modelo e condições da empresa, o mesmo link entrega o mesmo PDF e os mesmos dados", async () => {
++    const { error: erroCond } = await adminUser.cliente
++      .from("proposta_condicoes_comerciais")
++      .update({ validade_dias: 30, pagamento_cartao: "OUTRA CONDIÇÃO" })
++      .eq("empresa_id", empresaId);
++    expect(erroCond).toBeNull();
+     await servico.from("negocios").update({ valor: 99999, consumo_medio_kwh: 10 }).eq("id", negocioId);
+     await servico.from("kit_componentes").update({ quantidade: 40 }).eq("negocio_id", negocioId).eq("tipo", "modulo");
+     await servico.from("parametros_calculadora").update({ produtividade_kwh_kwp_mes: 200 }).eq("empresa_id", empresaId);
+@@ -143,6 +169,12 @@ describe("emissão preservada: emitir, baixar, reabrir", () => {
+     expect(lida.dados.sistema.potenciaKwp).toBe(5.4);
+     expect(lida.dados.comercial.garantias).toEqual(["Módulos: 12 anos"]);
+     expect(lida.dados.comercial.incluso).toEqual(["Projeto e homologação", "Instalação"]);
++    // Prazo, vencimento e formas de pagamento continuam os da emissão.
++    expect(lida.dados.esquema).toBe(5);
++    if (lida.dados.esquema !== 5) return;
++    expect(lida.dados.comercial.validadeDias).toBe(15);
++    expect(lida.dados.comercial.validadeAte).toBe(lida.emissao.validade_ate);
++    expect(lida.dados.comercial.pagamento.cartao).toBe("Em até 12x");
+   });
+ 
+   it("a nova emissão (v2) usa os dados atuais e tem link e arquivo próprios; a v1 não muda", async () => {
+@@ -159,6 +191,9 @@ describe("emissão preservada: emitir, baixar, reabrir", () => {
+     expect(lida2.dados.sistema.potenciaKwp).toBe(21.6);
+     // A produtividade mudou para 200: a confirmação foi apagada, então a v2 sai SEM o número de geração.
+     expect(lida2.dados.sistema.geracao).toBeNull();
++    // A v2 congela a configuração de agora (30 dias, nova condição do cartão).
++    expect(lida2.dados.esquema === 5 && lida2.dados.comercial.validadeDias).toBe(30);
++    expect(lida2.dados.esquema === 5 && lida2.dados.comercial.pagamento.cartao).toBe("OUTRA CONDIÇÃO");
+     expect(sha256Hex(lida2.pdf)).not.toBe(hashV1);
+     const lida1 = await lerEmissaoPorToken(servico, v1.token);
+     expect(lida1.ok && sha256Hex(lida1.pdf)).toBe(hashV1);
+diff --git a/tests/proposta-condicoes-comerciais-db.test.ts b/tests/proposta-condicoes-comerciais-db.test.ts
+new file mode 100644
+index 0000000..c6b67ab
+--- /dev/null
++++ b/tests/proposta-condicoes-comerciais-db.test.ts
+@@ -0,0 +1,73 @@
++/**
++ * Condições comerciais da proposta simples (D1/D2) contra o banco local: quem configura (admin e gestor), quem só lê
++ * (vendedor) e quem não enxerga nada (outra empresa). Limites do banco: prazo só 7, 15 ou 30 dias; cada condição até
++ * 80 caracteres; sem DELETE.
++ */
++import { beforeAll, describe, expect, it } from "vitest";
++import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
++
++let admin: Usuario, gestor: Usuario, vendedor: Usuario, adminOutra: Usuario;
++let empresaId: string;
++
++const tabela = (u: Usuario) => u.cliente.from("proposta_condicoes_comerciais");
++const COMPLETA = { validade_dias: 15, pagamento_avista: "Pix ou transferência", pagamento_cartao: "Em até 12x", pagamento_financiamento: "Bancário" };
++
++beforeAll(async () => {
++  [admin, gestor, vendedor, adminOutra] = await Promise.all([
++    criarUsuario("cond-admin"),
++    criarUsuario("cond-gestor"),
++    criarUsuario("cond-vend"),
++    criarUsuario("cond-outra"),
++  ]);
++  const { data: e1 } = await servico.from("empresas").insert({ nome: `Condições ${sufixo}` }).select("id").single();
++  const { data: e2 } = await servico.from("empresas").insert({ nome: `Condições outra ${sufixo}` }).select("id").single();
++  empresaId = e1!.id;
++  const { error } = await servico.from("empresa_membros").insert([
++    { empresa_id: empresaId, user_id: admin.id, papel: "admin" },
++    { empresa_id: empresaId, user_id: gestor.id, papel: "gestor" },
++    { empresa_id: empresaId, user_id: vendedor.id, papel: "vendedor" },
++    { empresa_id: e2!.id, user_id: adminOutra.id, papel: "admin" },
++  ]);
++  if (error) throw error;
++});
++
++describe("proposta_condicoes_comerciais: quem configura", () => {
++  it("vendedor não cria nem altera; gestor cria; admin altera", async () => {
++    expect((await tabela(vendedor).insert({ empresa_id: empresaId, ...COMPLETA })).error).not.toBeNull();
++
++    expect((await tabela(gestor).insert({ empresa_id: empresaId, ...COMPLETA })).error).toBeNull();
++
++    const tentativa = await tabela(vendedor).update({ pagamento_cartao: "Vendedor mudou" }).eq("empresa_id", empresaId).select("empresa_id");
++    expect(tentativa.data ?? []).toHaveLength(0);
++
++    const pelaAdmin = await tabela(admin).update({ validade_dias: 30 }).eq("empresa_id", empresaId).select("validade_dias, pagamento_cartao");
++    expect(pelaAdmin.error).toBeNull();
++    expect(pelaAdmin.data).toEqual([{ validade_dias: 30, pagamento_cartao: "Em até 12x" }]);
++  });
++
++  it("vendedor lê (prévia antes de emitir); outra empresa não lê nem altera", async () => {
++    const lido = await tabela(vendedor).select("validade_dias").eq("empresa_id", empresaId);
++    expect(lido.data).toEqual([{ validade_dias: 30 }]);
++
++    expect((await tabela(adminOutra).select("empresa_id").eq("empresa_id", empresaId)).data ?? []).toHaveLength(0);
++    const alheio = await tabela(adminOutra).update({ validade_dias: 7 }).eq("empresa_id", empresaId).select("empresa_id");
++    expect(alheio.data ?? []).toHaveLength(0);
++    expect((await tabela(adminOutra).insert({ empresa_id: empresaId, ...COMPLETA })).error).not.toBeNull();
++  });
++
++  it("o banco só aceita 7, 15 ou 30 dias e condições de até 80 caracteres", async () => {
++    for (const validade_dias of [0, 10, 31]) {
++      expect((await tabela(admin).update({ validade_dias }).eq("empresa_id", empresaId)).error, String(validade_dias)).not.toBeNull();
++    }
++    expect((await tabela(admin).update({ pagamento_avista: "x".repeat(81) }).eq("empresa_id", empresaId)).error).not.toBeNull();
++    expect((await tabela(admin).update({ pagamento_avista: "   " }).eq("empresa_id", empresaId)).error).not.toBeNull();
++    // Nulo é permitido: limpa o campo e a emissão fica bloqueada até completar.
++    expect((await tabela(admin).update({ pagamento_avista: null }).eq("empresa_id", empresaId)).error).toBeNull();
++  });
++
++  it("ninguém apaga a configuração (sem política de DELETE)", async () => {
++    const apagado = await tabela(admin).delete().eq("empresa_id", empresaId).select("empresa_id");
++    expect(apagado.data ?? []).toHaveLength(0);
++    expect((await servico.from("proposta_condicoes_comerciais").select("empresa_id").eq("empresa_id", empresaId)).data).toHaveLength(1);
++  });
++});
+diff --git a/R:/wt-m2-p0-retomada/e2e/12-proposta-emitida.spec.ts b/e2e/12-proposta-emitida.spec.ts
+index b5b4d78..432060f 100644
+--- a/R:/wt-m2-p0-retomada/e2e/12-proposta-emitida.spec.ts
++++ b/e2e/12-proposta-emitida.spec.ts
+@@ -61,25 +61,37 @@ async function negocioComKit(nome: string, confirmarProdutividade: boolean) {
+     });
+     if (error) throw error;
+   }
++  await configurarCondicoes();
+   return { id, cliente: c };
+ }
+ 
+-async function emitir(page: import("@playwright/test").Page, negocioId: string, validade: string) {
++/** Configuração FICTÍCIA da empresa de teste (D1/D2), gravada pelo admin: 15 dias e as três formas de pagamento. */
++const CONDICOES = { validade_dias: 15, pagamento_avista: "Pix ou transferência", pagamento_cartao: "Em até 12x", pagamento_financiamento: "Bancário, sujeito a análise" };
++async function configurarCondicoes() {
++  const admin = await clienteDe(base.usuarios.admin, base.senha);
++  const { error } = await admin.from("proposta_condicoes_comerciais").upsert({ empresa_id: base.empresaA, ...CONDICOES }, { onConflict: "empresa_id" });
++  if (error) throw error;
++}
++
++/** O vendedor só emite: validade e pagamento vêm da configuração da empresa (D1/D2). */
++async function emitir(page: import("@playwright/test").Page, negocioId: string) {
+   await entrarComo(page, base.usuarios.vendedor, base.senha);
+   await page.goto(`/negocios/${negocioId}`);
+-  await page.getByLabel("Válida até").fill(validade);
+-  await page.getByLabel("Condições de pagamento").fill("À vista por Pix ou transferência\nFinanciamento bancário, com parcelas a combinar");
+   await page.getByRole("button", { name: /^Emitir/ }).click();
+ }
+ 
+-const AMANHA = () => new Date(Date.now() + 24 * 3600 * 1000).toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
++/** DD/MM/AAAA de hoje em São Paulo + n dias (a validade que a emissão calcula). */
++const VENCIMENTO = (dias: number) => {
++  const [a, m, d] = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" }).split("-").map(Number) as [number, number, number];
++  return new Date(Date.UTC(a, m - 1, d + dias)).toLocaleDateString("pt-BR", { timeZone: "UTC" });
++};
+ 
+ test.describe("proposta simples emitida", () => {
+   test.use({ viewport: { width: 1440, height: 900 } });
+ 
+   test("emitir, abrir o link sem login, baixar o PDF e reabrir depois de mudar negócio e kit: mesmo PDF", async ({ page, browser, request }) => {
+     const n = await negocioComKit("Cliente emissão (fictício)", true);
+-    await emitir(page, n.id, AMANHA());
++    await emitir(page, n.id);
+     await expect(page.getByText("Proposta v1 emitida.")).toBeVisible();
+     await expect(page.getByTestId("lista-emissoes")).toContainText("Versão 1");
+ 
+@@ -95,6 +107,11 @@ test.describe("proposta simples emitida", () => {
+     // 5,5 kWp × 120 (produtividade confirmada pela fixture acima; não é parâmetro de proposta real).
+     await expect(pagina.getByText("660 kWh/mês", { exact: true })).toBeVisible();
+     await expect(pagina.getByText("R$ 24.900,00")).toBeVisible();
++    // D1/D2: vencimento calculado (hoje + 15) e as três formas de pagamento juntas, com rótulo.
++    await expect(pagina.getByText(`Proposta válida até ${VENCIMENTO(15)}.`, { exact: false })).toBeVisible();
++    for (const linha of ["À vista: Pix ou transferência", "Cartão: Em até 12x", "Financiamento: Bancário, sujeito a análise"]) {
++      await expect(pagina.getByText(linha, { exact: false })).toBeVisible();
++    }
+     await expect(pagina.getByText("Esta proposta apresenta o sistema e sua geração estimada. Não inclui estimativa de economia ou prazo de retorno.")).toBeVisible();
+ 
+     const resposta1 = await request.get(`/proposta/${v1.token}/pdf`);
+@@ -118,8 +135,6 @@ test.describe("proposta simples emitida", () => {
+ 
+     // Nova versão: outro link, outro arquivo; a anterior continua igual.
+     await page.reload();
+-    await page.getByLabel("Válida até").fill(AMANHA());
+-    await page.getByLabel("Condições de pagamento").fill("À vista por Pix ou transferência");
+     await page.getByRole("button", { name: /^Emitir/ }).click();
+     await expect(page.getByText("Proposta v2 emitida.")).toBeVisible();
+     const { data: depois } = await n.cliente.from("propostas_emissoes").select("token, pdf_sha256, versao").eq("negocio_id", n.id).order("versao");
+@@ -139,7 +154,7 @@ test.describe("proposta simples emitida", () => {
+     await admin.from("parametros_calculadora").update({ produtividade_kwh_kwp_mes: atual }).eq("empresa_id", base.empresaA);
+ 
+     const n = await negocioComKit("Cliente sem geração (fictício)", false);
+-    await emitir(page, n.id, AMANHA());
++    await emitir(page, n.id);
+     await expect(page.getByTestId("geracao-status")).toContainText("fora da proposta");
+     await expect(page.getByText("Proposta v1 emitida.")).toBeVisible();
+     const { data } = await n.cliente.from("propostas_emissoes").select("token, dados").eq("negocio_id", n.id).single();
+@@ -150,12 +165,15 @@ test.describe("proposta simples emitida", () => {
+     expect(html).toContain("Esta proposta apresenta o sistema. Não inclui estimativa de geração, economia ou prazo de retorno.");
+   });
+ 
+-  test("SDR não vê o card de emissão e a validade é obrigatória e não pode ser passada", async ({ page }) => {
++  test("vendedor só vê a validade e as formas de pagamento da empresa (não edita nem escolhe); SDR não vê o card", async ({ page }) => {
+     const n = await negocioComKit("Cliente validade (fictício)", true);
+     await entrarComo(page, base.usuarios.vendedor, base.senha);
+     await page.goto(`/negocios/${n.id}`);
+-    await expect(page.getByLabel("Válida até")).toHaveAttribute("required", "");
+-    await expect(page.getByLabel("Válida até")).toHaveAttribute("min", /^\d{4}-\d{2}-\d{2}$/);
++    await expect(page.getByTestId("validade-prevista")).toHaveText(`15 dias, até ${VENCIMENTO(15)} se emitida hoje`);
++    await expect(page.getByTestId("condicoes-da-empresa")).toContainText("Em até 12x");
++    // Sem campo de data nem de texto livre de pagamento.
++    await expect(page.getByLabel("Válida até")).toHaveCount(0);
++    await expect(page.getByLabel("Condições de pagamento")).toHaveCount(0);
+ 
+     await entrarComo(page, base.usuarios.sdr, base.senha);
+     await page.goto(`/negocios/${n.id}`);

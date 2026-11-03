@@ -5,6 +5,7 @@
  * de status com texto incompleto (contrato antigo) e de modelo antigo inválido.
  */
 import { beforeAll, describe, expect, it } from "vitest";
+import { nomeKitPersonalizado } from "@/lib/calculadora";
 import { atualizarStatusContratoComCliente, gerarContratoComCliente } from "@/lib/contratos-geracao";
 import type { SupabaseServidor } from "@/lib/supabase/server";
 import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
@@ -53,7 +54,8 @@ async function negocio(titulo: string, contato: Record<string, string | null> = 
     .select("id")
     .single();
   if (error) throw error;
-  await servico.from("kit_componentes").insert({ empresa_id: empresa, negocio_id: n!.id, tipo: "modulo", descricao: "Módulo 550 W", quantidade: 10, ordem: 0 });
+  // 10 x 550 W = 5,5 kWp: coerente com o cálculo fictício abaixo (o contrato recusa cálculo de outro kit).
+  await servico.from("kit_componentes").insert({ empresa_id: empresa, negocio_id: n!.id, tipo: "modulo", descricao: "Módulo 550 W", potencia_w: 550, quantidade: 10, ordem: 0 });
   return n!.id;
 }
 
@@ -110,19 +112,24 @@ describe("contrato com RLS real", () => {
     }
   });
 
-  it("cálculo com preço diferente do valor atual do negócio bloqueia a geração até atualizar o preço", async () => {
+  // ANTES: "cálculo com preço diferente do valor atual do negócio bloqueia a geração até atualizar o preço" (mensagem
+  // "Atualizar preço no cálculo"; liberava depois de atualizar kit_preco e payback). AGORA toda linha é legada (fórmula
+  // antiga, não validada), a proposta não mostra preço e o contrato NÃO bloqueia por preço divergente nem por legado; o
+  // contrato continua bloqueando quando o kit mudou depois do cálculo.
+  it("linha legada com preço diferente do valor do negócio NÃO bloqueia o contrato (usa o valor atual e não altera a linha); kit alterado bloqueia", async () => {
     const id = await negocio("Preço antigo");
+    await servico.from("negocios").update({ consumo_medio_kwh: 500 }).eq("id", id);
     const calculo = {
       empresa_id: empresa,
       negocio_id: id,
-      kit_nome: "Kit 5 kWp",
-      kit_potencia_kwp: 5,
+      kit_nome: nomeKitPersonalizado([{ tipo: "modulo", descricao: "Módulo 550 W", potenciaW: 550, quantidade: 10 }]),
+      kit_potencia_kwp: 5.5,
       kit_preco: 25000,
       tipo_ligacao: "bifasico" as const,
       consumo_medio_kwh: 500,
       tarifa_kwh: 0.9,
       produtividade_kwh_kwp_mes: 120,
-      percentual_fio_b: 0.45,
+      percentual_fio_b: 0.6, // parâmetros reais da empresa (padrão do banco: 120 kWh/kWp/mês, Fio B 0,6, bifásico 50)
       disponibilidade_kwh: 50,
       geracao_estimada_kwh_mes: 600,
       kwh_faturado: 50,
@@ -139,15 +146,19 @@ describe("contrato com RLS real", () => {
     expect((await gerar(id)).ok).toBe(true);
     await servico.from("contratos").delete().eq("negocio_id", id);
 
+    // Valor do negócio diferente do preço da linha: gera, com o valor ATUAL do negócio, e a linha segue intocada.
     await servico.from("negocios").update({ valor: 28000 }).eq("id", id);
-    const r = await gerar(id);
-    expect(r.ok).toBe(false);
-    expect(r.mensagem).toContain("Atualizar preço no cálculo");
-    expect(await contrato(id)).toBeNull();
-
-    await servico.from("calculos_solares").update({ kit_preco: 28000, payback_meses: 125.7 }).eq("negocio_id", id);
-    expect((await gerar(id)).ok).toBe(true);
+    expect(await gerar(id)).toEqual({ ok: true, mensagem: "Contrato pronto." });
     expect((await contrato(id))!.conteudo).toContain("28.000");
+    const { data: linha } = await servico.from("calculos_solares").select("kit_preco, payback_meses").eq("negocio_id", id).single();
+    expect(linha).toEqual({ kit_preco: 25000, payback_meses: 112.2 });
+    await servico.from("contratos").delete().eq("negocio_id", id);
+
+    // Kit alterado depois do cálculo (11 x 550 W = 6,05 kWp contra 5,5 kWp): recusa e não grava.
+    await servico.from("kit_componentes").update({ quantidade: 11 }).eq("negocio_id", id).eq("tipo", "modulo");
+    const r = await gerar(id);
+    expect(r).toEqual({ ok: false, mensagem: "O kit mudou depois do último cálculo. Recalcule antes de gerar o contrato." });
+    expect(await contrato(id)).toBeNull();
   });
 
   it("modelo antigo inválido (salvo antes da validação) não gera contrato", async () => {

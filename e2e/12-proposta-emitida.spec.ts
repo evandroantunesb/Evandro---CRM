@@ -1,0 +1,187 @@
+import { createHash } from "node:crypto";
+import { expect, test } from "@playwright/test";
+import { clienteDe, entrarComo, lerBase } from "./ajuda";
+import type { BaseFicticia } from "./base-ficticia";
+
+/**
+ * Proposta simples emitida (M2 P0; contrato .aurora/contratos/m2-p0-emissao-preservada-implantacao.md): o vendedor emite
+ * pela ficha, o cliente abre o link sem login e baixa o PDF; depois de mudar negócio, kit e modelo, o MESMO link entrega
+ * os MESMOS bytes. Interface real + Supabase LOCAL descartável, base fictícia.
+ */
+
+let base: BaseFicticia;
+test.beforeAll(() => {
+  base = lerBase();
+});
+
+const sha256 = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
+const FONTE = "Relatório de geração real das usinas da região (e2e fictício)";
+const RESPONSAVEL = "Eng. Ana Prado (e2e fictício)";
+
+async function negocioComKit(nome: string, confirmarProdutividade: boolean) {
+  const v = base.usuarios.vendedor;
+  const c = await clienteDe(v, base.senha);
+  const { data: funil } = await c.from("funis").select("id").eq("empresa_id", base.empresaA).single();
+  const { data: etapa } = await c.from("etapas").select("id").eq("funil_id", funil!.id).order("ordem").limit(1).single();
+  const { data: contato, error: e1 } = await c
+    .from("contatos")
+    .insert({ empresa_id: base.empresaA, nome, telefone: "(45) 90000-0000", cidade: "Cascavel", uf: "PR" })
+    .select("id")
+    .single();
+  if (e1) throw e1;
+  const { data: negocio, error: e2 } = await c
+    .from("negocios")
+    .insert({
+      empresa_id: base.empresaA,
+      titulo: `Sistema solar — ${nome}`,
+      contato_id: contato!.id,
+      funil_id: funil!.id,
+      etapa_id: etapa!.id,
+      responsavel_id: v.membroId,
+      valor: 24900,
+      consumo_medio_kwh: 450,
+    })
+    .select("id")
+    .single();
+  if (e2) throw e2;
+  const id = negocio!.id;
+  const { error: e3 } = await c.from("kit_componentes").insert([
+    { empresa_id: base.empresaA, negocio_id: id, tipo: "modulo", descricao: "Módulo fictício 550 W", potencia_w: 550, quantidade: 10, ordem: 0 },
+    { empresa_id: base.empresaA, negocio_id: id, tipo: "inversor", descricao: "Inversor fictício 5 kW", potencia_w: null, quantidade: 1, ordem: 1 },
+  ]);
+  if (e3) throw e3;
+  if (confirmarProdutividade) {
+    const admin = await clienteDe(base.usuarios.admin, base.senha);
+    const { data: p } = await admin.from("parametros_calculadora").select("produtividade_kwh_kwp_mes").eq("empresa_id", base.empresaA).single();
+    const { error } = await admin.rpc("confirmar_produtividade_calculadora", {
+      p_empresa_id: base.empresaA,
+      p_valor: p!.produtividade_kwh_kwp_mes,
+      p_fonte: FONTE,
+      p_responsavel: RESPONSAVEL,
+    });
+    if (error) throw error;
+  }
+  await configurarCondicoes();
+  return { id, cliente: c };
+}
+
+/** Configuração FICTÍCIA da empresa de teste (D1/D2), gravada pelo admin: 15 dias e as três formas de pagamento. */
+const CONDICOES = { validade_dias: 15, pagamento_avista: "Pix ou transferência", pagamento_cartao: "Em até 12x", pagamento_financiamento: "Bancário, sujeito a análise" };
+async function configurarCondicoes() {
+  const admin = await clienteDe(base.usuarios.admin, base.senha);
+  const { error } = await admin.from("proposta_condicoes_comerciais").upsert({ empresa_id: base.empresaA, ...CONDICOES }, { onConflict: "empresa_id" });
+  if (error) throw error;
+}
+
+/** O vendedor só emite: validade e pagamento vêm da configuração da empresa (D1/D2). */
+async function emitir(page: import("@playwright/test").Page, negocioId: string) {
+  await entrarComo(page, base.usuarios.vendedor, base.senha);
+  await page.goto(`/negocios/${negocioId}`);
+  await page.getByRole("button", { name: /^Emitir/ }).click();
+}
+
+/** DD/MM/AAAA de hoje em São Paulo + n dias (a validade que a emissão calcula). */
+const VENCIMENTO = (dias: number) => {
+  const [a, m, d] = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" }).split("-").map(Number) as [number, number, number];
+  return new Date(Date.UTC(a, m - 1, d + dias)).toLocaleDateString("pt-BR", { timeZone: "UTC" });
+};
+
+test.describe("proposta simples emitida", () => {
+  test.use({ viewport: { width: 1440, height: 900 } });
+
+  test("emitir, abrir o link sem login, baixar o PDF e reabrir depois de mudar negócio e kit: mesmo PDF", async ({ page, browser, request }) => {
+    const n = await negocioComKit("Cliente emissão (fictício)", true);
+    await emitir(page, n.id);
+    await expect(page.getByText("Proposta v1 emitida.")).toBeVisible();
+    await expect(page.getByTestId("lista-emissoes")).toContainText("Versão 1");
+
+    const { data: linhas } = await n.cliente.from("propostas_emissoes").select("token, pdf_sha256, pdf_bytes, dados").eq("negocio_id", n.id);
+    expect(linhas).toHaveLength(1);
+    const v1 = linhas![0]!;
+
+    // Cliente: sem login, contexto novo.
+    const anonimo = await browser.newContext();
+    const pagina = await anonimo.newPage();
+    await pagina.goto(`/proposta/${v1.token}`);
+    await expect(pagina.getByRole("heading", { name: "Cliente emissão (fictício)" })).toBeVisible();
+    // 5,5 kWp × 120 (produtividade confirmada pela fixture acima; não é parâmetro de proposta real).
+    await expect(pagina.getByText("660 kWh/mês", { exact: true })).toBeVisible();
+    await expect(pagina.getByText("R$ 24.900,00")).toBeVisible();
+    // D1/D2: vencimento calculado (hoje + 15) e as três formas de pagamento juntas, com rótulo.
+    await expect(pagina.getByText(`Proposta válida até ${VENCIMENTO(15)}.`, { exact: false })).toBeVisible();
+    for (const linha of ["À vista: Pix ou transferência", "Cartão: Em até 12x", "Financiamento: Bancário, sujeito a análise"]) {
+      await expect(pagina.getByText(linha, { exact: false })).toBeVisible();
+    }
+    await expect(pagina.getByText("Esta proposta apresenta o sistema e sua geração estimada. Não inclui estimativa de economia ou prazo de retorno.")).toBeVisible();
+
+    const resposta1 = await request.get(`/proposta/${v1.token}/pdf`);
+    expect(resposta1.status()).toBe(200);
+    expect(resposta1.headers()["content-type"]).toContain("application/pdf");
+    const bytes1 = new Uint8Array(await resposta1.body());
+    expect(Buffer.from(bytes1).subarray(0, 4).toString()).toBe("%PDF");
+    expect(sha256(bytes1)).toBe(v1.pdf_sha256);
+    expect(bytes1.byteLength).toBe(v1.pdf_bytes);
+
+    // Mudanças depois da emissão: preço, consumo e kit do negócio.
+    await n.cliente.from("negocios").update({ valor: 99999, consumo_medio_kwh: 10 }).eq("id", n.id);
+    await n.cliente.from("kit_componentes").update({ quantidade: 40 }).eq("negocio_id", n.id).eq("tipo", "modulo");
+
+    await pagina.reload();
+    await expect(pagina.getByText("R$ 24.900,00")).toBeVisible();
+    await expect(pagina.getByText("R$ 99.999,00")).toHaveCount(0);
+    const resposta2 = await request.get(`/proposta/${v1.token}/pdf`);
+    expect(sha256(new Uint8Array(await resposta2.body()))).toBe(v1.pdf_sha256);
+    await anonimo.close();
+
+    // Nova versão: outro link, outro arquivo; a anterior continua igual.
+    await page.reload();
+    await page.getByRole("button", { name: /^Emitir/ }).click();
+    await expect(page.getByText("Proposta v2 emitida.")).toBeVisible();
+    const { data: depois } = await n.cliente.from("propostas_emissoes").select("token, pdf_sha256, versao").eq("negocio_id", n.id).order("versao");
+    expect(depois).toHaveLength(2);
+    expect(depois![1]!.token).not.toBe(v1.token);
+    expect(depois![1]!.pdf_sha256).not.toBe(v1.pdf_sha256);
+    const resposta3 = await request.get(`/proposta/${v1.token}/pdf`);
+    expect(sha256(new Uint8Array(await resposta3.body()))).toBe(v1.pdf_sha256);
+  });
+
+  test("sem a produtividade confirmada pelo admin a proposta sai SEM o número de geração", async ({ page, request }) => {
+    // Empresa fictícia compartilhada: apaga a confirmação mudando e restaurando o valor pelo admin.
+    const admin = await clienteDe(base.usuarios.admin, base.senha);
+    const { data: p } = await admin.from("parametros_calculadora").select("produtividade_kwh_kwp_mes").eq("empresa_id", base.empresaA).single();
+    const atual = p!.produtividade_kwh_kwp_mes;
+    await admin.from("parametros_calculadora").update({ produtividade_kwh_kwp_mes: atual + 1 }).eq("empresa_id", base.empresaA);
+    await admin.from("parametros_calculadora").update({ produtividade_kwh_kwp_mes: atual }).eq("empresa_id", base.empresaA);
+
+    const n = await negocioComKit("Cliente sem geração (fictício)", false);
+    await emitir(page, n.id);
+    await expect(page.getByTestId("geracao-status")).toContainText("fora da proposta");
+    await expect(page.getByText("Proposta v1 emitida.")).toBeVisible();
+    const { data } = await n.cliente.from("propostas_emissoes").select("token, dados").eq("negocio_id", n.id).single();
+    expect((data!.dados as { sistema: { geracao: unknown } }).sistema.geracao).toBeNull();
+    const html = await (await request.get(`/proposta/${data!.token}`)).text();
+    expect(html).not.toContain("Geração estimada");
+    // O rodapé também não promete a geração que não está na proposta.
+    expect(html).toContain("Esta proposta apresenta o sistema. Não inclui estimativa de geração, economia ou prazo de retorno.");
+  });
+
+  test("vendedor só vê a validade e as formas de pagamento da empresa (não edita nem escolhe); SDR não vê o card", async ({ page }) => {
+    const n = await negocioComKit("Cliente validade (fictício)", true);
+    await entrarComo(page, base.usuarios.vendedor, base.senha);
+    await page.goto(`/negocios/${n.id}`);
+    await expect(page.getByTestId("validade-prevista")).toHaveText(`15 dias, até ${VENCIMENTO(15)} se emitida hoje`);
+    await expect(page.getByTestId("condicoes-da-empresa")).toContainText("Em até 12x");
+    // Sem campo de data nem de texto livre de pagamento.
+    await expect(page.getByLabel("Válida até")).toHaveCount(0);
+    await expect(page.getByLabel("Condições de pagamento")).toHaveCount(0);
+
+    await entrarComo(page, base.usuarios.sdr, base.senha);
+    await page.goto(`/negocios/${n.id}`);
+    await expect(page.getByRole("button", { name: /^Emitir/ })).toHaveCount(0);
+  });
+
+  test("token inexistente não vira proposta (404); links antigos seguem o comportamento já coberto em 10-calculo-estados", async ({ request }) => {
+    const resposta = await request.get(`/proposta/${crypto.randomUUID()}`);
+    expect(resposta.status()).toBe(404);
+  });
+});
