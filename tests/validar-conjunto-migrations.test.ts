@@ -8,8 +8,12 @@ import { afterAll, describe, expect, it } from "vitest";
 
 const SCRIPT = ".github/scripts/validar-conjunto-migrations.sh";
 const WORKFLOW = ".github/workflows/banco-producao.yml";
-// Aviso no sininho da justificativa de atraso das obras: só ela, nenhuma a mais ou a menos.
-const AUTORIZADA = "20261107100000_obras_justificativa_aviso.sql";
+// Trajetória da Engenharia (#302) e autoconfirmação de pagamento (#303): só as duas, nenhuma a mais ou a menos.
+const AUTORIZADAS = ["20261108100000_engenharia_trajetoria.sql", "20261109100000_autoconfirmacao_pagamento.sql"];
+const LISTA = AUTORIZADAS.join("\n");
+// Aviso no sininho da justificativa de atraso (#295): aplicada em 03/11/2026, antes destas. Se voltar a aparecer como
+// pendente, não é autorizada.
+const JUSTIFICATIVA = "20261107100000_obras_justificativa_aviso.sql";
 // Visão Completa das obras (#292): aplicada em 03/11/2026, antes desta. Se voltar a aparecer como pendente, não é autorizada.
 const COMPLETA = "20261106100000_obras_opr_completa.sql";
 // Custos das obras (#291): aplicada em 02/11/2026, antes desta. Se voltar a aparecer como pendente, não é autorizada.
@@ -121,7 +125,7 @@ const pasta = mkdtempSync(join(tmpdir(), "conjunto-migrations-"));
 afterAll(() => rmSync(pasta, { recursive: true, force: true }));
 
 let contador = 0;
-function validar(saidaDryRun: string | null, autorizadas: string | null = AUTORIZADA) {
+function validar(saidaDryRun: string | null, autorizadas: string | null = LISTA) {
   const arquivo = join(pasta, `dry-run-${contador++}.txt`);
   if (saidaDryRun !== null) writeFileSync(arquivo, saidaDryRun);
   const env: NodeJS.ProcessEnv = { ...process.env };
@@ -148,15 +152,14 @@ function dryRunCom(...migrations: string[]) {
 }
 
 describe("conjunto exatamente igual ao autorizado", () => {
-  it("uma migration, a autorizada: passa", () => {
-    const r = validar(dryRunCom(AUTORIZADA));
+  it("as autorizadas, e só elas: passa", () => {
+    const r = validar(dryRunCom(...AUTORIZADAS));
     expect(r.codigo).toBe(0);
     expect(r.saida).toContain("Conjunto confirmado");
   });
 
   it("vários itens autorizados, em qualquer ordem, e o dry-run lista os mesmos: passa", () => {
-    const outra = JA_APLICADA;
-    const r = validar(dryRunCom(outra, AUTORIZADA), `${AUTORIZADA}\n${outra}\n`);
+    const r = validar(dryRunCom(...[...AUTORIZADAS].reverse()), `${AUTORIZADAS[1]} ${AUTORIZADAS[0]}\n`);
     expect(r.codigo).toBe(0);
   });
 });
@@ -169,13 +172,13 @@ describe("conjunto diferente do autorizado: encerra com erro", () => {
   });
 
   it("migration extra além da autorizada", () => {
-    const r = validar(dryRunCom("20261016100000_nova_inesperada.sql", AUTORIZADA));
+    const r = validar(dryRunCom("20261016100000_nova_inesperada.sql", ...AUTORIZADAS));
     expect(r.codigo).toBe(1);
     expect(r.saida).toContain("20261016100000_nova_inesperada.sql");
   });
 
   it("várias migrations extras", () => {
-    expect(validar(dryRunCom(AUTORIZADA, ...SOLO)).codigo).toBe(1);
+    expect(validar(dryRunCom(...AUTORIZADAS, ...SOLO)).codigo).toBe(1);
   });
 
   it("só uma migration diferente da autorizada (substituição)", () => {
@@ -186,34 +189,32 @@ describe("conjunto diferente do autorizado: encerra com erro", () => {
   it("migration anterior já aplicada (inclusive as três do Solo), sozinha ou junto com a autorizada, não passa", () => {
     for (const anterior of JA_APLICADAS) {
       expect(validar(dryRunCom(anterior)).codigo, anterior).toBe(1);
-      expect(validar(dryRunCom(anterior, AUTORIZADA)).codigo, anterior).toBe(1);
+      expect(validar(dryRunCom(anterior, ...AUTORIZADAS)).codigo, anterior).toBe(1);
     }
   });
 
   it("as três do Solo, já aplicadas, são recusadas pela lista atual e só passariam se alguém as autorizasse de novo", () => {
     const r = validar(dryRunCom(...SOLO));
     expect(r.codigo).toBe(1);
-    expect(r.saida).toContain(AUTORIZADA);
+    expect(r.saida).toContain(AUTORIZADAS[0]);
     expect(validar(dryRunCom(...SOLO), SOLO.join("\n")).codigo).toBe(0);
   });
 
   it("falta uma das autorizadas (dois itens autorizados, um listado)", () => {
-    const outra = JA_APLICADA;
-    const r = validar(dryRunCom(AUTORIZADA), `${AUTORIZADA} ${outra}`);
-    expect(r.codigo).toBe(1);
+    for (const listada of AUTORIZADAS) expect(validar(dryRunCom(listada)).codigo, listada).toBe(1);
   });
 
   it("migration autorizada listada em duplicidade no dry-run, com extra: não passa", () => {
-    expect(validar(dryRunCom(AUTORIZADA, AUTORIZADA, JA_APLICADA)).codigo).toBe(1);
+    expect(validar(dryRunCom(...AUTORIZADAS, AUTORIZADAS[0], JA_APLICADA)).codigo).toBe(1);
   });
 
   it("nome parecido com o autorizado (sufixo ou prefixo a mais) não passa", () => {
-    expect(validar(dryRunCom(AUTORIZADA.replace(".sql", "_v2.sql"))).codigo).toBe(1);
-    expect(validar(dryRunCom(`x${AUTORIZADA}`)).codigo).toBe(1);
+    expect(validar(dryRunCom(AUTORIZADAS[0].replace(".sql", "_v2.sql"), AUTORIZADAS[1])).codigo).toBe(1);
+    expect(validar(dryRunCom(`x${AUTORIZADAS[0]}`, AUTORIZADAS[1])).codigo).toBe(1);
   });
 
   it("versão extra citada sem o nome do arquivo (não interpretável)", () => {
-    const r = validar(`${dryRunCom(AUTORIZADA)}\nversion 20261015120000 pending\n`);
+    const r = validar(`${dryRunCom(...AUTORIZADAS)}\nversion 20261015120000 pending\n`);
     expect(r.codigo).toBe(1);
     expect(r.saida).toContain("20261015120000");
   });
@@ -229,30 +230,30 @@ describe("entradas inválidas: encerra com erro antes de qualquer aplicação", 
   });
 
   it("lista autorizada ausente, vazia ou só espaços", () => {
-    expect(validar(dryRunCom(AUTORIZADA), null).codigo).toBe(1);
-    expect(validar(dryRunCom(AUTORIZADA), "").codigo).toBe(1);
-    expect(validar(dryRunCom(AUTORIZADA), " \n ").codigo).toBe(1);
+    expect(validar(dryRunCom(...AUTORIZADAS), null).codigo).toBe(1);
+    expect(validar(dryRunCom(...AUTORIZADAS), "").codigo).toBe(1);
+    expect(validar(dryRunCom(...AUTORIZADAS), " \n ").codigo).toBe(1);
   });
 
   it("item autorizado fora do formato ou repetido", () => {
-    expect(validar(dryRunCom(AUTORIZADA), `${AUTORIZADA}\narquivamento.sql`).codigo).toBe(1);
-    expect(validar(dryRunCom(AUTORIZADA), `${AUTORIZADA}\n${AUTORIZADA}`).codigo).toBe(1);
+    expect(validar(dryRunCom(...AUTORIZADAS), `${LISTA}\narquivamento.sql`).codigo).toBe(1);
+    expect(validar(dryRunCom(...AUTORIZADAS), `${LISTA}\n${AUTORIZADAS[0]}`).codigo).toBe(1);
   });
 
   it("sem argumento", () => {
-    const r = spawnSync(BASH, [SCRIPT], { env: { ...process.env, MIGRATIONS_AUTORIZADAS: AUTORIZADA }, encoding: "utf8" });
+    const r = spawnSync(BASH, [SCRIPT], { env: { ...process.env, MIGRATIONS_AUTORIZADAS: LISTA }, encoding: "utf8" });
     expect(r.status).toBe(1);
   });
 });
 
 describe("protocolos da Engenharia", () => {
-  it("só ela pendente (checklist, tarefas de setor, dados do cliente, dados pessoais da obra, fixação, validade da proposta, eletroposto SDR, eletroposto, temperatura e calculadora já aplicados): passa", () => {
-    expect(validar(dryRunCom(AUTORIZADA)).codigo).toBe(0);
+  it("só elas pendentes (justificativa, checklist, tarefas de setor, dados do cliente, dados pessoais da obra, fixação, validade da proposta, eletroposto SDR, eletroposto, temperatura e calculadora já aplicados): passa", () => {
+    expect(validar(dryRunCom(...AUTORIZADAS)).codigo).toBe(0);
   });
 
-  it("checklist, tarefas de setor, dados do cliente, dados pessoais da obra, fixação, validade da proposta, eletroposto SDR, eletroposto, temperatura ou qualquer migration da calculadora pendente junto, ou sozinha, não passa", () => {
-    for (const m of [COMPLETA, CUSTOS, CRONOGRAMA, CONDICAO_ESCOLHIDA, DESCONTOS, CONDICOES_CONFIG, CAPTURA_LIMITE, PRIVILEGIOS_TABELAS, FUNCOES_SEM_LOGIN, INICIAR_ATUACAO, ENQUADRAMENTO, PASSOS, TAREFAS_AUTOMATICAS, PRAZOS, VISTORIA, PROTOCOLOS, CHECKLIST, NOTIFICACOES, ANEXOS_TAREFA, TAREFAS_SETOR, DADOS_CLIENTE, CLIENTE_OCULTO, FIXACAO, VALIDADE_PROPOSTA, ELETROPOSTO_SDR, ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) {
-      expect(validar(dryRunCom(AUTORIZADA, m)).codigo, m).toBe(1);
+  it("justificativa, checklist, tarefas de setor, dados do cliente, dados pessoais da obra, fixação, validade da proposta, eletroposto SDR, eletroposto, temperatura ou qualquer migration da calculadora pendente junto, ou sozinha, não passa", () => {
+    for (const m of [JUSTIFICATIVA, COMPLETA, CUSTOS, CRONOGRAMA, CONDICAO_ESCOLHIDA, DESCONTOS, CONDICOES_CONFIG, CAPTURA_LIMITE, PRIVILEGIOS_TABELAS, FUNCOES_SEM_LOGIN, INICIAR_ATUACAO, ENQUADRAMENTO, PASSOS, TAREFAS_AUTOMATICAS, PRAZOS, VISTORIA, PROTOCOLOS, CHECKLIST, NOTIFICACOES, ANEXOS_TAREFA, TAREFAS_SETOR, DADOS_CLIENTE, CLIENTE_OCULTO, FIXACAO, VALIDADE_PROPOSTA, ELETROPOSTO_SDR, ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) {
+      expect(validar(dryRunCom(...AUTORIZADAS, m)).codigo, m).toBe(1);
       expect(validar(dryRunCom(m)).codigo, m).toBe(1);
     }
     // Dois `bash` por migration da lista: no Windows, com a suíte inteira rodando, passa dos 20 s padrão.
@@ -260,14 +261,16 @@ describe("protocolos da Engenharia", () => {
 
   it("a calculadora inteira pendente, com ou sem a autorizada, não passa", () => {
     expect(validar(dryRunCom(...CALCULADORA)).codigo).toBe(1);
-    expect(validar(dryRunCom(...CALCULADORA, AUTORIZADA)).codigo).toBe(1);
+    expect(validar(dryRunCom(...CALCULADORA, ...AUTORIZADAS)).codigo).toBe(1);
   });
 
-  it("a autorizada existe na pasta e é a única da lista autorizada do workflow", () => {
-    expect(existsSync(`supabase/migrations/${AUTORIZADA}`)).toBe(true);
+  it("as autorizadas existem na pasta e são as únicas da lista autorizada do workflow", () => {
     const texto = readFileSync(WORKFLOW, "utf8");
-    expect(texto).toContain(AUTORIZADA);
-    for (const m of [COMPLETA, CUSTOS, CRONOGRAMA, CONDICAO_ESCOLHIDA, DESCONTOS, CONDICOES_CONFIG, CAPTURA_LIMITE, PRIVILEGIOS_TABELAS, FUNCOES_SEM_LOGIN, INICIAR_ATUACAO, ENQUADRAMENTO, PASSOS, TAREFAS_AUTOMATICAS, PRAZOS, VISTORIA, PROTOCOLOS, CHECKLIST, NOTIFICACOES, ANEXOS_TAREFA, TAREFAS_SETOR, DADOS_CLIENTE, CLIENTE_OCULTO, FIXACAO, VALIDADE_PROPOSTA, ELETROPOSTO_SDR, ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) expect(texto, m).not.toContain(m);
+    for (const m of AUTORIZADAS) {
+      expect(existsSync(`supabase/migrations/${m}`), m).toBe(true);
+      expect(texto, m).toContain(m);
+    }
+    for (const m of [JUSTIFICATIVA, COMPLETA, CUSTOS, CRONOGRAMA, CONDICAO_ESCOLHIDA, DESCONTOS, CONDICOES_CONFIG, CAPTURA_LIMITE, PRIVILEGIOS_TABELAS, FUNCOES_SEM_LOGIN, INICIAR_ATUACAO, ENQUADRAMENTO, PASSOS, TAREFAS_AUTOMATICAS, PRAZOS, VISTORIA, PROTOCOLOS, CHECKLIST, NOTIFICACOES, ANEXOS_TAREFA, TAREFAS_SETOR, DADOS_CLIENTE, CLIENTE_OCULTO, FIXACAO, VALIDADE_PROPOSTA, ELETROPOSTO_SDR, ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) expect(texto, m).not.toContain(m);
   });
 });
 
@@ -287,7 +290,7 @@ describe("ligação no workflow", () => {
   it("a trava usa o arquivo do dry-run e a lista com só as migrations autorizadas, sem entrada do operador", () => {
     const trecho = aplicar.slice(aplicar.indexOf("name: Conferir que o conjunto"), aplicar.indexOf("name: Aplicar (supabase"));
     expect(trecho).toContain('bash .github/scripts/validar-conjunto-migrations.sh "$RUNNER_TEMP/dry-run.txt"');
-    expect(trecho.match(/\d{14}_[A-Za-z0-9_.-]+\.sql/g)).toEqual([AUTORIZADA]);
+    expect(trecho.match(/\d{14}_[A-Za-z0-9_.-]+\.sql/g)).toEqual(AUTORIZADAS);
     expect(trecho).not.toContain("inputs.");
     expect(trecho).not.toContain("secrets.");
     expect(trecho).not.toContain("continue-on-error");
