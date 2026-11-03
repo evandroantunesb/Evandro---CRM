@@ -11,7 +11,8 @@ test("carteira da Engenharia alterna para Kanban e o cartão abre a obra", async
   const visao = page.getByRole("navigation", { name: "Visão da carteira" });
   // A carteira abre no Resumo (as sete fases); Lista e Kanban ficam a um toque.
   await expect(visao.getByRole("link", { name: "Resumo" })).toHaveAttribute("aria-current", "page");
-  await expect(page.getByRole("region", { name: "Resumo da carteira" })).toBeVisible();
+  // A última fase do Resumo, como no desenho, é a das obras com a Engenharia concluída no mês.
+  await expect(page.getByRole("region", { name: "Resumo da carteira" }).getByText("Concluída no mês", { exact: true })).toBeVisible();
   await visao.getByRole("link", { name: "Lista" }).click();
   await expect(page).toHaveURL(/carteira=lista/);
   await expect(visao.getByRole("link", { name: "Lista" })).toHaveAttribute("aria-current", "page");

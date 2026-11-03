@@ -14,21 +14,27 @@ const ha = (desde: string | null) => {
   return dias === 0 ? "desde hoje" : `há ${dias} dia${dias > 1 ? "s" : ""}`;
 };
 
-/** Resumo da carteira: as sete fases do Kanban em blocos, com a parte de cada uma no total. */
-export function ResumoFases({ colunas, hrefKanban }: { colunas: ColunaKanbanEngenharia[]; hrefKanban: string }) {
-  const total = Math.max(1, colunas.reduce((n, c) => n + c.obras.length, 0));
+/**
+ * Resumo da carteira: as sete fases do Kanban em blocos, com a parte de cada uma no total. A última, como no desenho, é
+ * "Concluída no mês" (obras com a Engenharia concluída no mês, da trajetória); sem a trajetória, fica a fase do Kanban.
+ */
+export function ResumoFases({ colunas, concluidasNoMes, hrefKanban }: { colunas: ColunaKanbanEngenharia[]; concluidasNoMes: number | null; hrefKanban: string }) {
+  const blocos = colunas.map((c) =>
+    c.fase === "concluida" && concluidasNoMes != null ? { fase: c.fase, rotulo: "Concluída no mês", valor: concluidasNoMes } : { fase: c.fase, rotulo: c.rotulo, valor: c.obras.length },
+  );
+  const total = Math.max(1, blocos.reduce((n, b) => n + b.valor, 0));
   return (
     <div role="region" aria-label="Resumo da carteira" className="grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-linha sm:grid-cols-4 lg:grid-cols-7">
-      {colunas.map((c) => (
+      {blocos.map((b) => (
         <Link
-          key={c.fase}
+          key={b.fase}
           href={hrefKanban}
           className="flex min-w-0 flex-col gap-1.5 bg-superficie p-4 transition-colors duration-200 ease-raion last:col-span-2 hover:bg-superficie-2 sm:last:col-span-1"
         >
-          <span className="text-xs font-medium text-texto-2">{c.rotulo}</span>
-          <span className="font-titulo text-3xl font-light tracking-tight text-texto tabular-nums">{c.obras.length}</span>
+          <span className="text-xs font-medium text-texto-2">{b.rotulo}</span>
+          <span className="font-titulo text-3xl font-light tracking-tight text-texto tabular-nums">{b.valor}</span>
           <span aria-hidden className="mt-auto h-1.5 w-full overflow-hidden rounded-full bg-superficie-2">
-            <span className="block h-full rounded-full bg-dourado" style={{ width: `${(c.obras.length / total) * 100}%` }} />
+            <span className="block h-full rounded-full bg-dourado" style={{ width: `${(b.valor / total) * 100}%` }} />
           </span>
         </Link>
       ))}

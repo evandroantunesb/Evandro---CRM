@@ -3,16 +3,18 @@ import { Cartao } from "@/components/ui";
 import { lerCondicoes } from "@/lib/engenharia-enquadramento-regras";
 import { carregarConfigPrazos, carregarFeriadosEmpresa } from "@/lib/engenharia-prazos";
 import { CHAVES_PRAZO_DISTRIBUIDORA, CHAVES_PRAZO_INTERNO, type ChavePrazo } from "@/lib/engenharia-prazos-regras";
+import { lerMarcos } from "@/lib/engenharia-trajetoria";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { LinhaItemModelo, NovoItemModelo } from "./formularios";
+import { FormMarcos } from "./marcos";
 import { FormPrazos, LinhaFeriado, NovoFeriado } from "./prazos";
 
 export default async function ConfigEngenharia() {
   const { atual } = await exigirPapel("admin");
   const supabase = await criarClienteServidor();
   // Enquanto a migration não estiver aplicada (preview usa o banco de produção), as listas vêm vazias.
-  const [{ data }, prazos, feriados] = await Promise.all([
+  const [{ data }, prazos, feriados, marcosRes] = await Promise.all([
     supabase
       .from("engenharia_checklist_modelo")
       .select("id, grupo, titulo, obrigatorio, ordem, ativo, condicoes")
@@ -21,6 +23,7 @@ export default async function ConfigEngenharia() {
       .order("titulo"),
     carregarConfigPrazos(supabase, atual.empresaId),
     carregarFeriadosEmpresa(supabase, atual.empresaId),
+    supabase.from("engenharia_marcos").select("obras, kwp").eq("empresa_id", atual.empresaId).maybeSingle(),
   ]);
   const itens = (data ?? []).map((i) => ({ ...i, condicoes: lerCondicoes(i.condicoes) }));
   const dias = new Map(prazos.map((p) => [p.chave, p.diasUteis]));
@@ -33,7 +36,7 @@ export default async function ConfigEngenharia() {
         voltar={{ href: "/configuracoes", rotulo: "Configurações" }}
         sobretitulo="Configurações · Obras"
         titulo="Engenharia"
-        descricao="Checklist de documentos, prazos e feriados da empresa."
+        descricao="Checklist de documentos, prazos, feriados da empresa e marcos da trajetória."
       />
 
       <h2 className="sobretitulo mt-4 px-1">Checklist de documentos</h2>
@@ -85,6 +88,15 @@ export default async function ConfigEngenharia() {
             <LinhaFeriado key={f.id} feriado={f} />
           ))}
         </div>
+      </Cartao>
+
+      <h2 className="sobretitulo mt-4 px-1">Marcos da trajetória</h2>
+      <p className="text-sm text-zinc-600">
+        Em &quot;Sua trajetória&quot; e na &quot;Trajetória da equipe&quot;, a barra mostra quanto falta para o próximo marco: a cada
+        tantas obras ou tantos kWp com a Engenharia concluída. Vale para a empresa toda.
+      </p>
+      <Cartao titulo="Marcos">
+        {marcosRes.error || !marcosRes.data ? <p className="text-sm text-zinc-500">Marcos indisponíveis.</p> : <FormMarcos marcos={lerMarcos(marcosRes.data)} />}
       </Cartao>
     </div>
   );

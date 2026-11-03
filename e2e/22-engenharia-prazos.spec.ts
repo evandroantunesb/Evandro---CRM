@@ -29,6 +29,19 @@ test("prazos configuráveis, feriado da empresa e desempenho na Central", async 
   await linha.getByRole("button", { name: "Remover" }).click();
   await expect(page.locator("form").filter({ hasText: "Feriado E2E" })).toHaveCount(0);
 
+  // Marcos da trajetória: nascem em 25 obras / 250 kWp; o admin muda e volta ao padrão.
+  const marcoObras = page.getByLabel("Marco: a cada quantas obras concluídas");
+  await expect(marcoObras).toHaveValue("25");
+  await expect(page.getByLabel("Marco: a cada quantos kWp concluídos")).toHaveValue("250");
+  await marcoObras.fill("10");
+  await page.getByRole("button", { name: "Salvar marcos" }).click();
+  await expect(page.getByText("Marcos salvos.")).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel("Marco: a cada quantas obras concluídas")).toHaveValue("10");
+  await page.getByLabel("Marco: a cada quantas obras concluídas").fill("25");
+  await page.getByRole("button", { name: "Salvar marcos" }).click();
+  await expect(page.getByText("Marcos salvos.")).toBeVisible();
+
   await page.goto("/engenharia");
   await expect(page.getByText("Prazos vencidos")).toBeVisible();
   const desempenho = page.locator("section").filter({ has: page.getByRole("heading", { name: "Desempenho", level: 2 }) });

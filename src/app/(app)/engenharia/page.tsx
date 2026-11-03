@@ -9,7 +9,7 @@ import { agendaPrazos, cargaPorResponsavel, montarMeuDia, resumoFaixa, type Just
 import { carregarIndicadoresEngenharia, carregarPrazosObras } from "@/lib/engenharia-prazos";
 import { lerPeriodo } from "@/lib/engenharia-prazos-regras";
 import { carregarStatusProtocolos, contarExigenciasAbertas } from "@/lib/engenharia-protocolos";
-import { concluidasNoMes, lerMetrica, lerTrajetoria } from "@/lib/engenharia-trajetoria";
+import { concluidasNoMes, lerMarcos, lerMetrica, lerTrajetoria } from "@/lib/engenharia-trajetoria";
 import { montarCentralEngenharia, montarKanbanEngenharia, type ObraNaEngenharia } from "@/lib/engenharia-regras";
 import { carregarAcoesVistoria } from "@/lib/engenharia-vistoria";
 import { hojeEmSaoPaulo, saudacao } from "@/lib/formatacao";
@@ -100,7 +100,7 @@ export default async function Engenharia({ searchParams }: PageProps<"/engenhari
   const podeIniciar = atual.papel === "operacao" && atua;
   const filtroTarefas = { empresaId: atual.empresaId, membroId: atual.membroId, papel: atual.papel, setor: "engenharia" as const };
 
-  const [abertas, daAba, porAba, obras, exigencias, acoesVistoria, prazos, indicadores, protocolos, participacoes, pedidos, trajetoria] = await Promise.all([
+  const [abertas, daAba, porAba, obras, exigencias, acoesVistoria, prazos, indicadores, protocolos, participacoes, pedidos, trajetoria, marcosRes] = await Promise.all([
     carregarTarefasSetor(supabase, { ...filtroTarefas, filtro: "abertas" }),
     estado.ver === "abertas" ? null : carregarTarefasSetor(supabase, { ...filtroTarefas, filtro: estado.ver }),
     contarAbasTarefasSetor(supabase, atual.empresaId, atual.membroId, "engenharia"),
@@ -116,12 +116,17 @@ export default async function Engenharia({ searchParams }: PageProps<"/engenhari
     supabase.from("obra_justificativas_atraso").select("id, obra_id, etapa, prazo").eq("empresa_id", atual.empresaId).eq("pedido_a", atual.membroId).is("respondido_em", null),
     // Obras e kWp com a Engenharia concluída, por mês (a minha e, para quem vê a equipe, a do setor).
     supabase.rpc("trajetoria_engenharia", { p_empresa_id: atual.empresaId }),
+    supabase.from("engenharia_marcos").select("obras, kwp").eq("empresa_id", atual.empresaId).maybeSingle(),
   ]);
   for (const r of [participacoes, pedidos]) if (r.error) throw r.error;
-  // Sem a trajetória, a tela segue sem o painel (como o Desempenho sem os indicadores).
+  // Sem a trajetória, a tela segue sem o painel (como o Desempenho sem os indicadores); sem os marcos, vale o padrão.
   const historico = trajetoria.error ? null : lerTrajetoria(trajetoria.data);
+  const marcos = lerMarcos(marcosRes.error ? null : marcosRes.data);
   const mesAtual = hojeEmSaoPaulo().slice(0, 7);
   const noMes = historico ? concluidasNoMes(historico.pessoal, mesAtual) : null;
+  // "Concluída no mês" do Resumo: a minha no Pessoal, a do setor na Equipe.
+  const mesesDaVisao = pessoal ? historico?.pessoal : historico?.equipe?.meses;
+  const concluidasDaVisao = mesesDaVisao ? concluidasNoMes(mesesDaVisao, mesAtual).atual : null;
   // Fases "Pronto para protocolo" e anteriores dependem do checklist (Resumo e Kanban).
   const checklistsAptos = await carregarChecklistsAptos(
     supabase,
@@ -241,7 +246,7 @@ export default async function Engenharia({ searchParams }: PageProps<"/engenhari
           ) : estado.carteira === "lista" ? (
             <ListaPorEtapa grupos={daVisao.grupos} prazos={prazos} vazio={pessoal ? "Nenhuma obra com você na Engenharia." : "Nenhuma obra em andamento na Engenharia."} />
           ) : (
-            <ResumoFases colunas={colunas} hrefKanban={hrefEngenharia(estado, { carteira: "kanban" })} />
+            <ResumoFases colunas={colunas} concluidasNoMes={concluidasDaVisao} hrefKanban={hrefEngenharia(estado, { carteira: "kanban" })} />
           )}
           {pode(atual.papel, OBRAS) && (
             <Link href="/obras" className="mt-4 inline-block text-sm text-zinc-600 underline hover:text-zinc-900">
@@ -267,9 +272,11 @@ export default async function Engenharia({ searchParams }: PageProps<"/engenhari
 
       {historico &&
         (pessoal ? (
-          <Trajetoria meses={historico.pessoal} empresaNome={atual.empresaNome} estado={estado} mesAtual={mesAtual} />
+          <Trajetoria meses={historico.pessoal} empresaNome={atual.empresaNome} estado={estado} mesAtual={mesAtual} marcos={marcos} />
         ) : (
-          historico.equipe && <Trajetoria meses={historico.equipe.meses} pessoas={historico.equipe.pessoas} empresaNome={atual.empresaNome} estado={estado} mesAtual={mesAtual} />
+          historico.equipe && (
+            <Trajetoria meses={historico.equipe.meses} pessoas={historico.equipe.pessoas} empresaNome={atual.empresaNome} estado={estado} mesAtual={mesAtual} marcos={marcos} />
+          )
         ))}
 
       <CartaoRecolhivel
