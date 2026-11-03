@@ -265,7 +265,7 @@ describe("regressões de tela", () => {
       });
     });
 
-    it("kit salvo com cálculo: Cancelar restaura exatamente o que está gravado", () => {
+    it("kit salvo com cálculo: Cancelar restaura o gravado; consumo e conta vêm do negócio, nunca do cálculo legado", () => {
       const estado = estadoSalvoDoKit({
         componentesSalvos: [
           { tipo: "modulo", descricao: "Módulo 550 W", potenciaW: 550, quantidade: 10 },
@@ -283,8 +283,8 @@ describe("regressões de tela", () => {
         ],
         estrutura: "gancho",
         tipoLigacao: "bifasico",
-        consumoMedioKwh: (480.5).toLocaleString("pt-BR"),
-        valorFaturaMedio: "300",
+        consumoMedioKwh: "450",
+        valorFaturaMedio: "320",
         // M2-a: a tarifa reabre com todas as casas gravadas (antes "0,95", e salvar de novo mudava o valor).
         tarifaKwh: "0,9512",
       });
@@ -299,6 +299,17 @@ describe("regressões de tela", () => {
       expect(estado.linhas).toEqual([{ tipo: "modulo", descricao: "Módulo 600 W", potenciaW: "", quantidade: "8" }]);
       expect(estado).toMatchObject({ consumoMedioKwh: "450", valorFaturaMedio: "320", tarifaKwh: "" });
     });
+
+    it("cálculo legado e negócio sem consumo nem conta: os campos abrem vazios (não herdam o cálculo)", () => {
+      const estado = estadoSalvoDoKit({
+        componentesSalvos: [{ tipo: "modulo", descricao: "Módulo 550 W", potenciaW: 550, quantidade: 10 }],
+        calculo: { tipoLigacao: "trifasico", consumoMedioKwh: 700, valorFaturaMedio: 900, tarifaKwh: 0.95 },
+        estruturaTelhado: null,
+        consumoMedioKwhPadrao: null,
+        valorFaturaMedioPadrao: null,
+      });
+      expect(estado).toMatchObject({ consumoMedioKwh: "", valorFaturaMedio: "" });
+    });
   });
 
   it("ficha: remover kit salvo pede confirmação; com cálculo, a tela explica a recusa", () => {
@@ -311,11 +322,13 @@ describe("regressões de tela", () => {
     expect(kit).toContain('"Remover kit salvo"');
   });
 
-  it("kit reaberto traz o valor da conta salvo no cálculo", () => {
+  it("kit reaberto traz consumo e conta atuais do negócio", () => {
     const kit = fonte("src", "app", "(app)", "negocios", "[id]", "kit-personalizado.tsx");
-    // O estado inicial vem de `estadoSalvoDoKit`, que usa a conta salva no cálculo (testado acima).
+    // O estado inicial vem de `estadoSalvoDoKit`, que usa os valores do negócio (testado acima).
     expect(kit).toContain("useState(() => salvo().valorFaturaMedio)");
-    expect(fonte("src", "app", "(app)", "negocios", "[id]", "page.tsx")).toMatch(/valorFaturaMedio: calculo\.valor_fatura_medio/);
+    const pagina = fonte("src", "app", "(app)", "negocios", "[id]", "page.tsx");
+    expect(pagina).toContain("consumoMedioKwhPadrao={negocio.consumo_medio_kwh}");
+    expect(pagina).toContain("valorFaturaMedioPadrao={negocio.valor_conta_energia}");
   });
 
   it("endereço do contato é editável e aparece na ficha", () => {

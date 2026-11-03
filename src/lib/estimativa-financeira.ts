@@ -41,7 +41,9 @@ export type CodigoPendencia =
   | "fio_b_vigencia_ausente"
   | "fio_b_vigencia_fora"
   | "base_tributaria_divergente"
-  | "percentual_legal_indisponivel";
+  | "percentual_legal_indisponivel"
+  /** A regra de cálculo da economia ainda não foi validada pelo Evandro: vale mesmo com todos os dados presentes. */
+  | "formula_nao_validada";
 
 export type Pendencia = { codigo: CodigoPendencia; mensagem: string };
 
@@ -62,7 +64,12 @@ export type EstimativaFinanceira =
 
 /** Percentual legal da parcela do Fio B: GD II em 2026 = 60%. Qualquer outro enquadramento = null. O vendedor nunca informa. */
 export function percentualLegalFioB(enq: EnquadramentoEntrada): number | null {
-  return enq.gd === RECORTE_P0.gd && enq.anoReferencia === RECORTE_P0.anoReferencia ? 0.6 : null;
+  return enq.classe === RECORTE_P0.classe &&
+    enq.modalidade === RECORTE_P0.modalidade &&
+    enq.gd === RECORTE_P0.gd &&
+    enq.anoReferencia === RECORTE_P0.anoReferencia
+    ? 0.6
+    : null;
 }
 
 /** Número finito e positivo; NaN/Infinity/null/undefined contam como ausentes. */
@@ -135,4 +142,63 @@ export function avaliarCompletude(e: EntradaEstimativa): { completa: true } | { 
   }
 
   return p.length ? { completa: false, pendencias: p } : { completa: true };
+}
+
+export type EstimativaIncompleta = Extract<EstimativaFinanceira, { estado: "incompleta" }>;
+
+export const MENSAGEM_FORMULA_NAO_VALIDADA = "A regra de cálculo da economia ainda não foi validada.";
+
+function arredondar2(v: number): number {
+  return Math.round(v * 100) / 100;
+}
+
+/**
+ * Porta única do motor (`calcular`): avalia a completude e devolve SEMPRE a estimativa incompleta, com a geração
+ * (potência × produtividade, que não depende da regra financeira) e TODAS as pendências. A pendência
+ * `formula_nao_validada` é sempre incluída: o ramo "completa" só existe como tipo, até a fórmula ser aprovada.
+ * Nunca devolve conta, economia nem payback.
+ */
+export function avaliarEstimativa(
+  e: EntradaEstimativa & { potenciaKwp: number | null; produtividadeKwhKwpMes: number | null },
+): EstimativaIncompleta {
+  const r = avaliarCompletude(e);
+  const pendencias: Pendencia[] = r.completa ? [] : [...r.pendencias];
+  pendencias.push({ codigo: "formula_nao_validada", mensagem: MENSAGEM_FORMULA_NAO_VALIDADA });
+  const geracao = positivo(e.potenciaKwp) && positivo(e.produtividadeKwhKwpMes) ? arredondar2(e.potenciaKwp * e.produtividadeKwhKwpMes) : null;
+  return { estado: "incompleta", pendencias, geracaoEstimadaKwhMes: geracao, potenciaKwp: positivo(e.potenciaKwp) ? e.potenciaKwp : null };
+}
+
+/** Data de hoje no formato AAAA-MM-DD (referência da vigência do Fio B). */
+export function hojeIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/** Entrada vazia do que hoje não existe em lugar nenhum do app (enquadramento, distribuidora estruturada, Fio B, base tributária). */
+export const ENQUADRAMENTO_NAO_INFORMADO: EnquadramentoEntrada = { classe: null, modalidade: null, gd: null, anoReferencia: null };
+
+/** Pendências quando NENHUM dado da estimativa está disponível (o caso de todo negócio hoje). */
+export function pendenciasSemDados(): Pendencia[] {
+  return avaliarEstimativa({
+    enquadramento: ENQUADRAMENTO_NAO_INFORMADO,
+    tarifaBaseRsKwh: null,
+    tarifaBaseBaseTributaria: null,
+    consumoMedioKwh: null,
+    consumoOrigem: null,
+    tarifaEfetivaContaRsKwh: null,
+    parametrosFioB: null,
+    dataReferencia: hojeIso(),
+    potenciaKwp: null,
+    produtividadeKwhKwpMes: null,
+  }).pendencias;
+}
+
+/** Lista as pendências em uma frase só, sem o ponto final de cada item. */
+export function listaDePendencias(pendencias: Pendencia[]): string {
+  return pendencias.map((p) => p.mensagem.replace(/\.\s*$/, "")).join("; ");
+}
+
+/** Mensagem exata de proposta bloqueada. `extra` (ex.: "o cálculo salvo usa a fórmula antiga") vem antes da lista. */
+export function mensagemPropostaIncompleta(pendencias: Pendencia[], extra?: string): string {
+  const itens = [extra, listaDePendencias(pendencias)].filter(Boolean).join("; ");
+  return `A estimativa financeira está incompleta: ${itens}. A proposta fica disponível quando os dados forem validados.`;
 }

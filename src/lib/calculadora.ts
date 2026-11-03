@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { consumoComoPersistido } from "@/lib/consumo-persistido";
+import { avaliarEstimativa, ENQUADRAMENTO_NAO_INFORMADO, hojeIso, type EntradaEstimativa, type Pendencia } from "@/lib/estimativa-financeira";
 import { TIPOS_COMPONENTE_KIT, type TipoLigacao } from "@/lib/tipos";
 
 export type EntradaCalculo = {
@@ -7,13 +8,24 @@ export type EntradaCalculo = {
   precoKit: number;
   tipoLigacao: TipoLigacao;
   consumoMedioKwh: number;
+  /** Tarifa informada pelo vendedor. Não tem base tributária declarada: sozinha não completa a estimativa. */
   tarifaKwh: number;
   produtividadeKwhKwpMes: number;
-  percentualFioB: number;
-  disponibilidadeKwh: number;
+  /** Sem efeito no motor atual (o percentual da empresa não é o percentual legal). Mantido por compatibilidade. */
+  percentualFioB?: number;
+  /** Sem efeito no motor atual (só entrará com a regra validada). Mantido por compatibilidade. */
+  disponibilidadeKwh?: number;
+  /**
+   * Dados da estimativa que hoje não existem em lugar nenhum do app (enquadramento, Fio B da distribuidora com
+   * origem e vigência, base tributária). Ausentes = pendências.
+   */
+  dadosEstimativa?: Partial<
+    Pick<EntradaEstimativa, "enquadramento" | "tarifaBaseBaseTributaria" | "parametrosFioB" | "tarifaEfetivaContaRsKwh" | "dataReferencia">
+  >;
 };
 
-export type ResultadoCalculo = {
+/** Campos do resultado financeiro. Só existem no ramo "completa", que hoje não é produzido. */
+export type CamposCalculoCompleto = {
   geracaoEstimadaKwhMes: number;
   kwhFaturado: number;
   kwhCompensado: number;
@@ -25,46 +37,72 @@ export type ResultadoCalculo = {
   paybackMeses: number | null;
 };
 
+/**
+ * Resultado do motor. `incompleta` é o ÚNICO estado produzido hoje: regra ou dado pendente nunca vira número.
+ * `completa` é só ponto de extensão (a fórmula entra depois da validação do Evandro) e usa `fecharEconomia`.
+ */
+export type ResultadoCalculo =
+  | ({ estado: "completa" } & CamposCalculoCompleto)
+  | { estado: "incompleta"; pendencias: Pendencia[]; potenciaKwp: number; geracaoEstimadaKwhMes: number };
+
+export type ResultadoCalculoIncompleto = Extract<ResultadoCalculo, { estado: "incompleta" }>;
+
 function arredondar(valor: number, casas: number) {
   const fator = 10 ** casas;
   return Math.round(valor * fator) / fator;
 }
 
 /**
- * Calculadora solar — modo comercial.
+ * Aritmética de arredondamento APROVADA pelo Evandro em 21/10/2026 (só ela; a fórmula das contas NÃO está aprovada):
+ * a economia é a diferença entre as DUAS CONTAS JÁ ARREDONDADAS em centavos (os números exibidos fecham: conta hoje −
+ * conta com sistema = economia). Economia <= 0 => payback indisponível (null); o payback usa a economia arredondada.
+ * Pronta para o ramo "completa"; NENHUM caminho de produção a chama hoje.
+ * Ver .aurora/contratos/m2-p0-arredondamento-economia.md.
+ */
+export function fecharEconomia(
+  contaSemSolar: number,
+  contaComSolar: number,
+  precoKit: number,
+): { contaSemSolar: number; contaComSolar: number; economiaMensal: number; paybackMeses: number | null } {
+  const contaSemSolarArred = arredondar(contaSemSolar, 2);
+  const contaComSolarArred = arredondar(contaComSolar, 2);
+  const economiaMensal = arredondar(contaSemSolarArred - contaComSolarArred, 2);
+  return {
+    contaSemSolar: contaSemSolarArred,
+    contaComSolar: contaComSolarArred,
+    economiaMensal,
+    paybackMeses: economiaMensal > 0 ? arredondar(precoKit / economiaMensal, 1) : null,
+  };
+}
+
+/**
+ * Calculadora solar — modo comercial (motor).
  *
- * Estimativa simplificada (sem simulação horária/pvlib): usa uma produtividade
- * média (kWh por kWp por mês) e desconta da conta o custo de disponibilidade
- * mínimo e o Fio B (Lei 14.300) sobre a energia compensada. Não considera
- * banco de créditos entre meses nem sazonalidade — o vendedor deve tratar o
- * resultado como uma estimativa comercial, não um projeto de engenharia.
+ * A cobrança financeira antiga (sem piso; Fio B = kWh compensado × tarifa cheia × percentual) foi RETIRADA do
+ * caminho de produção: nunca foi validada. Regra ou dado pendente = estimativa incompleta, sem recorrer a ela.
+ * O motor devolve a geração (potência × produtividade) e as pendências, nunca conta, economia nem payback.
+ * A fórmula validada entrará no ramo `completa` (ponto de extensão), reaproveitando `fecharEconomia`.
+ * Ver .aurora/contratos/m2-p0-motor-estimativa.md.
  */
 export function calcular(entrada: EntradaCalculo): ResultadoCalculo {
-  const { potenciaKwp, consumoMedioKwh, tarifaKwh, produtividadeKwhKwpMes, percentualFioB, disponibilidadeKwh } =
-    entrada;
-
-  const geracaoEstimadaKwhMes = potenciaKwp * produtividadeKwhKwpMes;
-
-  // A concessionária sempre cobra pelo menos o custo de disponibilidade (em
-  // kWh), mesmo quando a geração cobre todo o consumo.
-  let kwhFaturado = Math.max(consumoMedioKwh - geracaoEstimadaKwhMes, disponibilidadeKwh);
-  kwhFaturado = Math.min(kwhFaturado, consumoMedioKwh);
-  const kwhCompensado = Math.max(consumoMedioKwh - kwhFaturado, 0);
-
-  const custoFioB = kwhCompensado * tarifaKwh * percentualFioB;
-  const contaSemSolar = consumoMedioKwh * tarifaKwh;
-  const contaComSolar = kwhFaturado * tarifaKwh + custoFioB;
-  const economiaMensal = contaSemSolar - contaComSolar;
-
+  const d = entrada.dadosEstimativa ?? {};
+  const estimativa = avaliarEstimativa({
+    enquadramento: d.enquadramento ?? ENQUADRAMENTO_NAO_INFORMADO,
+    tarifaBaseRsKwh: entrada.tarifaKwh,
+    tarifaBaseBaseTributaria: d.tarifaBaseBaseTributaria ?? null,
+    consumoMedioKwh: entrada.consumoMedioKwh,
+    consumoOrigem: "informado",
+    tarifaEfetivaContaRsKwh: d.tarifaEfetivaContaRsKwh ?? null,
+    parametrosFioB: d.parametrosFioB ?? null,
+    dataReferencia: d.dataReferencia ?? hojeIso(),
+    potenciaKwp: entrada.potenciaKwp,
+    produtividadeKwhKwpMes: entrada.produtividadeKwhKwpMes,
+  });
   return {
-    geracaoEstimadaKwhMes: arredondar(geracaoEstimadaKwhMes, 2),
-    kwhFaturado: arredondar(kwhFaturado, 2),
-    kwhCompensado: arredondar(kwhCompensado, 2),
-    custoFioB: arredondar(custoFioB, 2),
-    contaSemSolar: arredondar(contaSemSolar, 2),
-    contaComSolar: arredondar(contaComSolar, 2),
-    economiaMensal: arredondar(economiaMensal, 2),
-    paybackMeses: economiaMensal > 0 ? arredondar(entrada.precoKit / economiaMensal, 1) : null,
+    estado: "incompleta",
+    pendencias: estimativa.pendencias,
+    potenciaKwp: entrada.potenciaKwp,
+    geracaoEstimadaKwhMes: arredondar(entrada.potenciaKwp * entrada.produtividadeKwhKwpMes, 2),
   };
 }
 
