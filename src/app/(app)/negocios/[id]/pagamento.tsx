@@ -22,7 +22,7 @@ export function Pagamento({
   contratoId: string;
   status: StatusPagamentoContrato;
   podeConfirmar: boolean;
-  /** Por que quem vê não confirma (sem papel, ou foi quem fechou a venda); só usado quando `podeConfirmar` é falso. */
+  /** Por que quem vê não confirma (sem papel de gestor ou admin); só usado quando `podeConfirmar` é falso. */
   motivoSemConfirmar: string;
 }) {
   const [resultadoConfirmar, acaoConfirmar, confirmando] = useActionState(confirmarPagamento, null);
