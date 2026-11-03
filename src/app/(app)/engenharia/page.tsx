@@ -1,43 +1,30 @@
-import { CabecalhoPagina } from "@/components/cabecalho-pagina";
-import { AlarmClock, BellRing, CalendarX, CirclePause, HardHat, Hourglass, Inbox, type LucideIcon } from "lucide-react";
+import { AlarmClock, BellRing, CalendarClock, CalendarX, CirclePause, HardHat, Hourglass, Inbox, type LucideIcon } from "lucide-react";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { CabecalhoPagina, CLASSE_ACAO_CABECALHO, CLASSE_SEGMENTO_CABECALHO, classeItemSegmentoCabecalho } from "@/components/cabecalho-pagina";
 import { IniciarAtuacao } from "@/components/engenharia/iniciar-atuacao";
 import { ListaTarefasSetor } from "@/components/tarefas-setor";
-import { Cartao, CartaoRecolhivel, Selo } from "@/components/ui";
+import { Cartao, CartaoRecolhivel } from "@/components/ui";
 import { carregarChecklistsAptos } from "@/lib/engenharia-checklist";
-import {
-  diasDesde,
-  montarCentralEngenharia,
-  montarKanbanEngenharia,
-  type ColunaKanbanEngenharia,
-  type ObraNaEngenharia,
-} from "@/lib/engenharia-regras";
+import { agendaPrazos, cargaPorResponsavel, montarMeuDia, resumoFaixa, type JustificativaPendente } from "@/lib/engenharia-inicio";
 import { carregarIndicadoresEngenharia, carregarPrazosObras } from "@/lib/engenharia-prazos";
-import {
-  PERIODOS_INDICADORES,
-  lerPeriodo,
-  seloPrazo,
-  textoMediana,
-  textoProporcao,
-  type IndicadoresEngenharia,
-  type PeriodoIndicadores,
-  type PrazoObra,
-} from "@/lib/engenharia-prazos-regras";
+import { lerPeriodo } from "@/lib/engenharia-prazos-regras";
 import { carregarStatusProtocolos, contarExigenciasAbertas } from "@/lib/engenharia-protocolos";
-import type { StatusProtocolo } from "@/lib/engenharia-protocolos-regras";
+import { montarCentralEngenharia, montarKanbanEngenharia, type ObraNaEngenharia } from "@/lib/engenharia-regras";
 import { carregarAcoesVistoria } from "@/lib/engenharia-vistoria";
-import { carregarObras, type ObraListaVM } from "@/lib/obras/dados";
-import { ROTULO_ESTADO_SETOR, rotuloStatus } from "@/lib/obras/rotulos";
+import { hojeEmSaoPaulo, saudacao } from "@/lib/formatacao";
+import { ETAPAS_OBRA, ROTULO_ETAPA_CURTO, type EtapaObra } from "@/lib/obras/cronograma";
+import { carregarObras } from "@/lib/obras/dados";
+import { rotuloStatus } from "@/lib/obras/rotulos";
 import { ENGENHARIA, OBRAS, pode } from "@/lib/permissoes";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { carregarTarefasSetor, contarAbasTarefasSetor } from "@/lib/tarefas-setor";
-import { ROTULO_FILTRO_TAREFAS_SETOR, type FiltroTarefasSetor, type TarefaSetorVM } from "@/lib/tarefas-setor-regras";
+import { ROTULO_FILTRO_TAREFAS_SETOR, type TarefaSetorVM } from "@/lib/tarefas-setor-regras";
+import { Aba, Kanban, ListaObras, ListaPorEtapa, ResumoFases } from "./carteira";
+import { Desempenho } from "./desempenho";
+import { FILTROS, hrefEngenharia, lerCarteira, lerFiltro, type EstadoEngenharia, type Filtro, type VisaoEngenharia } from "./estado";
+import { MeuDia, ProximosPrazos } from "./meu-dia";
 
-// Sem "Pedidas por mim": a Engenharia vê o que é do setor, não o que pediu a outros.
-const FILTROS = ["abertas", "minhas", "fila", "concluidas"] as const satisfies readonly FiltroTarefasSetor[];
-type Filtro = (typeof FILTROS)[number];
 const VAZIO: Record<Filtro, string> = {
   abertas: "Nenhuma tarefa de Engenharia aberta.",
   minhas: "Nenhuma tarefa com você.",
@@ -45,46 +32,32 @@ const VAZIO: Record<Filtro, string> = {
   concluidas: "Nenhuma tarefa concluída.",
 };
 
-const formatarPotencia = (kwp: number | null) =>
-  kwp == null ? "" : ` · ${new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 2 }).format(kwp)} kWp`;
-
-const ha = (desde: string | null) => {
-  if (!desde) return null;
-  const dias = diasDesde(desde);
-  return dias === 0 ? "desde hoje" : `há ${dias} dia${dias > 1 ? "s" : ""}`;
-};
-
-type VisaoCarteira = "lista" | "kanban";
-
-/**
- * Link da Central guardando a visão da carteira e o período dos indicadores (padrões ficam fora da URL). `comPeriodo`
- * põe o período mesmo no padrão: é o que mantém o Desempenho aberto depois de trocar o período.
- */
-const hrefCentral = ({ carteira, periodo, comPeriodo = false }: { carteira: VisaoCarteira; periodo: PeriodoIndicadores; comPeriodo?: boolean }) => {
-  const q = new URLSearchParams();
-  if (carteira === "kanban") q.set("carteira", "kanban");
-  if (comPeriodo || periodo !== 30) q.set("periodo", String(periodo));
-  return q.size ? `/engenharia?${q}` : "/engenharia";
-};
-
 // Etapas em que o checklist decide entre "Pronto para protocolo" e as fases anteriores (antes do protocolo).
 const ETAPAS_ANTES_DO_PROTOCOLO = new Set(["a_iniciar", "projeto_em_elaboracao"]);
+const DIAS_AGENDA = 7;
+const DIAS_PERTO = 3;
 
 // No contexto da Engenharia, a tarefa de obra abre o card da obra para o engenheiro, não a tela de Obras.
 const paraCard = (t: TarefaSetorVM): TarefaSetorVM =>
   t.obraId ? { ...t, referencia: { ...t.referencia, href: `/engenharia/${t.obraId}` } } : t;
 
+const rotuloEngenharia = (s: string) => rotuloStatus("engenharia", s);
+
+/** "terça-feira, 3 de novembro" → "Terça, 3 de novembro" (fuso de Brasília). */
+function dataDeHoje(agora = new Date()) {
+  const texto = agora.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long", timeZone: "America/Sao_Paulo" }).replace("-feira", "");
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
+}
+
 /**
- * Central da Engenharia: abre no que exige ação de quem entrou (tarefas e obras), depois o que espera terceiros e a
- * carteira por etapa; as abas de tarefas ficam em `?ver=`. Admin e gestor acompanham; `operacao` vê só se atua em
- * Engenharia. Tudo sob RLS: a tela não decide permissão, só monta o que chega.
+ * Início do engenheiro (desenho aprovado em 03/11/2026). "Pessoal": o que é meu (Meu dia, prazos, minhas obras);
+ * "Equipe" (coordenador, admin e gestor): o setor inteiro, com os indicadores e a carga por responsável. Carteira em
+ * Resumo/Kanban/Lista e as tarefas do setor nas duas. Tudo sob RLS: a tela não decide permissão, só monta o que chega.
  */
 export default async function Engenharia({ searchParams }: PageProps<"/engenharia">) {
-  const { atual } = await exigirPapel(...ENGENHARIA);
-  const { ver, periodo: periodoBruto, carteira: carteiraBruta } = await searchParams;
-  const periodo = lerPeriodo(periodoBruto);
-  const carteira: VisaoCarteira = carteiraBruta === "kanban" ? "kanban" : "lista";
-  const filtro = (FILTROS as readonly string[]).includes(ver as string) ? (ver as Filtro) : null;
+  const sessao = await exigirPapel(...ENGENHARIA);
+  const { atual } = sessao;
+  const params = await searchParams;
   const supabase = await criarClienteServidor();
 
   const { data: meusSetores } = await supabase
@@ -105,506 +78,246 @@ export default async function Engenharia({ searchParams }: PageProps<"/engenhari
     );
   }
 
-  const [{ tarefas, membrosPorSetor }, porAba, obras, exigencias, acoesVistoria, prazos, indicadores] = await Promise.all([
-    carregarTarefasSetor(supabase, {
-      empresaId: atual.empresaId,
-      membroId: atual.membroId,
-      papel: atual.papel,
-      filtro: filtro ?? "abertas",
-      setor: "engenharia",
-    }),
-    contarAbasTarefasSetor(supabase, atual.empresaId, atual.membroId, "engenharia"),
-    // As obras só entram na Central; as abas de tarefas não as usam.
-    filtro ? null : carregarObras(supabase, { empresaId: atual.empresaId, papel: atual.papel, membroId: atual.membroId }).then((r) => r.obras),
-    filtro ? null : contarExigenciasAbertas(supabase, atual.empresaId),
-    filtro ? null : carregarAcoesVistoria(supabase, atual.empresaId),
-    filtro ? null : carregarPrazosObras(supabase, atual.empresaId),
-    filtro ? null : carregarIndicadoresEngenharia(supabase, atual.empresaId, periodo),
-  ]);
-  const listaTarefas = tarefas.map(paraCard);
+  // Admin e gestor acompanham o setor (abrem em Equipe); o coordenador escolhe; o executor fica só com Pessoal.
+  const gestao = atual.papel === "admin" || atual.papel === "gestor";
+  const temEquipe = gestao || coordenaSetor;
+  const visaoPadrao: VisaoEngenharia = gestao ? "equipe" : "pessoal";
+  const estado: EstadoEngenharia = {
+    visao: temEquipe && (params.visao === "equipe" || params.visao === "pessoal") ? params.visao : visaoPadrao,
+    visaoPadrao,
+    carteira: lerCarteira(params.carteira),
+    periodo: lerPeriodo(params.periodo),
+    periodoNaUrl: params.periodo != null,
+    ver: lerFiltro(params.ver),
+  };
+  const pessoal = estado.visao === "pessoal";
+  // Definir responsável é do admin e do coordenador (quem a RPC deixa gerir a obra); o gestor só acompanha.
+  const coordena = atual.papel === "admin" || coordenaSetor;
+  // Iniciar atuação é de quem atua na Engenharia (mesma regra da RPC); admin e gestor não iniciam.
+  const podeIniciar = atual.papel === "operacao" && atua;
+  const filtroTarefas = { empresaId: atual.empresaId, membroId: atual.membroId, papel: atual.papel, setor: "engenharia" as const };
 
-  // Só o Kanban precisa dos protocolos e do checklist (fases "Pronto para protocolo" e "Conexão / vistoria").
-  const [protocolos, checklistsAptos] =
-    obras && carteira === "kanban"
-      ? await Promise.all([
-          carregarStatusProtocolos(supabase, atual.empresaId),
-          carregarChecklistsAptos(
-            supabase,
-            atual.empresaId,
-            obras
-              .filter((o) => o.situacao === "em_andamento")
-              .filter((o) => ETAPAS_ANTES_DO_PROTOCOLO.has(o.setores.find((s) => s.setor === "engenharia")?.status ?? ""))
-              .map((o) => o.id),
-          ),
-        ])
-      : [null, null];
+  const [abertas, daAba, porAba, obras, exigencias, acoesVistoria, prazos, indicadores, protocolos, participacoes, pedidos] = await Promise.all([
+    carregarTarefasSetor(supabase, { ...filtroTarefas, filtro: "abertas" }),
+    estado.ver === "abertas" ? null : carregarTarefasSetor(supabase, { ...filtroTarefas, filtro: estado.ver }),
+    contarAbasTarefasSetor(supabase, atual.empresaId, atual.membroId, "engenharia"),
+    carregarObras(supabase, { empresaId: atual.empresaId, papel: atual.papel, membroId: atual.membroId }).then((r) => r.obras),
+    contarExigenciasAbertas(supabase, atual.empresaId),
+    carregarAcoesVistoria(supabase, atual.empresaId),
+    carregarPrazosObras(supabase, atual.empresaId),
+    carregarIndicadoresEngenharia(supabase, atual.empresaId, estado.periodo),
+    carregarStatusProtocolos(supabase, atual.empresaId),
+    // "Minhas obras": onde participo hoje da Engenharia (responsável, apoio ou substituto).
+    supabase.from("obra_participantes").select("obra_id").eq("empresa_id", atual.empresaId).eq("membro_id", atual.membroId).eq("setor", "engenharia").is("fim", null),
+    // Pedidos de justificativa de atraso ainda sem resposta, feitos a mim.
+    supabase.from("obra_justificativas_atraso").select("id, obra_id, etapa, prazo").eq("empresa_id", atual.empresaId).eq("pedido_a", atual.membroId).is("respondido_em", null),
+  ]);
+  for (const r of [participacoes, pedidos]) if (r.error) throw r.error;
+  // Fases "Pronto para protocolo" e anteriores dependem do checklist (Resumo e Kanban).
+  const checklistsAptos = await carregarChecklistsAptos(
+    supabase,
+    atual.empresaId,
+    obras
+      .filter((o) => o.situacao === "em_andamento")
+      .filter((o) => ETAPAS_ANTES_DO_PROTOCOLO.has(o.setores.find((s) => s.setor === "engenharia")?.status ?? ""))
+      .map((o) => o.id),
+  );
+
+  // Ação, obras novas e tarefas olham o setor que eu vejo; a carteira, os terceiros e os prazos seguem a visão.
+  const central = montarCentralEngenharia(obras, rotuloEngenharia, { coordena, podeIniciar, exigencias, acoesVistoria });
+  const minhas = new Set((participacoes.data ?? []).map((p) => p.obra_id));
+  const obrasDaVisao = pessoal ? obras.filter((o) => minhas.has(o.id)) : obras;
+  const daVisao = pessoal ? montarCentralEngenharia(obrasDaVisao, rotuloEngenharia, { coordena, podeIniciar, exigencias, acoesVistoria }) : central;
+  const emCurso = daVisao.grupos.flatMap((g) => g.obras);
+  const colunas = montarKanbanEngenharia(obrasDaVisao, rotuloEngenharia, { exigencias, acoesVistoria, protocolos, checklistsAptos });
+  const prazosEmCurso = emCurso.flatMap((o) => prazos.get(o.id) ?? []);
+  const vencidos = prazosEmCurso.filter((p) => p.diasRestantes < 0).length;
+
+  const tarefas = abertas.tarefas.map(paraCard);
+  // Minhas tarefas e as da fila que eu posso assumir.
+  const tarefasMinhas = tarefas.filter((t) => t.responsavel?.id === atual.membroId || (!t.responsavel && t.podeAgir));
+  const obraPorId = new Map(obras.map((o) => [o.id, o]));
+  const justificativas: JustificativaPendente[] = (pedidos.data ?? []).flatMap((j) => {
+    const o = obraPorId.get(j.obra_id);
+    if (!o || !(ETAPAS_OBRA as readonly string[]).includes(j.etapa)) return [];
+    return [{ id: j.id, obraId: j.obra_id, obra: `Obra #${o.numero} · ${o.clienteNome}`, etapa: ROTULO_ETAPA_CURTO[j.etapa as EtapaObra], prazo: j.prazo }];
+  });
+
+  const semResponsavel = central.grupos.flatMap((g) => g.obras).find((o) => o.principalNome == null);
+  const primeiroNome = sessao.nome.split(/[\s@]/)[0] || sessao.nome;
+  const resumo = pessoal
+    ? resumoFaixa({ acoes: central.acoes.length, vencemAmanha: prazosEmCurso.filter((p) => p.diasRestantes === 1).length, novas: central.novas.length }, true)
+    : resumoFaixa({ acoes: emCurso.filter((o) => !o.comTerceiro && o.proximaAcao).length, vencidos, novas: emCurso.filter((o) => o.principalNome == null).length }, false);
 
   return (
-    <div className="mx-auto flex max-w-[1100px] flex-col gap-4">
+    <div className="mx-auto flex max-w-[1200px] flex-col gap-4">
       <CabecalhoPagina
-        sobretitulo="Obras · Engenharia"
-        titulo="Engenharia"
-        descricao={
+        destaque
+        sobretitulo={`${dataDeHoje()} · Engenharia${pessoal ? "" : " · equipe"}`}
+        titulo={pessoal ? `${saudacao()}, ${primeiroNome}.` : `Engenharia da ${atual.empresaNome}`}
+        descricao={resumo}
+        acoes={
           <>
-            O que precisa de você hoje, o que espera terceiros e as obras por etapa do projeto.
-            {atual.papel === "operacao" && (
-              <span className="mt-1 block text-offwhite/90">Você atua em Engenharia como {coordenaSetor ? "coordenador" : "executor"}.</span>
+            {temEquipe && (
+              <nav aria-label="Visão" className={CLASSE_SEGMENTO_CABECALHO}>
+                {(["pessoal", "equipe"] as const).map((v) => (
+                  <Link key={v} href={hrefEngenharia(estado, { visao: v })} aria-current={estado.visao === v ? "page" : undefined} className={classeItemSegmentoCabecalho(estado.visao === v)}>
+                    {v === "pessoal" ? "Pessoal" : "Equipe"}
+                  </Link>
+                ))}
+              </nav>
+            )}
+            {pessoal && podeIniciar && central.novas[0] && (
+              <IniciarAtuacao obraId={central.novas[0].id} rotulo={`Iniciar a próxima obra da fila: obra #${central.novas[0].numero}`} naFaixa />
+            )}
+            {!pessoal && coordena && semResponsavel && (
+              <Link href={`/engenharia/${semResponsavel.id}`} className={CLASSE_ACAO_CABECALHO}>
+                Definir responsável da próxima obra
+              </Link>
             )}
           </>
         }
       />
 
-      <nav aria-label="Visão" className="flex flex-wrap gap-2">
-        <Aba href="/engenharia" atual={filtro === null}>
-          Central
-        </Aba>
-        {FILTROS.map((f) => (
-          <Aba key={f} href={`/engenharia?ver=${f}`} atual={f === filtro} contagem={f === "concluidas" ? 0 : porAba[f]}>
-            {ROTULO_FILTRO_TAREFAS_SETOR[f]}
-          </Aba>
-        ))}
-      </nav>
-
-      {filtro || !obras ? (
-        <Cartao titulo={`${ROTULO_FILTRO_TAREFAS_SETOR[filtro ?? "abertas"]} (${tarefas.length})`}>
-          <ListaTarefasSetor tarefas={listaTarefas} membrosPorSetor={membrosPorSetor} vazio={VAZIO[filtro ?? "abertas"]} />
-        </Cartao>
+      {pessoal ? (
+        <>
+          <Indicadores
+            numeros={[
+              ["Comigo agora", tarefasMinhas.length + central.acoes.length, "obras e tarefas", BellRing],
+              [
+                `Prazos nos próximos ${DIAS_PERTO} dias úteis`,
+                prazosEmCurso.filter((p) => p.diasRestantes >= 0 && p.diasRestantes <= DIAS_PERTO).length,
+                vencidos === 0 ? "nenhum vencido" : vencidos === 1 ? "1 já vencido" : `${vencidos} já vencidos`,
+                CalendarClock,
+              ],
+              ["Aguardando terceiros", daVisao.comTerceiros.length, "cliente, fornecedor ou concessionária", Hourglass],
+            ]}
+          />
+          <div className="grid items-start gap-4 lg:grid-cols-[3fr_2fr]">
+            <MeuDia dia={montarMeuDia({ acoes: central.acoes, tarefas: tarefasMinhas, novas: central.novas, justificativas, prazos, hoje: hojeEmSaoPaulo() })} />
+            <ProximosPrazos agenda={agendaPrazos(emCurso, prazos, DIAS_AGENDA)} dias={DIAS_AGENDA} />
+          </div>
+        </>
       ) : (
-        <Central
-          tarefas={listaTarefas}
-          membrosPorSetor={membrosPorSetor}
-          obras={obras}
-          exigencias={exigencias ?? new Map()}
-          acoesVistoria={acoesVistoria ?? new Map()}
-          prazos={prazos ?? new Map()}
-          indicadores={indicadores ?? null}
-          periodo={periodo}
-          desempenhoAberto={periodoBruto != null}
-          carteira={carteira}
-          protocolos={protocolos ?? new Map()}
-          checklistsAptos={checklistsAptos ?? new Set()}
-          membroId={atual.membroId}
-          podeVerObras={pode(atual.papel, OBRAS)}
-          // Definir responsável é do admin e do coordenador (quem a RPC deixa gerir a obra); o gestor só acompanha.
-          coordena={atual.papel === "admin" || coordenaSetor}
-          // Iniciar atuação é de quem atua na Engenharia (mesma regra da RPC); admin e gestor não iniciam.
-          podeIniciar={atual.papel === "operacao" && atua}
+        <Indicadores
+          numeros={[
+            // Carteira e paradas vêm do banco (sem o limite de linhas da lista); se ele falhar, contam a lista.
+            ["Obras na Engenharia", indicadores?.carteira.total ?? emCurso.length, null, HardHat],
+            ["Precisam de você", tarefasMinhas.length + central.acoes.length, null, BellRing],
+            ...(podeIniciar ? [["Novas obras", central.novas.length, null, Inbox] as Numero] : []),
+            ["Aguardando terceiros", daVisao.comTerceiros.length, null, Hourglass],
+            ["Paradas", indicadores?.carteira.paradas ?? emCurso.filter((o) => o.estado === "parado").length, null, CirclePause],
+            ["Prazos vencidos", [...prazos.values()].filter((lista) => lista.some((p) => p.diasRestantes < 0)).length, null, CalendarX],
+            ["Tarefas atrasadas", tarefas.filter((t) => t.atrasada).length, null, AlarmClock],
+          ]}
         />
       )}
-    </div>
-  );
-}
 
-function Central({
-  tarefas,
-  membrosPorSetor,
-  obras,
-  exigencias,
-  acoesVistoria,
-  prazos,
-  indicadores,
-  periodo,
-  desempenhoAberto,
-  carteira,
-  protocolos,
-  checklistsAptos,
-  membroId,
-  podeVerObras,
-  coordena,
-  podeIniciar,
-}: {
-  tarefas: TarefaSetorVM[];
-  membrosPorSetor: Parameters<typeof ListaTarefasSetor>[0]["membrosPorSetor"];
-  obras: ObraListaVM[];
-  exigencias: ReadonlyMap<string, number>;
-  acoesVistoria: ReadonlyMap<string, string>;
-  prazos: ReadonlyMap<string, PrazoObra[]>;
-  indicadores: IndicadoresEngenharia | null;
-  periodo: PeriodoIndicadores;
-  desempenhoAberto: boolean;
-  carteira: VisaoCarteira;
-  protocolos: ReadonlyMap<string, readonly StatusProtocolo[]>;
-  checklistsAptos: ReadonlySet<string>;
-  membroId: string;
-  podeVerObras: boolean;
-  coordena: boolean;
-  podeIniciar: boolean;
-}) {
-  const { acoes, novas, comTerceiros, grupos } = montarCentralEngenharia(obras, (s) => rotuloStatus("engenharia", s), {
-    coordena,
-    podeIniciar,
-    exigencias,
-    acoesVistoria,
-  });
-
-  // Minhas tarefas e as da fila que eu posso assumir; o resto do setor fica nas abas.
-  const tarefasMinhas = tarefas.filter((t) => t.responsavel?.id === membroId || (!t.responsavel && t.podeAgir));
-  const atrasadas = tarefas.filter((t) => t.atrasada).length;
-  const totalObras = grupos.reduce((n, g) => n + g.obras.length, 0);
-  const paradas = grupos.reduce((n, g) => n + g.obras.filter((o) => o.estado === "parado").length, 0);
-  const nada = tarefasMinhas.length === 0 && acoes.length === 0 && novas.length === 0;
-  // Como a carteira, vem do banco: obras em curso com algum prazo vencido, sem o limite de linhas da lista.
-  const prazosVencidos = [...prazos.values()].filter((lista) => lista.some((p) => p.diasRestantes < 0)).length;
-
-  const numeros: [string, number, LucideIcon][] = [
-    // Carteira e paradas vêm do banco (sem o limite de linhas da lista); se ele falhar, contam a lista.
-    ["Obras na Engenharia", indicadores?.carteira.total ?? totalObras, HardHat],
-    ["Precisam de você", tarefasMinhas.length + acoes.length, BellRing],
-    // Fila do setor (qualquer um que atua pode iniciar), por isso fora de "Precisam de você"; só para quem inicia.
-    ...(podeIniciar ? [["Novas obras", novas.length, Inbox] as [string, number, LucideIcon]] : []),
-    ["Aguardando terceiros", comTerceiros.length, Hourglass],
-    ["Paradas", indicadores?.carteira.paradas ?? paradas, CirclePause],
-    ["Prazos vencidos", prazosVencidos, CalendarX],
-    ["Tarefas atrasadas", atrasadas, AlarmClock],
-  ];
-
-  return (
-    <>
-      {/* Indicadores numa superfície só, separados por fios (como no Início), sem um cartão por número. */}
-      <div className="painel overflow-hidden">
-        <dl className={`grid grid-cols-2 gap-px bg-linha sm:grid-cols-3 ${numeros.length > 6 ? "sm:grid-cols-4 lg:grid-cols-7" : "lg:grid-cols-6"}`}>
-          {numeros.map(([rotulo, valor, Icone]) => (
-            <div key={rotulo} className="flex min-w-0 flex-col gap-2 bg-superficie p-4 md:p-5">
-              <dt className="flex min-w-0 items-center gap-2 text-xs font-medium text-texto-2">
-                <Icone size={15} className="shrink-0 text-dourado-texto" aria-hidden />
-                <span className="truncate">{rotulo}</span>
-              </dt>
-              <dd className="font-titulo text-3xl font-light tracking-tight text-texto tabular-nums">{valor}</dd>
-            </div>
-          ))}
-        </dl>
+      <div className={pessoal ? "" : "grid items-start gap-4 lg:grid-cols-[3fr_1fr]"}>
+        <Cartao
+          titulo={pessoal ? `Minhas obras na Engenharia (${emCurso.length})` : `Obras na Engenharia (${emCurso.length})`}
+          acao={
+            <nav aria-label="Visão da carteira" className="flex flex-wrap gap-2">
+              {(["resumo", "kanban", "lista"] as const).map((c) => (
+                <Aba key={c} href={hrefEngenharia(estado, { carteira: c })} atual={estado.carteira === c}>
+                  {c === "resumo" ? "Resumo" : c === "kanban" ? "Kanban" : "Lista"}
+                </Aba>
+              ))}
+            </nav>
+          }
+        >
+          {estado.carteira === "kanban" ? (
+            <Kanban colunas={colunas} prazos={prazos} />
+          ) : estado.carteira === "lista" ? (
+            <ListaPorEtapa grupos={daVisao.grupos} prazos={prazos} vazio={pessoal ? "Nenhuma obra com você na Engenharia." : "Nenhuma obra em andamento na Engenharia."} />
+          ) : (
+            <ResumoFases colunas={colunas} hrefKanban={hrefEngenharia(estado, { carteira: "kanban" })} />
+          )}
+          {pode(atual.papel, OBRAS) && (
+            <Link href="/obras" className="mt-4 inline-block text-sm text-zinc-600 underline hover:text-zinc-900">
+              Ver todas as obras
+            </Link>
+          )}
+        </Cartao>
+        {!pessoal && <CargaEquipe obras={emCurso} />}
       </div>
 
-      <Cartao titulo="Precisa de você">
-        {nada ? (
-          <p className="text-sm text-zinc-500">Nenhuma ação pendente para você agora.</p>
-        ) : (
-          <div className="flex flex-col gap-5">
-            {novas.length > 0 && (
-              <section aria-label="Novas obras">
-                <h3 className="mb-2 text-sm font-medium text-texto">
-                  Novas obras <span className="text-zinc-500">({novas.length})</span>
-                </h3>
-                <ListaNovas obras={novas} />
-              </section>
-            )}
-            {tarefasMinhas.length > 0 && (
-              <section aria-label="Tarefas">
-                <h3 className="mb-2 text-sm font-medium text-texto">
-                  Tarefas <span className="text-zinc-500">({tarefasMinhas.length})</span>
-                </h3>
-                <ListaTarefasSetor tarefas={tarefasMinhas} membrosPorSetor={membrosPorSetor} vazio="" />
-              </section>
-            )}
-            {acoes.length > 0 && (
-              <section aria-label="Próximas ações nas obras">
-                <h3 className="mb-2 text-sm font-medium text-texto">
-                  Obras <span className="text-zinc-500">({acoes.length})</span>
-                </h3>
-                <ListaObras obras={acoes} prazos={prazos} acao />
-              </section>
-            )}
-          </div>
-        )}
-      </Cartao>
+      <section aria-label="Tarefas da Engenharia">
+        <Cartao titulo="Tarefas da Engenharia">
+          <nav aria-label="Filtro das tarefas" className="mb-4 flex flex-wrap gap-2">
+            {FILTROS.map((f) => (
+              <Aba key={f} href={hrefEngenharia(estado, { ver: f })} atual={f === estado.ver} contagem={f === "concluidas" ? 0 : porAba[f]}>
+                {ROTULO_FILTRO_TAREFAS_SETOR[f]}
+              </Aba>
+            ))}
+          </nav>
+          <ListaTarefasSetor tarefas={daAba ? daAba.tarefas.map(paraCard) : tarefas} membrosPorSetor={(daAba ?? abertas).membrosPorSetor} vazio={VAZIO[estado.ver]} />
+        </Cartao>
+      </section>
 
       <CartaoRecolhivel
-        titulo={`Aguardando terceiros (${comTerceiros.length})`}
-        resumo={comTerceiros.length === 0 ? "Nenhuma obra esperando cliente, fornecedor ou concessionária." : "Obras esperando cliente, fornecedor ou concessionária."}
+        titulo={`Aguardando terceiros (${daVisao.comTerceiros.length})`}
+        resumo={daVisao.comTerceiros.length === 0 ? "Nenhuma obra esperando cliente, fornecedor ou concessionária." : "Obras esperando cliente, fornecedor ou concessionária."}
       >
-        {comTerceiros.length === 0 ? (
+        {daVisao.comTerceiros.length === 0 ? (
           <p className="text-sm text-zinc-500">Nenhuma obra esperando cliente, fornecedor ou concessionária.</p>
         ) : (
-          <ListaObras obras={comTerceiros} prazos={prazos} acao />
+          <ListaObras obras={daVisao.comTerceiros} prazos={prazos} acao />
         )}
       </CartaoRecolhivel>
 
-      <Cartao
-        titulo={`Obras na Engenharia (${totalObras})`}
-        acao={
-          <nav aria-label="Visão da carteira" className="flex gap-2">
-            <Aba href={hrefCentral({ carteira: "lista", periodo })} atual={carteira === "lista"}>
-              Lista
-            </Aba>
-            <Aba href={hrefCentral({ carteira: "kanban", periodo })} atual={carteira === "kanban"}>
-              Kanban
-            </Aba>
-          </nav>
-        }
-      >
-        {carteira === "kanban" ? (
-          <Kanban
-            colunas={montarKanbanEngenharia(obras, (s) => rotuloStatus("engenharia", s), { exigencias, acoesVistoria, protocolos, checklistsAptos })}
-            prazos={prazos}
-          />
-        ) : totalObras === 0 ? (
-          <p className="text-sm text-zinc-500">Nenhuma obra em andamento na Engenharia.</p>
-        ) : (
-          <div role="region" aria-label="Carteira por etapa" className="flex flex-col gap-5">
-            {grupos
-              .filter((g) => g.obras.length > 0)
-              .map((g) => (
-                <section key={g.status} aria-label={g.rotulo}>
-                  <h3 className="mb-2 text-sm font-medium text-texto">
-                    {g.rotulo} <span className="text-zinc-500">({g.obras.length})</span>
-                  </h3>
-                  <ListaObras obras={g.obras} prazos={prazos} />
-                </section>
-              ))}
-            {podeVerObras && (
-              <Link href="/obras" className="w-fit text-sm text-zinc-600 underline hover:text-zinc-900">
-                Ver carteira completa em Obras
-              </Link>
-            )}
-          </div>
-        )}
-      </Cartao>
-
-      {indicadores && (
-        <Desempenho
-          indicadores={indicadores}
-          periodo={periodo}
-          aberto={desempenhoAberto}
-          carteira={carteira}
-          rotuloEtapa={(s) => rotuloStatus("engenharia", s)}
-        />
-      )}
-    </>
-  );
-}
-
-/** Desempenho do período: medianas em dias úteis e proporções, com o tamanho da amostra. Sem amostra, "—". */
-function Desempenho({
-  indicadores,
-  periodo,
-  aberto,
-  carteira,
-  rotuloEtapa,
-}: {
-  indicadores: IndicadoresEngenharia;
-  periodo: PeriodoIndicadores;
-  /** Secundário (spec v1.3): vem fechado; abre quando a pessoa escolhe um período. */
-  aberto: boolean;
-  carteira: VisaoCarteira;
-  rotuloEtapa: (status: string) => string;
-}) {
-  const { etapas, protocoloAprovacao, exigencia, naoConformidade, conexao } = indicadores;
-  const maiorMediana = Math.max(1, ...etapas.map((e) => e.mediana));
-  const amostra = (n: number, um: string, varios: string) => (n === 0 ? "sem registros no período" : `${n} ${n === 1 ? um : varios}`);
-  const linhas: [string, string, string][] = [
-    ["Do protocolo à aprovação", textoMediana(protocoloAprovacao), amostra(protocoloAprovacao.n, "protocolo aprovado", "protocolos aprovados")],
-    ["Protocolos com exigência", textoProporcao(exigencia), amostra(exigencia.total, "protocolo", "protocolos")],
-    ["Vistorias com não conformidade", textoProporcao(naoConformidade), amostra(naoConformidade.total, "resultado de vistoria", "resultados de vistoria")],
-    ["Da vistoria aprovada à conexão", textoMediana(conexao), amostra(conexao.n, "conexão", "conexões")],
-  ];
-  return (
-    <CartaoRecolhivel titulo="Desempenho" resumo={`Tempos e proporções dos últimos ${periodo} dias`} aberto={aberto}>
-      <div className="flex flex-col gap-4">
-        <nav aria-label="Período" className="flex flex-wrap items-center gap-2 text-sm text-zinc-600">
-          Últimos
-          {PERIODOS_INDICADORES.map((p) => (
-            <Aba key={p} href={hrefCentral({ carteira, periodo: p, comPeriodo: true })} atual={p === periodo}>
-              {p} dias
-            </Aba>
-          ))}
-        </nav>
-        <p className="text-xs text-zinc-500">Tempos em mediana de dias úteis, sem contar o dia do marco. Só obras que você pode ver.</p>
-        <dl className="grid grid-cols-1 gap-px overflow-hidden rounded-xl bg-linha sm:grid-cols-2">
-          {linhas.map(([rotulo, valor, detalhe]) => (
-            <div key={rotulo} className="flex flex-col gap-1 bg-superficie px-4 py-3">
-              <dt className="text-xs font-medium text-texto-2">{rotulo}</dt>
-              <dd className="font-titulo text-2xl font-light tracking-tight text-texto tabular-nums">{valor}</dd>
-              <dd className="text-xs text-zinc-500">{detalhe}</dd>
-            </div>
-          ))}
-        </dl>
-        <section aria-label="Tempo em cada etapa">
-          <h3 className="mb-2 text-sm font-medium text-texto">Tempo em cada etapa</h3>
-          {etapas.length === 0 ? (
-            <p className="text-sm text-zinc-500">Nenhuma obra saiu de uma etapa no período.</p>
-          ) : (
-            // Barras horizontais em dourado (como os gráficos do Início): o comprimento é a mediana da etapa.
-            <ul className="flex flex-col gap-3 text-sm">
-              {etapas.map((e) => (
-                <li key={e.etapa} className="flex flex-col gap-1.5">
-                  <div className="flex flex-wrap justify-between gap-2">
-                    <span className="text-texto">{rotuloEtapa(e.etapa)}</span>
-                    <span className="text-zinc-600 tabular-nums">
-                      {textoMediana({ mediana: e.mediana, n: e.n })} · {e.n} {e.n === 1 ? "obra" : "obras"}
-                    </span>
-                  </div>
-                  <div aria-hidden className="h-1.5 w-full overflow-hidden rounded-full bg-superficie-2">
-                    <div
-                      className="h-full rounded-full bg-dourado transition-[width] duration-700 ease-raion"
-                      style={{ width: `${Math.max(2, (e.mediana / maiorMediana) * 100)}%` }}
-                    />
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      </div>
-    </CartaoRecolhivel>
-  );
-}
-
-/**
- * Carteira em colunas por fase (spec v1.3, seção 31). Só leitura: o cartão abre o card da obra, onde está o trabalho;
- * não há arrastar. No celular as fases ficam uma embaixo da outra; da largura média em diante, lado a lado com rolagem
- * dentro do quadro.
- */
-function Kanban({ colunas, prazos }: { colunas: ColunaKanbanEngenharia[]; prazos: ReadonlyMap<string, PrazoObra[]> }) {
-  return (
-    <div className="flex flex-col gap-5">
-      <p className="text-xs text-zinc-500">A fase vem do que foi registrado na obra (etapa, checklist, protocolo e exigências). Para mudar, abra a obra.</p>
-      <div role="region" aria-label="Kanban da carteira" className="flex flex-col gap-4 md:flex-row md:overflow-x-auto md:pb-2">
-        {colunas.map((c) => (
-          <section key={c.fase} aria-label={c.rotulo} className="flex flex-col gap-2 md:w-64 md:shrink-0">
-            <h3 className="text-sm font-medium text-texto">
-              {c.rotulo} <span className="text-zinc-500">({c.obras.length})</span>
-            </h3>
-            {c.obras.length === 0 ? (
-              <p className="rounded-lg border border-dashed border-linha px-3 py-2 text-xs text-zinc-500">Nenhuma obra.</p>
-            ) : (
-              <ul className="flex flex-col gap-2">
-                {c.obras.map((o) => (
-                  <li key={o.id}>
-                    <CartaoKanban obra={o} prazos={prazos.get(o.id) ?? []} />
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        ))}
-      </div>
+      {indicadores && <Desempenho indicadores={indicadores} estado={estado} rotuloEtapa={rotuloEngenharia} />}
     </div>
   );
 }
 
-function CartaoKanban({ obra: o, prazos }: { obra: ObraNaEngenharia; prazos: PrazoObra[] }) {
-  const tempo = ha(o.desde);
+type Numero = [rotulo: string, valor: number, rodape: string | null, Icone: LucideIcon];
+
+/** Indicadores numa superfície só, separados por fios (como no Início), sem um cartão por número. */
+function Indicadores({ numeros }: { numeros: Numero[] }) {
+  // Três números: um por linha no celular (dois por linha deixaria um buraco); mais que isso, em duas colunas.
+  const colunas = numeros.length <= 3 ? "grid-cols-1 sm:grid-cols-3" : numeros.length > 6 ? "grid-cols-2 sm:grid-cols-4 lg:grid-cols-7" : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-6";
   return (
-    <article className="flex flex-col gap-1.5 rounded-xl border border-linha bg-superficie px-3 py-2.5 text-sm transition-colors duration-200 ease-raion hover:border-dourado/60">
-      <p className="font-medium break-words text-texto">
-        Obra #{o.numero} · {o.clienteNome}
-      </p>
-      <p className="text-xs text-zinc-500">
-        {o.cidadeUf}
-        {formatarPotencia(o.potenciaKwp)}
-      </p>
-      {o.proximaAcao && <p className="text-zinc-700">{o.proximaAcao}</p>}
-      <p className="text-xs text-zinc-500">
-        {o.principalNome ?? "Sem responsável"}
-        {tempo ? ` · ${o.aguardando ? "aguardando" : "na etapa"} ${tempo}` : ""}
-      </p>
-      {(o.aguardando || o.estado === "parado" || prazos.length > 0) && (
-        <div className="flex flex-wrap gap-1.5">
-          {o.aguardando && <Selo tom="atencao">{o.aguardando}</Selo>}
-          {o.estado === "parado" && <Selo tom="atencao">{ROTULO_ESTADO_SETOR.parado}</Selo>}
-          {prazos.map((p) => {
-            const selo = seloPrazo(p);
-            return (
-              <Selo key={p.chave} tom={selo.tom}>
-                {selo.texto}
-              </Selo>
-            );
-          })}
-        </div>
+    <div className="painel overflow-hidden">
+      <dl className={`grid gap-px bg-linha ${colunas}`}>
+        {numeros.map(([rotulo, valor, rodape, Icone]) => (
+          <div key={rotulo} className="flex min-w-0 flex-col gap-2 bg-superficie p-4 md:p-5">
+            <dt className="flex min-w-0 items-center gap-2 text-xs font-medium text-texto-2">
+              <Icone size={15} className="shrink-0 text-dourado-texto" aria-hidden />
+              <span className="truncate">{rotulo}</span>
+            </dt>
+            <dd className="font-titulo text-3xl font-light tracking-tight text-texto tabular-nums">{valor}</dd>
+            {rodape && <dd className="text-xs text-zinc-500">{rodape}</dd>}
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
+/** Quem está com quantas obras em curso (responsável principal na Engenharia). */
+function CargaEquipe({ obras }: { obras: ObraNaEngenharia[] }) {
+  const carga = cargaPorResponsavel(obras);
+  const maior = Math.max(1, ...carga.map((c) => c.total));
+  return (
+    <Cartao titulo="Carga por responsável">
+      {carga.length === 0 ? (
+        <p className="text-sm text-zinc-500">Nenhuma obra em curso.</p>
+      ) : (
+        <ul className="flex flex-col gap-3">
+          {carga.map((c) => (
+            <li key={c.nome ?? "sem"} className="flex flex-col gap-1.5 text-sm">
+              <div className="flex justify-between gap-2">
+                <span className="truncate text-texto">{c.nome ?? "Sem responsável"}</span>
+                <span className="font-medium text-texto tabular-nums">{c.total}</span>
+              </div>
+              <div aria-hidden className="h-1.5 w-full overflow-hidden rounded-full bg-superficie-2">
+                <div className={`h-full rounded-full ${c.nome ? "bg-dourado" : "bg-zinc-400"}`} style={{ width: `${(c.total / maior) * 100}%` }} />
+              </div>
+            </li>
+          ))}
+        </ul>
       )}
-      <Link
-        href={`/engenharia/${o.id}`}
-        aria-label={`Continuar a obra #${o.numero}`}
-        className="mt-1 w-fit text-sm font-medium text-texto underline decoration-dourado underline-offset-4 hover:decoration-2"
-      >
-        Continuar
-      </Link>
-    </article>
-  );
-}
-
-/** Linhas de obra. Com `acao`, destaca a próxima ação e a etapa; na carteira, só os dados da obra. */
-function ListaObras({ obras, prazos, acao = false }: { obras: ObraNaEngenharia[]; prazos: ReadonlyMap<string, PrazoObra[]>; acao?: boolean }) {
-  return (
-    <ul className="divide-y divide-linha rounded-lg border border-linha">
-      {obras.map((o) => {
-        const tempo = ha(o.desde);
-        return (
-          <li key={o.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm">
-            <div className="min-w-0">
-              {acao && o.proximaAcao && <p className="font-medium text-texto">{o.proximaAcao}</p>}
-              <p className={`break-words ${acao ? "text-zinc-700" : "font-medium text-texto"}`}>
-                <Link href={`/engenharia/${o.id}`} className="hover:underline">
-                  Obra #{o.numero} · {o.clienteNome}
-                </Link>
-              </p>
-              <p className="text-xs text-zinc-500">
-                {acao ? o.statusRotulo : o.cidadeUf}
-                {!acao && formatarPotencia(o.potenciaKwp)}
-                {o.principalNome ? ` · ${o.principalNome}` : " · Sem responsável"}
-                {tempo ? ` · ${o.aguardando ? "aguardando" : "na etapa"} ${tempo}` : ""}
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {o.aguardando && <Selo tom="atencao">{o.aguardando}</Selo>}
-              {o.estado === "parado" && <Selo tom="atencao">{ROTULO_ESTADO_SETOR.parado}</Selo>}
-              {(prazos.get(o.id) ?? []).map((p) => {
-                const selo = seloPrazo(p);
-                return (
-                  <Selo key={p.chave} tom={selo.tom}>
-                    {selo.texto}
-                  </Selo>
-                );
-              })}
-            </div>
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
-/** Obras sem responsável na Engenharia, cada uma com "Iniciar atuação" (quem inicia vira o responsável principal). */
-function ListaNovas({ obras }: { obras: ObraNaEngenharia[] }) {
-  return (
-    <ul className="divide-y divide-linha rounded-lg border border-linha">
-      {obras.map((o) => {
-        const tempo = ha(o.desde);
-        return (
-          <li key={o.id} className="flex flex-wrap items-center justify-between gap-3 px-3 py-2 text-sm">
-            <div className="min-w-0">
-              <p className="break-words font-medium text-texto">
-                <Link href={`/engenharia/${o.id}`} className="hover:underline">
-                  Obra #{o.numero} · {o.clienteNome}
-                </Link>
-              </p>
-              <p className="text-xs text-zinc-500">
-                {o.cidadeUf}
-                {formatarPotencia(o.potenciaKwp)}
-                {tempo ? ` · na fila ${tempo}` : ""}
-              </p>
-            </div>
-            <IniciarAtuacao obraId={o.id} rotulo={`Iniciar atuação na obra #${o.numero}`} />
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
-function Aba({ href, atual, contagem = 0, children }: { href: string; atual: boolean; contagem?: number; children: ReactNode }) {
-  return (
-    <Link
-      href={href}
-      aria-current={atual ? "page" : undefined}
-      className={`rounded-full border px-3 py-1 text-sm ${atual ? "border-dourado bg-dourado/10 text-texto" : "border-linha text-zinc-600 hover:border-dourado"}`}
-    >
-      {children}
-      {contagem > 0 && (
-        <span className="ml-1.5 inline-flex min-w-5 items-center justify-center rounded-full bg-dourado px-1.5 text-xs font-semibold text-carvao">
-          {contagem}
-        </span>
-      )}
-    </Link>
+    </Cartao>
   );
 }

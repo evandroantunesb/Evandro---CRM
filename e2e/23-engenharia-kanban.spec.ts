@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { entrarComo, lerBase } from "./ajuda";
 
-// Engenharia (P6a): a carteira alterna entre Lista e Kanban; o Kanban mostra as sete fases da spec, cada obra numa só,
+// Engenharia (P6a): a carteira alterna entre Resumo, Lista e Kanban; o Kanban mostra as sete fases da spec, cada obra numa só,
 // e o cartão abre o card da obra (sem arrastar).
 test("carteira da Engenharia alterna para Kanban e o cartão abre a obra", async ({ page }) => {
   const { usuarios, senha } = lerBase();
@@ -9,6 +9,11 @@ test("carteira da Engenharia alterna para Kanban e o cartão abre a obra", async
   await entrarComo(page, usuarios.execEng, senha);
   await page.goto("/engenharia");
   const visao = page.getByRole("navigation", { name: "Visão da carteira" });
+  // A carteira abre no Resumo (as sete fases); Lista e Kanban ficam a um toque.
+  await expect(visao.getByRole("link", { name: "Resumo" })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("region", { name: "Resumo da carteira" })).toBeVisible();
+  await visao.getByRole("link", { name: "Lista" }).click();
+  await expect(page).toHaveURL(/carteira=lista/);
   await expect(visao.getByRole("link", { name: "Lista" })).toHaveAttribute("aria-current", "page");
   const naLista = await page.getByRole("region", { name: "Carteira por etapa" }).getByRole("link", { name: /^Obra #/ }).count();
 

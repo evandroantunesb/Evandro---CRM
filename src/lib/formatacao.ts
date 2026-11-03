@@ -64,6 +64,14 @@ export function formatarDataHora(iso: string) {
   });
 }
 
+/** Saudação pela hora de Brasília: "Bom dia", "Boa tarde" ou "Boa noite". */
+export function saudacao(agora = new Date()) {
+  const hora = Number(agora.toLocaleString("pt-BR", { hour: "2-digit", hour12: false, timeZone: "America/Sao_Paulo" }));
+  if (hora < 12) return "Bom dia";
+  if (hora < 18) return "Boa tarde";
+  return "Boa noite";
+}
+
 /** Hoje no fuso de Brasília, no formato do campo de data ("2026-10-14"). */
 export function hojeEmSaoPaulo(agora = Date.now()) {
   return new Date(agora).toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });

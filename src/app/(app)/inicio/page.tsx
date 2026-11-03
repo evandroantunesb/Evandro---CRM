@@ -17,6 +17,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { saudacao } from "@/lib/formatacao";
 import { redirect } from "next/navigation";
 import { ListaTarefas, type TarefaLista } from "@/components/lista-tarefas";
 import { Cartao, Selo } from "@/components/ui";
@@ -63,13 +64,6 @@ function limitesMes(deslocamento: number, referencia = new Date()) {
 function variacao(atual: number, anterior: number): number | null {
   if (anterior === 0) return null;
   return ((atual - anterior) / anterior) * 100;
-}
-
-function saudacao(agora = new Date()) {
-  const hora = Number(agora.toLocaleString("pt-BR", { hour: "2-digit", hour12: false, timeZone: "America/Sao_Paulo" }));
-  if (hora < 12) return "Bom dia";
-  if (hora < 18) return "Boa tarde";
-  return "Boa noite";
 }
 
 export default async function Inicio({ searchParams }: { searchParams: Promise<{ visao?: string | string[] }> }) {

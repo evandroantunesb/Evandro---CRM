@@ -10,7 +10,10 @@ test("executor de Engenharia abre o card da obra e cria tarefa; Compras não ent
   await entrarComo(page, usuarios.execEng, senha);
   await page.getByRole("link", { name: "Engenharia", exact: true }).first().click();
   await page.waitForURL("**/engenharia");
-  await expect(page.getByRole("heading", { name: "Engenharia", level: 1 })).toBeVisible();
+  // Início do engenheiro: a faixa saúda a pessoa; a carteira em lista fica em ?carteira=lista.
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(page.getByText(/· Engenharia$/)).toBeVisible();
+  await page.goto("/engenharia?carteira=lista");
   // A primeira obra com responsável que o executor vê na carteira: outros testes (03) trocam responsáveis e etapas da
   // base antes deste, então não se fixa obra nem etapa. As obras novas (sem responsável) ficam de fora: nelas ele ainda
   // não atua, só pode iniciar.
@@ -33,9 +36,9 @@ test("executor de Engenharia abre o card da obra e cria tarefa; Compras não ent
   await novo.getByRole("button", { name: "Enviar ao setor" }).click();
   await expect(page.getByText(titulo, { exact: true })).toBeVisible();
 
-  // Na Central, a tarefa da fila que o executor pode assumir aparece em "Precisa de você", com o link para o card.
+  // No início, a tarefa da fila que o executor pode assumir aparece em "Meu dia", com o link para o card.
   await page.goto("/engenharia");
-  const tarefasMinhas = page.getByRole("region", { name: "Tarefas", exact: true });
+  const tarefasMinhas = page.getByRole("region", { name: "Meu dia", exact: true });
   await expect(tarefasMinhas.getByText(titulo, { exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: new RegExp(`^Obra #${obra!.numero} `) }).first()).toHaveAttribute("href", `/engenharia/${obraId}`);
 

@@ -8,7 +8,7 @@ test("executor vê os oito passos, confirma o enquadramento e reabre com motivo"
   const { usuarios, senha } = lerBase();
 
   await entrarComo(page, usuarios.execEng, senha);
-  await page.goto("/engenharia");
+  await page.goto("/engenharia?carteira=lista");
   const link = page
     .getByRole("region", { name: "Carteira por etapa" })
     .getByRole("listitem")
