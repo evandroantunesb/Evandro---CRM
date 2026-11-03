@@ -136,3 +136,27 @@ export async function removerFeriado(_: ResultadoAcao, formData: FormData): Prom
   revalidatePath(CAMINHO);
   return { ok: true, mensagem: "Feriado removido." };
 }
+
+// ---------------------------------------------------------------------------
+// Marcos da trajetória
+// ---------------------------------------------------------------------------
+
+const marcos = z.object({
+  obras: z.coerce.number().int("Use números inteiros").min(1, "Mínimo de 1 obra").max(10000, "Máximo de 10.000 obras"),
+  kwp: z.coerce.number().int("Use números inteiros").min(1, "Mínimo de 1 kWp").max(100000, "Máximo de 100.000 kWp"),
+});
+
+/** A cada quantas obras e kWp vem um marco em "Sua trajetória". A linha nasce com a empresa; só os números mudam. */
+export async function salvarMarcos(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  const { atual } = await exigirPapel("admin");
+  const m = marcos.safeParse({ obras: String(formData.get("obras") ?? "").trim(), kwp: String(formData.get("kwp") ?? "").trim() });
+  if (!m.success) return { ok: false, mensagem: m.error.issues[0].message };
+
+  const supabase = await criarClienteServidor();
+  const { data, error } = await supabase.from("engenharia_marcos").update(m.data).eq("empresa_id", atual.empresaId).select("empresa_id");
+  // Sem linha atualizada, o banco recusou em silêncio (RLS): não diz "salvo".
+  if (error || !data?.length) return { ok: false, mensagem: "Não foi possível salvar os marcos." };
+  revalidatePath(CAMINHO);
+  revalidatePath("/engenharia");
+  return { ok: true, mensagem: "Marcos salvos." };
+}

@@ -13,8 +13,16 @@ export type Trajetoria = {
   equipe: { meses: MesTrajetoria[]; pessoas: PessoaTrajetoria[] } | null;
 };
 
-/** Marcos fixos por ora (a cada 25 obras ou 250 kWp); editáveis em Configurações numa PR seguinte. */
-export const PASSO_MARCO: Record<MetricaTrajetoria, number> = { obras: 25, kwp: 250 };
+/** A cada quantas obras ou kWp vem um marco. O admin edita em Configurações › Engenharia (`engenharia_marcos`). */
+export type MarcosTrajetoria = Record<MetricaTrajetoria, number>;
+/** Padrão de toda empresa, e o que vale se a configuração não puder ser lida. */
+export const PASSO_MARCO: MarcosTrajetoria = { obras: 25, kwp: 250 };
+
+/** Linha de `engenharia_marcos`; sem ela, ou com valor fora do lugar, vale o padrão. */
+export function lerMarcos(bruto: { obras: unknown; kwp: unknown } | null | undefined): MarcosTrajetoria {
+  const passo = (v: unknown, padrao: number) => (Number.isInteger(v) && (v as number) > 0 ? (v as number) : padrao);
+  return { obras: passo(bruto?.obras, PASSO_MARCO.obras), kwp: passo(bruto?.kwp, PASSO_MARCO.kwp) };
+}
 /** Trimestres nos gráficos; os anteriores já estão no acumulado. */
 export const TRIMESTRES_NO_GRAFICO = 12;
 
@@ -99,7 +107,7 @@ const indiceTrimestre = (mes: string) => {
 const rotuloTrimestre = (indice: number) => `T${(indice % 4) + 1} ${String(Math.floor(indice / 4)).slice(-2)}`;
 
 /** Soma os meses (até o mês atual) na métrica escolhida. `mesAtual` no formato "AAAA-MM" (fuso de Brasília). */
-export function resumirTrajetoria(meses: MesTrajetoria[], metrica: MetricaTrajetoria, mesAtual: string): ResumoTrajetoria {
+export function resumirTrajetoria(meses: MesTrajetoria[], metrica: MetricaTrajetoria, mesAtual: string, marcos: MarcosTrajetoria = PASSO_MARCO): ResumoTrajetoria {
   const ate = meses.filter((m) => m.mes <= mesAtual).sort((a, b) => a.mes.localeCompare(b.mes));
   const totalObras = ate.reduce((s, m) => s + m.obras, 0);
   const totalKwp = ate.reduce((s, m) => s + m.kwp, 0);
@@ -119,7 +127,7 @@ export function resumirTrajetoria(meses: MesTrajetoria[], metrica: MetricaTrajet
   const anteriores = trimestres.slice(0, -1);
 
   const atingido = metrica === "obras" ? totalObras : totalKwp;
-  const passo = PASSO_MARCO[metrica];
+  const passo = marcos[metrica];
   const proximo = (Math.floor(atingido / passo) + 1) * passo;
   return {
     totalObras,

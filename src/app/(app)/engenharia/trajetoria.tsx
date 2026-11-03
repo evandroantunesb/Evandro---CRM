@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { mesPorExtenso, resumirTrajetoria, type MesTrajetoria, type MetricaTrajetoria, type PessoaTrajetoria, type Trimestre } from "@/lib/engenharia-trajetoria";
+import { mesPorExtenso, resumirTrajetoria, type MarcosTrajetoria, type MesTrajetoria, type MetricaTrajetoria, type PessoaTrajetoria, type Trimestre } from "@/lib/engenharia-trajetoria";
 import { hrefEngenharia, type EstadoEngenharia } from "./estado";
 
 const inteiro = (v: number) => Math.round(v).toLocaleString("pt-BR");
@@ -23,6 +23,7 @@ export function Trajetoria({
   empresaNome,
   estado,
   mesAtual,
+  marcos,
 }: {
   meses: MesTrajetoria[];
   /** Presente só na visão Equipe. */
@@ -30,9 +31,11 @@ export function Trajetoria({
   empresaNome: string;
   estado: EstadoEngenharia;
   mesAtual: string;
+  /** A cada quantas obras ou kWp vem um marco (Configurações › Engenharia). */
+  marcos: MarcosTrajetoria;
 }) {
   const equipe = pessoas != null;
-  const r = resumirTrajetoria(meses, estado.metrica, mesAtual);
+  const r = resumirTrajetoria(meses, estado.metrica, mesAtual, marcos);
   const desde = r.desde ? (equipe ? "desde a primeira obra no sistema" : `desde a sua primeira obra, em ${mesPorExtenso(r.desde)}`) : null;
 
   return (

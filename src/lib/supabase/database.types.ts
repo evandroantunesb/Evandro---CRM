@@ -1331,6 +1331,35 @@ export type Database = {
           },
         ];
       };
+      engenharia_marcos: {
+        Row: {
+          empresa_id: string;
+          kwp: number;
+          obras: number;
+          updated_at: string;
+        };
+        Insert: {
+          empresa_id: string;
+          kwp?: number;
+          obras?: number;
+          updated_at?: string;
+        };
+        Update: {
+          empresa_id?: string;
+          kwp?: number;
+          obras?: number;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "engenharia_marcos_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: true;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       engenharia_prazos: {
         Row: {
           chave: string;

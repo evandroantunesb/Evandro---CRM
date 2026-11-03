@@ -1,11 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { concluidasNoMes, lerMetrica, lerTrajetoria, mesAnterior, mesPorExtenso, resumirTrajetoria, type MesTrajetoria } from "@/lib/engenharia-trajetoria";
+import { concluidasNoMes, lerMarcos, lerMetrica, lerTrajetoria, mesAnterior, mesPorExtenso, resumirTrajetoria, type MesTrajetoria } from "@/lib/engenharia-trajetoria";
 
 const MESES: MesTrajetoria[] = [
   { mes: "2026-08", obras: 2, kwp: 20 },
   { mes: "2026-10", obras: 3, kwp: 31.5 },
   { mes: "2026-11", obras: 4, kwp: 40 },
 ];
+
+describe("lerMarcos", () => {
+  it("usa a linha da empresa e cai no padrão (25 obras / 250 kWp) sem ela ou com valor inválido", () => {
+    expect(lerMarcos({ obras: 10, kwp: 100 })).toEqual({ obras: 10, kwp: 100 });
+    expect(lerMarcos(null)).toEqual({ obras: 25, kwp: 250 });
+    expect(lerMarcos({ obras: 0, kwp: "x" })).toEqual({ obras: 25, kwp: 250 });
+    expect(lerMarcos({ obras: 2.5, kwp: -1 })).toEqual({ obras: 25, kwp: 250 });
+  });
+});
 
 describe("lerTrajetoria", () => {
   it("lê o pessoal e a equipe; meses inválidos ficam de fora", () => {
@@ -66,6 +75,12 @@ describe("resumirTrajetoria", () => {
     expect(resumirTrajetoria(MESES, "obras", "2026-11").marco).toEqual({ proximo: 25, falta: 16, progresso: 9 / 25 });
     expect(resumirTrajetoria(MESES, "kwp", "2026-11").marco).toMatchObject({ proximo: 250, falta: 158.5 });
     expect(resumirTrajetoria([{ mes: "2026-11", obras: 25, kwp: 250 }], "obras", "2026-11").marco).toMatchObject({ proximo: 50, falta: 25 });
+  });
+
+  it("marcos da empresa: o passo configurado vale para obras e para kWp", () => {
+    const marcos = { obras: 5, kwp: 40 };
+    expect(resumirTrajetoria(MESES, "obras", "2026-11", marcos).marco).toEqual({ proximo: 10, falta: 1, progresso: 9 / 10 });
+    expect(resumirTrajetoria(MESES, "kwp", "2026-11", marcos).marco).toMatchObject({ proximo: 120, falta: 28.5 });
   });
 
   it("sem obras concluídas: zeros, sem média e sem trimestres", () => {
