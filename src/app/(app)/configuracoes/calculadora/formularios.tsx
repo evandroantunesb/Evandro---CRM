@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef } from "react";
 import { Botao, Campo, Mensagem } from "@/components/ui";
 import { criarKit, editarKit, editarParametros } from "@/lib/acoes/calculadora";
+import { percentualParaCampo } from "@/lib/percentual-exibicao";
 
 const inputClasse = "min-w-0 flex-1 rounded-md border border-zinc-300 px-3 py-1.5 text-sm";
 
@@ -91,7 +92,7 @@ export function FormularioParametros({
         rotulo="Percentual do Fio B cobrado sobre a energia compensada (%)"
         name="percentual_fio_b"
         inputMode="decimal"
-        defaultValue={String(parametros.percentualFioB * 100).replace(".", ",")}
+        defaultValue={percentualParaCampo(parametros.percentualFioB)}
         required
       />
       <div className="grid grid-cols-3 gap-2">
@@ -148,7 +149,7 @@ export function FormularioParametros({
           rotulo="Comissão (% sobre o subtotal)"
           name="comissao_percentual"
           inputMode="decimal"
-          defaultValue={String(parametros.comissaoPercentual * 100).replace(".", ",")}
+          defaultValue={percentualParaCampo(parametros.comissaoPercentual)}
           placeholder="0"
         />
       </div>
