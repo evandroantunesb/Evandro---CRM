@@ -1,0 +1,10 @@
+$ pnpm exec playwright test e2e/06-calculadora-numeros.spec.ts e2e/09-preco-desatualizado.spec.ts e2e/10-calculo-estados.spec.ts e2e/11-kit-consumo-fatura-salvos.spec.ts e2e/12-proposta-emitida.spec.ts --reporter=list
+[WebServer] Failed to type check.
+[WebServer] 
+[WebServer] 
+[WebServer] ✖ e2e: servidor recusado (trava fail-closed): o build do app de teste falhou.
+[WebServer]   Nada foi construído nem iniciado.
+[WebServer] 
+Error: Process from config.webServer was not able to start. Exit code: 1
+
+exit=1

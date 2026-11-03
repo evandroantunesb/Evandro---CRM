@@ -1,8 +1,9 @@
 import { Cartao } from "@/components/ui";
 import { carregarConfiguracao } from "@/lib/crm";
+import { produtividadeConfirmada } from "@/lib/propostas/proposta-simples";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { FormularioParametros, LinhaKit, NovoKit } from "./formularios";
+import { ConfirmarProdutividade, FormularioParametros, LinhaKit, NovoKit } from "./formularios";
 
 export default async function ConfigCalculadora() {
   const { atual } = await exigirPapel("admin");
@@ -44,6 +45,14 @@ export default async function ConfigCalculadora() {
               custoEngenharia: parametros.custo_engenharia,
               comissaoPercentual: parametros.comissao_percentual,
             }}
+          />
+        )}
+        {parametros && (
+          <ConfirmarProdutividade
+            valor={parametros.produtividade_kwh_kwp_mes}
+            confirmadaEm={produtividadeConfirmada(parametros)?.em ?? null}
+            confirmadaFonte={produtividadeConfirmada(parametros)?.fonte ?? null}
+            confirmadaResponsavel={produtividadeConfirmada(parametros)?.responsavel ?? null}
           />
         )}
       </Cartao>

@@ -1,0 +1,29 @@
+    grantee    |                          privilegios                          
+---------------+---------------------------------------------------------------
+ anon          | DELETE, REFERENCES, SELECT, TRIGGER
+ authenticated | DELETE, REFERENCES, SELECT, TRIGGER
+ service_role  | DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE
+(3 rows)
+
+    polname     | polcmd 
+----------------+--------
+ apagar cálculo | d
+ ver cálculo    | r
+(2 rows)
+
+                   tgname                   
+--------------------------------------------
+ calculos_solares_arquivado_somente_leitura
+ calculos_solares_exige_kit
+ calculos_solares_historico
+ calculos_solares_obra_venda_alterada
+ calculos_solares_referencia_oficial
+ calculos_solares_updated_at
+(6 rows)
+
+               proname                |                     acl                      
+--------------------------------------+----------------------------------------------
+ autorizar_gravacao_calculo           | postgres=X/postgres authenticated=X/postgres
+ calculos_solares_conferir_referencia | postgres=X/postgres
+(2 rows)
+

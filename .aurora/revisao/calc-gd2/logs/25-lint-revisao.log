@@ -1,0 +1,25 @@
+$ pnpm run lint
+
+> raion-crm@0.1.0 lint R:\wt-m2-p0-calc
+> eslint
+
+
+R:\wt-m2-p0-calc\scripts\e2e-relogio.cjs
+  11:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+R:\wt-m2-p0-calc\scripts\seed-metas-vendedores.mjs
+  115:27  warning  '_nome' is defined but never used  @typescript-eslint/no-unused-vars
+
+R:\wt-m2-p0-calc\tests\calculo-gravacao-confiavel-db.test.ts
+  98:15  warning  '_id' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  98:32  warning  '_c' is assigned a value but never used   @typescript-eslint/no-unused-vars
+  98:48  warning  '_u' is assigned a value but never used   @typescript-eslint/no-unused-vars
+
+R:\wt-m2-p0-calc\tests\stack-supabase-local.test.ts
+  195:35  warning  '_raiz' is defined but never used    @typescript-eslint/no-unused-vars
+  195:50  warning  '_opcoes' is defined but never used  @typescript-eslint/no-unused-vars
+
+✖ 7 problems (1 error, 6 warnings)
+
+ ELIFECYCLE  Command failed with exit code 1.
+exit=1

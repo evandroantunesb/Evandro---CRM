@@ -27,19 +27,23 @@ export type ComponenteKitProposta = {
   potenciaW: number | null;
 };
 
+/**
+ * Campos de resultado nulos = sem dado confiável (estimativa incompleta, cálculo legado ou emissão sem dados
+ * preservados). Nunca preencher com zero: o renderer omite o que é nulo.
+ */
 export type DadosSistemaProposta = {
   clienteNome: string;
   clienteEndereco: string | null;
   kitNome: string;
-  kitPotenciaKwp: number;
+  kitPotenciaKwp: number | null;
   tipoLigacao: TipoLigacao;
-  consumoMedioKwh: number;
-  geracaoEstimadaKwhMes: number;
-  contaSemSolar: number;
-  contaComSolar: number;
-  economiaMensal: number;
+  consumoMedioKwh: number | null;
+  geracaoEstimadaKwhMes: number | null;
+  contaSemSolar: number | null;
+  contaComSolar: number | null;
+  economiaMensal: number | null;
   paybackMeses: number | null;
   modoPreco: ModoPreco;
-  kitPreco: number;
+  kitPreco: number | null;
   componentes: ComponenteKitProposta[];
 };

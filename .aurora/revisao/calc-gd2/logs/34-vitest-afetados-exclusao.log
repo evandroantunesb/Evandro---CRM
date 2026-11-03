@@ -1,0 +1,11 @@
+$ pnpm exec vitest run tests/travas-kit-sdr-db.test.ts tests/calculos-estimativa-incompleta-db.test.ts tests/calculo-gd2-db.test.ts tests/negocios-gravacao-db.test.ts tests/calculo-vigencia-db.test.ts tests/calculadora-db.test.ts tests/proposta-db.test.ts tests/parametros-regulatorios-db.test.ts tests/negocios-gravacao.test.ts
+
+ RUN  v5.0.2 R:/wt-m2-p0-calc
+
+
+ Test Files  9 passed (9)
+      Tests  144 passed (144)
+   Start at  06:55:05
+   Duration  16.99s (tests 74%, transform 13%, import 13%)
+
+exit=0

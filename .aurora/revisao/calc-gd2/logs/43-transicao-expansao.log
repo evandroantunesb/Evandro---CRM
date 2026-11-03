@@ -1,0 +1,23 @@
+$ node .aurora/revisao/calc-gd2/integracao/verificar-transicao.mjs expansao
+{
+  "fase": "expansao",
+  "resultados": [
+    {
+      "nome": "app antigo: INSERT direto aceito",
+      "resultado": "ok"
+    },
+    {
+      "nome": "app antigo: UPDATE direto aceito",
+      "resultado": "ok"
+    },
+    {
+      "nome": "app novo: RPC de autorização devolve empresa e membro da sessão",
+      "resultado": "ok"
+    },
+    {
+      "nome": "`completo` forjado pelo cliente recusado",
+      "resultado": "ok"
+    }
+  ]
+}
+exit=0

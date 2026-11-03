@@ -1,0 +1,31 @@
+
+ RUN  v5.0.2 R:/wt-m2-p0-calc
+
+ ❯ tests/calculo-vigencia-db.test.ts (19 tests | 1 failed) 1414ms
+   ❯ gerarLinkProposta (Server Action) (7)
+     × as mensagens da proposta são as da regra nova (legado cita a fórmula antiga; sem linha não cita) 8ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/calculo-vigencia-db.test.ts > gerarLinkProposta (Server Action) > as mensagens da proposta são as da regra nova (legado cita a fórmula antiga; sem linha não cita)
+AssertionError: expected 'O último cálculo foi feito pela fórmu…' to contain 'A estimativa financeira está incomple…'
+
+Expected: "A estimativa financeira está incompleta: o último cálculo foi feito pela fórmula antiga, que não foi validada"
+Received: "O último cálculo foi feito pela fórmula antiga, que não foi validada. Recalcule o kit antes de gerar a proposta."
+
+ ❯ tests/calculo-vigencia-db.test.ts:199:38
+    197| describe("gerarLinkProposta (Server Action)", () => {
+    198|   it("as mensagens da proposta são as da regra nova (legado cita a fór…
+    199|     expect(MENSAGEM_PROPOSTA_LEGADO).toContain("A estimativa financeir…
+       |                                      ^
+    200|     expect(MENSAGEM_PROPOSTA_LEGADO).toContain("A proposta fica dispon…
+    201|     expect(MENSAGEM_PROPOSTA_SEM_LINHA).toContain("A estimativa financ…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  1 failed | 50 passed (51)
+   Start at  23:54:21
+   Duration  6.17s (tests 74%, import 14%, worker 6%, transform 6%)
+

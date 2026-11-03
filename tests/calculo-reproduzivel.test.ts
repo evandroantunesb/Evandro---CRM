@@ -1,16 +1,26 @@
 /**
- * M2-Q1/Q2 (B): o cálculo gravado precisa ser reproduzível. Cada entrada persistida é normalizada para a escala da
- * coluna do Postgres (half away from zero sobre o valor decimal) ANTES de calcular e é gravada já normalizada;
- * calcular(entradaDaLinha(linha)) devolve exatamente os resultados gravados na linha.
+ * M2-Q1/Q2 (B), reescrito na M2-Q6 (mudança de requisito, escopo congelado): o motor `calcular` devolve SEMPRE a
+ * estimativa incompleta, então `linhaDeCalculo` NUNCA gera linha FINANCEIRA de `calculos_solares`: devolve
+ * `{ ok:false, incompleta:true, mensagem, pendencias, potenciaKwp, geracaoEstimadaKwhMes, linha }`, em que `linha` é o
+ * resultado técnico com `estado_financeiro = 'incompleto'` (financeiros e payback nulos; migration 20261023200000) ou
+ * `null` para conta em R$ sem kWh. Entrada inválida continua sendo erro comum (sem `incompleta`). O dimensionamento
+ * (decisão D1) continua intacto.
  *
- * Escalas (migration 20260926000100_calculadora.sql): tarifa_kwh numeric(8,4), kit_potencia_kwp numeric(6,2),
- * kit_preco numeric(12,2), valor_fatura_medio numeric(12,2), consumo_medio_kwh numeric(10,2).
- *
- * Decisões D1 e D2 de Nora (autorizada pelo Evandro) estão registradas nos blocos correspondentes abaixo.
+ * As escalas das colunas de `calculos_solares` (tarifa 5 casas desde 20261023210000, potência/preço/fatura/consumo 2 casas) continuam
+ * conferidas nos limites de validação abaixo (o que a normalização transforma em 0 é recusado) e, para linhas
+ * legadas gravadas, em tests/calculadora-persistencia-db.test.ts. A reprodução "calcular(entradaDaLinha(linha)) ==
+ * linha" deixou de existir: a linha existente é da fórmula antiga e não é reproduzível pelo motor.
  */
 import { describe, expect, it } from "vitest";
 import { calcular, dimensionarSistema, sugerirQuantidadeModulos } from "@/lib/calculadora";
-import { consumoComoPersistido, entradaDaLinha, linhaDeCalculo } from "@/lib/calculo-reproduzivel";
+import {
+  consumoComoPersistido,
+  entradaDaLinha,
+  linhaDeCalculo,
+  mensagemEstimativaIncompleta,
+  pendenciasDaEntrada,
+  type ResultadoLinha,
+} from "@/lib/calculo-reproduzivel";
 
 const EMPRESA = "00000000-0000-0000-0000-0000000000aa";
 
@@ -32,25 +42,30 @@ const ENTRADA_BASE = {
   tarifaKwh: 0.9,
 };
 
-function montar(sobrescrever: Partial<typeof ENTRADA_BASE> = {}) {
-  const r = linhaDeCalculo(EMPRESA, { ...ENTRADA_BASE, ...sobrescrever }, PARAMETROS);
-  if (!r.ok) throw new Error(`linhaDeCalculo recusou entrada válida: ${r.mensagem}`);
-  return r.linha;
+type SobrescreverEntrada = Partial<typeof ENTRADA_BASE>;
+
+function resultado(sobrescrever: SobrescreverEntrada = {}, parametros: typeof PARAMETROS | null = PARAMETROS): ResultadoLinha {
+  return linhaDeCalculo(EMPRESA, { ...ENTRADA_BASE, ...sobrescrever }, parametros);
 }
 
-/** Resultados gravados na linha, no formato de ResultadoCalculo. */
-function resultadosGravados(linha: ReturnType<typeof montar>) {
-  return {
-    geracaoEstimadaKwhMes: linha.geracao_estimada_kwh_mes,
-    kwhFaturado: linha.kwh_faturado,
-    kwhCompensado: linha.kwh_compensado,
-    custoFioB: linha.custo_fio_b,
-    contaSemSolar: linha.conta_sem_solar,
-    contaComSolar: linha.conta_com_solar,
-    economiaMensal: linha.economia_mensal,
-    paybackMeses: linha.payback_meses,
-  };
+type Incompleta = Extract<ResultadoLinha, { incompleta: true }>;
+
+/** Exige a estimativa incompleta (nunca linha, nunca erro comum). */
+function incompleta(sobrescrever: SobrescreverEntrada = {}, parametros: typeof PARAMETROS | null = PARAMETROS): Incompleta {
+  const r = resultado(sobrescrever, parametros);
+  if (r.ok) throw new Error("linhaDeCalculo gerou uma linha: o motor nunca deveria produzir cálculo completo");
+  if (r.incompleta !== true) throw new Error(`esperava estimativa incompleta, veio o erro comum: ${r.mensagem}`);
+  return r;
 }
+
+const codigosDe = (r: Incompleta) => r.pendencias.map((p) => p.codigo);
+
+// Sem contexto regulatório (enquadramento/distribuidora da qualificação) nem base declarada: incompleta.
+const CODIGOS_DA_EMPRESA = ["enquadramento_ausente", "distribuidora_ausente", "base_tributaria_ausente"];
+
+const MENSAGEM_BASE =
+  "Estimativa financeira incompleta: Informe o tipo de cliente na Qualificação SDR (a estimativa cobre cliente residencial); " +
+  "Informe a distribuidora de energia na Qualificação SDR; Declare se a tarifa informada inclui tributos.";
 
 describe("consumoComoPersistido (numeric(10,2), half away from zero, semântica decimal)", () => {
   it.each([
@@ -77,193 +92,233 @@ describe("consumoComoPersistido (numeric(10,2), half away from zero, semântica 
   });
 });
 
-describe("linhaDeCalculo: consumo e reprodução", () => {
-  it("consumo informado com casas excedentes: grava com 2 casas e reproduz o cálculo", () => {
-    const linha = montar({ consumoMedioKwh: 1200.555 });
-    expect(linha.consumo_medio_kwh).toBe(1200.56);
-    // Oráculo independente: calcular() sobre o consumo já persistido.
-    expect(resultadosGravados(linha)).toEqual(
-      calcular({
-        potenciaKwp: 10,
-        precoKit: 30000,
-        tipoLigacao: "bifasico",
-        consumoMedioKwh: 1200.56,
-        tarifaKwh: 0.9,
-        produtividadeKwhKwpMes: 120,
-        percentualFioB: 0.45,
-        disponibilidadeKwh: 50,
-      }),
-    );
-    expect(calcular(entradaDaLinha(linha))).toEqual(resultadosGravados(linha));
-  });
+/** Resultado sem a linha técnica (o que o motor decide; a linha só registra as entradas). */
+const semLinha = ({ linha, ...resto }: Incompleta) => (void linha, resto);
 
-  it("consumo estimado por fatura / tarifa: 1000 / 0,90 grava 1111,11", () => {
-    const linha = montar({ consumoMedioKwh: null, valorFaturaMedio: 1000 });
-    expect(linha.consumo_medio_kwh).toBe(1111.11);
-    expect(calcular(entradaDaLinha(linha))).toEqual(resultadosGravados(linha));
-    expect(entradaDaLinha(linha).consumoMedioKwh).toBe(1111.11);
-  });
-
-  it("consumo já com 2 casas permanece inalterado", () => {
-    const linha = montar({ consumoMedioKwh: 1200.55 });
-    expect(linha.consumo_medio_kwh).toBe(1200.55);
-    expect(calcular(entradaDaLinha(linha))).toEqual(resultadosGravados(linha));
-  });
-
-  it("consumo informado vence a fatura", () => {
-    const linha = montar({ consumoMedioKwh: 500, valorFaturaMedio: 1000 });
-    expect(linha.consumo_medio_kwh).toBe(500);
-    expect(calcular(entradaDaLinha(linha))).toEqual(resultadosGravados(linha));
-  });
-
-  it.each([
-    ["monofasico", 30],
-    ["bifasico", 50],
-    ["trifasico", 100],
-  ] as const)("tipo %s usa a disponibilidade correspondente (%s kWh) e reproduz", (tipoLigacao, disp) => {
-    // Consumo baixo, perto da disponibilidade, para a escolha da disponibilidade alterar o resultado.
-    const linha = montar({ tipoLigacao, consumoMedioKwh: 1100.005 });
-    const entrada = entradaDaLinha(linha);
-    expect(entrada.disponibilidadeKwh).toBe(disp);
-    expect(entrada.tipoLigacao).toBe(tipoLigacao);
-    expect(entrada.produtividadeKwhKwpMes).toBe(120);
-    expect(entrada.percentualFioB).toBe(0.45);
-    expect(entrada.tarifaKwh).toBe(0.9);
-    expect(entrada.potenciaKwp).toBe(10);
-    expect(entrada.precoKit).toBe(30000);
-    expect(calcular(entrada)).toEqual(resultadosGravados(linha));
-  });
-
-  it("sistema que cobre todo o consumo reproduz também (faturado = disponibilidade)", () => {
-    const linha = montar({ potenciaKwp: 50, precoKit: 200000, consumoMedioKwh: 800.005 });
-    expect(calcular(entradaDaLinha(linha))).toEqual(resultadosGravados(linha));
-  });
-
-  it("sem economia: payback nulo é reproduzido como nulo", () => {
-    const linha = montar({ potenciaKwp: 0.1, consumoMedioKwh: 40, tarifaKwh: 0.01 });
-    expect(linha.payback_meses).toBeNull();
-    expect(calcular(entradaDaLinha(linha))).toEqual(resultadosGravados(linha));
-  });
-});
-
-/**
- * D2 (decidido por Nora, autorizada pelo Evandro): `linhaDeCalculo` normaliza tarifa (4 casas), potência, preço e
- * fatura (2 casas) ANTES de calcular e grava normalizado; o consumo é consumoComoPersistido(informado ?? fatura
- * persistida / tarifa persistida). Os valores esperados abaixo são a regra de escala do banco (half away from zero
- * decimal) calculada à mão, e o cálculo é conferido contra `calcular` sobre as entradas normalizadas.
- */
-describe("D2: linhaDeCalculo normaliza as entradas persistidas e grava normalizado", () => {
-  function oraculo(linha: ReturnType<typeof montar>) {
-    return calcular({
-      potenciaKwp: linha.kit_potencia_kwp,
-      precoKit: linha.kit_preco,
-      tipoLigacao: linha.tipo_ligacao as "monofasico" | "bifasico" | "trifasico",
-      consumoMedioKwh: linha.consumo_medio_kwh,
-      tarifaKwh: linha.tarifa_kwh,
-      produtividadeKwhKwpMes: 120,
-      percentualFioB: 0.45,
-      disponibilidadeKwh: linha.disponibilidade_kwh,
+describe("linhaDeCalculo: estimativa incompleta, só o resultado técnico", () => {
+  it("entrada completa do vendedor (consumo em kWh e tarifa): incompleta, linha técnica, com a mensagem exata", () => {
+    const r = incompleta();
+    expect(r.ok).toBe(false);
+    expect(codigosDe(r)).toEqual(CODIGOS_DA_EMPRESA);
+    expect(r.mensagem).toBe(MENSAGEM_BASE);
+    expect(r.mensagem).toBe(mensagemEstimativaIncompleta(r.pendencias));
+    expect(r.potenciaKwp).toBe(10);
+    expect(r.geracaoEstimadaKwhMes).toBe(1200); // 10 kWp × 120 kWh/kWp/mês
+    expect(r.linha).toEqual({
+      empresa_id: EMPRESA,
+      kit_id: null,
+      kit_nome: "Kit 10 kWp",
+      kit_potencia_kwp: 10,
+      kit_preco: 30000,
+      tipo_ligacao: "bifasico",
+      consumo_medio_kwh: 1200,
+      valor_fatura_medio: null,
+      tarifa_kwh: 0.9,
+      produtividade_kwh_kwp_mes: 120,
+      percentual_fio_b: 0.45,
+      disponibilidade_kwh: 50,
+      geracao_estimada_kwh_mes: 1200,
+      estado_financeiro: "incompleto",
+      pendencias: r.pendencias,
+      metodo_calculo: null,
+      kwh_faturado: null,
+      kwh_compensado: null,
+      kwh_nao_compensado: null,
+      custo_fio_b: null,
+      conta_sem_solar: null,
+      conta_com_solar: null,
+      economia_mensal: null,
+      payback_meses: null,
+      autoconsumo_kwh: null,
+      ressalvas: null,
+      // Novas entradas registradas mesmo incompleta (sem contexto: só tarifa e origem; base não declarada).
+      data_referencia: null,
+      tarifa_base_tributaria: null,
+      tarifa_origem: "informada_vendedor",
+      percentual_legal_fio_b: null,
+      tarifa_gd_id: null,
+      distribuidora: null,
+      enquadramento: null,
+      fio_b_rs_mwh: null,
+      fio_b_base_tributaria: null,
+      fio_b_vigencia_inicio: null,
+      fio_b_vigencia_fim: null,
+      financeiro_desatualizado_em: null,
+      financeiro_desatualizado_motivo: null,
     });
-  }
+  });
 
-  it("tarifa 0,123456 grava 0,1235 e o cálculo usa 0,1235", () => {
-    const linha = montar({ tarifaKwh: 0.123456 });
-    expect(linha.tarifa_kwh).toBe(0.1235);
-    const esperado = calcular({
+  it("nenhum campo financeiro vaza no resultado: na linha, todos nulos (ausência nunca vira zero)", () => {
+    const r = incompleta();
+    expect(Object.keys(r).sort()).toEqual(["geracaoEstimadaKwhMes", "incompleta", "linha", "mensagem", "ok", "pendencias", "potenciaKwp"]);
+    const l = r.linha!;
+    for (const campo of ["kwh_faturado", "kwh_compensado", "custo_fio_b", "conta_sem_solar", "conta_com_solar", "economia_mensal", "payback_meses"] as const) {
+      expect(l[campo], campo).toBeNull();
+    }
+    expect(l.metodo_calculo).toBeNull();
+  });
+
+  // ANTES (conta em R$ sem kWh): `{ok:false, incompleta:true, mensagem: MENSAGEM_ESTIMATIVA_INCOMPLETA}` sem pendências.
+  // AGORA: mesma ideia (nunca deriva consumo da fatura ÷ tarifa base), mas com a lista de pendências.
+  it("conta em R$ sem consumo em kWh: incompleta, nunca deriva consumo da fatura ÷ tarifa base", () => {
+    const r = incompleta({ consumoMedioKwh: null, valorFaturaMedio: 1000 });
+    expect(codigosDe(r)).toEqual([
+      "enquadramento_ausente",
+      "distribuidora_ausente",
+      "consumo_ausente",
+      "consumo_estimado_pela_tarifa_base",
+      "base_tributaria_ausente",
+    ]);
+    expect(r.mensagem).toContain("Informe o consumo médio em kWh");
+    expect(r.mensagem).toContain("O consumo veio do valor da conta em R$");
+    expect(r.geracaoEstimadaKwhMes).toBe(1200);
+  });
+
+  it("consumo em kWh informado não gera as pendências de consumo, mesmo com fatura (informado vence a fatura)", () => {
+    const r = incompleta({ consumoMedioKwh: 500, valorFaturaMedio: 1000 });
+    expect(codigosDe(r)).toEqual(CODIGOS_DA_EMPRESA);
+  });
+
+  it("consumo informado com casas excedentes (1200,555) é aceito: incompleta, não erro", () => {
+    expect(codigosDe(incompleta({ consumoMedioKwh: 1200.555 }))).toEqual(CODIGOS_DA_EMPRESA);
+  });
+
+  it("sem parâmetros e sem consumo em kWh: incompleta com geração indisponível (null), não o erro de parâmetros", () => {
+    const r = incompleta({ consumoMedioKwh: null, valorFaturaMedio: 1000 }, null);
+    expect(r.geracaoEstimadaKwhMes).toBeNull();
+    expect(r.potenciaKwp).toBe(10);
+  });
+
+  it("potência é normalizada para 2 casas no resultado (5,505 -> 5,51) e a geração usa a potência normalizada", () => {
+    const r = incompleta({ potenciaKwp: 5.505 });
+    expect(r.potenciaKwp).toBe(5.51);
+    expect(r.geracaoEstimadaKwhMes).toBe(661.2); // 5,51 × 120
+  });
+
+  it("potência 5,504 -> 5,5 e geração 660", () => {
+    const r = incompleta({ potenciaKwp: 5.504 });
+    expect(r.potenciaKwp).toBe(5.5);
+    expect(r.geracaoEstimadaKwhMes).toBe(660);
+  });
+
+  it.each(["monofasico", "bifasico", "trifasico"] as const)(
+    "tipo de ligação %s e preço não mudam o resultado (percentual e disponibilidade não têm efeito)",
+    (tipoLigacao) => {
+      const ref = semLinha(incompleta());
+      const r = incompleta({ tipoLigacao, precoKit: 1 });
+      expect(semLinha(r)).toEqual(ref);
+      expect(semLinha(r)).toEqual(
+        semLinha(
+          incompleta(
+            { tipoLigacao },
+            { ...PARAMETROS, percentual_fio_b: 0.99, disponibilidade_mono_kwh: 1, disponibilidade_bi_kwh: 2, disponibilidade_tri_kwh: 3 },
+          ),
+        ),
+      );
+      // A linha técnica registra o que foi informado (ligação e preço), sem efeito no resultado.
+      expect(r.linha).toMatchObject({ tipo_ligacao: tipoLigacao, kit_preco: 1, economia_mensal: null });
+    },
+  );
+
+  it("preço 0 e preço com casas excedentes são aceitos (incompleta), como antes aceitavam", () => {
+    expect(codigosDe(incompleta({ precoKit: 0 }))).toEqual(CODIGOS_DA_EMPRESA);
+    expect(codigosDe(incompleta({ precoKit: 19999.995 }))).toEqual(CODIGOS_DA_EMPRESA);
+  });
+
+  it("é determinístico e o motor concorda: calcular(entradaDaLinha-equivalente) também é incompleta", () => {
+    expect(incompleta()).toEqual(incompleta());
+    const motor = calcular({
       potenciaKwp: 10,
       precoKit: 30000,
       tipoLigacao: "bifasico",
       consumoMedioKwh: 1200,
-      tarifaKwh: 0.1235,
+      tarifaKwh: 0.9,
       produtividadeKwhKwpMes: 120,
-      percentualFioB: 0.45,
-      disponibilidadeKwh: 50,
     });
-    expect(resultadosGravados(linha)).toEqual(esperado);
-    expect(calcular(entradaDaLinha(linha))).toEqual(resultadosGravados(linha));
+    expect(motor.estado).toBe("incompleta");
+  });
+});
+
+describe("pendenciasDaEntrada e entradaDaLinha", () => {
+  it("sem consumo nem fatura: consumo ausente, sem a pendência de conta em R$", () => {
+    const c = pendenciasDaEntrada({ consumoMedioKwh: null, valorFaturaMedio: null, tarifaKwh: 0.9 }).map((p) => p.codigo);
+    expect(c).toContain("consumo_ausente");
+    expect(c).not.toContain("consumo_estimado_pela_tarifa_base");
+    expect(c).toContain("base_tributaria_ausente");
   });
 
-  it("tarifa 0,95231 grava 0,9523 e reproduz", () => {
-    const linha = montar({ tarifaKwh: 0.95231 });
-    expect(linha.tarifa_kwh).toBe(0.9523);
-    expect(resultadosGravados(linha)).toEqual(oraculo(linha));
-    expect(calcular(entradaDaLinha(linha))).toEqual(resultadosGravados(linha));
+  it("sem tarifa: tarifa_base_ausente", () => {
+    const c = pendenciasDaEntrada({ consumoMedioKwh: 300, valorFaturaMedio: null, tarifaKwh: null }).map((p) => p.codigo);
+    expect(c).toContain("tarifa_base_ausente");
+    expect(c).not.toContain("consumo_ausente");
   });
 
-  it("fatura 1000 com tarifa 0,95231: consumo 1050,09 (= 1000 / 0,9523 normalizado), fatura gravada 1000", () => {
-    // 1000 / 0,9523 = 1050,0892... -> 1050,09 (2 casas). Com a tarifa BRUTA daria 1050,08 (1000 / 0,95231 = 1050,078...).
-    const linha = montar({ consumoMedioKwh: null, valorFaturaMedio: 1000, tarifaKwh: 0.95231 });
-    expect(linha.tarifa_kwh).toBe(0.9523);
-    expect(linha.consumo_medio_kwh).toBe(1050.09);
-    expect(linha.valor_fatura_medio).toBe(1000);
-    expect(resultadosGravados(linha)).toEqual(oraculo(linha));
-    expect(calcular(entradaDaLinha(linha))).toEqual(resultadosGravados(linha));
-  });
-
-  it("fatura com casas excedentes é gravada normalizada e o consumo parte da fatura persistida", () => {
-    // 1000,005 -> 1000,01; tarifa 0,5: 1000,01 / 0,5 = 2000,02 (a fatura bruta daria 1000,005 / 0,5 = 2000,01).
-    const linha = montar({ consumoMedioKwh: null, valorFaturaMedio: 1000.005, tarifaKwh: 0.5 });
-    expect(linha.valor_fatura_medio).toBe(1000.01);
-    expect(linha.consumo_medio_kwh).toBe(2000.02);
-    expect(calcular(entradaDaLinha(linha))).toEqual(resultadosGravados(linha));
-  });
-
-  it("fatura 999,995 -> 1000 e consumo a partir de 1000 (não de 999,995)", () => {
-    // tarifa 0,7: 1000 / 0,7 = 1428,5714... -> 1428,57; 999,995 / 0,7 = 1428,5642... -> 1428,56.
-    const linha = montar({ consumoMedioKwh: null, valorFaturaMedio: 999.995, tarifaKwh: 0.7 });
-    expect(linha.valor_fatura_medio).toBe(1000);
-    expect(linha.consumo_medio_kwh).toBe(1428.57);
-    expect(calcular(entradaDaLinha(linha))).toEqual(resultadosGravados(linha));
-  });
-
-  it("valor_fatura_medio nulo continua nulo", () => {
-    expect(montar({ consumoMedioKwh: 1200, valorFaturaMedio: null }).valor_fatura_medio).toBeNull();
-  });
-
-  it("potência 5,505 grava 5,51 e preço 20000,005 grava 20000,01; o cálculo usa os normalizados", () => {
-    const linha = montar({ potenciaKwp: 5.505, precoKit: 20000.005 });
-    expect(linha.kit_potencia_kwp).toBe(5.51);
-    expect(linha.kit_preco).toBe(20000.01);
-    expect(resultadosGravados(linha)).toEqual(oraculo(linha));
-    expect(calcular(entradaDaLinha(linha))).toEqual(resultadosGravados(linha));
-  });
-
-  it("potência 6,1 e preço 19999,995 (-> 20000): valores normalizados e reprodução", () => {
-    const linha = montar({ potenciaKwp: 6.1, precoKit: 19999.995 });
-    expect(linha.kit_potencia_kwp).toBe(6.1);
-    expect(linha.kit_preco).toBe(20000);
-    expect(calcular(entradaDaLinha(linha))).toEqual(resultadosGravados(linha));
-  });
-
-  it("todas as entradas com excesso de casas ao mesmo tempo: reproduz e refazer da linha dá a mesma linha", () => {
-    const linha = montar({ potenciaKwp: 7.775, precoKit: 25999.995, tarifaKwh: 0.95231, consumoMedioKwh: 987.655 });
-    expect(linha.kit_potencia_kwp).toBe(7.78);
-    expect(linha.kit_preco).toBe(26000);
-    expect(linha.tarifa_kwh).toBe(0.9523);
-    expect(linha.consumo_medio_kwh).toBe(987.66);
-    expect(calcular(entradaDaLinha(linha))).toEqual(resultadosGravados(linha));
-    const refeita = montar({
-      kitNome: linha.kit_nome,
-      potenciaKwp: linha.kit_potencia_kwp,
-      precoKit: linha.kit_preco,
-      tarifaKwh: linha.tarifa_kwh,
-      consumoMedioKwh: linha.consumo_medio_kwh,
-      valorFaturaMedio: linha.valor_fatura_medio ?? null,
+  it("entradaDaLinha só repassa os valores gravados da linha (uso restante: linha legada)", () => {
+    expect(
+      entradaDaLinha({
+        kit_potencia_kwp: 5.5,
+        kit_preco: 20000,
+        tipo_ligacao: "trifasico",
+        consumo_medio_kwh: 400,
+        tarifa_kwh: 0.9,
+        produtividade_kwh_kwp_mes: 120,
+        percentual_fio_b: 0.6,
+        disponibilidade_kwh: 100,
+      }),
+    ).toEqual({
+      potenciaKwp: 5.5,
+      precoKit: 20000,
+      tipoLigacao: "trifasico",
+      consumoMedioKwh: 400,
+      tarifaKwh: 0.9,
+      produtividadeKwhKwpMes: 120,
+      percentualFioB: 0.6,
+      disponibilidadeKwh: 100,
     });
-    expect(refeita).toEqual(linha);
+  });
+});
+
+/**
+ * D2 (decidido por Nora, autorizada pelo Evandro): `linhaDeCalculo` normaliza tarifa (5 casas), potência, preço e
+ * fatura (2 casas) ANTES de calcular. Os valores esperados abaixo são a regra de escala do banco (half away from
+ * zero decimal) calculada à mão.
+ */
+describe("D2: linhaDeCalculo normaliza as entradas persistidas (sem gravar linha nova)", () => {
+  // ANTES: estes testes conferiam o que era GRAVADO na linha (tarifa 0,1235; 0,9523; fatura 1000,01; consumo derivado
+  // da fatura etc.) e a reprodução pelo motor. AGORA não há linha nova: o que resta da normalização é (a) o que ela
+  // transforma em 0 continua recusado (ver "validações" abaixo) e (b) a potência normalizada devolvida. A escala das
+  // colunas gravadas segue testada em tests/calculadora-persistencia-db.test.ts com linhas legadas de fixture.
+
+  it("potência 6,1 e 7,775 (-> 7,78): potência normalizada e geração sobre a potência normalizada", () => {
+    expect(incompleta({ potenciaKwp: 6.1 }).potenciaKwp).toBe(6.1);
+    const r = incompleta({ potenciaKwp: 7.775 });
+    expect(r.potenciaKwp).toBe(7.78);
+    expect(r.geracaoEstimadaKwhMes).toBe(933.6); // 7,78 × 120
   });
 
-  it("preço 0 é aceito (>= 0) e payback fica nulo", () => {
-    const linha = montar({ precoKit: 0 });
-    expect(linha.kit_preco).toBe(0);
-    expect(linha.payback_meses).toBeNull();
+  it.each([
+    [1000, 0.95231],
+    [1000.005, 0.5],
+    [999.995, 0.7],
+  ])("fatura %s e tarifa %s sem consumo em kWh: estimativa incompleta (nunca consumo derivado)", (fatura, tarifa) => {
+    const r = incompleta({ consumoMedioKwh: null, valorFaturaMedio: fatura, tarifaKwh: tarifa });
+    expect(codigosDe(r)).toContain("consumo_ausente");
+    expect(codigosDe(r)).toContain("consumo_estimado_pela_tarifa_base");
+    // Sem kWh não há linha técnica (a coluna de consumo exige kWh): nada é gravado.
+    expect(r.linha).toBeNull();
+  });
+
+  it("todas as entradas com excesso de casas ao mesmo tempo continuam aceitas (incompleta, sem erro)", () => {
+    const r = incompleta({ potenciaKwp: 7.775, precoKit: 25999.995, tarifaKwh: 0.95231, consumoMedioKwh: 987.655 });
+    expect(codigosDe(r)).toEqual(CODIGOS_DA_EMPRESA);
+    expect(r.potenciaKwp).toBe(7.78);
   });
 });
 
 describe("linhaDeCalculo: validações e ordem dos erros", () => {
   const ERRO_ENTRADA = "Informe o consumo médio ou o valor médio da fatura.";
   const ERRO_POTENCIA = "Informe ao menos um módulo com potência para calcular.";
-  const ERRO_TARIFA = "Informe uma tarifa maior que zero (o banco guarda 4 casas).";
+  const ERRO_TARIFA = "Informe uma tarifa maior que zero (o banco guarda 5 casas).";
   const ERRO_PRECO = "Informe um preço do kit válido (maior ou igual a zero).";
   const ERRO_CONSUMO = "Informe um consumo maior que zero (o banco guarda 2 casas).";
   const ERRO_PARAMETROS = "Parâmetros da calculadora não configurados.";
@@ -287,17 +342,18 @@ describe("linhaDeCalculo: validações e ordem dos erros", () => {
   });
 
   it("potência 0,005 (normaliza para 0,01) é aceita", () => {
-    expect(montar({ potenciaKwp: 0.005 }).kit_potencia_kwp).toBe(0.01);
+    expect(incompleta({ potenciaKwp: 0.005 }).potenciaKwp).toBe(0.01);
   });
 
-  it("tarifa 0,00004 (normaliza para 0) devolve o erro de tarifa; 0 e negativa também", () => {
-    expect(mensagem({ tarifaKwh: 0.00004 })).toBe(ERRO_TARIFA);
+  it("tarifa 0,000004 (normaliza para 0) devolve o erro de tarifa; 0 e negativa também", () => {
+    expect(mensagem({ tarifaKwh: 0.000004 })).toBe(ERRO_TARIFA);
     expect(mensagem({ tarifaKwh: 0 })).toBe(ERRO_TARIFA);
     expect(mensagem({ tarifaKwh: -0.5 })).toBe(ERRO_TARIFA);
   });
 
-  it("tarifa 0,00005 (normaliza para 0,0001) é aceita", () => {
-    expect(montar({ tarifaKwh: 0.00005 }).tarifa_kwh).toBe(0.0001);
+  it("tarifa 0,000005 (normaliza para 0,00001) é aceita", () => {
+    // Aceita (não é o erro de tarifa): estimativa incompleta.
+    expect(codigosDe(incompleta({ tarifaKwh: 0.000005 }))).toEqual(CODIGOS_DA_EMPRESA);
   });
 
   it("preço -1 devolve o erro de preço", () => {
@@ -312,8 +368,18 @@ describe("linhaDeCalculo: validações e ordem dos erros", () => {
     expect(mensagem({ consumoMedioKwh: 0 })).toBe(ERRO_CONSUMO);
   });
 
-  it("fatura 0,004 com tarifa 1 (fatura persistida 0, consumo 0) devolve o erro de consumo", () => {
-    expect(mensagem({ consumoMedioKwh: null, valorFaturaMedio: 0.004, tarifaKwh: 1 })).toBe(ERRO_CONSUMO);
+  // ALTERADO: antes devolvia ERRO_CONSUMO (consumo derivado = 0). Sem derivacao, conta em R$ sem kWh e
+  // estimativa incompleta, mesmo com fatura que normaliza para 0.
+  it("fatura 0,004 com tarifa 1 sem consumo em kWh devolve estimativa incompleta (não mais o erro de consumo)", () => {
+    const r = incompleta({ consumoMedioKwh: null, valorFaturaMedio: 0.004, tarifaKwh: 1 });
+    expect(codigosDe(r)).toContain("consumo_estimado_pela_tarifa_base");
+    expect(r.mensagem).not.toBe(ERRO_CONSUMO);
+  });
+
+  it("estimativa incompleta não é erro de entrada: só aparece com entrada válida (potência, tarifa e preço ok)", () => {
+    expect(mensagem({ consumoMedioKwh: null, valorFaturaMedio: 1000, potenciaKwp: 0 })).toBe(ERRO_POTENCIA);
+    expect(mensagem({ consumoMedioKwh: null, valorFaturaMedio: 1000, tarifaKwh: 0 })).toBe(ERRO_TARIFA);
+    expect(mensagem({ consumoMedioKwh: null, valorFaturaMedio: 1000, precoKit: -1 })).toBe(ERRO_PRECO);
   });
 
   it("parâmetros nulos com entrada válida devolvem o erro de parâmetros", () => {
@@ -335,7 +401,7 @@ describe("linhaDeCalculo: validações e ordem dos erros", () => {
     });
 
     it("tarifa e preço inválidos: tarifa primeiro", () => {
-      expect(mensagem({ tarifaKwh: 0.00004, precoKit: -1 })).toBe(ERRO_TARIFA);
+      expect(mensagem({ tarifaKwh: 0.000004, precoKit: -1 })).toBe(ERRO_TARIFA);
     });
 
     it("preço e consumo inválidos: preço primeiro", () => {
@@ -457,11 +523,12 @@ describe("A1 (decidido em D1): dimensionamento usa o consumo como persistido", (
     expect({ total: problemas.length, amostra: problemas.slice(0, 10) }).toEqual({ total: 0, amostra: [] });
   });
 
-  it("a linha gravada a partir de 1190,404 grava 1190,40 e a potência normalizada do kit de 17 módulos", () => {
-    const r = linhaDeCalculo(EMPRESA, { ...ENTRADA_BASE, potenciaKwp: 17 * 0.62, consumoMedioKwh: 1190.404, tarifaKwh: 0.9 }, PARAMETROS);
-    expect(r.ok).toBe(true);
-    if (!r.ok) return;
-    expect(r.linha.consumo_medio_kwh).toBe(1190.4);
-    expect(r.linha.kit_potencia_kwp).toBe(10.54);
+  // ANTES: a linha gravada de 1190,404 trazia consumo 1190,40 e potência 10,54. AGORA não há linha: o consumo
+  // 1190,404 é aceito (incompleta) e o resultado traz a potência normalizada do kit de 17 módulos.
+  it("o consumo 1190,404 é aceito e o kit de 17 módulos devolve a potência normalizada 10,54 e a geração 1264,8", () => {
+    const r = incompleta({ potenciaKwp: 17 * 0.62, consumoMedioKwh: 1190.404, tarifaKwh: 0.9 });
+    expect(r.potenciaKwp).toBe(10.54);
+    expect(r.geracaoEstimadaKwhMes).toBe(1264.8);
+    expect(codigosDe(r)).not.toContain("consumo_ausente");
   });
 });

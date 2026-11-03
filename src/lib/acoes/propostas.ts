@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { carregarVigencia, mensagemDeRecusa, motivosDaAcao, MENSAGEM_PROPOSTA_ECONOMIA_INDISPONIVEL } from "@/lib/calculo-vigencia";
+import { mensagemPropostaIncompleta, pendenciasSemDados } from "@/lib/estimativa-financeira";
 import { mensagemErro } from "@/lib/erros";
 import { exigirPapel } from "@/lib/sessao";
 import { NEGOCIOS, PROPOSTA_E_CONTRATO, pode } from "@/lib/permissoes";
@@ -23,12 +25,15 @@ export async function gerarLinkProposta(_: ResultadoAcao, formData: FormData): P
   if (!dados.success) return { ok: false, mensagem: "Negócio inválido." };
 
   const supabase = await criarClienteServidor();
-  const { data: calculo } = await supabase
-    .from("calculos_solares")
-    .select("id")
-    .eq("negocio_id", dados.data.negocioId)
-    .maybeSingle();
-  if (!calculo) return { ok: false, mensagem: "Calcule o kit antes de gerar a proposta." };
+  // Falha de leitura nunca vale como "vigente". Enquanto a estimativa financeira for incompleta (hoje, sempre) ou o
+  // cálculo salvo for legado (fórmula antiga, não validada), não há proposta: nada financeiro é emitido.
+  const lido = await carregarVigencia(supabase, dados.data.negocioId);
+  if (!lido.ok) return { ok: false, mensagem: "Não foi possível conferir o cálculo. Tente de novo." };
+  if (!lido.calculo) return { ok: false, mensagem: mensagemPropostaIncompleta(pendenciasSemDados()) };
+  const motivos = motivosDaAcao(lido.vigencia.motivos, "proposta");
+  if (motivos.length) return { ok: false, mensagem: mensagemDeRecusa(motivos, "proposta") };
+  // Cálculo completo e vigente: o link antigo mostraria conta e economia (D1/D2, congelados). Nada é gravado.
+  if (lido.calculo.estado_financeiro === "completo") return { ok: false, mensagem: MENSAGEM_PROPOSTA_ECONOMIA_INDISPONIVEL };
 
   let modeloId = dados.data.modeloId ?? null;
   if (!modeloId) {

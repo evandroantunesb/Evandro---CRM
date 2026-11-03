@@ -22,7 +22,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { loadEnv } from "vite";
 import { ARQUIVO_MARCADOR, montarMarcador } from "./lib/bundle-servido.mjs";
 import { ambienteEfetivo, verificarAmbienteLocal } from "./lib/guard-supabase-local.mjs";
@@ -89,7 +89,17 @@ const trava = spawnSync(process.execPath, [join(raiz, "scripts", "checar-ambient
 });
 if (trava.status !== 0) recusar("a trava de `pnpm start` recusou o ambiente.");
 
-const servidor = spawn(process.execPath, [nextBin, "start", "--port", porta], { cwd: raiz, env, stdio: "inherit", shell: false });
+// Relógio de teste (scripts/e2e-relogio.mjs): só neste `next start` do e2e, nunca no build nem em produção. A data do
+// servidor só muda se o próprio teste gravar e2e/.estado/relogio.json no disco local; sem o arquivo, é a real.
+const ARQUIVO_RELOGIO = join(raiz, "e2e", ".estado", "relogio.json");
+rmSync(ARQUIVO_RELOGIO, { force: true });
+const relogio = pathToFileURL(join(raiz, "scripts", "e2e-relogio.mjs")).href;
+const servidor = spawn(process.execPath, ["--import", relogio, nextBin, "start", "--port", porta], {
+  cwd: raiz,
+  env: { ...env, RAION_E2E_RELOGIO_ARQUIVO: ARQUIVO_RELOGIO },
+  stdio: "inherit",
+  shell: false,
+});
 for (const sinal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
   process.on(sinal, () => servidor.kill(sinal));
 }

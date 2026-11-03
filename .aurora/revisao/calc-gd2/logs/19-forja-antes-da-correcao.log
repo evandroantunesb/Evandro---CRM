@@ -1,0 +1,252 @@
+$ pnpm exec vitest run tests/calculo-gravacao-confiavel-db.test.ts
+
+ RUN  v5.0.2 R:/wt-m2-p0-calc
+
+ ❯ tests/calculo-gravacao-confiavel-db.test.ts (12 tests | 11 failed) 911ms
+   ❯ vendedor autenticado não grava financeiro direto (PostgREST) (6)
+     × INSERT de linha `completo` forjada: recusado, nada gravado 166ms
+     × INSERT de linha `legado` com economia (fórmula antiga forjada): recusado 31ms
+     × UPDATE de valores, método, percentual, fonte, estado e autoria numa linha legítima: recusado, linha intacta 62ms
+     × UPDATE de linha `incompleto` para `completo` com números: recusado 52ms
+     × UPSERT por cima da linha legítima: recusado, linha intacta 101ms
+   ❯ autorização real (empresa, negócio, papel) e autoria da sessão (5)
+     × RPC de autorização: vendedor responsável recebe a própria autoria; ela não grava nada 18ms
+     × outra empresa: RPC recusa, salvar pelo servidor recusa e nada é gravado 26ms
+     × papel `operacao` (acesso operacional, sem acesso comercial): RPC recusa e salvar não grava cálculo 27ms
+     × colega da mesma empresa que não vê o negócio: RPC recusa e salvar não grava 27ms
+     × salvar legítimo grava `completo` com a autoria da SESSÃO, mesmo com membroId adulterado no `atual` 44ms
+   ❯ defesa no banco: `completo` só com a referência tarifária oficial (inclusive pelo caminho privilegiado) (1)
+     × fonte, percentual, vigência ou método divergentes da tabela oficial: recusado mesmo com a service role 51ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 11 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/calculo-gravacao-confiavel-db.test.ts > vendedor autenticado não grava financeiro direto (PostgREST) > INSERT de linha `completo` forjada: recusado, nada gravado
+AssertionError: expected undefined to be '42501' // Object.is equality
+
+- Expected:
+"42501"
+
++ Received:
+undefined
+
+ ❯ tests/calculo-gravacao-confiavel-db.test.ts:98:25
+     96|     await servico.from("kit_componentes").insert({ empresa_id: empresa…
+     97|     const { error } = await vendedor.cliente.from("calculos_solares").…
+     98|     expect(error?.code).toBe("42501");
+       |                         ^
+     99|     expect(await linha(negocioId)).toBeNull();
+    100|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/11]⎯
+
+ FAIL  tests/calculo-gravacao-confiavel-db.test.ts > vendedor autenticado não grava financeiro direto (PostgREST) > INSERT de linha `legado` com economia (fórmula antiga forjada): recusado
+AssertionError: expected '23502' to be '42501' // Object.is equality
+
+Expected: "42501"
+Received: "23502"
+
+ ❯ tests/calculo-gravacao-confiavel-db.test.ts:125:25
+    123|       payback_meses: 1,
+    124|     });
+    125|     expect(error?.code).toBe("42501");
+       |                         ^
+    126|     expect(await linha(negocioId)).toBeNull();
+    127|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/11]⎯
+
+ FAIL  tests/calculo-gravacao-confiavel-db.test.ts > vendedor autenticado não grava financeiro direto (PostgREST) > UPDATE de valores, método, percentual, fonte, estado e autoria numa linha legítima: recusado, linha intacta
+AssertionError: expected { …(3) } to deeply equal { …(3) }
+
+- Expected
++ Received
+
+  {
+-   "codigo": "42501",
+-   "data": null,
++   "codigo": undefined,
++   "data": [
++     {
++       "id": "e0446e44-4b2b-4495-8af6-e6fb85d79852",
++     },
++   ],
+    "patch": {
+      "economia_mensal": 9999.99,
+    },
+  }
+
+ ❯ tests/calculo-gravacao-confiavel-db.test.ts:147:52
+    145|       const { data, error } = await vendedor.cliente.from("calculos_so…
+    146|       // Sem privilégio de UPDATE: erro 42501 (nunca "0 linhas" silenc…
+    147|       expect({ patch, codigo: error?.code, data }).toEqual({ patch, co…
+       |                                                    ^
+    148|     }
+    149|     expect(await linha(negocioId)).toEqual(antes);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/11]⎯
+
+ FAIL  tests/calculo-gravacao-confiavel-db.test.ts > vendedor autenticado não grava financeiro direto (PostgREST) > UPDATE de linha `incompleto` para `completo` com números: recusado
+AssertionError: expected '23514' to be '42501' // Object.is equality
+
+Expected: "42501"
+Received: "23514"
+
+ ❯ tests/calculo-gravacao-confiavel-db.test.ts:161:25
+    159|       .update({ estado_financeiro: "completo", economia_mensal: 191.79…
+    160|       .eq("negocio_id", negocioId);
+    161|     expect(error?.code).toBe("42501");
+       |                         ^
+    162|     expect(await linha(negocioId)).toEqual(antes);
+    163|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/11]⎯
+
+ FAIL  tests/calculo-gravacao-confiavel-db.test.ts > vendedor autenticado não grava financeiro direto (PostgREST) > UPSERT por cima da linha legítima: recusado, linha intacta
+AssertionError: expected undefined to be '42501' // Object.is equality
+
+- Expected:
+"42501"
+
++ Received:
+undefined
+
+ ❯ tests/calculo-gravacao-confiavel-db.test.ts:170:25
+    168|     const antes = await linha(negocioId);
+    169|     const { error } = await vendedor.cliente.from("calculos_solares").…
+    170|     expect(error?.code).toBe("42501");
+       |                         ^
+    171|     expect(await linha(negocioId)).toEqual(antes);
+    172|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/11]⎯
+
+ FAIL  tests/calculo-gravacao-confiavel-db.test.ts > autorização real (empresa, negócio, papel) e autoria da sessão > RPC de autorização: vendedor responsável recebe a própria autoria; ela não grava nada
+AssertionError: expected { code: 'PGRST202', …(3) } to be null
+
+- Expected:
+null
+
++ Received:
+{
+  "code": "PGRST202",
+  "details": "Searched for the function public.autorizar_gravacao_calculo with parameter p_negocio_id or with a single unnamed json/jsonb parameter, but no matches were found in the schema cache.",
+  "hint": null,
+  "message": "Could not find the function public.autorizar_gravacao_calculo(p_negocio_id) in the schema cache",
+}
+
+ ❯ tests/calculo-gravacao-confiavel-db.test.ts:184:19
+    182|     const negocioId = await novoNegocio();
+    183|     const { data, error } = await vendedor.cliente.rpc("autorizar_grav…
+    184|     expect(error).toBeNull();
+       |                   ^
+    185|     expect(data).toEqual([{ empresa_id: empresa, membro_id: atualVende…
+    186|     expect(await linha(negocioId)).toBeNull();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/11]⎯
+
+ FAIL  tests/calculo-gravacao-confiavel-db.test.ts > autorização real (empresa, negócio, papel) e autoria da sessão > outra empresa: RPC recusa, salvar pelo servidor recusa e nada é gravado
+AssertionError: expected 'PGRST202' to be '42501' // Object.is equality
+
+Expected: "42501"
+Received: "PGRST202"
+
+ ❯ tests/calculo-gravacao-confiavel-db.test.ts:192:29
+    190|     const negocioId = await novoNegocio();
+    191|     const rpc = await fora.cliente.rpc("autorizar_gravacao_calculo", {…
+    192|     expect(rpc.error?.code).toBe("42501");
+       |                             ^
+    193|     const r = await salvarComo(fora, atualFora, negocioId);
+    194|     expect(r.ok).toBe(false);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/11]⎯
+
+ FAIL  tests/calculo-gravacao-confiavel-db.test.ts > autorização real (empresa, negócio, papel) e autoria da sessão > papel `operacao` (acesso operacional, sem acesso comercial): RPC recusa e salvar não grava cálculo
+AssertionError: expected 'PGRST202' to be '42501' // Object.is equality
+
+Expected: "42501"
+Received: "PGRST202"
+
+ ❯ tests/calculo-gravacao-confiavel-db.test.ts:202:113
+    200|   it("papel `operacao` (acesso operacional, sem acesso comercial): RPC…
+    201|     const negocioId = await novoNegocio();
+    202|     expect((await operacao.cliente.rpc("autorizar_gravacao_calculo", {…
+       |                                                                                                                 ^
+    203|     const r = await salvarComo(operacao, atualOperacao, negocioId);
+    204|     expect(r.ok).toBe(false);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/11]⎯
+
+ FAIL  tests/calculo-gravacao-confiavel-db.test.ts > autorização real (empresa, negócio, papel) e autoria da sessão > colega da mesma empresa que não vê o negócio: RPC recusa e salvar não grava
+AssertionError: expected 'PGRST202' to be '42501' // Object.is equality
+
+Expected: "42501"
+Received: "PGRST202"
+
+ ❯ tests/calculo-gravacao-confiavel-db.test.ts:210:111
+    208|   it("colega da mesma empresa que não vê o negócio: RPC recusa e salva…
+    209|     const negocioId = await novoNegocio();
+    210|     expect((await colega.cliente.rpc("autorizar_gravacao_calculo", { p…
+       |                                                                                                               ^
+    211|     expect((await salvarComo(colega, atualColega, negocioId)).ok).toBe…
+    212|     expect(await linha(negocioId)).toBeNull();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/11]⎯
+
+ FAIL  tests/calculo-gravacao-confiavel-db.test.ts > autorização real (empresa, negócio, papel) e autoria da sessão > salvar legítimo grava `completo` com a autoria da SESSÃO, mesmo com membroId adulterado no `atual`
+AssertionError: expected { …(46) } to match object { estado_financeiro: 'completo', …(4) }
+(41 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "atualizado_por": "f41c5751-f1fc-42e4-89d1-f66e9bca375a",
+-   "criado_por": "f41c5751-f1fc-42e4-89d1-f66e9bca375a",
++   "atualizado_por": "29fcec23-5f2e-483f-95e3-d3dcbfa184d9",
++   "criado_por": "29fcec23-5f2e-483f-95e3-d3dcbfa184d9",
+    "economia_mensal": 191.79,
+    "empresa_id": "e959e17c-20d8-4ece-acf9-248fea7e360b",
+    "estado_financeiro": "completo",
+  }
+
+ ❯ tests/calculo-gravacao-confiavel-db.test.ts:219:36
+    217|     const adulterado: Atual = { ...atualVendedor, membroId: atualColeg…
+    218|     expect(await salvarComo(vendedor, adulterado, negocioId)).toMatchO…
+    219|     expect(await linha(negocioId)).toMatchObject({
+       |                                    ^
+    220|       estado_financeiro: "completo",
+    221|       economia_mensal: 191.79,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/11]⎯
+
+ FAIL  tests/calculo-gravacao-confiavel-db.test.ts > defesa no banco: `completo` só com a referência tarifária oficial (inclusive pelo caminho privilegiado) > fonte, percentual, vigência ou método divergentes da tabela oficial: recusado mesmo com a service role
+AssertionError: expected { patch: { fio_b_rs_mwh: 1 }, …(1) } to deeply equal { patch: { fio_b_rs_mwh: 1 }, …(1) }
+
+- Expected
++ Received
+
+  {
+-   "codigo": "23514",
++   "codigo": undefined,
+    "patch": {
+      "fio_b_rs_mwh": 1,
+    },
+  }
+
+ ❯ tests/calculo-gravacao-confiavel-db.test.ts:248:46
+    246|     for (const patch of ataques) {
+    247|       const { error } = await servico.from("calculos_solares").update(…
+    248|       expect({ patch, codigo: error?.code }).toEqual({ patch, codigo: …
+       |                                              ^
+    249|     }
+    250|     expect(await linha(negocioId)).toEqual(antes);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/11]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  11 failed | 1 passed (12)
+   Start at  06:04:05
+   Duration  12.21s (tests 73%, import 13%, transform 13%)
+
+exit=1

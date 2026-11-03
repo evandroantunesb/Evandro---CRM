@@ -1,0 +1,9 @@
+
+ RUN  v5.0.2 R:/wt-m2-p0-calc
+
+
+ Test Files  1 passed (1)
+      Tests  28 passed (28)
+   Start at  23:55:08
+   Duration  4.99s (tests 89%, import 6%, transform 4%)
+

@@ -9,7 +9,7 @@ import { ambienteEfetivo, verificarAmbienteLocal } from "./scripts/lib/guard-sup
  */
 const efetivo = ambienteEfetivo(loadEnv("development", process.cwd(), ""), process.env);
 verificarAmbienteLocal(efetivo);
-for (const chave of ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY"]) {
+for (const chave of ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY"]) {
   if (efetivo[chave] && !process.env[chave]) process.env[chave] = efetivo[chave];
 }
 

@@ -1,0 +1,86 @@
+$ pnpm exec vitest run
+
+ RUN  v5.0.2 R:/wt-m2-p0-calc
+
+ ❯ tests/obras-acesso-db.test.ts (33 tests | 33 skipped) 2769ms
+ ❯ tests/handoff-resposta-gestor-db.test.ts (49 tests | 49 skipped) 2827ms
+ ❯ tests/pagamento-registrado-solo-db.test.ts (33 tests | 33 skipped) 2891ms
+ ❯ tests/obras-escrita-db.test.ts (36 tests | 36 skipped) 2480ms
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/handoff-resposta-gestor-db.test.ts [ tests/handoff-resposta-gestor-db.test.ts ]
+AuthRetryableFetchError: Database error querying schema
+ ❯ handleError node_modules/.pnpm/@supabase+auth-js@2.117.2/node_modules/@supabase/auth-js/src/lib/fetch.ts:97:11
+ ❯ _handleRequest node_modules/.pnpm/@supabase+auth-js@2.117.2/node_modules/@supabase/auth-js/src/lib/fetch.ts:239:5
+ ❯ _request node_modules/.pnpm/@supabase+auth-js@2.117.2/node_modules/@supabase/auth-js/src/lib/fetch.ts:200:16
+ ❯ SupabaseAuthClient.signInWithPassword node_modules/.pnpm/@supabase+auth-js@2.117.2/node_modules/@supabase/auth-js/src/GoTrueClient.ts:1243:15
+ ❯ criarUsuario tests/ajuda.ts:24:32
+     22|   if (error) throw error;
+     23|   const cliente = createClient<Database>(URL, ANON, { auth: { persistS…
+     24|   const { error: erroLogin } = await cliente.auth.signInWithPassword({…
+       |                                ^
+     25|   if (erroLogin) throw erroLogin;
+     26|   return { id: data.user.id, email, cliente };
+ ❯ tests/handoff-resposta-gestor-db.test.ts:58:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  tests/obras-acesso-db.test.ts [ tests/obras-acesso-db.test.ts ]
+AuthRetryableFetchError: Unexpected failure, please check server logs for more information
+ ❯ handleError node_modules/.pnpm/@supabase+auth-js@2.117.2/node_modules/@supabase/auth-js/src/lib/fetch.ts:97:11
+ ❯ _handleRequest node_modules/.pnpm/@supabase+auth-js@2.117.2/node_modules/@supabase/auth-js/src/lib/fetch.ts:239:5
+ ❯ _request node_modules/.pnpm/@supabase+auth-js@2.117.2/node_modules/@supabase/auth-js/src/lib/fetch.ts:200:16
+ ❯ SupabaseAuthClient.signInWithPassword node_modules/.pnpm/@supabase+auth-js@2.117.2/node_modules/@supabase/auth-js/src/GoTrueClient.ts:1243:15
+ ❯ criarUsuario tests/ajuda.ts:24:32
+     22|   if (error) throw error;
+     23|   const cliente = createClient<Database>(URL, ANON, { auth: { persistS…
+     24|   const { error: erroLogin } = await cliente.auth.signInWithPassword({…
+       |                                ^
+     25|   if (erroLogin) throw erroLogin;
+     26|   return { id: data.user.id, email, cliente };
+ ❯ tests/obras-acesso-db.test.ts:176:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  tests/obras-escrita-db.test.ts > Obras 3b-3: cenário progressivo (ordem importa)
+AuthRetryableFetchError: Database error querying schema
+ ❯ handleError node_modules/.pnpm/@supabase+auth-js@2.117.2/node_modules/@supabase/auth-js/src/lib/fetch.ts:97:11
+ ❯ _handleRequest node_modules/.pnpm/@supabase+auth-js@2.117.2/node_modules/@supabase/auth-js/src/lib/fetch.ts:239:5
+ ❯ _request node_modules/.pnpm/@supabase+auth-js@2.117.2/node_modules/@supabase/auth-js/src/lib/fetch.ts:200:16
+ ❯ SupabaseAuthClient.signInWithPassword node_modules/.pnpm/@supabase+auth-js@2.117.2/node_modules/@supabase/auth-js/src/GoTrueClient.ts:1243:15
+ ❯ criarUsuario tests/ajuda.ts:24:32
+     22|   if (error) throw error;
+     23|   const cliente = createClient<Database>(URL, ANON, { auth: { persistS…
+     24|   const { error: erroLogin } = await cliente.auth.signInWithPassword({…
+       |                                ^
+     25|   if (erroLogin) throw erroLogin;
+     26|   return { id: data.user.id, email, cliente };
+ ❯ tests/obras-escrita-db.test.ts:284:11
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  tests/pagamento-registrado-solo-db.test.ts [ tests/pagamento-registrado-solo-db.test.ts ]
+AuthRetryableFetchError: Unexpected failure, please check server logs for more information
+ ❯ handleError node_modules/.pnpm/@supabase+auth-js@2.117.2/node_modules/@supabase/auth-js/src/lib/fetch.ts:97:11
+ ❯ _handleRequest node_modules/.pnpm/@supabase+auth-js@2.117.2/node_modules/@supabase/auth-js/src/lib/fetch.ts:239:5
+ ❯ _request node_modules/.pnpm/@supabase+auth-js@2.117.2/node_modules/@supabase/auth-js/src/lib/fetch.ts:200:16
+ ❯ SupabaseAuthClient.signInWithPassword node_modules/.pnpm/@supabase+auth-js@2.117.2/node_modules/@supabase/auth-js/src/GoTrueClient.ts:1243:15
+ ❯ criarUsuario tests/ajuda.ts:24:32
+     22|   if (error) throw error;
+     23|   const cliente = createClient<Database>(URL, ANON, { auth: { persistS…
+     24|   const { error: erroLogin } = await cliente.auth.signInWithPassword({…
+       |                                ^
+     25|   if (erroLogin) throw erroLogin;
+     26|   return { id: data.user.id, email, cliente };
+ ❯ tests/pagamento-registrado-solo-db.test.ts:94:76
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  4 failed | 101 passed (105)
+      Tests  1987 passed | 151 skipped (2138)
+   Start at  06:56:01
+   Duration  40.80s (tests 91%, import 5%, transform 3%)
+
+exit=1

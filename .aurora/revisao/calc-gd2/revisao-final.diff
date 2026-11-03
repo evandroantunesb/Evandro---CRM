@@ -1,0 +1,473 @@
+diff -ruN --strip-trailing-cr -x .estado src/lib/calculo-gravacao.ts src/lib/calculo-gravacao.ts
+--- src/lib/calculo-gravacao.ts	2026-10-23 07:01:04.586244400 -0300
++++ src/lib/calculo-gravacao.ts	2026-10-23 06:53:15.918619000 -0300
+@@ -1,5 +1,6 @@
+ import "server-only";
+ import type { LinhaCalculo } from "@/lib/calculo-reproduzivel";
++import { env } from "@/lib/env";
+ import { mensagemErro } from "@/lib/erros";
+ import { criarClienteAdmin } from "@/lib/supabase/admin";
+ import type { SupabaseServidor } from "@/lib/supabase/server";
+@@ -17,11 +18,30 @@
+ export type AutorizacaoCalculo = { empresaId: string; membroId: string; negocioId: string };
+ 
+ export const MENSAGEM_SEM_PERMISSAO_CALCULO = "Sem permissão para gravar o cálculo deste negócio.";
++export const MENSAGEM_GRAVACAO_INDISPONIVEL = "Não foi possível gravar o cálculo agora: o servidor não está configurado para isso.";
++
++/** Erro no formato do Supabase (a mensagem chega ao usuário por `mensagemErro`). */
++const erroIndisponivel = () => ({ message: MENSAGEM_GRAVACAO_INDISPONIVEL, hint: "mensagem_usuario" });
++
++/** Cliente privilegiado, ou null se a chave do servidor falta (nunca lança: quem chama restaura o que já mexeu). */
++function clienteGravacao() {
++  try {
++    return criarClienteAdmin();
++  } catch {
++    return null;
++  }
++}
+ 
+ export async function autorizarGravacaoCalculo(
+   supabase: SupabaseServidor,
+   negocioId: string,
+ ): Promise<{ ok: true; autorizacao: AutorizacaoCalculo } | { ok: false; mensagem: string }> {
++  // Sem a chave do servidor, nada é gravado: recusa ANTES de mexer em kit, negócio ou cálculo.
++  try {
++    env.supabaseServiceRoleKey();
++  } catch {
++    return { ok: false, mensagem: MENSAGEM_GRAVACAO_INDISPONIVEL };
++  }
+   const { data, error } = await supabase.rpc("autorizar_gravacao_calculo", { p_negocio_id: negocioId });
+   const linha = data?.[0];
+   if (error || !linha) return { ok: false, mensagem: mensagemErro(error, MENSAGEM_SEM_PERMISSAO_CALCULO) };
+@@ -34,6 +54,8 @@
+   linha: LinhaCalculo,
+   { observacoes, substituir }: { observacoes?: string | null; substituir: boolean },
+ ) {
++  const admin = clienteGravacao();
++  if (!admin) return { error: erroIndisponivel() };
+   const registro = {
+     ...linha,
+     ...(observacoes !== undefined ? { observacoes } : {}),
+@@ -42,7 +64,6 @@
+     criado_por: autorizacao.membroId,
+     atualizado_por: autorizacao.membroId,
+   };
+-  const admin = criarClienteAdmin();
+   const { error } = substituir
+     ? await admin.from("calculos_solares").upsert(registro, { onConflict: "negocio_id", ignoreDuplicates: false })
+     : await admin.from("calculos_solares").insert(registro);
+@@ -51,7 +72,9 @@
+ 
+ /** R6.2: marca a linha atual do negócio autorizado como desatualizada (sem tocar em números). */
+ export async function marcarCalculoDesatualizado(autorizacao: AutorizacaoCalculo, calculoId: string) {
+-  return criarClienteAdmin()
++  const admin = clienteGravacao();
++  if (!admin) return { data: null, error: erroIndisponivel() };
++  return admin
+     .from("calculos_solares")
+     .update({
+       financeiro_desatualizado_em: new Date().toISOString(),
+@@ -65,7 +88,9 @@
+ 
+ /** "Atualizar preço no cálculo": só `kit_preco` (payback segue nulo no P0), se o preço lido não mudou no meio. */
+ export async function atualizarPrecoDoCalculo(autorizacao: AutorizacaoCalculo, calculoId: string, precoLido: number, preco: number) {
+-  return criarClienteAdmin()
++  const admin = clienteGravacao();
++  if (!admin) return { data: null, error: erroIndisponivel() };
++  return admin
+     .from("calculos_solares")
+     .update({ kit_preco: preco, payback_meses: null, atualizado_por: autorizacao.membroId })
+     .eq("id", calculoId)
+diff -ruN --strip-trailing-cr -x .estado src/lib/supabase/database.types.ts src/lib/supabase/database.types.ts
+--- src/lib/supabase/database.types.ts	2026-10-23 07:01:04.622469800 -0300
++++ src/lib/supabase/database.types.ts	2026-10-23 06:52:57.320838400 -0300
+@@ -407,6 +407,8 @@
+       calculos_solares_historico: {
+         Row: {
+           arquivado_em: string;
++          arquivado_por: string | null;
++          arquivado_por_papel: string | null;
+           calculo_id: string;
+           empresa_id: string;
+           id: string;
+@@ -416,6 +418,8 @@
+         };
+         Insert: {
+           arquivado_em?: string;
++          arquivado_por?: string | null;
++          arquivado_por_papel?: string | null;
+           calculo_id: string;
+           empresa_id: string;
+           id?: string;
+@@ -425,6 +429,8 @@
+         };
+         Update: {
+           arquivado_em?: string;
++          arquivado_por?: string | null;
++          arquivado_por_papel?: string | null;
+           calculo_id?: string;
+           empresa_id?: string;
+           id?: string;
+@@ -434,6 +440,13 @@
+         };
+         Relationships: [
+           {
++            foreignKeyName: "calculos_solares_historico_arquivado_por_fkey";
++            columns: ["arquivado_por"];
++            isOneToOne: false;
++            referencedRelation: "empresa_membros";
++            referencedColumns: ["id"];
++          },
++          {
+             foreignKeyName: "calculos_solares_historico_empresa_id_fkey";
+             columns: ["empresa_id"];
+             isOneToOne: false;
+diff -ruN --strip-trailing-cr -x .estado tests/calculo-gravacao-confiavel-db.test.ts tests/calculo-gravacao-confiavel-db.test.ts
+--- tests/calculo-gravacao-confiavel-db.test.ts	2026-10-23 07:01:04.665541000 -0300
++++ tests/calculo-gravacao-confiavel-db.test.ts	2026-10-23 06:54:31.299887700 -0300
+@@ -6,17 +6,23 @@
+  *    fonte, autoria ou o estado `completo`, nem para criar linha "legado" com economia);
+  *  - a RPC de autorização não grava nada e recusa outra empresa e o papel `operacao`;
+  *  - o caminho legítimo continua gravando, com a autoria do usuário da sessão (nunca a informada);
+- *  - mesmo o caminho privilegiado não grava `completo` com referência tarifária divergente da tabela oficial.
++ *  - mesmo o caminho privilegiado não grava `completo` com referência tarifária divergente da tabela oficial;
++ *  - sem a chave do servidor, nada é gravado (nem o kit) e a recusa é clara;
++ *  - apagar deixa a linha inteira no histórico com a autoria (migration 20261023230000), e só quem pode apaga;
++ *  - trigger e motor concordam no percentual legal e no piso do art. 291 para todo ano e ligação suportados.
+  */
+ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
++import { MENSAGEM_GRAVACAO_INDISPONIVEL } from "@/lib/calculo-gravacao";
+ import { atualizarPrecoCalculoComCliente, salvarKitComCliente, type Atual } from "@/lib/negocios-gravacao";
++import { DISPONIBILIDADE_ART_291, PERCENTUAL_LEGAL_FIO_B_GD2 } from "@/lib/tarifa-gd";
++import { TIPOS_LIGACAO } from "@/lib/tipos";
+ import type { SupabaseServidor } from "@/lib/supabase/server";
+ import type { TablesInsert, TablesUpdate } from "@/lib/supabase/database.types";
+ import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
+ 
+-let vendedor: Usuario, colega: Usuario, operacao: Usuario, fora: Usuario;
++let vendedor: Usuario, colega: Usuario, operacao: Usuario, fora: Usuario, admin: Usuario;
+ let empresa: string, outraEmpresa: string, funil: string, etapa: string;
+-let atualVendedor: Atual, atualColega: Atual, atualOperacao: Atual, atualFora: Atual;
++let atualVendedor: Atual, atualColega: Atual, atualOperacao: Atual, atualFora: Atual, membroAdmin: string;
+ const cliente = (u: Usuario) => u.cliente as unknown as SupabaseServidor;
+ const KIT = JSON.stringify([{ tipo: "modulo", descricao: "Módulo 600 W", potenciaW: 600, quantidade: 5 }]);
+ 
+@@ -27,7 +33,9 @@
+ }
+ 
+ beforeAll(async () => {
+-  [vendedor, colega, operacao, fora] = await Promise.all(["forja-vendedor", "forja-colega", "forja-operacao", "forja-fora"].map(criarUsuario));
++  [vendedor, colega, operacao, fora, admin] = await Promise.all(
++    ["forja-vendedor", "forja-colega", "forja-operacao", "forja-fora", "forja-admin"].map(criarUsuario),
++  );
+   const [{ data: e1 }, { data: e2 }] = await Promise.all([
+     servico.from("empresas").insert({ nome: `Forja ${sufixo}` }).select("id").single(),
+     servico.from("empresas").insert({ nome: `Forja outra ${sufixo}` }).select("id").single(),
+@@ -36,12 +44,14 @@
+   outraEmpresa = e2!.id;
+   const membro = async (empresaId: string, u: Usuario, papel: "admin" | "vendedor" | "operacao") =>
+     (await servico.from("empresa_membros").insert({ empresa_id: empresaId, user_id: u.id, papel }).select("id").single()).data!.id;
+-  const [m1, m2, m3, m4] = await Promise.all([
++  const [m1, m2, m3, m4, m5] = await Promise.all([
+     membro(empresa, vendedor, "vendedor"),
+     membro(empresa, colega, "vendedor"),
+     membro(empresa, operacao, "operacao"),
+     membro(outraEmpresa, fora, "admin"),
++    membro(empresa, admin, "admin"),
+   ]);
++  membroAdmin = m5;
+   atualVendedor = { empresaId: empresa, membroId: m1, papel: "vendedor" };
+   atualColega = { empresaId: empresa, membroId: m2, papel: "vendedor" };
+   atualOperacao = { empresaId: empresa, membroId: m3, papel: "operacao" } as unknown as Atual;
+@@ -260,3 +270,143 @@
+     expect(await linha(negocioId)).toEqual(antes);
+   });
+ });
++
++describe("sem a chave do servidor (SUPABASE_SERVICE_ROLE_KEY ausente)", () => {
++  it("salvar e atualizar preço recusam ANTES de mexer em kit, negócio ou cálculo, com mensagem clara", async () => {
++    const negocioId = await novoNegocio();
++    await salvarComo(vendedor, atualVendedor, negocioId);
++    await servico.from("negocios").update({ valor: 22000 }).eq("id", negocioId);
++    const antes = {
++      calculo: await linha(negocioId),
++      kit: (await servico.from("kit_componentes").select("*").eq("negocio_id", negocioId).order("ordem")).data,
++      negocio: (await servico.from("negocios").select("*").eq("id", negocioId).single()).data,
++    };
++    const chave = process.env.SUPABASE_SERVICE_ROLE_KEY;
++    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
++    try {
++      const outroKit = JSON.stringify([{ tipo: "modulo", descricao: "Módulo 600 W", potenciaW: 600, quantidade: 4 }]);
++      expect(await salvarComo(vendedor, atualVendedor, negocioId, { componentes: outroKit, consumoMedioKwh: "450" })).toEqual({
++        ok: false,
++        mensagem: `${MENSAGEM_GRAVACAO_INDISPONIVEL} Nada foi alterado.`,
++      });
++      expect(await atualizarPrecoCalculoComCliente(cliente(vendedor), atualVendedor, negocioId)).toEqual({
++        ok: false,
++        mensagem: `${MENSAGEM_GRAVACAO_INDISPONIVEL} Nada foi alterado.`,
++      });
++    } finally {
++      process.env.SUPABASE_SERVICE_ROLE_KEY = chave;
++    }
++    expect({
++      calculo: await linha(negocioId),
++      kit: (await servico.from("kit_componentes").select("*").eq("negocio_id", negocioId).order("ordem")).data,
++      negocio: (await servico.from("negocios").select("*").eq("id", negocioId).single()).data,
++    }).toEqual(antes);
++  });
++});
++
++describe("exclusão: só quem pode, sempre com a linha inteira e a autoria no histórico (mesma transação)", () => {
++  const historico = async (negocioId: string) =>
++    (await servico.from("calculos_solares_historico").select("motivo, linha, arquivado_por, arquivado_por_papel").eq("negocio_id", negocioId)).data ?? [];
++  const apagarComo = async (u: Usuario, negocioId: string) =>
++    u.cliente.from("calculos_solares").delete().eq("negocio_id", negocioId).select("id");
++
++  it("quem criou apaga direto pelo PostgREST: a linha vai inteira ao histórico (motivo `apagado`, autor = sessão)", async () => {
++    const negocioId = await novoNegocio();
++    await salvarComo(vendedor, atualVendedor, negocioId);
++    const antes = (await linha(negocioId))!;
++    const { data, error } = await apagarComo(vendedor, negocioId);
++    expect(error).toBeNull();
++    expect(data).toEqual([{ id: antes.id }]);
++    expect(await linha(negocioId)).toBeNull();
++    const h = await historico(negocioId);
++    expect(h).toHaveLength(1);
++    expect(h[0]).toMatchObject({ motivo: "apagado", arquivado_por: atualVendedor.membroId, arquivado_por_papel: "authenticated" });
++    expect(h[0]!.linha).toMatchObject({
++      id: antes.id,
++      estado_financeiro: "completo",
++      economia_mensal: 191.79,
++      criado_por: atualVendedor.membroId,
++      tarifa_gd_id: antes.tarifa_gd_id,
++    });
++  });
++
++  it("admin da empresa apaga (autor = admin); outra empresa, `operacao` e colega sem acesso não apagam nada", async () => {
++    const negocioId = await novoNegocio();
++    await salvarComo(vendedor, atualVendedor, negocioId);
++    const antes = await linha(negocioId);
++    for (const u of [fora, operacao, colega]) {
++      const { data, error } = await apagarComo(u, negocioId);
++      expect({ error, data }).toEqual({ error: null, data: [] }); // RLS: a linha nem é visível para apagar
++    }
++    expect(await linha(negocioId)).toEqual(antes);
++    expect(await historico(negocioId)).toEqual([]);
++
++    const { data } = await apagarComo(admin, negocioId);
++    expect(data).toHaveLength(1);
++    expect(await historico(negocioId)).toEqual([
++      expect.objectContaining({ motivo: "apagado", arquivado_por: membroAdmin, arquivado_por_papel: "authenticated" }),
++    ]);
++  });
++
++  it("anônimo não apaga; o serviço apaga, mas também deixa a linha no histórico (papel `service_role`)", async () => {
++    const negocioId = await novoNegocio();
++    await salvarComo(vendedor, atualVendedor, negocioId);
++    const { createClient } = await import("@supabase/supabase-js");
++    const anonimo = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { auth: { persistSession: false } });
++    expect((await anonimo.from("calculos_solares").delete().eq("negocio_id", negocioId).select("id")).data ?? []).toEqual([]);
++    expect(await linha(negocioId)).not.toBeNull();
++    await servico.from("calculos_solares").delete().eq("negocio_id", negocioId);
++    expect(await historico(negocioId)).toEqual([
++      expect.objectContaining({ motivo: "apagado", arquivado_por: null, arquivado_por_papel: "service_role" }),
++    ]);
++  });
++
++  it("substituição pelo servidor registra a autoria da autorização; excluir o negócio continua possível (cascata)", async () => {
++    const negocioId = await novoNegocio();
++    await salvarComo(vendedor, atualVendedor, negocioId);
++    await salvarComo(vendedor, atualVendedor, negocioId, { tarifaBaseTributaria: "com_tributos" });
++    expect(await historico(negocioId)).toEqual([
++      expect.objectContaining({ motivo: "desatualizado_por_entradas", arquivado_por: atualVendedor.membroId, arquivado_por_papel: "service_role" }),
++    ]);
++    const { error } = await servico.from("negocios").delete().eq("id", negocioId);
++    expect(error).toBeNull();
++    expect(await linha(negocioId)).toBeNull();
++    expect(await historico(negocioId)).toEqual([]);
++  });
++});
++
++describe("concordância trigger × motor (percentual legal e piso do art. 291)", () => {
++  it("para todo ano do motor e toda ligação, a linha completa do motor passa no trigger com os mesmos valores", async () => {
++    const { data: copel } = await servico.from("tarifas_gd_aneel").select("vigencia_inicio, vigencia_fim").eq("distribuidora", "COPEL-DIS").single();
++    const anos = Object.keys(PERCENTUAL_LEGAL_FIO_B_GD2).map(Number);
++    expect(anos.length).toBeGreaterThan(0);
++    for (const ano of anos) {
++      // Um dia do ano dentro da vigência da linha oficial (sem ele não há resultado completo a conferir).
++      const inicio = [copel!.vigencia_inicio, `${ano}-01-01`].sort()[1]!;
++      const fim = [copel!.vigencia_fim, `${ano}-12-31`].sort()[0]!;
++      expect(inicio <= fim, `ano ${ano} sem dia na vigência da tarifa oficial: inclua uma linha vigente no teste`).toBe(true);
++      for (const tipo of TIPOS_LIGACAO) {
++        vi.setSystemTime(new Date(`${inicio}T12:00:00-03:00`));
++        const negocioId = await novoNegocio();
++        const r = await salvarComo(vendedor, atualVendedor, negocioId, { tipoLigacao: tipo });
++        expect({ ano, tipo, r }).toMatchObject({ ano, tipo, r: { ok: true, mensagem: "Kit e cálculo salvos." } });
++        expect(await linha(negocioId)).toMatchObject({
++          estado_financeiro: "completo",
++          data_referencia: inicio,
++          tipo_ligacao: tipo,
++          percentual_legal_fio_b: PERCENTUAL_LEGAL_FIO_B_GD2[ano],
++          disponibilidade_kwh: DISPONIBILIDADE_ART_291[tipo],
++        });
++        // E o trigger recusa qualquer outro valor de percentual ou de piso para essa linha.
++        const outrosPercentuais = Object.values(PERCENTUAL_LEGAL_FIO_B_GD2).filter((v) => v !== PERCENTUAL_LEGAL_FIO_B_GD2[ano]);
++        for (const percentual_legal_fio_b of [...outrosPercentuais, 0.9]) {
++          expect((await servico.from("calculos_solares").update({ percentual_legal_fio_b }).eq("negocio_id", negocioId)).error?.code).toBe("23514");
++        }
++        for (const outro of TIPOS_LIGACAO.filter((t) => t !== tipo)) {
++          const patch = { disponibilidade_kwh: DISPONIBILIDADE_ART_291[outro] };
++          expect((await servico.from("calculos_solares").update(patch).eq("negocio_id", negocioId)).error?.code).toBe("23514");
++        }
++      }
++    }
++  });
++});
+diff -ruN --strip-trailing-cr -x .estado tests/negocios-gravacao.test.ts tests/negocios-gravacao.test.ts
+--- tests/negocios-gravacao.test.ts	2026-10-23 07:01:04.101406700 -0300
++++ tests/negocios-gravacao.test.ts	2026-10-23 06:50:52.229787400 -0300
+@@ -197,8 +197,13 @@
+   });
+ 
+   it("cadastro: Cancelar montagem fecha o editor e descarta só os itens; valor digitado fica", () => {
+-    const inicio = formulario.indexOf("function cancelarMontagem(");
+-    const cancelar = formulario.slice(inicio, formulario.indexOf("\n  }\n", inicio));
++    // O recorte usa o fim da função ("\n  }\n"): normaliza só o texto lido, para valer com checkout LF ou CRLF.
++    const fonteLf = formulario.replace(/\r\n/g, "\n");
++    const inicio = fonteLf.indexOf("function cancelarMontagem(");
++    expect(inicio).toBeGreaterThanOrEqual(0);
++    const fim = fonteLf.indexOf("\n  }\n", inicio);
++    expect(fim).toBeGreaterThan(inicio);
++    const cancelar = fonteLf.slice(inicio, fim);
+     expect(cancelar).toContain("setLinhas([])");
+     expect(cancelar).toContain("setMostrarKit(false)");
+     // Só o valor que veio da sugestão automática é limpo.
+diff -ruN --strip-trailing-cr -x .estado supabase/migrations/20261023220000_calculos_solares_gravacao_servidor.sql supabase/migrations/20261023220000_calculos_solares_gravacao_servidor.sql
+--- supabase/migrations/20261023220000_calculos_solares_gravacao_servidor.sql	2026-10-23 07:01:04.814949600 -0300
++++ supabase/migrations/20261023220000_calculos_solares_gravacao_servidor.sql	2026-10-23 07:06:06.534813600 -0300
+@@ -5,8 +5,9 @@
+ -- o estado `completo` (ou uma linha `legado` com economia). Provado em .aurora/revisao/calc-gd2/logs/19*.log.
+ --
+ -- Mecanismo (o menor que mantém um motor só, em TypeScript, src/lib/calculadora.ts):
+---   1) `authenticated` perde INSERT e UPDATE na tabela (sem policy nem privilégio): nenhum payload do cliente chega lá.
+---      SELECT e DELETE continuam como estavam (apagar não forja número; a policy de DELETE não muda).
++--   1) `authenticated` perde INSERT e UPDATE na tabela: fica na migration 20261023240000 (CONTRAÇÃO), aplicada só
++--      depois que a versão do app que grava pelo servidor estiver no ar. Esta migration só ACRESCENTA (RPC e trigger)
++--      e é compatível com a versão anterior do app, que ainda grava direto (linhas `legado`; nunca `completo`).
+ --   2) `autorizar_gravacao_calculo(negocio)`: chamada com a sessão do usuário, só CONFERE (acesso comercial à empresa
+ --      do negócio, ver o negócio, negócio não arquivado) e devolve a empresa e o membro da sessão (autoria real). Não
+ --      grava nada e não recebe valor nenhum.
+@@ -17,10 +18,6 @@
+ --      percentual legal do ano da data de referência e o piso do art. 291 da ligação. Não refaz a conta (isso
+ --      duplicaria o motor); confere que a REFERÊNCIA usada é a autorizada.
+ 
+-drop policy "criar cálculo" on public.calculos_solares;
+-drop policy "editar cálculo" on public.calculos_solares;
+-revoke insert, update, truncate on public.calculos_solares from anon, authenticated;
+-
+ -- ---------------------------------------------------------------------------
+ -- 2) Autorização (sem escrita)
+ -- ---------------------------------------------------------------------------
+diff -ruN --strip-trailing-cr -x .estado supabase/migrations/20261023230000_calculos_solares_exclusao_historico.sql supabase/migrations/20261023230000_calculos_solares_exclusao_historico.sql
+--- supabase/migrations/20261023230000_calculos_solares_exclusao_historico.sql	1969-12-31 21:00:00.000000000 -0300
++++ supabase/migrations/20261023230000_calculos_solares_exclusao_historico.sql	2026-10-23 06:52:38.758159400 -0300
+@@ -0,0 +1,79 @@
++-- Exclusão do cálculo solar com histórico e autoria (M2 P0, revisão final da calculadora GD II; Evandro, 23/10/2026).
++--
++-- Até aqui, apagar a linha de `calculos_solares` (policy "apagar cálculo": quem criou ou o admin; ação `apagarCalculo`)
++-- não deixava rastro, e o histórico (`calculos_solares_historico`, só no UPDATE) não dizia quem arquivou.
++--
++--   1) `arquivado_por` (membro) e `arquivado_por_papel` (papel do banco que executou) no histórico.
++--   2) UPDATE (substituição pelo servidor, R6.1): autoria = `atualizado_por` da linha NOVA, que o servidor preenche com o
++--      membro da autorização (`autorizar_gravacao_calculo`).
++--   3) DELETE: BEFORE DELETE grava a linha inteira com motivo `apagado` na MESMA transação. Usuário autenticado sem
++--      membro identificado na empresa da linha é recusado (a RLS já exige o criador ou o admin). Única exceção: a
++--      cascata da exclusão do próprio negócio (o negócio já não existe), cujo histórico também sai pela FK.
++
++alter table public.calculos_solares_historico
++  add column arquivado_por uuid references public.empresa_membros (id) on delete set null,
++  add column arquivado_por_papel text;
++
++alter table public.calculos_solares_historico drop constraint calculos_solares_historico_motivo_check;
++alter table public.calculos_solares_historico
++  add constraint calculos_solares_historico_motivo_check
++    check (motivo in ('desatualizado_por_entradas', 'substituido_por_recalculo', 'apagado'));
++
++comment on column public.calculos_solares_historico.arquivado_por is
++  'Membro responsável: no UPDATE, o atualizado_por da linha nova (autorização do servidor); no DELETE, o membro da sessão.';
++comment on column public.calculos_solares_historico.arquivado_por_papel is
++  'Papel do banco que executou (authenticated, service_role, postgres...).';
++
++-- 2) UPDATE: mesma regra de antes, agora com a autoria.
++create or replace function public.calculos_solares_arquivar_historico()
++returns trigger
++language plpgsql security definer set search_path = ''
++as $$
++declare
++  v_ignorar text[] := array[
++    'updated_at', 'atualizado_por', 'observacoes', 'kit_preco', 'payback_meses',
++    'financeiro_desatualizado_em', 'financeiro_desatualizado_motivo'
++  ];
++begin
++  if old.estado_financeiro in ('legado', 'completo')
++     and (to_jsonb(old) - v_ignorar) is distinct from (to_jsonb(new) - v_ignorar) then
++    insert into public.calculos_solares_historico (calculo_id, empresa_id, negocio_id, motivo, linha, arquivado_por, arquivado_por_papel)
++    values (
++      old.id, old.empresa_id, old.negocio_id,
++      case when new.estado_financeiro = 'incompleto' then 'desatualizado_por_entradas' else 'substituido_por_recalculo' end,
++      to_jsonb(old),
++      new.atualizado_por,
++      coalesce(auth.role(), session_user::text)
++    );
++  end if;
++  return new;
++end;
++$$;
++revoke execute on function public.calculos_solares_arquivar_historico() from public, anon, authenticated;
++
++-- 3) DELETE: arquiva a linha inteira com o autor, antes de apagar.
++create or replace function public.calculos_solares_arquivar_exclusao()
++returns trigger
++language plpgsql security definer set search_path = ''
++as $$
++declare
++  v_papel text := coalesce(auth.role(), session_user::text);
++  v_autor uuid;
++begin
++  -- Cascata da exclusão do negócio: ele já não existe e o histórico dele sai junto (FK on delete cascade).
++  if not exists (select 1 from public.negocios n where n.id = old.negocio_id) then
++    return old;
++  end if;
++  v_autor := public.meu_membro_id(old.empresa_id);
++  if v_papel in ('authenticated', 'anon') and v_autor is null then
++    raise exception 'Sem permissão para apagar este cálculo.' using errcode = '42501', hint = 'mensagem_usuario';
++  end if;
++  insert into public.calculos_solares_historico (calculo_id, empresa_id, negocio_id, motivo, linha, arquivado_por, arquivado_por_papel)
++  values (old.id, old.empresa_id, old.negocio_id, 'apagado', to_jsonb(old), v_autor, v_papel);
++  return old;
++end;
++$$;
++revoke all on function public.calculos_solares_arquivar_exclusao() from public, anon, authenticated, service_role;
++
++create trigger calculos_solares_historico_exclusao before delete on public.calculos_solares
++  for each row execute function public.calculos_solares_arquivar_exclusao();
+diff -ruN --strip-trailing-cr -x .estado supabase/migrations/20261023240000_calculos_solares_revogar_escrita_direta.sql supabase/migrations/20261023240000_calculos_solares_revogar_escrita_direta.sql
+--- supabase/migrations/20261023240000_calculos_solares_revogar_escrita_direta.sql	1969-12-31 21:00:00.000000000 -0300
++++ supabase/migrations/20261023240000_calculos_solares_revogar_escrita_direta.sql	2026-10-23 07:06:07.680642900 -0300
+@@ -0,0 +1,16 @@
++-- CONTRAÇÃO: o cliente autenticado deixa de gravar `calculos_solares` (M2 P0, calculadora GD II; Evandro, 23/10/2026).
++--
++-- Fecha a brecha do financeiro forjado: as policies "criar cálculo"/"editar cálculo" deixavam qualquer membro que vê o
++-- negócio gravar, pelo PostgREST, qualquer coluna (economia, contas, método, percentual, fonte, autoria, `completo`).
++-- Provado em .aurora/revisao/calc-gd2/logs/19*.log; testes negativos em tests/calculo-gravacao-confiavel-db.test.ts.
++--
++-- ORDEM DE IMPLANTAÇÃO: aplicar SÓ depois que a versão do app que grava pelo servidor (src/lib/calculo-gravacao.ts,
++-- RPC `autorizar_gravacao_calculo` da migration 20261023220000) estiver servindo todo o tráfego. A versão anterior do
++-- app grava direto com o cliente do usuário: com esta migration aplicada, ela deixaria de salvar o cálculo.
++-- Reversão de emergência (reabre a brecha): .aurora/revisao/calc-gd2/integracao/reverter-20261023240000.sql.
++--
++-- SELECT e DELETE continuam como estavam (DELETE grava histórico com autoria: migration 20261023230000).
++
++drop policy "criar cálculo" on public.calculos_solares;
++drop policy "editar cálculo" on public.calculos_solares;
++revoke insert, update, truncate on public.calculos_solares from anon, authenticated;

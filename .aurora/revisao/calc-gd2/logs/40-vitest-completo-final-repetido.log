@@ -1,0 +1,11 @@
+$ pnpm exec vitest run
+
+ RUN  v5.0.2 R:/wt-m2-p0-calc
+
+
+ Test Files  105 passed (105)
+      Tests  2138 passed (2138)
+   Start at  07:00:00
+   Duration  45.39s (tests 93%, import 5%, transform 2%)
+
+exit=0

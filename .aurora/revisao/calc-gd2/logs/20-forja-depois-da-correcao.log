@@ -1,0 +1,11 @@
+$ pnpm exec vitest run tests/calculo-gravacao-confiavel-db.test.ts
+
+ RUN  v5.0.2 R:/wt-m2-p0-calc
+
+
+ Test Files  1 passed (1)
+      Tests  12 passed (12)
+   Start at  06:07:35
+   Duration  12.12s (tests 73%, import 13%, transform 13%)
+
+exit=0

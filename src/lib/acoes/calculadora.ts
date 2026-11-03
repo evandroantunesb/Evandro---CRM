@@ -5,6 +5,7 @@ import { z } from "zod";
 import { mensagemErro } from "@/lib/erros";
 import { lerNumeroBr, MENSAGEM_NUMERO_BR } from "@/lib/formatacao";
 import { atualizarPrecoCalculoComCliente, salvarKitComCliente } from "@/lib/negocios-gravacao";
+import { LIMITES_CONFIRMACAO } from "@/lib/propostas/proposta-simples";
 import { exigirPapel } from "@/lib/sessao";
 import { CALCULADORA } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
@@ -124,11 +125,9 @@ export async function editarParametros(_: ResultadoAcao, formData: FormData): Pr
     .pipe(z.number({ message: `Custo inválido. ${MENSAGEM_NUMERO_BR}` }).nonnegative("Custo inválido"));
   const dados = z
     .object({
+      // Fio B e disponibilidade não são mais editáveis: a estimativa usa a regra legal (Lei 14.300, art. 27; REN 1.000,
+      // art. 291). As colunas ficam só para conferir as linhas da fórmula antiga e nunca são gravadas por aqui.
       produtividade_kwh_kwp_mes: numeroBr("Informe a produtividade"),
-      percentual_fio_b: percentual,
-      disponibilidade_mono_kwh: numeroBr("Informe a disponibilidade monofásica"),
-      disponibilidade_bi_kwh: numeroBr("Informe a disponibilidade bifásica"),
-      disponibilidade_tri_kwh: numeroBr("Informe a disponibilidade trifásica"),
       custo_instalacao_por_modulo: custoOpcional,
       custo_material_ca_por_kwp: custoOpcional,
       custo_engenharia: custoOpcional,
@@ -141,4 +140,31 @@ export async function editarParametros(_: ResultadoAcao, formData: FormData): Pr
   if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível salvar os parâmetros.") };
   revalidatePath(CAMINHO_LISTAS);
   return { ok: true, mensagem: "Parâmetros salvos." };
+}
+
+/**
+ * O admin confirma o valor ATUAL da produtividade informando o valor que viu, a fonte e o responsável pela validação.
+ * Só com essa confirmação a geração estimada pode aparecer numa proposta emitida; mudar o valor apaga a confirmação.
+ */
+export async function confirmarProdutividade(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  const { atual } = await exigirPapel("admin");
+  const dados = z
+    .object({
+      valor: z.coerce.number().positive("Informe o valor da produtividade."),
+      fonte: z.string().trim().min(LIMITES_CONFIRMACAO.fonteMin, `Informe a fonte do valor (mínimo de ${LIMITES_CONFIRMACAO.fonteMin} caracteres).`).max(LIMITES_CONFIRMACAO.fonteMax, `A fonte passa de ${LIMITES_CONFIRMACAO.fonteMax} caracteres.`),
+      responsavel: z.string().trim().min(LIMITES_CONFIRMACAO.responsavelMin, "Informe quem validou o valor.").max(LIMITES_CONFIRMACAO.responsavelMax, `O nome passa de ${LIMITES_CONFIRMACAO.responsavelMax} caracteres.`),
+    })
+    .safeParse(Object.fromEntries(formData));
+  if (!dados.success) return { ok: false, mensagem: dados.error.issues[0]!.message };
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.rpc("confirmar_produtividade_calculadora", {
+    p_empresa_id: atual.empresaId,
+    p_valor: dados.data.valor,
+    p_fonte: dados.data.fonte,
+    p_responsavel: dados.data.responsavel,
+  });
+  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível confirmar a produtividade.") };
+  revalidatePath(CAMINHO_LISTAS);
+  revalidatePath("/configuracoes/calculadora");
+  return { ok: true, mensagem: "Produtividade confirmada." };
 }

@@ -96,10 +96,12 @@ function Capa({
           {dados.clienteEndereco && <Text style={{ fontSize: 10, color: CINZA, marginTop: 4 }}>{dados.clienteEndereco}</Text>}
           <View style={{ marginTop: 30 }}>
             <View style={estilos.linha}>
-              <View style={estilos.coluna}>
-                <Text style={estilos.rotulo}>Sistema</Text>
-                <Text style={estilos.valor}>{dados.kitPotenciaKwp.toLocaleString("pt-BR")} kWp</Text>
-              </View>
+              {dados.kitPotenciaKwp != null && (
+                <View style={estilos.coluna}>
+                  <Text style={estilos.rotulo}>Sistema</Text>
+                  <Text style={estilos.valor}>{dados.kitPotenciaKwp.toLocaleString("pt-BR")} kWp</Text>
+                </View>
+              )}
               <View style={estilos.coluna}>
                 <Text style={estilos.rotulo}>Ligação</Text>
                 <Text style={estilos.valor}>{ROTULO_TIPO_LIGACAO[dados.tipoLigacao]}</Text>
@@ -161,20 +163,24 @@ function ResumoSistema({ dados }: { dados: DadosSistemaProposta }) {
           <Text style={estilos.rotulo}>Kit</Text>
           <Text style={estilos.valor}>{dados.kitNome}</Text>
         </View>
-        <View style={estilos.coluna}>
-          <Text style={estilos.rotulo}>Potência</Text>
-          <Text style={estilos.valor}>{dados.kitPotenciaKwp.toLocaleString("pt-BR")} kWp</Text>
-        </View>
+        {dados.kitPotenciaKwp != null && (
+          <View style={estilos.coluna}>
+            <Text style={estilos.rotulo}>Potência</Text>
+            <Text style={estilos.valor}>{dados.kitPotenciaKwp.toLocaleString("pt-BR")} kWp</Text>
+          </View>
+        )}
       </View>
       <View style={estilos.linha}>
         <View style={estilos.coluna}>
           <Text style={estilos.rotulo}>Ligação</Text>
           <Text style={estilos.valor}>{ROTULO_TIPO_LIGACAO[dados.tipoLigacao]}</Text>
         </View>
-        <View style={estilos.coluna}>
-          <Text style={estilos.rotulo}>Geração média estimada</Text>
-          <Text style={estilos.valor}>{dados.geracaoEstimadaKwhMes.toLocaleString("pt-BR")} kWh/mês</Text>
-        </View>
+        {dados.geracaoEstimadaKwhMes != null && (
+          <View style={estilos.coluna}>
+            <Text style={estilos.rotulo}>Geração média estimada</Text>
+            <Text style={estilos.valor}>{dados.geracaoEstimadaKwhMes.toLocaleString("pt-BR")} kWh/mês</Text>
+          </View>
+        )}
       </View>
     </Cartao>
   );
@@ -202,6 +208,7 @@ function ResumoEquipamentos({ dados }: { dados: DadosSistemaProposta }) {
 const MESES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
 function GraficoGeracaoMensal({ dados, destaque }: { dados: DadosSistemaProposta; destaque: string }) {
+  if (dados.geracaoEstimadaKwhMes == null) return null;
   const largura = 460;
   const altura = 90;
   const gap = 6;
@@ -228,6 +235,7 @@ function GraficoGeracaoMensal({ dados, destaque }: { dados: DadosSistemaProposta
 }
 
 function ContaAntesDepois({ dados, primaria, destaque }: { dados: DadosSistemaProposta; primaria: string; destaque: string }) {
+  if (dados.contaSemSolar == null || dados.contaComSolar == null) return null;
   const max = Math.max(dados.contaSemSolar, dados.contaComSolar, 1);
   const alturaMax = 90;
   const alturaAntes = (dados.contaSemSolar / max) * alturaMax;
@@ -249,16 +257,19 @@ function ContaAntesDepois({ dados, primaria, destaque }: { dados: DadosSistemaPr
           <Text style={{ fontSize: 9, color: CINZA, marginTop: 4 }}>Com o sistema</Text>
           <Text style={{ fontSize: 10.5, fontFamily: "Helvetica-Bold", color: primaria }}>{formatarMoeda(dados.contaComSolar)}</Text>
         </View>
-        <View>
-          <Text style={estilos.rotulo}>Economia estimada</Text>
-          <Text style={{ fontSize: 14, fontFamily: "Helvetica-Bold", color: "#15803d" }}>{formatarMoeda(dados.economiaMensal)}/mês</Text>
-        </View>
+        {dados.economiaMensal != null && (
+          <View>
+            <Text style={estilos.rotulo}>Economia estimada</Text>
+            <Text style={{ fontSize: 14, fontFamily: "Helvetica-Bold", color: "#15803d" }}>{formatarMoeda(dados.economiaMensal)}/mês</Text>
+          </View>
+        )}
       </View>
     </Cartao>
   );
 }
 
 function ValorProposta({ dados, primaria }: { dados: DadosSistemaProposta; primaria: string }) {
+  if (dados.kitPreco == null) return null;
   return (
     <Cartao titulo="Valor da proposta">
       <Text style={{ fontSize: 30, fontFamily: "Helvetica-Bold", color: primaria }}>{formatarMoeda(dados.kitPreco)}</Text>
@@ -270,16 +281,19 @@ function ValorProposta({ dados, primaria }: { dados: DadosSistemaProposta; prima
 }
 
 function CondicoesPagamento({ dados }: { dados: DadosSistemaProposta }) {
+  const mostraAvista = dados.kitPreco != null && (dados.modoPreco === "avista" || dados.modoPreco === "completo");
+  const mostraParcelado = dados.modoPreco === "parcelado" || dados.modoPreco === "completo";
+  if (!mostraAvista && !mostraParcelado) return null;
   return (
     <Cartao titulo="Condições de pagamento">
       <View style={estilos.linha}>
-        {(dados.modoPreco === "avista" || dados.modoPreco === "completo") && (
+        {mostraAvista && dados.kitPreco != null && (
           <View style={estilos.coluna}>
             <Text style={estilos.rotulo}>À vista</Text>
             <Text style={estilos.valor}>{formatarMoeda(dados.kitPreco)}</Text>
           </View>
         )}
-        {(dados.modoPreco === "parcelado" || dados.modoPreco === "completo") && (
+        {mostraParcelado && (
           <View style={estilos.coluna}>
             <Text style={estilos.rotulo}>Parcelado</Text>
             <Text style={estilos.valor}>Consulte condições com o vendedor</Text>
@@ -635,14 +649,18 @@ function ConsumoAtual({ dados }: { dados: DadosSistemaProposta }) {
   return (
     <Cartao titulo="Consumo atual">
       <View style={estilos.linha}>
-        <View style={estilos.coluna}>
-          <Text style={estilos.rotulo}>Consumo médio</Text>
-          <Text style={estilos.valor}>{dados.consumoMedioKwh.toLocaleString("pt-BR")} kWh/mês</Text>
-        </View>
-        <View style={estilos.coluna}>
-          <Text style={estilos.rotulo}>Valor médio da conta</Text>
-          <Text style={estilos.valor}>{formatarMoeda(dados.contaSemSolar)}</Text>
-        </View>
+        {dados.consumoMedioKwh != null && (
+          <View style={estilos.coluna}>
+            <Text style={estilos.rotulo}>Consumo médio</Text>
+            <Text style={estilos.valor}>{dados.consumoMedioKwh.toLocaleString("pt-BR")} kWh/mês</Text>
+          </View>
+        )}
+        {dados.contaSemSolar != null && (
+          <View style={estilos.coluna}>
+            <Text style={estilos.rotulo}>Valor médio da conta</Text>
+            <Text style={estilos.valor}>{formatarMoeda(dados.contaSemSolar)}</Text>
+          </View>
+        )}
       </View>
       <View style={estilos.linha}>
         <View style={estilos.coluna}>
@@ -692,8 +710,9 @@ function BlocoImagem({ config }: { config: unknown }) {
 }
 
 function ResumoEnergetico({ dados }: { dados: DadosSistemaProposta }) {
+  if (dados.geracaoEstimadaKwhMes == null) return null;
   const anual = dados.geracaoEstimadaKwhMes * 12;
-  const cobertura = dados.consumoMedioKwh > 0 ? Math.round((dados.geracaoEstimadaKwhMes / dados.consumoMedioKwh) * 100) : null;
+  const cobertura = dados.consumoMedioKwh != null && dados.consumoMedioKwh > 0 ? Math.round((dados.geracaoEstimadaKwhMes / dados.consumoMedioKwh) * 100) : null;
   return (
     <Cartao titulo="Resumo energético">
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 16 }}>
@@ -719,17 +738,19 @@ function ResumoEnergetico({ dados }: { dados: DadosSistemaProposta }) {
 function GraficoConsumoVsGeracao({ config, dados, destaque }: { config: unknown; dados: DadosSistemaProposta; destaque: string }) {
   const consumo = numerosDoConfig(config, "valoresConsumo");
   if (!consumo) return <SemDados texto="Cadastre os 12 valores mensais de consumo pra ativar este gráfico." />;
+  const geracao = dados.geracaoEstimadaKwhMes;
+  if (geracao == null) return null;
   const largura = 460;
   const altura = 90;
   const gap = 6;
   const larguraBarra = (largura - gap * 11) / 12;
-  const max = Math.max(...consumo, dados.geracaoEstimadaKwhMes, 1);
+  const max = Math.max(...consumo, geracao, 1);
   return (
     <Cartao titulo="Consumo × geração">
       <Svg width={largura} height={altura + 16}>
         {MESES.flatMap((_, i) => {
           const alturaConsumo = (consumo[i]! / max) * altura;
-          const alturaGeracao = (dados.geracaoEstimadaKwhMes / max) * altura;
+          const alturaGeracao = (geracao / max) * altura;
           const x = i * (larguraBarra + gap);
           const largMeia = (larguraBarra - 2) / 2;
           return [
@@ -777,6 +798,7 @@ function GraficoConsumoMensal({ config }: { config: unknown }) {
 }
 
 function EconomiaEstimada({ dados }: { dados: DadosSistemaProposta }) {
+  if (dados.economiaMensal == null) return null;
   const anual = dados.economiaMensal * 12;
   return (
     <Cartao titulo="Economia estimada">
@@ -972,6 +994,11 @@ const TIPOS_TEXTO_SIMPLES: TipoBloco[] = ["about_company", "simulation_assumptio
  */
 function blocoTemConteudo(tipo: TipoBloco, dados: DadosSistemaProposta, config: unknown) {
   if ((tipo === "investment_main" || tipo === "payment_options") && dados.modoPreco === "sem_preco") return false;
+  // Dado nulo = sem dado confiável: o bloco que depende dele não entra no PDF.
+  if ((tipo === "generation_monthly_chart" || tipo === "generation_summary") && dados.geracaoEstimadaKwhMes == null) return false;
+  if (tipo === "before_after_bill" && (dados.contaSemSolar == null || dados.contaComSolar == null)) return false;
+  if (tipo === "investment_main" && dados.kitPreco == null) return false;
+  if (tipo === "savings_summary" && dados.economiaMensal == null) return false;
   if (TIPOS_LISTA_SIMPLES.includes(tipo)) return itensDoConfig(config) !== null;
   if (TIPOS_TEXTO_SIMPLES.includes(tipo)) return campoTexto(config, "texto") !== "";
   if (tipo === "scope_inclusions_exclusions") {
@@ -979,7 +1006,7 @@ function blocoTemConteudo(tipo: TipoBloco, dados: DadosSistemaProposta, config: 
     return itensDoConfig({ itens: cfg.incluido }) !== null || itensDoConfig({ itens: cfg.excluido }) !== null;
   }
   if (tipo === "consumption_chart") return numerosDoConfig(config, "valores") !== null;
-  if (tipo === "generation_vs_consumption") return numerosDoConfig(config, "valoresConsumo") !== null;
+  if (tipo === "generation_vs_consumption") return numerosDoConfig(config, "valoresConsumo") !== null && dados.geracaoEstimadaKwhMes != null;
   if (tipo === "equipment_table") return dados.componentes.length > 0;
   if (tipo === "installation_layout") return campoTexto(config, "imagemUrl") !== "" || campoTexto(config, "texto") !== "";
   if (tipo === "cashflow_payback") return campoTexto(config, "texto") !== "" || dados.paybackMeses != null;

@@ -20,16 +20,17 @@ export type ModeloDisponivel = { id: string; nome: string; padrao: boolean };
 
 export function Proposta({
   negocioId,
-  temCalculo,
   precoDesatualizado = false,
+  bloqueio = null,
   proposta,
   siteUrl,
   modelos,
 }: {
   negocioId: string;
-  temCalculo: boolean;
   /** Valor do negócio diferente do preço do cálculo: a proposta mostra o preço antigo. */
   precoDesatualizado?: boolean;
+  /** Mensagem do servidor para a proposta bloqueada (estimativa incompleta ou cálculo legado); nulo = liberada. */
+  bloqueio?: string | null;
   proposta: PropostaSalva | null;
   siteUrl: string;
   modelos: ModeloDisponivel[];
@@ -38,17 +39,13 @@ export function Proposta({
   const [resultadoExibicao, acaoExibicao] = useActionState(definirExibicaoProposta, null);
   const [copiado, setCopiado] = useState(false);
 
-  if (!temCalculo) {
-    return <p className="text-sm text-zinc-600">Calcule o kit acima para poder gerar a proposta.</p>;
-  }
-
   if (!proposta) {
     const padrao = modelos.find((m) => m.padrao);
     return (
       <form action={acaoGerar} className="flex flex-col gap-3">
         <input type="hidden" name="negocioId" value={negocioId} />
         <p className="text-sm text-zinc-600">Gere um link para enviar a proposta ao cliente, sem precisar de PDF.</p>
-        {precoDesatualizado && <AvisoPrecoDesatualizado />}
+        {bloqueio ? <AvisoProposta mensagem={bloqueio} /> : precoDesatualizado && <AvisoPrecoDesatualizado />}
         {modelos.length > 0 && (
           <Selecao rotulo="Modelo de proposta" name="modeloId" defaultValue={padrao?.id ?? modelos[0]!.id}>
             {modelos.map((m) => (
@@ -60,7 +57,7 @@ export function Proposta({
           </Selecao>
         )}
         <Mensagem resultado={resultadoGerar} />
-        <Botao type="submit" disabled={gerando} className="self-start">
+        <Botao type="submit" disabled={gerando || !!bloqueio} className="self-start">
           {gerando ? "Gerando..." : "Gerar link da proposta"}
         </Botao>
       </form>
@@ -72,7 +69,7 @@ export function Proposta({
 
   return (
     <div className="flex flex-col gap-3">
-      {precoDesatualizado && <AvisoPrecoDesatualizado />}
+      {bloqueio ? <AvisoProposta mensagem={bloqueio} jaEmitida /> : precoDesatualizado && <AvisoPrecoDesatualizado />}
       <div className="flex flex-col gap-1">
         <span className="text-sm font-medium text-zinc-700">Link da proposta</span>
         <div className="flex flex-wrap gap-2">
@@ -96,11 +93,13 @@ export function Proposta({
           <a href={linkWhatsapp} target="_blank" rel="noopener noreferrer">
             <Botao type="button">Enviar no WhatsApp</Botao>
           </a>
-          <a href={`/proposta/${proposta.token}/pdf`} target="_blank" rel="noopener noreferrer">
-            <Botao type="button" variante="secundario">
-              Baixar PDF
-            </Botao>
-          </a>
+          {!bloqueio && (
+            <a href={`/proposta/${proposta.token}/pdf`} target="_blank" rel="noopener noreferrer">
+              <Botao type="button" variante="secundario">
+                Baixar PDF
+              </Botao>
+            </a>
+          )}
         </div>
       </div>
 
@@ -138,6 +137,20 @@ export function Proposta({
             <Eye size={12} /> {proposta.aberturas}
           </span>
           {proposta.ultimaAbertura && <span>última em {formatarDataHora(proposta.ultimaAbertura)}</span>}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function AvisoProposta({ mensagem, jaEmitida = false }: { mensagem: string; jaEmitida?: boolean }) {
+  return (
+    <div role="status" data-testid="proposta-bloqueada" className="flex flex-col gap-1 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900">
+      <p>{mensagem}</p>
+      {jaEmitida && (
+        <p>
+          O link já enviado ao cliente continua válido, mas informa que os valores desta proposta não estão disponíveis, e o PDF não é
+          gerado.
         </p>
       )}
     </div>

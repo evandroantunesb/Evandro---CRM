@@ -12,9 +12,24 @@ import { carregarConfiguracao, formatarDataHora, formatarMoeda } from "@/lib/crm
 import { env } from "@/lib/env";
 import { hojeEmSaoPaulo } from "@/lib/formatacao";
 import { precoDoCalculoDesatualizado } from "@/lib/calculo-preco";
+import {
+  calculoEhIncompleto,
+  calculoEhLegado,
+  carregarVigencia,
+  ENTRADAS_NAO_VERIFICAVEIS,
+  MENSAGEM_PROPOSTA_ECONOMIA_INDISPONIVEL,
+  mensagemDeRecusa,
+  motivosDaAcao,
+  type MotivoDesatualizacao,
+} from "@/lib/calculo-vigencia";
+import { carregarContextoEstimativa } from "@/lib/contexto-estimativa";
+import { mensagemPropostaIncompleta, pendenciasSemDados } from "@/lib/estimativa-financeira";
 import { descreverAtividade } from "@/lib/linha-do-tempo";
+import type { BaseTributaria } from "@/lib/tarifa-gd";
 import { exigirPapel } from "@/lib/sessao";
 import { ARQUIVAR_NEGOCIO, ATRIBUIR_TAREFA_A_OUTROS, EDITAR_VALOR_NEGOCIO, ESCOLHER_RESPONSAVEL_NEGOCIO, NEGOCIOS, PAGAMENTO_SOLO, PROPOSTA_E_CONTRATO, RESPONSAVEL_COMERCIAL, pode } from "@/lib/permissoes";
+import { listarEmissoesDoNegocio } from "@/lib/propostas/emissoes-dados";
+import { extrairConteudoDoModelo, produtividadeConfirmada } from "@/lib/propostas/proposta-simples";
 import { avisarSchemaAusente, funcaoAusente, tabelaAusente } from "@/lib/schema-ausente";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { cartaoFechamento } from "@/lib/venda";
@@ -36,13 +51,29 @@ import { Fechamento } from "./fechamento";
 import { RegistrarArquivo } from "./registrar-arquivo";
 import { FeedbackHandoff } from "./feedback-handoff";
 import { HandoffAceite } from "./handoff-aceite";
-import { KitPersonalizado } from "./kit-personalizado";
+import { KitPersonalizado, type CalculoHistorico } from "./kit-personalizado";
 import { MarcosVenda } from "./marcos-venda";
 import { NovaNota } from "./nova-nota";
 import { Pagamento } from "./pagamento";
 import { PagamentoSolo, type SituacaoRegistro } from "./pagamento-solo";
+import { EmitirProposta } from "./emitir-proposta";
 import { Proposta } from "./proposta";
 import { Qualificacao } from "./qualificacao";
+
+/** Última linha do histórico do cálculo (cópia jsonb da linha substituída) no formato da ficha. */
+function historicoDaTela(h: { arquivado_em: string; motivo: string; linha: unknown } | null): CalculoHistorico | null {
+  if (!h || !h.linha || typeof h.linha !== "object") return null;
+  const l = h.linha as Record<string, unknown>;
+  return {
+    arquivadoEm: h.arquivado_em,
+    motivo: h.motivo,
+    estadoFinanceiro: String(l.estado_financeiro ?? "legado"),
+    kitNome: String(l.kit_nome ?? ""),
+    consumoMedioKwh: Number(l.consumo_medio_kwh),
+    tarifaKwh: Number(l.tarifa_kwh),
+    economiaMensal: l.economia_mensal == null ? null : Number(l.economia_mensal),
+  };
+}
 
 function tamanhoLegivel(bytes: number) {
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
@@ -97,7 +128,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
       supabase
         .from("calculos_solares")
         .select(
-          "id, kit_nome, kit_preco, tipo_ligacao, consumo_medio_kwh, valor_fatura_medio, tarifa_kwh, geracao_estimada_kwh_mes, economia_mensal, payback_meses, observacoes",
+          "id, kit_nome, kit_potencia_kwp, kit_preco, tipo_ligacao, consumo_medio_kwh, valor_fatura_medio, tarifa_kwh, geracao_estimada_kwh_mes, economia_mensal, payback_meses, observacoes, estado_financeiro, conta_sem_solar, conta_com_solar, kwh_compensado, kwh_nao_compensado, custo_fio_b, tarifa_base_tributaria, tarifa_origem, distribuidora, fio_b_rs_mwh, percentual_legal_fio_b, fio_b_vigencia_inicio, fio_b_vigencia_fim, disponibilidade_kwh, data_referencia, ressalvas",
         )
         .eq("negocio_id", id)
         .maybeSingle(),
@@ -122,6 +153,32 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
   const { data: modelosProposta } = proposta
     ? { data: null }
     : await supabase.from("proposta_modelos").select("id, nome, padrao").eq("empresa_id", atual.empresaId).eq("status", "publicado").order("nome");
+  // Emissões preservadas (proposta simples). Antes da migration (preview usa o banco de produção) a tabela não existe:
+  // o card some em vez de quebrar a ficha.
+  const emissoesRes = pode(atual.papel, PROPOSTA_E_CONTRATO) ? await listarEmissoesDoNegocio(supabase, id) : null;
+  const emissoesAusente = emissoesRes ? tabelaAusente(emissoesRes.erro, "propostas_emissoes") : false;
+  if (emissoesRes?.erro && emissoesAusente) avisarSchemaAusente("propostas_emissoes", emissoesRes.erro);
+  else if (emissoesRes?.erro) throw new Error("Não foi possível ler as propostas emitidas.");
+  const emissoes = emissoesRes?.emissoes ?? [];
+  // Sugestão das condições de pagamento: texto do bloco "Condições comerciais" do modelo padrão publicado (só leitura).
+  const { data: modeloPadrao } = emissoesRes && !emissoesAusente
+    ? await supabase
+        .from("proposta_modelos")
+        .select("proposta_modelo_blocos(tipo, ativo, config)")
+        .eq("empresa_id", atual.empresaId)
+        .eq("status", "publicado")
+        .eq("padrao", true)
+        .maybeSingle()
+    : { data: null };
+  const conteudoModelo = extrairConteudoDoModelo(modeloPadrao?.proposta_modelo_blocos);
+  const { data: parametrosEmissao } = emissoesRes && !emissoesAusente
+    ? await supabase
+        .from("parametros_calculadora")
+        .select("produtividade_kwh_kwp_mes, produtividade_confirmada_valor, produtividade_confirmada_em, produtividade_confirmada_fonte, produtividade_confirmada_responsavel")
+        .eq("empresa_id", atual.empresaId)
+        .maybeSingle()
+    : { data: null };
+  const geracaoConfirmada = produtividadeConfirmada(parametrosEmissao) != null;
   const { data: aberturas } = proposta
     ? await supabase
         .from("propostas_aberturas")
@@ -197,7 +254,52 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
 
   // Arquivado (P1a-0): somente leitura no banco; a ficha esconde as ações que seriam recusadas.
   const arquivado = negocio.arquivado_em != null;
-  const precoDesatualizado = !!calculo && precoDoCalculoDesatualizado(calculo.kit_preco, negocio.valor);
+  // Preço do cálculo x valor do negócio só importa para cálculo não legado: o legado não aparece como atual, a proposta
+  // não mostra preço e o contrato usa o valor do negócio (mesma regra de contratos-geracao.ts).
+  // Resultado técnico incompleto também fica de fora: não tem payback para atualizar com o preço.
+  const precoDesatualizado =
+    !!calculo && !calculoEhLegado(calculo) && !calculoEhIncompleto(calculo) && precoDoCalculoDesatualizado(calculo.kit_preco, negocio.valor);
+  // Vigência do cálculo salvo: toda linha existente é legada (fórmula antiga, não validada) e nunca vale como resultado
+  // atual. Falha de leitura também nunca vale como vigente: cai no motivo `legado`, que vale para toda linha hoje.
+  const [carregamento, contextoEstimativa, { data: historicoCalculo }] = await Promise.all([
+    calculo ? carregarVigencia(supabase, id) : Promise.resolve(null),
+    // Mesmo contexto que o servidor usa ao salvar (data em São Paulo, qualificação, tarifas oficiais): a prévia é o que será gravado.
+    carregarContextoEstimativa(supabase, { tipoCliente: negocio.qualif_tipo_cliente, distribuidoraInformada: negocio.qualif_distribuidora }),
+    supabase
+      .from("calculos_solares_historico")
+      .select("arquivado_em, motivo, linha")
+      .eq("negocio_id", id)
+      .order("arquivado_em", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+  const leituraOk = carregamento?.ok === true && carregamento.calculo != null;
+  const motivosCalculo: MotivoDesatualizacao[] = !calculo
+    ? []
+    : carregamento?.ok === true && carregamento.calculo != null
+      ? carregamento.vigencia.motivos
+      : ["legado"];
+  const vigenciaDaTela = calculo
+    ? {
+        motivos: motivosCalculo,
+        naoVerificavel: carregamento?.ok === true && carregamento.calculo != null ? carregamento.vigencia.naoVerificavel : [...ENTRADAS_NAO_VERIFICAVEIS],
+      }
+    : null;
+  // Mensagens de bloqueio (as mesmas que o servidor devolve). Proposta: sempre bloqueada hoje (sem linha = estimativa
+  // incompleta; linha legada = fórmula antiga). Contrato: só o que o afeta (não bloqueia por `legado`); o preço tem aviso próprio.
+  const motivosProposta = motivosDaAcao(motivosCalculo, "proposta");
+  const bloqueioProposta = !calculo
+    ? mensagemPropostaIncompleta(pendenciasSemDados())
+    : motivosProposta.length > 0
+      ? mensagemDeRecusa(motivosProposta, "proposta")
+      : MENSAGEM_PROPOSTA_ECONOMIA_INDISPONIVEL;
+  // Emissão da proposta simples: não usa o cálculo salvo (legado). Potência e geração saem do kit atual e da produtividade
+  // da empresa; consumo e preço, do negócio. O servidor confere tudo de novo; aqui só o aviso mais comum.
+  const bloqueioEmissao = (componentes ?? []).some((c) => c.tipo === "modulo" && c.potencia_w)
+    ? null
+    : "Cadastre ao menos um módulo com potência no kit do negócio antes de emitir.";
+  const motivosContrato = motivosDaAcao(motivosCalculo, "contrato").filter((m) => m !== "preco");
+  const bloqueioContrato = calculo && leituraOk && motivosContrato.length > 0 ? mensagemDeRecusa(motivosContrato, "contrato") : null;
   const responsavelAtual = config.membros.find((m) => m.id === negocio.responsavel_id);
   const responsavelInativo = negocio.responsavel_id != null && !responsavelAtual?.ativo;
 
@@ -414,6 +516,9 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
                   : null
               }
               precoDesatualizado={precoDesatualizado}
+              vigencia={vigenciaDaTela}
+              contexto={contextoEstimativa}
+              historico={historicoDaTela(historicoCalculo)}
               calculo={
                 calculo
                   ? {
@@ -428,6 +533,22 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
                       economiaMensal: calculo.economia_mensal,
                       paybackMeses: calculo.payback_meses,
                       observacoes: calculo.observacoes,
+                      estadoFinanceiro: calculo.estado_financeiro,
+                      contaSemSolar: calculo.conta_sem_solar,
+                      contaComSolar: calculo.conta_com_solar,
+                      kwhCompensado: calculo.kwh_compensado,
+                      kwhNaoCompensado: calculo.kwh_nao_compensado,
+                      custoFioB: calculo.custo_fio_b,
+                      tarifaBaseTributaria: calculo.tarifa_base_tributaria as BaseTributaria | null,
+                      tarifaOrigem: calculo.tarifa_origem,
+                      distribuidora: calculo.distribuidora,
+                      fioBRsMwh: calculo.fio_b_rs_mwh,
+                      percentualLegalFioB: calculo.percentual_legal_fio_b,
+                      vigenciaInicio: calculo.fio_b_vigencia_inicio,
+                      vigenciaFim: calculo.fio_b_vigencia_fim,
+                      disponibilidadeKwh: calculo.disponibilidade_kwh,
+                      dataReferencia: calculo.data_referencia,
+                      ressalvas: calculo.ressalvas,
                     }
                   : null
               }
@@ -501,11 +622,25 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
               );
             })()}
           {pode(atual.papel, PROPOSTA_E_CONTRATO) && (
-            <Cartao titulo="Proposta">
+            <>
+              {!emissoesAusente && (
+                <Cartao titulo="Proposta simples">
+                <EmitirProposta
+                  negocioId={negocio.id}
+                  hoje={hojeEmSaoPaulo()}
+                  conteudoModelo={conteudoModelo}
+                  geracaoConfirmada={geracaoConfirmada}
+                  bloqueio={arquivado ? "Negócio arquivado: não é possível emitir proposta." : bloqueioEmissao}
+                  siteUrl={env.siteUrl}
+                  emissoes={emissoes.map((e) => ({ versao: e.versao, token: e.token, validadeAte: e.validade_ate, emitidaEm: e.emitida_em }))}
+                />
+                </Cartao>
+              )}
+              <Cartao titulo="Proposta">
               <Proposta
                 negocioId={negocio.id}
-                temCalculo={!!calculo}
                 precoDesatualizado={precoDesatualizado}
+                bloqueio={bloqueioProposta}
                 siteUrl={env.siteUrl}
                 modelos={(modelosProposta ?? []).map((m) => ({ id: m.id, nome: m.nome, padrao: m.padrao }))}
                 proposta={
@@ -521,7 +656,8 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
                     : null
                 }
               />
-            </Cartao>
+              </Cartao>
+            </>
           )}
           {pode(atual.papel, PROPOSTA_E_CONTRATO) && (
             <div id="contrato" className="scroll-mt-4">
@@ -530,6 +666,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
                   negocioId={negocio.id}
                   siteUrl={env.siteUrl}
                   precoDesatualizado={precoDesatualizado}
+                  bloqueio={bloqueioContrato}
                   contrato={contrato ? { token: contrato.token, status: contrato.status as StatusContrato } : null}
                 />
               </Cartao>

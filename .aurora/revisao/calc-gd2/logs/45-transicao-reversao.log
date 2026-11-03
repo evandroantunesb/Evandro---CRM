@@ -1,0 +1,56 @@
+$ psql < reverter-20261023240000.sql  (reversão de emergência)
+BEGIN
+GRANT
+CREATE POLICY
+CREATE POLICY
+COMMIT
+$ node verificar-transicao.mjs expansao  (app antigo volta a gravar)
+{
+  "fase": "expansao",
+  "resultados": [
+    {
+      "nome": "app antigo: INSERT direto aceito",
+      "resultado": "ok"
+    },
+    {
+      "nome": "app antigo: UPDATE direto aceito",
+      "resultado": "ok"
+    },
+    {
+      "nome": "app novo: RPC de autorização devolve empresa e membro da sessão",
+      "resultado": "ok"
+    },
+    {
+      "nome": "`completo` forjado pelo cliente recusado",
+      "resultado": "ok"
+    }
+  ]
+}
+exit=0
+$ psql < 20261023240000 (reaplica a contração)
+DROP POLICY
+DROP POLICY
+REVOKE
+$ node verificar-transicao.mjs contracao
+{
+  "fase": "contracao",
+  "resultados": [
+    {
+      "nome": "app antigo: INSERT direto recusado (42501)",
+      "resultado": "ok"
+    },
+    {
+      "nome": "app antigo: UPDATE direto recusado (42501)",
+      "resultado": "ok"
+    },
+    {
+      "nome": "app novo: RPC de autorização devolve empresa e membro da sessão",
+      "resultado": "ok"
+    },
+    {
+      "nome": "`completo` forjado pelo cliente recusado",
+      "resultado": "ok"
+    }
+  ]
+}
+exit=0

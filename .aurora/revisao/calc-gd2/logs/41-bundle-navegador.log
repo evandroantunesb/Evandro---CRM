@@ -1,0 +1,13 @@
+# Busca no bundle do navegador (.next/static), build do e2e de 2026-10-23 06:57:50
+'SUPABASE_SERVICE_ROLE_KEY' em .next/static: 0 arquivo(s); no servidor (.next/server): 10
+'autorizar_gravacao_calculo' em .next/static: 0 arquivo(s); no servidor (.next/server): 2
+'criarClienteAdmin' em .next/static: 0 arquivo(s); no servidor (.next/server): 46
+'calculo-gravacao' em .next/static: 0 arquivo(s); no servidor (.next/server): 1
+'MENSAGEM_GRAVACAO_INDISPONIVEL' em .next/static: 0 arquivo(s); no servidor (.next/server): 1
+'o servidor não está configurado para isso' em .next/static: 0 arquivo(s); no servidor (.next/server): 2
+valor da chave local em .next/static: 0 arquivo(s) (valor não exibido)
+valor da chave local em .next/server: 0 arquivo(s) (lida em tempo de execução, não embutida)
+src/lib/calculo-gravacao.ts:1:import "server-only";
+src/lib/supabase/admin.ts:1:import "server-only";
+src/lib/negocios-gravacao.ts:1:import "server-only";
+src/lib/calculo-servidor.ts:1:import "server-only";

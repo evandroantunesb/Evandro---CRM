@@ -1,0 +1,36 @@
+$ pnpm exec vitest run tests/calculo-gravacao-confiavel-db.test.ts -t "legado"
+
+ RUN  v5.0.2 R:/wt-m2-p0-calc
+
+ ❯ tests/calculo-gravacao-confiavel-db.test.ts (12 tests | 1 failed | 11 skipped) 326ms
+   ❯ vendedor autenticado não grava financeiro direto (PostgREST) (6)
+     × INSERT de linha `legado` com economia (fórmula antiga forjada): recusado 52ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/calculo-gravacao-confiavel-db.test.ts > vendedor autenticado não grava financeiro direto (PostgREST) > INSERT de linha `legado` com economia (fórmula antiga forjada): recusado
+AssertionError: expected undefined to be '42501' // Object.is equality
+
+- Expected:
+"42501"
+
++ Received:
+undefined
+
+ ❯ tests/calculo-gravacao-confiavel-db.test.ts:126:25
+    124|       payback_meses: 1,
+    125|     });
+    126|     expect(error?.code).toBe("42501");
+       |                         ^
+    127|     expect(await linha(negocioId)).toBeNull();
+    128|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 11 skipped (12)
+   Start at  06:04:36
+   Duration  11.63s (tests 49%, import 26%, transform 24%, worker 1%)
+
+exit=1

@@ -1,0 +1,11 @@
+$ pnpm exec vitest run tests/negocios-gravacao.test.ts
+
+ RUN  v5.0.2 R:/wt-m2-p0-calc
+
+
+ Test Files  1 passed (1)
+      Tests  34 passed (34)
+   Start at  06:50:54
+   Duration  11.09s (transform 44%, tests 35%, import 16%, worker 3%, environment 1%)
+
+exit=0

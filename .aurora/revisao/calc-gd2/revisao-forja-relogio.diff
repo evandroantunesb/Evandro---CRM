@@ -1,0 +1,1777 @@
+diff -ruN --strip-trailing-cr -x .estado src/app/(app)/configuracoes/calculadora/formularios.tsx src/app/(app)/configuracoes/calculadora/formularios.tsx
+--- src/app/(app)/configuracoes/calculadora/formularios.tsx	2026-10-23 06:21:30.659254300 -0300
++++ src/app/(app)/configuracoes/calculadora/formularios.tsx	2026-10-23 06:14:24.801516700 -0300
+@@ -88,35 +88,22 @@
+         defaultValue={String(parametros.produtividadeKwhKwpMes).replace(".", ",")}
+         required
+       />
+-      <Campo
+-        rotulo="Percentual do Fio B cobrado sobre a energia compensada (%)"
+-        name="percentual_fio_b"
+-        inputMode="decimal"
+-        defaultValue={percentualParaCampo(parametros.percentualFioB)}
+-        required
+-      />
+-      <div className="grid grid-cols-3 gap-2">
+-        <Campo
+-          rotulo="Disponibilidade monofásico (kWh)"
+-          name="disponibilidade_mono_kwh"
+-          inputMode="decimal"
+-          defaultValue={String(parametros.disponibilidadeMonoKwh).replace(".", ",")}
+-          required
+-        />
+-        <Campo
+-          rotulo="Disponibilidade bifásico (kWh)"
+-          name="disponibilidade_bi_kwh"
+-          inputMode="decimal"
+-          defaultValue={String(parametros.disponibilidadeBiKwh).replace(".", ",")}
+-          required
+-        />
+-        <Campo
+-          rotulo="Disponibilidade trifásico (kWh)"
+-          name="disponibilidade_tri_kwh"
+-          inputMode="decimal"
+-          defaultValue={String(parametros.disponibilidadeTriKwh).replace(".", ",")}
+-          required
+-        />
++      {/* Fio B e disponibilidade saíram da edição: a estimativa usa a regra legal, não estes valores da empresa. */}
++      <div data-testid="parametros-regulatorios" className="rounded-md bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
++        <p className="font-medium text-zinc-700">Fio B e custo de disponibilidade: definidos pela regra, não configuráveis</p>
++        <p>
++          A estimativa usa o Fio B oficial da distribuidora (ANEEL, vigente na data do cálculo), o percentual legal do ano
++          (Lei 14.300, art. 27: 60% em 2026, 75% em 2027) e o custo de disponibilidade da ligação (REN 1.000, art. 291:
++          monofásico 30 kWh, bifásico 50 kWh, trifásico 100 kWh).
++        </p>
++        <p className="mt-1 text-zinc-500">
++          Valores antigos da empresa, sem efeito na estimativa (guardados só para conferir cálculos feitos pela fórmula
++          antiga): Fio B {percentualParaCampo(parametros.percentualFioB)}%; disponibilidade{" "}
++          {[parametros.disponibilidadeMonoKwh, parametros.disponibilidadeBiKwh, parametros.disponibilidadeTriKwh]
++            .map((v) => String(v).replace(".", ","))
++            .join(" / ")}{" "}
++          kWh.
++        </p>
+       </div>
+       <p className="mt-2 text-sm font-medium text-zinc-700">Custos internos (opcional)</p>
+       <p className="-mt-2 text-xs text-zinc-500">
+diff -ruN --strip-trailing-cr -x .estado src/app/(app)/negocios/[id]/kit-personalizado.tsx src/app/(app)/negocios/[id]/kit-personalizado.tsx
+--- src/app/(app)/negocios/[id]/kit-personalizado.tsx	2026-10-23 06:21:37.643456900 -0300
++++ src/app/(app)/negocios/[id]/kit-personalizado.tsx	2026-10-23 06:15:16.312065200 -0300
+@@ -236,19 +236,43 @@
+   };
+ }
+ 
+-/** Hipótese e limitações declaradas da estimativa completa (contrato, seções 2 e 4). */
+-function HipotesesELimitacoes({ ressalvas, kwhNaoCompensado }: { ressalvas: string[]; kwhNaoCompensado: number | null }) {
++/** Premissas PRESUMIDAS (não informadas pelo vendedor): sempre visíveis, fora do bloco recolhido. */
++const RESSALVAS_PRESUMIDAS = ["modalidade_convencional", "bifasico_tres_condutores"];
++
++/** Hipótese, premissas presumidas e limitações declaradas da estimativa completa (contrato, seções 2 e 4). */
++function HipotesesELimitacoes({
++  ressalvas,
++  kwhNaoCompensado,
++  tarifaOrigem,
++}: {
++  ressalvas: string[];
++  kwhNaoCompensado: number | null;
++  tarifaOrigem: string | null;
++}) {
++  const presumidas = ressalvas.filter((r) => RESSALVAS_PRESUMIDAS.includes(r));
+   return (
+     <div className="flex flex-col gap-2">
+       <p data-testid="hipotese-autoconsumo" className="text-xs text-zinc-600">
+         Hipótese: autoconsumo simultâneo considerado zero (toda a geração é tratada como injetada na rede e compensada).
+       </p>
++      {presumidas.length > 0 && (
++        <p data-testid="premissas-presumidas" className="text-xs text-amber-800">
++          Presumido (confira na conta do cliente): {presumidas.map((r) => textoRessalva(r).replace(/\.$/, "").replace(/^./, (c) => c.toLowerCase())).join("; ")}.
++        </p>
++      )}
++      {tarifaOrigem === "informada_vendedor" && (
++        <p data-testid="tarifa-informada" className="text-xs text-amber-800">
++          Tarifa informada pelo vendedor: não é a tarifa oficial (TE + TUSD) da distribuidora.
++        </p>
++      )}
+       <details data-testid="limitacoes-estimativa" className="rounded-md border border-zinc-200 px-3 py-2 text-xs text-zinc-600">
+         <summary className="cursor-pointer font-medium text-zinc-700">Limitações da estimativa</summary>
+         <ul className="mt-1 list-disc pl-5">
+-          {ressalvas.map((r) => (
+-            <li key={r}>{textoRessalva(r, { kwhNaoCompensado })}</li>
+-          ))}
++          {ressalvas
++            .filter((r) => !RESSALVAS_PRESUMIDAS.includes(r))
++            .map((r) => (
++              <li key={r}>{textoRessalva(r, { kwhNaoCompensado })}</li>
++            ))}
+         </ul>
+       </details>
+     </div>
+@@ -319,7 +343,7 @@
+       {previa.estado === "completa" && (
+         <>
+           <p className="-mt-2 text-xs text-zinc-500">Payback indisponível: {MOTIVO_PAYBACK}.</p>
+-          <HipotesesELimitacoes ressalvas={previa.retrato.ressalvas} kwhNaoCompensado={previa.kwhNaoCompensado} />
++          <HipotesesELimitacoes ressalvas={previa.retrato.ressalvas} kwhNaoCompensado={previa.kwhNaoCompensado} tarifaOrigem={previa.retrato.tarifaOrigem} />
+         </>
+       )}
+       {previa.estado === "incompleta" && mostrarQuadro && (
+@@ -879,7 +903,11 @@
+               )}
+             </dl>
+             <p className="-mt-1 text-xs text-zinc-500">Payback indisponível: {MOTIVO_PAYBACK}.</p>
+-            <HipotesesELimitacoes ressalvas={calculo.ressalvas ?? []} kwhNaoCompensado={calculo.kwhNaoCompensado ?? null} />
++            <HipotesesELimitacoes
++              ressalvas={calculo.ressalvas ?? []}
++              kwhNaoCompensado={calculo.kwhNaoCompensado ?? null}
++              tarifaOrigem={calculo.tarifaOrigem ?? null}
++            />
+           </>
+         )}
+         {componentesSalvos.length > 0 && (
+diff -ruN --strip-trailing-cr -x .estado src/app/(app)/negocios/[id]/page.tsx src/app/(app)/negocios/[id]/page.tsx
+--- src/app/(app)/negocios/[id]/page.tsx	2026-10-23 06:21:37.660970500 -0300
++++ src/app/(app)/negocios/[id]/page.tsx	2026-10-23 06:17:40.433823900 -0300
+@@ -17,6 +17,7 @@
+   calculoEhLegado,
+   carregarVigencia,
+   ENTRADAS_NAO_VERIFICAVEIS,
++  MENSAGEM_PROPOSTA_ECONOMIA_INDISPONIVEL,
+   mensagemDeRecusa,
+   motivosDaAcao,
+   type MotivoDesatualizacao,
+@@ -291,7 +292,7 @@
+     ? mensagemPropostaIncompleta(pendenciasSemDados())
+     : motivosProposta.length > 0
+       ? mensagemDeRecusa(motivosProposta, "proposta")
+-      : null;
++      : MENSAGEM_PROPOSTA_ECONOMIA_INDISPONIVEL;
+   // Emissão da proposta simples: não usa o cálculo salvo (legado). Potência e geração saem do kit atual e da produtividade
+   // da empresa; consumo e preço, do negócio. O servidor confere tudo de novo; aqui só o aviso mais comum.
+   const bloqueioEmissao = (componentes ?? []).some((c) => c.tipo === "modulo" && c.potencia_w)
+diff -ruN --strip-trailing-cr -x .estado src/app/(app)/negocios/[id]/proposta.tsx src/app/(app)/negocios/[id]/proposta.tsx
+--- src/app/(app)/negocios/[id]/proposta.tsx	2026-10-23 06:21:31.960789700 -0300
++++ src/app/(app)/negocios/[id]/proposta.tsx	2026-10-23 06:17:29.734770000 -0300
+@@ -147,7 +147,6 @@
+   return (
+     <div role="status" data-testid="proposta-bloqueada" className="flex flex-col gap-1 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900">
+       <p>{mensagem}</p>
+-      <p>Isso não depende de você: a empresa ainda precisa configurar e validar os dados da estimativa financeira.</p>
+       {jaEmitida && (
+         <p>
+           O link já enviado ao cliente continua válido, mas informa que os valores desta proposta não estão disponíveis, e o PDF não é
+diff -ruN --strip-trailing-cr -x .estado src/app/(app)/negocios/novo/formulario.tsx src/app/(app)/negocios/novo/formulario.tsx
+--- src/app/(app)/negocios/novo/formulario.tsx	2026-10-23 06:21:31.725742900 -0300
++++ src/app/(app)/negocios/novo/formulario.tsx	2026-10-23 06:16:10.393095900 -0300
+@@ -740,13 +740,13 @@
+                   <dd className="font-medium text-zinc-900">a definir (sem catálogo de equipamentos)</dd>
+                 </div>
+                 <div>
+-                  <dt className="text-zinc-500">Geração / economia / payback</dt>
+-                  <dd className="font-medium text-zinc-900">pendentes de validação da empresa</dd>
++                  <dt className="text-zinc-500">Conta e economia</dt>
++                  <dd className="font-medium text-zinc-900">calculadas na ficha do negócio</dd>
+                 </div>
+               </dl>
+               <p className="mt-2 text-xs text-zinc-500">
+                 Estimativa ilustrativa: não é salva no negócio. Para salvar um kit, monte-o manualmente; a geração aparece
+-                ao montar o kit; a economia e o payback dependem de a empresa validar o cálculo.
++                ao montar o kit. A conta e a economia são calculadas na ficha do negócio, depois da Qualificação SDR.
+               </p>
+             </div>
+           )}
+@@ -809,7 +809,7 @@
+                 previa={previa}
+                 potenciaKwp={potenciaKwp}
+                 precoDefinido={numero(valor) != null}
+-                rodape="Você pode salvar o negócio e o kit assim mesmo; a economia e o payback aparecem quando a empresa validar o cálculo."
++                rodape="O cadastro salva o kit com a estimativa incompleta. Depois de criar, preencha a Qualificação SDR (tipo de cliente e distribuidora), confira a tarifa e a base tributária e recalcule o kit na ficha do negócio para ver a conta e a economia."
+               />
+             )}
+           </fieldset>
+diff -ruN --strip-trailing-cr -x .estado src/lib/acoes/calculadora.ts src/lib/acoes/calculadora.ts
+--- src/lib/acoes/calculadora.ts	2026-10-23 06:21:32.807386400 -0300
++++ src/lib/acoes/calculadora.ts	2026-10-23 06:14:24.829771700 -0300
+@@ -125,11 +125,9 @@
+     .pipe(z.number({ message: `Custo inválido. ${MENSAGEM_NUMERO_BR}` }).nonnegative("Custo inválido"));
+   const dados = z
+     .object({
++      // Fio B e disponibilidade não são mais editáveis: a estimativa usa a regra legal (Lei 14.300, art. 27; REN 1.000,
++      // art. 291). As colunas ficam só para conferir as linhas da fórmula antiga e nunca são gravadas por aqui.
+       produtividade_kwh_kwp_mes: numeroBr("Informe a produtividade"),
+-      percentual_fio_b: percentual,
+-      disponibilidade_mono_kwh: numeroBr("Informe a disponibilidade monofásica"),
+-      disponibilidade_bi_kwh: numeroBr("Informe a disponibilidade bifásica"),
+-      disponibilidade_tri_kwh: numeroBr("Informe a disponibilidade trifásica"),
+       custo_instalacao_por_modulo: custoOpcional,
+       custo_material_ca_por_kwp: custoOpcional,
+       custo_engenharia: custoOpcional,
+diff -ruN --strip-trailing-cr -x .estado src/lib/acoes/propostas.ts src/lib/acoes/propostas.ts
+--- src/lib/acoes/propostas.ts	2026-10-23 06:21:32.996954100 -0300
++++ src/lib/acoes/propostas.ts	2026-10-23 06:17:29.730770700 -0300
+@@ -2,7 +2,7 @@
+ 
+ import { revalidatePath } from "next/cache";
+ import { z } from "zod";
+-import { carregarVigencia, mensagemDeRecusa, motivosDaAcao } from "@/lib/calculo-vigencia";
++import { carregarVigencia, mensagemDeRecusa, motivosDaAcao, MENSAGEM_PROPOSTA_ECONOMIA_INDISPONIVEL } from "@/lib/calculo-vigencia";
+ import { mensagemPropostaIncompleta, pendenciasSemDados } from "@/lib/estimativa-financeira";
+ import { mensagemErro } from "@/lib/erros";
+ import { exigirPapel } from "@/lib/sessao";
+@@ -32,6 +32,8 @@
+   if (!lido.calculo) return { ok: false, mensagem: mensagemPropostaIncompleta(pendenciasSemDados()) };
+   const motivos = motivosDaAcao(lido.vigencia.motivos, "proposta");
+   if (motivos.length) return { ok: false, mensagem: mensagemDeRecusa(motivos, "proposta") };
++  // Cálculo completo e vigente: o link antigo mostraria conta e economia (D1/D2, congelados). Nada é gravado.
++  if (lido.calculo.estado_financeiro === "completo") return { ok: false, mensagem: MENSAGEM_PROPOSTA_ECONOMIA_INDISPONIVEL };
+ 
+   let modeloId = dados.data.modeloId ?? null;
+   if (!modeloId) {
+diff -ruN --strip-trailing-cr -x .estado src/lib/calculo-gravacao.ts src/lib/calculo-gravacao.ts
+--- src/lib/calculo-gravacao.ts	1969-12-31 21:00:00.000000000 -0300
++++ src/lib/calculo-gravacao.ts	2026-10-23 06:53:15.918619000 -0300
+@@ -0,0 +1,101 @@
++import "server-only";
++import type { LinhaCalculo } from "@/lib/calculo-reproduzivel";
++import { env } from "@/lib/env";
++import { mensagemErro } from "@/lib/erros";
++import { criarClienteAdmin } from "@/lib/supabase/admin";
++import type { SupabaseServidor } from "@/lib/supabase/server";
++
++/**
++ * Único caminho de escrita em `calculos_solares` (migration 20261023220000): o cliente autenticado não tem INSERT nem
++ * UPDATE na tabela. O servidor
++ *   1) confere, COM A SESSÃO do usuário, que ele pode gravar o cálculo do negócio (`autorizar_gravacao_calculo`:
++ *      acesso comercial à empresa do negócio, vê o negócio, negócio não arquivado), recebendo empresa e membro;
++ *   2) grava com a service role só a linha que ele mesmo montou pelo motor compartilhado (`montarLinhaCalculo`), com
++ *      empresa, negócio e autoria vindos do passo 1 (nunca do formulário nem do `atual` informado).
++ * O banco ainda recusa linha `completo` cuja referência tarifária não seja a oficial (trigger
++ * `calculos_solares_referencia_oficial`).
++ */
++export type AutorizacaoCalculo = { empresaId: string; membroId: string; negocioId: string };
++
++export const MENSAGEM_SEM_PERMISSAO_CALCULO = "Sem permissão para gravar o cálculo deste negócio.";
++export const MENSAGEM_GRAVACAO_INDISPONIVEL = "Não foi possível gravar o cálculo agora: o servidor não está configurado para isso.";
++
++/** Erro no formato do Supabase (a mensagem chega ao usuário por `mensagemErro`). */
++const erroIndisponivel = () => ({ message: MENSAGEM_GRAVACAO_INDISPONIVEL, hint: "mensagem_usuario" });
++
++/** Cliente privilegiado, ou null se a chave do servidor falta (nunca lança: quem chama restaura o que já mexeu). */
++function clienteGravacao() {
++  try {
++    return criarClienteAdmin();
++  } catch {
++    return null;
++  }
++}
++
++export async function autorizarGravacaoCalculo(
++  supabase: SupabaseServidor,
++  negocioId: string,
++): Promise<{ ok: true; autorizacao: AutorizacaoCalculo } | { ok: false; mensagem: string }> {
++  // Sem a chave do servidor, nada é gravado: recusa ANTES de mexer em kit, negócio ou cálculo.
++  try {
++    env.supabaseServiceRoleKey();
++  } catch {
++    return { ok: false, mensagem: MENSAGEM_GRAVACAO_INDISPONIVEL };
++  }
++  const { data, error } = await supabase.rpc("autorizar_gravacao_calculo", { p_negocio_id: negocioId });
++  const linha = data?.[0];
++  if (error || !linha) return { ok: false, mensagem: mensagemErro(error, MENSAGEM_SEM_PERMISSAO_CALCULO) };
++  return { ok: true, autorizacao: { empresaId: linha.empresa_id, membroId: linha.membro_id, negocioId } };
++}
++
++/** Grava (insere ou substitui pela chave `negocio_id`) a linha montada pelo motor, com empresa e autoria autorizadas. */
++export async function gravarLinhaCalculo(
++  autorizacao: AutorizacaoCalculo,
++  linha: LinhaCalculo,
++  { observacoes, substituir }: { observacoes?: string | null; substituir: boolean },
++) {
++  const admin = clienteGravacao();
++  if (!admin) return { error: erroIndisponivel() };
++  const registro = {
++    ...linha,
++    ...(observacoes !== undefined ? { observacoes } : {}),
++    empresa_id: autorizacao.empresaId,
++    negocio_id: autorizacao.negocioId,
++    criado_por: autorizacao.membroId,
++    atualizado_por: autorizacao.membroId,
++  };
++  const { error } = substituir
++    ? await admin.from("calculos_solares").upsert(registro, { onConflict: "negocio_id", ignoreDuplicates: false })
++    : await admin.from("calculos_solares").insert(registro);
++  return { error };
++}
++
++/** R6.2: marca a linha atual do negócio autorizado como desatualizada (sem tocar em números). */
++export async function marcarCalculoDesatualizado(autorizacao: AutorizacaoCalculo, calculoId: string) {
++  const admin = clienteGravacao();
++  if (!admin) return { data: null, error: erroIndisponivel() };
++  return admin
++    .from("calculos_solares")
++    .update({
++      financeiro_desatualizado_em: new Date().toISOString(),
++      financeiro_desatualizado_motivo: "entradas_alteradas_sem_resultado_novo",
++    })
++    .eq("id", calculoId)
++    .eq("negocio_id", autorizacao.negocioId)
++    .eq("empresa_id", autorizacao.empresaId)
++    .select("id");
++}
++
++/** "Atualizar preço no cálculo": só `kit_preco` (payback segue nulo no P0), se o preço lido não mudou no meio. */
++export async function atualizarPrecoDoCalculo(autorizacao: AutorizacaoCalculo, calculoId: string, precoLido: number, preco: number) {
++  const admin = clienteGravacao();
++  if (!admin) return { data: null, error: erroIndisponivel() };
++  return admin
++    .from("calculos_solares")
++    .update({ kit_preco: preco, payback_meses: null, atualizado_por: autorizacao.membroId })
++    .eq("id", calculoId)
++    .eq("negocio_id", autorizacao.negocioId)
++    .eq("empresa_id", autorizacao.empresaId)
++    .eq("kit_preco", precoLido)
++    .select("id");
++}
+diff -ruN --strip-trailing-cr -x .estado src/lib/calculo-vigencia.ts src/lib/calculo-vigencia.ts
+--- src/lib/calculo-vigencia.ts	2026-10-23 06:21:37.709704000 -0300
++++ src/lib/calculo-vigencia.ts	2026-10-23 06:17:29.707359400 -0300
+@@ -55,6 +55,13 @@
+ export const MENSAGEM_PRECO_CALCULO_INCOMPLETO =
+   "A estimativa financeira está incompleta: não há economia calculada para acompanhar o preço. Complete os dados e recalcule o kit.";
+ 
++/**
++ * Cálculo completo e vigente: mesmo assim o link da proposta antiga (com conta e economia) não é gerado neste P0 (a
++ * proposta com economia, D1/D2, está congelada). A proposta simples (sem economia) segue pela emissão.
++ */
++export const MENSAGEM_PROPOSTA_ECONOMIA_INDISPONIVEL =
++  "A proposta com conta e economia ainda não está liberada. Emita a proposta simples (sistema, geração e preço, sem economia).";
++
+ export const MENSAGEM_PROPOSTA_CALCULO_INCOMPLETO =
+   "A estimativa financeira do último cálculo está incompleta: complete os dados indicados no kit e recalcule antes de gerar a proposta.";
+ 
+diff -ruN --strip-trailing-cr -x .estado src/lib/negocios-gravacao.ts src/lib/negocios-gravacao.ts
+--- src/lib/negocios-gravacao.ts	2026-10-23 06:21:37.745643800 -0300
++++ src/lib/negocios-gravacao.ts	2026-10-23 06:07:11.270264000 -0300
+@@ -13,6 +13,7 @@
+ } from "@/lib/calculo-reproduzivel";
+ import { carregarVigencia, mensagemDeRecusa, motivosDaAcao } from "@/lib/calculo-vigencia";
+ import { montarLinhaCalculo } from "@/lib/calculo-servidor";
++import { atualizarPrecoDoCalculo, autorizarGravacaoCalculo, gravarLinhaCalculo, marcarCalculoDesatualizado } from "@/lib/calculo-gravacao";
+ import type { Pendencia } from "@/lib/estimativa-financeira";
+ import { mensagemErro } from "@/lib/erros";
+ import { lerNumeroBr, MENSAGEM_NUMERO_BR } from "@/lib/formatacao";
+@@ -249,7 +250,9 @@
+     if (erroKit) {
+       avisos.push("kit");
+     } else if (d.tipo_ligacao && d.tarifa_kwh != null) {
+-      const montado = await montarLinhaCalculo(supabase, atual.empresaId, {
++      // O cálculo só é gravado pelo servidor, depois da autorização da sessão no negócio recém-criado.
++      const autorizado = await autorizarGravacaoCalculo(supabase, negocio.id);
++      const montado = await montarLinhaCalculo(supabase, autorizado.ok ? autorizado.autorizacao.empresaId : atual.empresaId, {
+         kitNome: nomeKitPersonalizado(d.componentes),
+         potenciaKwp: potenciaKitPersonalizadoKwp(d.componentes),
+         precoKit: d.valor ?? 0,
+@@ -260,17 +263,17 @@
+         tarifaBaseTributaria: null,
+       }, { tipoCliente: null, distribuidoraInformada: null }); // negócio novo: sem qualificação, estimativa incompleta
+       if (montado.ok) {
+-        const { error: erroCalculo } = await supabase
+-          .from("calculos_solares")
+-          .insert({ ...montado.linha, negocio_id: negocio.id, atualizado_por: atual.membroId, criado_por: atual.membroId });
++        const { error: erroCalculo } = autorizado.ok
++          ? await gravarLinhaCalculo(autorizado.autorizacao, montado.linha, { substituir: false })
++          : { error: true };
+         if (erroCalculo) avisos.push("calculo");
+       } else if (montado.incompleta) {
+         // Informação, não falha: kit e negócio salvos; o resultado técnico (sem parte financeira) é gravado quando
+         // há consumo em kWh. Falha ao gravá-lo vira aviso "calculo", como no ramo completo.
+         if (montado.linha) {
+-          const { error: erroCalculo } = await supabase
+-            .from("calculos_solares")
+-            .insert({ ...montado.linha, negocio_id: negocio.id, atualizado_por: atual.membroId, criado_por: atual.membroId });
++          const { error: erroCalculo } = autorizado.ok
++            ? await gravarLinhaCalculo(autorizado.autorizacao, montado.linha, { substituir: false })
++            : { error: true };
+           if (erroCalculo) avisos.push("calculo");
+         }
+         estimativa = { estado: "incompleta", mensagem: montado.mensagem, pendencias: montado.pendencias };
+@@ -422,6 +425,10 @@
+       .eq("negocio_id", d.negocioId),
+   ]);
+   if (!negocio) return { ok: false, mensagem: "Negócio não encontrado." };
++  // Autorização real (sessão × empresa × negócio) antes de qualquer escrita; empresa e autoria do cálculo vêm daqui.
++  const autorizado = await autorizarGravacaoCalculo(supabase, d.negocioId);
++  if (!autorizado.ok) return { ok: false, mensagem: `${autorizado.mensagem} Nada foi alterado.` };
++  const autorizacao = autorizado.autorizacao;
+   if (erroAntigos || !itensAntigos) return { ok: false, mensagem: "Não foi possível ler o kit atual. Nada foi alterado." };
+   // Falha ao ler o cálculo nunca vale como "sem cálculo": abriria a remoção do kit protegido.
+   if (erroCalculo) return { ok: false, mensagem: MENSAGEM_CALCULO_NAO_CONFERIDO };
+@@ -438,7 +445,7 @@
+ 
+   let montado: Awaited<ReturnType<typeof montarLinhaCalculo>> | null = null;
+   if (d.tarifaKwh != null) {
+-    montado = await montarLinhaCalculo(supabase, atual.empresaId, {
++    montado = await montarLinhaCalculo(supabase, autorizacao.empresaId, {
+       kitNome: nomeKitPersonalizado(d.componentes),
+       potenciaKwp: potenciaKitPersonalizadoKwp(d.componentes),
+       precoKit: negocio.valor ?? 0,
+@@ -471,7 +478,7 @@
+ 
+   // Substitui a lista de itens: novos primeiro (uma inserção, tudo ou nada), antigos depois.
+   if (d.componentes.length) {
+-    const { error } = await inserirItensKit(supabase, atual.empresaId, d.negocioId, d.componentes);
++    const { error } = await inserirItensKit(supabase, autorizacao.empresaId, d.negocioId, d.componentes);
+     if (error) return { ok: false, mensagem: "Não foi possível salvar os itens do kit. Nada foi alterado." };
+   }
+   const antigos = itensAntigos.map((i) => i.id);
+@@ -488,16 +495,7 @@
+   }
+ 
+   if (linhaNova) {
+-    const { error } = await supabase.from("calculos_solares").upsert(
+-      {
+-        ...linhaNova,
+-        negocio_id: d.negocioId,
+-        observacoes: d.observacoes || null,
+-        atualizado_por: atual.membroId,
+-        criado_por: atual.membroId,
+-      },
+-      { onConflict: "negocio_id", ignoreDuplicates: false },
+-    );
++    const { error } = await gravarLinhaCalculo(autorizacao, linhaNova, { observacoes: d.observacoes || null, substituir: true });
+     if (error) {
+       // O cálculo anterior continua como estava (o upsert é uma instrução só); volta os itens.
+       const restaurado = await restaurarKit(supabase, d.negocioId, itensAntigos);
+@@ -513,11 +511,7 @@
+   // R6.2: sem resultado novo, a linha com parte financeira recebe a marca explícita (bloqueia proposta e preço e deixa
+   // de aparecer como resultado atual). Sai quando a linha for regravada (R6.3: toda linha nova zera a marca).
+   if (marcarDesatualizado) {
+-    const { data, error } = await supabase
+-      .from("calculos_solares")
+-      .update({ financeiro_desatualizado_em: new Date().toISOString(), financeiro_desatualizado_motivo: "entradas_alteradas_sem_resultado_novo" })
+-      .eq("id", calculoAtual!.id)
+-      .select("id");
++    const { data, error } = await marcarCalculoDesatualizado(autorizacao, calculoAtual!.id);
+     if (error || !data?.length) {
+       const restaurado = await restaurarKit(supabase, d.negocioId, itensAntigos);
+       const motivo = mensagemErro(error, "Não foi possível marcar o cálculo anterior como desatualizado.");
+@@ -597,14 +591,11 @@
+   if (calculo.economia_mensal == null) return { ok: false, mensagem: mensagemDeRecusa(["incompleta"], "preco") };
+ 
+   const preco = lido.valorNegocio ?? 0;
+-  // Só grava se o cálculo continua com o preço lido (outra edição no meio não é sobrescrita em silêncio).
+-  const { data, error } = await supabase
+-    .from("calculos_solares")
+-    // Só a linha `completo` passa pela vigência; nela o payback é sempre nulo (P0; o banco recusa outro valor).
+-    .update({ kit_preco: preco, payback_meses: null, atualizado_por: atual.membroId })
+-    .eq("id", calculo.id)
+-    .eq("kit_preco", calculo.kit_preco)
+-    .select("id");
++  const autorizado = await autorizarGravacaoCalculo(supabase, negocioId);
++  if (!autorizado.ok) return { ok: false, mensagem: `${autorizado.mensagem} Nada foi alterado.` };
++  // Só grava se o cálculo continua com o preço lido (outra edição no meio não é sobrescrita em silêncio). Só a linha
++  // `completo` passa pela vigência; nela o payback é sempre nulo (P0; o banco recusa outro valor).
++  const { data, error } = await atualizarPrecoDoCalculo(autorizado.autorizacao, calculo.id, calculo.kit_preco, preco);
+   if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível atualizar o cálculo.") };
+   if (!data?.length) return { ok: false, mensagem: "O cálculo mudou enquanto você atualizava. Recarregue a página e tente de novo." };
+   return { ok: true, negocioId, mensagem: "Preço do cálculo atualizado." };
+diff -ruN --strip-trailing-cr -x .estado src/lib/supabase/database.types.ts src/lib/supabase/database.types.ts
+--- src/lib/supabase/database.types.ts	2026-10-23 06:21:37.761680400 -0300
++++ src/lib/supabase/database.types.ts	2026-10-23 06:52:57.320838400 -0300
+@@ -407,6 +407,8 @@
+       calculos_solares_historico: {
+         Row: {
+           arquivado_em: string;
++          arquivado_por: string | null;
++          arquivado_por_papel: string | null;
+           calculo_id: string;
+           empresa_id: string;
+           id: string;
+@@ -416,6 +418,8 @@
+         };
+         Insert: {
+           arquivado_em?: string;
++          arquivado_por?: string | null;
++          arquivado_por_papel?: string | null;
+           calculo_id: string;
+           empresa_id: string;
+           id?: string;
+@@ -425,6 +429,8 @@
+         };
+         Update: {
+           arquivado_em?: string;
++          arquivado_por?: string | null;
++          arquivado_por_papel?: string | null;
+           calculo_id?: string;
+           empresa_id?: string;
+           id?: string;
+@@ -434,6 +440,13 @@
+         };
+         Relationships: [
+           {
++            foreignKeyName: "calculos_solares_historico_arquivado_por_fkey";
++            columns: ["arquivado_por"];
++            isOneToOne: false;
++            referencedRelation: "empresa_membros";
++            referencedColumns: ["id"];
++          },
++          {
+             foreignKeyName: "calculos_solares_historico_empresa_id_fkey";
+             columns: ["empresa_id"];
+             isOneToOne: false;
+@@ -4019,6 +4032,13 @@
+         Args: { p_obra_id: string; p_setor: Database["public"]["Enums"]["setor_obra"] };
+         Returns: string;
+       };
++      autorizar_gravacao_calculo: {
++        Args: { p_negocio_id: string };
++        Returns: {
++          empresa_id: string;
++          membro_id: string;
++        }[];
++      };
+       avaliar_condicao_regra: { Args: { p_condicao: Json; p_payload: Json }; Returns: boolean };
+       buscar_contato_duplicado: {
+         Args: { p_email: string; p_empresa_id: string; p_telefone: string };
+diff -ruN --strip-trailing-cr -x .estado tests/calculadora-db.test.ts tests/calculadora-db.test.ts
+--- tests/calculadora-db.test.ts	2026-10-23 06:21:36.144171600 -0300
++++ tests/calculadora-db.test.ts	2026-10-23 06:09:55.265982700 -0300
+@@ -105,7 +105,22 @@
+       .from("kit_componentes")
+       .insert({ empresa_id: empresa, negocio_id: negocio, tipo: "modulo", descricao: "Módulo 550 W", potencia_w: 550, quantidade: 11, ordem: 0 });
+     expect(erroKit).toBeNull();
+-    const { error } = await vendedor1.cliente.from("calculos_solares").insert({
++    // O vendedor não grava o cálculo direto (só o servidor, migration 20261023220000): a linha vai pelo serviço.
++    const { error: erroDireto } = await vendedor1.cliente.from("calculos_solares").insert({
++      empresa_id: empresa,
++      negocio_id: negocio,
++      kit_nome: "Forjado",
++      kit_potencia_kwp: 6,
++      kit_preco: 24000,
++      consumo_medio_kwh: 500,
++      tarifa_kwh: 0.9,
++      produtividade_kwh_kwp_mes: 130,
++      percentual_fio_b: 0.6,
++      disponibilidade_kwh: 100,
++      geracao_estimada_kwh_mes: 780,
++    });
++    expect(erroDireto?.code).toBe("42501");
++    const { error } = await servico.from("calculos_solares").insert({
+       empresa_id: empresa,
+       negocio_id: negocio,
+       kit_id: kit,
+@@ -130,7 +145,7 @@
+     expect(error).toBeNull();
+ 
+     // Recalcular substitui o cálculo existente em vez de duplicar (unique em negocio_id).
+-    const { error: erroDuplicado } = await vendedor1.cliente.from("calculos_solares").insert({
++    const { error: erroDuplicado } = await servico.from("calculos_solares").insert({
+       empresa_id: empresa,
+       negocio_id: negocio,
+       kit_id: kit,
+diff -ruN --strip-trailing-cr -x .estado tests/calculo-gd2-db.test.ts tests/calculo-gd2-db.test.ts
+--- tests/calculo-gd2-db.test.ts	2026-10-23 06:21:37.812372600 -0300
++++ tests/calculo-gd2-db.test.ts	2026-10-23 06:18:13.634961300 -0300
+@@ -4,9 +4,10 @@
+  * do vendedor (RLS real). Cobre: completo → reabrir (vigente) → entradas mudam com resultado incompleto (histórico
+  * desatualizado, novas entradas gravadas) → recálculo; R6.2/R6.3 sem linha nova; virada 2026/2027 e fim da vigência;
+  * mistura de bases; preço; CHECKs do estado `completo`; histórico imutável; isolamento entre empresas.
+- * Datas: o motor usa a data de hoje em São Paulo; os cenários de 2027 fixam só o `Date` (vi.setSystemTime).
++ * Datas: o motor usa a data de hoje em São Paulo; cada cenário fixa só o `Date` (vi.setSystemTime): 22/10/2026 por
++ * padrão (vigência da REH 3.592, 60%), e os de 2027 trocam a data. Nada depende da data real da execução.
+  */
+-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
++import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+ import { atualizarPrecoCalculoComCliente, editarNegocioComCliente, salvarKitComCliente, type Atual } from "@/lib/negocios-gravacao";
+ import { carregarVigencia, avaliarVigencia, mensagemDeRecusa, motivosDaAcao } from "@/lib/calculo-vigencia";
+ import { carregarContextoEstimativa } from "@/lib/contexto-estimativa";
+@@ -49,6 +50,11 @@
+   etapa = et!.id;
+ });
+ 
++beforeEach(() => {
++  vi.useFakeTimers({ toFake: ["Date"] });
++  vi.setSystemTime(new Date("2026-10-22T12:00:00-03:00"));
++});
++
+ afterEach(() => {
+   vi.useRealTimers();
+ });
+diff -ruN --strip-trailing-cr -x .estado tests/calculo-gravacao-confiavel-db.test.ts tests/calculo-gravacao-confiavel-db.test.ts
+--- tests/calculo-gravacao-confiavel-db.test.ts	1969-12-31 21:00:00.000000000 -0300
++++ tests/calculo-gravacao-confiavel-db.test.ts	2026-10-23 06:54:31.299887700 -0300
+@@ -0,0 +1,412 @@
++/**
++ * Financeiro forjado (M2 P0, revisão da calculadora GD II): `calculos_solares` só é gravado pelo caminho do servidor
++ * (motor compartilhado + referência tarifária lida no servidor), depois da autorização real do usuário no negócio.
++ * Contra o banco local descartável, com os clientes AUTENTICADOS (RLS e privilégios reais):
++ *  - vendedor autenticado não consegue INSERT, UPDATE nem UPSERT direto (nem para forjar valores, método, percentual,
++ *    fonte, autoria ou o estado `completo`, nem para criar linha "legado" com economia);
++ *  - a RPC de autorização não grava nada e recusa outra empresa e o papel `operacao`;
++ *  - o caminho legítimo continua gravando, com a autoria do usuário da sessão (nunca a informada);
++ *  - mesmo o caminho privilegiado não grava `completo` com referência tarifária divergente da tabela oficial;
++ *  - sem a chave do servidor, nada é gravado (nem o kit) e a recusa é clara;
++ *  - apagar deixa a linha inteira no histórico com a autoria (migration 20261023230000), e só quem pode apaga;
++ *  - trigger e motor concordam no percentual legal e no piso do art. 291 para todo ano e ligação suportados.
++ */
++import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
++import { MENSAGEM_GRAVACAO_INDISPONIVEL } from "@/lib/calculo-gravacao";
++import { atualizarPrecoCalculoComCliente, salvarKitComCliente, type Atual } from "@/lib/negocios-gravacao";
++import { DISPONIBILIDADE_ART_291, PERCENTUAL_LEGAL_FIO_B_GD2 } from "@/lib/tarifa-gd";
++import { TIPOS_LIGACAO } from "@/lib/tipos";
++import type { SupabaseServidor } from "@/lib/supabase/server";
++import type { TablesInsert, TablesUpdate } from "@/lib/supabase/database.types";
++import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
++
++let vendedor: Usuario, colega: Usuario, operacao: Usuario, fora: Usuario, admin: Usuario;
++let empresa: string, outraEmpresa: string, funil: string, etapa: string;
++let atualVendedor: Atual, atualColega: Atual, atualOperacao: Atual, atualFora: Atual, membroAdmin: string;
++const cliente = (u: Usuario) => u.cliente as unknown as SupabaseServidor;
++const KIT = JSON.stringify([{ tipo: "modulo", descricao: "Módulo 600 W", potenciaW: 600, quantidade: 5 }]);
++
++function fd(campos: Record<string, string | undefined>) {
++  const f = new FormData();
++  for (const [k, v] of Object.entries(campos)) if (v !== undefined) f.append(k, v);
++  return f;
++}
++
++beforeAll(async () => {
++  [vendedor, colega, operacao, fora, admin] = await Promise.all(
++    ["forja-vendedor", "forja-colega", "forja-operacao", "forja-fora", "forja-admin"].map(criarUsuario),
++  );
++  const [{ data: e1 }, { data: e2 }] = await Promise.all([
++    servico.from("empresas").insert({ nome: `Forja ${sufixo}` }).select("id").single(),
++    servico.from("empresas").insert({ nome: `Forja outra ${sufixo}` }).select("id").single(),
++  ]);
++  empresa = e1!.id;
++  outraEmpresa = e2!.id;
++  const membro = async (empresaId: string, u: Usuario, papel: "admin" | "vendedor" | "operacao") =>
++    (await servico.from("empresa_membros").insert({ empresa_id: empresaId, user_id: u.id, papel }).select("id").single()).data!.id;
++  const [m1, m2, m3, m4, m5] = await Promise.all([
++    membro(empresa, vendedor, "vendedor"),
++    membro(empresa, colega, "vendedor"),
++    membro(empresa, operacao, "operacao"),
++    membro(outraEmpresa, fora, "admin"),
++    membro(empresa, admin, "admin"),
++  ]);
++  membroAdmin = m5;
++  atualVendedor = { empresaId: empresa, membroId: m1, papel: "vendedor" };
++  atualColega = { empresaId: empresa, membroId: m2, papel: "vendedor" };
++  atualOperacao = { empresaId: empresa, membroId: m3, papel: "operacao" } as unknown as Atual;
++  atualFora = { empresaId: outraEmpresa, membroId: m4, papel: "admin" };
++  await servico.from("parametros_calculadora").update({ produtividade_kwh_kwp_mes: 100 }).eq("empresa_id", empresa);
++  const { data: f } = await servico.from("funis").select("id").eq("empresa_id", empresa).single();
++  funil = f!.id;
++  const { data: et } = await servico.from("etapas").select("id").eq("funil_id", funil).order("ordem").limit(1).single();
++  etapa = et!.id;
++});
++
++// Data fixa (22/10/2026: vigência da REH 3.592, 60%); nada depende da data real da execução.
++beforeEach(() => {
++  vi.useFakeTimers({ toFake: ["Date"] });
++  vi.setSystemTime(new Date("2026-10-22T12:00:00-03:00"));
++});
++afterEach(() => {
++  vi.useRealTimers();
++});
++
++async function novoNegocio() {
++  const { data: c } = await servico.from("contatos").insert({ empresa_id: empresa, nome: `Cliente ${Math.random()}`, telefone: "44 90000-0000" }).select("id").single();
++  const { data: n, error } = await servico
++    .from("negocios")
++    .insert({
++      empresa_id: empresa,
++      titulo: "Forja",
++      contato_id: c!.id,
++      funil_id: funil,
++      etapa_id: etapa,
++      valor: 20000,
++      responsavel_id: atualVendedor.membroId,
++      qualif_tipo_cliente: "residencial",
++      qualif_distribuidora: "Copel",
++    })
++    .select("id")
++    .single();
++  if (error) throw error;
++  return n!.id;
++}
++
++const salvarComo = (u: Usuario, atual: Atual, negocioId: string, extra: Record<string, string> = {}) =>
++  salvarKitComCliente(
++    cliente(u),
++    atual,
++    fd({ negocioId, tipoLigacao: "bifasico", consumoMedioKwh: "500", tarifaKwh: "0,76802", tarifaBaseTributaria: "sem_tributos", componentes: KIT, ...extra }),
++  );
++const linha = async (negocioId: string) => (await servico.from("calculos_solares").select("*").eq("negocio_id", negocioId).maybeSingle()).data;
++
++/** Linha "completa" plausível (copiada de uma legítima) com a economia e a fonte adulteradas. */
++async function payloadForjado(negocioId: string): Promise<TablesInsert<"calculos_solares">> {
++  const modelo = await novoNegocio();
++  await salvarComo(vendedor, atualVendedor, modelo);
++  const resto = Object.fromEntries(Object.entries((await linha(modelo))!).filter(([k]) => !["id", "created_at", "updated_at"].includes(k)));
++  return { ...(resto as TablesInsert<"calculos_solares">), negocio_id: negocioId, economia_mensal: 9999.99, conta_com_solar: 0.01, percentual_legal_fio_b: 0.1 };
++}
++
++describe("vendedor autenticado não grava financeiro direto (PostgREST)", () => {
++  it("INSERT de linha `completo` forjada: recusado, nada gravado", async () => {
++    const negocioId = await novoNegocio();
++    await servico.from("kit_componentes").insert({ empresa_id: empresa, negocio_id: negocioId, tipo: "modulo", descricao: "Módulo 600 W", potencia_w: 600, quantidade: 5, ordem: 0 });
++    const { error } = await vendedor.cliente.from("calculos_solares").insert(await payloadForjado(negocioId));
++    expect(error?.code).toBe("42501");
++    expect(await linha(negocioId)).toBeNull();
++  });
++
++  it("INSERT de linha `legado` com economia (fórmula antiga forjada): recusado", async () => {
++    const negocioId = await novoNegocio();
++    await servico.from("kit_componentes").insert({ empresa_id: empresa, negocio_id: negocioId, tipo: "modulo", descricao: "Módulo 600 W", potencia_w: 600, quantidade: 5, ordem: 0 });
++    const { error } = await vendedor.cliente.from("calculos_solares").insert({
++      empresa_id: empresa,
++      negocio_id: negocioId,
++      kit_nome: "Forjado",
++      kit_potencia_kwp: 3,
++      kit_preco: 20000,
++      tipo_ligacao: "bifasico",
++      consumo_medio_kwh: 500,
++      tarifa_kwh: 0.9,
++      produtividade_kwh_kwp_mes: 100,
++      percentual_fio_b: 0.45,
++      disponibilidade_kwh: 50,
++      geracao_estimada_kwh_mes: 300,
++      kwh_faturado: 200,
++      kwh_compensado: 300,
++      custo_fio_b: 1,
++      conta_sem_solar: 450,
++      conta_com_solar: 1,
++      economia_mensal: 449,
++      payback_meses: 1,
++    });
++    expect(error?.code).toBe("42501");
++    expect(await linha(negocioId)).toBeNull();
++  });
++
++  it("UPDATE de valores, método, percentual, fonte, estado e autoria numa linha legítima: recusado, linha intacta", async () => {
++    const negocioId = await novoNegocio();
++    expect(await salvarComo(vendedor, atualVendedor, negocioId)).toMatchObject({ ok: true, mensagem: "Kit e cálculo salvos." });
++    const antes = await linha(negocioId);
++    const ataques: TablesUpdate<"calculos_solares">[] = [
++      { economia_mensal: 9999.99 },
++      { conta_sem_solar: 5000, conta_com_solar: 0.01 },
++      { metodo_calculo: "metodo_inventado" },
++      { percentual_legal_fio_b: 0.1 },
++      { fio_b_rs_mwh: 1, tarifa_origem: "oficial_aneel" },
++      { tarifa_gd_id: null },
++      { payback_meses: 3 },
++      { criado_por: atualColega.membroId, atualizado_por: atualColega.membroId },
++      { financeiro_desatualizado_em: null, financeiro_desatualizado_motivo: null, kit_preco: 1 },
++    ];
++    for (const patch of ataques) {
++      const { data, error } = await vendedor.cliente.from("calculos_solares").update(patch).eq("negocio_id", negocioId).select("id");
++      // Sem privilégio de UPDATE: erro 42501 (nunca "0 linhas" silencioso que pareça sucesso).
++      expect({ patch, codigo: error?.code, data }).toEqual({ patch, codigo: "42501", data: null });
++    }
++    expect(await linha(negocioId)).toEqual(antes);
++  });
++
++  it("UPDATE de linha `incompleto` para `completo` com números: recusado", async () => {
++    const negocioId = await novoNegocio();
++    await salvarComo(vendedor, atualVendedor, negocioId, { tarifaBaseTributaria: "com_tributos" });
++    const antes = await linha(negocioId);
++    expect(antes).toMatchObject({ estado_financeiro: "incompleto" });
++    const { error } = await vendedor.cliente
++      .from("calculos_solares")
++      .update({ estado_financeiro: "completo", economia_mensal: 191.79, metodo_calculo: "gd2_piso_655i_v1", pendencias: null })
++      .eq("negocio_id", negocioId);
++    expect(error?.code).toBe("42501");
++    expect(await linha(negocioId)).toEqual(antes);
++  });
++
++  it("UPSERT por cima da linha legítima: recusado, linha intacta", async () => {
++    const negocioId = await novoNegocio();
++    await salvarComo(vendedor, atualVendedor, negocioId);
++    const antes = await linha(negocioId);
++    const { error } = await vendedor.cliente.from("calculos_solares").upsert(await payloadForjado(negocioId), { onConflict: "negocio_id" });
++    expect(error?.code).toBe("42501");
++    expect(await linha(negocioId)).toEqual(antes);
++  });
++
++  it("o trigger de histórico não é RPC exposta", async () => {
++    const { error } = await vendedor.cliente.rpc("calculos_solares_arquivar_historico" as never);
++    expect(error).not.toBeNull();
++  });
++});
++
++describe("autorização real (empresa, negócio, papel) e autoria da sessão", () => {
++  it("RPC de autorização: vendedor responsável recebe a própria autoria; ela não grava nada", async () => {
++    const negocioId = await novoNegocio();
++    const { data, error } = await vendedor.cliente.rpc("autorizar_gravacao_calculo", { p_negocio_id: negocioId });
++    expect(error).toBeNull();
++    expect(data).toEqual([{ empresa_id: empresa, membro_id: atualVendedor.membroId }]);
++    expect(await linha(negocioId)).toBeNull();
++  });
++
++  it("outra empresa: RPC recusa, salvar pelo servidor recusa e nada é gravado", async () => {
++    const negocioId = await novoNegocio();
++    const rpc = await fora.cliente.rpc("autorizar_gravacao_calculo", { p_negocio_id: negocioId });
++    expect(rpc.error?.code).toBe("42501");
++    const r = await salvarComo(fora, atualFora, negocioId);
++    expect(r.ok).toBe(false);
++    expect(await linha(negocioId)).toBeNull();
++    const { data: kit } = await servico.from("kit_componentes").select("id").eq("negocio_id", negocioId);
++    expect(kit).toEqual([]);
++  });
++
++  it("papel `operacao` (acesso operacional, sem acesso comercial): RPC recusa e salvar não grava cálculo", async () => {
++    const negocioId = await novoNegocio();
++    expect((await operacao.cliente.rpc("autorizar_gravacao_calculo", { p_negocio_id: negocioId })).error?.code).toBe("42501");
++    const r = await salvarComo(operacao, atualOperacao, negocioId);
++    expect(r.ok).toBe(false);
++    expect(await linha(negocioId)).toBeNull();
++  });
++
++  it("colega da mesma empresa que não vê o negócio: RPC recusa e salvar não grava", async () => {
++    const negocioId = await novoNegocio();
++    expect((await colega.cliente.rpc("autorizar_gravacao_calculo", { p_negocio_id: negocioId })).error?.code).toBe("42501");
++    expect((await salvarComo(colega, atualColega, negocioId)).ok).toBe(false);
++    expect(await linha(negocioId)).toBeNull();
++  });
++
++  it("salvar legítimo grava `completo` com a autoria da SESSÃO, mesmo com membroId adulterado no `atual`", async () => {
++    const negocioId = await novoNegocio();
++    const adulterado: Atual = { ...atualVendedor, membroId: atualColega.membroId };
++    expect(await salvarComo(vendedor, adulterado, negocioId)).toMatchObject({ ok: true, mensagem: "Kit e cálculo salvos." });
++    expect(await linha(negocioId)).toMatchObject({
++      estado_financeiro: "completo",
++      economia_mensal: 191.79,
++      empresa_id: empresa,
++      criado_por: atualVendedor.membroId,
++      atualizado_por: atualVendedor.membroId,
++    });
++    // Preço também passa pelo servidor (e com a autoria da sessão).
++    await servico.from("negocios").update({ valor: 22000 }).eq("id", negocioId);
++    expect(await atualizarPrecoCalculoComCliente(cliente(vendedor), adulterado, negocioId)).toMatchObject({ ok: true });
++    expect(await linha(negocioId)).toMatchObject({ kit_preco: 22000, atualizado_por: atualVendedor.membroId, economia_mensal: 191.79 });
++  });
++});
++
++describe("defesa no banco: `completo` só com a referência tarifária oficial (inclusive pelo caminho privilegiado)", () => {
++  it("fonte, percentual, vigência ou método divergentes da tabela oficial: recusado mesmo com a service role", async () => {
++    const negocioId = await novoNegocio();
++    await salvarComo(vendedor, atualVendedor, negocioId);
++    const antes = await linha(negocioId);
++    const ataques: TablesUpdate<"calculos_solares">[] = [
++      { fio_b_rs_mwh: 1 },
++      { percentual_legal_fio_b: 0.75 },
++      { fio_b_vigencia_fim: "2030-01-01" },
++      { distribuidora: "OUTRA" },
++      { metodo_calculo: "metodo_inventado" },
++      { enquadramento: "B3/comercial/convencional/GD_II" },
++    ];
++    for (const patch of ataques) {
++      const { error } = await servico.from("calculos_solares").update(patch).eq("negocio_id", negocioId);
++      expect({ patch, codigo: error?.code }).toEqual({ patch, codigo: "23514" });
++    }
++    expect(await linha(negocioId)).toEqual(antes);
++  });
++});
++
++describe("sem a chave do servidor (SUPABASE_SERVICE_ROLE_KEY ausente)", () => {
++  it("salvar e atualizar preço recusam ANTES de mexer em kit, negócio ou cálculo, com mensagem clara", async () => {
++    const negocioId = await novoNegocio();
++    await salvarComo(vendedor, atualVendedor, negocioId);
++    await servico.from("negocios").update({ valor: 22000 }).eq("id", negocioId);
++    const antes = {
++      calculo: await linha(negocioId),
++      kit: (await servico.from("kit_componentes").select("*").eq("negocio_id", negocioId).order("ordem")).data,
++      negocio: (await servico.from("negocios").select("*").eq("id", negocioId).single()).data,
++    };
++    const chave = process.env.SUPABASE_SERVICE_ROLE_KEY;
++    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
++    try {
++      const outroKit = JSON.stringify([{ tipo: "modulo", descricao: "Módulo 600 W", potenciaW: 600, quantidade: 4 }]);
++      expect(await salvarComo(vendedor, atualVendedor, negocioId, { componentes: outroKit, consumoMedioKwh: "450" })).toEqual({
++        ok: false,
++        mensagem: `${MENSAGEM_GRAVACAO_INDISPONIVEL} Nada foi alterado.`,
++      });
++      expect(await atualizarPrecoCalculoComCliente(cliente(vendedor), atualVendedor, negocioId)).toEqual({
++        ok: false,
++        mensagem: `${MENSAGEM_GRAVACAO_INDISPONIVEL} Nada foi alterado.`,
++      });
++    } finally {
++      process.env.SUPABASE_SERVICE_ROLE_KEY = chave;
++    }
++    expect({
++      calculo: await linha(negocioId),
++      kit: (await servico.from("kit_componentes").select("*").eq("negocio_id", negocioId).order("ordem")).data,
++      negocio: (await servico.from("negocios").select("*").eq("id", negocioId).single()).data,
++    }).toEqual(antes);
++  });
++});
++
++describe("exclusão: só quem pode, sempre com a linha inteira e a autoria no histórico (mesma transação)", () => {
++  const historico = async (negocioId: string) =>
++    (await servico.from("calculos_solares_historico").select("motivo, linha, arquivado_por, arquivado_por_papel").eq("negocio_id", negocioId)).data ?? [];
++  const apagarComo = async (u: Usuario, negocioId: string) =>
++    u.cliente.from("calculos_solares").delete().eq("negocio_id", negocioId).select("id");
++
++  it("quem criou apaga direto pelo PostgREST: a linha vai inteira ao histórico (motivo `apagado`, autor = sessão)", async () => {
++    const negocioId = await novoNegocio();
++    await salvarComo(vendedor, atualVendedor, negocioId);
++    const antes = (await linha(negocioId))!;
++    const { data, error } = await apagarComo(vendedor, negocioId);
++    expect(error).toBeNull();
++    expect(data).toEqual([{ id: antes.id }]);
++    expect(await linha(negocioId)).toBeNull();
++    const h = await historico(negocioId);
++    expect(h).toHaveLength(1);
++    expect(h[0]).toMatchObject({ motivo: "apagado", arquivado_por: atualVendedor.membroId, arquivado_por_papel: "authenticated" });
++    expect(h[0]!.linha).toMatchObject({
++      id: antes.id,
++      estado_financeiro: "completo",
++      economia_mensal: 191.79,
++      criado_por: atualVendedor.membroId,
++      tarifa_gd_id: antes.tarifa_gd_id,
++    });
++  });
++
++  it("admin da empresa apaga (autor = admin); outra empresa, `operacao` e colega sem acesso não apagam nada", async () => {
++    const negocioId = await novoNegocio();
++    await salvarComo(vendedor, atualVendedor, negocioId);
++    const antes = await linha(negocioId);
++    for (const u of [fora, operacao, colega]) {
++      const { data, error } = await apagarComo(u, negocioId);
++      expect({ error, data }).toEqual({ error: null, data: [] }); // RLS: a linha nem é visível para apagar
++    }
++    expect(await linha(negocioId)).toEqual(antes);
++    expect(await historico(negocioId)).toEqual([]);
++
++    const { data } = await apagarComo(admin, negocioId);
++    expect(data).toHaveLength(1);
++    expect(await historico(negocioId)).toEqual([
++      expect.objectContaining({ motivo: "apagado", arquivado_por: membroAdmin, arquivado_por_papel: "authenticated" }),
++    ]);
++  });
++
++  it("anônimo não apaga; o serviço apaga, mas também deixa a linha no histórico (papel `service_role`)", async () => {
++    const negocioId = await novoNegocio();
++    await salvarComo(vendedor, atualVendedor, negocioId);
++    const { createClient } = await import("@supabase/supabase-js");
++    const anonimo = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { auth: { persistSession: false } });
++    expect((await anonimo.from("calculos_solares").delete().eq("negocio_id", negocioId).select("id")).data ?? []).toEqual([]);
++    expect(await linha(negocioId)).not.toBeNull();
++    await servico.from("calculos_solares").delete().eq("negocio_id", negocioId);
++    expect(await historico(negocioId)).toEqual([
++      expect.objectContaining({ motivo: "apagado", arquivado_por: null, arquivado_por_papel: "service_role" }),
++    ]);
++  });
++
++  it("substituição pelo servidor registra a autoria da autorização; excluir o negócio continua possível (cascata)", async () => {
++    const negocioId = await novoNegocio();
++    await salvarComo(vendedor, atualVendedor, negocioId);
++    await salvarComo(vendedor, atualVendedor, negocioId, { tarifaBaseTributaria: "com_tributos" });
++    expect(await historico(negocioId)).toEqual([
++      expect.objectContaining({ motivo: "desatualizado_por_entradas", arquivado_por: atualVendedor.membroId, arquivado_por_papel: "service_role" }),
++    ]);
++    const { error } = await servico.from("negocios").delete().eq("id", negocioId);
++    expect(error).toBeNull();
++    expect(await linha(negocioId)).toBeNull();
++    expect(await historico(negocioId)).toEqual([]);
++  });
++});
++
++describe("concordância trigger × motor (percentual legal e piso do art. 291)", () => {
++  it("para todo ano do motor e toda ligação, a linha completa do motor passa no trigger com os mesmos valores", async () => {
++    const { data: copel } = await servico.from("tarifas_gd_aneel").select("vigencia_inicio, vigencia_fim").eq("distribuidora", "COPEL-DIS").single();
++    const anos = Object.keys(PERCENTUAL_LEGAL_FIO_B_GD2).map(Number);
++    expect(anos.length).toBeGreaterThan(0);
++    for (const ano of anos) {
++      // Um dia do ano dentro da vigência da linha oficial (sem ele não há resultado completo a conferir).
++      const inicio = [copel!.vigencia_inicio, `${ano}-01-01`].sort()[1]!;
++      const fim = [copel!.vigencia_fim, `${ano}-12-31`].sort()[0]!;
++      expect(inicio <= fim, `ano ${ano} sem dia na vigência da tarifa oficial: inclua uma linha vigente no teste`).toBe(true);
++      for (const tipo of TIPOS_LIGACAO) {
++        vi.setSystemTime(new Date(`${inicio}T12:00:00-03:00`));
++        const negocioId = await novoNegocio();
++        const r = await salvarComo(vendedor, atualVendedor, negocioId, { tipoLigacao: tipo });
++        expect({ ano, tipo, r }).toMatchObject({ ano, tipo, r: { ok: true, mensagem: "Kit e cálculo salvos." } });
++        expect(await linha(negocioId)).toMatchObject({
++          estado_financeiro: "completo",
++          data_referencia: inicio,
++          tipo_ligacao: tipo,
++          percentual_legal_fio_b: PERCENTUAL_LEGAL_FIO_B_GD2[ano],
++          disponibilidade_kwh: DISPONIBILIDADE_ART_291[tipo],
++        });
++        // E o trigger recusa qualquer outro valor de percentual ou de piso para essa linha.
++        const outrosPercentuais = Object.values(PERCENTUAL_LEGAL_FIO_B_GD2).filter((v) => v !== PERCENTUAL_LEGAL_FIO_B_GD2[ano]);
++        for (const percentual_legal_fio_b of [...outrosPercentuais, 0.9]) {
++          expect((await servico.from("calculos_solares").update({ percentual_legal_fio_b }).eq("negocio_id", negocioId)).error?.code).toBe("23514");
++        }
++        for (const outro of TIPOS_LIGACAO.filter((t) => t !== tipo)) {
++          const patch = { disponibilidade_kwh: DISPONIBILIDADE_ART_291[outro] };
++          expect((await servico.from("calculos_solares").update(patch).eq("negocio_id", negocioId)).error?.code).toBe("23514");
++        }
++      }
++    }
++  });
++});
+diff -ruN --strip-trailing-cr -x .estado tests/calculo-vigencia-db.test.ts tests/calculo-vigencia-db.test.ts
+--- tests/calculo-vigencia-db.test.ts	2026-10-23 06:21:37.842625300 -0300
++++ tests/calculo-vigencia-db.test.ts	2026-10-23 06:18:21.544529000 -0300
+@@ -28,11 +28,11 @@
+ 
+ const { gerarLinkProposta } = await import("@/lib/acoes/propostas");
+ const { gerarContratoComCliente } = await import("@/lib/contratos-geracao");
+-const { atualizarPrecoCalculoComCliente } = await import("@/lib/negocios-gravacao");
++const { atualizarPrecoCalculoComCliente, salvarKitComCliente } = await import("@/lib/negocios-gravacao");
+ const { MENSAGEM_CONTRATO_CALCULO_DESATUALIZADO, MENSAGEM_PRECO_CALCULO_LEGADO } = await import("@/lib/calculo-vigencia");
+ const { criarUsuario, servico, sufixo } = await import("./ajuda");
+ const { nomeKitPersonalizado } = await import("@/lib/calculadora");
+-const { mensagemDeRecusa } = await import("@/lib/calculo-vigencia");
++const { mensagemDeRecusa, MENSAGEM_PROPOSTA_ECONOMIA_INDISPONIVEL } = await import("@/lib/calculo-vigencia");
+ const { mensagemPropostaIncompleta, pendenciasSemDados } = await import("@/lib/estimativa-financeira");
+ 
+ let admin: Usuario;
+@@ -248,6 +248,35 @@
+     expect(await estado(id)).toEqual(antes);
+   });
+ 
++  // Regra aceita (GD II): cálculo completo e vigente. A proposta com conta e economia (D1/D2) segue congelada: o link
++  // antigo é recusado e nada é gravado; a proposta simples (sem economia) é pela emissão.
++  it("cálculo completo e vigente: link antigo recusado (sem economia em proposta) e nada gravado", async () => {
++    vi.useFakeTimers({ toFake: ["Date"] });
++    vi.setSystemTime(new Date("2026-10-22T12:00:00-03:00"));
++    try {
++      const id = await negocioComCalculo("Proposta completo", { semCalculo: true });
++      await servico.from("negocios").update({ qualif_tipo_cliente: "residencial", qualif_distribuidora: "Copel" }).eq("id", id);
++      const dadosKit = new FormData();
++      for (const [k, v] of Object.entries({
++        negocioId: id,
++        tipoLigacao: "bifasico",
++        consumoMedioKwh: "500",
++        tarifaKwh: "0,76802",
++        tarifaBaseTributaria: "sem_tributos",
++        componentes: JSON.stringify(COMPONENTES_KIT),
++      }))
++        dadosKit.append(k, v);
++      const salvo = await salvarKitComCliente(vendedor.cliente as unknown as SupabaseServidor, { empresaId: empresa, membroId: membroVendedor, papel: "vendedor" }, dadosKit);
++      expect(salvo).toMatchObject({ ok: true, mensagem: "Kit e cálculo salvos." });
++      const antes = await estado(id);
++      expect(await gerarProposta(id)).toEqual({ ok: false, mensagem: MENSAGEM_PROPOSTA_ECONOMIA_INDISPONIVEL });
++      expect(await estado(id)).toEqual(antes);
++      expect(antes.propostas).toHaveLength(0);
++    } finally {
++      vi.useRealTimers();
++    }
++  });
++
+   // ANTES: "Calcule o kit antes de gerar a proposta.". AGORA: dados incompletos, sem linha e sem proposta.
+   it("sem linha de cálculo: recusa (estimativa incompleta), sem proposta", async () => {
+     const id = await negocioComCalculo("Proposta sem cálculo", { semCalculo: true });
+diff -ruN --strip-trailing-cr -x .estado tests/negocios-gravacao.test.ts tests/negocios-gravacao.test.ts
+--- tests/negocios-gravacao.test.ts	2026-10-23 06:21:37.935117400 -0300
++++ tests/negocios-gravacao.test.ts	2026-10-23 06:50:52.229787400 -0300
+@@ -197,8 +197,13 @@
+   });
+ 
+   it("cadastro: Cancelar montagem fecha o editor e descarta só os itens; valor digitado fica", () => {
+-    const inicio = formulario.indexOf("function cancelarMontagem(");
+-    const cancelar = formulario.slice(inicio, formulario.indexOf("\n  }\n", inicio));
++    // O recorte usa o fim da função ("\n  }\n"): normaliza só o texto lido, para valer com checkout LF ou CRLF.
++    const fonteLf = formulario.replace(/\r\n/g, "\n");
++    const inicio = fonteLf.indexOf("function cancelarMontagem(");
++    expect(inicio).toBeGreaterThanOrEqual(0);
++    const fim = fonteLf.indexOf("\n  }\n", inicio);
++    expect(fim).toBeGreaterThan(inicio);
++    const cancelar = fonteLf.slice(inicio, fim);
+     expect(cancelar).toContain("setLinhas([])");
+     expect(cancelar).toContain("setMostrarKit(false)");
+     // Só o valor que veio da sugestão automática é limpo.
+diff -ruN --strip-trailing-cr -x .estado tests/parametros-regulatorios-db.test.ts tests/parametros-regulatorios-db.test.ts
+--- tests/parametros-regulatorios-db.test.ts	1969-12-31 21:00:00.000000000 -0300
++++ tests/parametros-regulatorios-db.test.ts	2026-10-23 06:19:19.999425800 -0300
+@@ -0,0 +1,60 @@
++/**
++ * Configuração da calculadora (M2 P0, revisão GD II): o Fio B e a disponibilidade da EMPRESA saíram da edição — a
++ * estimativa usa a regra legal (Lei 14.300, art. 27; REN 1.000, art. 291). A Server Action real `editarParametros`
++ * (só a sessão é substituída) grava a produtividade e os custos e IGNORA esses campos, mesmo num formulário forjado.
++ */
++import { beforeAll, describe, expect, it, vi } from "vitest";
++import type { Usuario } from "./ajuda";
++
++const sessao = vi.hoisted(() => ({
++  usuario: null as unknown as { cliente: unknown },
++  atual: null as unknown as { empresaId: string; membroId: string; papel: string },
++}));
++vi.mock("@/lib/sessao", () => ({
++  exigirPapel: async (...papeis: string[]) => {
++    if (!papeis.includes(sessao.atual.papel)) throw new Error("sem permissão");
++    return { atual: sessao.atual };
++  },
++}));
++vi.mock("@/lib/supabase/server", () => ({ criarClienteServidor: async () => sessao.usuario.cliente }));
++vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
++
++const { editarParametros } = await import("@/lib/acoes/calculadora");
++const { criarUsuario, servico, sufixo } = await import("./ajuda");
++
++let admin: Usuario;
++let empresa: string;
++
++beforeAll(async () => {
++  admin = await criarUsuario("param-admin");
++  const { data: e } = await servico.from("empresas").insert({ nome: `Parâmetros ${sufixo}` }).select("id").single();
++  empresa = e!.id;
++  const { data: m } = await servico.from("empresa_membros").insert({ empresa_id: empresa, user_id: admin.id, papel: "admin" }).select("id").single();
++  sessao.usuario = admin;
++  sessao.atual = { empresaId: empresa, membroId: m!.id, papel: "admin" };
++});
++
++describe("editarParametros", () => {
++  it("grava produtividade e custos; Fio B e disponibilidade enviados à força são ignorados", async () => {
++    const colunas = "produtividade_kwh_kwp_mes, percentual_fio_b, disponibilidade_mono_kwh, disponibilidade_bi_kwh, disponibilidade_tri_kwh, custo_engenharia";
++    const { data: antes } = await servico.from("parametros_calculadora").select(colunas).eq("empresa_id", empresa).single();
++    const f = new FormData();
++    for (const [k, v] of Object.entries({
++      produtividade_kwh_kwp_mes: "118,5",
++      percentual_fio_b: "99",
++      disponibilidade_mono_kwh: "1",
++      disponibilidade_bi_kwh: "2",
++      disponibilidade_tri_kwh: "3",
++      custo_engenharia: "1.500",
++      comissao_percentual: "5",
++    }))
++      f.append(k, v);
++    expect(await editarParametros(null, f)).toEqual({ ok: true, mensagem: "Parâmetros salvos." });
++    const { data: depois } = await servico.from("parametros_calculadora").select(colunas).eq("empresa_id", empresa).single();
++    expect(depois).toEqual({
++      ...antes,
++      produtividade_kwh_kwp_mes: 118.5,
++      custo_engenharia: 1500,
++    });
++  });
++});
+diff -ruN --strip-trailing-cr -x .estado tests/proposta-db.test.ts tests/proposta-db.test.ts
+--- tests/proposta-db.test.ts	2026-10-23 06:21:37.334434700 -0300
++++ tests/proposta-db.test.ts	2026-10-23 06:09:55.253963200 -0300
+@@ -48,7 +48,8 @@
+     .from("kit_componentes")
+     .insert({ empresa_id: empresa, negocio_id: negocio, tipo: "modulo", descricao: "Módulo 550 W", potencia_w: 550, quantidade: 8, ordem: 0 });
+   if (erroKit) throw erroKit;
+-  const { data: calc, error } = await vendedor1.cliente
++  // Fixture legada pelo serviço: o cliente autenticado não grava `calculos_solares` (migration 20261023220000).
++  const { data: calc, error } = await servico
+     .from("calculos_solares")
+     .insert({
+       empresa_id: empresa,
+diff -ruN --strip-trailing-cr -x .estado tests/travas-kit-sdr-db.test.ts tests/travas-kit-sdr-db.test.ts
+--- tests/travas-kit-sdr-db.test.ts	2026-10-23 06:21:37.947374800 -0300
++++ tests/travas-kit-sdr-db.test.ts	2026-10-23 06:09:55.278995500 -0300
+@@ -437,28 +437,29 @@
+     expect(await temCalculo(negocioId)).toBe(false);
+   });
+ 
+-  it("R3: criar cálculo direto em negócio sem kit é recusado (vendedor e serviço)", async () => {
++  it("R3: criar cálculo direto em negócio sem kit é recusado (vendedor sem privilégio; serviço pela trava do kit)", async () => {
+     const negocioId = await criarNegocio(vendedor);
+-    for (const c of [vendedor.cliente, servico]) {
+-      const { error } = await c.from("calculos_solares").insert(linhaCalculo(negocioId));
+-      expect(error?.message).toContain(MENSAGEM_CALCULO);
+-      expect(error?.hint).toBe("mensagem_usuario");
+-    }
++    expect((await vendedor.cliente.from("calculos_solares").insert(linhaCalculo(negocioId))).error?.code).toBe("42501");
++    const { error } = await servico.from("calculos_solares").insert(linhaCalculo(negocioId));
++    expect(error?.message).toContain(MENSAGEM_CALCULO);
++    expect(error?.hint).toBe("mensagem_usuario");
+     expect(await temCalculo(negocioId)).toBe(false);
+   });
+ 
+   it("levar um cálculo para negócio sem kit é recusado; o cálculo fica onde estava", async () => {
+     const comCalculo = await negocioComCalculo();
+     const semKit = await criarNegocio(vendedor);
+-    const { error } = await vendedor.cliente.from("calculos_solares").update({ negocio_id: semKit }).eq("negocio_id", comCalculo);
++    expect((await vendedor.cliente.from("calculos_solares").update({ negocio_id: semKit }).eq("negocio_id", comCalculo)).error?.code).toBe("42501");
++    const { error } = await servico.from("calculos_solares").update({ negocio_id: semKit }).eq("negocio_id", comCalculo);
+     expect(error?.message).toContain(MENSAGEM_CALCULO);
+     expect(await temCalculo(comCalculo)).toBe(true);
+     expect(await temCalculo(semKit)).toBe(false);
+   });
+ 
+-  it("criação normal com kit: direto pelo Supabase e pelo cadastro do app", async () => {
++  it("criação normal com kit: pelo serviço e pelo cadastro do app (o vendedor não grava direto)", async () => {
+     const negocioId = await criarNegocio(vendedor, { componentes: KIT_UM });
+-    const { error } = await vendedor.cliente.from("calculos_solares").insert(linhaCalculo(negocioId));
++    expect((await vendedor.cliente.from("calculos_solares").insert(linhaCalculo(negocioId))).error?.code).toBe("42501");
++    const { error } = await servico.from("calculos_solares").insert(linhaCalculo(negocioId));
+     expect(error).toBeNull();
+     expect(await temCalculo(negocioId)).toBe(true);
+     expect(await temCalculo(await negocioComCalculo())).toBe(true);
+@@ -466,7 +467,7 @@
+ 
+   // ANTES: "recálculo de cálculo existente: pelo app, ..." (o app regravava a tarifa 1,05). AGORA o app não substitui a
+   // linha legada por um resultado incompleto: a tarifa da linha legada fica em 0,95; upsert e update diretos seguem valendo.
+-  it("cálculo existente: o app grava as novas entradas (1,05) e a legada (0,95) vai para o histórico; upsert e update direto continuam permitidos", async () => {
++  it("cálculo existente: o app grava as novas entradas (1,05) e a legada (0,95) vai para o histórico; upsert e update direto do vendedor são recusados", async () => {
+     const negocioId = await negocioComCalculo();
+     const r = await salvarKitComCliente(
+       cliente(vendedor),
+@@ -478,12 +479,12 @@
+     const { data: hist } = await servico.from("calculos_solares_historico").select("motivo, linha").eq("negocio_id", negocioId);
+     expect(hist).toHaveLength(1);
+     expect(hist![0]).toMatchObject({ motivo: "desatualizado_por_entradas", linha: { estado_financeiro: "legado", tarifa_kwh: 0.95 } });
++    // Migration 20261023220000: o cliente autenticado não grava `calculos_solares` (só o servidor).
+     const { error: erroUpsert } = await vendedor.cliente.from("calculos_solares").upsert({ ...linhaCalculo(negocioId, 1.1), estado_financeiro: "legado", pendencias: null }, { onConflict: "negocio_id" });
+-    expect(erroUpsert).toBeNull();
+-    expect(await tarifaSalva(negocioId)).toBeCloseTo(1.1);
++    expect(erroUpsert?.code).toBe("42501");
+     const { error: erroUpdate } = await vendedor.cliente.from("calculos_solares").update({ tarifa_kwh: 1.2 }).eq("negocio_id", negocioId);
+-    expect(erroUpdate).toBeNull();
+-    expect(await tarifaSalva(negocioId)).toBeCloseTo(1.2);
++    expect(erroUpdate?.code).toBe("42501");
++    expect(await tarifaSalva(negocioId)).toBeCloseTo(1.05);
+   });
+ 
+   it("cálculo antigo sem itens (calculadora de catálogo): continua como está e pode ser recalculado ou apagado", async () => {
+@@ -505,8 +506,10 @@
+     expect(await temCalculo(recalcular)).toBe(true);
+     expect(await lerKit(recalcular)).toEqual([]);
+ 
+-    expect((await vendedor.cliente.from("calculos_solares").update({ tarifa_kwh: 1.15 }).eq("negocio_id", recalcular)).error).toBeNull();
+-    expect((await vendedor.cliente.from("calculos_solares").upsert(linhaCalculo(recalcular, 1.25), { onConflict: "negocio_id" })).error).toBeNull();
++    // Direto, só o serviço grava (o vendedor recebe 42501); o kit ausente não trava a linha antiga.
++    expect((await vendedor.cliente.from("calculos_solares").update({ tarifa_kwh: 1.15 }).eq("negocio_id", recalcular)).error?.code).toBe("42501");
++    expect((await servico.from("calculos_solares").update({ tarifa_kwh: 1.15 }).eq("negocio_id", recalcular)).error).toBeNull();
++    expect((await servico.from("calculos_solares").upsert(linhaCalculo(recalcular, 1.25), { onConflict: "negocio_id" })).error).toBeNull();
+     expect(await tarifaSalva(recalcular)).toBeCloseTo(1.25);
+     expect(await lerKit(recalcular)).toEqual([]); // nada corrigido sozinho
+ 
+diff -ruN --strip-trailing-cr -x .estado e2e/06-calculadora-numeros.spec.ts e2e/06-calculadora-numeros.spec.ts
+--- e2e/06-calculadora-numeros.spec.ts	2026-10-23 06:21:37.962647000 -0300
++++ e2e/06-calculadora-numeros.spec.ts	2026-10-23 06:10:45.041820200 -0300
+@@ -1,5 +1,5 @@
+ import { expect, test, type Page } from "@playwright/test";
+-import { clienteDe, entrarComo, lerBase } from "./ajuda";
++import { clienteDe, clienteServico, entrarComo, lerBase } from "./ajuda";
+ import type { BaseFicticia } from "./base-ficticia";
+ 
+ /**
+@@ -39,7 +39,8 @@
+       .from("kit_componentes")
+       .insert({ empresa_id: base.empresaA, negocio_id: id, tipo: "modulo", descricao: "Módulo fictício 550 W", potencia_w: 550, quantidade: 10, ordem: 0 });
+     if (e3) throw e3;
+-    const { error: e4 } = await c.from("calculos_solares").insert({
++    // Linha legada só como fixture, pelo serviço local: o app não a cria e o vendedor não grava `calculos_solares`.
++    const { error: e4 } = await clienteServico().from("calculos_solares").insert({
+       empresa_id: base.empresaA,
+       negocio_id: id,
+       kit_nome: "Kit personalizado · 5,5 kWp (Módulo fictício 550 W)",
+diff -ruN --strip-trailing-cr -x .estado e2e/09-preco-desatualizado.spec.ts e2e/09-preco-desatualizado.spec.ts
+--- e2e/09-preco-desatualizado.spec.ts	2026-10-23 06:21:30.580661000 -0300
++++ e2e/09-preco-desatualizado.spec.ts	2026-10-23 06:10:45.044326300 -0300
+@@ -1,5 +1,5 @@
+ import { expect, test } from "@playwright/test";
+-import { clienteDe, entrarComo, lerBase } from "./ajuda";
++import { clienteDe, clienteServico, entrarComo, lerBase } from "./ajuda";
+ import type { BaseFicticia } from "./base-ficticia";
+ 
+ /**
+@@ -44,7 +44,8 @@
+     .from("kit_componentes")
+     .insert({ empresa_id: base.empresaA, negocio_id: negocio!.id, tipo: "modulo", descricao: "Módulo fictício 550 W", potencia_w: 550, quantidade: 10, ordem: 0 });
+   if (e3) throw e3;
+-  const { error: e4 } = await c.from("calculos_solares").insert({
++  // Linha legada só como fixture, pelo serviço local: o app não a cria e o vendedor não grava `calculos_solares`.
++  const { error: e4 } = await clienteServico().from("calculos_solares").insert({
+     empresa_id: base.empresaA,
+     negocio_id: negocio!.id,
+     kit_nome: "Kit personalizado · 5,5 kWp (Módulo fictício 550 W)",
+diff -ruN --strip-trailing-cr -x .estado e2e/10-calculo-estados.spec.ts e2e/10-calculo-estados.spec.ts
+--- e2e/10-calculo-estados.spec.ts	2026-10-23 06:21:37.976725100 -0300
++++ e2e/10-calculo-estados.spec.ts	2026-10-23 06:10:45.045330900 -0300
+@@ -1,5 +1,5 @@
+ import { expect, test, type Locator, type Page } from "@playwright/test";
+-import { clienteDe, entrarComo, lerBase } from "./ajuda";
++import { clienteDe, clienteServico, entrarComo, lerBase } from "./ajuda";
+ import type { BaseFicticia } from "./base-ficticia";
+ 
+ /**
+@@ -61,7 +61,8 @@
+     if (error) throw error;
+   }
+   if (legado) {
+-    const { error } = await c.from("calculos_solares").insert({
++    // Linha legada só como fixture, pelo serviço local: o app não a cria e o vendedor não grava `calculos_solares`.
++    const { error } = await clienteServico().from("calculos_solares").insert({
+       empresa_id: base.empresaA,
+       negocio_id: id,
+       // Mesmo formato que `nomeKitPersonalizado` grava: o nome do kit carrega a potência do cálculo.
+diff -ruN --strip-trailing-cr -x .estado e2e/13-calculo-gd2-fluxo.spec.ts e2e/13-calculo-gd2-fluxo.spec.ts
+--- e2e/13-calculo-gd2-fluxo.spec.ts	2026-10-23 06:21:37.990976800 -0300
++++ e2e/13-calculo-gd2-fluxo.spec.ts	2026-10-23 06:20:33.423203400 -0300
+@@ -1,4 +1,6 @@
+ import { createHash } from "node:crypto";
++import { rmSync, writeFileSync } from "node:fs";
++import { join } from "node:path";
+ import { expect, test, type Page } from "@playwright/test";
+ import { clienteDe, entrarComo, lerBase } from "./ajuda";
+ import type { BaseFicticia } from "./base-ficticia";
+@@ -9,7 +11,9 @@
+  * tributária incompatível → resultado incompleto, cálculo anterior no histórico como desatualizado, versão emitida intacta;
+  * e isolamento entre empresas.
+  *
+- * Caso numérico (data real do teste, dentro da vigência da REH 3.592 e em 2026 → 60%): Copel residencial B1, bifásico
++ * Data: o SERVIDOR de teste roda com o relógio em DATA_CALCULO (scripts/e2e-relogio.mjs, só no `next start` do e2e),
++ * independente da data real; a emissão volta ao relógio real (o banco exige `emitida_em` perto do `now()` dele).
++ * Caso numérico (22/10/2026: vigência da REH 3.592, 2026 → 60%): Copel residencial B1, bifásico
+  * (D = 50 kWh), consumo 500 kWh, 5 × 500 W = 2,5 kWp × 120 = 300 kWh, T = 0,76802 (TE + TUSD, sem tributos).
+  * Conta sem solar 384,01; com solar 192,22; economia 191,79; payback indisponível.
+  */
+@@ -21,10 +25,21 @@
+ 
+ const sha256 = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
+ const AMANHA = () => new Date(Date.now() + 24 * 3600 * 1000).toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+-const ehDe2026NaVigencia = () => {
+-  const hoje = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+-  return hoje >= "2026-06-24" && hoje <= "2026-12-31";
+-};
++
++/** Instante do cálculo: no passado em relação a qualquer execução (sessões e JWT nunca expiram no relógio deslocado). */
++const DATA_CALCULO = "2026-10-22T12:00:00-03:00";
++const ARQUIVO_RELOGIO = join(__dirname, ".estado", "relogio.json");
++
++/** Data do servidor de teste: `iso` (deslocamento lido por scripts/e2e-relogio.mjs) ou a real (`null`). */
++async function relogioDoServidor(page: Page, iso: string | null) {
++  if (iso) writeFileSync(ARQUIVO_RELOGIO, JSON.stringify({ deslocamentoMs: Date.parse(iso) - Date.now() }));
++  else rmSync(ARQUIVO_RELOGIO, { force: true });
++  await page.waitForTimeout(400); // o servidor relê o arquivo a cada 250 ms
++}
++
++test.afterEach(() => {
++  rmSync(ARQUIVO_RELOGIO, { force: true });
++});
+ 
+ async function negocioResidencialCopel(nome: string) {
+   const v = base.usuarios.vendedor;
+@@ -81,7 +96,7 @@
+   test.use({ viewport: { width: 1440, height: 900 } });
+ 
+   test("prévia → salvar → reabrir → proposta; entrada nova incompleta vai ao histórico e a versão emitida não muda", async ({ page, browser, request }) => {
+-    test.skip(!ehDe2026NaVigencia(), "Caso numérico fixado para 2026 (60%) dentro da vigência da REH 3.592.");
++    await relogioDoServidor(page, DATA_CALCULO);
+     const n = await negocioResidencialCopel("Cliente GD II Copel (fictício)");
+     await entrarComo(page, base.usuarios.vendedor, base.senha);
+     await page.goto(`/negocios/${n.id}`);
+@@ -100,9 +115,15 @@
+     await expect(page.getByTestId("previa-economia")).toHaveText(/^R\$\s191,79\/mês$/);
+     await expect(page.getByTestId("previa-payback")).toHaveText("indisponível");
+     await expect(page.getByTestId("hipotese-autoconsumo")).toContainText("autoconsumo simultâneo considerado zero");
++    // Premissas presumidas sempre visíveis (fora do bloco recolhido); tarifa oficial: sem aviso de tarifa informada.
++    await expect(page.getByTestId("premissas-presumidas")).toHaveText(
++      "Presumido (confira na conta do cliente): tarifa convencional presumida (não tarifa branca); bifásico considerado a três condutores (custo de disponibilidade de 50 kWh).",
++    );
++    await expect(page.getByTestId("tarifa-informada")).toHaveCount(0);
+     await expect(page.getByTestId("limitacoes-estimativa")).not.toHaveAttribute("open", "");
+     await expect(page.getByTestId("detalhes-tecnicos")).not.toHaveAttribute("open", "");
+     await expect(page.getByTestId("detalhes-tecnicos")).toContainText("214,5356");
++    await expect(page.getByTestId("detalhes-tecnicos")).toContainText("Data de referência: 22/10/2026.");
+ 
+     // Salvar: linha completa com o retrato dos parâmetros.
+     await page.getByRole("button", { name: /^Salvar kit/ }).click();
+@@ -111,7 +132,7 @@
+     const { data: linha } = await n.cliente
+       .from("calculos_solares")
+       .select(
+-        "estado_financeiro, conta_sem_solar, conta_com_solar, economia_mensal, payback_meses, tarifa_kwh, tarifa_base_tributaria, tarifa_origem, fio_b_rs_mwh, percentual_legal_fio_b, disponibilidade_kwh, tipo_ligacao, financeiro_desatualizado_em",
++        "estado_financeiro, conta_sem_solar, conta_com_solar, economia_mensal, payback_meses, tarifa_kwh, tarifa_base_tributaria, tarifa_origem, fio_b_rs_mwh, percentual_legal_fio_b, disponibilidade_kwh, tipo_ligacao, financeiro_desatualizado_em, data_referencia",
+       )
+       .eq("negocio_id", n.id)
+       .single();
+@@ -129,6 +150,7 @@
+       disponibilidade_kwh: 50,
+       tipo_ligacao: "bifasico",
+       financeiro_desatualizado_em: null,
++      data_referencia: "2026-10-22",
+     });
+ 
+     // Reabrir: o resultado salvo é o atual.
+@@ -139,8 +161,16 @@
+     await expect(page.getByTestId("hipotese-autoconsumo")).toBeVisible();
+     await expect(page.getByTestId("detalhes-tecnicos")).not.toHaveAttribute("open", "");
+     await expect(page.getByTestId("calculo-historico")).toHaveCount(0);
+-
+-    // Proposta simples emitida (sem economia: D1/D2 congelados).
++    // Link antigo (proposta com conta e economia, D1/D2 congelados): continua bloqueado mesmo com o cálculo completo.
++    await expect(page.getByRole("button", { name: "Gerar link da proposta" })).toBeDisabled();
++    await expect(page.getByTestId("proposta-bloqueada")).toHaveText(
++      "A proposta com conta e economia ainda não está liberada. Emita a proposta simples (sistema, geração e preço, sem economia).",
++    );
++
++    // Proposta simples emitida (sem economia: D1/D2 congelados), com o relógio real: o banco confere `emitida_em` e a
++    // validade contra o próprio `now()`.
++    await relogioDoServidor(page, null);
++    await page.reload();
+     await page.getByLabel("Válida até").fill(AMANHA());
+     await page.getByLabel("Condições de pagamento").fill("À vista por Pix ou transferência");
+     await page.getByRole("button", { name: /^Emitir/ }).click();
+@@ -154,7 +184,10 @@
+     const pdf1 = new Uint8Array(await (await request.get(`/proposta/${v1.token}/pdf`)).body());
+     expect(sha256(pdf1)).toBe(v1.pdf_sha256);
+ 
+-    // Entrada nova: base "com tributos" (incompatível com o Fio B sem tributos) → financeiro incompleto.
++    // Entrada nova: base "com tributos" (incompatível com o Fio B sem tributos) → financeiro incompleto. De volta à data
++    // do cálculo, para que a única pendência seja a base (e não a vigência).
++    await relogioDoServidor(page, DATA_CALCULO);
++    await page.reload();
+     await page.getByRole("button", { name: "Editar kit / recalcular" }).click();
+     await page.getByLabel("Base tributária da tarifa").selectOption("com_tributos");
+     await expect(page.getByTestId("previa-economia")).toHaveCount(0);
+@@ -168,7 +201,7 @@
+       .eq("negocio_id", n.id)
+       .single();
+     expect(depois).toMatchObject({ estado_financeiro: "incompleto", economia_mensal: null, conta_sem_solar: null, tarifa_base_tributaria: "com_tributos" });
+-    expect(JSON.stringify(depois!.pendencias)).toContain("base_tributaria_divergente");
++    expect((depois!.pendencias as { codigo: string }[]).map((p) => p.codigo)).toEqual(["base_tributaria_divergente"]);
+     const { data: hist } = await n.cliente.from("calculos_solares_historico").select("motivo, linha").eq("negocio_id", n.id);
+     expect(hist).toHaveLength(1);
+     expect(hist![0]!.motivo).toBe("desatualizado_por_entradas");
+@@ -212,7 +245,7 @@
+   });
+ 
+   test("ligação muda o piso (art. 291): monofásico 30 kWh e trifásico 100 kWh na prévia", async ({ page }) => {
+-    test.skip(!ehDe2026NaVigencia(), "Caso numérico fixado para 2026 (60%) dentro da vigência da REH 3.592.");
++    await relogioDoServidor(page, DATA_CALCULO);
+     const n = await negocioResidencialCopel("Cliente GD II pisos (fictício)");
+     await entrarComo(page, base.usuarios.vendedor, base.senha);
+     await page.goto(`/negocios/${n.id}`);
+@@ -226,4 +259,24 @@
+     await expect(detalhes).toContainText("art. 291): 50 kWh");
+     await expect(page.getByTestId("previa-economia")).toHaveText(/^R\$\s191,79\/mês$/);
+   });
++
++  test("relógio do servidor fora da vigência (10/05/2026): sem tarifa oficial, estimativa incompleta mesmo com tarifa e base", async ({ page }) => {
++    await relogioDoServidor(page, "2026-05-10T12:00:00-03:00");
++    const n = await negocioResidencialCopel("Cliente GD II antes da vigência (fictício)");
++    await entrarComo(page, base.usuarios.vendedor, base.senha);
++    await page.goto(`/negocios/${n.id}`);
++    await montarKit(page);
++    // Sem linha vigente nessa data: nada é sugerido e o vendedor não consegue "forçar" o resultado completo.
++    await expect(page.getByLabel("Tarifa (R$/kWh)")).toHaveValue("");
++    await expect(page.getByTestId("tarifa-origem")).toContainText("Sem tarifa oficial para este negócio");
++    await page.getByLabel("Tarifa (R$/kWh)").fill("0,76802");
++    await page.getByLabel("Base tributária da tarifa").selectOption("sem_tributos");
++    await expect(page.getByTestId("previa-economia")).toHaveCount(0);
++    await expect(page.getByTestId("pendencias-empresa").getByRole("listitem")).toHaveText(["Sem tarifa vigente da COPEL-DIS para 10/05/2026."]);
++    await page.getByRole("button", { name: /^Salvar kit/ }).click();
++    await expect(page.getByTestId("kit-salvo")).toBeVisible();
++    const { data } = await n.cliente.from("calculos_solares").select("estado_financeiro, economia_mensal, data_referencia, pendencias").eq("negocio_id", n.id).single();
++    expect(data).toMatchObject({ estado_financeiro: "incompleto", economia_mensal: null, data_referencia: "2026-05-10" });
++    expect((data!.pendencias as { codigo: string }[]).map((p) => p.codigo)).toEqual(["fio_b_vigencia_fora"]);
++  });
+ });
+diff -ruN --strip-trailing-cr -x .estado e2e/ajuda.ts e2e/ajuda.ts
+--- e2e/ajuda.ts	2026-10-23 06:21:30.623144000 -0300
++++ e2e/ajuda.ts	2026-10-23 06:10:45.027474800 -0300
+@@ -55,5 +55,16 @@
+   return cliente;
+ }
+ 
++/**
++ * Cliente LOCAL com a service role, só para FIXTURES que o app não cria mais (ex.: linha legada de `calculos_solares`,
++ * que o cliente autenticado não grava desde a migration 20261023220000). A chave vem do ambiente já validado como
++ * local pela trava do playwright.config.ts.
++ */
++export function clienteServico() {
++  return createClient<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
++    auth: { persistSession: false },
++  });
++}
++
+ /** Texto do indicador "Obra X de N". */
+ export const indicador = (page: Page) => page.getByRole("navigation", { name: "Navegação entre obras" }).locator("p[aria-live]");
+diff -ruN --strip-trailing-cr -x .estado supabase/migrations/20261023220000_calculos_solares_gravacao_servidor.sql supabase/migrations/20261023220000_calculos_solares_gravacao_servidor.sql
+--- supabase/migrations/20261023220000_calculos_solares_gravacao_servidor.sql	1969-12-31 21:00:00.000000000 -0300
++++ supabase/migrations/20261023220000_calculos_solares_gravacao_servidor.sql	2026-10-23 06:06:01.540212300 -0300
+@@ -0,0 +1,111 @@
++-- Cálculo solar gravado só pelo servidor (M2 P0, revisão da calculadora GD II; Evandro, 23/10/2026).
++--
++-- Brecha fechada: as policies "criar cálculo"/"editar cálculo" deixavam qualquer membro que vê o negócio gravar, pelo
++-- PostgREST, qualquer coluna de `calculos_solares`: economia, contas, método, percentual, fonte tarifária, autoria e
++-- o estado `completo` (ou uma linha `legado` com economia). Provado em .aurora/revisao/calc-gd2/logs/19*.log.
++--
++-- Mecanismo (o menor que mantém um motor só, em TypeScript, src/lib/calculadora.ts):
++--   1) `authenticated` perde INSERT e UPDATE na tabela (sem policy nem privilégio): nenhum payload do cliente chega lá.
++--      SELECT e DELETE continuam como estavam (apagar não forja número; a policy de DELETE não muda).
++--   2) `autorizar_gravacao_calculo(negocio)`: chamada com a sessão do usuário, só CONFERE (acesso comercial à empresa
++--      do negócio, ver o negócio, negócio não arquivado) e devolve a empresa e o membro da sessão (autoria real). Não
++--      grava nada e não recebe valor nenhum.
++--   3) O servidor (src/lib/calculo-gravacao.ts) grava com a service role a linha que ELE montou pelo motor, com as
++--      entradas validadas e a referência tarifária lida da tabela oficial; empresa e autoria vêm do passo 2.
++--   4) Defesa no banco, para qualquer escritor (inclusive a service role): linha `completo` só com o método aceito e
++--      o retrato igual à linha oficial de `tarifas_gd_aneel` (fonte, Fio B, base, vigência, enquadramento), o
++--      percentual legal do ano da data de referência e o piso do art. 291 da ligação. Não refaz a conta (isso
++--      duplicaria o motor); confere que a REFERÊNCIA usada é a autorizada.
++
++drop policy "criar cálculo" on public.calculos_solares;
++drop policy "editar cálculo" on public.calculos_solares;
++revoke insert, update, truncate on public.calculos_solares from anon, authenticated;
++
++-- ---------------------------------------------------------------------------
++-- 2) Autorização (sem escrita)
++-- ---------------------------------------------------------------------------
++create or replace function public.autorizar_gravacao_calculo(p_negocio_id uuid)
++returns table (empresa_id uuid, membro_id uuid)
++language plpgsql stable security definer set search_path = ''
++as $$
++declare
++  v_empresa uuid;
++  v_arquivado timestamptz;
++  v_membro uuid;
++begin
++  select n.empresa_id, n.arquivado_em into v_empresa, v_arquivado from public.negocios n where n.id = p_negocio_id;
++  if v_empresa is null
++     or not public.tem_acesso_comercial(v_empresa)
++     or not public.pode_ver_negocio(p_negocio_id) then
++    raise exception 'Sem permissão para gravar o cálculo deste negócio.' using errcode = '42501', hint = 'mensagem_usuario';
++  end if;
++  if v_arquivado is not null then
++    raise exception 'Negócio arquivado: o cálculo é só leitura.' using errcode = '42501', hint = 'mensagem_usuario';
++  end if;
++  v_membro := public.meu_membro_id(v_empresa);
++  if v_membro is null then
++    raise exception 'Sem permissão para gravar o cálculo deste negócio.' using errcode = '42501', hint = 'mensagem_usuario';
++  end if;
++  return query select v_empresa, v_membro;
++end;
++$$;
++revoke all on function public.autorizar_gravacao_calculo(uuid) from public, anon, authenticated, service_role;
++grant execute on function public.autorizar_gravacao_calculo(uuid) to authenticated;
++comment on function public.autorizar_gravacao_calculo(uuid) is
++  'Só confere: o usuário da sessão pode gravar o cálculo deste negócio (acesso comercial, vê o negócio, não arquivado). Devolve empresa e membro (autoria). Não grava.';
++
++-- ---------------------------------------------------------------------------
++-- 4) Linha `completo` só com a referência oficial
++-- ---------------------------------------------------------------------------
++create or replace function public.calculos_solares_conferir_referencia()
++returns trigger
++language plpgsql security definer set search_path = ''
++as $$
++declare
++  t public.tarifas_gd_aneel%rowtype;
++begin
++  if new.estado_financeiro is distinct from 'completo' then
++    return new;
++  end if;
++  -- Num UPDATE que não toca o retrato (preço, marca de desatualização, observações), não reconfere.
++  if tg_op = 'UPDATE' and old.estado_financeiro = 'completo'
++     and (new.metodo_calculo, new.tarifa_gd_id, new.distribuidora, new.enquadramento, new.fio_b_rs_mwh,
++          new.fio_b_base_tributaria, new.fio_b_vigencia_inicio, new.fio_b_vigencia_fim, new.percentual_legal_fio_b,
++          new.data_referencia, new.disponibilidade_kwh, new.tipo_ligacao, new.tarifa_kwh, new.tarifa_origem,
++          new.tarifa_base_tributaria)
++     is not distinct from
++         (old.metodo_calculo, old.tarifa_gd_id, old.distribuidora, old.enquadramento, old.fio_b_rs_mwh,
++          old.fio_b_base_tributaria, old.fio_b_vigencia_inicio, old.fio_b_vigencia_fim, old.percentual_legal_fio_b,
++          old.data_referencia, old.disponibilidade_kwh, old.tipo_ligacao, old.tarifa_kwh, old.tarifa_origem,
++          old.tarifa_base_tributaria) then
++    return new;
++  end if;
++
++  select * into t from public.tarifas_gd_aneel where id = new.tarifa_gd_id;
++  if not found
++     -- Método aceito (src/lib/fio-b-gd2.ts, METODO_GD2_PISO_V1).
++     or new.metodo_calculo is distinct from 'gd2_piso_655i_v1'
++     or new.distribuidora is distinct from t.distribuidora
++     or new.enquadramento is distinct from (t.subgrupo || '/' || t.subclasse || '/' || t.modalidade || '/GD_II')
++     or new.fio_b_rs_mwh is distinct from t.tusd_fio_b_rs_mwh
++     or new.fio_b_base_tributaria is distinct from t.base_tributaria
++     or new.fio_b_vigencia_inicio is distinct from t.vigencia_inicio
++     or new.fio_b_vigencia_fim is distinct from t.vigencia_fim
++     or new.data_referencia not between t.vigencia_inicio and t.vigencia_fim
++     -- Percentual legal do ano (Lei 14.300, art. 27; src/lib/tarifa-gd.ts, PERCENTUAL_LEGAL_FIO_B_GD2).
++     or new.percentual_legal_fio_b is distinct from (case extract(year from new.data_referencia)::int when 2026 then 0.6 when 2027 then 0.75 end)
++     -- Piso do art. 291 da REN 1.000 pela ligação (src/lib/tarifa-gd.ts, DISPONIBILIDADE_ART_291).
++     or new.disponibilidade_kwh is distinct from (case new.tipo_ligacao when 'monofasico' then 30 when 'bifasico' then 50 when 'trifasico' then 100 end)
++     -- "Oficial" só quando a tarifa é exatamente TE + TUSD da linha (5 casas).
++     or (new.tarifa_origem = 'oficial_aneel' and new.tarifa_kwh is distinct from round((t.te_rs_mwh + t.tusd_rs_mwh) / 1000, 5)) then
++    raise exception 'Cálculo completo com referência tarifária diferente da oficial. Nada foi alterado.'
++      using errcode = 'check_violation', hint = 'mensagem_usuario';
++  end if;
++  return new;
++end;
++$$;
++revoke all on function public.calculos_solares_conferir_referencia() from public, anon, authenticated, service_role;
++
++create trigger calculos_solares_referencia_oficial
++  before insert or update on public.calculos_solares
++  for each row execute function public.calculos_solares_conferir_referencia();
+diff -ruN --strip-trailing-cr -x .estado supabase/migrations/20261023230000_calculos_solares_exclusao_historico.sql supabase/migrations/20261023230000_calculos_solares_exclusao_historico.sql
+--- supabase/migrations/20261023230000_calculos_solares_exclusao_historico.sql	1969-12-31 21:00:00.000000000 -0300
++++ supabase/migrations/20261023230000_calculos_solares_exclusao_historico.sql	2026-10-23 06:52:38.758159400 -0300
+@@ -0,0 +1,79 @@
++-- Exclusão do cálculo solar com histórico e autoria (M2 P0, revisão final da calculadora GD II; Evandro, 23/10/2026).
++--
++-- Até aqui, apagar a linha de `calculos_solares` (policy "apagar cálculo": quem criou ou o admin; ação `apagarCalculo`)
++-- não deixava rastro, e o histórico (`calculos_solares_historico`, só no UPDATE) não dizia quem arquivou.
++--
++--   1) `arquivado_por` (membro) e `arquivado_por_papel` (papel do banco que executou) no histórico.
++--   2) UPDATE (substituição pelo servidor, R6.1): autoria = `atualizado_por` da linha NOVA, que o servidor preenche com o
++--      membro da autorização (`autorizar_gravacao_calculo`).
++--   3) DELETE: BEFORE DELETE grava a linha inteira com motivo `apagado` na MESMA transação. Usuário autenticado sem
++--      membro identificado na empresa da linha é recusado (a RLS já exige o criador ou o admin). Única exceção: a
++--      cascata da exclusão do próprio negócio (o negócio já não existe), cujo histórico também sai pela FK.
++
++alter table public.calculos_solares_historico
++  add column arquivado_por uuid references public.empresa_membros (id) on delete set null,
++  add column arquivado_por_papel text;
++
++alter table public.calculos_solares_historico drop constraint calculos_solares_historico_motivo_check;
++alter table public.calculos_solares_historico
++  add constraint calculos_solares_historico_motivo_check
++    check (motivo in ('desatualizado_por_entradas', 'substituido_por_recalculo', 'apagado'));
++
++comment on column public.calculos_solares_historico.arquivado_por is
++  'Membro responsável: no UPDATE, o atualizado_por da linha nova (autorização do servidor); no DELETE, o membro da sessão.';
++comment on column public.calculos_solares_historico.arquivado_por_papel is
++  'Papel do banco que executou (authenticated, service_role, postgres...).';
++
++-- 2) UPDATE: mesma regra de antes, agora com a autoria.
++create or replace function public.calculos_solares_arquivar_historico()
++returns trigger
++language plpgsql security definer set search_path = ''
++as $$
++declare
++  v_ignorar text[] := array[
++    'updated_at', 'atualizado_por', 'observacoes', 'kit_preco', 'payback_meses',
++    'financeiro_desatualizado_em', 'financeiro_desatualizado_motivo'
++  ];
++begin
++  if old.estado_financeiro in ('legado', 'completo')
++     and (to_jsonb(old) - v_ignorar) is distinct from (to_jsonb(new) - v_ignorar) then
++    insert into public.calculos_solares_historico (calculo_id, empresa_id, negocio_id, motivo, linha, arquivado_por, arquivado_por_papel)
++    values (
++      old.id, old.empresa_id, old.negocio_id,
++      case when new.estado_financeiro = 'incompleto' then 'desatualizado_por_entradas' else 'substituido_por_recalculo' end,
++      to_jsonb(old),
++      new.atualizado_por,
++      coalesce(auth.role(), session_user::text)
++    );
++  end if;
++  return new;
++end;
++$$;
++revoke execute on function public.calculos_solares_arquivar_historico() from public, anon, authenticated;
++
++-- 3) DELETE: arquiva a linha inteira com o autor, antes de apagar.
++create or replace function public.calculos_solares_arquivar_exclusao()
++returns trigger
++language plpgsql security definer set search_path = ''
++as $$
++declare
++  v_papel text := coalesce(auth.role(), session_user::text);
++  v_autor uuid;
++begin
++  -- Cascata da exclusão do negócio: ele já não existe e o histórico dele sai junto (FK on delete cascade).
++  if not exists (select 1 from public.negocios n where n.id = old.negocio_id) then
++    return old;
++  end if;
++  v_autor := public.meu_membro_id(old.empresa_id);
++  if v_papel in ('authenticated', 'anon') and v_autor is null then
++    raise exception 'Sem permissão para apagar este cálculo.' using errcode = '42501', hint = 'mensagem_usuario';
++  end if;
++  insert into public.calculos_solares_historico (calculo_id, empresa_id, negocio_id, motivo, linha, arquivado_por, arquivado_por_papel)
++  values (old.id, old.empresa_id, old.negocio_id, 'apagado', to_jsonb(old), v_autor, v_papel);
++  return old;
++end;
++$$;
++revoke all on function public.calculos_solares_arquivar_exclusao() from public, anon, authenticated, service_role;
++
++create trigger calculos_solares_historico_exclusao before delete on public.calculos_solares
++  for each row execute function public.calculos_solares_arquivar_exclusao();
+diff --git a/playwright.config.ts b/playwright.config.ts
+index 5803e3d..5b90059 100644
+--- a/playwright.config.ts
++++ b/playwright.config.ts
+@@ -9,7 +9,7 @@ import { ambienteEfetivo, verificarAmbienteLocal } from "./scripts/lib/guard-sup
+  */
+ const efetivo = ambienteEfetivo(loadEnv("development", process.cwd(), ""), process.env);
+ verificarAmbienteLocal(efetivo);
+-for (const chave of ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY"]) {
++for (const chave of ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY"]) {
+   if (efetivo[chave] && !process.env[chave]) process.env[chave] = efetivo[chave];
+ }
+ 
+diff --git a/scripts/e2e-servidor.mjs b/scripts/e2e-servidor.mjs
+index d37174f..5e19233 100644
+--- a/scripts/e2e-servidor.mjs
++++ b/scripts/e2e-servidor.mjs
+@@ -22,7 +22,7 @@ import { spawn, spawnSync } from "node:child_process";
+ import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+ import { createRequire } from "node:module";
+ import { dirname, join, resolve } from "node:path";
+-import { fileURLToPath } from "node:url";
++import { fileURLToPath, pathToFileURL } from "node:url";
+ import { loadEnv } from "vite";
+ import { ARQUIVO_MARCADOR, montarMarcador } from "./lib/bundle-servido.mjs";
+ import { ambienteEfetivo, verificarAmbienteLocal } from "./lib/guard-supabase-local.mjs";
+@@ -89,7 +89,17 @@ const trava = spawnSync(process.execPath, [join(raiz, "scripts", "checar-ambient
+ });
+ if (trava.status !== 0) recusar("a trava de `pnpm start` recusou o ambiente.");
+ 
+-const servidor = spawn(process.execPath, [nextBin, "start", "--port", porta], { cwd: raiz, env, stdio: "inherit", shell: false });
++// Relógio de teste (scripts/e2e-relogio.mjs): só neste `next start` do e2e, nunca no build nem em produção. A data do
++// servidor só muda se o próprio teste gravar e2e/.estado/relogio.json no disco local; sem o arquivo, é a real.
++const ARQUIVO_RELOGIO = join(raiz, "e2e", ".estado", "relogio.json");
++rmSync(ARQUIVO_RELOGIO, { force: true });
++const relogio = pathToFileURL(join(raiz, "scripts", "e2e-relogio.mjs")).href;
++const servidor = spawn(process.execPath, ["--import", relogio, nextBin, "start", "--port", porta], {
++  cwd: raiz,
++  env: { ...env, RAION_E2E_RELOGIO_ARQUIVO: ARQUIVO_RELOGIO },
++  stdio: "inherit",
++  shell: false,
++});
+ for (const sinal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
+   process.on(sinal, () => servidor.kill(sinal));
+ }
+--- /dev/null	2026-10-23 07:01:15.000000000 -0300
++++ scripts/e2e-relogio.mjs	2026-10-23 06:36:39.437602900 -0300
+@@ -0,0 +1,45 @@
++/**
++ * Relógio do servidor de TESTE de navegador (só e2e): carregado com `--import` por scripts/e2e-servidor.mjs no
++ * `next start` do e2e, nunca em produção nem no build. Desloca `Date` (e `Date.now()`) pelo valor gravado em
++ * RAION_E2E_RELOGIO_ARQUIVO (e2e/.estado/relogio.json, ignorado pelo git), que só o próprio teste escreve no disco
++ * local: nenhum usuário do app, cabeçalho ou parâmetro de requisição altera a data. Sem arquivo, o relógio é o real.
++ *
++ * Formato: {"deslocamentoMs": <número>}. O tempo continua andando (só soma o deslocamento), para não congelar
++ * timeouts nem a expiração de sessões.
++ *
++ * É uma função (não `class extends Date`) com `now`, `parse` e `UTC` PRÓPRIOS e o mesmo prototype: o sandbox do
++ * middleware do Next copia só as propriedades próprias do `Date` global (sem elas, `Date.parse` some e tudo quebra).
++ */
++import { readFileSync } from "node:fs";
++
++const arquivo = process.env.RAION_E2E_RELOGIO_ARQUIVO;
++if (arquivo) {
++  const DataReal = Date;
++  let lidoEm = 0;
++  let deslocamento = 0;
++  const deslocamentoAtual = () => {
++    const agora = DataReal.now();
++    if (agora - lidoEm > 250) {
++      lidoEm = agora;
++      try {
++        const lido = JSON.parse(readFileSync(arquivo, "utf8")).deslocamentoMs;
++        deslocamento = Number.isFinite(lido) ? lido : 0;
++      } catch {
++        deslocamento = 0;
++      }
++    }
++    return deslocamento;
++  };
++  const agoraDeslocado = () => DataReal.now() + deslocamentoAtual();
++
++  function DataE2E(...args) {
++    // `Date()` sem `new` devolve texto, como o original.
++    if (!new.target) return new DataReal(agoraDeslocado()).toString();
++    return args.length === 0 ? new DataReal(agoraDeslocado()) : new DataReal(...args);
++  }
++  DataE2E.prototype = DataReal.prototype;
++  DataE2E.now = agoraDeslocado;
++  DataE2E.parse = DataReal.parse;
++  DataE2E.UTC = DataReal.UTC;
++  globalThis.Date = DataE2E;
++}

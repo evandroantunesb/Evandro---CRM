@@ -1,0 +1,11 @@
+$ pnpm exec vitest run tests/parametros-regulatorios-db.test.ts
+
+ RUN  v5.0.2 R:/wt-m2-p0-calc
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  06:19:27
+   Duration  11.66s (tests 45%, transform 28%, import 26%, worker 1%)
+
+exit=0

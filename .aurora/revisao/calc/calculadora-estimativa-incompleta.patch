@@ -1,0 +1,1777 @@
+diff --git a/.aurora/contratos/m2-p0-decisao-fio-b-copel.md b/.aurora/contratos/m2-p0-decisao-fio-b-copel.md
+new file mode 100644
+index 0000000..163d0e1
+--- /dev/null
++++ b/.aurora/contratos/m2-p0-decisao-fio-b-copel.md
+@@ -0,0 +1,61 @@
++# Decisão técnica — Fio B da Copel e conta com/sem solar (B1 convencional, GD II)
++
++Estado: **aguarda aceite do Evandro**. Nada disto está ligado ao motor real; os valores existem só em teste (`tests/fio-b-copel-quatro-casos.test.ts`). Nora, 22/10/2026.
++
++## 1. Valor oficial (fonte encontrada)
++
++| Item | Valor |
++| --- | --- |
++| Fonte | ANEEL, Dados Abertos, conjunto "Componentes Tarifárias", recurso `componentes-tarifarias-2026` (id `e8717aa8-2521-453f-bf16-fbb9a16eea39`), API `datastore_search`, carga de 22/10/2026 |
++| URL | https://dadosabertos.aneel.gov.br/dataset/componentes-tarifarias (recurso acima) |
++| Ato | RESOLUÇÃO HOMOLOGATÓRIA Nº 3.592, DE 23 DE JUNHO DE 2026 (RTP 2026 da Copel-DIS; DOU 24/06/2026, extrato) |
++| Agente | `COPEL-DIS`, CNPJ 04.368.898/0001-06 |
++| Vigência | 24/06/2026 a 23/06/2027 |
++| Linha | Base "Tarifa de Aplicação"; subgrupo B1; modalidade Convencional; classe Residencial; subclasse Residencial; detalhe "SCEE" (igual em "Não se aplica"); posto "Não se aplica" |
++| Componente | `TUSD_FioB` = **214,535600374 R$/MWh = 0,214535600374 R$/kWh** |
++| Identificação | `_id` 887694 (SCEE; repetida em 923614) e 885153 (Não se aplica; repetida em 885357). Toda linha aparece 2x, idêntica |
++| Totais da mesma linha | TE 310,85 + TUSD 457,17 = **768,02 R$/MWh (T = 0,76802 R$/kWh)**. SCEE: TUSD 457,17, TE 30,20 |
++| Conferência interna | soma dos `TUSD_*` = 457,1718 e dos `TE_*` = 310,8486 (fecham os totais) |
++| Conferência cruzada | conjunto "Tarifas de aplicação das distribuidoras" (id `fcf2906c-…`, forma de dados do anexo da REH): REH 3.592, B1 Convencional Residencial = TUSD 457,17 / TE 310,85; SCEE = 457,17 / 30,20 |
++| Base tributária | sem tributos: "Tarifa de Aplicação" é a tarifa homologada usada no faturamento (dicionário de metadados ANEEL); as REHs lidas (3.544 e 3.445) autorizam incluir PIS/Cofins **por fora** (art. 12); ICMS é estadual. A Copel declara que a tabela do site dela já inclui ICMS/PIS/Cofins (não é a mesma base) |
++
++A tarifa cheia exibida ao consumidor não foi usada como Fio B.
++
++## 2. Como a GD II é faturada (regra comprovada no texto vigente)
++
++- **Lei 14.300/2022, art. 27** (Planalto): GD II paga, "sobre toda a energia elétrica ativa compensada", as componentes de remuneração dos ativos, quota de reintegração e O&M da distribuição (= TUSD Fio B): **60% a partir de 2026; 75% a partir de 2027**; 90% em 2028.
++- **REN 1.000, art. 655-Q**: na GD II aplicam-se "as tarifas homologadas para a unidade consumidora e os descontos tarifários estabelecidos na REH da distribuidora para a GD II".
++- **REN 1.000, art. 655-I** (redação REN 1.098/2024), grupo B no SCEE: parcela de consumo = **maior** entre (I) custo de disponibilidade (art. 291) e (II) faturamento = energia da rede não compensada às tarifas normais + energia compensada às "tarifas TUSD e TE aplicáveis ao SCEE … com seus percentuais de desconto … GD I, II ou III". **§2º**: a energia compensada vai até o limite em que esse faturamento fique ≥ custo de disponibilidade (I) e nunca passa do consumo do ciclo (II).
++- **REN 1.000, art. 291**: custo de disponibilidade = 30 kWh (mono/bifásico 2 condutores), 50 kWh (bifásico 3 condutores), 100 kWh (trifásico), valorados à tarifa da unidade.
++- **Tabela 4 das REHs** (descontos sobre a tarifa SCEE): GD II = 100% de desconto na TE SCEE e desconto parcial na TUSD SCEE, por período. O desconto é exatamente `1 − p × FioB / TUSD_SCEE`: conferido em duas REHs legíveis — Equatorial GO 3.544 (76,86% em 2025 e 69,15% em 2026, derivados = publicados) e Enel CE 3.445 (71,76% e 62,35%, derivados = publicados).
++
++Logo, para a Copel: **N = 0,60 × 0,214535600374 = 0,1287214 R$/kWh** (24/06 a 31/12/2026) e **0,75 × 0,214535600374 = 0,1609017 R$/kWh** (01/01 a 23/06/2027). Desconto esperado na Tabela 4 da REH 3.592: TUSD 71,84% (2026) e 64,80% (2027), TE 100%.
++
++## 3. Fórmula
++
++Entradas: consumo total `Ct`, geração `G`, autoconsumo instantâneo `A` (padrão 0), `C = Ct − A`, `E = G − A`, `D` (art. 291), `T = (TE + TUSD)` sem tributos, `N` acima.
++
++- **Sem solar:** `max(Ct, D) × T`
++- **Com solar:** `K = min(E, C, max(0, (C − D) × T / (T − N)))`; conta = `max(D × T, (C − K) × T + K × N)`
++- Economia = sem − com, sobre as contas já arredondadas (regra aprovada em 21/10); payback só com economia > 0.
++
++## 4. Quatro contas à mão (T = 0,76802; N = 0,1287214; bifásico 3 condutores, D = 50 kWh)
++
++| Caso | Entrada | Sem solar | Com solar | Economia |
++| --- | --- | --- | --- | --- |
++| 1. Geração zero | Ct 300, G 0 | 300 × T = **230,41** | K = 0 → 230,41 | **0,00** (payback indisponível) |
++| 2. Consumo abaixo do piso | Ct 40, G 200 | max(40, 50) × T = **38,40** | C < D → K = 0; max(38,40; 30,72) = **38,40** | **0,00**; 200 kWh sobram (sem banco de créditos) |
++| 3. Compensação parcial | Ct 500, G 300 | 500 × T = **384,01** | limite 540,61 → K = 300; 200 × T + 300 × N = 153,604 + 38,616 = **192,22** | **191,79** |
++| 4. Compensação total | Ct 400, G 500 | 400 × T = **307,21** | limite 420,47 → K = 400; 400 × N = **51,49** (> piso 38,40) | **255,72**; 100 kWh sobram |
++| 4b. Sobra limitada pelo piso | Ct 200, G 400 | 200 × T = **153,60** | limite 150 × T / (T − N) = 180,20 → K = 180,20; conta = piso **38,40** | **115,20** |
++
++As cinco contas foram conferidas também pelo módulo isolado `fio-b-hipotese.ts` (`tests/fio-b-copel-quatro-casos.test.ts`, 5/5).
++
++## 5. O que exige o seu aceite técnico
++
++1. **Tabela 4 da REH 3.592 não lida**: o PDF da ANEEL (www2.aneel.gov.br/cedoc e legislacao.aneel.gov.br) responde 403 a acesso automatizado (desafio Cloudflare); o DOU só publica o extrato. O desconto 71,84% é derivado pelo método conferido em duas REHs. Com o percentual arredondado da tabela, N seria 0,1287391 (diferença de R$ 0,0000177/kWh). Basta abrir o PDF no navegador e conferir a linha "B1 Convencional Residencial, GD II".
++2. **Base tributária**: T e N oficiais, sem tributos. A estimativa sai "sem tributos" e a tarifa digitada pelo vendedor (base desconhecida) deixa de entrar na economia. O tratamento de ICMS/PIS/Cofins sobre a energia compensada segue em aberto. Também confirmar, no texto da REH 3.592, o artigo de PIS/Cofins por fora.
++3. **Piso**: sigo o art. 655-I da REN (piso sobre o faturamento total). O art. 16, §1º, da Lei 14.300 diz que na GD II o mínimo só se aplica se o consumo medido for menor que o mínimo; a REN é mais restritiva e resulta em conta maior (economia menor, lado conservador).
++4. **Fora da conta**: parcela de injeção (655-I, §3º, só com medição de demanda e aviso prévio), bandeiras (Lei 14.300, art. 19), iluminação pública, banco de créditos (E − K não é valorado), autoconsumo instantâneo (0, conservador).
++5. **Período**: o recorte P0 é só 2026. Em 01/01/2027 N passa a 0,1609017 (75%). Recomendo usar a data do cálculo e incluir 2027 (75%) no recorte, dentro da vigência da REH (até 23/06/2027).
++6. **Texto compilado da REN 1.000**: lido da cópia hospedada pela Cemig (ago/2025, até a REN 1.115/2025), porque o compilado da ANEEL também está bloqueado. Confirmar que 655-I, 655-Q e 291 não mudaram depois disso.
+diff --git a/.aurora/contratos/m2-p0-ligacao-motor.md b/.aurora/contratos/m2-p0-ligacao-motor.md
+new file mode 100644
+index 0000000..cb3eaaf
+--- /dev/null
++++ b/.aurora/contratos/m2-p0-ligacao-motor.md
+@@ -0,0 +1,24 @@
++# Ponto exato de ligação do cálculo financeiro ao motor (`calcular`)
++
++Estado: mapa para depois do aceite (ver `m2-p0-decisao-fio-b-copel.md`). Nada disto foi ligado. Nora, 22/10/2026, worktree `R:/wt-m2-p0-calc`.
++
++## Já pronto nesta rodada (trabalho independente)
++
++- Migration `20261023200000_calculos_estimativa_incompleta.sql`: `calculos_solares.estado_financeiro` (`legado`/`incompleto`/`completo`), `pendencias`, `metodo_calculo`; financeiros anuláveis; CHECK de coerência (incompleto = financeiros e payback nulos + pendências; completo = números + método).
++- `linhaDeCalculo` devolve o resultado técnico `incompleto` e os dois salvamentos (criar negócio, salvar kit) gravam. Linha `legado` nunca é substituída por resultado incompleto.
++- Vigência: motivo `incompleta` (bloqueia proposta antiga e preço; o contrato ignora). Ficha: "Resultado técnico salvo (sem economia)", recolhido.
++
++## Onde a regra entra (em ordem)
++
++1. **Dados oficiais** — tabela `parametros_fio_b` (rascunho `.aurora/propostas-sql/m2-p0-fio-b.sql`, parte 1) com a linha da Copel: `fio_b_rs_kwh` 0,214536, `base_tributaria` `sem_tributos`, `origem` `oficial_aneel`, fonte/linha da ANEEL, vigência 2026-06-24 a 2027-06-23. Admin cadastra. O vendedor nunca digita.
++2. **Leitura no servidor** — `src/lib/calculo-servidor.ts:32` (`montarLinhaCalculo`): além de `parametros_calculadora`, ler `parametros_fio_b` vigente na data do cálculo e o enquadramento do negócio; passar para `linhaDeCalculo`.
++3. **Entrada do motor** — `src/lib/calculo-reproduzivel.ts:163` (`linhaDeCalculo` chama `calcular`): preencher `dadosEstimativa` (`enquadramento`, `parametrosFioB`, `tarifaBaseBaseTributaria`, `dataReferencia`). Hoje é omitido, por isso tudo sai incompleto.
++4. **Motor** — `src/lib/calculadora.ts:87` (`calcular`): hoje devolve sempre `incompleta` (linha 102). Novo ramo: se `avaliarCompletude` não tiver pendências, chamar `calcularFioBHipotese` (`src/lib/fio-b-hipotese.ts:74`) com `T`, `D` (pelo `tipoLigacao`), `N = percentualLegalFioB(enq) × fioB` e montar `estado: "completa"` via `fecharEconomia` (`calculadora.ts`). Mapeamento: `kwhCompensado = K`, `kwhFaturado = C − K`, `custoFioB = K × N`, contas e economia do módulo.
++5. **Trava da fórmula** — `src/lib/estimativa-financeira.ts:166`: a pendência `formula_nao_validada` é sempre acrescentada; sai com o aceite. `RECORTE_P0` (linha 8) e `percentualLegalFioB` (linha 66) ganham 2027 = 0,75, se aceito.
++6. **Gravação** — `calculo-reproduzivel.ts:211` (ramo `ok: true`): já grava `estado_financeiro: "completo"`; falta `metodo_calculo` (o banco recusa sem ele) e o retrato do Fio B usado (rascunho, parte 2: distribuidora, enquadramento, Fio B, base, origem, fonte, vigência, percentual legal).
++7. **Prévia do vendedor** — `src/app/(app)/negocios/[id]/kit-personalizado.tsx:420` e `src/app/(app)/negocios/novo/formulario.tsx:307` chamam `calcular` no navegador: receber os mesmos `dadosEstimativa` por props do servidor. Fio B automático, só em "Detalhes técnicos" (recolhido).
++8. **Leitores do estado `completo`** — vigência (`calculo-vigencia.ts`), ficha, preço (`atualizarPrecoCalculoComCliente`), proposta: liberar só `completo`; `legado` e `incompleta` continuam bloqueados.
++
++## Teste depois do aceite
++
++prévia → salvar → reabrir → proposta, no banco descartável, com a linha da Copel cadastrada e os quatro casos da decisão como oráculo.
+diff --git a/R:/wt-m2-p0-retomada/e2e/06-calculadora-numeros.spec.ts b/e2e/06-calculadora-numeros.spec.ts
+index 04cbd75..68540a6 100644
+--- a/R:/wt-m2-p0-retomada/e2e/06-calculadora-numeros.spec.ts
++++ b/e2e/06-calculadora-numeros.spec.ts
+@@ -75,6 +75,25 @@ async function novoNegocio(nome: string, { legado = false, consumoNegocio = null
+   return { id, calculo, consumoDoNegocio };
+ }
+ 
++/** Parte financeira do resultado técnico incompleto: sempre nula (ausência nunca vira zero). */
++const SEM_FINANCEIRO = {
++  estado_financeiro: "incompleto",
++  kwh_faturado: null,
++  kwh_compensado: null,
++  custo_fio_b: null,
++  conta_sem_solar: null,
++  conta_com_solar: null,
++  economia_mensal: null,
++  payback_meses: null,
++};
++
++/** Colunas que o salvamento decide (sem id, autor e datas, que mudam a cada gravação). */
++function tecnicoDa(l: Record<string, unknown> | null) {
++  if (!l) return null;
++  const campos = ["consumo_medio_kwh", "tarifa_kwh", "geracao_estimada_kwh_mes", ...Object.keys(SEM_FINANCEIRO)];
++  return Object.fromEntries(campos.map((k) => [k, l[k]]));
++}
++
+ async function montarKit(page: Page, consumo: string, tarifa: string) {
+   await page.getByRole("button", { name: "+ Adicionar módulo" }).click();
+   await page.getByLabel("Modelo / descrição").last().fill("Módulo fictício 550 W");
+@@ -92,7 +111,7 @@ async function salvar(page: Page) {
+ test.describe("calculadora: números no padrão brasileiro", () => {
+   test.use({ viewport: { width: 1440, height: 900 } });
+ 
+-  test("1200 kWh: salvar → reabrir → salvar sem editar mantém o consumo (sem linha de cálculo)", async ({ page }) => {
++  test("1200 kWh: salvar → reabrir → salvar sem editar mantém o consumo e o resultado técnico (sem parte financeira)", async ({ page }) => {
+     const n = await novoNegocio("Cliente M2-a ida e volta (fictício)");
+     await entrarComo(page, base.usuarios.vendedor, base.senha);
+     await page.goto(`/negocios/${n.id}`);
+@@ -100,15 +119,18 @@ test.describe("calculadora: números no padrão brasileiro", () => {
+     await expect(page.getByTestId("previa-sistema")).toContainText("660 kWh/mês"); // prévia: geração não depende do consumo
+     await salvar(page);
+     expect(await n.consumoDoNegocio()).toBe(1200);
+-    expect(await n.calculo()).toBeNull();
++    // Resultado técnico salvo: 5,5 kWp × 120 = 660 kWh/mês; nenhum número financeiro (estado `incompleto`).
++    const tecnico = tecnicoDa(await n.calculo());
++    expect(tecnico).toEqual({ ...SEM_FINANCEIRO, consumo_medio_kwh: 1200, tarifa_kwh: 0.95, geracao_estimada_kwh_mes: 660 });
+ 
+     for (let i = 0; i < 2; i++) {
+       await page.reload();
+       // O consumo reabre na escala brasileira ("1.200", não 1,2) e salvar sem editar não muda nada.
++      await page.getByRole("button", { name: "Editar kit / recalcular" }).click();
+       await expect(page.getByLabel("Consumo médio (kWh/mês)")).toHaveValue("1.200");
+       await salvar(page);
+       expect(await n.consumoDoNegocio()).toBe(1200);
+-      expect(await n.calculo()).toBeNull();
++      expect(tecnicoDa(await n.calculo())).toEqual(tecnico);
+     }
+   });
+ 
+@@ -154,12 +176,14 @@ test.describe("calculadora: números no padrão brasileiro", () => {
+     await expect(page.getByTestId("pendencias-vendedor")).toHaveCount(0); // consumo válido: nada a informar pelo vendedor
+     await salvar(page);
+     expect(await n.consumoDoNegocio()).toBe(1200.5);
+-    expect(await n.calculo()).toBeNull();
++    const tecnico = tecnicoDa(await n.calculo());
++    expect(tecnico).toEqual({ ...SEM_FINANCEIRO, consumo_medio_kwh: 1200.5, tarifa_kwh: 0.95, geracao_estimada_kwh_mes: 660 });
+ 
++    await page.getByRole("button", { name: "Editar kit / recalcular" }).click();
+     await page.getByLabel("Consumo médio (kWh/mês)").fill("1.2");
+     await page.getByRole("button", { name: /^Salvar kit/ }).click();
+     await expect(page.getByRole("status").filter({ hasText: "Número inválido" })).toBeVisible();
+     expect(await n.consumoDoNegocio()).toBe(1200.5);
+-    expect(await n.calculo()).toBeNull();
++    expect(tecnicoDa(await n.calculo())).toEqual(tecnico);
+   });
+ });
+diff --git a/R:/wt-m2-p0-retomada/e2e/10-calculo-estados.spec.ts b/e2e/10-calculo-estados.spec.ts
+index c626a00..92c22a0 100644
+--- a/R:/wt-m2-p0-retomada/e2e/10-calculo-estados.spec.ts
++++ b/e2e/10-calculo-estados.spec.ts
+@@ -150,7 +150,7 @@ async function semNumerosDaProposta(page: Page) {
+ test.describe("estados do cálculo", () => {
+   test.use({ viewport: { width: 1440, height: 900 } });
+ 
+-  test("(a) dados do vendedor completos: prévia com potência e geração, quadro só com pendências da empresa; salvar não cria cálculo", async ({ page }) => {
++  test("(a) dados do vendedor completos: prévia com potência e geração, quadro só com pendências da empresa; salvar grava só o resultado técnico", async ({ page }) => {
+     const n = await novoNegocio("Cliente dados completos (fictício)");
+     await abrir(page, n.id);
+     await adicionarModulo(page, "550", "10");
+@@ -183,23 +183,43 @@ test.describe("estados do cálculo", () => {
+     // Mensagem persistente do salvamento (não some sozinha); some ao editar qualquer campo.
+     const salvo = porId(page, "kit-salvo");
+     await expect(salvo).toBeVisible();
+-    await expect(salvo).toContainText("Itens do kit salvos. A economia e o payback ainda não foram calculados.");
++    await expect(salvo).toContainText("Kit e resultado técnico salvos. A economia e o payback ainda não foram calculados.");
+     await expect(salvo).toContainText(
+       "Isso não depende de você: a empresa ainda precisa configurar e validar o enquadramento da unidade, o Fio B da distribuidora, a base tributária e a regra de cálculo da economia.",
+     );
+     await expect(salvo).not.toContainText("Falta você informar");
++    await expect(salvo).not.toContainText("fórmula antiga");
+     await page.waitForTimeout(2000);
+     await expect(salvo).toBeVisible();
+ 
+-    // Itens e consumo gravados; NENHUMA linha em calculos_solares.
++    // Itens e consumo gravados; a linha de calculos_solares é só o resultado técnico (sem nenhum número financeiro).
+     await expect.poll(async () => (await n.itens()).map((i) => ({ potencia: i.potencia_w, quantidade: i.quantidade }))).toEqual([{ potencia: 550, quantidade: 10 }]);
+-    expect(await n.calculo()).toBeNull();
++    expect(await n.calculo()).toMatchObject({
++      estado_financeiro: "incompleto",
++      consumo_medio_kwh: 700,
++      tarifa_kwh: 0.95,
++      geracao_estimada_kwh_mes: 660,
++      economia_mensal: null,
++      conta_sem_solar: null,
++      conta_com_solar: null,
++      custo_fio_b: null,
++      payback_meses: null,
++    });
+     expect(await n.negocio()).toMatchObject({ consumo_medio_kwh: 700 });
+     await expect(page.getByText("Economia estimada")).toHaveCount(0);
+     await expect(page.getByText("Payback estimado")).toHaveCount(0);
++    // O resultado técnico salvo fica recolhido; nunca aparece o histórico da fórmula antiga.
++    await expect(porId(page, "resultado-tecnico-salvo")).toHaveCount(1);
++    await expect(porId(page, "calculo-anterior")).toHaveCount(0);
+ 
+-    await page.getByLabel("Consumo médio (kWh/mês)").fill("710");
++    // Reabrir: o mesmo resultado técnico, ainda sem números inventados.
++    await page.reload();
++    await expect(porId(page, "resultado-tecnico-salvo")).toContainText("660 kWh/mês");
++    await expect(page.getByText("Economia estimada")).toHaveCount(0);
++
++    await page.getByRole("button", { name: "Editar kit / recalcular" }).click();
+     await expect(salvo).toHaveCount(0);
++    await page.getByLabel("Consumo médio (kWh/mês)").fill("710");
+     await expect(porId(page, "estimativa-incompleta")).toBeVisible();
+ 
+     // Detalhes técnicos: recolhido, só leitura, sem percentual nem campo editável.
+diff --git a/R:/wt-m2-p0-retomada/e2e/11-kit-consumo-fatura-salvos.spec.ts b/e2e/11-kit-consumo-fatura-salvos.spec.ts
+index 266fa33..21c6b91 100644
+--- a/R:/wt-m2-p0-retomada/e2e/11-kit-consumo-fatura-salvos.spec.ts
++++ b/e2e/11-kit-consumo-fatura-salvos.spec.ts
+@@ -47,7 +47,11 @@ async function novoNegocio(nome: string) {
+   return {
+     id,
+     calculo: async () => {
+-      const { data, error } = await c.from("calculos_solares").select("id").eq("negocio_id", id).maybeSingle();
++      const { data, error } = await c
++        .from("calculos_solares")
++        .select("estado_financeiro, consumo_medio_kwh, valor_fatura_medio, economia_mensal")
++        .eq("negocio_id", id)
++        .maybeSingle();
+       if (error) throw error;
+       return data;
+     },
+@@ -79,7 +83,7 @@ async function adicionarModulo(page: Page) {
+ test.describe("kWh e fatura do kit preservados", () => {
+   test.use({ viewport: { width: 1440, height: 900 } });
+ 
+-  test("campos do kit vazios avisam o valor já salvo, salvar preserva consumo e fatura e não cria cálculo", async ({ page }) => {
++  test("campos do kit vazios avisam o valor já salvo, salvar preserva consumo e fatura e grava só o resultado técnico", async ({ page }) => {
+     const n = await novoNegocio("Cliente kit vazio preserva (fictício)");
+     await abrir(page, n.id);
+     await adicionarModulo(page);
+@@ -108,10 +112,11 @@ test.describe("kWh e fatura do kit preservados", () => {
+     await page.getByRole("button", { name: /^Salvar kit/ }).click();
+     await expect(page.getByTestId("kit-salvo")).toBeVisible();
+ 
+-    // Reabrir: itens gravados, consumo e fatura preservados, nenhuma linha em calculos_solares.
++    // Reabrir: itens gravados, consumo e fatura preservados; a linha de calculos_solares é só o resultado técnico com os
++    // valores efetivos (450 kWh / R$ 300), sem parte financeira.
+     await expect.poll(async () => (await n.itens()).map((i) => ({ potencia: i.potencia_w, quantidade: i.quantidade }))).toEqual([{ potencia: 550, quantidade: 10 }]);
+     expect(await n.negocio()).toEqual({ consumo_medio_kwh: 450, valor_conta_energia: 300 });
+-    expect(await n.calculo()).toBeNull();
++    expect(await n.calculo()).toEqual({ estado_financeiro: "incompleto", consumo_medio_kwh: 450, valor_fatura_medio: 300, economia_mensal: null });
+     await page.reload();
+     expect(await n.negocio()).toEqual({ consumo_medio_kwh: 450, valor_conta_energia: 300 });
+     await expect(page.getByLabel("Consumo médio (12 meses, kWh)")).toHaveValue("450");
+diff --git a/R:/wt-m2-p0-retomada/src/app/(app)/negocios/[id]/kit-personalizado.tsx b/src/app/(app)/negocios/[id]/kit-personalizado.tsx
+index 9d5000a..de04044 100644
+--- a/R:/wt-m2-p0-retomada/src/app/(app)/negocios/[id]/kit-personalizado.tsx
++++ b/src/app/(app)/negocios/[id]/kit-personalizado.tsx
+@@ -36,9 +36,12 @@ export type CalculoSalvo = {
+   valorFaturaMedio: number | null;
+   tarifaKwh: number;
+   geracaoEstimadaKwhMes: number;
+-  economiaMensal: number;
++  /** Nula no resultado técnico incompleto (sem parte financeira). */
++  economiaMensal: number | null;
+   paybackMeses: number | null;
+   observacoes: string | null;
++  /** `legado`, `incompleto` ou `completo` (coluna `estado_financeiro`). */
++  estadoFinanceiro: string;
+ };
+ 
+ /** Resultado de `carregarVigencia` que a tela usa: por que o cálculo salvo não vale como atual e o que não foi conferido. */
+@@ -63,11 +66,17 @@ function numeroBr(v: number) {
+ const TEXTO_SEM_ECONOMIA = "Sem economia estimada neste cenário";
+ 
+ /** Payback só existe com economia positiva e valor positivo: nunca "0 meses". */
+-function textoPayback(economiaMensal: number, paybackMeses: number | null) {
+-  if (!(economiaMensal > 0) || paybackMeses == null || !(paybackMeses > 0)) return "indisponível";
++function textoPayback(economiaMensal: number | null, paybackMeses: number | null) {
++  if (economiaMensal == null || !(economiaMensal > 0) || paybackMeses == null || !(paybackMeses > 0)) return "indisponível";
+   return `${numeroBr(paybackMeses)} meses`;
+ }
+ 
++/** Economia ausente (nula) nunca vira zero nem "sem economia": é "indisponível". */
++function textoEconomia(economiaMensal: number | null) {
++  if (economiaMensal == null) return "indisponível";
++  return economiaMensal > 0 ? `${formatarMoeda(economiaMensal)}/mês` : TEXTO_SEM_ECONOMIA;
++}
++
+ const ROTULO_NAO_VERIFICAVEL: Record<EntradaNaoVerificavel, string> = {
+   tarifa: "tarifa",
+   tipo_ligacao: "tipo de ligação",
+@@ -208,15 +217,29 @@ export function PreviaEstimativa({
+ }
+ 
+ /** Mensagem persistente depois de salvar o kit: o que foi salvo e o que falta, em linguagem simples. */
+-function MensagemKitSalvo({ pendencias, calculoAnterior }: { pendencias: Pendencia[]; calculoAnterior: boolean }) {
++/**
++ * `tecnicoSalvo`: o servidor gravou o resultado técnico (sem parte financeira). `calculoAnterior`: ficou uma linha
++ * anterior que não vale como atual (`legado` = fórmula antiga; `incompleto` = resultado técnico anterior).
++ */
++function MensagemKitSalvo({
++  pendencias,
++  tecnicoSalvo,
++  calculoAnterior,
++}: {
++  pendencias: Pendencia[];
++  tecnicoSalvo: boolean;
++  calculoAnterior: "legado" | "incompleto" | null;
++}) {
+   const { vendedor, empresa } = separarPendencias(pendencias);
+   return (
+     <p data-testid="kit-salvo" role="status" className="rounded-md bg-zinc-50 px-3 py-2 text-sm text-zinc-700">
+-      Itens do kit salvos. A economia e o payback ainda não foram calculados.
++      {tecnicoSalvo ? "Kit e resultado técnico salvos." : "Itens do kit salvos."} A economia e o payback ainda não foram calculados.
+       {vendedor.length > 0 && ` Falta você informar ${juntar(vendedor)}.`} Isso não depende de você: a empresa ainda precisa configurar e
+       validar {juntar(empresa.map((i) => i.curto))}.
+-      {calculoAnterior &&
++      {!tecnicoSalvo &&
++        calculoAnterior === "legado" &&
+         " O cálculo anterior foi mantido só como histórico: foi feito por uma fórmula antiga, que não foi validada, e não vale como resultado atual."}
++      {!tecnicoSalvo && calculoAnterior === "incompleto" && " O resultado técnico anterior foi mantido, mas não vale como resultado atual."}
+     </p>
+   );
+ }
+@@ -313,6 +336,9 @@ export function KitPersonalizado({
+     }
+   }
+   const avisoKitSalvo = !!resultado?.ok && assinaturaSalva === assinatura;
++  // O servidor diz o que gravou ("Kit e resultado técnico salvos." x "Itens do kit salvos.").
++  const tecnicoSalvo = avisoKitSalvo && !!resultado?.mensagem?.startsWith("Kit e resultado técnico salvos");
++  const anterior = calculo?.estadoFinanceiro === "legado" ? "legado" : calculo?.estadoFinanceiro === "incompleto" ? "incompleto" : null;
+ 
+   /**
+    * Cancelar: não grava nem apaga nada no banco; só descarta o que foi mexido na tela e volta ao
+@@ -420,7 +446,7 @@ export function KitPersonalizado({
+             Favor adicionar o padrão atual do cliente (em &quot;Dados do negócio&quot;) para conferir compatibilidade com o kit.
+           </p>
+         )}
+-        {avisoKitSalvo && <MensagemKitSalvo pendencias={pendenciasPrevia} calculoAnterior />}
++        {avisoKitSalvo && <MensagemKitSalvo pendencias={pendenciasPrevia} tecnicoSalvo={tecnicoSalvo} calculoAnterior={anterior} />}
+         {precoDesatualizado && (
+           <form action={acaoPreco} role="alert" className="flex flex-col gap-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
+             <input type="hidden" name="negocioId" value={negocioId} />
+@@ -453,7 +479,40 @@ export function KitPersonalizado({
+                 <span className="text-zinc-500">Estrutura do telhado:</span> {estruturaTelhado}
+               </p>
+             )}
+-            {/* Histórico: valores do cálculo antigo, em visual secundário e recolhidos; não são o resultado atual. */}
++            {calculo.estadoFinanceiro === "incompleto" ? (
++              // Resultado técnico salvo (sem parte financeira): recolhido; a prévia acima é o estado atual.
++              <details data-testid="resultado-tecnico-salvo" className="rounded-md border border-dashed border-zinc-300 px-3 py-2 text-sm">
++                <summary className="cursor-pointer text-zinc-500">Resultado técnico salvo (sem economia)</summary>
++                {outrosMotivos.filter((m) => m !== "incompleta").length > 0 && (
++                  <ul className="mt-1 list-disc pl-5 text-xs text-zinc-500">
++                    {outrosMotivos
++                      .filter((m) => m !== "incompleta")
++                      .map((m) => (
++                        <li key={m}>{textoDoMotivo(m).replace(/^./, (c) => c.toUpperCase())}.</li>
++                      ))}
++                  </ul>
++                )}
++                <dl className="mt-2 grid grid-cols-2 gap-3 text-sm text-zinc-500">
++                  <div>
++                    <dt>Kit</dt>
++                    <dd>{calculo.kitNome}</dd>
++                  </div>
++                  <div>
++                    <dt>Ligação</dt>
++                    <dd>{ROTULO_TIPO_LIGACAO[calculo.tipoLigacao]}</dd>
++                  </div>
++                  <div>
++                    <dt>Geração estimada</dt>
++                    <dd>{numeroBr(calculo.geracaoEstimadaKwhMes)} kWh/mês</dd>
++                  </div>
++                  <div>
++                    <dt>Consumo médio</dt>
++                    <dd>{numeroBr(calculo.consumoMedioKwh)} kWh/mês</dd>
++                  </div>
++                </dl>
++              </details>
++            ) : (
++            /* Histórico: valores do cálculo antigo, em visual secundário e recolhidos; não são o resultado atual. */
+             <details data-testid="calculo-anterior" className="rounded-md border border-dashed border-zinc-300 px-3 py-2 text-sm">
+               <summary className="cursor-pointer text-zinc-500">Cálculo anterior (fórmula antiga, não validada)</summary>
+               <p className="mt-2 text-xs text-zinc-500">
+@@ -487,7 +546,7 @@ export function KitPersonalizado({
+                 </div>
+                 <div>
+                   <dt>Economia (fórmula antiga)</dt>
+-                  <dd>{calculo.economiaMensal > 0 ? `${formatarMoeda(calculo.economiaMensal)}/mês` : TEXTO_SEM_ECONOMIA}</dd>
++                  <dd>{textoEconomia(calculo.economiaMensal)}</dd>
+                 </div>
+                 <div>
+                   <dt>Payback (fórmula antiga)</dt>
+@@ -500,6 +559,7 @@ export function KitPersonalizado({
+                 </p>
+               )}
+             </details>
++            )}
+           </>
+         ) : (
+           <dl className="grid grid-cols-2 gap-3 text-sm">
+@@ -521,8 +581,8 @@ export function KitPersonalizado({
+             </div>
+             <div>
+               <dt className="text-zinc-500">Economia estimada</dt>
+-              <dd className={calculo.economiaMensal > 0 ? "font-medium text-green-700" : "text-zinc-700"}>
+-                {calculo.economiaMensal > 0 ? `${formatarMoeda(calculo.economiaMensal)}/mês` : TEXTO_SEM_ECONOMIA}
++              <dd className={(calculo.economiaMensal ?? 0) > 0 ? "font-medium text-green-700" : "text-zinc-700"}>
++                {textoEconomia(calculo.economiaMensal)}
+               </dd>
+             </div>
+             <div>
+@@ -698,7 +758,7 @@ export function KitPersonalizado({
+         </Botao>
+       </div>
+       {resultado?.ok ? (
+-        avisoKitSalvo && <MensagemKitSalvo pendencias={pendenciasPrevia} calculoAnterior={!!calculo} />
++        avisoKitSalvo && <MensagemKitSalvo pendencias={pendenciasPrevia} tecnicoSalvo={tecnicoSalvo} calculoAnterior={anterior} />
+       ) : (
+         <Mensagem resultado={resultado} />
+       )}
+diff --git a/R:/wt-m2-p0-retomada/src/app/(app)/negocios/[id]/page.tsx b/src/app/(app)/negocios/[id]/page.tsx
+index edd0929..e03957b 100644
+--- a/R:/wt-m2-p0-retomada/src/app/(app)/negocios/[id]/page.tsx
++++ b/src/app/(app)/negocios/[id]/page.tsx
+@@ -12,7 +12,15 @@ import { carregarConfiguracao, formatarDataHora, formatarMoeda } from "@/lib/crm
+ import { env } from "@/lib/env";
+ import { hojeEmSaoPaulo } from "@/lib/formatacao";
+ import { precoDoCalculoDesatualizado } from "@/lib/calculo-preco";
+-import { calculoEhLegado, carregarVigencia, ENTRADAS_NAO_VERIFICAVEIS, mensagemDeRecusa, motivosDaAcao, type MotivoDesatualizacao } from "@/lib/calculo-vigencia";
++import {
++  calculoEhIncompleto,
++  calculoEhLegado,
++  carregarVigencia,
++  ENTRADAS_NAO_VERIFICAVEIS,
++  mensagemDeRecusa,
++  motivosDaAcao,
++  type MotivoDesatualizacao,
++} from "@/lib/calculo-vigencia";
+ import { mensagemPropostaIncompleta, pendenciasSemDados } from "@/lib/estimativa-financeira";
+ import { descreverAtividade } from "@/lib/linha-do-tempo";
+ import { exigirPapel } from "@/lib/sessao";
+@@ -102,7 +110,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
+       supabase
+         .from("calculos_solares")
+         .select(
+-          "id, kit_nome, kit_potencia_kwp, kit_preco, tipo_ligacao, consumo_medio_kwh, valor_fatura_medio, tarifa_kwh, geracao_estimada_kwh_mes, economia_mensal, payback_meses, observacoes",
++          "id, kit_nome, kit_potencia_kwp, kit_preco, tipo_ligacao, consumo_medio_kwh, valor_fatura_medio, tarifa_kwh, geracao_estimada_kwh_mes, economia_mensal, payback_meses, observacoes, estado_financeiro",
+         )
+         .eq("negocio_id", id)
+         .maybeSingle(),
+@@ -230,7 +238,9 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
+   const arquivado = negocio.arquivado_em != null;
+   // Preço do cálculo x valor do negócio só importa para cálculo não legado: o legado não aparece como atual, a proposta
+   // não mostra preço e o contrato usa o valor do negócio (mesma regra de contratos-geracao.ts).
+-  const precoDesatualizado = !!calculo && !calculoEhLegado(calculo) && precoDoCalculoDesatualizado(calculo.kit_preco, negocio.valor);
++  // Resultado técnico incompleto também fica de fora: não tem payback para atualizar com o preço.
++  const precoDesatualizado =
++    !!calculo && !calculoEhLegado(calculo) && !calculoEhIncompleto(calculo) && precoDoCalculoDesatualizado(calculo.kit_preco, negocio.valor);
+   // Vigência do cálculo salvo: toda linha existente é legada (fórmula antiga, não validada) e nunca vale como resultado
+   // atual. Falha de leitura também nunca vale como vigente: cai no motivo `legado`, que vale para toda linha hoje.
+   const carregamento = calculo ? await carregarVigencia(supabase, id) : null;
+@@ -492,6 +502,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
+                       economiaMensal: calculo.economia_mensal,
+                       paybackMeses: calculo.payback_meses,
+                       observacoes: calculo.observacoes,
++                      estadoFinanceiro: calculo.estado_financeiro,
+                     }
+                   : null
+               }
+diff --git a/R:/wt-m2-p0-retomada/src/app/proposta/[token]/page.tsx b/src/app/proposta/[token]/page.tsx
+index 7bb9221..f851e3c 100644
+--- a/R:/wt-m2-p0-retomada/src/app/proposta/[token]/page.tsx
++++ b/src/app/proposta/[token]/page.tsx
+@@ -104,7 +104,8 @@ export default async function PropostaPublica({ params }: PageProps<"/proposta/[
+   if (!calculo) notFound();
+ 
+   const modoPreco = proposta.modo_preco as ModoPreco;
+-  const semEconomia = !(calculo.economia_mensal > 0);
++  // Economia nula (resultado técnico incompleto) nunca vira número: conta como "sem economia".
++  const semEconomia = calculo.economia_mensal == null || !(calculo.economia_mensal > 0);
+ 
+   return (
+     <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-6 px-6 py-10">
+diff --git a/R:/wt-m2-p0-retomada/src/lib/calculo-reproduzivel.ts b/src/lib/calculo-reproduzivel.ts
+index 14cd184..b92b7e8 100644
+--- a/R:/wt-m2-p0-retomada/src/lib/calculo-reproduzivel.ts
++++ b/src/lib/calculo-reproduzivel.ts
+@@ -5,8 +5,10 @@
+  * em `calculos_solares`, na escala das colunas.
+  *
+  * ATENÇÃO (M2-B8): o motor `calcular` devolve hoje SEMPRE estimativa incompleta; `linhaDeCalculo` repassa isso como
+- * `{ ok: false, incompleta: true, pendencias }` e NENHUMA linha nova é gravada. Linhas já existentes foram geradas pela
+- * fórmula antiga (não validada) e não são reproduzíveis por `calcular`.
++ * `{ ok: false, incompleta: true, pendencias, linha }`, em que `linha` é o resultado TÉCNICO a gravar com
++ * `estado_financeiro = 'incompleto'` (números financeiros e payback nulos, pendências gravadas; migration
++ * 20261023200000). Conta em R$ sem kWh não tem linha (`linha: null`: a coluna de consumo exige kWh). Linhas já
++ * existentes (`legado`) foram geradas pela fórmula antiga (não validada) e não são reproduzíveis por `calcular`.
+  */
+ import { calcular, DISPONIBILIDADE_PADRAO, type EntradaCalculo } from "@/lib/calculadora";
+ import { consumoComoPersistido, valorComoPersistido } from "@/lib/consumo-persistido";
+@@ -73,12 +75,14 @@ export type ResultadoLinha =
+       pendencias: Pendencia[];
+       potenciaKwp: number | null;
+       geracaoEstimadaKwhMes: number | null;
++      /** Resultado técnico a gravar como `incompleto`; nulo quando não há consumo em kWh. */
++      linha: LinhaCalculo | null;
+     };
+ 
+ export const MENSAGEM_ESTIMATIVA_INCOMPLETA =
+   "Estimativa financeira incompleta: informe o consumo em kWh ou a tarifa efetiva da conta.";
+ 
+-/** Texto do aviso de estimativa incompleta (kit salvo, nenhuma linha gravada em `calculos_solares`). */
++/** Texto do aviso de estimativa incompleta (kit salvo; parte financeira ausente). */
+ export function mensagemEstimativaIncompleta(pendencias: Pendencia[]): string {
+   return `Estimativa financeira incompleta: ${listaDePendencias(pendencias)}.`;
+ }
+@@ -146,6 +150,7 @@ export function linhaDeCalculo(empresaId: string, entrada: EntradaLinhaCalculo,
+       pendencias,
+       potenciaKwp,
+       geracaoEstimadaKwhMes: parametros ? valorComoPersistido(potenciaKwp * parametros.produtividade_kwh_kwp_mes, 2) : null,
++      linha: null,
+     };
+   }
+ 
+@@ -166,7 +171,8 @@ export function linhaDeCalculo(empresaId: string, entrada: EntradaLinhaCalculo,
+     disponibilidadeKwh,
+   });
+ 
+-  // Hoje o motor só devolve "incompleta": nenhuma linha nova em `calculos_solares`.
++  // Hoje o motor só devolve "incompleta": grava-se o resultado técnico (entradas + geração), sem economia, conta,
++  // Fio B nem payback. Ausência nunca vira zero: o banco exige esses campos nulos no estado `incompleto`.
+   if (resultado.estado === "incompleta") {
+     return {
+       ok: false,
+@@ -175,13 +181,41 @@ export function linhaDeCalculo(empresaId: string, entrada: EntradaLinhaCalculo,
+       pendencias: resultado.pendencias,
+       potenciaKwp: resultado.potenciaKwp,
+       geracaoEstimadaKwhMes: resultado.geracaoEstimadaKwhMes,
++      linha: {
++        empresa_id: empresaId,
++        kit_id: null,
++        kit_nome: entrada.kitNome,
++        kit_potencia_kwp: potenciaKwp,
++        kit_preco: precoKit,
++        tipo_ligacao: entrada.tipoLigacao,
++        consumo_medio_kwh: consumoMedioKwh,
++        valor_fatura_medio: valorFaturaMedio,
++        tarifa_kwh: tarifaKwh,
++        produtividade_kwh_kwp_mes: parametros.produtividade_kwh_kwp_mes,
++        percentual_fio_b: parametros.percentual_fio_b,
++        disponibilidade_kwh: disponibilidadeKwh,
++        geracao_estimada_kwh_mes: resultado.geracaoEstimadaKwhMes,
++        estado_financeiro: "incompleto",
++        pendencias: resultado.pendencias,
++        kwh_faturado: null,
++        kwh_compensado: null,
++        custo_fio_b: null,
++        conta_sem_solar: null,
++        conta_com_solar: null,
++        economia_mensal: null,
++        payback_meses: null,
++      },
+     };
+   }
+ 
+-  // Ponto de extensão: ramo "completa" (só existirá após a validação da fórmula; exigirá também coluna de método).
++  // Ponto de extensão: ramo "completa" (só existirá após o aceite da regra). `metodo_calculo` entra com a regra
++  // aceita; até lá o banco RECUSA esta linha (estado `completo` exige método), em vez de gravá-la como `legado`.
++  // Ver .aurora/contratos/m2-p0-ligacao-motor.md.
+   return {
+     ok: true,
+     linha: {
++      estado_financeiro: "completo",
++      metodo_calculo: null,
+       empresa_id: empresaId,
+       kit_id: null,
+       kit_nome: entrada.kitNome,
+diff --git a/R:/wt-m2-p0-retomada/src/lib/calculo-vigencia.ts b/src/lib/calculo-vigencia.ts
+index de3c056..de84b81 100644
+--- a/R:/wt-m2-p0-retomada/src/lib/calculo-vigencia.ts
++++ b/src/lib/calculo-vigencia.ts
+@@ -45,9 +45,13 @@ export const MENSAGEM_PRECO_CALCULO_DESATUALIZADO = "O kit mudou depois do últi
+ export const MENSAGEM_PRECO_CALCULO_LEGADO =
+   "O cálculo salvo foi feito pela fórmula antiga, que não foi validada: o preço não pode ser atualizado nele. Aguarde a validação da estimativa financeira.";
+ 
++export const MENSAGEM_PRECO_CALCULO_INCOMPLETO =
++  "A estimativa financeira está incompleta: não há economia nem payback para atualizar com o preço. Aguarde a validação da estimativa financeira.";
++
+ /** Por que o cálculo salvo não vale como atual. */
+ export type MotivoDesatualizacao =
+-  | "legado" // linha gerada pela fórmula antiga (não validada): hoje, toda linha existente
++  | "legado" // linha gerada pela fórmula antiga (não validada): `estado_financeiro = 'legado'`
++  | "incompleta" // resultado técnico sem parte financeira: `estado_financeiro = 'incompleto'`
+   | "kit"
+   | "consumo"
+   | "parametros" // produtividade (afeta a geração, logo o contrato)
+@@ -56,7 +60,16 @@ export type MotivoDesatualizacao =
+   | "nao_comprovado";
+ 
+ /** Ordem de relevância: o primeiro motivo da lista é o "principal" citado nas mensagens. */
+-const PRIORIDADE: MotivoDesatualizacao[] = ["legado", "kit", "consumo", "parametros", "parametros_financeiros", "preco", "nao_comprovado"];
++const PRIORIDADE: MotivoDesatualizacao[] = [
++  "legado",
++  "incompleta",
++  "kit",
++  "consumo",
++  "parametros",
++  "parametros_financeiros",
++  "preco",
++  "nao_comprovado",
++];
+ 
+ /** Entradas do cálculo SEM fonte independente atual: registradas, nunca comparadas nem rotuladas como atuais. */
+ export type EntradaNaoVerificavel = "tarifa" | "tipo_ligacao" | "fio_b" | "enquadramento";
+@@ -67,12 +80,17 @@ export const ENTRADAS_NAO_VERIFICAVEIS: readonly EntradaNaoVerificavel[] = ["tar
+ export type Vigencia = { vigente: boolean; motivos: MotivoDesatualizacao[]; naoVerificavel: EntradaNaoVerificavel[] };
+ 
+ /**
+- * Verdadeiro para a linha gerada pela fórmula antiga. Sem coluna de método (sem migration), toda linha existente é
+- * legada por definição. Ponto de extensão: com a fórmula validada, a linha passará a trazer o método.
++ * Verdadeiro para a linha gerada pela fórmula antiga (`estado_financeiro = 'legado'`, default de toda linha anterior à
++ * migration 20261023200000). Estado ausente (recorte de colunas sem ele) também conta como legado: nunca vale como atual.
+  */
+-export function calculoEhLegado(calculo?: unknown): boolean {
+-  void calculo;
+-  return true;
++export function calculoEhLegado(calculo?: { estado_financeiro?: string | null } | null): boolean {
++  const estado = calculo?.estado_financeiro;
++  return estado == null || estado === "legado";
++}
++
++/** Verdadeiro para o resultado técnico gravado sem parte financeira (`estado_financeiro = 'incompleto'`). */
++export function calculoEhIncompleto(calculo?: { estado_financeiro?: string | null } | null): boolean {
++  return calculo?.estado_financeiro === "incompleto";
+ }
+ 
+ /** Linha de `kit_componentes` (só o que a soma de potência usa). */
+@@ -93,6 +111,8 @@ export type CalculoParaVigencia = {
+   percentual_fio_b: number;
+   produtividade_kwh_kwp_mes: number;
+   disponibilidade_kwh: number;
++  /** Ausente = legado (ver `calculoEhLegado`). */
++  estado_financeiro?: string | null;
+ };
+ 
+ export type ParametrosAtuais = {
+@@ -145,6 +165,7 @@ export function avaliarVigencia(calculo: CalculoParaVigencia, atual: EstadoAtual
+   const achados = new Set<MotivoDesatualizacao>();
+ 
+   if (calculoEhLegado(calculo)) achados.add("legado");
++  else if (calculoEhIncompleto(calculo)) achados.add("incompleta");
+ 
+   // Kit: potência E composição.
+   if (calculo.kit_id) {
+@@ -199,16 +220,16 @@ export function avaliarVigencia(calculo: CalculoParaVigencia, atual: EstadoAtual
+ }
+ 
+ /**
+- * Atalho: true quando o cálculo NÃO vale como atual. Hoje sempre verdadeiro (`legado`).
++ * Atalho: true quando o cálculo NÃO vale como atual. Hoje sempre verdadeiro (`legado` ou `incompleta`).
+  * Aceita o recorte de colunas e de estado que os chamadores de `src/app` (ficha, página pública, PDF) têm (só os
+- * componentes): para linha legada devolve `true` sem comparar nada; só avalia de verdade com o estado completo.
+- * Dado faltante nunca vale como vigente.
++ * componentes): para linha legada ou incompleta devolve `true` sem comparar nada; só avalia de verdade com o estado
++ * completo. Dado faltante nunca vale como vigente.
+  */
+ export function calculoDesatualizado(
+   calculo: Partial<CalculoParaVigencia> | null | undefined,
+   atual: { componentes: ComponenteKitVigencia[] } & Partial<Omit<EstadoAtualParaVigencia, "componentes">>,
+ ): boolean {
+-  if (!calculo || calculoEhLegado(calculo)) return true;
++  if (!calculo || calculoEhLegado(calculo) || calculoEhIncompleto(calculo)) return true;
+   return !avaliarVigencia(calculo as CalculoParaVigencia, atual as EstadoAtualParaVigencia).vigente;
+ }
+ 
+@@ -216,7 +237,7 @@ export type AcaoBloqueada = "proposta" | "contrato" | "preco";
+ 
+ /** Motivos que impedem a ação. Proposta e preço: todos (menos o próprio `preco` na ação de preço). Contrato: só o que o afeta. */
+ export function motivosDaAcao(motivos: MotivoDesatualizacao[], acao: AcaoBloqueada): MotivoDesatualizacao[] {
+-  if (acao === "contrato") return motivos.filter((m) => m !== "legado" && m !== "parametros_financeiros");
++  if (acao === "contrato") return motivos.filter((m) => m !== "legado" && m !== "incompleta" && m !== "parametros_financeiros");
+   if (acao === "preco") return motivos.filter((m) => m !== "preco");
+   return motivos;
+ }
+@@ -238,6 +259,8 @@ export function textoDoMotivo(motivo: MotivoDesatualizacao): string {
+   switch (motivo) {
+     case "legado":
+       return "o último cálculo foi feito pela fórmula antiga, que não foi validada";
++    case "incompleta":
++      return "o último cálculo tem só o resultado técnico: a estimativa financeira está incompleta";
+     case "parametros_financeiros":
+       return "os parâmetros financeiros da calculadora da empresa mudaram depois do último cálculo";
+     case "kit":
+@@ -264,6 +287,12 @@ export function mensagemDeRecusa(motivos: MotivoDesatualizacao[], acao: AcaoBloq
+     if (acao === "preco") return MENSAGEM_PRECO_CALCULO_LEGADO;
+     return `Não é possível ${COMPLEMENTO[acao]}: ${textoDoMotivo("legado")}.`;
+   }
++  // Recalcular não resolve: falta regra/dado validado. Proposta cita as pendências; preço não tem payback a refazer.
++  if (principal === "incompleta") {
++    if (acao === "proposta") return mensagemPropostaIncompleta(pendenciasSemDados());
++    if (acao === "preco") return MENSAGEM_PRECO_CALCULO_INCOMPLETO;
++    return `Não é possível ${COMPLEMENTO[acao]}: ${textoDoMotivo("incompleta")}.`;
++  }
+   if (principal === "kit") return CONSTANTE_KIT[acao];
+   const texto = textoDoMotivo(principal);
+   const inicio = texto.charAt(0).toUpperCase() + texto.slice(1);
+diff --git a/R:/wt-m2-p0-retomada/src/lib/contratos-geracao.ts b/src/lib/contratos-geracao.ts
+index 01d5ca4..903f8e9 100644
+--- a/R:/wt-m2-p0-retomada/src/lib/contratos-geracao.ts
++++ b/src/lib/contratos-geracao.ts
+@@ -8,7 +8,7 @@ import {
+   validarModeloContrato,
+   type FontesContrato,
+ } from "@/lib/contrato";
+-import { calculoEhLegado, carregarVigencia, mensagemDeRecusa, motivosDaAcao } from "@/lib/calculo-vigencia";
++import { calculoEhIncompleto, calculoEhLegado, carregarVigencia, mensagemDeRecusa, motivosDaAcao } from "@/lib/calculo-vigencia";
+ import { MENSAGEM_PRECO_DESATUALIZADO, precoDoCalculoDesatualizado } from "@/lib/calculo-preco";
+ import { mensagemErro } from "@/lib/erros";
+ import { formatarMoeda } from "@/lib/formatacao";
+@@ -38,7 +38,7 @@ export async function gerarContratoComCliente(
+         .maybeSingle(),
+       supabase
+         .from("calculos_solares")
+-        .select("kit_nome, kit_potencia_kwp, kit_preco, tipo_ligacao, consumo_medio_kwh, geracao_estimada_kwh_mes")
++        .select("kit_nome, kit_potencia_kwp, kit_preco, tipo_ligacao, consumo_medio_kwh, geracao_estimada_kwh_mes, estado_financeiro")
+         .eq("negocio_id", negocioId)
+         .maybeSingle(),
+       supabase.from("kit_componentes").select("tipo, descricao, quantidade, potencia_w").eq("negocio_id", negocioId).order("ordem"),
+@@ -55,7 +55,8 @@ export async function gerarContratoComCliente(
+   // O contrato usa o valor atual do negócio e a proposta, o preço do cálculo: com os dois diferentes, não gera.
+   // Com cálculo legado (fórmula antiga) a proposta não mostra preço nenhum e "Atualizar preço" é recusado: a guarda
+   // não protege nada e só travaria o contrato, que segue usando o valor atual do negócio (decisão de Nora, M2-B8).
+-  const legado = !!calculo && calculoEhLegado(calculo);
++  // O mesmo vale para o resultado técnico incompleto (sem parte financeira, nunca entra em proposta).
++  const legado = !!calculo && (calculoEhLegado(calculo) || calculoEhIncompleto(calculo));
+   if (calculo && !legado && precoDoCalculoDesatualizado(calculo.kit_preco, negocio.valor)) {
+     return { ok: false, mensagem: MENSAGEM_PRECO_DESATUALIZADO };
+   }
+diff --git a/R:/wt-m2-p0-retomada/src/lib/negocios-gravacao.ts b/src/lib/negocios-gravacao.ts
+index d287bfe..e1b7440 100644
+--- a/R:/wt-m2-p0-retomada/src/lib/negocios-gravacao.ts
++++ b/src/lib/negocios-gravacao.ts
+@@ -119,7 +119,8 @@ export type EstimativaCriacao = { estado: "incompleta"; mensagem: string; penden
+ 
+ /**
+  * `estimativa` (opcional) = informação de que a estimativa financeira ficou incompleta (não é falha nem aviso de erro):
+- * negócio e kit foram salvos e nenhuma linha foi gravada em `calculos_solares`.
++ * negócio e kit foram salvos e, havendo consumo em kWh, o resultado técnico foi gravado em `calculos_solares` como
++ * `incompleto` (sem economia, conta, Fio B nem payback).
+  */
+ export type ResultadoCriacao =
+   | { ok: true; negocioId: string; empresaId: string; avisos: AvisoCriacao[]; estimativa?: EstimativaCriacao }
+@@ -257,7 +258,14 @@ export async function criarNegocioComCliente(supabase: SupabaseServidor, atual:
+           .insert({ ...montado.linha, negocio_id: negocio.id, atualizado_por: atual.membroId, criado_por: atual.membroId });
+         if (erroCalculo) avisos.push("calculo");
+       } else if (montado.incompleta) {
+-        // Informação, não falha: kit e negócio salvos, nenhuma linha em `calculos_solares`.
++        // Informação, não falha: kit e negócio salvos; o resultado técnico (sem parte financeira) é gravado quando
++        // há consumo em kWh. Falha ao gravá-lo vira aviso "calculo", como no ramo completo.
++        if (montado.linha) {
++          const { error: erroCalculo } = await supabase
++            .from("calculos_solares")
++            .insert({ ...montado.linha, negocio_id: negocio.id, atualizado_por: atual.membroId, criado_por: atual.membroId });
++          if (erroCalculo) avisos.push("calculo");
++        }
+         estimativa = { estado: "incompleta", mensagem: montado.mensagem, pendencias: montado.pendencias };
+       } else {
+         avisos.push("calculo");
+@@ -387,7 +395,7 @@ export async function salvarKitComCliente(
+ 
+   const [{ data: negocio }, { data: calculoAtual, error: erroCalculo }, { data: itensAntigos, error: erroAntigos }] = await Promise.all([
+     supabase.from("negocios").select("valor, consumo_medio_kwh, valor_conta_energia").eq("id", d.negocioId).maybeSingle(),
+-    supabase.from("calculos_solares").select("id").eq("negocio_id", d.negocioId).maybeSingle(),
++    supabase.from("calculos_solares").select("id, estado_financeiro").eq("negocio_id", d.negocioId).maybeSingle(),
+     supabase
+       .from("kit_componentes")
+       .select("id, empresa_id, negocio_id, tipo, descricao, potencia_w, quantidade, ordem")
+@@ -421,8 +429,18 @@ export async function salvarKitComCliente(
+     });
+     if (!montado.ok && !montado.incompleta) return { ok: false, mensagem: `${montado.mensagem} Nada foi alterado.` };
+   }
+-  // Sem tarifa o kit também é salvo: com a linha legada (fórmula antiga) o salvamento a mantém intocada e o aviso diz
+-  // que ela não vale como resultado atual (ver `calculo-vigencia`, motivo `legado`).
++  // Sem tarifa (ou com conta em R$ sem kWh) o kit também é salvo sem linha nova: a linha anterior fica intocada e o
++  // aviso diz que ela não vale como resultado atual (ver `calculo-vigencia`, motivos `legado` e `incompleta`).
++  // Com consumo em kWh, o resultado técnico incompleto é gravado quando não há linha ou a anterior também é incompleta.
++  // A linha LEGADA nunca é substituída por um resultado incompleto: fica como histórico (substituí-la apagaria dado
++  // existente; decisão pendente do Evandro).
++  const linhaNova = montado
++    ? montado.ok
++      ? montado.linha
++      : montado.incompleta && calculoAtual?.estado_financeiro !== "legado"
++        ? montado.linha
++        : null
++    : null;
+ 
+   // Substitui a lista de itens: novos primeiro (uma inserção, tudo ou nada), antigos depois.
+   if (d.componentes.length) {
+@@ -442,10 +460,10 @@ export async function salvarKitComCliente(
+     }
+   }
+ 
+-  if (montado?.ok) {
++  if (linhaNova) {
+     const { error } = await supabase.from("calculos_solares").upsert(
+       {
+-        ...montado.linha,
++        ...linhaNova,
+         negocio_id: d.negocioId,
+         observacoes: d.observacoes || null,
+         atualizado_por: atual.membroId,
+@@ -480,23 +498,29 @@ export async function salvarKitComCliente(
+     return {
+       ok: false,
+       negocioId: d.negocioId,
+-      mensagem: `${montado?.ok ? "Kit e cálculo salvos" : "Itens do kit salvos"}, mas a estrutura do telhado não foi gravada. Salve de novo.`,
++      mensagem: `${montado?.ok ? "Kit e cálculo salvos" : linhaNova ? "Kit e resultado técnico salvos" : "Itens do kit salvos"}, mas a estrutura do telhado não foi gravada. Salve de novo.`,
+     };
+   }
+ 
+   if (montado?.ok) return { ok: true, negocioId: d.negocioId, mensagem: "Kit e cálculo salvos." };
+ 
+-  // Estimativa incompleta (hoje, sempre): itens salvos, nenhuma linha gerada e o cálculo anterior (se houver) fica como estava.
++  // Estimativa incompleta (hoje, sempre): itens salvos. Com linha nova, o resultado técnico foi gravado; sem ela, o
++  // cálculo anterior (se houver) fica como estava.
+   const pendencias =
+     montado && !montado.ok && montado.incompleta
+       ? montado.pendencias
+       : pendenciasDaEntrada({ consumoMedioKwh, valorFaturaMedio, tarifaKwh: d.tarifaKwh ?? null });
++  const anteriorMantido = !linhaNova && calculoAtual;
+   return {
+     ok: true,
+     negocioId: d.negocioId,
+     pendencias,
+-    mensagem: `Itens do kit salvos. ${mensagemEstimativaIncompleta(pendencias)}${
+-      calculoAtual ? " O cálculo anterior foi mantido, mas foi feito pela fórmula antiga (não validada) e não vale como resultado atual." : ""
++    mensagem: `${linhaNova ? "Kit e resultado técnico salvos." : "Itens do kit salvos."} ${mensagemEstimativaIncompleta(pendencias)}${
++      anteriorMantido
++        ? calculoAtual.estado_financeiro === "legado"
++          ? " O cálculo anterior foi mantido, mas foi feito pela fórmula antiga (não validada) e não vale como resultado atual."
++          : " O cálculo anterior foi mantido, mas não vale como resultado atual."
++        : ""
+     }`,
+   };
+ }
+@@ -523,6 +547,8 @@ export async function atualizarPrecoCalculoComCliente(
+   const motivos = motivosDaAcao(lido.vigencia.motivos, "preco");
+   if (motivos.length) return { ok: false, mensagem: mensagemDeRecusa(motivos, "preco") };
+   if (!precoDoCalculoDesatualizado(calculo.kit_preco, lido.valorNegocio)) return { ok: true, negocioId, mensagem: "O preço do cálculo já está em dia." };
++  // Sem economia (estimativa incompleta) não há payback a recalcular; a vigência já recusa, isto é a trava final.
++  if (calculo.economia_mensal == null) return { ok: false, mensagem: mensagemDeRecusa(["incompleta"], "preco") };
+ 
+   const preco = lido.valorNegocio ?? 0;
+   // Só grava se o cálculo continua com o preço lido (outra edição no meio não é sobrescrita em silêncio).
+diff --git a/R:/wt-m2-p0-retomada/src/lib/supabase/database.types.ts b/src/lib/supabase/database.types.ts
+index 79a9214..db7e44f 100644
+--- a/R:/wt-m2-p0-retomada/src/lib/supabase/database.types.ts
++++ b/src/lib/supabase/database.types.ts
+@@ -218,25 +218,28 @@ export type Database = {
+         Row: {
+           atualizado_por: string | null;
+           consumo_medio_kwh: number;
+-          conta_com_solar: number;
+-          conta_sem_solar: number;
++          conta_com_solar: number | null;
++          conta_sem_solar: number | null;
+           created_at: string;
+           criado_por: string | null;
+-          custo_fio_b: number;
++          custo_fio_b: number | null;
+           disponibilidade_kwh: number;
+-          economia_mensal: number;
++          economia_mensal: number | null;
+           empresa_id: string;
++          estado_financeiro: string;
+           geracao_estimada_kwh_mes: number;
+           id: string;
+           kit_id: string | null;
+           kit_nome: string;
+           kit_potencia_kwp: number;
+           kit_preco: number;
+-          kwh_compensado: number;
+-          kwh_faturado: number;
++          kwh_compensado: number | null;
++          kwh_faturado: number | null;
++          metodo_calculo: string | null;
+           negocio_id: string;
+           observacoes: string | null;
+           payback_meses: number | null;
++          pendencias: Json | null;
+           percentual_fio_b: number;
+           produtividade_kwh_kwp_mes: number;
+           tarifa_kwh: number;
+@@ -247,25 +250,28 @@ export type Database = {
+         Insert: {
+           atualizado_por?: string | null;
+           consumo_medio_kwh: number;
+-          conta_com_solar: number;
+-          conta_sem_solar: number;
++          conta_com_solar?: number | null;
++          conta_sem_solar?: number | null;
+           created_at?: string;
+           criado_por?: string | null;
+-          custo_fio_b: number;
++          custo_fio_b?: number | null;
+           disponibilidade_kwh: number;
+-          economia_mensal: number;
++          economia_mensal?: number | null;
+           empresa_id: string;
++          estado_financeiro?: string;
+           geracao_estimada_kwh_mes: number;
+           id?: string;
+           kit_id?: string | null;
+           kit_nome: string;
+           kit_potencia_kwp: number;
+           kit_preco: number;
+-          kwh_compensado: number;
+-          kwh_faturado: number;
++          kwh_compensado?: number | null;
++          kwh_faturado?: number | null;
++          metodo_calculo?: string | null;
+           negocio_id: string;
+           observacoes?: string | null;
+           payback_meses?: number | null;
++          pendencias?: Json | null;
+           percentual_fio_b: number;
+           produtividade_kwh_kwp_mes: number;
+           tarifa_kwh: number;
+@@ -276,25 +282,28 @@ export type Database = {
+         Update: {
+           atualizado_por?: string | null;
+           consumo_medio_kwh?: number;
+-          conta_com_solar?: number;
+-          conta_sem_solar?: number;
++          conta_com_solar?: number | null;
++          conta_sem_solar?: number | null;
+           created_at?: string;
+           criado_por?: string | null;
+-          custo_fio_b?: number;
++          custo_fio_b?: number | null;
+           disponibilidade_kwh?: number;
+-          economia_mensal?: number;
++          economia_mensal?: number | null;
+           empresa_id?: string;
++          estado_financeiro?: string;
+           geracao_estimada_kwh_mes?: number;
+           id?: string;
+           kit_id?: string | null;
+           kit_nome?: string;
+           kit_potencia_kwp?: number;
+           kit_preco?: number;
+-          kwh_compensado?: number;
+-          kwh_faturado?: number;
++          kwh_compensado?: number | null;
++          kwh_faturado?: number | null;
++          metodo_calculo?: string | null;
+           negocio_id?: string;
+           observacoes?: string | null;
+           payback_meses?: number | null;
++          pendencias?: Json | null;
+           percentual_fio_b?: number;
+           produtividade_kwh_kwp_mes?: number;
+           tarifa_kwh?: number;
+diff --git a/supabase/migrations/20261023200000_calculos_estimativa_incompleta.sql b/supabase/migrations/20261023200000_calculos_estimativa_incompleta.sql
+new file mode 100644
+index 0000000..719fdb0
+--- /dev/null
++++ b/supabase/migrations/20261023200000_calculos_estimativa_incompleta.sql
+@@ -0,0 +1,63 @@
++-- Estimativa financeira incompleta persistida (M2 P0, calculadora; Evandro, 22/10/2026).
++--
++-- Até aqui, `calculos_solares` só aceitava a linha com TODOS os números financeiros (NOT NULL): a estimativa
++-- incompleta não era gravada e o kit salvo ficava sem registro do resultado técnico. Esta migration permite gravar
++-- o resultado técnico (kit, potência, ligação, consumo, tarifa informada, produtividade, geração) SEM economia, conta,
++-- Fio B nem payback, com a lista de pendências que impede a parte financeira.
++--
++-- `estado_financeiro`:
++--   legado     = linha gerada pela fórmula antiga (não validada). Todas as linhas existentes (default no ADD COLUMN,
++--                sem reescrita de dados). Números financeiros presentes; sem método; nunca entram em proposta.
++--   incompleto = resultado técnico sem parte financeira: os seis números financeiros e o payback são NULOS (ausência
++--                nunca vira zero), `pendencias` é um array JSON não vazio e não há método.
++--   completo   = parte financeira calculada pela regra validada: números presentes e `metodo_calculo` obrigatório.
++--                Nenhum código grava este estado ainda (só depois do aceite da regra e dos dados de Fio B).
++--
++-- Aditiva e compatível: colunas novas com default constante (sem reescrita), DROP NOT NULL e CHECKs criados NOT VALID
++-- e validados em seguida (as linhas existentes já cumprem a regra de `legado`). Leitores antigos continuam lendo as
++-- linhas legadas iguais; os tipos gerados passam a marcar os números financeiros como anuláveis.
++
++alter table public.calculos_solares
++  add column estado_financeiro text not null default 'legado',
++  add column metodo_calculo text,
++  add column pendencias jsonb;
++
++alter table public.calculos_solares
++  alter column kwh_faturado drop not null,
++  alter column kwh_compensado drop not null,
++  alter column custo_fio_b drop not null,
++  alter column conta_sem_solar drop not null,
++  alter column conta_com_solar drop not null,
++  alter column economia_mensal drop not null;
++
++alter table public.calculos_solares
++  add constraint calculos_solares_estado_financeiro_ck
++    check (estado_financeiro in ('legado', 'incompleto', 'completo')) not valid,
++  add constraint calculos_solares_estado_coerente_ck check (
++    case estado_financeiro
++      when 'incompleto' then
++        kwh_faturado is null and kwh_compensado is null and custo_fio_b is null
++        and conta_sem_solar is null and conta_com_solar is null and economia_mensal is null
++        and payback_meses is null and metodo_calculo is null
++        and coalesce(jsonb_typeof(pendencias) = 'array' and pendencias <> '[]'::jsonb, false)
++      when 'legado' then
++        kwh_faturado is not null and kwh_compensado is not null and custo_fio_b is not null
++        and conta_sem_solar is not null and conta_com_solar is not null and economia_mensal is not null
++        and metodo_calculo is null and pendencias is null
++      when 'completo' then
++        kwh_faturado is not null and kwh_compensado is not null and custo_fio_b is not null
++        and conta_sem_solar is not null and conta_com_solar is not null and economia_mensal is not null
++        and length(btrim(coalesce(metodo_calculo, ''))) > 0 and pendencias is null
++      else false
++    end
++  ) not valid;
++
++alter table public.calculos_solares validate constraint calculos_solares_estado_financeiro_ck;
++alter table public.calculos_solares validate constraint calculos_solares_estado_coerente_ck;
++
++comment on column public.calculos_solares.estado_financeiro is
++  'legado = fórmula antiga (não validada, nunca entra em proposta); incompleto = resultado técnico sem parte financeira (números nulos + pendências); completo = regra validada (exige metodo_calculo).';
++comment on column public.calculos_solares.pendencias is
++  'Só no estado incompleto: array JSON de {codigo, mensagem} com o que impede a parte financeira.';
++comment on column public.calculos_solares.metodo_calculo is
++  'Só no estado completo: identificador da regra validada que gerou os números financeiros.';
+diff --git a/R:/wt-m2-p0-retomada/tests/calculo-reproduzivel.test.ts b/tests/calculo-reproduzivel.test.ts
+index 44bac38..89a3d9f 100644
+--- a/R:/wt-m2-p0-retomada/tests/calculo-reproduzivel.test.ts
++++ b/tests/calculo-reproduzivel.test.ts
+@@ -1,8 +1,10 @@
+ /**
+  * M2-Q1/Q2 (B), reescrito na M2-Q6 (mudança de requisito, escopo congelado): o motor `calcular` devolve SEMPRE a
+- * estimativa incompleta, então `linhaDeCalculo` NUNCA gera linha nova de `calculos_solares`: devolve
+- * `{ ok:false, incompleta:true, mensagem, pendencias, potenciaKwp, geracaoEstimadaKwhMes }`. Entrada inválida
+- * continua sendo erro comum (sem `incompleta`). O dimensionamento (decisão D1) continua intacto.
++ * estimativa incompleta, então `linhaDeCalculo` NUNCA gera linha FINANCEIRA de `calculos_solares`: devolve
++ * `{ ok:false, incompleta:true, mensagem, pendencias, potenciaKwp, geracaoEstimadaKwhMes, linha }`, em que `linha` é o
++ * resultado técnico com `estado_financeiro = 'incompleto'` (financeiros e payback nulos; migration 20261023200000) ou
++ * `null` para conta em R$ sem kWh. Entrada inválida continua sendo erro comum (sem `incompleta`). O dimensionamento
++ * (decisão D1) continua intacto.
+  *
+  * As escalas das colunas de `calculos_solares` (tarifa 4 casas, potência/preço/fatura/consumo 2 casas) continuam
+  * conferidas nos limites de validação abaixo (o que a normalização transforma em 0 é recusado) e, para linhas
+@@ -91,21 +93,52 @@ describe("consumoComoPersistido (numeric(10,2), half away from zero, semântica
+   });
+ });
+ 
+-describe("linhaDeCalculo: estimativa incompleta, nenhuma linha nova", () => {
+-  it("entrada completa do vendedor (consumo em kWh e tarifa): incompleta, sem linha, com a mensagem exata", () => {
++/** Resultado sem a linha técnica (o que o motor decide; a linha só registra as entradas). */
++const semLinha = ({ linha, ...resto }: Incompleta) => (void linha, resto);
++
++describe("linhaDeCalculo: estimativa incompleta, só o resultado técnico", () => {
++  it("entrada completa do vendedor (consumo em kWh e tarifa): incompleta, linha técnica, com a mensagem exata", () => {
+     const r = incompleta();
+-    expect(r).not.toHaveProperty("linha");
+     expect(r.ok).toBe(false);
+     expect(codigosDe(r)).toEqual(CODIGOS_DA_EMPRESA);
+     expect(r.mensagem).toBe(MENSAGEM_BASE);
+     expect(r.mensagem).toBe(mensagemEstimativaIncompleta(r.pendencias));
+     expect(r.potenciaKwp).toBe(10);
+     expect(r.geracaoEstimadaKwhMes).toBe(1200); // 10 kWp × 120 kWh/kWp/mês
++    expect(r.linha).toEqual({
++      empresa_id: EMPRESA,
++      kit_id: null,
++      kit_nome: "Kit 10 kWp",
++      kit_potencia_kwp: 10,
++      kit_preco: 30000,
++      tipo_ligacao: "bifasico",
++      consumo_medio_kwh: 1200,
++      valor_fatura_medio: null,
++      tarifa_kwh: 0.9,
++      produtividade_kwh_kwp_mes: 120,
++      percentual_fio_b: 0.45,
++      disponibilidade_kwh: 50,
++      geracao_estimada_kwh_mes: 1200,
++      estado_financeiro: "incompleto",
++      pendencias: r.pendencias,
++      kwh_faturado: null,
++      kwh_compensado: null,
++      custo_fio_b: null,
++      conta_sem_solar: null,
++      conta_com_solar: null,
++      economia_mensal: null,
++      payback_meses: null,
++    });
+   });
+ 
+-  it("nenhum campo financeiro vaza no resultado", () => {
++  it("nenhum campo financeiro vaza no resultado: na linha, todos nulos (ausência nunca vira zero)", () => {
+     const r = incompleta();
+-    expect(Object.keys(r).sort()).toEqual(["geracaoEstimadaKwhMes", "incompleta", "mensagem", "ok", "pendencias", "potenciaKwp"]);
++    expect(Object.keys(r).sort()).toEqual(["geracaoEstimadaKwhMes", "incompleta", "linha", "mensagem", "ok", "pendencias", "potenciaKwp"]);
++    const l = r.linha!;
++    for (const campo of ["kwh_faturado", "kwh_compensado", "custo_fio_b", "conta_sem_solar", "conta_com_solar", "economia_mensal", "payback_meses"] as const) {
++      expect(l[campo], campo).toBeNull();
++    }
++    expect(l).not.toHaveProperty("metodo_calculo");
+   });
+ 
+   // ANTES (conta em R$ sem kWh): `{ok:false, incompleta:true, mensagem: MENSAGEM_ESTIMATIVA_INCOMPLETA}` sem pendências.
+@@ -156,15 +189,19 @@ describe("linhaDeCalculo: estimativa incompleta, nenhuma linha nova", () => {
+   it.each(["monofasico", "bifasico", "trifasico"] as const)(
+     "tipo de ligação %s e preço não mudam o resultado (percentual e disponibilidade não têm efeito)",
+     (tipoLigacao) => {
+-      const ref = incompleta();
++      const ref = semLinha(incompleta());
+       const r = incompleta({ tipoLigacao, precoKit: 1 });
+-      expect(r).toEqual(ref);
+-      expect(r).toEqual(
+-        incompleta(
+-          { tipoLigacao },
+-          { ...PARAMETROS, percentual_fio_b: 0.99, disponibilidade_mono_kwh: 1, disponibilidade_bi_kwh: 2, disponibilidade_tri_kwh: 3 },
++      expect(semLinha(r)).toEqual(ref);
++      expect(semLinha(r)).toEqual(
++        semLinha(
++          incompleta(
++            { tipoLigacao },
++            { ...PARAMETROS, percentual_fio_b: 0.99, disponibilidade_mono_kwh: 1, disponibilidade_bi_kwh: 2, disponibilidade_tri_kwh: 3 },
++          ),
+         ),
+       );
++      // A linha técnica registra o que foi informado (ligação e preço), sem efeito no resultado.
++      expect(r.linha).toMatchObject({ tipo_ligacao: tipoLigacao, kit_preco: 1, economia_mensal: null });
+     },
+   );
+ 
+@@ -252,7 +289,8 @@ describe("D2: linhaDeCalculo normaliza as entradas persistidas (sem gravar linha
+     const r = incompleta({ consumoMedioKwh: null, valorFaturaMedio: fatura, tarifaKwh: tarifa });
+     expect(codigosDe(r)).toContain("consumo_ausente");
+     expect(codigosDe(r)).toContain("consumo_estimado_pela_tarifa_base");
+-    expect(r).not.toHaveProperty("linha");
++    // Sem kWh não há linha técnica (a coluna de consumo exige kWh): nada é gravado.
++    expect(r.linha).toBeNull();
+   });
+ 
+   it("todas as entradas com excesso de casas ao mesmo tempo continuam aceitas (incompleta, sem erro)", () => {
+diff --git a/tests/calculos-estimativa-incompleta-db.test.ts b/tests/calculos-estimativa-incompleta-db.test.ts
+new file mode 100644
+index 0000000..049a93d
+--- /dev/null
++++ b/tests/calculos-estimativa-incompleta-db.test.ts
+@@ -0,0 +1,103 @@
++/**
++ * Estimativa financeira incompleta persistida (migration 20261023200000): regras do banco para `estado_financeiro`.
++ *  - incompleto: os seis números financeiros e o payback NULOS, pendências em array não vazio, sem método;
++ *  - legado: números presentes, sem método nem pendências (default de toda linha anterior);
++ *  - completo: números presentes e `metodo_calculo` obrigatório (nenhum código grava este estado ainda).
++ * Ausência nunca vira zero: incompleto com qualquer número financeiro (inclusive 0) é recusado.
++ */
++import { beforeAll, describe, expect, it } from "vitest";
++import { servico, sufixo } from "./ajuda";
++
++let empresa: string;
++let negocio: string;
++
++const FINANCEIRO = { kwh_faturado: 100, kwh_compensado: 500, custo_fio_b: 60, conta_sem_solar: 570, conta_com_solar: 140, economia_mensal: 430 };
++const NULOS = { kwh_faturado: null, kwh_compensado: null, custo_fio_b: null, conta_sem_solar: null, conta_com_solar: null, economia_mensal: null };
++const PENDENCIAS = [{ codigo: "formula_nao_validada", mensagem: "A regra de cálculo da economia ainda não foi validada." }];
++
++/** Entradas e resultado técnico (5,5 kWp × 120 = 660 kWh/mês); a parte financeira vem de cada caso. */
++const tecnico = () => ({
++  empresa_id: empresa,
++  negocio_id: negocio,
++  kit_nome: "Kit personalizado · 5,5 kWp",
++  kit_potencia_kwp: 5.5,
++  kit_preco: 25000,
++  tipo_ligacao: "trifasico" as const,
++  consumo_medio_kwh: 600,
++  tarifa_kwh: 0.95,
++  produtividade_kwh_kwp_mes: 120,
++  percentual_fio_b: 0.45,
++  disponibilidade_kwh: 100,
++  geracao_estimada_kwh_mes: 660,
++});
++
++async function inserir(extra: Record<string, unknown>) {
++  const { error } = await servico.from("calculos_solares").insert({ ...tecnico(), ...extra });
++  if (!error) await servico.from("calculos_solares").delete().eq("negocio_id", negocio);
++  return error;
++}
++
++beforeAll(async () => {
++  const { data: e } = await servico.from("empresas").insert({ nome: `Estimativa incompleta ${sufixo}` }).select("id").single();
++  empresa = e!.id;
++  const { data: f } = await servico.from("funis").select("id").eq("empresa_id", empresa).single();
++  const { data: et } = await servico.from("etapas").select("id").eq("funil_id", f!.id).order("ordem").limit(1).single();
++  const { data: c } = await servico.from("contatos").insert({ empresa_id: empresa, nome: "Cliente estimativa", telefone: "44 90000-0002" }).select("id").single();
++  const { data: n } = await servico
++    .from("negocios")
++    .insert({ empresa_id: empresa, titulo: "Estimativa incompleta", contato_id: c!.id, funil_id: f!.id, etapa_id: et!.id })
++    .select("id")
++    .single();
++  negocio = n!.id;
++  // O banco só aceita cálculo em negócio com kit.
++  const { error } = await servico
++    .from("kit_componentes")
++    .insert({ empresa_id: empresa, negocio_id: negocio, tipo: "modulo", descricao: "Módulo 550 W", potencia_w: 550, quantidade: 10, ordem: 0 });
++  if (error) throw error;
++});
++
++describe("calculos_solares.estado_financeiro", () => {
++  it("linha sem estado (como as anteriores à migration) nasce legada e exige os números", async () => {
++    const { data, error } = await servico.from("calculos_solares").insert({ ...tecnico(), ...FINANCEIRO }).select("estado_financeiro, metodo_calculo, pendencias").single();
++    expect(error).toBeNull();
++    expect(data).toEqual({ estado_financeiro: "legado", metodo_calculo: null, pendencias: null });
++    await servico.from("calculos_solares").delete().eq("negocio_id", negocio);
++    expect((await inserir({ ...NULOS }))?.code).toBe("23514"); // legado sem números
++    expect((await inserir({ ...FINANCEIRO, metodo_calculo: "x" }))?.code).toBe("23514"); // legado com método
++    expect((await inserir({ ...FINANCEIRO, pendencias: PENDENCIAS }))?.code).toBe("23514"); // legado com pendências
++  });
++
++  it("incompleto: aceito só com todos os financeiros e o payback nulos e com pendências", async () => {
++    expect(await inserir({ estado_financeiro: "incompleto", ...NULOS, payback_meses: null, pendencias: PENDENCIAS })).toBeNull();
++    for (const campo of Object.keys(FINANCEIRO) as (keyof typeof FINANCEIRO)[]) {
++      for (const valor of [FINANCEIRO[campo], 0]) {
++        const erro = await inserir({ estado_financeiro: "incompleto", ...NULOS, [campo]: valor, pendencias: PENDENCIAS });
++        expect(erro?.code, `${campo} = ${valor}`).toBe("23514");
++      }
++    }
++    expect((await inserir({ estado_financeiro: "incompleto", ...NULOS, payback_meses: 0, pendencias: PENDENCIAS }))?.code).toBe("23514");
++    expect((await inserir({ estado_financeiro: "incompleto", ...NULOS, pendencias: null }))?.code).toBe("23514");
++    expect((await inserir({ estado_financeiro: "incompleto", ...NULOS, pendencias: [] }))?.code).toBe("23514");
++    expect((await inserir({ estado_financeiro: "incompleto", ...NULOS, pendencias: { codigo: "x" } }))?.code).toBe("23514");
++    expect((await inserir({ estado_financeiro: "incompleto", ...NULOS, pendencias: PENDENCIAS, metodo_calculo: "x" }))?.code).toBe("23514");
++  });
++
++  it("completo: exige números e método; sem método é recusado (o motor ainda não grava este estado)", async () => {
++    expect((await inserir({ estado_financeiro: "completo", ...FINANCEIRO }))?.code).toBe("23514");
++    expect((await inserir({ estado_financeiro: "completo", ...FINANCEIRO, metodo_calculo: "   " }))?.code).toBe("23514");
++    expect((await inserir({ estado_financeiro: "completo", ...NULOS, metodo_calculo: "metodo_teste" }))?.code).toBe("23514");
++    expect((await inserir({ estado_financeiro: "completo", ...FINANCEIRO, metodo_calculo: "metodo_teste", pendencias: PENDENCIAS }))?.code).toBe("23514");
++    expect(await inserir({ estado_financeiro: "completo", ...FINANCEIRO, metodo_calculo: "metodo_teste" })).toBeNull();
++  });
++
++  it("estado desconhecido é recusado; passar de incompleto a legado exige os números", async () => {
++    expect((await inserir({ estado_financeiro: "outro", ...FINANCEIRO }))?.code).toBe("23514");
++    const { error } = await servico.from("calculos_solares").insert({ ...tecnico(), estado_financeiro: "incompleto", ...NULOS, pendencias: PENDENCIAS });
++    expect(error).toBeNull();
++    const semNumeros = await servico.from("calculos_solares").update({ estado_financeiro: "legado", pendencias: null }).eq("negocio_id", negocio);
++    expect(semNumeros.error?.code).toBe("23514");
++    const { data } = await servico.from("calculos_solares").select("estado_financeiro").eq("negocio_id", negocio).single();
++    expect(data).toEqual({ estado_financeiro: "incompleto" });
++    await servico.from("calculos_solares").delete().eq("negocio_id", negocio);
++  });
++});
+diff --git a/tests/fio-b-copel-quatro-casos.test.ts b/tests/fio-b-copel-quatro-casos.test.ts
+new file mode 100644
+index 0000000..4725bff
+--- /dev/null
++++ b/tests/fio-b-copel-quatro-casos.test.ts
+@@ -0,0 +1,56 @@
++/**
++ * Quatro contas feitas à mão (decisão técnica de 22/10/2026, PENDENTE de aceite do Evandro) conferidas contra o módulo
++ * isolado `fio-b-hipotese.ts`. Só teste: nada aqui liga a hipótese ao motor real.
++ *
++ * Dados oficiais (ANEEL, Componentes Tarifárias 2026 e Tarifas de Aplicação; REH 3.592/2026, COPEL-DIS, vigência
++ * 24/06/2026 a 23/06/2027; B1 Convencional, Residencial, "Tarifa de Aplicação", sem tributos, R$/MWh):
++ *   TE 310,85 + TUSD 457,17 => T = 0,76802 R$/kWh
++ *   TUSD_FioB 214,535600374 => N (GD II 2026, Lei 14.300 art. 27, IV: 60%) = 0,6 × 0,214535600374 = 0,1287213602 R$/kWh
++ * Piso: bifásico a três condutores, D = 50 kWh (REN 1.000, art. 291, II).
++ */
++import { describe, expect, it } from "vitest";
++import { calcularFioBHipotese } from "@/lib/fio-b-hipotese";
++
++const T = (310.85 + 457.17) / 1000;
++const N = (0.6 * 214.535600374) / 1000;
++const D = 50;
++
++const caso = (consumoTotalKwh: number, geracaoTotalKwh: number) =>
++  calcularFioBHipotese({ consumoTotalKwh, geracaoTotalKwh, tarifaCheiaRsKwh: T, custoDisponibilidadeKwh: D, custoEnergiaCompensadaRsKwh: N });
++
++describe("Copel B1 convencional GD II 2026: quatro casos feitos à mão", () => {
++  it("1. geração zero (300 kWh): sem = com = 300 × T = 230,41; economia 0", () => {
++    expect(caso(300, 0)).toMatchObject({ ok: true, energiaCompensadaKwh: 0, contaSemSolar: 230.41, contaComSolar: 230.41, economiaMensal: 0, paybackDisponivel: false });
++  });
++
++  it("2. consumo abaixo do piso (40 kWh, gera 200): as duas contas no piso 50 × T = 38,40; nada compensado", () => {
++    expect(caso(40, 200)).toMatchObject({
++      ok: true,
++      energiaCompensadaKwh: 0,
++      energiaDisponivelNaoCompensadaKwh: 200,
++      contaSemSolar: 38.4,
++      contaComSolar: 38.4,
++      economiaMensal: 0,
++      paybackDisponivel: false,
++    });
++  });
++
++  it("3. compensação parcial (500 kWh, gera 300): com = 200 × T + 300 × N = 192,22; economia 191,79", () => {
++    expect(caso(500, 300)).toMatchObject({ ok: true, energiaCompensadaKwh: 300, contaSemSolar: 384.01, contaComSolar: 192.22, economiaMensal: 191.79 });
++  });
++
++  it("4. compensação total (400 kWh, gera 500): K = 400; com = 400 × N = 51,49; economia 255,72; sobram 100 kWh", () => {
++    expect(caso(400, 500)).toMatchObject({
++      ok: true,
++      energiaCompensadaKwh: 400,
++      energiaDisponivelNaoCompensadaKwh: 100,
++      contaSemSolar: 307.21,
++      contaComSolar: 51.49,
++      economiaMensal: 255.72,
++    });
++  });
++
++  it("4b. geração sobra mas o piso limita (200 kWh, gera 400): K = 180,20; com = 38,40 (piso); economia 115,20", () => {
++    expect(caso(200, 400)).toMatchObject({ ok: true, energiaCompensadaKwh: 180.2, contaSemSolar: 153.6, contaComSolar: 38.4, economiaMensal: 115.2 });
++  });
++});
+diff --git a/R:/wt-m2-p0-retomada/tests/negocios-acoes-db.test.ts b/tests/negocios-acoes-db.test.ts
+index 416e691..d30fdb5 100644
+--- a/R:/wt-m2-p0-retomada/tests/negocios-acoes-db.test.ts
++++ b/tests/negocios-acoes-db.test.ts
+@@ -375,9 +375,16 @@ describe("ficha pela tela", () => {
+       observacoes: "",
+     }))
+       kit.append(k, v);
+-    // ANTES: "Kit e cálculo salvos." e a linha de cálculo era criada. AGORA: estimativa incompleta, itens salvos, sem linha.
++    // ANTES: "Kit e cálculo salvos." e a linha de cálculo era criada. AGORA: estimativa incompleta; itens e resultado
++    // técnico salvos (linha `incompleto`, sem parte financeira).
+     const pendencias = pendenciasDaEntrada({ consumoMedioKwh: 450, valorFaturaMedio: 320, tarifaKwh: 0.95 });
+-    expect(await salvarKitPersonalizado(null, kit)).toEqual({ ok: true, pendencias, mensagem: `Itens do kit salvos. ${mensagemEstimativaIncompleta(pendencias)}` });
++    expect(await salvarKitPersonalizado(null, kit)).toEqual({ ok: true, pendencias, mensagem: `Kit e resultado técnico salvos. ${mensagemEstimativaIncompleta(pendencias)}` });
++    const { data: tecnico } = await vendedor.cliente
++      .from("calculos_solares")
++      .select("estado_financeiro, economia_mensal, payback_meses, geracao_estimada_kwh_mes")
++      .eq("negocio_id", r.negocioId)
++      .single();
++    expect(tecnico).toEqual({ estado_financeiro: "incompleto", economia_mensal: null, payback_meses: null, geracao_estimada_kwh_mes: 660 });
+ 
+     const { data: n } = await vendedor.cliente
+       .from("negocios")
+@@ -408,7 +415,8 @@ describe("ficha pela tela", () => {
+       registros(r.negocioId),
+     ]);
+     expect(c).toEqual({ nome: "Cliente editado", documento: "123.456.789-09", endereco: "Rua Nova, 1", cidade: "Cascavel", uf: "PR" });
+-    expect(calc).toBeNull(); // nenhuma linha em calculos_solares (consumo e fatura ficam no negócio: valor_conta_energia 320 acima)
++    // Reabrir: o resultado técnico salvo traz a fatura e a tarifa enviadas (sem parte financeira, conferido acima).
++    expect(calc).toEqual({ valor_fatura_medio: 320, tarifa_kwh: 0.95 });
+     expect(lista.map((a) => [a.nome, a.categoria])).toEqual([["fatura.pdf", "fatura_gerador"]]);
+     expect((await conferir(r.negocioId)).semRegistro).toEqual([]);
+   });
+diff --git a/R:/wt-m2-p0-retomada/tests/negocios-gravacao-db.test.ts b/tests/negocios-gravacao-db.test.ts
+index bd47586..e3eae7a 100644
+--- a/R:/wt-m2-p0-retomada/tests/negocios-gravacao-db.test.ts
++++ b/tests/negocios-gravacao-db.test.ts
+@@ -18,7 +18,7 @@ import {
+ import { conferirArquivos } from "@/lib/anexos-servidor";
+ import { linhasParaComponentes } from "@/components/kit-componentes";
+ import { mensagemEstimativaIncompleta, pendenciasDaEntrada } from "@/lib/calculo-reproduzivel";
+-import { MENSAGEM_PRECO_CALCULO_LEGADO } from "@/lib/calculo-vigencia";
++import { MENSAGEM_PRECO_CALCULO_INCOMPLETO, MENSAGEM_PRECO_CALCULO_LEGADO } from "@/lib/calculo-vigencia";
+ import { MENSAGEM_NUMERO_BR } from "@/lib/formatacao";
+ import { estadoSalvoDoKit } from "@/lib/kit-formulario";
+ import { MENSAGEM_CALCULO_NAO_CONFERIDO, MENSAGEM_REMOCAO_COM_CALCULO, MENSAGEM_REMOCAO_SEM_CONFIRMACAO } from "@/lib/negocio-dados";
+@@ -116,6 +116,34 @@ async function reabrir(u: Usuario, negocioId: string) {
+ const SO_MODULO = JSON.stringify([{ tipo: "modulo", descricao: "Módulo 550 W", potenciaW: 550, quantidade: 12 }]);
+ 
+ const SUFIXO_LEGADO = " O cálculo anterior foi mantido, mas foi feito pela fórmula antiga (não validada) e não vale como resultado atual.";
++const SUFIXO_INCOMPLETO = " O cálculo anterior foi mantido, mas não vale como resultado atual.";
++
++/**
++ * Resultado técnico INCOMPLETO gravado (migration 20261023200000): entradas e geração presentes, parte financeira e
++ * payback nulos, pendências gravadas. Nulo = nenhuma linha.
++ */
++async function linhaGravada(negocioId: string) {
++  const { data, error } = await servico
++    .from("calculos_solares")
++    .select(
++      "estado_financeiro, consumo_medio_kwh, valor_fatura_medio, tarifa_kwh, geracao_estimada_kwh_mes, kwh_faturado, kwh_compensado, custo_fio_b, conta_sem_solar, conta_com_solar, economia_mensal, payback_meses, metodo_calculo, pendencias",
++    )
++    .eq("negocio_id", negocioId)
++    .maybeSingle();
++  if (error) throw error;
++  return data;
++}
++const SEM_FINANCEIRO = {
++  estado_financeiro: "incompleto",
++  kwh_faturado: null,
++  kwh_compensado: null,
++  custo_fio_b: null,
++  conta_sem_solar: null,
++  conta_com_solar: null,
++  economia_mensal: null,
++  payback_meses: null,
++  metodo_calculo: null,
++};
+ 
+ async function contarCalculos(negocioId: string): Promise<number> {
+   const { count, error } = await servico.from("calculos_solares").select("id", { count: "exact", head: true }).eq("negocio_id", negocioId);
+@@ -281,10 +309,11 @@ describe("kit", () => {
+       // consumo informado (300 / 0,95 = 315,79 kWh, o valor que antes era derivado da fatura): conta em R$ sozinha é estimativa incompleta.
+       fd({ negocioId: r.negocioId, tipoLigacao: "trifasico", consumoMedioKwh: "315,79", valorFaturaMedio: "300,00", tarifaKwh: "0,95", estruturaTelhado: "gancho", componentes: KIT, observacoes: "", ...extra });
+     // ANTES: com tarifa o salvamento criava o cálculo ("Kit e cálculo salvos."). AGORA: a estimativa é sempre incompleta,
+-    // os itens são salvos, consumo e fatura vão ao negócio e NENHUMA linha é criada em calculos_solares.
++    // os itens são salvos, consumo e fatura vão ao negócio e a linha gravada é só o RESULTADO TÉCNICO (estado
++    // `incompleto`: entradas e geração; economia, contas, Fio B e payback nulos; pendências gravadas).
+     const pendencias = pendenciasDaEntrada({ consumoMedioKwh: 315.79, valorFaturaMedio: 300, tarifaKwh: 0.95 });
+     const salvo = await salvarKitComCliente(cliente(vendedor), atual[vendedor.id], kitForm());
+-    expect(salvo).toMatchObject({ ok: true, negocioId: r.negocioId, mensagem: `Itens do kit salvos. ${mensagemEstimativaIncompleta(pendencias)}` });
++    expect(salvo).toMatchObject({ ok: true, negocioId: r.negocioId, mensagem: `Kit e resultado técnico salvos. ${mensagemEstimativaIncompleta(pendencias)}` });
+     expect(salvo.mensagem).toContain("Estimativa financeira incompleta: Informe o enquadramento");
+     expect(salvo.mensagem).toContain("A regra de cálculo da economia ainda não foi validada.");
+     expect(salvo.mensagem).not.toContain("O cálculo anterior");
+@@ -296,29 +325,32 @@ describe("kit", () => {
+       "formula_nao_validada",
+     ]);
+     f = await reabrir(vendedor, r.negocioId);
+-    expect(f.calculo).toBeNull();
+-    expect(await contarCalculos(r.negocioId)).toBe(0);
++    expect(await contarCalculos(r.negocioId)).toBe(1);
++    // Reabrir: o resultado técnico salvo volta igual (5,5 kWp × 120 = 660 kWh/mês), sem nenhum número financeiro.
++    const tecnico = { ...SEM_FINANCEIRO, consumo_medio_kwh: 315.79, valor_fatura_medio: 300, tarifa_kwh: 0.95, geracao_estimada_kwh_mes: 660, pendencias };
++    expect(await linhaGravada(r.negocioId)).toEqual(tecnico);
++    expect(f.calculo).toMatchObject({ tarifa_kwh: 0.95, valor_fatura_medio: 300, kit_potencia_kwp: 5.5 });
+     expect(f.kit).toHaveLength(2);
+     expect(f.negocio).toMatchObject({ consumo_medio_kwh: 315.79, valor_conta_energia: 300, estrutura_telhado: "gancho" });
+ 
+-    // Salvar de novo (a tela traz consumo e conta do negócio): mesmo resultado, ainda sem linha.
++    // Salvar de novo (a tela traz consumo e conta do negócio): mesmo resultado e a mesma linha técnica.
+     const de_novo = await salvarKitComCliente(cliente(vendedor), atual[vendedor.id], kitForm());
+     expect(de_novo).toMatchObject({ ok: true, mensagem: salvo.mensagem });
+     f = await reabrir(vendedor, r.negocioId);
+-    expect(f.calculo).toBeNull();
++    expect(await linhaGravada(r.negocioId)).toEqual(tecnico);
+     expect(f.kit).toHaveLength(2);
+     expect(f.negocio).toMatchObject({ consumo_medio_kwh: 315.79, valor_conta_energia: 300 });
+ 
+-    // ANTES: sem tarifa com cálculo salvo era recusado. AGORA: sem tarifa também salva (os itens trocam; sem linha criada).
++    // Sem tarifa também salva (os itens trocam); sem tarifa não há linha nova: a técnica anterior fica e não vale como atual.
+     const semTarifa = await salvarKitComCliente(cliente(vendedor), atual[vendedor.id], kitForm({ tarifaKwh: "", componentes: SO_MODULO }));
+     expect(semTarifa.ok).toBe(true);
+     expect(semTarifa.mensagem).toBe(
+-      `Itens do kit salvos. ${mensagemEstimativaIncompleta(pendenciasDaEntrada({ consumoMedioKwh: 315.79, valorFaturaMedio: 300, tarifaKwh: null }))}`,
++      `Itens do kit salvos. ${mensagemEstimativaIncompleta(pendenciasDaEntrada({ consumoMedioKwh: 315.79, valorFaturaMedio: 300, tarifaKwh: null }))}${SUFIXO_INCOMPLETO}`,
+     );
+     const depois = await reabrir(vendedor, r.negocioId);
+     expect(depois.kit).toEqual([{ tipo: "modulo", descricao: "Módulo 550 W", potencia_w: 550, quantidade: 12 }]);
+-    expect(depois.calculo).toBeNull();
+-    expect(await contarCalculos(r.negocioId)).toBe(0);
++    expect(await linhaGravada(r.negocioId)).toEqual(tecnico);
++    expect(await contarCalculos(r.negocioId)).toBe(1);
+   });
+ 
+   it("conta em R$ sem consumo em kWh: salva o kit, não cria cálculo e, havendo cálculo prévio, o mantém intacto (estimativa incompleta)", async () => {
+@@ -388,24 +420,35 @@ describe("kit", () => {
+         atual[vendedor.id],
+         fd({ negocioId, tipoLigacao: "trifasico", consumoMedioKwh: "", valorFaturaMedio: "", tarifaKwh: "0,95", estruturaTelhado: "", componentes: KIT, observacoes: "", ...extra }),
+       );
+-    /** Saída esperada: as pendências refletem os valores efetivos (nunca o campo cru). */
+-    const esperada = (negocioId: string, consumoMedioKwh: number | null, valorFaturaMedio: number | null, tarifaKwh: number | null) => {
++    /**
++     * Saída esperada: as pendências refletem os valores efetivos (nunca o campo cru). Com tarifa e consumo em kWh o
++     * resultado técnico é gravado; sem linha nova e com linha anterior, o sufixo diz que ela não vale como atual.
++     */
++    const esperada = (
++      negocioId: string,
++      consumoMedioKwh: number | null,
++      valorFaturaMedio: number | null,
++      tarifaKwh: number | null,
++      sufixo = "",
++    ) => {
+       const pendencias = pendenciasDaEntrada({ consumoMedioKwh, valorFaturaMedio, tarifaKwh });
+-      return { ok: true, negocioId, pendencias, mensagem: `Itens do kit salvos. ${mensagemEstimativaIncompleta(pendencias)}` };
++      const inicio = tarifaKwh != null && consumoMedioKwh != null ? "Kit e resultado técnico salvos." : "Itens do kit salvos.";
++      return { ok: true, negocioId, pendencias, mensagem: `${inicio} ${mensagemEstimativaIncompleta(pendencias)}${sufixo}` };
+     };
+ 
+-    it("kWh e fatura vazios no kit (com e sem tarifa) preservam 450 e 300 do negócio; pendências usam os efetivos; nenhuma linha de cálculo", async () => {
++    it("kWh e fatura vazios no kit (com e sem tarifa) preservam 450 e 300 do negócio; pendências usam os efetivos; linha só técnica", async () => {
+       const r = await criar(vendedor, novoNegocio({ consumo_medio_kwh: "450", valor_fatura_medio: "300,00" }));
+       expect((await reabrir(vendedor, r.negocioId)).negocio).toMatchObject({ consumo_medio_kwh: 450, valor_conta_energia: 300 });
+       for (const tarifaKwh of ["0,95", ""]) {
+-        const esp = esperada(r.negocioId, 450, 300, tarifaKwh ? 0.95 : null);
++        // Com tarifa: grava o resultado técnico com os efetivos (450 / 300). Sem tarifa: nada novo, a técnica fica.
++        const esp = esperada(r.negocioId, 450, 300, tarifaKwh ? 0.95 : null, tarifaKwh ? "" : SUFIXO_INCOMPLETO);
+         expect(esp.pendencias.map((p) => p.codigo)).not.toContain("consumo_ausente");
+         expect(await salvarKit(r.negocioId, { tarifaKwh })).toEqual(esp);
+         const f = await reabrir(vendedor, r.negocioId);
+         expect(f.negocio).toMatchObject({ consumo_medio_kwh: 450, valor_conta_energia: 300 });
+         expect(f.kit).toHaveLength(2);
+-        expect(f.calculo).toBeNull();
+-        expect(await contarCalculos(r.negocioId)).toBe(0);
++        expect(await linhaGravada(r.negocioId)).toMatchObject({ ...SEM_FINANCEIRO, consumo_medio_kwh: 450, valor_fatura_medio: 300, tarifa_kwh: 0.95 });
++        expect(await contarCalculos(r.negocioId)).toBe(1);
+       }
+     });
+ 
+@@ -415,7 +458,7 @@ describe("kit", () => {
+       expect((await reabrir(vendedor, r.negocioId)).negocio).toMatchObject({ consumo_medio_kwh: 520, valor_conta_energia: 410.5 });
+       expect(await salvarKit(r.negocioId)).toEqual(esperada(r.negocioId, 520, 410.5, 0.95));
+       expect((await reabrir(vendedor, r.negocioId)).negocio).toMatchObject({ consumo_medio_kwh: 520, valor_conta_energia: 410.5 });
+-      expect(await contarCalculos(r.negocioId)).toBe(0);
++      expect(await linhaGravada(r.negocioId)).toMatchObject({ ...SEM_FINANCEIRO, consumo_medio_kwh: 520, valor_fatura_medio: 410.5 });
+     });
+ 
+     it("limpeza explícita em Dados do negócio zera os dois; kit vazio depois não os recria e as pendências incluem consumo_ausente", async () => {
+@@ -450,7 +493,7 @@ describe("kit", () => {
+ 
+       expect(await salvarKit(r.negocioId, { consumoMedioKwh: "520" })).toEqual(esperada(r.negocioId, 520, 410.5, 0.95));
+       expect((await reabrir(vendedor, r.negocioId)).negocio).toMatchObject({ consumo_medio_kwh: 520, valor_conta_energia: 410.5 });
+-      expect(await contarCalculos(r.negocioId)).toBe(0);
++      expect(await linhaGravada(r.negocioId)).toMatchObject({ ...SEM_FINANCEIRO, consumo_medio_kwh: 520, valor_fatura_medio: 410.5 });
+     });
+ 
+     // Abre como a ficha (estadoSalvoDoKit com a linha legada e os valores atuais do negócio) e salva sem editar.
+@@ -483,7 +526,7 @@ describe("kit", () => {
+       expect(estado).toMatchObject({ consumoMedioKwh: "450", valorFaturaMedio: "300" });
+       expect(res.ok).toBe(true);
+       expect((await reabrir(vendedor, r.negocioId)).negocio).toMatchObject({ consumo_medio_kwh: 450, valor_conta_energia: 300 });
+-      // A linha legada continua intocada (histórico).
++      // A linha legada continua intocada (histórico): resultado incompleto nunca a substitui.
+       expect(await linhaLegada(r.negocioId)).toEqual({ consumo_medio_kwh: 700, valor_fatura_medio: 900 });
+     });
+ 
+@@ -515,17 +558,25 @@ describe("kit", () => {
+     const kitForm = (campos: Record<string, string>) =>
+       fd({ negocioId: r.negocioId, tipoLigacao: "trifasico", valorFaturaMedio: "", estruturaTelhado: "", componentes: KIT, observacoes: "", ...campos });
+ 
+-    // ANTES: salvar criava a linha (consumo 1200, tarifa 0,9512, geração 660). AGORA: o salvamento só grava o consumo no
+-    // negócio e nenhuma linha nasce; a escala 1.200 -> 1200 vale no negócio. A linha abaixo é fixture LEGADA (valores
+-    // derivados à mão: 5,5 kWp x 120 = 660; 1200 x 0,9512 = 1141,44), usada para conferir que reabrir e salvar sem editar
+-    // mantém tudo, inclusive a linha.
++    // ANTES: salvar criava a linha completa (consumo 1200, tarifa 0,9512, geração 660). AGORA: grava o resultado técnico
++    // incompleto com a mesma escala (1.200 -> 1200; 5,5 kWp x 120 = 660) e nenhum número financeiro; reabrir e salvar
++    // sem editar mantém tudo, inclusive a linha.
+     expect((await salvarKitComCliente(cliente(vendedor), atual[vendedor.id], kitForm({ consumoMedioKwh: "1.200", tarifaKwh: "0,9512" }))).ok).toBe(true);
+     expect((await reabrir(vendedor, r.negocioId)).negocio.consumo_medio_kwh).toBe(1200);
+-    const { data: semLinha } = await servico.from("calculos_solares").select("id").eq("negocio_id", r.negocioId);
+-    expect(semLinha).toEqual([]);
+-    await inserirLinhaLegada(r.negocioId, { consumo_medio_kwh: 1200, tarifa_kwh: 0.9512, conta_sem_solar: 1141.44 });
+     const primeiro = await calculo();
+-    expect(primeiro).toMatchObject({ consumo_medio_kwh: 1200, tarifa_kwh: 0.9512, kit_potencia_kwp: 5.5, geracao_estimada_kwh_mes: 660 });
++    expect(primeiro).toEqual({
++      consumo_medio_kwh: 1200,
++      valor_fatura_medio: null,
++      tarifa_kwh: 0.9512,
++      kit_potencia_kwp: 5.5,
++      geracao_estimada_kwh_mes: 660,
++      kwh_faturado: null,
++      custo_fio_b: null,
++      conta_sem_solar: null,
++      conta_com_solar: null,
++      economia_mensal: null,
++      payback_meses: null,
++    });
+ 
+     // Reabre como a ficha (estadoSalvoDoKit) e salva de novo o que os campos mostram, sem editar.
+     const { data: itens } = await vendedor.cliente.from("kit_componentes").select("tipo, descricao, potencia_w, quantidade").eq("negocio_id", r.negocioId).order("ordem");
+@@ -575,9 +626,9 @@ describe("kit", () => {
+   });
+ 
+   // ANTES ("cálculo recusado pelo banco restaura o kit anterior e só então diz que nada mudou"): a tarifa 100000 fazia o
+-  // banco recusar a linha e o kit era restaurado. AGORA nenhuma linha é gravada, então esse caminho não ocorre; o
+-  // equivalente que continua valendo é a restauração do kit quando a troca dos itens falha (teste "falha ao apagar...").
+-  // Aqui: a mesma entrada (tarifa fora do limite da coluna) não é recusada, não toca na linha legada e salva o kit.
++  // banco recusar a linha e o kit era restaurado. Com linha LEGADA o app não grava resultado incompleto por cima, então
++  // esse caminho não ocorre aqui (sem linha anterior, ver o teste seguinte). Aqui: a mesma entrada não é recusada, não
++  // toca na linha legada e salva o kit.
+   it("tarifa acima do limite da coluna: nenhuma linha é gravada, o banco não recusa nada e a linha legada fica intocada", async () => {
+     const r = await criar(vendedor, novoNegocio({ componentes: KIT, consumo_medio_kwh: "450" }));
+     await inserirLinhaLegada(r.negocioId);
+@@ -595,6 +646,22 @@ describe("kit", () => {
+     expect(linhaDepois).toEqual(linhaAntes);
+   });
+ 
++  // Sem linha anterior, o resultado técnico é gravado (migration 20261023200000) e volta o caminho original: a tarifa
++  // 100000 não cabe na coluna, o banco recusa a linha técnica e o kit anterior é restaurado.
++  it("sem linha anterior: o banco recusa a linha técnica fora do limite, o kit anterior volta e nada é gravado", async () => {
++    const r = await criar(vendedor, novoNegocio({ componentes: KIT, consumo_medio_kwh: "450" }));
++    const outroKit = JSON.stringify([{ tipo: "modulo", descricao: "Módulo 600 W", potenciaW: 600, quantidade: 8 }]);
++    const res = await salvarKitComCliente(
++      cliente(vendedor),
++      atual[vendedor.id],
++      fd({ negocioId: r.negocioId, tipoLigacao: "trifasico", consumoMedioKwh: "450", tarifaKwh: "100000", componentes: outroKit }),
++    );
++    expect(res.ok).toBe(false);
++    expect(res.mensagem).toContain("Nada foi alterado");
++    expect((await reabrir(vendedor, r.negocioId)).kit.map((k) => k.descricao)).toEqual(["Módulo 550 W", "Inversor 5 kW"]);
++    expect(await contarCalculos(r.negocioId)).toBe(0);
++  });
++
+   it("reenviar é seguro: substitui a lista inteira, mesmo com itens repetidos de uma falha anterior", async () => {
+     const r = await criar(vendedor, novoNegocio({ componentes: KIT }));
+     // Simula o pior caso de uma falha sem restauração: itens repetidos.
+@@ -640,24 +707,28 @@ describe("kit", () => {
+     expect((await remover(r.negocioId, { confirmarRemocao: "sim" })).ok).toBe(true);
+     expect((await reabrir(vendedor, r.negocioId)).kit).toEqual([]);
+ 
+-    // Com cálculo associado: recusa mesmo com confirmação e mesmo informando a tarifa.
++    // Com cálculo associado (técnico incompleto, gravado na criação, ou legado): recusa mesmo com confirmação e mesmo
++    // informando a tarifa.
+     const c = await criar(vendedor, novoNegocio({ componentes: KIT, consumo_medio_kwh: "450", tarifa_kwh: "0,95" }));
+-    expect((await reabrir(vendedor, c.negocioId)).calculo).toBeNull(); // criar não gera mais linha
+-    await inserirLinhaLegada(c.negocioId); // fixture: linha legada associada
+-    const antes = await reabrir(vendedor, c.negocioId);
+-    expect(antes.calculo).not.toBeNull();
++    expect(await linhaGravada(c.negocioId)).toMatchObject(SEM_FINANCEIRO); // criar grava o resultado técnico
++    const c2 = await criar(vendedor, novoNegocio({ componentes: KIT }));
++    await inserirLinhaLegada(c2.negocioId); // fixture: linha legada associada
+     const tentativas: Record<string, string>[] = [{ confirmarRemocao: "sim" }, { confirmarRemocao: "sim", tarifaKwh: "0,95", consumoMedioKwh: "450" }];
+-    for (const extra of tentativas) {
+-      expect(await remover(c.negocioId, extra)).toEqual({ ok: false, mensagem: MENSAGEM_REMOCAO_COM_CALCULO });
++    for (const negocioId of [c.negocioId, c2.negocioId]) {
++      const antes = await reabrir(vendedor, negocioId);
++      expect(antes.calculo).not.toBeNull();
++      for (const extra of tentativas) {
++        expect(await remover(negocioId, extra)).toEqual({ ok: false, mensagem: MENSAGEM_REMOCAO_COM_CALCULO });
++      }
++      const depois = await reabrir(vendedor, negocioId);
++      expect(depois.kit).toEqual(antes.kit);
++      expect(depois.calculo).toEqual(antes.calculo);
+     }
+-    const depois = await reabrir(vendedor, c.negocioId);
+-    expect(depois.kit).toEqual(antes.kit);
+-    expect(depois.calculo).toEqual(antes.calculo);
+   });
+ 
+   it("falha ao ler o cálculo: recusa antes de gravar ou apagar; kit e cálculo intactos", async () => {
+-    const c = await criar(vendedor, novoNegocio({ componentes: KIT, consumo_medio_kwh: "450", tarifa_kwh: "0,95" }));
+-    await inserirLinhaLegada(c.negocioId); // fixture: criar não gera mais linha
++    const c = await criar(vendedor, novoNegocio({ componentes: KIT }));
++    await inserirLinhaLegada(c.negocioId); // fixture: linha legada associada
+     const antes = await reabrir(vendedor, c.negocioId);
+     expect(antes.calculo).not.toBeNull();
+     const outroKit = JSON.stringify([{ tipo: "modulo", descricao: "Módulo 550 W", potenciaW: 550, quantidade: 12 }]);
+@@ -684,16 +755,25 @@ describe("kit", () => {
+     expect((await reabrir(vendedor, r.negocioId)).kit).toEqual([{ tipo: "modulo", descricao: "Módulo 550 W", potencia_w: 550, quantidade: 12 }]);
+   });
+ 
+-  it("criar com kit, consumo e tarifa: estimativa incompleta é informação, não aviso de falha; kit e consumo salvos, nenhuma linha", async () => {
++  it("criar com kit, consumo e tarifa: estimativa incompleta é informação, não aviso de falha; kit, consumo e resultado técnico salvos", async () => {
+     const r = await criar(vendedor, novoNegocio({ componentes: KIT, tarifa_kwh: "0,95", consumo_medio_kwh: "450", valor_fatura_medio: "300,00" }));
+     expect(r.avisos).toEqual([]);
+     expect(r.estimativa?.estado).toBe("incompleta");
+-    expect(r.estimativa?.mensagem).toBe(mensagemEstimativaIncompleta(pendenciasDaEntrada({ consumoMedioKwh: 450, valorFaturaMedio: 300, tarifaKwh: 0.95 })));
++    const pendencias = pendenciasDaEntrada({ consumoMedioKwh: 450, valorFaturaMedio: 300, tarifaKwh: 0.95 });
++    expect(r.estimativa?.mensagem).toBe(mensagemEstimativaIncompleta(pendencias));
+     expect(r.estimativa?.pendencias.map((p) => p.codigo)).toContain("formula_nao_validada");
+     const f = await reabrir(vendedor, r.negocioId);
+     expect(f.kit).toHaveLength(2);
+-    expect(f.calculo).toBeNull();
+-    expect(await contarCalculos(r.negocioId)).toBe(0);
++    expect(await contarCalculos(r.negocioId)).toBe(1);
++    // 5,5 kWp × 120 kWh/kWp/mês = 660 kWh/mês; nenhum número financeiro (ausência nunca vira zero).
++    expect(await linhaGravada(r.negocioId)).toEqual({
++      ...SEM_FINANCEIRO,
++      consumo_medio_kwh: 450,
++      valor_fatura_medio: 300,
++      tarifa_kwh: 0.95,
++      geracao_estimada_kwh_mes: 660,
++      pendencias,
++    });
+     expect(f.negocio).toMatchObject({ consumo_medio_kwh: 450, valor_conta_energia: 300 });
+   });
+ 
+@@ -806,8 +886,9 @@ describe("etapa fora do formulário de edição", () => {
+ 
+ describe("preço do cálculo x valor do negócio", () => {
+   async function negocioComCalculo() {
+-    const r = await criar(vendedor, novoNegocio({ componentes: KIT, valor: "25.000,00", consumo_medio_kwh: "700", tipo_ligacao: "trifasico", tarifa_kwh: "0,95" }));
+-    await inserirLinhaLegada(r.negocioId); // fixture legada: criar não gera mais linha
++    // Sem tarifa na criação: nenhuma linha técnica, para a fixture legada ocupar o lugar.
++    const r = await criar(vendedor, novoNegocio({ componentes: KIT, valor: "25.000,00", consumo_medio_kwh: "700", tipo_ligacao: "trifasico" }));
++    await inserirLinhaLegada(r.negocioId); // fixture legada
+     const { data: calculo } = await servico.from("calculos_solares").select("id, kit_preco, economia_mensal, payback_meses, geracao_estimada_kwh_mes").eq("negocio_id", r.negocioId).single();
+     expect(calculo).toMatchObject({ kit_preco: 25000 });
+     return { negocioId: r.negocioId, calculo: calculo! };
+@@ -841,6 +922,25 @@ describe("preço do cálculo x valor do negócio", () => {
+     });
+   });
+ 
++  it("resultado técnico incompleto: atualizar o preço é recusado (não há economia nem payback) e nada muda", async () => {
++    const r = await criar(vendedor, novoNegocio({ componentes: KIT, valor: "25.000,00", consumo_medio_kwh: "700", tipo_ligacao: "trifasico", tarifa_kwh: "0,95" }));
++    const antes = await lerCalculo(r.negocioId);
++    expect(antes).toEqual({ kit_preco: 25000, payback_meses: null, economia_mensal: null, geracao_estimada_kwh_mes: 660 });
++    const editado = await editarNegocioComCliente(
++      cliente(admin),
++      atual[admin.id],
++      fd({ negocioId: r.negocioId, titulo: "Valor corrigido", valor: "28.000,00", consumo_medio_kwh: "700" }),
++    );
++    expect(editado.ok).toBe(true);
++    for (let i = 0; i < 2; i++) {
++      expect(await atualizarPrecoCalculoComCliente(cliente(vendedor), atual[vendedor.id], r.negocioId)).toEqual({
++        ok: false,
++        mensagem: MENSAGEM_PRECO_CALCULO_INCOMPLETO,
++      });
++    }
++    expect(await lerCalculo(r.negocioId)).toEqual(antes);
++  });
++
+   it("negócio sem cálculo: recusa sem criar nada", async () => {
+     const r = await criar(vendedor, novoNegocio());
+     expect(await atualizarPrecoCalculoComCliente(cliente(vendedor), atual[vendedor.id], r.negocioId)).toMatchObject({ ok: false });
+diff --git a/R:/wt-m2-p0-retomada/tests/travas-kit-sdr-db.test.ts b/tests/travas-kit-sdr-db.test.ts
+index 2873ec4..877c850 100644
+--- a/R:/wt-m2-p0-retomada/tests/travas-kit-sdr-db.test.ts
++++ b/tests/travas-kit-sdr-db.test.ts
+@@ -156,15 +156,19 @@ async function criarNegocio(u: Usuario, extra: Record<string, string> = {}) {
+ }
+ 
+ /**
+- * Negócio do vendedor com kit de 2 itens e uma linha de cálculo LEGADA (fórmula antiga, não validada) inserida como
+- * fixture. ANTES o app gerava a linha ao criar o negócio com consumo e tarifa; AGORA o motor não gera mais linhas
+- * (estimativa sempre incompleta), então o cálculo existente é fixture. A trava do kit independe de como a linha nasceu.
++ * Negócio do vendedor com kit de 2 itens e uma linha de cálculo LEGADA (fórmula antiga, não validada) como fixture.
++ * Criar com consumo e tarifa grava o resultado técnico INCOMPLETO (sem parte financeira); a fixture o substitui pela
++ * linha legada. A trava do kit independe de como a linha nasceu.
+  */
+ async function negocioComCalculo(u: Usuario = vendedor) {
+   const negocioId = await criarNegocio(u, { componentes: KIT, consumo_medio_kwh: "450", tarifa_kwh: "0,95" });
+-  expect(await temCalculo(negocioId)).toBe(false); // criar não gera linha
++  const { data: criado } = await servico.from("calculos_solares").select("estado_financeiro").eq("negocio_id", negocioId).single();
++  expect(criado?.estado_financeiro).toBe("incompleto"); // criar grava só o resultado técnico
+   // Com autor registrado (como o app gravava): a RLS de exclusão do cálculo libera o próprio autor.
+-  const { error } = await servico.from("calculos_solares").insert({ ...linhaCalculo(negocioId), criado_por: atual[u.id].membroId, atualizado_por: atual[u.id].membroId });
++  const { error } = await servico.from("calculos_solares").upsert(
++    { ...linhaCalculo(negocioId), estado_financeiro: "legado", pendencias: null, criado_por: atual[u.id].membroId, atualizado_por: atual[u.id].membroId },
++    { onConflict: "negocio_id" },
++  );
+   expect(error).toBeNull();
+   const { data: calculo } = await servico.from("calculos_solares").select("id").eq("negocio_id", negocioId).single();
+   expect(calculo).not.toBeNull();
+@@ -264,9 +268,9 @@ describe("kit com cálculo solar nunca fica vazio", () => {
+   });
+ 
+   // ANTES ("restauração após falha no cálculo devolve o kit anterior com a trava ligada"): a tarifa 100000 fazia o banco
+-  // recusar a linha e o app restaurava o kit. AGORA nenhuma linha é gravada pelo app; a restauração por falha na troca
+-  // dos itens continua coberta pelo teste seguinte. Aqui: com a mesma entrada o app troca os itens (a trava deixa:
+-  // novos antes dos antigos) e a linha legada segue intacta.
++  // recusar a linha e o app restaurava o kit. AGORA a linha legada nunca é substituída por um resultado incompleto, então
++  // nenhuma linha é gravada; a restauração por falha na troca dos itens continua coberta pelo teste seguinte. Aqui: com
++  // a mesma entrada o app troca os itens (a trava deixa: novos antes dos antigos) e a linha legada segue intacta.
+   it("tarifa acima do limite da coluna com linha legada: o app troca os itens, não grava linha e não restaura nada", async () => {
+     const negocioId = await negocioComCalculo();
+     const { data: linhaAntes } = await servico.from("calculos_solares").select("*").eq("negocio_id", negocioId).single();
+@@ -459,8 +463,8 @@ describe("cálculo solar só é criado com kit", () => {
+     expect(await temCalculo(await negocioComCalculo())).toBe(true);
+   });
+ 
+-  // ANTES: "recálculo de cálculo existente: pelo app, ..." (o app regravava a tarifa 1,05). AGORA o app não recalcula nem
+-  // grava linha (estimativa incompleta): a tarifa da linha legada fica em 0,95; upsert e update diretos seguem valendo.
++  // ANTES: "recálculo de cálculo existente: pelo app, ..." (o app regravava a tarifa 1,05). AGORA o app não substitui a
++  // linha legada por um resultado incompleto: a tarifa da linha legada fica em 0,95; upsert e update diretos seguem valendo.
+   it("cálculo existente: o app não o recalcula (fica 0,95); upsert e update direto continuam permitidos", async () => {
+     const negocioId = await negocioComCalculo();
+     const r = await salvarKitComCliente(

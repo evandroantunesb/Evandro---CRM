@@ -1,0 +1,451 @@
+$ pnpm exec playwright test e2e/06-calculadora-numeros.spec.ts e2e/09-preco-desatualizado.spec.ts e2e/10-calculo-estados.spec.ts e2e/11-kit-consumo-fatura-salvos.spec.ts e2e/12-proposta-emitida.spec.ts e2e/13-calculo-gd2-fluxo.spec.ts --reporter=list
+
+Running 19 tests using 1 worker
+
+  ok  1 [chromium] › e2e\06-calculadora-numeros.spec.ts:114:7 › calculadora: números no padrão brasileiro › 1200 kWh: salvar → reabrir → salvar sem editar mantém o consumo e o resultado técnico (sem parte financeira) (7.9s)
+  x   2 [chromium] › e2e\06-calculadora-numeros.spec.ts:137:7 › calculadora: números no padrão brasileiro › linha legada: reabrir e salvar sem editar mantém consumo e tarifa na escala e não altera a linha (2.2s)
+  x   3 [chromium] › e2e\06-calculadora-numeros.spec.ts:156:7 › calculadora: números no padrão brasileiro › linha legada com consumo diferente do negócio: o editor abre o do negócio e salvar sem editar não traz o antigo (2.1s)
+  x   4 [chromium] › e2e\06-calculadora-numeros.spec.ts:170:7 › calculadora: números no padrão brasileiro › 1.200,50 tem prévia e grava 1200,5 no negócio; 1.2 é recusado sem gravar (16.7s)
+  ok  5 [chromium] › e2e\09-preco-desatualizado.spec.ts:81:7 › linha legada e valor do negócio editado › valor igual ou editado: nenhum aviso de preço, sem 'Atualizar preço', contrato liberado e linha intocada (1.9s)
+  x   6 [chromium] › e2e\10-calculo-estados.spec.ts:153:7 › estados do cálculo › (a) dados do vendedor completos: prévia com potência e geração, quadro só com pendências da empresa; salvar grava só o resultado técnico (16.7s)
+  x   7 [chromium] › e2e\10-calculo-estados.spec.ts:239:7 › estados do cálculo › (b) sem consumo: pendências do vendedor e da empresa; salvar grava o kit e a conta, sem cálculo (17.4s)
+  x   8 [chromium] › e2e\10-calculo-estados.spec.ts:281:7 › estados do cálculo › (c) linha legada: histórico recolhido ('fórmula antiga, não validada'), proposta e atualizar preço bloqueados, contrato liberado (16.8s)
+  ok  9 [chromium] › e2e\10-calculo-estados.spec.ts:323:7 › estados do cálculo › (c2) linha legada com o kit alterado: o contrato continua bloqueado pelo kit, sem tocar na linha (1.5s)
+  ok 10 [chromium] › e2e\10-calculo-estados.spec.ts:337:7 › estados do cálculo › (d) proposta emitida antes: página pública indisponível (sem sistema, economia nem preço) e PDF 409; ficha sem 'Baixar PDF' (1.6s)
+  ok 11 [chromium] › e2e\10-calculo-estados.spec.ts:365:7 › estados do cálculo › (d2) proposta emitida em negócio sem linha de cálculo: igualmente indisponível (nunca 404) e PDF 409 (549ms)
+  ok 12 [chromium] › e2e\11-kit-consumo-fatura-salvos.spec.ts:86:7 › kWh e fatura do kit preservados › campos do kit vazios avisam o valor já salvo, salvar preserva consumo e fatura e grava só o resultado técnico (2.9s)
+  ok 13 [chromium] › e2e\11-kit-consumo-fatura-salvos.spec.ts:126:7 › kWh e fatura do kit preservados › limpar em Dados do negócio apaga os dois; no kit os avisos somem e o texto atual volta; salvar mantém vazio (3.0s)
+  ok 14 [chromium] › e2e\12-proposta-emitida.spec.ts:80:7 › proposta simples emitida › emitir, abrir o link sem login, baixar o PDF e reabrir depois de mudar negócio e kit: mesmo PDF (4.4s)
+  ok 15 [chromium] › e2e\12-proposta-emitida.spec.ts:133:7 › proposta simples emitida › sem a produtividade confirmada pelo admin a proposta sai SEM o número de geração (2.6s)
+  ok 16 [chromium] › e2e\12-proposta-emitida.spec.ts:153:7 › proposta simples emitida › SDR não vê o card de emissão e a validade é obrigatória e não pode ser passada (1.9s)
+  ok 17 [chromium] › e2e\12-proposta-emitida.spec.ts:165:7 › proposta simples emitida › token inexistente não vira proposta (404); links antigos seguem o comportamento já coberto em 10-calculo-estados (90ms)
+  x  18 [chromium] › e2e\13-calculo-gd2-fluxo.spec.ts:83:7 › calculadora GD II integrada › prévia → salvar → reabrir → proposta; entrada nova incompleta vai ao histórico e a versão emitida não muda (17.0s)
+  ok 19 [chromium] › e2e\13-calculo-gd2-fluxo.spec.ts:214:7 › calculadora GD II integrada › ligação muda o piso (art. 291): monofásico 30 kWh e trifásico 100 kWh na prévia (2.0s)
+
+
+  1) [chromium] › e2e\06-calculadora-numeros.spec.ts:137:7 › calculadora: números no padrão brasileiro › linha legada: reabrir e salvar sem editar mantém consumo e tarifa na escala e não altera a linha 
+
+    Error: expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 16
+    + Received  + 29
+
+    @@ -1,21 +1,21 @@
+      Object {
+    -   "atualizado_por": null,
+    +   "atualizado_por": "eda2fdec-4e93-41dd-8a31-16abfab3677f",
+        "autoconsumo_kwh": null,
+        "consumo_medio_kwh": 1200,
+    -   "conta_com_solar": 613,
+    -   "conta_sem_solar": 1140,
+    +   "conta_com_solar": null,
+    +   "conta_sem_solar": null,
+        "created_at": "2026-10-23T08:41:17.636376+00:00",
+    -   "criado_por": null,
+    -   "custo_fio_b": 100,
+    -   "data_referencia": null,
+    +   "criado_por": "eda2fdec-4e93-41dd-8a31-16abfab3677f",
+    +   "custo_fio_b": null,
+    +   "data_referencia": "2026-10-23",
+        "disponibilidade_kwh": 100,
+        "distribuidora": null,
+    -   "economia_mensal": 527,
+    +   "economia_mensal": null,
+        "empresa_id": "db893720-3d46-4ace-b130-8eab1699366b",
+        "enquadramento": null,
+    -   "estado_financeiro": "legado",
+    +   "estado_financeiro": "incompleto",
+        "financeiro_desatualizado_em": null,
+        "financeiro_desatualizado_motivo": null,
+        "fio_b_base_tributaria": null,
+        "fio_b_rs_mwh": null,
+        "fio_b_vigencia_fim": null,
+    @@ -24,25 +24,38 @@
+        "id": "d6b5e330-62eb-4acd-a9b4-11c07bb2f67c",
+        "kit_id": null,
+        "kit_nome": "Kit personalizado · 5,5 kWp (Módulo fictício 550 W)",
+        "kit_potencia_kwp": 5.5,
+        "kit_preco": 25000,
+    -   "kwh_compensado": 660,
+    -   "kwh_faturado": 540,
+    +   "kwh_compensado": null,
+    +   "kwh_faturado": null,
+        "kwh_nao_compensado": null,
+        "metodo_calculo": null,
+        "negocio_id": "bc1b92ac-60bf-4610-989f-782c50a23879",
+        "observacoes": null,
+    -   "payback_meses": 47.4,
+    -   "pendencias": null,
+    -   "percentual_fio_b": 0.45,
+    -   "percentual_legal_fio_b": null,
+    +   "payback_meses": null,
+    +   "pendencias": Array [
+    +     Object {
+    +       "codigo": "enquadramento_ausente",
+    +       "mensagem": "Informe o tipo de cliente na Qualificação SDR (a estimativa cobre cliente residencial).",
+    +     },
+    +     Object {
+    +       "codigo": "distribuidora_ausente",
+    +       "mensagem": "Informe a distribuidora de energia na Qualificação SDR.",
+    +     },
+    +     Object {
+    +       "codigo": "base_tributaria_ausente",
+    +       "mensagem": "Declare se a tarifa informada inclui tributos.",
+    +     },
+    +   ],
+    +   "percentual_fio_b": 0.6,
+    +   "percentual_legal_fio_b": 0.6,
+        "produtividade_kwh_kwp_mes": 120,
+        "ressalvas": null,
+        "tarifa_base_tributaria": null,
+        "tarifa_gd_id": null,
+        "tarifa_kwh": 0.95,
+    -   "tarifa_origem": null,
+    +   "tarifa_origem": "informada_vendedor",
+        "tipo_ligacao": "trifasico",
+    -   "updated_at": "2026-10-23T08:41:17.636376+00:00",
+    +   "updated_at": "2026-10-23T08:41:18.887113+00:00",
+        "valor_fatura_medio": null,
+      }
+
+      148 |       await expect(page.getByLabel("Tarifa (R$/kWh)")).toHaveValue("0,95");
+      149 |       await salvar(page);
+    > 150 |       expect(await n.calculo()).toEqual(linha);
+          |                                 ^
+      151 |       expect(await n.consumoDoNegocio()).toBe(1200);
+      152 |       await page.reload();
+      153 |     }
+        at R:\wt-m2-p0-calc\e2e\06-calculadora-numeros.spec.ts:150:33
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    e2e-resultados\06-calculadora-numeros-cal-66ece-escala-e-não-altera-a-linha-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: e2e-resultados\06-calculadora-numeros-cal-66ece-escala-e-não-altera-a-linha-chromium\error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    e2e-resultados\06-calculadora-numeros-cal-66ece-escala-e-não-altera-a-linha-chromium\trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace e2e-resultados\06-calculadora-numeros-cal-66ece-escala-e-não-altera-a-linha-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2) [chromium] › e2e\06-calculadora-numeros.spec.ts:156:7 › calculadora: números no padrão brasileiro › linha legada com consumo diferente do negócio: o editor abre o do negócio e salvar sem editar não traz o antigo 
+
+    Error: expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 17
+    + Received  + 30
+
+    @@ -1,21 +1,21 @@
+      Object {
+    -   "atualizado_por": null,
+    +   "atualizado_por": "eda2fdec-4e93-41dd-8a31-16abfab3677f",
+        "autoconsumo_kwh": null,
+    -   "consumo_medio_kwh": 1200,
+    -   "conta_com_solar": 613,
+    -   "conta_sem_solar": 1140,
+    +   "consumo_medio_kwh": 450,
+    +   "conta_com_solar": null,
+    +   "conta_sem_solar": null,
+        "created_at": "2026-10-23T08:41:21.001147+00:00",
+    -   "criado_por": null,
+    -   "custo_fio_b": 100,
+    -   "data_referencia": null,
+    +   "criado_por": "eda2fdec-4e93-41dd-8a31-16abfab3677f",
+    +   "custo_fio_b": null,
+    +   "data_referencia": "2026-10-23",
+        "disponibilidade_kwh": 100,
+        "distribuidora": null,
+    -   "economia_mensal": 527,
+    +   "economia_mensal": null,
+        "empresa_id": "db893720-3d46-4ace-b130-8eab1699366b",
+        "enquadramento": null,
+    -   "estado_financeiro": "legado",
+    +   "estado_financeiro": "incompleto",
+        "financeiro_desatualizado_em": null,
+        "financeiro_desatualizado_motivo": null,
+        "fio_b_base_tributaria": null,
+        "fio_b_rs_mwh": null,
+        "fio_b_vigencia_fim": null,
+    @@ -24,25 +24,38 @@
+        "id": "fb6f5fc0-a6f9-4107-8e7f-3e464ced25ef",
+        "kit_id": null,
+        "kit_nome": "Kit personalizado · 5,5 kWp (Módulo fictício 550 W)",
+        "kit_potencia_kwp": 5.5,
+        "kit_preco": 25000,
+    -   "kwh_compensado": 660,
+    -   "kwh_faturado": 540,
+    +   "kwh_compensado": null,
+    +   "kwh_faturado": null,
+        "kwh_nao_compensado": null,
+        "metodo_calculo": null,
+        "negocio_id": "50db59c8-ba83-4fe8-8a30-6173b551cd86",
+        "observacoes": null,
+    -   "payback_meses": 47.4,
+    -   "pendencias": null,
+    -   "percentual_fio_b": 0.45,
+    -   "percentual_legal_fio_b": null,
+    +   "payback_meses": null,
+    +   "pendencias": Array [
+    +     Object {
+    +       "codigo": "enquadramento_ausente",
+    +       "mensagem": "Informe o tipo de cliente na Qualificação SDR (a estimativa cobre cliente residencial).",
+    +     },
+    +     Object {
+    +       "codigo": "distribuidora_ausente",
+    +       "mensagem": "Informe a distribuidora de energia na Qualificação SDR.",
+    +     },
+    +     Object {
+    +       "codigo": "base_tributaria_ausente",
+    +       "mensagem": "Declare se a tarifa informada inclui tributos.",
+    +     },
+    +   ],
+    +   "percentual_fio_b": 0.6,
+    +   "percentual_legal_fio_b": 0.6,
+        "produtividade_kwh_kwp_mes": 120,
+        "ressalvas": null,
+        "tarifa_base_tributaria": null,
+        "tarifa_gd_id": null,
+        "tarifa_kwh": 0.95,
+    -   "tarifa_origem": null,
+    +   "tarifa_origem": "informada_vendedor",
+        "tipo_ligacao": "trifasico",
+    -   "updated_at": "2026-10-23T08:41:21.001147+00:00",
+    +   "updated_at": "2026-10-23T08:41:22.276567+00:00",
+        "valor_fatura_medio": null,
+      }
+
+      165 |     await salvar(page);
+      166 |     expect(await n.consumoDoNegocio()).toBe(450);
+    > 167 |     expect(await n.calculo()).toEqual(linha);
+          |                               ^
+      168 |   });
+      169 |
+      170 |   test("1.200,50 tem prévia e grava 1200,5 no negócio; 1.2 é recusado sem gravar", async ({ page }) => {
+        at R:\wt-m2-p0-calc\e2e\06-calculadora-numeros.spec.ts:167:31
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    e2e-resultados\06-calculadora-numeros-cal-bdce3-em-editar-não-traz-o-antigo-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: e2e-resultados\06-calculadora-numeros-cal-bdce3-em-editar-não-traz-o-antigo-chromium\error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    e2e-resultados\06-calculadora-numeros-cal-bdce3-em-editar-não-traz-o-antigo-chromium\trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace e2e-resultados\06-calculadora-numeros-cal-bdce3-em-editar-não-traz-o-antigo-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  3) [chromium] › e2e\06-calculadora-numeros.spec.ts:170:7 › calculadora: números no padrão brasileiro › 1.200,50 tem prévia e grava 1200,5 no negócio; 1.2 é recusado sem gravar 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  getByTestId('pendencias-vendedor')
+    Expected: 0
+    Received: 1
+    Timeout:  15000ms
+
+    Call log:
+      - Expect "toHaveCount" getByTestId('pendencias-vendedor') with timeout 15000ms
+      - waiting for getByTestId('pendencias-vendedor')
+        33 × locator resolved to 1 element
+           - unexpected value "1"
+
+
+      174 |     await montarKit(page, "1.200,50", "0,95");
+      175 |     await expect(page.getByTestId("previa-sistema")).toContainText("660 kWh/mês");
+    > 176 |     await expect(page.getByTestId("pendencias-vendedor")).toHaveCount(0); // consumo válido: nada a informar pelo vendedor
+          |                                                           ^
+      177 |     await salvar(page);
+      178 |     expect(await n.consumoDoNegocio()).toBe(1200.5);
+      179 |     const tecnico = tecnicoDa(await n.calculo());
+        at R:\wt-m2-p0-calc\e2e\06-calculadora-numeros.spec.ts:176:59
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    e2e-resultados\06-calculadora-numeros-cal-1695d-o-1-2-é-recusado-sem-gravar-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: e2e-resultados\06-calculadora-numeros-cal-1695d-o-1-2-é-recusado-sem-gravar-chromium\error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    e2e-resultados\06-calculadora-numeros-cal-1695d-o-1-2-é-recusado-sem-gravar-chromium\trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace e2e-resultados\06-calculadora-numeros-cal-1695d-o-1-2-é-recusado-sem-gravar-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  4) [chromium] › e2e\10-calculo-estados.spec.ts:153:7 › estados do cálculo › (a) dados do vendedor completos: prévia com potência e geração, quadro só com pendências da empresa; salvar grava só o resultado técnico 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  getByTestId('pendencias-vendedor')
+    Expected: 0
+    Received: 1
+    Timeout:  15000ms
+
+    Call log:
+      - Expect "toHaveCount" getByTestId('pendencias-vendedor') with timeout 15000ms
+      - waiting for getByTestId('pendencias-vendedor')
+        33 × locator resolved to 1 element
+           - unexpected value "1"
+
+
+      169 |     await expect(quadro).toBeVisible();
+      170 |     await expect(quadro).toContainText("Estimativa financeira incompleta");
+    > 171 |     await expect(porId(page, "pendencias-vendedor")).toHaveCount(0);
+          |                                                      ^
+      172 |     const empresa = porId(page, "pendencias-empresa");
+      173 |     await expect(empresa).toContainText("Isso não depende de você: a empresa ainda precisa configurar e validar");
+      174 |     await expect(empresa.getByRole("listitem")).toHaveText([
+        at R:\wt-m2-p0-calc\e2e\10-calculo-estados.spec.ts:171:54
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    e2e-resultados\10-calculo-estados-estados-6d055-rava-só-o-resultado-técnico-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: e2e-resultados\10-calculo-estados-estados-6d055-rava-só-o-resultado-técnico-chromium\error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    e2e-resultados\10-calculo-estados-estados-6d055-rava-só-o-resultado-técnico-chromium\trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace e2e-resultados\10-calculo-estados-estados-6d055-rava-só-o-resultado-técnico-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  5) [chromium] › e2e\10-calculo-estados.spec.ts:239:7 › estados do cálculo › (b) sem consumo: pendências do vendedor e da empresa; salvar grava o kit e a conta, sem cálculo 
+
+    Error: expect(locator).toHaveText(expected) failed
+
+    Locator: getByTestId('pendencias-vendedor').getByRole('listitem')
+    Timeout: 15000ms
+    - Expected  - 0
+    + Received  + 3
+
+      Array [
+    +   "Informe o tipo de cliente na Qualificação SDR.",
+    +   "Informe a distribuidora na Qualificação SDR.",
+        "Informe o consumo médio em kWh/mês.",
+    +   "Informe se a tarifa inclui tributos (base tributária).",
+      ]
+
+    Call log:
+      - Expect "toHaveText" getByTestId('pendencias-vendedor').getByRole('listitem') with timeout 15000ms
+      - waiting for getByTestId('pendencias-vendedor').getByRole('listitem')
+        33 × locator resolved to 4 elements
+
+
+      250 |     const vendedor = porId(page, "pendencias-vendedor");
+      251 |     await expect(vendedor).toContainText("O que você pode informar");
+    > 252 |     await expect(vendedor.getByRole("listitem")).toHaveText(["Informe o consumo médio em kWh/mês."]);
+          |                                                  ^
+      253 |     await expect(porId(page, "pendencias-empresa").getByRole("listitem")).toHaveCount(4);
+      254 |     await expect(page.getByText("Economia estimada")).toHaveCount(0);
+      255 |     await expect(page.getByText("Payback estimado")).toHaveCount(0);
+        at R:\wt-m2-p0-calc\e2e\10-calculo-estados.spec.ts:252:50
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    e2e-resultados\10-calculo-estados-estados-434a1-o-kit-e-a-conta-sem-cálculo-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: e2e-resultados\10-calculo-estados-estados-434a1-o-kit-e-a-conta-sem-cálculo-chromium\error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    e2e-resultados\10-calculo-estados-estados-434a1-o-kit-e-a-conta-sem-cálculo-chromium\trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace e2e-resultados\10-calculo-estados-estados-434a1-o-kit-e-a-conta-sem-cálculo-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  6) [chromium] › e2e\10-calculo-estados.spec.ts:281:7 › estados do cálculo › (c) linha legada: histórico recolhido ('fórmula antiga, não validada'), proposta e atualizar preço bloqueados, contrato liberado 
+
+    Error: expect(locator).toContainText(expected) failed
+
+    Locator: getByTestId('proposta-bloqueada')
+    Expected substring: "o último cálculo foi feito pela fórmula antiga, que não foi validada"
+    Received string:    "O último cálculo foi feito pela fórmula antiga, que não foi validada. Recalcule o kit antes de gerar a proposta.Isso não depende de você: a empresa ainda precisa configurar e validar os dados da estimativa financeira."
+    Timeout: 15000ms
+
+    Call log:
+      - Expect "toContainText" getByTestId('proposta-bloqueada') with timeout 15000ms
+      - waiting for getByTestId('proposta-bloqueada')
+        33 × locator resolved to <div role="status" data-testid="proposta-bloqueada" class="flex flex-col gap-1 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900">…</div>
+           - unexpected value "O último cálculo foi feito pela fórmula antiga, que não foi validada. Recalcule o kit antes de gerar a proposta.Isso não depende de você: a empresa ainda precisa configurar e validar os dados da estimativa financeira."
+
+
+      307 |     const bloqueada = porId(page, "proposta-bloqueada");
+      308 |     await expect(bloqueada).toBeVisible();
+    > 309 |     await expect(bloqueada).toContainText("o último cálculo foi feito pela fórmula antiga, que não foi validada");
+          |                             ^
+      310 |
+      311 |     // Preço: valor do negócio diverge da linha legada, mas "Atualizar preço no cálculo" não é oferecido.
+      312 |     const { error } = await n.cliente.from("negocios").update({ valor: 28000 }).eq("id", n.id);
+        at R:\wt-m2-p0-calc\e2e\10-calculo-estados.spec.ts:309:29
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    e2e-resultados\10-calculo-estados-estados-71439-loqueados-contrato-liberado-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: e2e-resultados\10-calculo-estados-estados-71439-loqueados-contrato-liberado-chromium\error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    e2e-resultados\10-calculo-estados-estados-71439-loqueados-contrato-liberado-chromium\trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace e2e-resultados\10-calculo-estados-estados-71439-loqueados-contrato-liberado-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  7) [chromium] › e2e\13-calculo-gd2-fluxo.spec.ts:83:7 › calculadora GD II integrada › prévia → salvar → reabrir → proposta; entrada nova incompleta vai ao histórico e a versão emitida não muda 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByText('Kit e cálculo salvos.')
+    Expected: visible
+    Timeout: 15000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" getByText('Kit e cálculo salvos.') with timeout 15000ms
+      - waiting for getByText('Kit e cálculo salvos.')
+
+
+      107 |     // Salvar: linha completa com o retrato dos parâmetros.
+      108 |     await page.getByRole("button", { name: /^Salvar kit/ }).click();
+    > 109 |     await expect(page.getByText("Kit e cálculo salvos.")).toBeVisible();
+          |                                                           ^
+      110 |     await expect(page.getByText("A conta e a economia ainda não foram calculadas.")).toHaveCount(0);
+      111 |     const { data: linha } = await n.cliente
+      112 |       .from("calculos_solares")
+        at R:\wt-m2-p0-calc\e2e\13-calculo-gd2-fluxo.spec.ts:109:59
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    e2e-resultados\13-calculo-gd2-fluxo-calcu-06591-e-a-versão-emitida-não-muda-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: e2e-resultados\13-calculo-gd2-fluxo-calcu-06591-e-a-versão-emitida-não-muda-chromium\error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    e2e-resultados\13-calculo-gd2-fluxo-calcu-06591-e-a-versão-emitida-não-muda-chromium\trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace e2e-resultados\13-calculo-gd2-fluxo-calcu-06591-e-a-versão-emitida-não-muda-chromium\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  7 failed
+    [chromium] › e2e\06-calculadora-numeros.spec.ts:137:7 › calculadora: números no padrão brasileiro › linha legada: reabrir e salvar sem editar mantém consumo e tarifa na escala e não altera a linha 
+    [chromium] › e2e\06-calculadora-numeros.spec.ts:156:7 › calculadora: números no padrão brasileiro › linha legada com consumo diferente do negócio: o editor abre o do negócio e salvar sem editar não traz o antigo 
+    [chromium] › e2e\06-calculadora-numeros.spec.ts:170:7 › calculadora: números no padrão brasileiro › 1.200,50 tem prévia e grava 1200,5 no negócio; 1.2 é recusado sem gravar 
+    [chromium] › e2e\10-calculo-estados.spec.ts:153:7 › estados do cálculo › (a) dados do vendedor completos: prévia com potência e geração, quadro só com pendências da empresa; salvar grava só o resultado técnico 
+    [chromium] › e2e\10-calculo-estados.spec.ts:239:7 › estados do cálculo › (b) sem consumo: pendências do vendedor e da empresa; salvar grava o kit e a conta, sem cálculo 
+    [chromium] › e2e\10-calculo-estados.spec.ts:281:7 › estados do cálculo › (c) linha legada: histórico recolhido ('fórmula antiga, não validada'), proposta e atualizar preço bloqueados, contrato liberado 
+    [chromium] › e2e\13-calculo-gd2-fluxo.spec.ts:83:7 › calculadora GD II integrada › prévia → salvar → reabrir → proposta; entrada nova incompleta vai ao histórico e a versão emitida não muda 
+  12 passed (3.8m)
+exit=1

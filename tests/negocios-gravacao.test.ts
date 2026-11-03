@@ -197,8 +197,13 @@ describe("regressões de tela", () => {
   });
 
   it("cadastro: Cancelar montagem fecha o editor e descarta só os itens; valor digitado fica", () => {
-    const inicio = formulario.indexOf("function cancelarMontagem(");
-    const cancelar = formulario.slice(inicio, formulario.indexOf("\n  }\n", inicio));
+    // O recorte usa o fim da função ("\n  }\n"): normaliza só o texto lido, para valer com checkout LF ou CRLF.
+    const fonteLf = formulario.replace(/\r\n/g, "\n");
+    const inicio = fonteLf.indexOf("function cancelarMontagem(");
+    expect(inicio).toBeGreaterThanOrEqual(0);
+    const fim = fonteLf.indexOf("\n  }\n", inicio);
+    expect(fim).toBeGreaterThan(inicio);
+    const cancelar = fonteLf.slice(inicio, fim);
     expect(cancelar).toContain("setLinhas([])");
     expect(cancelar).toContain("setMostrarKit(false)");
     // Só o valor que veio da sugestão automática é limpo.
@@ -241,10 +246,12 @@ describe("regressões de tela", () => {
     expect(cancelar).not.toMatch(/\bacao\(|\benviar\(|salvarKitPersonalizado/);
     // Volta ao estado gravado (mesma função usada ao abrir o cartão).
     expect(cancelar).toContain("const s = salvo();");
-    for (const campo of ["setLinhas(s.linhas)", "setEstrutura(s.estrutura)", "setTipoLigacao(s.tipoLigacao)", "setTarifaKwh(s.tarifaKwh)"]) {
+    for (const campo of ["setLinhas(s.linhas)", "setEstrutura(s.estrutura)", "setTipoLigacao(s.tipoLigacao)", "setTarifaKwh(s.tarifaKwh)", "setTarifaBase(s.tarifaBaseTributaria)"]) {
       expect(cancelar).toContain(campo);
     }
-    expect(kit).toContain("estadoSalvoDoKit({ componentesSalvos, calculo, estruturaTelhado, consumoMedioKwhPadrao, valorFaturaMedioPadrao })");
+    expect(kit.replace(/\s+/g, " ")).toContain(
+      "estadoSalvoDoKit({ componentesSalvos, calculo, estruturaTelhado, consumoMedioKwhPadrao, valorFaturaMedioPadrao, tarifaOficialRsKwh: tarifaOficialKwh, })",
+    );
     // Cancelar sempre visível, inclusive na primeira montagem (sem condição em volta do botão).
     const botao = kit.indexOf('<Botao type="button" variante="secundario" onClick={cancelarEdicao}>');
     expect(botao).toBeGreaterThan(-1);
@@ -262,10 +269,11 @@ describe("regressões de tela", () => {
         consumoMedioKwh: "450",
         valorFaturaMedio: "320",
         tarifaKwh: "",
+        tarifaBaseTributaria: "",
       });
     });
 
-    it("kit salvo com cálculo: Cancelar restaura exatamente o que está gravado", () => {
+    it("kit salvo com cálculo: Cancelar restaura o gravado; consumo e conta vêm do negócio, nunca do cálculo legado", () => {
       const estado = estadoSalvoDoKit({
         componentesSalvos: [
           { tipo: "modulo", descricao: "Módulo 550 W", potenciaW: 550, quantidade: 10 },
@@ -283,10 +291,12 @@ describe("regressões de tela", () => {
         ],
         estrutura: "gancho",
         tipoLigacao: "bifasico",
-        consumoMedioKwh: (480.5).toLocaleString("pt-BR"),
-        valorFaturaMedio: "300",
+        consumoMedioKwh: "450",
+        valorFaturaMedio: "320",
         // M2-a: a tarifa reabre com todas as casas gravadas (antes "0,95", e salvar de novo mudava o valor).
         tarifaKwh: "0,9512",
+        // Linha legada não tem base declarada: abre vazia (precisa ser declarada).
+        tarifaBaseTributaria: "",
       });
     });
 
@@ -298,6 +308,31 @@ describe("regressões de tela", () => {
       });
       expect(estado.linhas).toEqual([{ tipo: "modulo", descricao: "Módulo 600 W", potenciaW: "", quantidade: "8" }]);
       expect(estado).toMatchObject({ consumoMedioKwh: "450", valorFaturaMedio: "320", tarifaKwh: "" });
+    });
+
+    it("cálculo legado e negócio sem consumo nem conta: os campos abrem vazios (não herdam o cálculo)", () => {
+      const estado = estadoSalvoDoKit({
+        componentesSalvos: [{ tipo: "modulo", descricao: "Módulo 550 W", potenciaW: 550, quantidade: 10 }],
+        calculo: { tipoLigacao: "trifasico", consumoMedioKwh: 700, valorFaturaMedio: 900, tarifaKwh: 0.95 },
+        estruturaTelhado: null,
+        consumoMedioKwhPadrao: null,
+        valorFaturaMedioPadrao: null,
+      });
+      expect(estado).toMatchObject({ consumoMedioKwh: "", valorFaturaMedio: "" });
+    });
+    it("sem cálculo e com tarifa oficial vigente: abre com a T oficial (5 casas) e a base sem tributos, editável", () => {
+      const estado = estadoSalvoDoKit({ ...base, componentesSalvos: [], calculo: null, tarifaOficialRsKwh: 0.76802 });
+      expect(estado).toMatchObject({ tarifaKwh: "0,76802", tarifaBaseTributaria: "sem_tributos" });
+    });
+
+    it("cálculo com base declarada: reabre com a tarifa e a base gravadas (não com a oficial)", () => {
+      const estado = estadoSalvoDoKit({
+        ...base,
+        componentesSalvos: [],
+        calculo: { tipoLigacao: "bifasico", consumoMedioKwh: 450, valorFaturaMedio: null, tarifaKwh: 0.95, tarifaBaseTributaria: "com_tributos" },
+        tarifaOficialRsKwh: 0.76802,
+      });
+      expect(estado).toMatchObject({ tarifaKwh: "0,95", tarifaBaseTributaria: "com_tributos" });
     });
   });
 
@@ -311,11 +346,13 @@ describe("regressões de tela", () => {
     expect(kit).toContain('"Remover kit salvo"');
   });
 
-  it("kit reaberto traz o valor da conta salvo no cálculo", () => {
+  it("kit reaberto traz consumo e conta atuais do negócio", () => {
     const kit = fonte("src", "app", "(app)", "negocios", "[id]", "kit-personalizado.tsx");
-    // O estado inicial vem de `estadoSalvoDoKit`, que usa a conta salva no cálculo (testado acima).
+    // O estado inicial vem de `estadoSalvoDoKit`, que usa os valores do negócio (testado acima).
     expect(kit).toContain("useState(() => salvo().valorFaturaMedio)");
-    expect(fonte("src", "app", "(app)", "negocios", "[id]", "page.tsx")).toMatch(/valorFaturaMedio: calculo\.valor_fatura_medio/);
+    const pagina = fonte("src", "app", "(app)", "negocios", "[id]", "page.tsx");
+    expect(pagina).toContain("consumoMedioKwhPadrao={negocio.consumo_medio_kwh}");
+    expect(pagina).toContain("valorFaturaMedioPadrao={negocio.valor_conta_energia}");
   });
 
   it("endereço do contato é editável e aparece na ficha", () => {

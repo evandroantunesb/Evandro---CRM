@@ -1,0 +1,20 @@
+
+> raion-crm@0.1.0 lint R:\wt-m2-p0-calc
+> eslint
+
+
+R:\wt-m2-p0-calc\scripts\seed-metas-vendedores.mjs
+  115:27  warning  '_nome' is defined but never used  @typescript-eslint/no-unused-vars
+
+R:\wt-m2-p0-calc\src\lib\negocios-gravacao.ts
+  6:10  warning  'paybackComPreco' is defined but never used  @typescript-eslint/no-unused-vars
+
+R:\wt-m2-p0-calc\tests\negocios-gravacao-db.test.ts
+  118:7  warning  'SUFIXO_LEGADO' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+R:\wt-m2-p0-calc\tests\stack-supabase-local.test.ts
+  195:35  warning  '_raiz' is defined but never used    @typescript-eslint/no-unused-vars
+  195:50  warning  '_opcoes' is defined but never used  @typescript-eslint/no-unused-vars
+
+✖ 5 problems (0 errors, 5 warnings)
+

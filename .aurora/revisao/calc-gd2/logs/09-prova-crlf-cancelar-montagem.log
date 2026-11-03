@@ -1,0 +1,8 @@
+$ node scratchpad/prova_crlf.mjs  (reproduz o slice do teste "cadastro: Cancelar montagem")
+git config core.autocrlf = true
+formulario.tsx idêntico ao snapshot base-rodada-gd2 (diff -q sem saída)
+worktree (CRLF) | CRLF: true | fim encontrado: false | tamanho do trecho: 23346 | falha: true
+worktree normalizado LF | CRLF: false | fim encontrado: true | tamanho do trecho: 145 | falha: false
+HEAD 2780a53 (LF no blob) | CRLF: false | fim encontrado: true | tamanho do trecho: 145 | falha: false
+HEAD 2780a53 com CRLF (autocrlf=true no checkout) | CRLF: true | fim encontrado: false | tamanho do trecho: 24489 | falha: true
+exit=0

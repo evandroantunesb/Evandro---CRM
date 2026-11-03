@@ -1,0 +1,39 @@
+
+ RUN  v5.0.2 R:/wt-m2-p0-calc
+
+ ❯ tests/travas-kit-sdr-db.test.ts (28 tests | 1 failed) 2979ms
+   ❯ cálculo solar só é criado com kit (8)
+     × cálculo existente: o app grava as novas entradas (1,05) e a legada (0,95) vai para o histórico; upsert e update direto continuam permitidos 90ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/travas-kit-sdr-db.test.ts > cálculo solar só é criado com kit > cálculo existente: o app grava as novas entradas (1,05) e a legada (0,95) vai para o histórico; upsert e update direto continuam permitidos
+AssertionError: expected { code: '23514', details: null, …(2) } to be null
+
+- Expected:
+null
+
++ Received:
+{
+  "code": "23514",
+  "details": null,
+  "hint": null,
+  "message": "new row for relation \"calculos_solares\" violates check constraint \"calculos_solares_estado_coerente_ck\"",
+}
+
+ ❯ tests/travas-kit-sdr-db.test.ts:482:24
+    480|     expect(hist![0]).toMatchObject({ motivo: "desatualizado_por_entrad…
+    481|     const { error: erroUpsert } = await vendedor.cliente.from("calculo…
+    482|     expect(erroUpsert).toBeNull();
+       |                        ^
+    483|     expect(await tarifaSalva(negocioId)).toBeCloseTo(1.1);
+    484|     const { error: erroUpdate } = await vendedor.cliente.from("calculo…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  1 failed | 46 passed (47)
+   Start at  23:54:49
+   Duration  5.29s (tests 86%, import 8%, transform 5%)
+

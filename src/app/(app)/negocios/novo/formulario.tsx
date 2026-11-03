@@ -14,13 +14,13 @@ import { ANEXOS_CRIACAO, prepararEnvioCriacao } from "@/lib/anexos-regras";
 import {
   calcular,
   custosInternosEstimados,
-  DISPONIBILIDADE_PADRAO_CAMEL,
   dimensionarSistema,
   POTENCIA_MODULO_REFERENCIA_W,
   potenciaKitPersonalizadoKwp,
   sugerirQuantidadeModulos,
 } from "@/lib/calculadora";
-import { formatarCep, formatarMascaraMoeda, formatarMoeda, formatarTelefoneBr, lerNumeroBr } from "@/lib/formatacao";
+import { PreviaEstimativa } from "@/app/(app)/negocios/[id]/kit-personalizado";
+import { formatarCep, formatarMascaraMoeda, formatarTelefoneBr, lerNumeroBr } from "@/lib/formatacao";
 import { montarEndereco } from "@/lib/negocio-dados";
 import { criarClienteNavegador } from "@/lib/supabase/navegador";
 import { ROTULO_TIPO_LIGACAO, TIPOS_LIGACAO, type ResultadoAcao, type TipoLigacao } from "@/lib/tipos";
@@ -300,24 +300,19 @@ export function FormularioNegocio({
       sugerirQuantidadeModulos(consumoMedioEstimado, parametros.produtividadeKwhKwpMes, potenciaW);
   }, [parametros, consumoMedioEstimado]);
 
+  // Resultado do motor (união incompleta | completa). Consumo e tarifa ausentes entram como 0 só para o motor listar
+  // as pendências; potência e geração não dependem deles. Conta em R$ não vira consumo.
   const previa = useMemo(() => {
-    const tarifa = numero(tarifaKwh);
-    const consumo = numero(consumoMedioKwh);
-    const fatura = numero(valorFaturaMedio);
-    const precoKit = numero(valor);
-    if (!parametros || potenciaKwp <= 0 || !tarifa || (!consumo && !fatura)) return null;
-    const consumoMedioFinal = consumo ?? fatura! / tarifa;
+    if (!parametros || potenciaKwp <= 0) return null;
     return calcular({
       potenciaKwp,
-      precoKit: precoKit ?? 0,
+      precoKit: numero(valor) ?? 0,
       tipoLigacao,
-      consumoMedioKwh: consumoMedioFinal,
-      tarifaKwh: tarifa,
+      consumoMedioKwh: numero(consumoMedioKwh) ?? 0,
+      tarifaKwh: numero(tarifaKwh) ?? 0,
       produtividadeKwhKwpMes: parametros.produtividadeKwhKwpMes,
-      percentualFioB: parametros.percentualFioB,
-      disponibilidadeKwh: parametros[DISPONIBILIDADE_PADRAO_CAMEL[tipoLigacao]],
     });
-  }, [parametros, tipoLigacao, consumoMedioKwh, valorFaturaMedio, tarifaKwh, potenciaKwp, valor]);
+  }, [parametros, tipoLigacao, consumoMedioKwh, tarifaKwh, potenciaKwp, valor]);
 
   /**
    * Envio sem o reset automático (nada do que foi digitado se perde se o servidor recusar).
@@ -667,7 +662,10 @@ export function FormularioNegocio({
               onChange={(e) => setValorFaturaMedio(formatarMascaraMoeda(e.target.value))}
             />
           </div>
-          <p className="text-xs text-zinc-400">Informe uma das duas opções — a outra pode ficar em branco.</p>
+          <p className="text-xs text-zinc-400">
+            Informe uma das duas opções — a outra pode ficar em branco. O valor da conta em R$ não vira consumo em kWh: o negócio é
+            criado do mesmo jeito, e o consumo em kWh pode ser informado depois.
+          </p>
         </fieldset>
 
         <fieldset className="flex flex-col gap-3">
@@ -742,13 +740,13 @@ export function FormularioNegocio({
                   <dd className="font-medium text-zinc-900">a definir (sem catálogo de equipamentos)</dd>
                 </div>
                 <div>
-                  <dt className="text-zinc-500">Geração / economia / payback</dt>
-                  <dd className="font-medium text-zinc-900">a calcular</dd>
+                  <dt className="text-zinc-500">Conta e economia</dt>
+                  <dd className="font-medium text-zinc-900">calculadas na ficha do negócio</dd>
                 </div>
               </dl>
               <p className="mt-2 text-xs text-zinc-500">
-                Estimativa ilustrativa: não é salva no negócio. Para salvar um kit, monte-o manualmente; os números reais
-                aparecem depois de informar a tarifa, na Etapa 3.
+                Estimativa ilustrativa: não é salva no negócio. Para salvar um kit, monte-o manualmente; a geração aparece
+                ao montar o kit. A conta e a economia são calculadas na ficha do negócio, depois da Qualificação SDR.
               </p>
             </div>
           )}
@@ -807,34 +805,12 @@ export function FormularioNegocio({
               Cancelar montagem
             </Botao>
             {previa && (
-              <>
-                <dl className="grid grid-cols-2 gap-3 rounded-lg bg-amber-50 px-4 py-3 text-sm md:grid-cols-4">
-                  <div>
-                    <dt className="text-zinc-500">Potência do kit</dt>
-                    <dd className="font-medium text-zinc-900">{potenciaKwp.toLocaleString("pt-BR")} kWp</dd>
-                  </div>
-                  <div>
-                    <dt className="text-zinc-500">Geração estimada</dt>
-                    <dd className="font-medium text-zinc-900">{previa.geracaoEstimadaKwhMes.toLocaleString("pt-BR")} kWh/mês</dd>
-                  </div>
-                  <div>
-                    <dt className="text-zinc-500">Economia estimada</dt>
-                    <dd className="font-medium text-green-700">{formatarMoeda(previa.economiaMensal)}/mês</dd>
-                  </div>
-                  <div>
-                    <dt className="text-zinc-500">Payback estimado</dt>
-                    <dd className="font-medium text-zinc-900">
-                      {previa.paybackMeses != null ? `${previa.paybackMeses.toLocaleString("pt-BR")} meses` : "—"}
-                    </dd>
-                  </div>
-                </dl>
-                {potenciaKwp > 0 && parametros && (previa.geracaoEstimadaKwhMes ?? 0) > 0 ? null : (
-                  <div className="flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                    <span>Confira a combinação de módulo e inversor — faltam dados pra validar o dimensionamento.</span>
-                  </div>
-                )}
-              </>
+              <PreviaEstimativa
+                previa={previa}
+                potenciaKwp={potenciaKwp}
+                precoDefinido={numero(valor) != null}
+                rodape="O cadastro salva o kit com a estimativa incompleta. Depois de criar, preencha a Qualificação SDR (tipo de cliente e distribuidora), confira a tarifa e a base tributária e recalcule o kit na ficha do negócio para ver a conta e a economia."
+              />
             )}
           </fieldset>
         )}

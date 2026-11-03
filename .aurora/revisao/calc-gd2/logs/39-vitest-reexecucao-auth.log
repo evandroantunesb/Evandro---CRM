@@ -1,0 +1,11 @@
+$ pnpm exec vitest run tests/handoff-resposta-gestor-db.test.ts tests/obras-acesso-db.test.ts tests/obras-escrita-db.test.ts tests/pagamento-registrado-solo-db.test.ts
+
+ RUN  v5.0.2 R:/wt-m2-p0-calc
+
+
+ Test Files  4 passed (4)
+      Tests  151 passed (151)
+   Start at  06:59:23
+   Duration  17.76s (tests 95%, transform 2%, import 2%)
+
+exit=0

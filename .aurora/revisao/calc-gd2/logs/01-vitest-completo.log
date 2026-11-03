@@ -1,0 +1,3062 @@
+
+ RUN  v5.0.2 R:/wt-m2-p0-calc
+
+ ✓ tests/docker-stack-local.test.ts (71 tests) 65ms
+ ✓ tests/obras-detalhe.test.ts (44 tests) 49ms
+ ✓ tests/obras-gestao.test.ts (26 tests) 47ms
+ ❯ tests/negocios-gravacao.test.ts (32 tests | 4 failed) 92ms
+   ✓ endereço do contato (1)
+     ✓ junta rua, número, complemento, bairro e CEP; cidade e UF ficam de fora 2ms
+   ✓ contato já cadastrado (3)
+     ✓ só preenche o que está vazio 1ms
+     ✓ nunca sobrescreve dado diferente: lista como divergente 1ms
+     ✓ mesmo dado com outra caixa ou espaços não é divergência 0ms
+   ✓ avisos de gravação parcial (2)
+     ✓ lê só códigos conhecidos da URL 1ms
+     ✓ todo aviso que o núcleo emite tem mensagem 2ms
+   ✓ arquivos fora da Server Action (8)
+     ✓ ignora o arquivo vazio sem nome (nada escolhido), mas mantém o vazio escolhido pelo usuário 23ms
+     ✓ nome legível de arquivo no Storage tira o prefixo uuid 0ms
+     ✓ envio do navegador registra só depois de o arquivo chegar (linha do tempo fiel) 1ms
+     ✓ objeto do Storage só confere com o nome que o gerou 1ms
+     ✓ registrarAnexo confere o objeto no Storage e não apaga arquivo quando a gravação falha 0ms
+     ✓ recusa vazio e acima de 20 MB 0ms
+     ✓ o cadastro manda à ação só os dados dos arquivos, na ordem dos campos 1ms
+     ✓ nenhum formulário do negócio manda arquivo para Server Action 2ms
+   ❯ regressões de tela (18)
+     ✓ cadastro manda cidade e UF ao servidor e não exibe campos que não são gravados 0ms
+     ✓ fotos e documentos vão como anexo geral 1ms
+     ✓ formulários não limpam o que foi digitado quando o servidor recusa 1ms
+     ✓ cadastro: Salvar nunca fica mudo (obrigatório escondido em outro passo, erro do servidor, contato não escolhido) 0ms
+     ✓ cadastro: Avançar confere só os campos do passo atual, sem exigência nova 0ms
+     × cadastro: Cancelar montagem fecha o editor e descarta só os itens; valor digitado fica 8ms
+     ✓ cadastro: passo 2 tem um botão só para seguir, que vira 'Continuar sem kit' sem kit em montagem 0ms
+     ✓ etapa saiu do formulário de edição e da gravação 0ms
+     ✓ ficha confere o Storage e avisa quando não conseguiu conferir 1ms
+     × ficha: Cancelar na edição do kit não grava nada e volta ao que está salvo 5ms
+     ❯ estado salvo do kit (usado ao abrir e no Cancelar) (4)
+       × primeira montagem (nada salvo): Cancelar limpa os itens e mantém os dados do negócio 26ms
+       × kit salvo com cálculo: Cancelar restaura o gravado; consumo e conta vêm do negócio, nunca do cálculo legado 3ms
+       ✓ kit salvo sem cálculo: itens gravados, consumo e conta do negócio 1ms
+       ✓ cálculo legado e negócio sem consumo nem conta: os campos abrem vazios (não herdam o cálculo) 1ms
+     ✓ ficha: remover kit salvo pede confirmação; com cálculo, a tela explica a recusa 2ms
+     ✓ kit reaberto traz consumo e conta atuais do negócio 1ms
+     ✓ endereço do contato é editável e aparece na ficha 0ms
+     ✓ ações delegam ao núcleo testado com banco 1ms
+ ✓ tests/proposta-simples.test.ts (36 tests) 1571ms
+   ✓ PDF da proposta simples (3)
+     ✓ gera um PDF válido de exatamente 3 páginas A4 (capa, sistema, oferta) 794ms
+     ✓ no pior caso dentro dos limites continua em 3 páginas 418ms
+ ✓ tests/operacao.test.ts (33 tests) 4556ms
+ ✓ tests/obras-acesso-db.test.ts (33 tests) 6553ms
+   ✓ operacao: dados pessoais do cliente (obras_operacao) (7)
+     ✓ operacao lê 0 linhas de obras diretamente, nem o snapshot 408ms
+     ✓ valor vendido continua bloqueado para todo operacao 306ms
+ ❯ tests/calculo-vigencia.test.ts (61 tests | 4 failed) 73ms
+   ✓ potenciaDoKitKwp (6)
+     ✓ soma só módulos: quantidade x potência / 1000 4ms
+     ✓ sem componentes a potência é 0 1ms
+     ✓ itens que não são módulo (inversor, bateria, outro) não contam 1ms
+     ✓ módulo sem potência (null) não conta 0ms
+     ✓ normaliza para 2 casas (meio para longe de zero) 1ms
+     ✓ é determinística e não altera a entrada 2ms
+   ✓ avaliarVigencia: linha existente é SEMPRE legada (6)
+     ✓ tudo o que é comparável bate: ainda assim NÃO é vigente, e o único motivo é 'legado' 26ms
+     ✓ calculoEhLegado é verdadeiro para qualquer linha (sem coluna de método) 1ms
+     ✓ naoVerificavel está SEMPRE presente, na ordem do contrato, com ou sem divergências 2ms
+     ✓ naoVerificavel é uma cópia: alterar o retorno não contamina a próxima avaliação 2ms
+     ✓ nunca 'vigente' mesmo com a tarifa do cálculo qualquer: a tarifa não tem fonte e não é comparada 1ms
+     ✓ é determinística e não altera as entradas 1ms
+   ✓ avaliarVigencia: motivos que continuam comparáveis (27)
+     ✓ kit personalizado: potência E composição (9)
+       ✓ mudar a quantidade de módulos (11 x 550 = 6,05 kWp contra 5,5): kit 0ms
+       ✓ mudar a potência do módulo (10 x 600 = 6 kWp contra 5,5): kit 0ms
+       ✓ remover módulos ou esvaziar o kit: kit 0ms
+       ✓ mesma potência, descrição do primeiro módulo diferente (nome do kit mudou): kit 0ms
+       ✓ inversor, bateria ou 'outro' mudando não conta (só módulos e o nome) 0ms
+       ✓ a ordem das linhas é a de `ordem`, não a do array 0ms
+       ✓ diferença abaixo de 0,005 kWp (escala de 2 casas): sem o motivo kit 0ms
+       ✓ diferença a partir de 0,005 kWp depois de arredondar: kit 0ms
+       ✓ limitação: 20 x 275 W (mesma potência total e mesma descrição) não é detectada 0ms
+     ✓ kit de catálogo (kit_id) (3)
+       ✓ registro igual: sem o motivo kit (os itens do negócio não são consultados) 0ms
+       ✓ nome ou potência do registro diferente: kit 0ms
+       ✓ registro não lido ou de outro id: não_comprovado, nunca vigente 0ms
+     ✓ preço, consumo, fatura (7)
+       ✓ valor do negócio diferente do preço do cálculo: preco (comparação em centavos) 1ms
+       ✓ consumo do negócio diferente do calculado: consumo (na escala de 2 casas) 0ms
+       ✓ fatura do negócio diferente da calculada: consumo 0ms
+       ✓ negócio com fatura e cálculo sem fatura: consumo (mudou) 0ms
+       ✓ negócio e cálculo sem fatura: nada a comparar 0ms
+       ✓ negócio sem consumo (nunca salvo, ou salvo sem consumo): não_comprovado (o cálculo não se compara a si mesmo) 4ms
+       ✓ negócio sem fatura com cálculo que a tem: não_comprovado 0ms
+     ✓ parâmetros da empresa (7)
+       ✓ produtividade diferente: parametros (afeta a geração) 0ms
+       ✓ produtividade na escala de 2 casas: 120,004 igual; 120,005 diferente 0ms
+       ✓ percentual do Fio B diferente: parametros_financeiros (não 'parametros') 0ms
+       ✓ percentual na escala de 3 casas: 0,4504 igual; 0,4505 diferente 0ms
+       ✓ disponibilidade do tipo de ligação do cálculo (bifásico) diferente: parametros_financeiros; a de outro tipo não conta 0ms
+       ✓ parâmetros inexistentes: não_comprovado 0ms
+       ✓ tipo de ligação desconhecido no cálculo: não_comprovado 0ms
+     ✓ todos os motivos juntos saem na ordem de relevância, sem repetição 0ms
+   ✓ motivosDaAcao (guardas por ação) (7)
+     ✓ proposta: todos os motivos bloqueiam (inclui legado) 0ms
+     ✓ preço: todos exceto o próprio 'preco' (legado bloqueia) 0ms
+     ✓ contrato: só o que o afeta (kit, consumo, parametros, preco, nao_comprovado); ignora legado e parametros_financeiros 0ms
+     ✓ linha legada que bate com o estado atual: proposta e preço bloqueados, contrato liberado 0ms
+     ✓ linha legada com o kit alterado: o contrato continua bloqueado (por kit) 0ms
+     ✓ linha legada com preço divergente: o contrato lista 'preco' (a guarda própria de preço, em contratos-geracao, é quem a ignora para legado) 0ms
+     ✓ é pura: não altera a lista recebida 0ms
+   ✓ calculoDesatualizado (compatibilidade): nunca vigente para linha existente (4)
+     ✓ sem cálculo: desatualizado 0ms
+     ✓ recorte de colunas só com a potência do kit, mesmo igual ao kit atual: true (legado), sem comparar 0ms
+     ✓ linha completa e estado atual completo, tudo igual: ainda true 0ms
+     ✓ é determinística e não altera os objetos 0ms
+   ❯ mensagens de recusa (11)
+     × textos exatos do contrato (a interface e as ações dependem deles) 11ms
+     × legado + proposta: 'A estimativa financeira está incompleta: o último cálculo foi feito pela fórmula antiga, que não foi validada; <pendências>. A proposta fica disponível quando os dados forem validados.' 2ms
+     ✓ legado + preço: a constante do legado 0ms
+     × legado + contrato: texto próprio (na prática o contrato filtra o legado antes) 1ms
+     ✓ motivo principal = o de maior relevância: legado vence kit 0ms
+     ✓ kit (sem legado) + proposta: a constante da ação 0ms
+     ✓ kit (sem legado) + contrato: a constante da ação 0ms
+     ✓ kit (sem legado) + preco: a constante da ação 0ms
+     ✓ consumo, parâmetros, preço e não comprovado: frase do motivo + caminho 0ms
+     ✓ sem motivos: cai em não comprovado (nunca uma mensagem vazia) 0ms
+     × textoDoMotivo: frase curta de cada motivo 1ms
+ ✓ tests/obras-escrita-db.test.ts (36 tests) 7182ms
+   ✓ Obras 3b-3: cenário progressivo (ordem importa) (36)
+     ✓ segurança (5)
+       ✓ coordenar não vira acesso comercial nem ao valor vendido 782ms
+       ✓ RPCs: só authenticated executa; funções internas: nenhum cliente 464ms
+ ✓ tests/fio-b-gd2.test.ts (77 tests) 50ms
+ ✓ tests/blindagem-comercial-db.test.ts (33 tests) 2543ms
+ ❯ tests/calculo-reproduzivel.test.ts (81 tests | 13 failed) 103ms
+   ✓ consumoComoPersistido (numeric(10,2), half away from zero, semântica decimal) (12)
+     ✓ 1200.555 -> 1200.56 3ms
+     ✓ 1200.554 -> 1200.55 0ms
+     ✓ 1200.5 -> 1200.5 0ms
+     ✓ 0.005 -> 0.01 0ms
+     ✓ 1.005 -> 1.01 0ms
+     ✓ 2.675 -> 2.68 0ms
+     ✓ 1111.111111 -> 1111.11 0ms
+     ✓ inteiro 0 fica inalterado 0ms
+     ✓ inteiro 1 fica inalterado 1ms
+     ✓ inteiro 1200 fica inalterado 0ms
+     ✓ inteiro 99999999 fica inalterado 0ms
+     ✓ é idempotente 0ms
+   ❯ linhaDeCalculo: estimativa incompleta, só o resultado técnico (13)
+     × entrada completa do vendedor (consumo em kWh e tarifa): incompleta, linha técnica, com a mensagem exata 41ms
+     × nenhum campo financeiro vaza no resultado: na linha, todos nulos (ausência nunca vira zero) 8ms
+     × conta em R$ sem consumo em kWh: incompleta, nunca deriva consumo da fatura ÷ tarifa base 2ms
+     × consumo em kWh informado não gera as pendências de consumo, mesmo com fatura (informado vence a fatura) 1ms
+     × consumo informado com casas excedentes (1200,555) é aceito: incompleta, não erro 1ms
+     ✓ sem parâmetros e sem consumo em kWh: incompleta com geração indisponível (null), não o erro de parâmetros 0ms
+     ✓ potência é normalizada para 2 casas no resultado (5,505 -> 5,51) e a geração usa a potência normalizada 0ms
+     ✓ potência 5,504 -> 5,5 e geração 660 0ms
+     ✓ tipo de ligação monofasico e preço não mudam o resultado (percentual e disponibilidade não têm efeito) 2ms
+     ✓ tipo de ligação bifasico e preço não mudam o resultado (percentual e disponibilidade não têm efeito) 1ms
+     ✓ tipo de ligação trifasico e preço não mudam o resultado (percentual e disponibilidade não têm efeito) 1ms
+     × preço 0 e preço com casas excedentes são aceitos (incompleta), como antes aceitavam 1ms
+     ✓ é determinístico e o motor concorda: calcular(entradaDaLinha-equivalente) também é incompleta 1ms
+   ❯ pendenciasDaEntrada e entradaDaLinha (3)
+     × sem consumo nem fatura: consumo ausente, sem a pendência de conta em R$ 3ms
+     ✓ sem tarifa: tarifa_base_ausente 1ms
+     ✓ entradaDaLinha só repassa os valores gravados da linha (uso restante: linha legada) 0ms
+   ❯ D2: linhaDeCalculo normaliza as entradas persistidas (sem gravar linha nova) (5)
+     ✓ potência 6,1 e 7,775 (-> 7,78): potência normalizada e geração sobre a potência normalizada 1ms
+     ✓ fatura 1000 e tarifa 0.95231 sem consumo em kWh: estimativa incompleta (nunca consumo derivado) 0ms
+     ✓ fatura 1000.005 e tarifa 0.5 sem consumo em kWh: estimativa incompleta (nunca consumo derivado) 0ms
+     ✓ fatura 999.995 e tarifa 0.7 sem consumo em kWh: estimativa incompleta (nunca consumo derivado) 1ms
+     × todas as entradas com excesso de casas ao mesmo tempo continuam aceitas (incompleta, sem erro) 1ms
+   ❯ linhaDeCalculo: validações e ordem dos erros (20)
+     ✓ sem consumo nem fatura 0ms
+     ✓ potência 0 0ms
+     ✓ potência -1 0ms
+     ✓ potência 0,004 (normaliza para 0) devolve o erro de potência 0ms
+     ✓ potência 0,005 (normaliza para 0,01) é aceita 0ms
+     × tarifa 0,00004 (normaliza para 0) devolve o erro de tarifa; 0 e negativa também 7ms
+     × tarifa 0,00005 (normaliza para 0,0001) é aceita 2ms
+     ✓ preço -1 devolve o erro de preço 0ms
+     ✓ consumo informado 0,004 (normaliza para 0) devolve o erro de consumo 0ms
+     ✓ consumo informado 0 devolve o erro de consumo 0ms
+     ✓ fatura 0,004 com tarifa 1 sem consumo em kWh devolve estimativa incompleta (não mais o erro de consumo) 1ms
+     × estimativa incompleta não é erro de entrada: só aparece com entrada válida (potência, tarifa e preço ok) 1ms
+     ✓ parâmetros nulos com entrada válida devolvem o erro de parâmetros 0ms
+     ❯ ordem: (1) entrada, (2) potência, (3) tarifa, (4) preço, (5) consumo, (6) parâmetros (7)
+       ✓ potência inválida e parâmetros nulos: erro de potência, não o de parâmetros 0ms
+       ✓ sem consumo/fatura e potência inválida: erro de entrada vem primeiro 0ms
+       ✓ potência e tarifa inválidas: potência primeiro 0ms
+       × tarifa e preço inválidos: tarifa primeiro 1ms
+       ✓ preço e consumo inválidos: preço primeiro 0ms
+       ✓ consumo inválido e parâmetros nulos: erro de consumo 0ms
+       × tarifa inválida e parâmetros nulos: erro de tarifa 1ms
+   ✓ A1 (decidido em D1): dimensionamento usa o consumo como persistido (28)
+     ✓ consumo 1190.396 -> 16 módulos 0ms
+     ✓ consumo 1190.4 -> 16 módulos 0ms
+     ✓ consumo 1190.404 -> 16 módulos 0ms
+     ✓ consumo 1190.405 -> 17 módulos 0ms
+     ✓ consumo 1190.41 -> 17 módulos 0ms
+     ✓ 1190,404 digitado e o gravado (1190,40) dão o mesmo número de módulos (a divergência acabou) 0ms
+     ✓ consumo 0,004 normaliza para 0 e devolve null (antes dava 1 módulo) 0ms
+     ✓ consumo 0,005 normaliza para 0,01 e dá 1 módulo 0ms
+     ✓ entrada inválida (consumo 0, produtividade 120, módulo 620) continua null 0ms
+     ✓ entrada inválida (consumo -5, produtividade 120, módulo 620) continua null 0ms
+     ✓ entrada inválida (consumo NaN, produtividade 120, módulo 620) continua null 0ms
+     ✓ entrada inválida (consumo 1000, produtividade 0, módulo 620) continua null 0ms
+     ✓ entrada inválida (consumo 1000, produtividade -1, módulo 620) continua null 0ms
+     ✓ entrada inválida (consumo 1000, produtividade 120, módulo 0) continua null 0ms
+     ✓ entrada inválida (consumo 1000, produtividade 120, módulo -620) continua null 0ms
+     ✓ entrada inválida (consumo 1000, produtividade NaN, módulo 620) continua null 0ms
+     ✓ entrada inválida (consumo 1000, produtividade 120, módulo NaN) continua null 0ms
+     ✓ consumo +Infinity devolve null (entrada não finita) 0ms
+     ✓ dimensionarSistema: consumo +Infinity devolve null 0ms
+     ✓ dimensionarSistema: consumo -Infinity devolve null 0ms
+     ✓ dimensionarSistema: consumo NaN devolve null 0ms
+     ✓ dimensionarSistema: produtividade +Infinity devolve null 0ms
+     ✓ dimensionarSistema: produtividade NaN devolve null 0ms
+     ✓ dimensionarSistema: potência do módulo +Infinity devolve null 0ms
+     ✓ dimensionarSistema: potência do módulo NaN devolve null 0ms
+     ✓ contraste: dimensionarSistema com entradas finitas e positivas (1200, 120, 620) não devolve null (17 módulos) 0ms
+     ✓ varredura densa ao redor de TODOS os limites 74,4 x k (k = 1..40): digitado === persistido e confere com oráculo inteiro 4ms
+     ✓ o consumo 1190,404 é aceito e o kit de 17 módulos devolve a potência normalizada 10,54 e a geração 1264,8 1ms
+ ✓ tests/handoff-resposta-gestor-db.test.ts (49 tests) 7566ms
+   ✓ pode_responder_handoff (regra usada pela tela e pelas RPCs) (1)
+     ✓ verdadeiro só para destinatário, admin da empresa e gestor de equipe ativa do destinatário 505ms
+   ✓ oportunidades_pendentes_equipe (lista restrita do Painel) (5)
+     ✓ gestor da equipe do destinatário e admin veem; demais papéis, equipes e empresas não 359ms
+   ✓ destinatário inativo (7)
+     ✓ desativado durante o aceite: o aceite espera a desativação e é recusado, sem alterar nada 812ms
+ ❯ tests/travas-kit-sdr-db.test.ts (28 tests | 2 failed) 7337ms
+   ❯ kit com cálculo solar nunca fica vazio (11)
+     ✓ acesso direto: apagar todos os itens com cálculo é recusado; kit e cálculo intactos 204ms
+     ✓ acesso direto: apagar um a um até esvaziar é recusado no último 132ms
+     ✓ acesso direto: mover os itens para outro negócio é recusado 137ms
+     ✓ acesso de serviço também é barrado (integridade, não permissão) 90ms
+     ✓ permitido: apagar parte dos itens, apagar kit sem cálculo e editar quantidade 185ms
+     ✓ permitido: trocar o kit pelo fluxo do app (novos antes de apagar os antigos) 278ms
+     ✓ permitido: remover o cálculo e depois o kit (apagarCalculo), pelo vendedor e pelo serviço 288ms
+     ✓ permitido: admin e serviço excluem o negócio inteiro com kit e cálculo (cascata) 274ms
+     × tarifa acima do limite da coluna com linha legada: o app troca os itens, não grava linha e não restaura nada 252ms
+     ✓ falha parcial com cálculo: exclusão falha → restaura; restauração falha → avisa; reenvio corrige 298ms
+     ✓ concorrência: duas transações apagando itens diferentes não esvaziam o kit 301ms
+   ❯ cálculo solar só é criado com kit (8)
+     ✓ R1: cálculo criado e, em paralelo, o último item apagado → a exclusão espera e é recusada 279ms
+     ✓ R2: último item apagado e, em paralelo, cálculo criado → o cálculo espera e é recusado 276ms
+     ✓ R3: criar cálculo direto em negócio sem kit é recusado (vendedor e serviço) 49ms
+     ✓ levar um cálculo para negócio sem kit é recusado; o cálculo fica onde estava 138ms
+     ✓ criação normal com kit: direto pelo Supabase e pelo cadastro do app 129ms
+     × cálculo existente: o app não o recalcula (fica 0,95); upsert e update direto continuam permitidos 153ms
+     ✓ cálculo antigo sem itens (calculadora de catálogo): continua como está e pode ser recalculado ou apagado 246ms
+     ✓ excluir o negócio × transação que segura um item e apaga outro: sem deadlock, a exclusão espera e termina íntegra 285ms
+   ✓ SDR não fecha, não reabre e não muda o valor (9)
+     ✓ gatilho da trava roda depois de negocios_preparar (ordem alfabética dos BEFORE) 19ms
+     ✓ acesso direto: status, motivo de perda e valor são recusados sem alteração parcial 100ms
+     ✓ negócio fechado: SDR não reabre nem troca o motivo de perda 163ms
+     ✓ etapa que fecha sozinha (ganho e perdido): recusada; etapa, datas e motivo padrão intactos 68ms
+     ✓ permitido ao SDR: mover para etapa comum, editar dados e qualificação, criar com valor 50ms
+     ✓ vendedor, gestor e admin: fechamento por etapa (Kanban), ganho, perda, reabrir e valor seguem livres 337ms
+     ✓ corrigir valor de negócio ganho pela função própria (admin) continua funcionando 72ms
+     ✓ envio para vendas e aceite: o responsável passa ao vendedor e o vendedor fecha 77ms
+     ✓ acesso de serviço (sem usuário logado) não é afetado 55ms
+ ✓ tests/obras-interface.test.ts (30 tests) 34ms
+ ❯ tests/negocios-gravacao-db.test.ts (32 tests | 5 failed) 7890ms
+   ✓ ciclo completo com contato novo (2)
+     ✓ criar → reabrir → editar negócio e contato → reabrir preserva tudo 187ms
+     ✓ edição recusada pela validação não grava nada 46ms
+   ✓ contato já cadastrado (2)
+     ✓ completa só o que está vazio e avisa quando mantém um dado diferente 103ms
+     ✓ negócio que falha depois de criar o contato devolve o contato (o reenvio não duplica) 95ms
+   ❯ kit (19)
+     × itens sem tarifa são salvos; com tarifa viram cálculo; salvar de novo mantém o valor da conta 177ms
+     × conta em R$ sem consumo em kWh: salva o kit, não cria cálculo e, havendo cálculo prévio, o mantém intacto (estimativa incompleta) 81ms
+     ❯ kWh e fatura do kit: vazio preserva o gravado no negócio (contrato M2-P0-K1) (6)
+       ✓ kWh e fatura vazios no kit (com e sem tarifa) preservam 450 e 300 do negócio; pendências usam os efetivos; linha só técnica 238ms
+       ✓ kWh e fatura preenchidos substituem; depois, kit vazio de novo mantém os novos valores 266ms
+       ✓ limpeza explícita em Dados do negócio zera os dois; kit vazio depois não os recria e as pendências incluem consumo_ausente 155ms
+       ✓ só um dos dois vazio: kWh vazio preserva o consumo e a fatura nova substitui; e o inverso 210ms
+       × negócio 450 kWh / R$ 300 e cálculo legado 700 kWh / R$ 900: abrir mostra 450 e 300; salvar sem editar mantém 450 e 300 235ms
+       ✓ negócio sem kWh nem fatura e cálculo legado 700 / 900: os campos abrem vazios e nada do cálculo vai ao negócio 118ms
+     ✓ números no padrão brasileiro: 1.200 kWh grava 1200; reabrir e salvar sem editar mantém tudo (M2-a) 325ms
+     ✓ falha ao gravar itens não apaga o kit anterior e não mostra sucesso 93ms
+     × tarifa acima do limite da coluna: nenhuma linha é gravada, o banco não recusa nada e a linha legada fica intocada 145ms
+     ✓ sem linha anterior: o banco recusa a linha técnica fora do limite, o kit anterior volta e nada é gravado 166ms
+     ✓ reenviar é seguro: substitui a lista inteira, mesmo com itens repetidos de uma falha anterior 255ms
+     ✓ falha ao apagar os itens antigos: restaura o kit inteiro; se nem a restauração fecha, avisa e o reenvio corrige 170ms
+     ✓ remover kit salvo: sem confirmação é recusado; com confirmação remove; com cálculo nunca 289ms
+     ✓ falha ao ler o cálculo: recusa antes de gravar ou apagar; kit e cálculo intactos 77ms
+     ✓ editar itens de um kit salvo (sem esvaziar) não pede confirmação 88ms
+     × criar com kit, consumo e tarifa: estimativa incompleta é informação, não aviso de falha; kit, consumo e resultado técnico salvos 81ms
+     ✓ cálculo que não fecha na criação vira aviso; os itens ficam salvos 59ms
+   ✓ anexos: validação, conferência do Storage e RLS (4)
+     ✓ arquivo vazio ou acima de 20 MB é recusado antes de criar qualquer coisa 11ms
+     ✓ criar não registra anexo nem escreve na linha do tempo antes de o arquivo chegar 69ms
+     ✓ confere a pasta: arquivo sem registro e registro sem arquivo; listagem com falha nunca vira 'tudo certo' 421ms
+     ✓ RLS: outra empresa e SDR sem acesso ao negócio não enviam, não listam, não registram e ninguém apaga direto no Storage 966ms
+   ✓ etapa fora do formulário de edição (2)
+     ✓ SDR não muda a etapa nem fecha o negócio pela edição, e não altera o valor 67ms
+     ✓ vendedor também não muda etapa pela edição (só pelo Mover etapa/Kanban) 64ms
+   ✓ preço do cálculo x valor do negócio (3)
+     ✓ editar o valor do negócio não mexe no cálculo; atualizar o preço de linha legada é recusado e nada muda 202ms
+     ✓ resultado técnico incompleto: atualizar o preço é recusado (não há economia nem payback) e nada muda 186ms
+     ✓ negócio sem cálculo: recusa sem criar nada 79ms
+ ✓ tests/pagamento-registrado-solo-db.test.ts (33 tests) 9283ms
+   ✓ Pro intacto e um pagamento por negócio (5)
+     ✓ upgrade: registro do Solo continua válido, com autor, e o admin ainda pode estorná-lo 491ms
+     ✓ sequência completa: Solo → Pro → estorno do registro → outro admin confirma no Pro 576ms
+     ✓ confirmação do Pro recusa negócio com registro ativo (mensagem do registro) 603ms
+     ✓ downgrade: confirmação ativa do Pro impede registro no Solo (sem dois pagamentos) 465ms
+   ✓ Retificação de registro Solo depois do upgrade (decisão da PR #186) (7)
+     ✓ após upgrade, admin corrige data/observação: uma linha ativa, cadeia preservada, sem eventos 496ms
+     ✓ após upgrade, admin estorna; depois não consegue registrar novo pagamento pelo caminho do Solo 421ms
+     ✓ gestor e vendedor da empresa não estornam nem corrigem 521ms
+     ✓ admin de outra empresa não estorna nem corrige 544ms
+     ✓ correções simultâneas: só uma vale, sem duplicata ativa 876ms
+ ✓ tests/stack-supabase-local.test.ts (46 tests) 55ms
+ ✓ tests/handoff-pontuacao-aceite-db.test.ts (38 tests) 9747ms
+   ✓ concorrência do envio (2)
+     ✓ troca de responsável em andamento: o envio espera e é recusado se o SDR deixou de ser o responsável 835ms
+     ✓ desativação do destinatário em andamento: o envio espera e é recusado 801ms
+   ✓ aceite desatualizado: responsável mudou depois do envio (14)
+     ✓ corrida: troca de responsável em andamento faz o aceite esperar; confirmada, o aceite é recusado sem estado parcial 829ms
+     ✓ corrida: A → C → A numa transação em andamento faz o aceite esperar e, confirmada, recusa 862ms
+     ✓ corrida: troca de responsável desfeita (rollback) libera o aceite, que conclui normalmente 678ms
+ ✓ tests/gamificacao-fix-reocorrencia.test.ts (6 tests) 1493ms
+ ✓ tests/fechamento-marcos.test.ts (32 tests) 107ms
+ ✓ tests/gamificacao-niveis-conquistas.test.ts (16 tests) 2720ms
+ ✓ tests/integridade-contratos-db.test.ts (16 tests) 1942ms
+ ✓ tests/arquivamento-concorrencia-db.test.ts (17 tests) 3097ms
+ ❯ tests/calculo-vigencia-db.test.ts (19 tests | 4 failed) 2867ms
+   ❯ gerarLinkProposta (Server Action) (7)
+     ✓ as mensagens da proposta são as da regra nova (legado cita a fórmula antiga; sem linha não cita) 3ms
+     × linha legada com kit vigente: recusa (fórmula antiga, não validada) e não grava nada 176ms
+     × kit alterado depois do cálculo: recusa e não grava nada; restaurado o kit, continua recusando (legado) 73ms
+     × kit sem nenhum módulo (potência 0) contra cálculo de 5,5 kWp: recusa sem gravar 76ms
+     ✓ falha ao ler o kit nunca vale como vigente: recusa e não grava 47ms
+     ✓ sem linha de cálculo: recusa (estimativa incompleta), sem proposta 75ms
+     × linha legada com consumo/tarifa diferentes do negócio: recusa igual (legado), sem proposta 67ms
+   ✓ gerarContratoComCliente (8)
+     ✓ controle: kit vigente gera o contrato 90ms
+     ✓ kit alterado depois do cálculo: recusa com a mensagem exata e não grava nada; restaurado o kit, gera 147ms
+     ✓ regerar o rascunho com o kit alterado depois: recusa e o contrato anterior fica intacto 108ms
+     ✓ preço divergente E kit alterado: vale a mensagem do kit (preço não bloqueia com linha legada), sem gravar 99ms
+     ✓ preço divergente com linha legada e kit vigente: o contrato é gerado (não bloqueia por legado nem por preço) 110ms
+     ✓ consumo do negócio diferente do cálculo: continua bloqueando o contrato (mensagem de consumo), sem gravar 110ms
+     ✓ produtividade da empresa diferente da do cálculo: bloqueia o contrato; percentual do Fio B diferente não bloqueia 396ms
+     ✓ sem cálculo a guarda de vigência não se aplica (o kit alterado não impede o contrato) 110ms
+   ✓ atualizarPrecoCalculoComCliente (4)
+     ✓ linha legada com kit vigente e valor do negócio mudado: recusa (fórmula antiga) e nada é gravado 123ms
+     ✓ kit alterado e preço a atualizar: recusa e nada é gravado; restaurado o kit, continua recusando (legado) 143ms
+     ✓ kit alterado com o preço já em dia: também recusa (não responde 'já está em dia'), sem gravar 67ms
+     ✓ falha ao ler o kit nunca vale como vigente: recusa e não grava 93ms
+ ✓ tests/obras-db.test.ts (15 tests) 3271ms
+ ✓ tests/bundle-servido.test.ts (19 tests) 30ms
+ ✓ tests/gamificacao-deal-value-corrected.test.ts (16 tests) 1734ms
+ ✓ tests/negocios-acoes-db.test.ts (11 tests) 8725ms
+   ✓ cadastro pela tela (4)
+     ✓ arquivos acima de 1 MB chegam: a ação recebe só os dados deles e o conteúdo vai direto ao Storage 1416ms
+     ✓ arquivo vazio escolhido pelo usuário é apontado antes de enviar; o servidor também recusa 452ms
+     ✓ envio interrompido entre o Storage e o registro fica visível ao reabrir e é registrado pela ficha 1431ms
+     ✓ registro e exclusão respeitam empresa e autoria 577ms
+   ✓ registrarAnexo não confia no navegador (5)
+     ✓ arquivo legítimo: registra com tamanho e tipo do Storage, não os do navegador 475ms
+     ✓ falha na gravação não apaga o arquivo (nem o de outra tentativa) 1186ms
+     ✓ outra empresa e SDR sem o negócio não registram; quem vê o negócio recupera escolhendo a categoria 976ms
+   ✓ ficha pela tela (2)
+     ✓ editar dados + fatura acima de 1 MB; kit e contato pelas ações; reabrir preserva tudo 1151ms
+ ✓ tests/fio-b-copel-casos.test.ts (32 tests) 64ms
+ ✓ tests/pagamento-solo-interface.test.ts (27 tests) 75ms
+ ✓ tests/gamificacao-pagamento-confirmado.test.ts (16 tests) 2174ms
+ ✓ tests/gamificacao-conquistas-marco.test.ts (27 tests) 12588ms
+   ✓ marco_contagem: pagamento.confirmado — reocorrência e permanência (sem contar dobrado o mesmo contrato) (5)
+     ✓ pagamento confirmado conta 1 pro responsável congelado na assinatura 425ms
+     ✓ pagamento confirmado → estornado: deixa de contar pra avaliação futura (estado ao vivo) 518ms
+     ✓ confirmado → estornado → reconfirmado: o mesmo contrato continua valendo só 1, nunca 2 398ms
+     ✓ múltiplos ciclos de confirma/estorna no mesmo contrato nunca fazem ele valer mais de 1 686ms
+     ✓ conquista já desbloqueada permanece desbloqueada mesmo depois do pagamento ser estornado 376ms
+   ✓ marco_contagem: perfil por ocorrência (causal/congelado), nunca o perfil atual do membro (2)
+     ✓ mudança de perfil sdr → closer não mistura ocorrências históricas: 8 como sdr, 2 como closer, nunca 10 1130ms
+     ✓ alterar perfil_aplicavel de uma conquista existente não reaproveita ocorrências causais de outro perfil 1009ms
+   ✓ marco_contagem: perfil causal congelado em contratos.perfil_assinatura (rodada 2 da auditoria) (7)
+     ✓ closer assina contrato → perfil_assinatura fica congelado como closer 567ms
+     ✓ mudar o perfil do membro depois da assinatura não altera o perfil_assinatura já congelado 375ms
+     ✓ reassinar o mesmo contrato não recalcula perfil_assinatura 387ms
+     ✓ pagamento confirmado depois usa o perfil congelado na assinatura, mesmo com o perfil atual diferente 706ms
+     ✓ deal.won registra o perfil causal (congelado) da própria ocorrência 495ms
+     ✓ mudança sdr → closer não mistura ocorrências antigas e novas em deal.qualified 855ms
+     ✓ ocorrência com perfil causal null só conta pra conquista geral, nunca pra uma de perfil específico 451ms
+ ✓ tests/gamificacao-reversao-tarefas.test.ts (11 tests) 1808ms
+ ✓ tests/gamificacao-xp-moedas.test.ts (9 tests) 1012ms
+ ✓ tests/gamificacao-fechamento-auditoria.test.ts (15 tests) 2427ms
+ ✓ tests/arquivamento-negocio-db.test.ts (9 tests) 1755ms
+   ✓ vínculos do negócio arquivado (2)
+     ✓ membro apagado: o banco ainda anula sozinho a referência na distribuição decidida do arquivado 357ms
+ ✓ tests/blindagem-contratos-sdr-db.test.ts (16 tests) 2396ms
+   ✓ SDR não lê dados de contrato nem de pagamento (4)
+     ✓ contratos: nenhuma linha (conteúdo, token, status) 348ms
+ ✓ tests/propostas-emissoes-db.test.ts (23 tests) 2858ms
+ ✓ tests/contrato.test.ts (18 tests) 54ms
+ ✓ tests/contrato-db.test.ts (11 tests) 2868ms
+   ✓ contrato com RLS real (6)
+     ✓ dado do cliente com {{ ou }} bloqueia a geração (nunca vira contrato pronto) 382ms
+ ✓ tests/cli-supabase-sem-shell.test.ts (35 tests) 1668ms
+   ✓ M1: resolução verificável do executável do Supabase CLI (6)
+     ✓ instalação real deste repositório: o binário existe, tem a versão do pacote e executa sem shell 912ms
+ ✓ tests/gamificacao-ranking-historico.test.ts (7 tests) 1812ms
+   ✓ ranking_gamificacao: p_ate — reconstrução causal do ledger num instante passado (7)
+     ✓ XP já estornado antes do corte não conta nem no histórico nem no vivo 409ms
+     ✓ isolamento por empresa: lançamento de outra empresa nunca aparece no histórico desta 457ms
+ ✓ tests/gamificacao-reavaliacao-valor-corrigido.test.ts (8 tests) 1305ms
+ ✓ tests/gamificacao-antifraude-fechamento.test.ts (9 tests) 1299ms
+ ✓ tests/gamificacao-handoff-won-causal.test.ts (4 tests) 1265ms
+ ✓ tests/crm.test.ts (11 tests) 1131ms
+ ✓ tests/estimativa-financeira.test.ts (30 tests) 41ms
+ ✓ tests/avatares-db.test.ts (16 tests) 1700ms
+ ✓ tests/gamificacao-contrato-sdr.test.ts (4 tests) 1056ms
+ ✓ tests/calculadora.test.ts (28 tests) 66ms
+ ❯ tests/calculos-estimativa-incompleta-db.test.ts (4 tests | 1 failed) 428ms
+   ❯ calculos_solares.estado_financeiro (4)
+     ✓ linha sem estado (como as anteriores à migration) nasce legada e exige os números 83ms
+     ✓ incompleto: aceito só com todos os financeiros e o payback nulos e com pendências 146ms
+     × completo: exige números e método; sem método é recusado (o motor ainda não grava este estado) 44ms
+     ✓ estado desconhecido é recusado; passar de incompleto a legado exige os números 32ms
+ ✓ tests/calculadora-db.test.ts (6 tests) 684ms
+ ✓ tests/gamificacao-streak.test.ts (7 tests) 3704ms
+   ✓ sequencia_produtiva_membro: crédito real de hoje entra na sequência (1)
+     ✓ membro novo sem histórico: sem crédito, sequência 0; depois de um crédito real hoje, sequência 1 436ms
+   ✓ sequencia_produtiva_membro: configuração de dias úteis por empresa (2)
+     ✓ bitmask padrão (31, segunda a sexta): sábado e domingo não são dia útil 333ms
+     ✓ empresa com sábado como dia útil (bitmask inclui bit 6) exige crédito no sábado pra não quebrar 391ms
+   ✓ sequencia_produtiva_membro: estorno retroativo remove o dia produtivo (1)
+     ✓ reabrir o negócio ganho hoje (estorno automático) faz o dia deixar de contar como produtivo 547ms
+   ✓ sequencia_produtiva_membro: bônus de conquista não cria dia produtivo (1)
+     ✓ desbloquear uma conquista (marco_contagem) credita só o bônus (referencia_tipo = 'conquista'), que não torna o dia produtivo 901ms
+   ✓ sequencia_produtiva_membro: self-only (2)
+     ✓ quem não é membro da empresa recebe sequência 0 e semana vazia, nunca erro 374ms
+     ✓ a função não aceita p_membro_id — não há forma de consultar a sequência de outro membro 317ms
+ ✓ tests/obras-apresentacao.test.ts (14 tests) 25ms
+ ✓ tests/kit-linhas.test.ts (51 tests) 70ms
+ ✓ tests/gamificacao-progresso-conquistas.test.ts (6 tests) 3333ms
+   ✓ progresso_conquistas_membro: xp_acumulado usa exatamente o mesmo filtro de avaliar_conquistas_pontos() (2)
+     ✓ bônus de conquista (referencia_tipo = 'conquista') não entra no 'realizado' de xp_acumulado 638ms
+     ✓ crédito estornado também não entra no 'realizado' 537ms
+   ✓ progresso_conquistas_membro: marco_contagem corresponde exatamente ao helper interno contar_marco_membro (1)
+     ✓ realizado de uma conquista marco_contagem reflete a contagem real de deal.won, via desbloqueio de um par-pino 468ms
+   ✓ progresso_conquistas_membro: self-only (2)
+     ✓ quem não é membro da empresa recebe lista vazia, nunca erro 325ms
+     ✓ a função não aceita p_membro_id — não há forma de consultar o progresso de outro membro 371ms
+   ✓ progresso_conquistas_membro: conquista já desbloqueada nunca aparece como 'próxima' (1)
+     ✓ depois de cruzar o limiar de verdade (desbloqueio real), a conquista deixa de aparecer na lista de progresso 586ms
+ ✓ tests/imagem-upload.test.ts (21 tests) 14ms
+ ✓ tests/handoff-fechamento.test.ts (8 tests) 1866ms
+ ✓ tests/recompensas-imagem-db.test.ts (16 tests) 1895ms
+ ✓ tests/comissoes-causal.test.ts (7 tests) 4980ms
+   ✓ cálculo causal (3)
+     ✓ credita o responsável congelado no deal.won — troca de responsável ao vivo depois não move a comissão 1061ms
+     ✓ correção de valor no mesmo ciclo soma o delta ao resultado apurado 453ms
+     ✓ ganho→reaberto invalida o ciclo antigo; o novo ganho é o único considerado 453ms
+   ✓ plano vigente no mês, não o plano atual (2)
+     ✓ alterar o plano depois não muda retroativamente o mês já calculado com a versão anterior 452ms
+     ✓ mês anterior a qualquer versão de plano retorna erro claro, nunca usa o plano atual 603ms
+   ✓ recálculo aberto e bloqueio de comissão fechada (2)
+     ✓ comissão aberta pode ser recalculada livremente 836ms
+     ✓ fechar bloqueia recálculo comum (lib) e qualquer UPDATE direto (trigger) 734ms
+ ✓ tests/handoff-origem-integridade-db.test.ts (9 tests) 2009ms
+ ✓ tests/venda.test.ts (16 tests) 14ms
+ ✓ tests/obras-detalhe-db.test.ts (8 tests) 1949ms
+ ✓ tests/permissoes.test.ts (37 tests) 240ms
+ ✓ tests/guard-supabase-local.test.ts (29 tests) 26ms
+ ✓ tests/gamificacao-deal-won-beneficiario.test.ts (4 tests) 939ms
+ ✓ tests/propostas-pdf.test.ts (9 tests) 662ms
+   ✓ ModeloPdfDocument (6)
+     ✓ renderiza todos os 42 blocos do catálogo de uma vez, cada um com config plausível 384ms
+ ✓ tests/propostas-emissoes-fluxo-db.test.ts (5 tests) 2715ms
+   ✓ emissão preservada: emitir, baixar, reabrir (5)
+     ✓ emite a versão 1 e o link devolve exatamente o PDF gravado 1115ms
+     ✓ a nova emissão (v2) usa os dados atuais e tem link e arquivo próprios; a v1 não muda 527ms
+ ✓ tests/rls-financeiro-sdr-db.test.ts (10 tests) 3642ms
+   ✓ SDR não lê dados financeiros (4)
+     ✓ atividades: nenhuma de pagamento (Solo e Pro), nem o JSON `dados` 1392ms
+ ✓ tests/propostas-pdf-dados.test.ts (9 tests) 14ms
+ ✓ tests/schema-ausente.test.ts (8 tests) 24ms
+ ❯ tests/calculadora-persistencia-db.test.ts (96 tests | 9 failed) 20296ms
+   ✓ percentuais: salvar, reabrir e salvar sem editar (parametros_calculadora) (30)
+     ✓ percentual_fio_b (16)
+       ✓ texto 0 -> banco 0 -> campo 0 e fica estável sem editar 98ms
+       ✓ texto 0,1 -> banco 0.001 -> campo 0,1 e fica estável sem editar 70ms
+       ✓ texto 7 -> banco 0.07 -> campo 7 e fica estável sem editar 46ms
+       ✓ texto 12,3 -> banco 0.123 -> campo 12,3 e fica estável sem editar 60ms
+       ✓ texto 29 -> banco 0.29 -> campo 29 e fica estável sem editar 49ms
+       ✓ texto 45 -> banco 0.45 -> campo 45 e fica estável sem editar 38ms
+       ✓ texto 57 -> banco 0.57 -> campo 57 e fica estável sem editar 31ms
+       ✓ texto 57,5 -> banco 0.575 -> campo 57,5 e fica estável sem editar 47ms
+       ✓ texto 99,9 -> banco 0.999 -> campo 99,9 e fica estável sem editar 44ms
+       ✓ texto 100 -> banco 1 -> campo 100 e fica estável sem editar 22ms
+       ✓ texto 0,05 -> banco 0.001 -> campo 0,1 e fica estável sem editar 31ms
+       ✓ texto 0,04 -> banco 0 -> campo 0 e fica estável sem editar 26ms
+       ✓ texto 0,15 -> banco 0.002 -> campo 0,2 e fica estável sem editar 21ms
+       ✓ texto 57,55 -> banco 0.576 -> campo 57,6 e fica estável sem editar 17ms
+       ✓ varredura de valores da escala da coluna: salvar -> reabrir -> salvar sem editar não muda nada 11059ms
+       ✓ o banco recusa fora de 0..1 (check): 100,1% e negativo 19ms
+     ✓ comissao_percentual (14)
+       ✓ texto 0 -> banco 0 -> campo 0 e fica estável sem editar 40ms
+       ✓ texto 0,01 -> banco 0.0001 -> campo 0,01 e fica estável sem editar 41ms
+       ✓ texto 7 -> banco 0.07 -> campo 7 e fica estável sem editar 50ms
+       ✓ texto 12,34 -> banco 0.1234 -> campo 12,34 e fica estável sem editar 53ms
+       ✓ texto 29 -> banco 0.29 -> campo 29 e fica estável sem editar 34ms
+       ✓ texto 57 -> banco 0.57 -> campo 57 e fica estável sem editar 37ms
+       ✓ texto 57,5 -> banco 0.575 -> campo 57,5 e fica estável sem editar 27ms
+       ✓ texto 99,99 -> banco 0.9999 -> campo 99,99 e fica estável sem editar 22ms
+       ✓ texto 100 -> banco 1 -> campo 100 e fica estável sem editar 27ms
+       ✓ texto 0,005 -> banco 0.0001 -> campo 0,01 e fica estável sem editar 22ms
+       ✓ texto 0,004 -> banco 0 -> campo 0 e fica estável sem editar 30ms
+       ✓ texto 12,345 -> banco 0.1235 -> campo 12,35 e fica estável sem editar 28ms
+       ✓ varredura de valores da escala da coluna: salvar -> reabrir -> salvar sem editar não muda nada 4388ms
+       ✓ o banco recusa fora de 0..1 (check): 100,1% e negativo 19ms
+   ✓ consumo: consumoComoPersistido bate com o Postgres real (40)
+     ✓ calculos_solares.consumo_medio_kwh: bruto 1200.555 66ms
+     ✓ calculos_solares.consumo_medio_kwh: bruto 1200.554 88ms
+     ✓ calculos_solares.consumo_medio_kwh: bruto 1.005 50ms
+     ✓ calculos_solares.consumo_medio_kwh: bruto 0.005 38ms
+     ✓ calculos_solares.consumo_medio_kwh: bruto 2.675 55ms
+     ✓ calculos_solares.consumo_medio_kwh: bruto 1111.111111 68ms
+     ✓ calculos_solares.consumo_medio_kwh: bruto 1500.005 75ms
+     ✓ calculos_solares.consumo_medio_kwh: bruto 800.125 84ms
+     ✓ calculos_solares.consumo_medio_kwh: bruto 1200 74ms
+     ✓ calculos_solares.consumo_medio_kwh: bruto 1500 66ms
+     ✓ calculos_solares.consumo_medio_kwh: bruto 1 51ms
+     ✓ calculos_solares.consumo_medio_kwh: bruto 1234.56 45ms
+     ✓ calculos_solares.consumo_medio_kwh: bruto 0.01 44ms
+     ✓ calculos_solares.consumo_medio_kwh: bruto 99.99 53ms
+     ✓ calculos_solares.consumo_medio_kwh: bruto 1234.5 52ms
+     ✓ calculos_solares.consumo_medio_kwh: bruto 12.345 61ms
+     ✓ calculos_solares.consumo_medio_kwh: bruto 100.995 55ms
+     ✓ calculos_solares.consumo_medio_kwh: bruto 99999999.99 33ms
+     ✓ negocios.consumo_medio_kwh: bruto 1200.555 20ms
+     ✓ negocios.consumo_medio_kwh: bruto 1200.554 17ms
+     ✓ negocios.consumo_medio_kwh: bruto 1.005 15ms
+     ✓ negocios.consumo_medio_kwh: bruto 0.005 11ms
+     ✓ negocios.consumo_medio_kwh: bruto 2.675 13ms
+     ✓ negocios.consumo_medio_kwh: bruto 1111.111111 12ms
+     ✓ negocios.consumo_medio_kwh: bruto 1500.005 19ms
+     ✓ negocios.consumo_medio_kwh: bruto 800.125 19ms
+     ✓ negocios.consumo_medio_kwh: bruto 1200 24ms
+     ✓ negocios.consumo_medio_kwh: bruto 1500 22ms
+     ✓ negocios.consumo_medio_kwh: bruto 1 16ms
+     ✓ negocios.consumo_medio_kwh: bruto 1234.56 26ms
+     ✓ negocios.consumo_medio_kwh: bruto 0.01 19ms
+     ✓ negocios.consumo_medio_kwh: bruto 99.99 12ms
+     ✓ negocios.consumo_medio_kwh: bruto 1234.5 21ms
+     ✓ negocios.consumo_medio_kwh: bruto 12.345 14ms
+     ✓ negocios.consumo_medio_kwh: bruto 100.995 25ms
+     ✓ negocios.consumo_medio_kwh: bruto 99999999.99 33ms
+     ✓ negocios.consumo_medio_kwh: bruto 0.004 63ms
+     ✓ negocios.consumo_medio_kwh: bruto 0.0049 30ms
+     ✓ negocios.consumo_medio_kwh: bruto 1e-7 59ms
+     ✓ negocios.consumo_medio_kwh: bruto 0 32ms
+   ❯ M2-Q2: valorComoPersistido bate com o Postgres real nas colunas de calculos_solares (13)
+     × tarifa_kwh numeric(8,4): bruto 0.123456 81ms
+     × tarifa_kwh numeric(8,4): bruto 0.95231 64ms
+     × tarifa_kwh numeric(8,4): bruto 0.00005 43ms
+     × tarifa_kwh numeric(8,4): bruto 1.23455 52ms
+     ✓ kit_potencia_kwp numeric(6,2): bruto 5.505 48ms
+     ✓ kit_potencia_kwp numeric(6,2): bruto 6.1 34ms
+     ✓ kit_potencia_kwp numeric(6,2): bruto 0.005 39ms
+     ✓ kit_preco numeric(12,2): bruto 20000.005 47ms
+     ✓ kit_preco numeric(12,2): bruto 19999.995 31ms
+     ✓ valor_fatura_medio numeric(12,2): bruto 1000.005 37ms
+     ✓ valor_fatura_medio numeric(12,2): bruto 999.995 40ms
+     × o banco rejeita (23514) tarifa bruta 0,00004 (normaliza para 0) e o helper também prevê 0 65ms
+     ✓ o banco rejeita (23514) potência bruta 0,004 (normaliza para 0) e o helper também prevê 0 41ms
+   ❯ linhas legadas (fórmula antiga, não validada): escala das colunas e motor atual (13)
+     ✓ tarifa 0,90 e consumo 1500,005: a linha legada inserida é lida na escala das colunas; o motor atual não a reproduz nem a altera 98ms
+     ✓ tarifa 0,90 e consumo 800,125: a linha legada inserida é lida na escala das colunas; o motor atual não a reproduz nem a altera 63ms
+     ✓ tarifa 0,95, consumo informado 1111,11 …: a linha legada inserida é lida na escala das colunas; o motor atual não a reproduz nem a altera 60ms
+     ✓ consumo 1200,555: a linha legada inserida é lida na escala das colunas; o motor atual não a reproduz nem a altera 57ms
+     ✓ consumo 1200,554: a linha legada inserida é lida na escala das colunas; o motor atual não a reproduz nem a altera 149ms
+     ✓ consumo 2 casas já exato: a linha legada inserida é lida na escala das colunas; o motor atual não a reproduz nem a altera 185ms
+     ✓ consumo informado 1111,11, fatura 1000 …: a linha legada inserida é lida na escala das colunas; o motor atual não a reproduz nem a altera 176ms
+     ✓ sistema cobre todo o consumo (consumo 3…: a linha legada inserida é lida na escala das colunas; o motor atual não a reproduz nem a altera 190ms
+     × tarifa 0,123456 e consumo 800 (tarifa g…: a linha legada inserida é lida na escala das colunas; o motor atual não a reproduz nem a altera 39ms
+     × tarifa 0,95231 e consumo 800 (tarifa gr…: a linha legada inserida é lida na escala das colunas; o motor atual não a reproduz nem a altera 53ms
+     × consumo informado 1050,09, fatura 1000 …: a linha legada inserida é lida na escala das colunas; o motor atual não a reproduz nem a altera 59ms
+     ✓ potência 5,505, preço 20000,005, consum…: a linha legada inserida é lida na escala das colunas; o motor atual não a reproduz nem a altera 111ms
+     × negócio sem linha: com os parâmetros reais da empresa o motor devolve incompleta e NENHUMA linha é criada 49ms
+ ✓ tests/produtividade-confirmada-db.test.ts (10 tests) 1230ms
+ ✓ tests/tarefas-resultado.test.ts (10 tests) 856ms
+ ✓ tests/consumo-persistido.test.ts (67 tests) 22ms
+ ✓ tests/imagens-emissao.test.ts (8 tests) 1121ms
+   ✓ foto da capa: fallback definido (2)
+     ✓ o PDF com logo e SEM foto (fallback) tem 3 páginas, e o PDF com logo e foto também 1105ms
+ ✓ tests/banco-local-uso.test.ts (7 tests) 15ms
+ ✓ tests/rls.test.ts (12 tests) 1659ms
+   ✓ auditoria (2)
+     ✓ vendedor não lê a auditoria e ninguém lê a de outra empresa 403ms
+ ✓ tests/emissao-preservada.test.ts (13 tests) 35ms
+ ✓ tests/leads-a-distribuir.test.ts (10 tests) 10ms
+ ✓ tests/gamificacao-ranking.test.ts (4 tests) 1564ms
+   ✓ ranking_gamificacao: autorização (3)
+     ✓ quem não é membro de nenhuma empresa não lê ranking de ninguém 356ms
+ ✓ tests/percentual-exibicao.test.ts (31 tests) 2372ms
+   ✓ varredura completa: comissão numeric(5,4) (3)
+     ✓ todo k/escala gera texto no formato do campo 709ms
+     ✓ salvar e reabrir sem alterar devolve o mesmo valor gravado (aritmética inteira) 690ms
+     ✓ o texto não perde casas: percentual lido bate com k*100/escala (inteiros) 704ms
+ ✓ tests/pagamento-solo-interface-db.test.ts (4 tests) 1078ms
+ ✓ tests/numeros-br.test.ts (47 tests) 42ms
+ ✓ tests/gamificacao-gerencial.test.ts (7 tests) 10ms
+ ✓ tests/proposta-db.test.ts (6 tests) 771ms
+ ✓ tests/metas-realizado-causal.test.ts (10 tests) 6686ms
+   ✓ receita e negócios ganhos: fonte causal (deal.won ativo + value_corrected) (3)
+     ✓ negócio ganho credita o responsável congelado no deal.won, não o responsável ao vivo trocado depois 1579ms
+     ✓ correção de valor (mesmo ciclo) soma o delta à receita, sem mudar a contagem de negócios ganhos 371ms
+     ✓ ganho→reaberto: o ciclo invalidado deixa de contar; novo ganho é um novo ciclo 475ms
+   ✓ conversão: só fechamento causal ativo (3)
+     ✓ ganho→reaberto→perdido conta como 1 perda (nunca como ganho+perda) 373ms
+     ✓ perdido→reaberto→ganho conta como 1 ganho 457ms
+     ✓ reaberto sem novo fechamento não entra na conversão 749ms
+   ✓ reuniões realizadas e tarefas concluídas: líquido da reversão simétrica (2)
+     ✓ reunião concluída como 'realizada' conta; reaberta deixa de contar; concluída de novo volta a contar (líquido, nunca acumula) 435ms
+     ✓ tarefa concluída credita o responsável congelado no task.completed, reatribuição ao vivo depois não transfere 864ms
+   ✓ receita — modelo A: período do deal.won original, mesmo com correção em outro mês (1)
+     ✓ ganhou em setembro, corrigiu em outubro: a receita causal de setembro já inclui o valor corrigido, outubro continua em zero 399ms
+   ✓ permissão: a RPC replica a visibilidade da RLS de metas (1)
+     ✓ vendedor sem papel admin/gestor não pode consultar o realizado de outro colaborador 378ms
+ ✓ tests/opensolar.test.ts (4 tests) 46ms
+ ✓ tests/gamificacao-catalogo-b1a.test.ts (4 tests) 8ms
+ ✓ tests/propostas-blocos.test.ts (4 tests) 9ms
+ ✓ tests/gamificacao-reuniao-realizada.test.ts (5 tests) 636ms
+ ✓ tests/contrato-status.test.ts (5 tests) 15ms
+ ✓ tests/compatibilidade-nao-verificada.test.ts (3 tests) 20ms
+ ✓ tests/metas.test.ts (5 tests) 7ms
+ ✓ tests/comissoes.test.ts (8 tests) 7ms
+ ✓ tests/painel-pendentes.test.ts (2 tests) 5ms
+ ✓ tests/calculo-preco.test.ts (7 tests) 8ms
+ ✓ tests/kit-componentes-db.test.ts (3 tests) 399ms
+ ✓ tests/loja-saldo-concorrencia.test.ts (16 tests) 7958ms
+   ✓ saldo negativo por reversão de crédito já gasto (3)
+     ✓ origem revertida depois do resgate deixa o saldo negativo, sem bloquear a reversão nem recolher a recompensa 703ms
+     ✓ ganhos futuros compensam naturalmente o saldo negativo 644ms
+     ✓ solicitar_resgate bloqueia novo resgate enquanto o saldo real for insuficiente/negativo 499ms
+   ✓ concorrência: FOR UPDATE em empresa_membros (1)
+     ✓ dois resgates simultâneos de recompensas diferentes, com saldo pra só um, deixam exatamente um passar 420ms
+   ✓ cancelamento: restaura o débito e é idempotente (2)
+     ✓ cancelar um resgate solicitado devolve as moedas 441ms
+     ✓ cancelar duas vezes não devolve as moedas duas vezes 675ms
+   ✓ máquina de estados: só os 4 caminhos permitidos (10)
+     ✓ permite solicitado → aprovado 450ms
+     ✓ permite solicitado → cancelado 507ms
+     ✓ permite aprovado → entregue 633ms
+     ✓ permite aprovado → cancelado 463ms
+     ✓ bloqueia solicitado → entregue 344ms
+ ✓ tests/guard-ambiente-local.test.ts (27 tests) 13313ms
+   ✓ host local, remoto e ausência de configuração (15)
+     ✓ dev: .env.local local passa 407ms
+     ✓ start: .env.local local passa 374ms
+     ✓ super-admin: .env.local local passa 369ms
+     ✓ dev: .env.local remoto é recusado, sem vazar valores 396ms
+     ✓ start: .env.local remoto é recusado, sem vazar valores 417ms
+     ✓ super-admin: .env.local remoto é recusado, sem vazar valores 367ms
+     ✓ dev: túnel/proxy em host local com chave remota é recusado, sem vazar a chave 351ms
+     ✓ start: túnel/proxy em host local com chave remota é recusado, sem vazar a chave 370ms
+     ✓ super-admin: túnel/proxy em host local com chave remota é recusado, sem vazar a chave 360ms
+     ✓ dev: sem nenhuma configuração é recusado 405ms
+     ✓ start: sem nenhuma configuração é recusado 455ms
+     ✓ super-admin: sem nenhuma configuração é recusado 437ms
+     ✓ recusa configuração incompleta (falta a service role) e URL inválida 743ms
+     ✓ recusa qualquer outra variável que cite domínio remoto do Supabase 353ms
+     ✓ modo ausente ou inválido não passa (código 2) 769ms
+   ✓ precedência de variáveis (6)
+     ✓ variável do processo prevalece sobre o arquivo (remoto no processo recusa) 427ms
+     ✓ variável do processo prevalece sobre o arquivo (local no processo libera arquivo remoto) 1348ms
+     ✓ next dev: .env.development.local (remoto) vence .env.local (local); next start não lê esse arquivo 907ms
+     ✓ next start: .env.production.local (remoto) é recusado; next dev não lê esse arquivo 857ms
+     ✓ Next e Vite têm precedências diferentes e cada comando usa a sua: .env.local local + .env.development remoto 1079ms
+     ✓ arquivo remoto sobrescrito por arquivo local de maior precedência passa 693ms
+   ✓ pnpm super-admin recusa antes de qualquer conexão (4)
+     ✓ ambiente remoto: sai com código 1 antes de usar a service role 311ms
+     ✓ sem configuração: recusa; processo remoto prevalece sobre arquivo local 592ms
+     ✓ equivalência: o ambiente do super-admin é o loadEnv do Vite, com o processo prevalecendo 454ms
+ ✓ tests/validar-conjunto-migrations.test.ts (21 tests) 9267ms
+   ✓ conjunto exatamente igual ao autorizado (2)
+     ✓ uma migration, a autorizada: passa 729ms
+     ✓ vários itens autorizados, em qualquer ordem, e o dry-run lista os mesmos: passa 783ms
+   ✓ conjunto diferente do autorizado: encerra com erro (10)
+     ✓ nenhuma migration pendente 553ms
+     ✓ migration extra além da autorizada 457ms
+     ✓ várias migrations extras 480ms
+     ✓ só uma migration diferente da autorizada (substituição) 996ms
+     ✓ migration anterior já aplicada (inclusive as três do Solo), sozinha ou junto com a autorizada, não passa 3155ms
+     ✓ as três do Solo, já aplicadas, são recusadas pela lista atual e só passariam se alguém as autorizasse de novo 578ms
+     ✓ nome parecido com o autorizado (sufixo ou prefixo a mais) não passa 387ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 42 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/calculadora-persistencia-db.test.ts > M2-Q2: valorComoPersistido bate com o Postgres real nas colunas de calculos_solares > tarifa_kwh numeric(8,4): bruto 0.123456
+AssertionError: expected 0.12346 to be 0.1235 // Object.is equality
+
+- Expected
++ Received
+
+- 0.1235
++ 0.12346
+
+ ❯ tests/calculadora-persistencia-db.test.ts:267:30
+    265|     expect(error).toBeNull();
+    266|     const { data } = await servico.from("calculos_solares").select("ta…
+    267|     expect(data!.tarifa_kwh).toBe(valorComoPersistido(bruto, 4));
+       |                              ^
+    268|   });
+    269|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/42]⎯
+
+ FAIL  tests/calculadora-persistencia-db.test.ts > M2-Q2: valorComoPersistido bate com o Postgres real nas colunas de calculos_solares > tarifa_kwh numeric(8,4): bruto 0.95231
+AssertionError: expected 0.95231 to be 0.9523 // Object.is equality
+
+- Expected
++ Received
+
+- 0.9523
++ 0.95231
+
+ ❯ tests/calculadora-persistencia-db.test.ts:267:30
+    265|     expect(error).toBeNull();
+    266|     const { data } = await servico.from("calculos_solares").select("ta…
+    267|     expect(data!.tarifa_kwh).toBe(valorComoPersistido(bruto, 4));
+       |                              ^
+    268|   });
+    269|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/42]⎯
+
+ FAIL  tests/calculadora-persistencia-db.test.ts > M2-Q2: valorComoPersistido bate com o Postgres real nas colunas de calculos_solares > tarifa_kwh numeric(8,4): bruto 0.00005
+AssertionError: expected 0.00005 to be 0.0001 // Object.is equality
+
+- Expected
++ Received
+
+- 0.0001
++ 0.00005
+
+ ❯ tests/calculadora-persistencia-db.test.ts:267:30
+    265|     expect(error).toBeNull();
+    266|     const { data } = await servico.from("calculos_solares").select("ta…
+    267|     expect(data!.tarifa_kwh).toBe(valorComoPersistido(bruto, 4));
+       |                              ^
+    268|   });
+    269|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/42]⎯
+
+ FAIL  tests/calculadora-persistencia-db.test.ts > M2-Q2: valorComoPersistido bate com o Postgres real nas colunas de calculos_solares > tarifa_kwh numeric(8,4): bruto 1.23455
+AssertionError: expected 1.23455 to be 1.2346 // Object.is equality
+
+- Expected
++ Received
+
+- 1.2346
++ 1.23455
+
+ ❯ tests/calculadora-persistencia-db.test.ts:267:30
+    265|     expect(error).toBeNull();
+    266|     const { data } = await servico.from("calculos_solares").select("ta…
+    267|     expect(data!.tarifa_kwh).toBe(valorComoPersistido(bruto, 4));
+       |                              ^
+    268|   });
+    269|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/42]⎯
+
+ FAIL  tests/calculadora-persistencia-db.test.ts > M2-Q2: valorComoPersistido bate com o Postgres real nas colunas de calculos_solares > o banco rejeita (23514) tarifa bruta 0,00004 (normaliza para 0) e o helper também prevê 0
+AssertionError: expected undefined to be '23514' // Object.is equality
+
+- Expected:
+"23514"
+
++ Received:
+undefined
+
+ ❯ tests/calculadora-persistencia-db.test.ts:294:25
+    292|     expect(valorComoPersistido(0.00004, 4)).toBe(0);
+    293|     const { error } = await inserirCalculoBruto({ tarifa_kwh: 0.00004 …
+    294|     expect(error?.code).toBe("23514");
+       |                         ^
+    295|   });
+    296|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/42]⎯
+
+ FAIL  tests/calculadora-persistencia-db.test.ts > linhas legadas (fórmula antiga, não validada): escala das colunas e motor atual > tarifa 0,123456 e consumo 800 (tarifa g…: a linha legada inserida é lida na escala das colunas; o motor atual não a reproduz nem a altera
+AssertionError: expected 0.12346 to be 0.1235 // Object.is equality
+
+- Expected
++ Received
+
+- 0.1235
++ 0.12346
+
+ ❯ tests/calculadora-persistencia-db.test.ts:404:30
+    402|     expect(lida!.consumo_medio_kwh).toBe(consumoComoPersistido(caso.co…
+    403|     if (caso.contaSemSolarGravada !== undefined) expect(lida!.conta_se…
+    404|     expect(lida!.tarifa_kwh).toBe(caso.tarifaGravada ?? valorComoPersi…
+       |                              ^
+    405|     expect(lida!.valor_fatura_medio).toBe(caso.faturaGravada ?? (caso.…
+    406|     expect(lida!.kit_potencia_kwp).toBe(caso.potenciaGravada ?? valorC…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/42]⎯
+
+ FAIL  tests/calculadora-persistencia-db.test.ts > linhas legadas (fórmula antiga, não validada): escala das colunas e motor atual > tarifa 0,95231 e consumo 800 (tarifa gr…: a linha legada inserida é lida na escala das colunas; o motor atual não a reproduz nem a altera
+ FAIL  tests/calculadora-persistencia-db.test.ts > linhas legadas (fórmula antiga, não validada): escala das colunas e motor atual > consumo informado 1050,09, fatura 1000 …: a linha legada inserida é lida na escala das colunas; o motor atual não a reproduz nem a altera
+AssertionError: expected 0.95231 to be 0.9523 // Object.is equality
+
+- Expected
++ Received
+
+- 0.9523
++ 0.95231
+
+ ❯ tests/calculadora-persistencia-db.test.ts:404:30
+    402|     expect(lida!.consumo_medio_kwh).toBe(consumoComoPersistido(caso.co…
+    403|     if (caso.contaSemSolarGravada !== undefined) expect(lida!.conta_se…
+    404|     expect(lida!.tarifa_kwh).toBe(caso.tarifaGravada ?? valorComoPersi…
+       |                              ^
+    405|     expect(lida!.valor_fatura_medio).toBe(caso.faturaGravada ?? (caso.…
+    406|     expect(lida!.kit_potencia_kwp).toBe(caso.potenciaGravada ?? valorC…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/42]⎯
+
+ FAIL  tests/calculadora-persistencia-db.test.ts > linhas legadas (fórmula antiga, não validada): escala das colunas e motor atual > negócio sem linha: com os parâmetros reais da empresa o motor devolve incompleta e NENHUMA linha é criada
+AssertionError: expected [ 'enquadramento_ausente', …(2) ] to include 'formula_nao_validada'
+ ❯ tests/calculadora-persistencia-db.test.ts:448:47
+    446|     if (r.ok || r.incompleta !== true) throw new Error("esperava estim…
+    447|     expect(r.geracaoEstimadaKwhMes).toBe(1200); // 10 kWp × 120 (parâm…
+    448|     expect(r.pendencias.map((p) => p.codigo)).toContain("formula_nao_v…
+       |                                               ^
+    449|     expect(await contarLinhas(negocio)).toBe(0);
+    450|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/42]⎯
+
+ FAIL  tests/calculo-reproduzivel.test.ts > linhaDeCalculo: estimativa incompleta, só o resultado técnico > entrada completa do vendedor (consumo em kWh e tarifa): incompleta, linha técnica, com a mensagem exata
+AssertionError: expected [ 'enquadramento_ausente', …(2) ] to deeply equal [ 'enquadramento_ausente', …(4) ]
+
+- Expected
++ Received
+
+  [
+    "enquadramento_ausente",
+    "distribuidora_ausente",
+-   "fio_b_ausente",
+-   "base_tributaria_divergente",
+-   "formula_nao_validada",
++   "base_tributaria_ausente",
+  ]
+
+ ❯ tests/calculo-reproduzivel.test.ts:103:26
+    101|     const r = incompleta();
+    102|     expect(r.ok).toBe(false);
+    103|     expect(codigosDe(r)).toEqual(CODIGOS_DA_EMPRESA);
+       |                          ^
+    104|     expect(r.mensagem).toBe(MENSAGEM_BASE);
+    105|     expect(r.mensagem).toBe(mensagemEstimativaIncompleta(r.pendencias)…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/42]⎯
+
+ FAIL  tests/calculo-reproduzivel.test.ts > linhaDeCalculo: estimativa incompleta, só o resultado técnico > nenhum campo financeiro vaza no resultado: na linha, todos nulos (ausência nunca vira zero)
+AssertionError: expected { …(32) } to not have property "metodo_calculo"
+
+- Expected:
+undefined
+
++ Received:
+null
+
+ ❯ tests/calculo-reproduzivel.test.ts:141:19
+    139|       expect(l[campo], campo).toBeNull();
+    140|     }
+    141|     expect(l).not.toHaveProperty("metodo_calculo");
+       |                   ^
+    142|   });
+    143|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/42]⎯
+
+ FAIL  tests/calculo-reproduzivel.test.ts > linhaDeCalculo: estimativa incompleta, só o resultado técnico > conta em R$ sem consumo em kWh: incompleta, nunca deriva consumo da fatura ÷ tarifa base
+AssertionError: expected [ 'enquadramento_ausente', …(4) ] to deeply equal [ 'enquadramento_ausente', …(6) ]
+
+- Expected
++ Received
+
+  [
+    "enquadramento_ausente",
+    "distribuidora_ausente",
+    "consumo_ausente",
+    "consumo_estimado_pela_tarifa_base",
+-   "fio_b_ausente",
+-   "base_tributaria_divergente",
+-   "formula_nao_validada",
++   "base_tributaria_ausente",
+  ]
+
+ ❯ tests/calculo-reproduzivel.test.ts:148:26
+    146|   it("conta em R$ sem consumo em kWh: incompleta, nunca deriva consumo…
+    147|     const r = incompleta({ consumoMedioKwh: null, valorFaturaMedio: 10…
+    148|     expect(codigosDe(r)).toEqual([
+       |                          ^
+    149|       "enquadramento_ausente",
+    150|       "distribuidora_ausente",
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/42]⎯
+
+ FAIL  tests/calculo-reproduzivel.test.ts > linhaDeCalculo: estimativa incompleta, só o resultado técnico > consumo em kWh informado não gera as pendências de consumo, mesmo com fatura (informado vence a fatura)
+AssertionError: expected [ 'enquadramento_ausente', …(2) ] to deeply equal [ 'enquadramento_ausente', …(4) ]
+
+- Expected
++ Received
+
+  [
+    "enquadramento_ausente",
+    "distribuidora_ausente",
+-   "fio_b_ausente",
+-   "base_tributaria_divergente",
+-   "formula_nao_validada",
++   "base_tributaria_ausente",
+  ]
+
+ ❯ tests/calculo-reproduzivel.test.ts:164:26
+    162|   it("consumo em kWh informado não gera as pendências de consumo, mesm…
+    163|     const r = incompleta({ consumoMedioKwh: 500, valorFaturaMedio: 100…
+    164|     expect(codigosDe(r)).toEqual(CODIGOS_DA_EMPRESA);
+       |                          ^
+    165|   });
+    166|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/42]⎯
+
+ FAIL  tests/calculo-reproduzivel.test.ts > linhaDeCalculo: estimativa incompleta, só o resultado técnico > consumo informado com casas excedentes (1200,555) é aceito: incompleta, não erro
+AssertionError: expected [ 'enquadramento_ausente', …(2) ] to deeply equal [ 'enquadramento_ausente', …(4) ]
+
+- Expected
++ Received
+
+  [
+    "enquadramento_ausente",
+    "distribuidora_ausente",
+-   "fio_b_ausente",
+-   "base_tributaria_divergente",
+-   "formula_nao_validada",
++   "base_tributaria_ausente",
+  ]
+
+ ❯ tests/calculo-reproduzivel.test.ts:168:66
+    166|
+    167|   it("consumo informado com casas excedentes (1200,555) é aceito: inco…
+    168|     expect(codigosDe(incompleta({ consumoMedioKwh: 1200.555 }))).toEqu…
+       |                                                                  ^
+    169|   });
+    170|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/42]⎯
+
+ FAIL  tests/calculo-reproduzivel.test.ts > linhaDeCalculo: estimativa incompleta, só o resultado técnico > preço 0 e preço com casas excedentes são aceitos (incompleta), como antes aceitavam
+AssertionError: expected [ 'enquadramento_ausente', …(2) ] to deeply equal [ 'enquadramento_ausente', …(4) ]
+
+- Expected
++ Received
+
+  [
+    "enquadramento_ausente",
+    "distribuidora_ausente",
+-   "fio_b_ausente",
+-   "base_tributaria_divergente",
+-   "formula_nao_validada",
++   "base_tributaria_ausente",
+  ]
+
+ ❯ tests/calculo-reproduzivel.test.ts:209:52
+    207|
+    208|   it("preço 0 e preço com casas excedentes são aceitos (incompleta), c…
+    209|     expect(codigosDe(incompleta({ precoKit: 0 }))).toEqual(CODIGOS_DA_…
+       |                                                    ^
+    210|     expect(codigosDe(incompleta({ precoKit: 19999.995 }))).toEqual(COD…
+    211|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/42]⎯
+
+ FAIL  tests/calculo-reproduzivel.test.ts > pendenciasDaEntrada e entradaDaLinha > sem consumo nem fatura: consumo ausente, sem a pendência de conta em R$
+AssertionError: expected [ 'enquadramento_ausente', …(3) ] to include 'formula_nao_validada'
+ ❯ tests/calculo-reproduzivel.test.ts:232:15
+    230|     expect(c).toContain("consumo_ausente");
+    231|     expect(c).not.toContain("consumo_estimado_pela_tarifa_base");
+    232|     expect(c).toContain("formula_nao_validada");
+       |               ^
+    233|   });
+    234|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/42]⎯
+
+ FAIL  tests/calculo-reproduzivel.test.ts > D2: linhaDeCalculo normaliza as entradas persistidas (sem gravar linha nova) > todas as entradas com excesso de casas ao mesmo tempo continuam aceitas (incompleta, sem erro)
+AssertionError: expected [ 'enquadramento_ausente', …(2) ] to deeply equal [ 'enquadramento_ausente', …(4) ]
+
+- Expected
++ Received
+
+  [
+    "enquadramento_ausente",
+    "distribuidora_ausente",
+-   "fio_b_ausente",
+-   "base_tributaria_divergente",
+-   "formula_nao_validada",
++   "base_tributaria_ausente",
+  ]
+
+ ❯ tests/calculo-reproduzivel.test.ts:298:26
+    296|   it("todas as entradas com excesso de casas ao mesmo tempo continuam …
+    297|     const r = incompleta({ potenciaKwp: 7.775, precoKit: 25999.995, ta…
+    298|     expect(codigosDe(r)).toEqual(CODIGOS_DA_EMPRESA);
+       |                          ^
+    299|     expect(r.potenciaKwp).toBe(7.78);
+    300|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/42]⎯
+
+ FAIL  tests/calculo-reproduzivel.test.ts > linhaDeCalculo: validações e ordem dos erros > tarifa 0,00004 (normaliza para 0) devolve o erro de tarifa; 0 e negativa também
+AssertionError: expected 'Estimativa financeira incompleta: Inf…' to be 'Informe uma tarifa maior que zero (o …' // Object.is equality
+
+Expected: "Informe uma tarifa maior que zero (o banco guarda 4 casas)."
+Received: "Estimativa financeira incompleta: Informe o tipo de cliente na Qualificação SDR (a estimativa cobre cliente residencial); Informe a distribuidora de energia na Qualificação SDR; Declare se a tarifa informada inclui tributos."
+
+ ❯ tests/calculo-reproduzivel.test.ts:334:46
+    332|
+    333|   it("tarifa 0,00004 (normaliza para 0) devolve o erro de tarifa; 0 e …
+    334|     expect(mensagem({ tarifaKwh: 0.00004 })).toBe(ERRO_TARIFA);
+       |                                              ^
+    335|     expect(mensagem({ tarifaKwh: 0 })).toBe(ERRO_TARIFA);
+    336|     expect(mensagem({ tarifaKwh: -0.5 })).toBe(ERRO_TARIFA);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/42]⎯
+
+ FAIL  tests/calculo-reproduzivel.test.ts > linhaDeCalculo: validações e ordem dos erros > tarifa 0,00005 (normaliza para 0,0001) é aceita
+AssertionError: expected [ 'enquadramento_ausente', …(2) ] to deeply equal [ 'enquadramento_ausente', …(4) ]
+
+- Expected
++ Received
+
+  [
+    "enquadramento_ausente",
+    "distribuidora_ausente",
+-   "fio_b_ausente",
+-   "base_tributaria_divergente",
+-   "formula_nao_validada",
++   "base_tributaria_ausente",
+  ]
+
+ ❯ tests/calculo-reproduzivel.test.ts:341:59
+    339|   it("tarifa 0,00005 (normaliza para 0,0001) é aceita", () => {
+    340|     // Aceita (não é o erro de tarifa): estimativa incompleta.
+    341|     expect(codigosDe(incompleta({ tarifaKwh: 0.00005 }))).toEqual(CODI…
+       |                                                           ^
+    342|   });
+    343|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/42]⎯
+
+ FAIL  tests/calculo-reproduzivel.test.ts > linhaDeCalculo: validações e ordem dos erros > estimativa incompleta não é erro de entrada: só aparece com entrada válida (potência, tarifa e preço ok)
+AssertionError: expected 'Informe uma tarifa maior que zero (o …' to be 'Informe uma tarifa maior que zero (o …' // Object.is equality
+
+Expected: "Informe uma tarifa maior que zero (o banco guarda 4 casas)."
+Received: "Informe uma tarifa maior que zero (o banco guarda 5 casas)."
+
+ ❯ tests/calculo-reproduzivel.test.ts:366:87
+    364|   it("estimativa incompleta não é erro de entrada: só aparece com entr…
+    365|     expect(mensagem({ consumoMedioKwh: null, valorFaturaMedio: 1000, p…
+    366|     expect(mensagem({ consumoMedioKwh: null, valorFaturaMedio: 1000, t…
+       |                                                                                       ^
+    367|     expect(mensagem({ consumoMedioKwh: null, valorFaturaMedio: 1000, p…
+    368|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/42]⎯
+
+ FAIL  tests/calculo-reproduzivel.test.ts > linhaDeCalculo: validações e ordem dos erros > ordem: (1) entrada, (2) potência, (3) tarifa, (4) preço, (5) consumo, (6) parâmetros > tarifa e preço inválidos: tarifa primeiro
+AssertionError: expected 'Informe um preço do kit válido (maior…' to be 'Informe uma tarifa maior que zero (o …' // Object.is equality
+
+Expected: "Informe uma tarifa maior que zero (o banco guarda 4 casas)."
+Received: "Informe um preço do kit válido (maior ou igual a zero)."
+
+ ❯ tests/calculo-reproduzivel.test.ts:389:62
+    387|
+    388|     it("tarifa e preço inválidos: tarifa primeiro", () => {
+    389|       expect(mensagem({ tarifaKwh: 0.00004, precoKit: -1 })).toBe(ERRO…
+       |                                                              ^
+    390|     });
+    391|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[20/42]⎯
+
+ FAIL  tests/calculo-reproduzivel.test.ts > linhaDeCalculo: validações e ordem dos erros > ordem: (1) entrada, (2) potência, (3) tarifa, (4) preço, (5) consumo, (6) parâmetros > tarifa inválida e parâmetros nulos: erro de tarifa
+AssertionError: expected 'Informe uma tarifa maior que zero (o …' to be 'Informe uma tarifa maior que zero (o …' // Object.is equality
+
+Expected: "Informe uma tarifa maior que zero (o banco guarda 4 casas)."
+Received: "Informe uma tarifa maior que zero (o banco guarda 5 casas)."
+
+ ❯ tests/calculo-reproduzivel.test.ts:401:48
+    399|
+    400|     it("tarifa inválida e parâmetros nulos: erro de tarifa", () => {
+    401|       expect(mensagem({ tarifaKwh: 0 }, null)).toBe(ERRO_TARIFA);
+       |                                                ^
+    402|     });
+    403|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[21/42]⎯
+
+ FAIL  tests/calculo-vigencia-db.test.ts > gerarLinkProposta (Server Action) > linha legada com kit vigente: recusa (fórmula antiga, não validada) e não grava nada
+AssertionError: expected { ok: false, …(1) } to deeply equal { ok: false, …(1) }
+
+- Expected
++ Received
+
+  {
+-   "mensagem": "A estimativa financeira está incompleta: o último cálculo foi feito pela fórmula antiga, que não foi validada; Informe o tipo de cliente na Qualificação SDR (a estimativa cobre cliente residencial); Informe a distribuidora de energia na Qualificação SDR; Informe a tarifa (R$/kWh); Informe o consumo médio em kWh; Declare se a tarifa informada inclui tributos. A proposta fica disponível quando os dados forem validados.",
++   "mensagem": "O último cálculo foi feito pela fórmula antiga, que não foi validada. Recalcule o kit antes de gerar a proposta.",
+    "ok": false,
+  }
+
+ ❯ tests/calculo-vigencia-db.test.ts:209:37
+    207|     const id = await negocioComCalculo("Proposta legado");
+    208|     const antes = await estado(id);
+    209|     expect(await gerarProposta(id)).toEqual({ ok: false, mensagem: MEN…
+       |                                     ^
+    210|     expect(await estado(id)).toEqual(antes);
+    211|     expect((await estado(id)).propostas).toHaveLength(0);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22/42]⎯
+
+ FAIL  tests/calculo-vigencia-db.test.ts > gerarLinkProposta (Server Action) > kit alterado depois do cálculo: recusa e não grava nada; restaurado o kit, continua recusando (legado)
+AssertionError: expected { ok: false, …(1) } to deeply equal { ok: false, …(1) }
+
+- Expected
++ Received
+
+  {
+-   "mensagem": "A estimativa financeira está incompleta: o último cálculo foi feito pela fórmula antiga, que não foi validada; Informe o tipo de cliente na Qualificação SDR (a estimativa cobre cliente residencial); Informe a distribuidora de energia na Qualificação SDR; Informe a tarifa (R$/kWh); Informe o consumo médio em kWh; Declare se a tarifa informada inclui tributos. A proposta fica disponível quando os dados forem validados.",
++   "mensagem": "O último cálculo foi feito pela fórmula antiga, que não foi validada. Recalcule o kit antes de gerar a proposta.",
+    "ok": false,
+  }
+
+ ❯ tests/calculo-vigencia-db.test.ts:222:37
+    220|     expect(antes.propostas).toHaveLength(0);
+    221|
+    222|     expect(await gerarProposta(id)).toEqual({ ok: false, mensagem: MEN…
+       |                                     ^
+    223|     expect(await estado(id)).toEqual(antes);
+    224|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[23/42]⎯
+
+ FAIL  tests/calculo-vigencia-db.test.ts > gerarLinkProposta (Server Action) > kit sem nenhum módulo (potência 0) contra cálculo de 5,5 kWp: recusa sem gravar
+AssertionError: expected { ok: false, …(1) } to deeply equal { ok: false, …(1) }
+
+- Expected
++ Received
+
+  {
+-   "mensagem": "A estimativa financeira está incompleta: o último cálculo foi feito pela fórmula antiga, que não foi validada; Informe o tipo de cliente na Qualificação SDR (a estimativa cobre cliente residencial); Informe a distribuidora de energia na Qualificação SDR; Informe a tarifa (R$/kWh); Informe o consumo médio em kWh; Declare se a tarifa informada inclui tributos. A proposta fica disponível quando os dados forem validados.",
++   "mensagem": "O último cálculo foi feito pela fórmula antiga, que não foi validada. Recalcule o kit antes de gerar a proposta.",
+    "ok": false,
+  }
+
+ ❯ tests/calculo-vigencia-db.test.ts:234:37
+    232|     await servico.from("kit_componentes").delete().eq("negocio_id", id…
+    233|     const antes = await estado(id);
+    234|     expect(await gerarProposta(id)).toEqual({ ok: false, mensagem: MEN…
+       |                                     ^
+    235|     expect(await estado(id)).toEqual(antes);
+    236|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[24/42]⎯
+
+ FAIL  tests/calculo-vigencia-db.test.ts > gerarLinkProposta (Server Action) > linha legada com consumo/tarifa diferentes do negócio: recusa igual (legado), sem proposta
+AssertionError: expected { ok: false, …(1) } to deeply equal { ok: false, …(1) }
+
+- Expected
++ Received
+
+  {
+-   "mensagem": "A estimativa financeira está incompleta: o último cálculo foi feito pela fórmula antiga, que não foi validada; Informe o tipo de cliente na Qualificação SDR (a estimativa cobre cliente residencial); Informe a distribuidora de energia na Qualificação SDR; Informe a tarifa (R$/kWh); Informe o consumo médio em kWh; Declare se a tarifa informada inclui tributos. A proposta fica disponível quando os dados forem validados.",
++   "mensagem": "O último cálculo foi feito pela fórmula antiga, que não foi validada. Recalcule o kit antes de gerar a proposta.",
+    "ok": false,
+  }
+
+ ❯ tests/calculo-vigencia-db.test.ts:263:37
+    261|     const { error } = await servico.from("calculos_solares").update({ …
+    262|     if (error) throw error;
+    263|     expect(await gerarProposta(id)).toEqual({ ok: false, mensagem: MEN…
+       |                                     ^
+    264|     expect((await estado(id)).propostas).toHaveLength(0);
+    265|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[25/42]⎯
+
+ FAIL  tests/calculo-vigencia.test.ts > mensagens de recusa > textos exatos do contrato (a interface e as ações dependem deles)
+AssertionError: expected 'O cálculo salvo foi feito pela fórmul…' to be 'O cálculo salvo foi feito pela fórmul…' // Object.is equality
+
+Expected: "O cálculo salvo foi feito pela fórmula antiga, que não foi validada: o preço não pode ser atualizado nele. Aguarde a validação da estimativa financeira."
+Received: "O cálculo salvo foi feito pela fórmula antiga, que não foi validada: o preço não pode ser atualizado nele. Recalcule o kit."
+
+ ❯ tests/calculo-vigencia.test.ts:402:43
+    400|     expect(MENSAGEM_CONTRATO_CALCULO_DESATUALIZADO).toBe("O kit mudou …
+    401|     expect(MENSAGEM_PRECO_CALCULO_DESATUALIZADO).toBe("O kit mudou dep…
+    402|     expect(MENSAGEM_PRECO_CALCULO_LEGADO).toBe(
+       |                                           ^
+    403|       "O cálculo salvo foi feito pela fórmula antiga, que não foi vali…
+    404|     );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[26/42]⎯
+
+ FAIL  tests/calculo-vigencia.test.ts > mensagens de recusa > legado + proposta: 'A estimativa financeira está incompleta: o último cálculo foi feito pela fórmula antiga, que não foi validada; <pendências>. A proposta fica disponível quando os dados forem validados.'
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ tests/calculo-vigencia.test.ts:409:141
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[27/42]⎯
+
+ FAIL  tests/calculo-vigencia.test.ts > mensagens de recusa > legado + contrato: texto próprio (na prática o contrato filtra o legado antes)
+AssertionError: expected 'O último cálculo foi feito pela fórmu…' to be 'Não é possível gerar o contrato: o úl…' // Object.is equality
+
+Expected: "Não é possível gerar o contrato: o último cálculo foi feito pela fórmula antiga, que não foi validada."
+Received: "O último cálculo foi feito pela fórmula antiga, que não foi validada. Recalcule o kit antes de gerar o contrato."
+
+ ❯ tests/calculo-vigencia.test.ts:421:54
+    419|
+    420|   it("legado + contrato: texto próprio (na prática o contrato filtra o…
+    421|     expect(mensagemDeRecusa(["legado"], "contrato")).toBe("Não é possí…
+       |                                                      ^
+    422|   });
+    423|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[28/42]⎯
+
+ FAIL  tests/calculo-vigencia.test.ts > mensagens de recusa > textoDoMotivo: frase curta de cada motivo
+AssertionError: expected 'os parâmetros financeiros da calculad…' to be 'os parâmetros financeiros da calculad…' // Object.is equality
+
+Expected: "os parâmetros financeiros da calculadora da empresa mudaram depois do último cálculo"
+Received: "os parâmetros financeiros da calculadora mudaram depois do último cálculo"
+
+ ❯ tests/calculo-vigencia.test.ts:458:53
+    456|     expect(textoDoMotivo("legado")).toBe("o último cálculo foi feito p…
+    457|     expect(textoDoMotivo("kit")).toBe("o kit mudou depois do último cá…
+    458|     expect(textoDoMotivo("parametros_financeiros")).toBe("os parâmetro…
+       |                                                     ^
+    459|   });
+    460| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[29/42]⎯
+
+ FAIL  tests/calculos-estimativa-incompleta-db.test.ts > calculos_solares.estado_financeiro > completo: exige números e método; sem método é recusado (o motor ainda não grava este estado)
+AssertionError: expected { code: '23514', …(3) } to be null
+
+- Expected:
+null
+
++ Received:
+{
+  "code": "23514",
+  "details": "Failing row contains (f526245f-f5ed-4063-9530-4c9a1a75de35, d6034b11-a6c1-4fcc-b44d-3bd969e3a1c1, ab1ad519-de57-453b-88ea-96b724dfa55f, null, Kit personalizado · 5,5 kWp, 5.50, 25000.00, trifasico, 600.00, null, 0.95000, 120.00, 0.450, 100.00, 660.00, 100.00, 500.00, 60.00, 570.00, 140.00, 430.00, null, null, null, null, 2026-10-23 02:47:09.51206+00, 2026-10-23 02:47:09.51206+00, completo, metodo_teste, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null).",
+  "hint": null,
+  "message": "new row for relation \"calculos_solares\" violates check constraint \"calculos_solares_estado_coerente_ck\"",
+}
+
+ ❯ tests/calculos-estimativa-incompleta-db.test.ts:90:109
+     88|     expect((await inserir({ estado_financeiro: "completo", ...NULOS, m…
+     89|     expect((await inserir({ estado_financeiro: "completo", ...FINANCEI…
+     90|     expect(await inserir({ estado_financeiro: "completo", ...FINANCEIR…
+       |                                                                                                             ^
+     91|   });
+     92|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[30/42]⎯
+
+ FAIL  tests/negocios-gravacao-db.test.ts > kit > itens sem tarifa são salvos; com tarifa viram cálculo; salvar de novo mantém o valor da conta
+AssertionError: expected 'Kit e resultado técnico salvos. Estim…' to contain 'Estimativa financeira incompleta: Inf…'
+
+Expected: "Estimativa financeira incompleta: Informe o enquadramento"
+Received: "Kit e resultado técnico salvos. Estimativa financeira incompleta: Informe o tipo de cliente na Qualificação SDR (a estimativa cobre cliente residencial); Informe a distribuidora de energia na Qualificação SDR; Declare se a tarifa informada inclui tributos."
+
+ ❯ tests/negocios-gravacao-db.test.ts:317:28
+    315|     const salvo = await salvarKitComCliente(cliente(vendedor), atual[v…
+    316|     expect(salvo).toMatchObject({ ok: true, negocioId: r.negocioId, me…
+    317|     expect(salvo.mensagem).toContain("Estimativa financeira incompleta…
+       |                            ^
+    318|     expect(salvo.mensagem).toContain("A regra de cálculo da economia a…
+    319|     expect(salvo.mensagem).not.toContain("O cálculo anterior");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[31/42]⎯
+
+ FAIL  tests/negocios-gravacao-db.test.ts > kit > conta em R$ sem consumo em kWh: salva o kit, não cria cálculo e, havendo cálculo prévio, o mantém intacto (estimativa incompleta)
+AssertionError: expected [ 'enquadramento_ausente', …(4) ] to deeply equal [ 'enquadramento_ausente', …(6) ]
+
+- Expected
++ Received
+
+  [
+    "enquadramento_ausente",
+    "distribuidora_ausente",
+    "consumo_ausente",
+    "consumo_estimado_pela_tarifa_base",
+-   "fio_b_ausente",
+-   "base_tributaria_divergente",
+-   "formula_nao_validada",
++   "base_tributaria_ausente",
+  ]
+
+ ❯ tests/negocios-gravacao-db.test.ts:375:48
+    373|     });
+    374|     // Pendências do vendedor (consumo) e da empresa (enquadramento, d…
+    375|     expect(pendenciasSem.map((p) => p.codigo)).toEqual([
+       |                                                ^
+    376|       "enquadramento_ausente",
+    377|       "distribuidora_ausente",
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[32/42]⎯
+
+ FAIL  tests/negocios-gravacao-db.test.ts > kit > kWh e fatura do kit: vazio preserva o gravado no negócio (contrato M2-P0-K1) > negócio 450 kWh / R$ 300 e cálculo legado 700 kWh / R$ 900: abrir mostra 450 e 300; salvar sem editar mantém 450 e 300
+AssertionError: expected { consumo_medio_kwh: 450, …(1) } to deeply equal { consumo_medio_kwh: 700, …(1) }
+
+- Expected
++ Received
+
+  {
+-   "consumo_medio_kwh": 700,
+-   "valor_fatura_medio": 900,
++   "consumo_medio_kwh": 450,
++   "valor_fatura_medio": 300,
+  }
+
+ ❯ tests/negocios-gravacao-db.test.ts:530:46
+    528|       expect((await reabrir(vendedor, r.negocioId)).negocio).toMatchOb…
+    529|       // A linha legada continua intocada (histórico): resultado incom…
+    530|       expect(await linhaLegada(r.negocioId)).toEqual({ consumo_medio_k…
+       |                                              ^
+    531|     });
+    532|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[33/42]⎯
+
+ FAIL  tests/negocios-gravacao-db.test.ts > kit > tarifa acima do limite da coluna: nenhuma linha é gravada, o banco não recusa nada e a linha legada fica intocada
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ tests/negocios-gravacao-db.test.ts:641:20
+    639|     const outroKit = JSON.stringify([{ tipo: "modulo", descricao: "Mód…
+    640|     const res = await salvarKitComCliente(cliente(vendedor), atual[ven…
+    641|     expect(res.ok).toBe(true);
+       |                    ^
+    642|     expect(res.mensagem).toContain("Itens do kit salvos. Estimativa fi…
+    643|     expect(res.mensagem).not.toContain("Nada foi alterado");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[34/42]⎯
+
+ FAIL  tests/negocios-gravacao-db.test.ts > kit > criar com kit, consumo e tarifa: estimativa incompleta é informação, não aviso de falha; kit, consumo e resultado técnico salvos
+AssertionError: expected [ 'enquadramento_ausente', …(2) ] to include 'formula_nao_validada'
+ ❯ tests/negocios-gravacao-db.test.ts:764:59
+    762|     const pendencias = pendenciasDaEntrada({ consumoMedioKwh: 450, val…
+    763|     expect(r.estimativa?.mensagem).toBe(mensagemEstimativaIncompleta(p…
+    764|     expect(r.estimativa?.pendencias.map((p) => p.codigo)).toContain("f…
+       |                                                           ^
+    765|     const f = await reabrir(vendedor, r.negocioId);
+    766|     expect(f.kit).toHaveLength(2);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[35/42]⎯
+
+ FAIL  tests/negocios-gravacao.test.ts > regressões de tela > cadastro: Cancelar montagem fecha o editor e descarta só os itens; valor digitado fica
+AssertionError: expected 'function cancelarMontagem() {\r\n    …' not to match /setContato|setConsumoMedioKwh|setValo…/
+
+- Expected:
+/setContato|setConsumoMedioKwh|setValorFaturaMedio|setCidade|setUf|setRua|setCep|setValorTocado/
+
++ Received:
+"function cancelarMontagem() {
+    setLinhas([]);
+    setMostrarProblemasKit(false);
+    setMostrarKit(false);
+    if (!valorTocado) setValor(\"\");
+  }
+
+  function voltar() {
+    setErroEtapa(null);
+    setEtapaAtual((e) => (e === 3 ? 2 : e === 2 ? 1 : e));
+  }
+
+  return (
+    <form onSubmit={enviar} noValidate className=\"flex flex-col gap-5\">
+      <input type=\"hidden\" name=\"funil_id\" value={funilId} />
+      {etapaId && <input type=\"hidden\" name=\"etapa_id\" value={etapaId} />}
+      <input type=\"hidden\" name=\"tipo_ligacao\" value={tipoLigacao} />
+      <input type=\"hidden\" name=\"componentes\" value={JSON.stringify(componentes)} />
+      <input type=\"hidden\" name=\"contato_endereco\" value={enderecoCompleto} />
+      <input type=\"hidden\" name=\"contato_cidade\" value={cidade} />
+      <input type=\"hidden\" name=\"contato_uf\" value={uf} />
+      <input type=\"hidden\" name=\"contato_nome\" value={contatoNome} />
+      <input type=\"hidden\" name=\"contato_telefone\" value={contatoTelefone} />
+      <input type=\"hidden\" name=\"contato_email\" value={contatoEmail} />
+      <input type=\"hidden\" name=\"valor\" value={valor} />
+      <input type=\"hidden\" name=\"consumo_medio_kwh\" value={consumoMedioKwh} />
+      <input type=\"hidden\" name=\"valor_fatura_medio\" value={valorFaturaMedio} />
+      <input type=\"hidden\" name=\"tarifa_kwh\" value={tarifaKwh} />
+      <input type=\"hidden\" name=\"estrutura_telhado\" value={estruturaTelhado} />
+      {contato && <input type=\"hidden\" name=\"contato_id\" value={contato.id} />}
+
+      <IndicadorEtapas atual={etapaAtual} />
+
+      {/* Etapa 1 — Cliente e consumo */}
+      <div ref={(el) => void (etapasRef.current[1] = el)} className={etapaAtual === 1 ? \"flex flex-col gap-5\" : \"hidden\"}>
+        <fieldset className=\"grid gap-3 md:grid-cols-2\">
+          <legend className=\"mb-2 text-sm font-semibold text-zinc-900\">Negócio</legend>
+          <Campo rotulo=\"Nome do negócio\" name=\"titulo\" placeholder=\"Ex.: Residência 5 kWp\" required />
+          <Selecao rotulo=\"Origem\" name=\"origem_id\" required defaultValue=\"\">
+            <option value=\"\" disabled>
+              Selecione
+            </option>
+            {origens.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.nome}
+              </option>
+            ))}
+          </Selecao>
+          {responsaveis.length > 0 && (
+            <Selecao rotulo=\"Responsável\" name=\"responsavel_id\" defaultValue={meuMembroId}>
+              {responsaveis.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.nome}
+                </option>
+              ))}
+            </Selecao>
+          )}
+        </fieldset>
+
+        <fieldset className=\"grid gap-3 md:grid-cols-2\">
+          <legend className=\"mb-2 text-sm font-semibold text-zinc-900\">Cliente</legend>
+          <div className=\"flex gap-2 md:col-span-2\">
+            <Botao type=\"button\" variante={modo === \"novo\" ? \"primario\" : \"secundario\"} onClick={() => setModo(\"novo\")}>
+              Novo cliente
+            </Botao>
+            <Botao
+              type=\"button\"
+              variante={modo === \"existente\" ? \"primario\" : \"secundario\"}
+              onClick={() => setModo(\"existente\")}
+            >
+              Cliente existente
+            </Botao>
+          </div>
+
+          {modo === \"existente\" ? (
+            <div className=\"flex flex-col gap-2 md:col-span-2\">
+              {contato ? (
+                <div className=\"flex items-center justify-between rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm\">
+                  <span>
+                    <strong>{contato.nome}</strong> {contato.telefone ?? contato.email}
+                  </span>
+                  <button type=\"button\" className=\"text-zinc-600 hover:underline\" onClick={() => setContato(null)}>
+                    Trocar
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <Campo rotulo=\"Buscar por nome, telefone ou e-mail\" value={busca} onChange={(e) => pesquisar(e.target.value)} />
+                  <ul className=\"flex flex-col\">
+                    {encontrados.map((c) => (
+                      <li key={c.id}>
+                        <button
+                          type=\"button\"
+                          onClick={() => escolherContato(c)}
+                          className=\"w-full rounded-md px-3 py-2 text-left text-sm hover:bg-zinc-100\"
+                        >
+                          <strong>{c.nome}</strong> <span className=\"text-zinc-500\">{c.telefone ?? c.email}</span>
+                        </button>
+                      </li>
+                    ))}
+                    {busca.length >= 2 && !encontrados.length && (
+                      <li className=\"px-3 py-2 text-sm text-zinc-500\">Nenhum contato encontrado.</li>
+                    )}
+                  </ul>
+                </>
+              )}
+            </div>
+          ) : (
+            <>
+              <Campo
+                rotulo=\"Nome / Razão social*\"
+                value={contatoNome}
+                onChange={(e) => setContatoNome(e.target.value)}
+                required
+              />
+              <Campo
+                rotulo=\"WhatsApp*\"
+                type=\"tel\"
+                inputMode=\"numeric\"
+                value={contatoTelefone}
+                placeholder=\"(11) 91234-5678\"
+                onChange={(e) => setContatoTelefone(formatarTelefoneBr(e.target.value))}
+                onBlur={() => conferirDuplicado(contatoTelefone, contatoEmail)}
+                required
+              />
+              <Campo
+                rotulo=\"E-mail\"
+                type=\"email\"
+                value={contatoEmail}
+                onChange={(e) => setContatoEmail(e.target.value)}
+                onBlur={() => conferirDuplicado(contatoTelefone, contatoEmail)}
+              />
+              {!emailValido && <p className=\"text-xs text-red-600 md:col-span-2\">E-mail inválido.</p>}
+              {duplicados.map((d) => (
+                <div key={d.contatoId} className=\"rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900 md:col-span-2\">
+                  {d.visivel ? (
+                    <>
+                      Já existe o contato <strong>{d.nome}</strong> com esses dados.{\" \"}
+                      <button
+                        type=\"button\"
+                        className=\"font-medium underline\"
+                        onClick={() => {
+                          setContato({ id: d.contatoId, nome: d.nome, telefone: null, email: null });
+                          setModo(\"existente\");
+                        }}
+                      >
+                        Usar este contato
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      Esse telefone ou e-mail já é de um cliente
+                      {d.responsavel ? (
+                        <>
+                          {\" \"}
+                          de <strong>{d.responsavel}</strong>
+                        </>
+                      ) : null}
+                      . Fale com o seu gestor antes de seguir.
+                    </>
+                  )}
+                </div>
+              ))}
+            </>
+          )}
+        </fieldset>
+
+        <fieldset className=\"grid gap-3 md:grid-cols-3\">
+          <legend className=\"mb-2 text-sm font-semibold text-zinc-900\">Localização</legend>
+          {modo === \"existente\" && contato?.endereco && (
+            <p className=\"rounded-md bg-zinc-50 px-3 py-2 text-xs text-zinc-600 md:col-span-3\">
+              Endereço já cadastrado no contato: <strong>{contato.endereco}</strong>. Ele é mantido; o que for digitado
+              aqui só completa campos vazios do contato.
+            </p>
+          )}
+          <Campo
+            rotulo=\"CEP\"
+            inputMode=\"numeric\"
+            value={cep}
+            placeholder=\"00000-000\"
+            onChange={(e) => setCep(formatarCep(e.target.value))}
+            onBlur={(e) => buscarEnderecoPorCep(e.target.value)}
+          />
+          {buscandoCep && <p className=\"self-end text-xs text-zinc-400 md:col-span-2\">Buscando endereço…</p>}
+          <div className=\"md:col-span-2\">
+            <Campo rotulo=\"Rua\" value={rua} onChange={(e) => setRua(e.target.value)} />
+          </div>
+          <Campo rotulo=\"Número\" value={numeroEndereco} onChange={(e) => setNumeroEndereco(e.target.value)} />
+          <Campo rotulo=\"Complemento\" value={complemento} onChange={(e) => setComplemento(e.target.value)} />
+          <Campo rotulo=\"Bairro\" value={bairro} onChange={(e) => setBairro(e.target.value)} />
+          <Campo rotulo=\"Cidade*\" value={cidade} onChange={(e) => setCidade(e.target.value)} required />
+          <Selecao rotulo=\"Estado*\" value={uf} onChange={(e) => setUf(e.target.value)} required>
+            <option value=\"\">UF</option>
+            {ESTADOS_BR.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </Selecao>
+          <p className=\"text-xs text-zinc-400 md:col-span-3\">
+            Cidade e estado identificam a distribuidora de energia e a tarifa aplicável — preencha pelo CEP ou manualmente.
+          </p>
+        </fieldset>
+
+        <fieldset className=\"flex flex-col gap-3\">
+          <legend className=\"mb-2 text-sm font-semibold text-zinc-900\">Dados de energia*</legend>
+          <div className=\"grid gap-3 md:grid-cols-2\">
+            <Campo
+              rotulo=\"Consumo médio mensal (kWh)\"
+              inputMode=\"decimal\"
+              placeholder=\"ex.: 780\"
+              value={consumoMedioKwh}
+              // Mantém ponto e vírgula: apagá-los transformava \"1.200,5\" em 12005 sem aviso.
+              onChange={(e) => setConsumoMedioKwh(e.target.value.replace(/[^\\d.,]/g, \"\"))}
+            />
+            <Campo
+              rotulo=\"Ou valor médio da conta (R$)\"
+              inputMode=\"numeric\"
+              placeholder=\"ex.: 650,00\"
+              value={valorFaturaMedio}
+              onChange={(e) => setValorFaturaMedio(formatarMascaraMoeda(e.target.value))}
+            />
+          </div>
+          <p className=\"text-xs text-zinc-400\">
+            Informe uma das duas opções — a outra pode ficar em branco. O valor da conta em R$ não vira consumo em kWh: o negócio é
+            criado do mesmo jeito, e o consumo em kWh pode ser informado depois.
+          </p>
+        </fieldset>
+
+        <fieldset className=\"flex flex-col gap-3\">
+          <legend className=\"mb-2 text-sm font-semibold text-zinc-900\">Documentos (opcional)</legend>
+          <div className=\"grid gap-3 md:grid-cols-2\">
+            <CardDocumento
+              titulo=\"📄 Anexar CNH\"
+              name=\"anexo_cnh_contato\"
+              accept=\"image/*,.pdf\"
+              arquivo={cnhSelecionada}
+              inputRef={inputCnh}
+              onArquivoChange={setCnhSelecionada}
+            />
+            <CardDocumento
+              titulo=\"⚡ Anexar conta de energia\"
+              name=\"anexo_fatura_gerador\"
+              accept=\"image/*,.pdf\"
+              arquivo={faturaSelecionada}
+              inputRef={inputFatura}
+              onArquivoChange={setFaturaSelecionada}
+            />
+          </div>
+        </fieldset>
+
+        {erroEtapa && <Mensagem resultado={{ ok: false, mensagem: erroEtapa }} />}
+        <div className=\"flex justify-end\">
+          <Botao type=\"button\" onClick={avancar} className=\"gap-1\">
+            Avançar <ChevronRight className=\"h-4 w-4\" />
+          </Botao>
+        </div>
+      </div>
+
+      {/* Etapa 2 — Sistema recomendado */}
+      <div ref={(el) => void (etapasRef.current[2] = el)} className={etapaAtual === 2 ? \"flex flex-col gap-5\" : \"hidden\"}>
+        <fieldset className=\"flex flex-col gap-3\">
+          <legend className=\"mb-2 text-sm font-semibold text-zinc-900\">Resumo do sistema</legend>
+          <dl className=\"grid grid-cols-2 gap-3 rounded-lg bg-zinc-50 px-4 py-3 text-sm md:grid-cols-3\">
+            <div>
+              <dt className=\"text-zinc-500\">Consumo mensal</dt>
+              <dd className=\"font-medium text-zinc-900\">
+                {consumoMedioEstimado ? `${consumoMedioEstimado.toLocaleString(\"pt-BR\")} kWh` : \"—\"}
+              </dd>
+            </div>
+            <div>
+              <dt className=\"text-zinc-500\">Produtividade</dt>
+              <dd className=\"font-medium text-zinc-900\">{parametros?.produtividadeKwhKwpMes ?? 120} kWh/kWp/mês</dd>
+            </div>
+            <div>
+              <dt className=\"text-zinc-500\">Sistema recomendado</dt>
+              <dd className=\"font-medium text-zinc-900\">
+                {sistemaRecomendado ? `${sistemaRecomendado.potenciaInstaladaKwp.toLocaleString(\"pt-BR\")} kWp` : \"—\"}
+              </dd>
+            </div>
+          </dl>
+
+          {sistemaRecomendado && (
+            <div className=\"rounded-xl border border-amber-200 bg-amber-50/60 p-4\">
+              <p className=\"mb-2 text-sm font-semibold text-zinc-900\">Kit recomendado (estimativa)</p>
+              <dl className=\"grid grid-cols-2 gap-3 text-sm md:grid-cols-4\">
+                <div>
+                  <dt className=\"text-zinc-500\">Potência</dt>
+                  <dd className=\"font-medium text-zinc-900\">{sistemaRecomendado.potenciaInstaladaKwp.toLocaleString(\"pt-BR\")} kWp</dd>
+                </div>
+                <div>
+                  <dt className=\"text-zinc-500\">Módulos</dt>
+                  <dd className=\"font-medium text-zinc-900\">
+                    {sistemaRecomendado.quantidadeModulos} × {POTENCIA_MODULO_REFERENCIA_W} W
+                  </dd>
+                </div>
+                <div>
+                  <dt className=\"text-zinc-500\">Inversor</dt>
+                  <dd className=\"font-medium text-zinc-900\">a definir (sem catálogo de equipamentos)</dd>
+                </div>
+                <div>
+                  <dt className=\"text-zinc-500\">Geração / economia / payback</dt>
+                  <dd className=\"font-medium text-zinc-900\">pendentes de validação da empresa</dd>
+                </div>
+              </dl>
+              <p className=\"mt-2 text-xs text-zinc-500\">
+                Estimativa ilustrativa: não é salva no negócio. Para salvar um kit, monte-o manualmente; a geração aparece
+                ao montar o kit; a economia e o payback dependem de a empresa validar o cálculo.
+              </p>
+            </div>
+          )}
+
+          {/* Não há conferência de módulo, inversor, tensão ou faixa MPPT neste assistente: o aviso diz isso, sem
+              nenhum \"validado\" ou \"compatível\" até existir uma validação de verdade (catálogo com ficha técnica). */}
+          <div role=\"status\" className=\"flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800\">
+            <AlertTriangle className=\"mt-0.5 h-4 w-4 shrink-0\" />
+            <span>
+              Compatibilidade técnica não verificada. O Raion ainda não confere módulo, inversor, tensão e faixa MPPT: confirme
+              com a engenharia antes de fechar o kit.
+            </span>
+          </div>
+        </fieldset>
+
+        <div className=\"flex flex-col gap-1\">
+          <label className=\"flex flex-col gap-1 text-sm\">
+            <span className=\"font-medium text-zinc-700\">Valor do negócio (R$)</span>
+            <span className=\"flex items-center rounded-lg border border-zinc-200 bg-white px-3 focus-within:border-dourado focus-within:ring-2 focus-within:ring-dourado/20\">
+              <span aria-hidden=\"true\" className=\"text-zinc-500\">R$</span>
+              <input
+                inputMode=\"numeric\"
+                required
+                value={valor}
+                onChange={(e) => {
+                  setValor(formatarMascaraMoeda(e.target.value));
+                  setValorTocado(true);
+                }}
+                className=\"w-full bg-transparent px-2 py-2 text-carvao outline-none placeholder:text-zinc-400\"
+                placeholder=\"0,00\"
+              />
+            </span>
+          </label>
+          {!valorTocado && precoSugerido != null && (
+            <p className=\"text-xs text-zinc-400\">
+              Preenchido com preço de referência do catálogo + custos internos configurados (estimativa, não é cotação real)
+              — ajuste se precisar.
+            </p>
+          )}
+        </div>
+
+        {!mostrarKit ? (
+          <Botao type=\"button\" variante=\"secundario\" onClick={() => setMostrarKit(true)} className=\"self-start\">
+            Montar kit manualmente
+          </Botao>
+        ) : (
+          <fieldset className=\"flex flex-col gap-3\">
+            <legend className=\"mb-2 text-sm font-semibold text-zinc-900\">Kit personalizado</legend>
+            <EditorComponentesKit
+              linhas={linhas}
+              onChange={setLinhas}
+              sugerirQuantidadeModulo={sugerirQuantidadeModulo}
+              problemas={mostrarProblemasKit ? problemasKit : undefined}
+            />
+            <Botao type=\"button\" variante=\"secundario\" onClick={cancelarMontagem} className=\"self-start\">
+              Cancelar montagem
+            </Botao>
+            {previa && (
+              <PreviaEstimativa
+                previa={previa}
+                potenciaKwp={potenciaKwp}
+                precoDefinido={numero(valor) != null}
+                rodape=\"Você pode salvar o negócio e o kit assim mesmo; a economia e o payback aparecem quando a empresa validar o cálculo.\"
+              />
+            )}
+          </fieldset>
+        )}
+
+        {erroEtapa && <Mensagem resultado={{ ok: false, mensagem: erroEtapa }} />}
+        <div className=\"flex justify-between\">
+          <Botao type=\"button\" variante=\"secundario\" onClick={voltar} className=\"gap-1\">
+            <ChevronLeft className=\"h-4 w-4\" /> Voltar
+          </Botao>
+          {/* Um botão só: sem kit em montagem, ele deixa claro que o cadastro segue sem kit. */}
+          <Botao type=\"button\" onClick={avancar} className=\"gap-1\">
+            {mostrarKit || componentes.length ? \"Avançar\" : \"Continuar sem kit\"} <ChevronRight className=\"h-4 w-4\" />
+          </Botao>
+        </div>
+      </div>
+
+      {/* Etapa 3 — Dados técnicos e complementares */}
+      <div ref={(el) => void (etapasRef.current[3] = el)} className={etapaAtual === 3 ? \"flex flex-col gap-5\" : \"hidden\"}>
+        <fieldset className=\"grid gap-3 md:grid-cols-2\">
+          <legend className=\"mb-2 text-sm font-semibold text-zinc-900\">Dados da unidade consumidora</legend>
+          <Campo rotulo=\"Unidade consumidora\" name=\"unidade_consumidora\" placeholder=\"Opcional\" />
+          <Campo rotulo=\"Distribuidora\" placeholder=\"Preenchida automaticamente em breve\" disabled />
+          <Campo
+            rotulo=\"Tarifa ANEEL (R$/kWh)\"
+            inputMode=\"decimal\"
+            placeholder=\"ex.: 0,95\"
+            value={tarifaKwh}
+            disabled={!componentes.length}
+            onChange={(e) => setTarifaKwh(e.target.value)}
+          />
+          <Selecao
+            rotulo=\"Tipo de ligação\"
+            value={tipoLigacao}
+            disabled={!componentes.length}
+            onChange={(e) => setTipoLigacao(e.target.value as TipoLigacao)}
+          >
+            {TIPOS_LIGACAO.map((t) => (
+              <option key={t} value={t}>
+                {ROTULO_TIPO_LIGACAO[t]}
+              </option>
+            ))}
+          </Selecao>
+          {!componentes.length && (
+            <p className=\"text-xs text-zinc-400 md:col-span-2\">
+              Tarifa e tipo de ligação são usados no cálculo do kit: monte o kit na etapa 2 para informá-los.
+            </p>
+          )}
+        </fieldset>
+
+        <fieldset className=\"grid gap-3 md:grid-cols-2\">
+          <legend className=\"mb-2 text-sm font-semibold text-zinc-900\">Características técnicas</legend>
+          <Campo rotulo=\"Tipo do telhado\" name=\"tipo_telhado\" placeholder=\"Ex.: cerâmico, metálico, laje, solo\" />
+          <Campo rotulo=\"Padrão do cliente\" name=\"padrao_cliente\" placeholder=\"Opcional\" />
+          <Campo
+            rotulo=\"Estrutura do telhado\"
+            value={estruturaTelhado}
+            onChange={(e) => setEstruturaTelhado(e.target.value)}
+            placeholder=\"Ex.: perfil de alumínio, gancho\"
+          />
+          <label className=\"flex flex-col gap-1 text-sm md:col-span-2\">
+            <span className=\"font-medium text-zinc-700\">Observações técnicas</span>
+            <textarea name=\"descricao\" rows={2} className=\"rounded-md border border-zinc-300 px-3 py-2\" />
+          </label>
+        </fieldset>
+
+        <fieldset className=\"grid gap-3 md:grid-cols-2\">
+          <legend className=\"mb-2 text-sm font-semibold text-zinc-900\">Documentos</legend>
+          <div className=\"flex flex-col gap-2 md:col-span-2\">
+            <p className=\"text-xs text-zinc-500\">Arquivos escolhidos na Etapa 1 serão enviados ao salvar o negócio. <Selo tom=\"neutro\">opcional</Selo></p>
+            {([
+              { rotulo: \"CNH\", arquivo: cnhSelecionada, input: inputCnh, atualizar: setCnhSelecionada },
+              { rotulo: \"Conta de energia\", arquivo: faturaSelecionada, input: inputFatura, atualizar: setFaturaSelecionada },
+            ] as const).map(({ rotulo, arquivo, input, atualizar }) => (
+              <div key={rotulo} className=\"flex flex-wrap items-center gap-x-3 gap-y-1 text-sm\">
+                <span className=\"font-medium text-zinc-700\">{rotulo}:</span>
+                <span className=\"max-w-full break-all text-zinc-600\">{arquivo ? `${arquivo.name} (selecionado para envio)` : \"não selecionado\"}</span>
+                {arquivo && (
+                  <button type=\"button\" className=\"text-amber-700 hover:underline\" onClick={() => abrirDocumentoSelecionado(arquivo)}>Ver</button>
+                )}
+                <button type=\"button\" className=\"text-amber-700 hover:underline\" onClick={() => input.current?.click()}>
+                  {arquivo ? \"Substituir\" : \"Anexar\"}
+                </button>
+                {arquivo && (
+                  <button type=\"button\" className=\"text-red-700 hover:underline\" onClick={() => removerDocumento(input, atualizar)}>Remover</button>
+                )}
+              </div>
+            ))}
+          </div>
+          <CampoArquivo rotulo=\"Fotos\" name=\"anexo_geral\" accept=\"image/*\" multiple />
+          <CampoArquivo rotulo=\"Outros documentos\" name=\"anexo_geral\" multiple />
+        </fieldset>
+
+        {erroEtapa && <Mensagem resultado={{ ok: false, mensagem: erroEtapa }} />}
+        <Mensagem resultado={resultado} />
+        <div className=\"flex justify-between\">
+          <Botao type=\"button\" variante=\"secundario\" onClick={voltar} className=\"gap-1\">
+            <ChevronLeft className=\"h-4 w-4\" /> Voltar
+          </Botao>
+          <Botao type=\"submit\" disabled={pendente}>
+            {enviandoArquivos ? \"Enviando arquivos...\" : pendente ? \"Salvando...\" : \"Salvar negócio\"}
+          </Botao>
+        </div>
+      </div>
+    </form>
+  );
+}"
+
+ ❯ tests/negocios-gravacao.test.ts:207:26
+    205|     expect(cancelar).toContain('if (!valorTocado) setValor("")');
+    206|     // Cliente, consumo, localização e valor digitado não são tocados.
+    207|     expect(cancelar).not.toMatch(/setContato|setConsumoMedioKwh|setVal…
+       |                          ^
+    208|     expect(formulario).toContain("onClick={cancelarMontagem}");
+    209|     expect(formulario).toContain("Cancelar montagem");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[36/42]⎯
+
+ FAIL  tests/negocios-gravacao.test.ts > regressões de tela > ficha: Cancelar na edição do kit não grava nada e volta ao que está salvo
+AssertionError: expected '"use client";\n\nimport { useActionSt…' to contain 'estadoSalvoDoKit({ componentesSalvos,…'
+
+- Expected
++ Received
+
+- estadoSalvoDoKit({ componentesSalvos, calculo, estruturaTelhado, consumoMedioKwhPadrao, valorFaturaMedioPadrao })
++ "use client";
++
++ import { useActionState, useMemo, useState } from "react";
++ import { EditorComponentesKit, type LinhaComponente } from "@/components/kit-componentes";
++ import { useEnvioSemReset } from "@/components/envio-sem-reset";
++ import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
++ import { atualizarPrecoCalculo, salvarKitPersonalizado } from "@/lib/acoes/calculadora";
++ import { calcular, custosInternosEstimados, potenciaKitPersonalizadoKwp, sugerirQuantidadeModulos, type ResultadoCalculo } from "@/lib/calculadora";
++ import {
++   mensagemDeRecusa,
++   motivosDaAcao,
++   textoDoMotivo,
++   type EntradaNaoVerificavel,
++   type MotivoDesatualizacao,
++ } from "@/lib/calculo-vigencia";
++ import type { Pendencia } from "@/lib/estimativa-financeira";
++ import { formatarDataIso, formatarMoeda, formatarNumeroBr, lerNumeroBr } from "@/lib/formatacao";
++ import { estadoSalvoDoKit } from "@/lib/kit-formulario";
++ import { analisarLinhas, resumoProblemasKit } from "@/lib/kit-linhas";
++ import { MENSAGEM_REMOCAO_COM_CALCULO } from "@/lib/negocio-dados";
++ import {
++   enquadramentoDoTipoCliente,
++   resolverTarifa,
++   tarifaOficialRsKwh,
++   textoRessalva,
++   textoVigencia,
++   type BaseTributaria,
++   type ContextoEstimativa,
++   type TarifaGd,
++ } from "@/lib/tarifa-gd";
++ import { ROTULO_TIPO_COMPONENTE_KIT, ROTULO_TIPO_LIGACAO, TIPOS_LIGACAO, type TipoComponenteKit, type TipoLigacao } from "@/lib/tipos";
++
++ export type ComponenteSalvo = {
++   tipo: TipoComponenteKit;
++   descricao: string;
++   potenciaW: number | null;
++   quantidade: number;
++ };
++
++ export type CalculoSalvo = {
++   id: string;
++   kitNome: string;
++   kitPreco: number;
++   tipoLigacao: TipoLigacao;
++   consumoMedioKwh: number;
++   valorFaturaMedio: number | null;
++   tarifaKwh: number;
++   geracaoEstimadaKwhMes: number;
++   /** Nula no resultado técnico incompleto (sem parte financeira). */
++   economiaMensal: number | null;
++   paybackMeses: number | null;
++   observacoes: string | null;
++   /** `legado`, `incompleto` ou `completo` (coluna `estado_financeiro`). */
++   estadoFinanceiro: string;
++   /** Retrato (linhas novas; nulos na legada). */
++   contaSemSolar?: number | null;
++   contaComSolar?: number | null;
++   kwhCompensado?: number | null;
++   kwhNaoCompensado?: number | null;
++   custoFioB?: number | null;
++   tarifaBaseTributaria?: BaseTributaria | null;
++   tarifaOrigem?: string | null;
++   distribuidora?: string | null;
++   fioBRsMwh?: number | null;
++   percentualLegalFioB?: number | null;
++   vigenciaInicio?: string | null;
++   vigenciaFim?: string | null;
++   disponibilidadeKwh?: number | null;
++   dataReferencia?: string | null;
++   ressalvas?: string[] | null;
++ };
++
++ /** Linha mais recente de `calculos_solares_historico` (cálculo anterior substituído). */
++ export type CalculoHistorico = {
++   arquivadoEm: string;
++   motivo: string;
++   estadoFinanceiro: string;
++   kitNome: string;
++   consumoMedioKwh: number;
++   tarifaKwh: number;
++   economiaMensal: number | null;
++ };
++
++ /** Resultado de `carregarVigencia` que a tela usa: por que o cálculo salvo não vale como atual e o que não foi conferido. */
++ export type VigenciaDaTela = { motivos: MotivoDesatualizacao[]; naoVerificavel: EntradaNaoVerificavel[] };
++
++ type Parametros = {
++   produtividadeKwhKwpMes: number;
++   percentualFioB: number;
++   disponibilidadeMonoKwh: number;
++   disponibilidadeBiKwh: number;
++   disponibilidadeTriKwh: number;
++   custoInstalacaoPorModulo: number;
++   custoMaterialCaPorKwp: number;
++   custoEngenharia: number;
++   comissaoPercentual: number;
++ };
++
++ function numeroBr(v: number) {
++   return v.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
++ }
++
++ const TEXTO_SEM_ECONOMIA = "Sem economia estimada neste cenário";
++ const MOTIVO_PAYBACK = "depende de projeção de tarifas e da transição da Lei 14.300";
++
++ /** Payback só existe com economia positiva e valor positivo: nunca "0 meses". No P0 é sempre nulo (indisponível). */
++ function textoPayback(economiaMensal: number | null, paybackMeses: number | null) {
++   if (economiaMensal == null || !(economiaMensal > 0) || paybackMeses == null || !(paybackMeses > 0)) return "indisponível";
++   return `${numeroBr(paybackMeses)} meses`;
++ }
++
++ /** Economia ausente (nula) nunca vira zero nem "sem economia": é "indisponível". */
++ function textoEconomia(economiaMensal: number | null) {
++   if (economiaMensal == null) return "indisponível";
++   return economiaMensal > 0 ? `${formatarMoeda(economiaMensal)}/mês` : TEXTO_SEM_ECONOMIA;
++ }
++
++ function percentual(v: number) {
++   return `${(v * 100).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%`;
++ }
++
++ const ROTULO_NAO_VERIFICAVEL: Record<EntradaNaoVerificavel, string> = {
++   tarifa: "tarifa",
++   tipo_ligacao: "tipo de ligação",
++   fio_b: "Fio B",
++   enquadramento: "enquadramento",
++ };
++
++ const ROTULO_BASE: Record<BaseTributaria, string> = {
++   sem_tributos: "sem tributos",
++   com_tributos: "com tributos",
++ };
++
++ /** O que o vendedor resolve (dado que ele digita ou preenche na qualificação), pelo código da pendência. */
++ const VENDEDOR: Partial<Record<Pendencia["codigo"], string>> = {
++   consumo_ausente: "o consumo médio em kWh/mês",
++   consumo_estimado_pela_tarifa_base: "o consumo médio em kWh/mês",
++   tarifa_base_ausente: "a tarifa (R$/kWh)",
++   base_tributaria_ausente: "se a tarifa inclui tributos (base tributária)",
++   base_tributaria_divergente: "a tarifa sem tributos (a informada inclui tributos)",
++   tarifa_abaixo_do_fio_b: "uma tarifa maior que o custo da energia compensada",
++   enquadramento_ausente: "o tipo de cliente na Qualificação SDR",
++   distribuidora_ausente: "a distribuidora na Qualificação SDR",
++ };
++
++ /** Separa as pendências do motor: o que o vendedor informa x o que depende da empresa/regra (mensagem do motor). */
++ function separarPendencias(pendencias: Pendencia[]) {
++   const vendedor: string[] = [];
++   const empresa: string[] = [];
++   for (const p of pendencias) {
++     const texto = VENDEDOR[p.codigo];
++     if (texto) {
++       if (!vendedor.includes(texto)) vendedor.push(texto);
++     } else if (!empresa.includes(p.mensagem)) {
++       empresa.push(p.mensagem);
++     }
++   }
++   return { vendedor, empresa };
++ }
++
++ /** "a, b e c" */
++ function juntar(itens: string[]) {
++   if (itens.length <= 1) return itens.join("");
++   return `${itens.slice(0, -1).join(", ")} e ${itens[itens.length - 1]}`;
++ }
++
++ /** Dados que o detalhe técnico mostra (Fio B automático, nunca digitado). */
++ type DadosTecnicos = {
++   distribuidora: string;
++   ato?: string | null;
++   vigenciaInicio: string;
++   vigenciaFim: string;
++   fioBRsMwh: number;
++   percentualLegal: number;
++   dataReferencia: string;
++   disponibilidadeKwh: number;
++   tipoLigacao: TipoLigacao;
++   tarifaKwh: number;
++   tarifaOrigem: string | null;
++   tarifaBaseTributaria: BaseTributaria | null;
++   kwhCompensado?: number | null;
++   kwhNaoCompensado?: number | null;
++   custoFioB?: number | null;
++ };
++
++ function dadosTecnicosDaPrevia(previa: ResultadoCalculo, tipoLigacao: TipoLigacao, tarifaKwh: number): DadosTecnicos | null {
++   if (previa.estado !== "completa") return null;
++   const r = previa.retrato;
++   return {
++     distribuidora: r.distribuidora,
++     ato: r.ato,
++     vigenciaInicio: r.vigenciaInicio,
++     vigenciaFim: r.vigenciaFim,
++     fioBRsMwh: r.fioBRsMwh,
++     percentualLegal: r.percentualLegalFioB,
++     dataReferencia: r.dataReferencia,
++     disponibilidadeKwh: r.disponibilidadeKwh,
++     tipoLigacao,
++     tarifaKwh,
++     tarifaOrigem: r.tarifaOrigem,
++     tarifaBaseTributaria: r.tarifaBaseTributaria,
++     kwhCompensado: previa.kwhCompensado,
++     kwhNaoCompensado: previa.kwhNaoCompensado,
++     custoFioB: previa.custoFioB,
++   };
++ }
++
++ function dadosTecnicosDoSalvo(c: CalculoSalvo): DadosTecnicos | null {
++   if (
++     c.estadoFinanceiro !== "completo" ||
++     c.distribuidora == null ||
++     c.vigenciaInicio == null ||
++     c.vigenciaFim == null ||
++     c.fioBRsMwh == null ||
++     c.percentualLegalFioB == null ||
++     c.dataReferencia == null ||
++     c.disponibilidadeKwh == null
++   ) {
++     return null;
++   }
++   return {
++     distribuidora: c.distribuidora,
++     vigenciaInicio: c.vigenciaInicio,
++     vigenciaFim: c.vigenciaFim,
++     fioBRsMwh: c.fioBRsMwh,
++     percentualLegal: c.percentualLegalFioB,
++     dataReferencia: c.dataReferencia,
++     disponibilidadeKwh: c.disponibilidadeKwh,
++     tipoLigacao: c.tipoLigacao,
++     tarifaKwh: c.tarifaKwh,
++     tarifaOrigem: c.tarifaOrigem ?? null,
++     tarifaBaseTributaria: c.tarifaBaseTributaria ?? null,
++     kwhCompensado: c.kwhCompensado,
++     kwhNaoCompensado: c.kwhNaoCompensado,
++     custoFioB: c.custoFioB,
++   };
++ }
++
++ /** Hipótese e limitações declaradas da estimativa completa (contrato, seções 2 e 4). */
++ function HipotesesELimitacoes({ ressalvas, kwhNaoCompensado }: { ressalvas: string[]; kwhNaoCompensado: number | null }) {
++   return (
++     <div className="flex flex-col gap-2">
++       <p data-testid="hipotese-autoconsumo" className="text-xs text-zinc-600">
++         Hipótese: autoconsumo simultâneo considerado zero (toda a geração é tratada como injetada na rede e compensada).
++       </p>
++       <details data-testid="limitacoes-estimativa" className="rounded-md border border-zinc-200 px-3 py-2 text-xs text-zinc-600">
++         <summary className="cursor-pointer font-medium text-zinc-700">Limitações da estimativa</summary>
++         <ul className="mt-1 list-disc pl-5">
++           {ressalvas.map((r) => (
++             <li key={r}>{textoRessalva(r, { kwhNaoCompensado })}</li>
++           ))}
++         </ul>
++       </details>
++     </div>
++   );
++ }
++
++ /**
++  * Prévia da calculadora com a união do motor: potência e geração sempre; contas e economia só no estado `completa`,
++  * com payback indisponível (P0), a hipótese de autoconsumo e as limitações. No estado `incompleta`, o quadro separa o
++  * que o vendedor pode informar do que depende da empresa ou da regra.
++  * O vendedor nunca escolhe fórmula, percentual legal nem valor de Fio B.
++  */
++ export function PreviaEstimativa({
++   previa,
++   potenciaKwp,
++   mostrarQuadro = true,
++   rodape,
++ }: {
++   previa: ResultadoCalculo;
++   potenciaKwp: number;
++   /** Falso quando outra mensagem já diz o que falta (ex.: logo após salvar). */
++   mostrarQuadro?: boolean;
++   /** Mantido por compatibilidade (o payback é indisponível no P0). */
++   precoDefinido?: boolean;
++   rodape: string;
++ }) {
++   const completa = previa.estado === "completa";
++   const { vendedor, empresa } = previa.estado === "incompleta" ? separarPendencias(previa.pendencias) : { vendedor: [], empresa: [] };
++   return (
++     <div className="flex flex-col gap-3">
++       <dl
++         data-testid="previa-sistema"
++         className={`grid grid-cols-2 gap-3 rounded-lg bg-amber-50 px-4 py-3 text-sm ${completa ? "md:grid-cols-3" : ""}`}
++       >
++         <div>
++           <dt className="text-zinc-500">Potência do kit</dt>
++           <dd className="font-medium text-zinc-900">{numeroBr(potenciaKwp)} kWp</dd>
++         </div>
++         <div>
++           <dt className="text-zinc-500">Geração estimada</dt>
++           <dd className="font-medium text-zinc-900">{previa.geracaoEstimadaKwhMes.toLocaleString("pt-BR")} kWh/mês</dd>
++         </div>
++         {previa.estado === "completa" && (
++           <>
++             <div>
++               <dt className="text-zinc-500">Conta hoje (energia)</dt>
++               <dd className="font-medium text-zinc-900">{formatarMoeda(previa.contaSemSolar)}/mês</dd>
++             </div>
++             <div>
++               <dt className="text-zinc-500">Conta com o sistema</dt>
++               <dd className="font-medium text-zinc-900">{formatarMoeda(previa.contaComSolar)}/mês</dd>
++             </div>
++             <div>
++               <dt className="text-zinc-500">Economia estimada</dt>
++               <dd data-testid="previa-economia" className={previa.economiaMensal > 0 ? "font-medium text-green-700" : "font-medium text-zinc-700"}>
++                 {previa.economiaMensal > 0 ? `${formatarMoeda(previa.economiaMensal)}/mês` : TEXTO_SEM_ECONOMIA}
++               </dd>
++             </div>
++             <div>
++               <dt className="text-zinc-500">Payback estimado</dt>
++               <dd data-testid="previa-payback" className="font-medium text-zinc-900" title={MOTIVO_PAYBACK}>
++                 indisponível
++               </dd>
++             </div>
++           </>
++         )}
++       </dl>
++       {previa.estado === "completa" && (
++         <>
++           <p className="-mt-2 text-xs text-zinc-500">Payback indisponível: {MOTIVO_PAYBACK}.</p>
++           <HipotesesELimitacoes ressalvas={previa.retrato.ressalvas} kwhNaoCompensado={previa.kwhNaoCompensado} />
++         </>
++       )}
++       {previa.estado === "incompleta" && mostrarQuadro && (
++         <div
++           role="status"
++           data-testid="estimativa-incompleta"
++           className="flex flex-col gap-2 rounded-lg bg-zinc-50 px-4 py-3 text-sm text-zinc-700"
++         >
++           <p className="font-medium text-zinc-900">Estimativa financeira incompleta</p>
++           <p>Por enquanto não há conta nem economia calculadas para este kit.</p>
++           {vendedor.length > 0 && (
++             <div data-testid="pendencias-vendedor">
++               <p className="font-medium text-zinc-800">O que você pode informar</p>
++               <ul className="list-disc pl-5">
++                 {vendedor.map((v) => (
++                   <li key={v}>Informe {v}.</li>
++                 ))}
++               </ul>
++             </div>
++           )}
++           {empresa.length > 0 && (
++             <div data-testid="pendencias-empresa">
++               <p className="font-medium text-zinc-800">O que não depende de você</p>
++               <ul className="list-disc pl-5">
++                 {empresa.map((m) => (
++                   <li key={m}>{m}</li>
++                 ))}
++               </ul>
++             </div>
++           )}
++           <p className="text-xs text-zinc-500">{rodape}</p>
++         </div>
++       )}
++     </div>
++   );
++ }
++
++ /**
++  * Mensagem persistente depois de salvar o kit: o que foi salvo e o que falta, em linguagem simples.
++  * `tecnicoSalvo`: o servidor gravou o resultado técnico (sem parte financeira). `calculoAnterior`: o que aconteceu com a
++  * linha anterior (`historico` = guardada no histórico como desatualizada; `legado`/`incompleto` = mantida, não atual).
++  */
++ function MensagemKitSalvo({
++   pendencias,
++   tecnicoSalvo,
++   calculoAnterior,
++ }: {
++   pendencias: Pendencia[];
++   tecnicoSalvo: boolean;
++   calculoAnterior: "historico" | "legado" | "incompleto" | null;
++ }) {
++   const { vendedor, empresa } = separarPendencias(pendencias);
++   return (
++     <p data-testid="kit-salvo" role="status" className="rounded-md bg-zinc-50 px-3 py-2 text-sm text-zinc-700">
++       {tecnicoSalvo ? "Kit e resultado técnico salvos." : "Itens do kit salvos."} A conta e a economia ainda não foram calculadas.
++       {vendedor.length > 0 && ` Falta você informar ${juntar(vendedor)}.`}
++       {empresa.length > 0 && ` Não depende de você: ${juntar(empresa.map((m) => m.replace(/\.\s*$/, "").replace(/^./, (c) => c.toLowerCase())))}.`}
++       {calculoAnterior === "historico" && " O cálculo anterior foi guardado no histórico como desatualizado e não vale como resultado atual."}
++       {!tecnicoSalvo &&
++         calculoAnterior === "legado" &&
++         " O cálculo anterior foi mantido só como histórico: foi feito por uma fórmula antiga, que não foi validada, e não vale como resultado atual."}
++       {!tecnicoSalvo && calculoAnterior === "incompleto" && " O resultado técnico anterior foi mantido, mas não vale como resultado atual."}
++     </p>
++   );
++ }
++
++ /** Fio B é calculado pelo motor, não digitado: aqui só leitura e recolhido. */
++ function DetalhesTecnicos({ dados }: { dados: DadosTecnicos | null }) {
++   return (
++     <details data-testid="detalhes-tecnicos" className="rounded-md border border-zinc-200 px-3 py-2 text-sm">
++       <summary className="cursor-pointer font-medium text-zinc-700">Detalhes técnicos</summary>
++       {dados ? (
++         <ul className="mt-2 list-disc pl-5 text-xs text-zinc-600">
++           <li>
++             Tarifa (T): R$ {formatarNumeroBr(dados.tarifaKwh)}/kWh,{" "}
++             {dados.tarifaBaseTributaria ? ROTULO_BASE[dados.tarifaBaseTributaria] : "base não declarada"} —{" "}
++             {dados.tarifaOrigem === "oficial_aneel" ? "tarifa oficial ANEEL (TE + TUSD)" : "informada pelo vendedor"}.
++           </li>
++           <li>
++             Fio B (TUSD_FioB, sem tributos): R$ {formatarNumeroBr(Math.round(dados.fioBRsMwh * 10000) / 10000)}/MWh — {dados.distribuidora}
++             {dados.ato ? `, ${dados.ato}` : ""}, vigência {textoVigencia(dados.vigenciaInicio, dados.vigenciaFim)}.
++           </li>
++           <li>
++             Percentual legal (Lei 14.300, art. 27) em {dados.dataReferencia.slice(0, 4)}: {percentual(dados.percentualLegal)} — energia
++             compensada a R$ {formatarNumeroBr(Math.round(((dados.percentualLegal * dados.fioBRsMwh) / 1000) * 100000) / 100000)}/kWh.
++           </li>
++           <li>
++             Custo de disponibilidade (REN 1.000, art. 291): {numeroBr(dados.disponibilidadeKwh)} kWh ({ROTULO_TIPO_LIGACAO[dados.tipoLigacao]}).
++           </li>
++           {dados.kwhCompensado != null && (
++             <li>
++               Energia compensada: {numeroBr(dados.kwhCompensado)} kWh
++               {dados.custoFioB != null ? ` (custo de ${formatarMoeda(dados.custoFioB)})` : ""}; injetada e não compensada no mês:{" "}
++               {numeroBr(dados.kwhNaoCompensado ?? 0)} kWh.
++             </li>
++           )}
++           <li>Data de referência: {formatarDataIso(dados.dataReferencia)}.</li>
++         </ul>
++       ) : (
++         <p className="mt-2 text-zinc-600">
++           O Fio B é calculado automaticamente a partir da tarifa oficial da distribuidora vigente na data do cálculo e do percentual
++           legal do ano. Aparece aqui quando a estimativa estiver completa.
++         </p>
++       )}
++       <p className="mt-2 text-xs text-zinc-500">Só leitura: o vendedor informa consumo, tarifa (com a base tributária), kit e preço.</p>
++     </details>
++   );
++ }
++
++ /** Mesmo conversor do servidor ("450", "1.200", "1.200,50"); vazio, inválido ou ambíguo vira null. */
++ function numero(v: string): number | null {
++   const n = lerNumeroBr(v);
++   return n != null && Number.isFinite(n) && n > 0 ? n : null;
++ }
++
++ /** Linha oficial vigente para o negócio (para sugerir a tarifa); nula sem enquadramento/distribuidora/vigência. */
++ function tarifaOficialDoContexto(contexto: ContextoEstimativa | null): TarifaGd | null {
++   if (!contexto) return null;
++   const enq = enquadramentoDoTipoCliente(contexto.tipoCliente);
++   if (enq.situacao !== "ok") return null;
++   const t = resolverTarifa(contexto.tarifas, contexto.distribuidoraInformada, enq.enquadramento, contexto.dataReferencia);
++   return t.situacao === "ok" ? t.tarifa : null;
++ }
++
++ export function KitPersonalizado({
++   negocioId,
++   negocioValor,
++   estruturaTelhado,
++   padraoCliente,
++   consumoMedioKwhPadrao,
++   valorFaturaMedioPadrao,
++   componentesSalvos,
++   calculo,
++   parametros,
++   contexto = null,
++   historico = null,
++   precoDesatualizado = false,
++   vigencia = null,
++ }: {
++   negocioId: string;
++   negocioValor: number | null;
++   estruturaTelhado: string | null;
++   padraoCliente: string | null;
++   consumoMedioKwhPadrao: number | null;
++   valorFaturaMedioPadrao: number | null;
++   componentesSalvos: ComponenteSalvo[];
++   calculo: CalculoSalvo | null;
++   parametros: Parametros | null;
++   /** Contexto regulatório do servidor (data de referência, qualificação, tarifas oficiais): a prévia usa o mesmo. */
++   contexto?: ContextoEstimativa | null;
++   /** Último cálculo substituído (`calculos_solares_historico`). */
++   historico?: CalculoHistorico | null;
++   /** O valor do negócio mudou depois do cálculo salvo (ver `precoDoCalculoDesatualizado`). */
++   precoDesatualizado?: boolean;
++   /** Vigência do cálculo salvo (`carregarVigencia`). Com motivos, o cálculo é histórico: nunca resultado atual. */
++   vigencia?: VigenciaDaTela | null;
++ }) {
++   const motivos = vigencia?.motivos ?? [];
++   const calculoDesatualizado = !!calculo && motivos.length > 0;
++   const [resultado, acao, pendente] = useActionState(salvarKitPersonalizado, null);
++   const [resultadoPreco, acaoPreco, atualizandoPreco] = useActionState(atualizarPrecoCalculo, null);
++   const enviarBase = useEnvioSemReset(acao);
++   // Só depois de uma tentativa de envio os problemas das linhas aparecem (linha recém-adicionada não "grita").
++   const [mostrarProblemas, setMostrarProblemas] = useState(false);
++   const [editando, setEditando] = useState(!calculo);
++   const [ultimoResultado, setUltimoResultado] = useState(resultado);
++
++   const tarifaOficial = tarifaOficialDoContexto(contexto);
++   const tarifaOficialKwh = tarifaOficial ? tarifaOficialRsKwh(tarifaOficial) : null;
++
++   // Sempre a partir do que está gravado: ao abrir e no Cancelar.
++   const salvo = () =>
++     estadoSalvoDoKit({
++       componentesSalvos,
++       calculo,
++       estruturaTelhado,
++       consumoMedioKwhPadrao,
++       valorFaturaMedioPadrao,
++       tarifaOficialRsKwh: tarifaOficialKwh,
++     });
++   const [linhas, setLinhas] = useState<LinhaComponente[]>(() => salvo().linhas);
++   const [estrutura, setEstrutura] = useState(() => salvo().estrutura);
++   const [tipoLigacao, setTipoLigacao] = useState<TipoLigacao>(() => salvo().tipoLigacao);
++   const [consumoMedioKwh, setConsumoMedioKwh] = useState(() => salvo().consumoMedioKwh);
++   // Ao reabrir, vem o valor da conta já salvo no cálculo (antes vinha vazio e se perdia ao salvar de novo).
++   const [valorFaturaMedio, setValorFaturaMedio] = useState(() => salvo().valorFaturaMedio);
++   const [tarifaKwh, setTarifaKwh] = useState(() => salvo().tarifaKwh);
++   const [tarifaBase, setTarifaBase] = useState<BaseTributaria | "">(() => salvo().tarifaBaseTributaria);
++   const [confirmaRemocao, setConfirmaRemocao] = useState(false);
++   // Muda a cada Cancelar para recriar o campo de observações (não controlado) com o valor salvo.
++   const [versaoObservacoes, setVersaoObservacoes] = useState(0);
++
++   // Mensagem persistente do último salvamento: fica enquanto o formulário for o mesmo que foi salvo e some na próxima
++   // edição (qualquer campo) ou ao clicar em "Editar kit / recalcular". Sem useEffect: ajusta durante a renderização.
++   const assinatura = useMemo(
++     () => JSON.stringify([linhas, estrutura, tipoLigacao, consumoMedioKwh, valorFaturaMedio, tarifaKwh, tarifaBase]),
++     [linhas, estrutura, tipoLigacao, consumoMedioKwh, valorFaturaMedio, tarifaKwh, tarifaBase],
++   );
++   const [assinaturaSalva, setAssinaturaSalva] = useState<string | null>(null);
++   if (resultado !== ultimoResultado) {
++     setUltimoResultado(resultado);
++     if (resultado?.ok) {
++       setEditando(false);
++       setAssinaturaSalva(assinatura);
++     }
++   }
++   const avisoKitSalvo = !!resultado?.ok && assinaturaSalva === assinatura;
++   // O servidor diz o que gravou ("Kit e resultado técnico salvos." x "Itens do kit salvos.") e o que fez com o anterior.
++   const tecnicoSalvo = avisoKitSalvo && !!resultado?.mensagem?.startsWith("Kit e resultado técnico salvos");
++   const anterior = resultado?.mensagem?.includes("guardado no histórico")
++     ? "historico"
++     : calculo?.estadoFinanceiro === "legado"
++       ? "legado"
++       : calculo?.estadoFinanceiro === "incompleto"
++         ? "incompleto"
++         : null;
++
++   /**
++    * Cancelar: não grava nem apaga nada no banco; só descarta o que foi mexido na tela e volta ao
++    * que está salvo. Na primeira montagem (nada salvo), limpa os itens não gravados.
++    */
++   function cancelarEdicao() {
++     const s = salvo();
++     setLinhas(s.linhas);
++     setEstrutura(s.estrutura);
++     setTipoLigacao(s.tipoLigacao);
++     setConsumoMedioKwh(s.consumoMedioKwh);
++     setValorFaturaMedio(s.valorFaturaMedio);
++     setTarifaKwh(s.tarifaKwh);
++     setTarifaBase(s.tarifaBaseTributaria);
++     setConfirmaRemocao(false);
++     setMostrarProblemas(false);
++     setVersaoObservacoes((v) => v + 1);
++     if (calculo) setEditando(false);
++   }
++
++   /** Tarifa digitada: igual à oficial = base sem tributos; outro valor = a base precisa ser declarada de novo. */
++   function mudarTarifa(valor: string) {
++     setTarifaKwh(valor);
++     const n = numero(valor);
++     setTarifaBase(n != null && tarifaOficialKwh != null && Math.round(n * 1e5) / 1e5 === tarifaOficialKwh ? "sem_tributos" : "");
++   }
++
++   function usarTarifaOficial() {
++     if (tarifaOficialKwh == null) return;
++     setTarifaKwh(formatarNumeroBr(tarifaOficialKwh));
++     setTarifaBase("sem_tributos");
++   }
++
++   // Mesma análise para a potência, o preço sugerido e o envio: a quantidade vista é a quantidade usada.
++   const { componentes, itens, problemas } = useMemo(() => analisarLinhas(linhas), [linhas]);
++   const potenciaKwp = potenciaKitPersonalizadoKwp(componentes);
++   // Remover o kit é uma ação explícita: tirar TODAS as linhas de um kit salvo (com cálculo, o servidor recusa).
++   // Linha sem descrição não conta: ela exige preenchimento ou remoção, nunca vira remoção do kit.
++   const removendoKitSalvo = componentesSalvos.length > 0 && linhas.length === 0;
++   const problemaKit = mostrarProblemas ? resumoProblemasKit(problemas, linhas) : null;
++
++   /** Bloqueia o envio enquanto houver linha inválida ou incompleta; o que foi digitado continua na tela. */
++   function enviar(evento: React.FormEvent<HTMLFormElement>) {
++     if (problemas.length > 0) {
++       evento.preventDefault();
++       setMostrarProblemas(true);
++       return;
++     }
++     enviarBase(evento);
++   }
++
++   // Valor efetivo = o do campo; vazio, vale o já salvo no negócio (mesma regra do servidor ao salvar o kit).
++   const consumoCampoVazio = lerNumeroBr(consumoMedioKwh) == null;
++   const faturaCampoVazia = lerNumeroBr(valorFaturaMedio) == null;
++   const consumoEfetivo = numero(consumoMedioKwh) ?? consumoMedioKwhPadrao;
++   const faturaEfetiva = numero(valorFaturaMedio) ?? valorFaturaMedioPadrao;
++
++   // Consumo médio em kWh, vindo do campo direto (ou do salvo) ou calculado a partir da fatura + tarifa.
++   const consumoMedioEstimado = useMemo(() => {
++     const tarifa = numero(tarifaKwh);
++     if (consumoEfetivo) return consumoEfetivo;
++     if (faturaEfetiva && tarifa) return faturaEfetiva / tarifa;
++     return null;
++   }, [consumoEfetivo, faturaEfetiva, tarifaKwh]);
++
++   // Sugere a quantidade de módulos pro consumo já informado, assim que o
++   // vendedor escolhe (ou digita) a potência de um módulo.
++   const sugerirQuantidadeModulo = useMemo(() => {
++     if (!parametros || !consumoMedioEstimado) return undefined;
++     return (potenciaW: number) =>
++       sugerirQuantidadeModulos(consumoMedioEstimado, parametros.produtividadeKwhKwpMes, potenciaW);
++   }, [parametros, consumoMedioEstimado]);
++
++   // Preço de referência (teste) do catálogo + custos internos configurados —
++   // só informativo aqui, já que o valor do negócio é editado em "Dados do negócio".
++   const precoSugerido = useMemo(() => {
++     if (!parametros) return null;
++     // Só linhas válidas, com a mesma quantidade que vai para o servidor ("1.200" = 1200 aqui também).
++     const somaComponentes = itens.reduce((acc, { indice, componente }) => {
++       const textoPreco = linhas[indice].precoEstimadoUnitario;
++       const precoUnitario = textoPreco ? Number(textoPreco) : NaN;
++       return Number.isFinite(precoUnitario) ? acc + precoUnitario * componente.quantidade : acc;
++     }, 0);
++     if (somaComponentes <= 0) return null;
++     const quantidadeModulos = componentes.filter((c) => c.tipo === "modulo").reduce((acc, c) => acc + c.quantidade, 0);
++     return custosInternosEstimados(somaComponentes, quantidadeModulos, potenciaKwp, parametros).total;
++   }, [linhas, itens, componentes, potenciaKwp, parametros]);
++
++   // Resultado do motor (união incompleta | completa), com o MESMO contexto que o servidor usa ao salvar. Consumo e
++   // tarifa ausentes entram como 0 só para o motor listar as pendências; potência e geração não dependem deles.
++   // A tarifa é normalizada às 5 casas gravadas (o servidor faz o mesmo antes de calcular).
++   const previa = useMemo<ResultadoCalculo | null>(() => {
++     if (!parametros) return null;
++     const tarifa = numero(tarifaKwh);
++     return calcular({
++       potenciaKwp,
++       precoKit: negocioValor ?? 0,
++       tipoLigacao,
++       consumoMedioKwh: consumoEfetivo != null ? Math.round(consumoEfetivo * 100) / 100 : 0,
++       tarifaKwh: tarifa != null ? Math.round(tarifa * 1e5) / 1e5 : 0,
++       produtividadeKwhKwpMes: parametros.produtividadeKwhKwpMes,
++       dadosEstimativa: { contexto, tarifaBaseTributaria: tarifaBase || null },
++     });
++   }, [parametros, tarifaKwh, tarifaBase, consumoEfetivo, potenciaKwp, negocioValor, tipoLigacao, contexto]);
++   const pendenciasPrevia = previa?.estado === "incompleta" ? previa.pendencias : [];
++
++   if (!parametros) {
++     return <p className="text-sm text-zinc-600">Parâmetros da calculadora não configurados para a empresa.</p>;
++   }
++
++   // "Atualizar preço no cálculo" fica desabilitado quando o servidor recusa (cálculo legado, incompleto ou desatualizado).
++   const motivosPreco = motivosDaAcao(motivos, "preco");
++   const bloqueioPreco = calculoDesatualizado && motivosPreco.length > 0 ? mensagemDeRecusa(motivosPreco, "preco") : null;
++   const legado = motivos.includes("legado");
++   const outrosMotivos = motivos.filter((m) => m !== "legado");
++
++   /** Último cálculo substituído, guardado no histórico (nunca é o resultado atual). */
++   const blocoHistorico = historico && (
++     <details data-testid="calculo-historico" className="rounded-md border border-dashed border-zinc-300 px-3 py-2 text-sm">
++       <summary className="cursor-pointer text-zinc-500">
++         Cálculo anterior — desatualizado (guardado no histórico em {new Date(historico.arquivadoEm).toLocaleDateString("pt-BR")})
++       </summary>
++       <p className="mt-2 text-xs text-zinc-500">
++         {historico.motivo === "desatualizado_por_entradas"
++           ? "As entradas mudaram e o resultado novo ficou incompleto. Os valores abaixo são só histórico: não correspondem às entradas atuais e não entram em proposta."
++           : "Substituído por um recálculo. Os valores abaixo são só histórico."}
++       </p>
++       <dl className="mt-2 grid grid-cols-2 gap-3 text-sm text-zinc-500">
++         <div>
++           <dt>Kit</dt>
++           <dd>{historico.kitNome}</dd>
++         </div>
++         <div>
++           <dt>Consumo médio</dt>
++           <dd>{numeroBr(historico.consumoMedioKwh)} kWh/mês</dd>
++         </div>
++         <div>
++           <dt>Tarifa</dt>
++           <dd>R$ {formatarNumeroBr(historico.tarifaKwh)}/kWh</dd>
++         </div>
++         <div>
++           <dt>{historico.estadoFinanceiro === "legado" ? "Economia (fórmula antiga)" : "Economia (desatualizada)"}</dt>
++           <dd>{textoEconomia(historico.economiaMensal)}</dd>
++         </div>
++       </dl>
++     </details>
++   );
++
++   if (calculo && !editando) {
++     const tecnicosSalvos = dadosTecnicosDoSalvo(calculo);
++     return (
++       <div className="flex flex-col gap-3">
++         {!padraoCliente && (
++           <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
++             Favor adicionar o padrão atual do cliente (em &quot;Dados do negócio&quot;) para conferir compatibilidade com o kit.
++           </p>
++         )}
++         {avisoKitSalvo && <MensagemKitSalvo pendencias={pendenciasPrevia} tecnicoSalvo={tecnicoSalvo} calculoAnterior={anterior} />}
++         {precoDesatualizado && (
++           <form action={acaoPreco} role="alert" className="flex flex-col gap-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
++             <input type="hidden" name="negocioId" value={negocioId} />
++             <p>
++               O valor do negócio ({negocioValor != null ? formatarMoeda(negocioValor) : "sem valor"}) é diferente do preço usado{" "}
++               {calculoDesatualizado ? "no cálculo anterior" : "neste cálculo"} ({formatarMoeda(calculo.kitPreco)}).
++               {!calculoDesatualizado && " O cálculo continua com o preço antigo até você atualizar."}
++             </p>
++             {bloqueioPreco && <p data-testid="preco-bloqueado">{bloqueioPreco}</p>}
++             <Botao type="submit" variante="secundario" disabled={atualizandoPreco || !!bloqueioPreco} className="self-start">
++               {atualizandoPreco ? "Atualizando..." : "Atualizar preço no cálculo"}
++             </Botao>
++           </form>
++         )}
++         <Mensagem resultado={resultadoPreco} />
++         {calculoDesatualizado ? (
++           <>
++             {/* Só o que vale hoje: potência e geração saem do kit atual; a conta e a economia só com os dados completos. */}
++             {potenciaKwp > 0 && previa && (
++               <PreviaEstimativa
++                 previa={previa}
++                 potenciaKwp={potenciaKwp}
++                 mostrarQuadro={!avisoKitSalvo}
++                 rodape="Complete o que falta e recalcule o kit para ver a conta e a economia."
++               />
++             )}
++             {estruturaTelhado && (
++               <p className="text-sm">
++                 <span className="text-zinc-500">Estrutura do telhado:</span> {estruturaTelhado}
++               </p>
++             )}
++             {calculo.estadoFinanceiro === "incompleto" ? (
++               // Resultado técnico salvo (sem parte financeira): recolhido; a prévia acima é o estado atual.
++               <details data-testid="resultado-tecnico-salvo" className="rounded-md border border-dashed border-zinc-300 px-3 py-2 text-sm">
++                 <summary className="cursor-pointer text-zinc-500">Resultado técnico salvo (sem economia)</summary>
++                 {outrosMotivos.filter((m) => m !== "incompleta").length > 0 && (
++                   <ul className="mt-1 list-disc pl-5 text-xs text-zinc-500">
++                     {outrosMotivos
++                       .filter((m) => m !== "incompleta")
++                       .map((m) => (
++                         <li key={m}>{textoDoMotivo(m).replace(/^./, (c) => c.toUpperCase())}.</li>
++                       ))}
++                   </ul>
++                 )}
++                 <dl className="mt-2 grid grid-cols-2 gap-3 text-sm text-zinc-500">
++                   <div>
++                     <dt>Kit</dt>
++                     <dd>{calculo.kitNome}</dd>
++                   </div>
++                   <div>
++                     <dt>Ligação</dt>
++                     <dd>{ROTULO_TIPO_LIGACAO[calculo.tipoLigacao]}</dd>
++                   </div>
++                   <div>
++                     <dt>Geração estimada</dt>
++                     <dd>{numeroBr(calculo.geracaoEstimadaKwhMes)} kWh/mês</dd>
++                   </div>
++                   <div>
++                     <dt>Consumo médio</dt>
++                     <dd>{numeroBr(calculo.consumoMedioKwh)} kWh/mês</dd>
++                   </div>
++                   <div>
++                     <dt>Tarifa informada</dt>
++                     <dd>
++                       R$ {formatarNumeroBr(calculo.tarifaKwh)}/kWh
++                       {calculo.tarifaBaseTributaria ? ` (${ROTULO_BASE[calculo.tarifaBaseTributaria]})` : " (base não declarada)"}
++                     </dd>
++                   </div>
++                 </dl>
++               </details>
++             ) : (
++               /* Histórico: valores do cálculo antigo, em visual secundário e recolhidos; não são o resultado atual. */
++               <details data-testid="calculo-anterior" className="rounded-md border border-dashed border-zinc-300 px-3 py-2 text-sm">
++                 <summary className="cursor-pointer text-zinc-500">
++                   {legado ? "Cálculo anterior (fórmula antiga, não validada)" : "Cálculo anterior (desatualizado)"}
++                 </summary>
++                 <p className="mt-2 text-xs text-zinc-500">
++                   {legado
++                     ? "Este cálculo foi feito por uma fórmula antiga, que não foi validada. Os valores abaixo são só histórico: não são a economia nem o payback atuais e não entram em proposta."
++                     : "Os valores abaixo são só histórico: não correspondem às entradas atuais e não entram em proposta."}
++                 </p>
++                 {outrosMotivos.length > 0 && (
++                   <ul className="mt-1 list-disc pl-5 text-xs text-zinc-500">
++                     {outrosMotivos.map((m) => (
++                       <li key={m}>{textoDoMotivo(m).replace(/^./, (c) => c.toUpperCase())}.</li>
++                     ))}
++                   </ul>
++                 )}
++                 <dl className="mt-2 grid grid-cols-2 gap-3 text-sm text-zinc-500">
++                   <div>
++                     <dt>Kit</dt>
++                     <dd>{calculo.kitNome}</dd>
++                   </div>
++                   <div>
++                     <dt>Ligação</dt>
++                     <dd>{ROTULO_TIPO_LIGACAO[calculo.tipoLigacao]}</dd>
++                   </div>
++                   <div>
++                     <dt>Geração (cálculo anterior)</dt>
++                     <dd>{numeroBr(calculo.geracaoEstimadaKwhMes)} kWh/mês</dd>
++                   </div>
++                   <div>
++                     <dt>Consumo médio</dt>
++                     <dd>{numeroBr(calculo.consumoMedioKwh)} kWh/mês</dd>
++                   </div>
++                   <div>
++                     <dt>{legado ? "Economia (fórmula antiga)" : "Economia (desatualizada)"}</dt>
++                     <dd>{textoEconomia(calculo.economiaMensal)}</dd>
++                   </div>
++                   <div>
++                     <dt>{legado ? "Payback (fórmula antiga)" : "Payback"}</dt>
++                     <dd>{textoPayback(calculo.economiaMensal, calculo.paybackMeses)}</dd>
++                   </div>
++                 </dl>
++                 {vigencia && vigencia.naoVerificavel.length > 0 && (
++                   <p className="mt-2 text-xs text-zinc-400">
++                     Conferido: kit, preço, consumo e parâmetros. Não conferido: {juntar(vigencia.naoVerificavel.map((n) => ROTULO_NAO_VERIFICAVEL[n]))}.
++                   </p>
++                 )}
++               </details>
++             )}
++             {calculo.estadoFinanceiro === "incompleto" && blocoHistorico}
++           </>
++         ) : (
++           <>
++             <dl data-testid="resultado-atual" className="grid grid-cols-2 gap-3 text-sm">
++               <div>
++                 <dt className="text-zinc-500">Kit</dt>
++                 <dd className="font-medium text-zinc-900">{calculo.kitNome}</dd>
++               </div>
++               <div>
++                 <dt className="text-zinc-500">Ligação</dt>
++                 <dd>{ROTULO_TIPO_LIGACAO[calculo.tipoLigacao]}</dd>
++               </div>
++               <div>
++                 <dt className="text-zinc-500">Geração estimada</dt>
++                 <dd>{numeroBr(calculo.geracaoEstimadaKwhMes)} kWh/mês</dd>
++               </div>
++               <div>
++                 <dt className="text-zinc-500">Consumo médio</dt>
++                 <dd>{numeroBr(calculo.consumoMedioKwh)} kWh/mês</dd>
++               </div>
++               {calculo.contaSemSolar != null && (
++                 <div>
++                   <dt className="text-zinc-500">Conta hoje (energia)</dt>
++                   <dd>{formatarMoeda(calculo.contaSemSolar)}/mês</dd>
++                 </div>
++               )}
++               {calculo.contaComSolar != null && (
++                 <div>
++                   <dt className="text-zinc-500">Conta com o sistema</dt>
++                   <dd>{formatarMoeda(calculo.contaComSolar)}/mês</dd>
++                 </div>
++               )}
++               <div>
++                 <dt className="text-zinc-500">Economia estimada</dt>
++                 <dd data-testid="economia-salva" className={(calculo.economiaMensal ?? 0) > 0 ? "font-medium text-green-700" : "text-zinc-700"}>
++                   {textoEconomia(calculo.economiaMensal)}
++                 </dd>
++               </div>
++               <div>
++                 <dt className="text-zinc-500">Payback estimado</dt>
++                 <dd data-testid="payback-salvo" title={MOTIVO_PAYBACK}>
++                   {textoPayback(calculo.economiaMensal, calculo.paybackMeses)}
++                 </dd>
++               </div>
++               {estruturaTelhado && (
++                 <div>
++                   <dt className="text-zinc-500">Estrutura do telhado</dt>
++                   <dd>{estruturaTelhado}</dd>
++                 </div>
++               )}
++             </dl>
++             <p className="-mt-1 text-xs text-zinc-500">Payback indisponível: {MOTIVO_PAYBACK}.</p>
++             <HipotesesELimitacoes ressalvas={calculo.ressalvas ?? []} kwhNaoCompensado={calculo.kwhNaoCompensado ?? null} />
++           </>
++         )}
++         {componentesSalvos.length > 0 && (
++           <ul className="flex flex-col gap-1 rounded-lg bg-zinc-50 p-3 text-sm">
++             {componentesSalvos.map((c, i) => (
++               <li key={i}>
++                 <span className="text-zinc-500">{ROTULO_TIPO_COMPONENTE_KIT[c.tipo]}:</span> {c.descricao}
++                 {c.potenciaW ? ` · ${numeroBr(c.potenciaW)} W` : ""} × {c.quantidade}
++               </li>
++             ))}
++           </ul>
++         )}
++         {calculo.observacoes && <p className="text-sm text-zinc-600">{calculo.observacoes}</p>}
++         <DetalhesTecnicos dados={calculoDesatualizado ? null : tecnicosSalvos} />
++         <p className="text-xs text-zinc-400">
++           Estimativa do modo comercial (sem simulação de engenharia) — confirme com o time técnico antes de fechar.
++         </p>
++         <Botao type="button" variante="secundario" onClick={() => {
++             setAssinaturaSalva(null);
++             setEditando(true);
++           }}
++           className="self-start">
++           Editar kit / recalcular
++         </Botao>
++       </div>
++     );
++   }
++
++   return (
++     <form onSubmit={enviar} className="flex flex-col gap-3">
++       <input type="hidden" name="negocioId" value={negocioId} />
++       <input type="hidden" name="componentes" value={JSON.stringify(componentes)} />
++       {!calculo && componentesSalvos.length > 0 && !avisoKitSalvo && (
++         <p className="rounded-md bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
++           Itens do kit salvos, ainda sem cálculo de conta e economia.
++         </p>
++       )}
++       {!padraoCliente && (
++         <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
++           Favor adicionar o padrão atual do cliente (em &quot;Dados do negócio&quot;) para conferir compatibilidade com o kit.
++         </p>
++       )}
++       <EditorComponentesKit
++         linhas={linhas}
++         onChange={setLinhas}
++         sugerirQuantidadeModulo={sugerirQuantidadeModulo}
++         problemas={mostrarProblemas ? problemas : undefined}
++       />
++       {problemaKit && <Mensagem resultado={{ ok: false, mensagem: problemaKit }} />}
++       {precoSugerido != null && (
++         <p className="-mt-1 text-xs text-zinc-400">
++           Preço sugerido (catálogo + custos internos, estimativa de teste): {formatarMoeda(precoSugerido)} — ajuste em
++           &ldquo;Dados do negócio&rdquo; se quiser usar.
++         </p>
++       )}
++       <Campo
++         rotulo="Estrutura do telhado"
++         name="estruturaTelhado"
++         value={estrutura}
++         onChange={(e) => setEstrutura(e.target.value)}
++         placeholder="Ex.: perfil de alumínio, gancho"
++       />
++       <Selecao
++         rotulo="Tipo de ligação"
++         name="tipoLigacao"
++         required
++         value={tipoLigacao}
++         onChange={(e) => setTipoLigacao(e.target.value as TipoLigacao)}
++       >
++         {TIPOS_LIGACAO.map((t) => (
++           <option key={t} value={t}>
++             {ROTULO_TIPO_LIGACAO[t]}
++           </option>
++         ))}
++       </Selecao>
++       <Campo
++         rotulo="Consumo médio (kWh/mês)"
++         name="consumoMedioKwh"
++         inputMode="decimal"
++         placeholder="ex.: 450"
++         value={consumoMedioKwh}
++         onChange={(e) => setConsumoMedioKwh(e.target.value)}
++       />
++       {consumoCampoVazio && consumoMedioKwhPadrao != null ? (
++         <p data-testid="kit-consumo-salvo" className="-mt-2 text-xs text-zinc-400">
++           Campo vazio: ao salvar, vale o consumo já salvo no negócio ({formatarNumeroBr(consumoMedioKwhPadrao)} kWh/mês). Para apagar, use
++           “Dados do negócio”.
++         </p>
++       ) : (
++         <p className="-mt-2 text-xs text-zinc-400">
++           O kit é salvo mesmo sem o consumo em kWh. Só o valor da conta em R$ não é usado como consumo.
++         </p>
++       )}
++       <Campo
++         rotulo="Valor médio da fatura (R$, opcional)"
++         name="valorFaturaMedio"
++         inputMode="decimal"
++         placeholder="ex.: 450,00"
++         value={valorFaturaMedio}
++         onChange={(e) => setValorFaturaMedio(e.target.value)}
++       />
++       {faturaCampoVazia && valorFaturaMedioPadrao != null && (
++         <p data-testid="kit-fatura-salva" className="-mt-2 text-xs text-zinc-400">
++           Campo vazio: ao salvar, vale a fatura já salva no negócio ({formatarMoeda(valorFaturaMedioPadrao)}). Para apagar, use “Dados do
++           negócio”.
++         </p>
++       )}
++       <Campo
++         rotulo="Tarifa (R$/kWh)"
++         name="tarifaKwh"
++         inputMode="decimal"
++         placeholder="ex.: 0,76802"
++         value={tarifaKwh}
++         onChange={(e) => mudarTarifa(e.target.value)}
++       />
++       <Selecao
++         rotulo="Base tributária da tarifa"
++         name="tarifaBaseTributaria"
++         value={tarifaBase}
++         onChange={(e) => setTarifaBase(e.target.value as BaseTributaria | "")}
++       >
++         <option value="">Não declarada</option>
++         <option value="sem_tributos">Sem tributos (como a ANEEL publica)</option>
++         <option value="com_tributos">Com tributos (ICMS, PIS/Cofins)</option>
++       </Selecao>
++       <p data-testid="tarifa-origem" className="-mt-2 text-xs text-zinc-400">
++         {tarifaOficial && tarifaOficialKwh != null ? (
++           <>
++             Tarifa oficial {tarifaOficial.distribuidora} ({tarifaOficial.ato}, TE + TUSD, sem tributos): R${" "}
++             {formatarNumeroBr(tarifaOficialKwh)}/kWh.{" "}
++             {numero(tarifaKwh) != null && Math.round(numero(tarifaKwh)! * 1e5) / 1e5 === tarifaOficialKwh ? (
++               "Em uso."
++             ) : (
++               <button type="button" onClick={usarTarifaOficial} className="underline">
++                 Usar a tarifa oficial
++               </button>
++             )}{" "}
++             O Fio B oficial é sem tributos: a tarifa precisa estar na mesma base.
++           </>
++         ) : (
++           "Sem tarifa oficial para este negócio (confira o tipo de cliente e a distribuidora na Qualificação SDR). Informe a tarifa e a base."
++         )}
++       </p>
++       {potenciaKwp > 0 && previa && (
++         <PreviaEstimativa
++           previa={previa}
++           potenciaKwp={potenciaKwp}
++           mostrarQuadro={!avisoKitSalvo}
++           rodape="Você pode salvar o kit assim mesmo; a conta e a economia aparecem quando os dados estiverem completos."
++         />
++       )}
++       <label className="flex flex-col gap-1 text-sm">
++         <span className="font-medium text-zinc-700">Observações (opcional)</span>
++         <textarea
++           key={versaoObservacoes}
++           name="observacoes"
++           rows={2}
++           defaultValue={calculo?.observacoes ?? ""}
++           className="rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-dourado focus:ring-2 focus:ring-dourado/20"
++         />
++       </label>
++       {removendoKitSalvo &&
++         (calculo ? (
++           <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">{MENSAGEM_REMOCAO_COM_CALCULO}</p>
++         ) : (
++           <label className="flex items-start gap-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900">
++             <input
++               type="checkbox"
++               name="confirmarRemocao"
++               value="sim"
++               checked={confirmaRemocao}
++               onChange={(e) => setConfirmaRemocao(e.target.checked)}
++               className="mt-1"
++             />
++             <span>
++               Confirmo a remoção do kit salvo ({componentesSalvos.length} {componentesSalvos.length === 1 ? "item" : "itens"}). Para
++               manter o kit, use Cancelar.
++             </span>
++           </label>
++         ))}
++       <div className="flex items-center gap-2">
++         <Botao type="submit" disabled={pendente || (removendoKitSalvo && (!!calculo || !confirmaRemocao))}>
++           {pendente ? "Salvando..." : removendoKitSalvo ? "Remover kit salvo" : "Salvar kit"}
++         </Botao>
++         {/* Sempre disponível, inclusive na primeira montagem. */}
++         <Botao type="button" variante="secundario" onClick={cancelarEdicao}>
++           Cancelar
++         </Botao>
++       </div>
++       {resultado?.ok ? (
++         avisoKitSalvo && <MensagemKitSalvo pendencias={pendenciasPrevia} tecnicoSalvo={tecnicoSalvo} calculoAnterior={anterior} />
++       ) : (
++         <Mensagem resultado={resultado} />
++       )}
++       {historico && blocoHistorico}
++       <DetalhesTecnicos dados={previa ? dadosTecnicosDaPrevia(previa, tipoLigacao, numero(tarifaKwh) ?? 0) : null} />
++     </form>
++   );
++ }
++
+
+ ❯ tests/negocios-gravacao.test.ts:247:17
+    245|       expect(cancelar).toContain(campo);
+    246|     }
+    247|     expect(kit).toContain("estadoSalvoDoKit({ componentesSalvos, calcu…
+       |                 ^
+    248|     // Cancelar sempre visível, inclusive na primeira montagem (sem co…
+    249|     const botao = kit.indexOf('<Botao type="button" variante="secundar…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[37/42]⎯
+
+ FAIL  tests/negocios-gravacao.test.ts > regressões de tela > estado salvo do kit (usado ao abrir e no Cancelar) > primeira montagem (nada salvo): Cancelar limpa os itens e mantém os dados do negócio
+AssertionError: expected { linhas: [], estrutura: '', …(5) } to deeply equal { linhas: [], estrutura: '', …(4) }
+
+- Expected
++ Received
+
+  {
+    "consumoMedioKwh": "450",
+    "estrutura": "",
+    "linhas": [],
++   "tarifaBaseTributaria": "",
+    "tarifaKwh": "",
+    "tipoLigacao": "trifasico",
+    "valorFaturaMedio": "320",
+  }
+
+ ❯ tests/negocios-gravacao.test.ts:258:83
+    256|
+    257|     it("primeira montagem (nada salvo): Cancelar limpa os itens e mant…
+    258|       expect(estadoSalvoDoKit({ ...base, componentesSalvos: [], calcul…
+       |                                                                                   ^
+    259|         linhas: [],
+    260|         estrutura: "",
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[38/42]⎯
+
+ FAIL  tests/negocios-gravacao.test.ts > regressões de tela > estado salvo do kit (usado ao abrir e no Cancelar) > kit salvo com cálculo: Cancelar restaura o gravado; consumo e conta vêm do negócio, nunca do cálculo legado
+AssertionError: expected { Object (linhas, estrutura, ...) } to deeply equal { Object (linhas, estrutura, ...) }
+
+- Expected
++ Received
+
+@@ -13,9 +13,10 @@
+        "potenciaW": "5.000",
+        "quantidade": "1",
+        "tipo": "inversor",
+      },
+    ],
++   "tarifaBaseTributaria": "",
+    "tarifaKwh": "0,9512",
+    "tipoLigacao": "bifasico",
+    "valorFaturaMedio": "320",
+  }
+
+ ❯ tests/negocios-gravacao.test.ts:279:22
+    277|         valorFaturaMedioPadrao: 320,
+    278|       });
+    279|       expect(estado).toEqual({
+       |                      ^
+    280|         linhas: [
+    281|           { tipo: "modulo", descricao: "Módulo 550 W", potenciaW: "550…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[39/42]⎯
+
+ FAIL  tests/travas-kit-sdr-db.test.ts > kit com cálculo solar nunca fica vazio > tarifa acima do limite da coluna com linha legada: o app troca os itens, não grava linha e não restaura nada
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ tests/travas-kit-sdr-db.test.ts:283:18
+    281|       fd({ negocioId, tipoLigacao: "trifasico", consumoMedioKwh: "450"…
+    282|     );
+    283|     expect(r.ok).toBe(true);
+       |                  ^
+    284|     expect(r.mensagem).not.toContain("Nada foi alterado");
+    285|     expect((await lerKit(negocioId)).map((k) => k.descricao)).toEqual(…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[40/42]⎯
+
+ FAIL  tests/travas-kit-sdr-db.test.ts > cálculo solar só é criado com kit > cálculo existente: o app não o recalcula (fica 0,95); upsert e update direto continuam permitidos
+AssertionError: expected 1.05 to be close to 0.95, received difference is 0.10000000000000009, but expected 0.005
+ ❯ tests/travas-kit-sdr-db.test.ts:476:42
+    474|     );
+    475|     expect(r.ok).toBe(true);
+    476|     expect(await tarifaSalva(negocioId)).toBeCloseTo(0.95);
+       |                                          ^
+    477|     const { error: erroUpsert } = await vendedor.cliente.from("calculo…
+    478|     expect(erroUpsert).toBeNull();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[41/42]⎯
+
+
+ Test Files  8 failed | 94 passed (102)
+      Tests  42 failed | 2050 passed (2092)
+   Start at  23:46:50
+   Duration  30.84s (tests 92%, import 6%, transform 2%)
+
+    Isolate  102 workers spawned · ~219ms startup each (spawn + environment, per file)
+             at least ~1.81s faster with isolate: false — reuses workers across files instead of one per file
+

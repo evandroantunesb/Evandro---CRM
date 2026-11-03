@@ -1,0 +1,63 @@
+
+ RUN  v5.0.2 R:/wt-m2-p0-calc
+
+ ❯ tests/calculo-gd2-db.test.ts (13 tests | 2 failed) 2216ms
+   ❯ datas: percentual pelo ano e componente pela vigência (2)
+     × salvar em 01/01/2027 usa 75% com a mesma REH; salvar em 24/06/2027 fica incompleto (sem tarifa vigente) 880ms
+   ❯ preço e valor comercial (1)
+     × editar o valor do negócio nunca é bloqueado; 'Atualizar preço no cálculo' só leva o valor ao kit_preco (payback segue nulo) 110ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/calculo-gd2-db.test.ts > datas: percentual pelo ano e componente pela vigência > salvar em 01/01/2027 usa 75% com a mesma REH; salvar em 24/06/2027 fica incompleto (sem tarifa vigente)
+AssertionError: expected { …(46) } to match object { …(4) }
+(42 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "data_referencia": "2027-06-24",
+    "economia_mensal": null,
+    "estado_financeiro": "incompleto",
+-   "tarifa_gd_id": null,
++   "tarifa_gd_id": "dc8fc1c9-fb9f-435e-b67a-e60d906a394a",
+  }
+
+ ❯ tests/calculo-gd2-db.test.ts:255:36
+    253|     const r = await salvar(negocioId);
+    254|     expect(r.mensagem).toContain("Sem tarifa vigente da COPEL-DIS para…
+    255|     expect(await linha(negocioId)).toMatchObject({ estado_financeiro: …
+       |                                    ^
+    256|     expect((await historico(negocioId)).at(-1)).toMatchObject({ motivo…
+    257|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  tests/calculo-gd2-db.test.ts > preço e valor comercial > editar o valor do negócio nunca é bloqueado; 'Atualizar preço no cálculo' só leva o valor ao kit_preco (payback segue nulo)
+AssertionError: expected [ 'preco', 'nao_comprovado' ] to deeply equal [ 'preco' ]
+
+- Expected
++ Received
+
+  [
+    "preco",
++   "nao_comprovado",
+  ]
+
+ ❯ tests/calculo-gd2-db.test.ts:273:35
+    271|     const lido = await carregarVigencia(vendedor.cliente, negocioId);
+    272|     if (!lido.ok || !lido.calculo) throw new Error("leitura");
+    273|     expect(lido.vigencia.motivos).toEqual(["preco"]);
+       |                                   ^
+    274|     const ok = await atualizarPrecoCalculoComCliente(cliente(vendedor)…
+    275|     expect(ok).toMatchObject({ ok: true, mensagem: "Preço do cálculo a…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  2 failed | 15 passed (17)
+   Start at  23:52:33
+   Duration  4.43s (tests 85%, import 9%, transform 6%)
+
