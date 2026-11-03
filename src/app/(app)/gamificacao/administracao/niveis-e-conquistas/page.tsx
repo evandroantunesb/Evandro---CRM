@@ -3,7 +3,7 @@ import { type MarcoConquista } from "@/lib/gamificacao";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import type { PerfilGamificacao } from "@/lib/tipos";
-import { CabecalhoPaginaGf, CartaoGf, EstadoVazioGf, PaginaGf, SecaoGf, VoltarGf } from "../../_compartilhado/ui";
+import { CabecalhoPaginaGf, CartaoGf, EstadoVazioGf, PaginaGf, SecaoGf } from "../../_compartilhado/ui";
 import { LinhaConquista, LinhaNivel, NovaConquista, NovoNivel } from "../_compartilhado/formularios";
 
 export default async function NiveisEConquistas() {
@@ -21,8 +21,11 @@ export default async function NiveisEConquistas() {
   return (
     <PaginaGf largura="formulario" className="gap-8">
       <div className="flex flex-col gap-3">
-        <VoltarGf href="/configuracoes#gamificacao">Configurações</VoltarGf>
-        <CabecalhoPaginaGf titulo="Níveis e conquistas" />
+        <CabecalhoPaginaGf
+          voltar={{ href: "/configuracoes#gamificacao", rotulo: "Configurações" }}
+          sobretitulo="Gamificação e metas · admin"
+          titulo="Níveis e conquistas"
+        />
       </div>
 
       <SecaoGf

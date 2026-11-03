@@ -6,7 +6,7 @@ import { RESPONSAVEL_COMERCIAL, pode } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import type { StatusComissao, TipoCalculoComissao } from "@/lib/tipos";
 import { formatarReferenciaComissao, StatusComissaoGf } from "../../gamificacao/_compartilhado/comissao-ui";
-import { CabecalhoPaginaGf, CartaoGf, EstadoVazioGf, PaginaGf, VoltarGf } from "../../gamificacao/_compartilhado/ui";
+import { CabecalhoPaginaGf, CartaoGf, EstadoVazioGf, PaginaGf } from "../../gamificacao/_compartilhado/ui";
 import { CalcularComissaoForm, FecharComissaoForm, HistoricoVersoesPlano, PlanoComissaoForm, type VersaoPlano } from "./formularios";
 
 export default async function ConfigComissoes() {
@@ -48,8 +48,9 @@ export default async function ConfigComissoes() {
 
   return (
     <PaginaGf largura="formulario">
-      <VoltarGf href="/configuracoes#gamificacao">Configurações</VoltarGf>
       <CabecalhoPaginaGf
+        voltar={{ href: "/configuracoes#gamificacao", rotulo: "Configurações" }}
+        sobretitulo="Gamificação e metas · admin"
         titulo="Comissões"
         descricao="Cada colaborador tem um plano com salário-base opcional e faixas de resultado (receita de negócios ganhos no mês). É um conceito separado de pontos e de metas — não afeta o extrato nem o ranking da gamificação. Alterar o plano cria uma nova versão com vigência a partir do mês escolhido; versões passadas são preservadas."
       />

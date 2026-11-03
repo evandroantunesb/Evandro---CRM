@@ -4,7 +4,7 @@ import { exigirPapel } from "@/lib/sessao";
 import { RESPONSAVEL_COMERCIAL, pode } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import type { MetricaMeta } from "@/lib/tipos";
-import { CabecalhoPaginaGf, CartaoGf, EstadoVazioGf, PaginaGf, VoltarGf } from "../../gamificacao/_compartilhado/ui";
+import { CabecalhoPaginaGf, CartaoGf, EstadoVazioGf, PaginaGf } from "../../gamificacao/_compartilhado/ui";
 import { LinhaMeta, NovaMeta } from "./formularios";
 
 export default async function ConfigMetas() {
@@ -24,8 +24,9 @@ export default async function ConfigMetas() {
 
   return (
     <PaginaGf largura="formulario">
-      <VoltarGf href="/configuracoes#gamificacao">Configurações</VoltarGf>
       <CabecalhoPaginaGf
+        voltar={{ href: "/configuracoes#gamificacao", rotulo: "Configurações" }}
+        sobretitulo="Gamificação e metas · admin"
         titulo="Metas"
         descricao="Cada meta é individual: escolha o colaborador, a métrica e o período. O progresso é calculado sozinho a partir dos negócios e tarefas já registrados no CRM."
       />

@@ -124,6 +124,7 @@ function Conteudo({
   return (
     <div className="gf-gerencial">
       <CabecalhoPaginaGf
+        sobretitulo="Visão geral"
         titulo="Gamificação"
         descricao={`${daEmpresa ? "Visão gerencial da empresa" : "Visão gerencial da sua equipe"} · ${periodoRotulo.toLowerCase()}`}
         acao={

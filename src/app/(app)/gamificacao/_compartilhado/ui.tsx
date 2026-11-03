@@ -1,6 +1,6 @@
 import type { ComponentType, CSSProperties, ReactNode } from "react";
 import Link from "next/link";
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Minus, Plus, Undo2 } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ChevronLeft, Minus, Plus, Undo2 } from "lucide-react";
 import { FotoAvatar } from "@/components/foto-avatar";
 
 /** Ícone Lucide (ou compatível) aceito pelos componentes do módulo. */
@@ -62,21 +62,38 @@ export function PaginaGf({
   );
 }
 
-/** Cabeçalho de página: título (h1), descrição curta opcional e uma ação/controle à direita. */
+/**
+ * Abertura das telas do módulo (faixa `gf` do desenho aprovado): cartão escuro com o sobretítulo verde, título
+ * (h1), descrição curta e uma ação/controle à direita. Nas telas de administração, `voltar` leva às Configurações.
+ */
 export function CabecalhoPaginaGf({
   titulo,
   descricao,
   acao,
+  sobretitulo = "Gamificação",
+  voltar,
 }: {
   titulo: ReactNode;
   descricao?: ReactNode;
   acao?: ReactNode;
+  sobretitulo?: ReactNode;
+  voltar?: { href: string; rotulo: ReactNode };
 }) {
   return (
-    <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <header className="flex flex-col gap-5 rounded-3xl border border-[var(--gf-borda)] bg-[var(--gf-surface)] px-6 py-6 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between md:px-8">
       <div className="min-w-0">
-        <h1 className="gf-t-pagina">{titulo}</h1>
-        {descricao && <p className="gf-t-aux mt-1.5 max-w-3xl text-sm text-pretty">{descricao}</p>}
+        {voltar && (
+          <Link
+            href={voltar.href}
+            className="mb-2.5 inline-flex min-h-8 w-fit items-center gap-1 rounded-md text-[13px] font-medium text-[var(--gf-texto-sec)] hover:text-[var(--gf-texto)]"
+          >
+            <ChevronLeft size={16} aria-hidden />
+            {voltar.rotulo}
+          </Link>
+        )}
+        <p className="text-[11px] font-semibold tracking-[0.14em] text-[var(--gf-verde)] uppercase">{sobretitulo}</p>
+        <h1 className="mt-2 font-titulo text-3xl leading-tight font-light tracking-tight text-[var(--gf-texto)] md:text-4xl">{titulo}</h1>
+        {descricao && <p className="mt-2 max-w-3xl text-sm text-pretty text-[var(--gf-texto-sec)]">{descricao}</p>}
       </div>
       {acao && <div className="min-w-0 sm:shrink-0">{acao}</div>}
     </header>
