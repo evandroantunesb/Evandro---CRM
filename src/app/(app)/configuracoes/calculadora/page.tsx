@@ -1,4 +1,5 @@
-import { Cartao, Voltar } from "@/components/ui";
+import { CabecalhoPagina } from "@/components/cabecalho-pagina";
+import { Cartao } from "@/components/ui";
 import { carregarConfiguracao } from "@/lib/crm";
 import { produtividadeConfirmada } from "@/lib/propostas/proposta-simples";
 import { exigirPapel } from "@/lib/sessao";
@@ -15,8 +16,13 @@ export default async function ConfigCalculadora() {
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
-      <Voltar href="/configuracoes">Configurações</Voltar>
-      <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Kits e calculadora</h1>
+      <CabecalhoPagina
+        detalhe
+        voltar={{ href: "/configuracoes", rotulo: "Configurações" }}
+        sobretitulo="Configurações · Venda"
+        titulo="Kits e calculadora"
+        descricao="Kits prontos do catálogo e parâmetros do cálculo."
+      />
       <Cartao titulo={`Kits (${kits.length})`}>
         <p className="mb-3 text-sm text-zinc-600">
           Kits prontos do catálogo, com potência e preço. O vendedor escolhe um deles na calculadora do negócio.

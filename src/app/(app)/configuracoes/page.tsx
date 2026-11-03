@@ -1,3 +1,4 @@
+import { CabecalhoPagina } from "@/components/cabecalho-pagina";
 import {
   BadgeDollarSign,
   CalendarClock,
@@ -100,10 +101,12 @@ export default async function Configuracoes() {
 
   return (
     <div className="mx-auto flex max-w-3xl animate-entrar flex-col gap-8">
-      <header className="flex flex-col gap-2">
-        <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Configurações</h1>
-        <p className="text-sm text-texto-2">Como a sua empresa funciona no Raion: aquisição, venda, pessoas e gamificação.</p>
-      </header>
+      <CabecalhoPagina
+        detalhe
+        sobretitulo="Administração"
+        titulo="Configurações"
+        descricao="Como a sua empresa funciona no Raion: aquisição, venda, pessoas e gamificação."
+      />
       {GRUPOS.map((grupo) => (
         <section key={grupo.id} id={grupo.id} aria-labelledby={`grupo-${grupo.id}`} className="flex scroll-mt-20 flex-col gap-3">
           <h2 id={`grupo-${grupo.id}`} className="sobretitulo px-1">

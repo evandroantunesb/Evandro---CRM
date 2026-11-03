@@ -1,4 +1,4 @@
-import { Voltar } from "@/components/ui";
+import { CabecalhoPagina } from "@/components/cabecalho-pagina";
 import { carregarConfiguracao, formatarDataHora } from "@/lib/crm";
 import { REGRAS_TEMPERATURA } from "@/lib/permissoes";
 import { exigirPapel } from "@/lib/sessao";
@@ -41,19 +41,22 @@ export default async function RegrasTemperatura() {
   return (
     <div className="mx-auto flex max-w-3xl animate-entrar flex-col gap-6">
       {/* O gestor chega pela tela de Negócios (o hub de Configurações é só do admin). */}
-      {atual.papel === "admin" ? <Voltar href="/configuracoes">Configurações</Voltar> : <Voltar href="/negocios">Negócios</Voltar>}
-      <header className="flex flex-col gap-2">
-        <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Temperatura dos negócios</h1>
-        <p className="text-sm text-texto-2">
-          O sistema confere as regras ligadas de cima para baixo: a primeira que se aplica define se o negócio está Quente ou Frio, e o nome
-          dela aparece no card como o motivo. Se nenhuma se aplica, o negócio fica Morno. Vale para todos os negócios abertos da empresa.
+      <CabecalhoPagina
+        detalhe
+        voltar={atual.papel === "admin" ? { href: "/configuracoes", rotulo: "Configurações" } : { href: "/negocios", rotulo: "Negócios" }}
+        sobretitulo="Configurações · Comercial"
+        titulo="Temperatura dos negócios"
+        descricao="Regras que deixam um negócio Quente ou Frio."
+      />
+      <p className="text-sm text-texto-2">
+        O sistema confere as regras ligadas de cima para baixo: a primeira que se aplica define se o negócio está Quente ou Frio, e o nome
+        dela aparece no card como o motivo. Se nenhuma se aplica, o negócio fica Morno. Vale para todos os negócios abertos da empresa.
+      </p>
+      {ultima && autor && (
+        <p className="text-xs text-texto-2">
+          Última alteração por {autor} em {formatarDataHora(ultima.updated_at)}.
         </p>
-        {ultima && autor && (
-          <p className="text-xs text-texto-2">
-            Última alteração por {autor} em {formatarDataHora(ultima.updated_at)}.
-          </p>
-        )}
-      </header>
+      )}
       {regras.length ? (
         <EditorRegras regras={regras} etapas={etapas} />
       ) : (

@@ -1,3 +1,4 @@
+import { CabecalhoPagina, CLASSE_SEGMENTO_CABECALHO, classeItemSegmentoCabecalho } from "@/components/cabecalho-pagina";
 import Link from "next/link";
 import { Cartao, Selo } from "@/components/ui";
 import { carregarRelatorioCobranca, referenciaMesAtual, rotuloMesReferencia } from "@/lib/cobranca";
@@ -20,18 +21,21 @@ export default async function Cobranca({ searchParams }: PageProps<"/super-admin
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Cobrança</h1>
-        <div className="flex items-center gap-3 text-sm">
-          <Link href={`/super-admin/cobranca?mes=${mesAdjacente(referencia, -1)}`} className="text-zinc-600 hover:underline">
-            ← Mês anterior
-          </Link>
-          <span className="font-medium capitalize">{rotuloMesReferencia(referencia)}</span>
-          <Link href={`/super-admin/cobranca?mes=${mesAdjacente(referencia, 1)}`} className="text-zinc-600 hover:underline">
-            Próximo mês →
-          </Link>
-        </div>
-      </div>
+      <CabecalhoPagina
+        sobretitulo="Super-admin · cobrança"
+        titulo={<span className="capitalize">{rotuloMesReferencia(referencia)}</span>}
+        descricao="Feche o mês para congelar os valores e marque cada empresa como paga quando o pagamento entrar."
+        acoes={
+          <nav aria-label="Mês" className={CLASSE_SEGMENTO_CABECALHO}>
+            <Link href={`/super-admin/cobranca?mes=${mesAdjacente(referencia, -1)}`} className={classeItemSegmentoCabecalho(false)}>
+              ‹ Mês anterior
+            </Link>
+            <Link href={`/super-admin/cobranca?mes=${mesAdjacente(referencia, 1)}`} className={classeItemSegmentoCabecalho(false)}>
+              Próximo mês ›
+            </Link>
+          </nav>
+        }
+      />
       <Cartao titulo={`Total do mês: R$ ${totalMes.toFixed(2)}`}>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">

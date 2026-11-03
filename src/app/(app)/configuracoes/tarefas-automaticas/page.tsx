@@ -1,4 +1,5 @@
-import { Cartao, Voltar } from "@/components/ui";
+import { CabecalhoPagina } from "@/components/cabecalho-pagina";
+import { Cartao } from "@/components/ui";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { LinhaRegra, NovaRegra, type Regra } from "./formularios";
@@ -26,8 +27,13 @@ export default async function ConfigTarefasAutomaticas() {
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
-      <Voltar href="/configuracoes">Configurações</Voltar>
-      <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Tarefas automáticas</h1>
+      <CabecalhoPagina
+        detalhe
+        voltar={{ href: "/configuracoes", rotulo: "Configurações" }}
+        sobretitulo="Configurações · Obras"
+        titulo="Tarefas automáticas"
+        descricao="Tarefas que nascem para um setor quando outro chega a um status."
+      />
       <p className="text-sm text-zinc-600">
         Quando um setor da obra chega ao status escolhido, a tarefa nasce para o setor indicado: com o responsável principal desse setor
         na obra ou, sem ele, na fila do setor. Cada regra abre uma única tarefa por obra, mesmo que o status volte e chegue de novo.
