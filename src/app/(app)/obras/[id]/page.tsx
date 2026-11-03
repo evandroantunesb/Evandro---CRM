@@ -9,6 +9,7 @@ import { carregarObras } from "@/lib/obras/dados";
 import { filtrosDeParams, hrefObra, montarNavegacao, queryDosFiltros, temFiltroAtivo } from "@/lib/obras/navegacao";
 import { AjusteEntregaContratada, GestaoFixacao, GestaoMarco, GestaoSetor } from "./gestao";
 import { CustosObraFicha } from "./custos";
+import { AtrasosObra, EscalonamentosObra } from "./opr";
 import { VistoriaEngenharia } from "@/components/engenharia/vistoria";
 import { ResumoVistoria } from "@/components/engenharia/vistoria-resumo";
 import { Campo, CartaoSetor, ContatoCliente, DadosTecnicos, ListaParticipantes, comUnidade } from "@/components/obras/detalhe-obra";
@@ -22,8 +23,9 @@ import {
   type AlertaObra,
   type SituacaoObra,
 } from "@/lib/obras/rotulos";
-import { FINANCEIRO_OBRA, OBRAS, PRAZOS_OBRA, pode } from "@/lib/permissoes";
+import { ESCALONAMENTO_OBRA, FINANCEIRO_OBRA, OBRAS, OPR_COMPLETA, PRAZOS_OBRA, pode } from "@/lib/permissoes";
 import { ehCategoriaCusto, montarCustos, type CategoriaCustoObra } from "@/lib/obras/custos";
+import { COLUNAS_JUSTIFICATIVA, atrasosDaObra, justificativasPorEtapa } from "@/lib/obras/justificativas";
 import { hojeEmSaoPaulo } from "@/lib/formatacao";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
@@ -43,7 +45,7 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
 
   const supabase = await criarClienteServidor();
   // A lista navegável é recalculada aqui, a cada obra: mesma empresa, mesma RLS, mesmos filtros.
-  const [obra, lista, tarefasSetor, vistoria, vistorias, cronograma, orcamento, lancamentos] = await Promise.all([
+  const [obra, lista, tarefasSetor, vistoria, vistorias, cronograma, orcamento, lancamentos, justificativasRes, escalonamentosRes, identidades] = await Promise.all([
     carregarDetalheObra(supabase, { empresaId: atual.empresaId, papel: atual.papel, obraId: id, membroId: atual.membroId }),
     carregarObras(supabase, { empresaId: atual.empresaId, papel: atual.papel, comResponsaveis: false }),
     carregarTarefasSetor(supabase, { empresaId: atual.empresaId, membroId: atual.membroId, papel: atual.papel, obraId: id, filtro: "todas" }),
@@ -52,11 +54,20 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
     carregarVistoriasEngenharia(supabase, { empresaId: atual.empresaId, obraId: id }),
     // Zero linhas para quem não vê a obra; cada linha repete a entrega contratada e a previsão do material.
     supabase.rpc("cronograma_obra", { p_obra_id: id }),
-    // A RLS devolve orçamento e lançamentos só a quem vê os custos da obra (admin, gestor que vê a obra, Operacional dela).
+    // A RLS devolve orçamento e lançamentos só a quem vê os custos da obra (admin, gestor, Operacional dela).
     supabase.from("obra_orcamento").select("categoria, planejado").eq("obra_id", id),
     supabase.from("obra_custos").select("id, categoria, valor, ocorrido_em, descricao, estorna_id, created_at").eq("obra_id", id).order("created_at", { ascending: false }),
+    supabase.from("obra_justificativas_atraso").select(COLUNAS_JUSTIFICATIVA).eq("obra_id", id),
+    // Mesma visibilidade dos custos (admin, gestor, Operacional da obra).
+    supabase
+      .from("obra_escalonamentos")
+      .select("id, titulo, valor, aberto_por, aberto_em, resolucao, fechado_por, fechado_em")
+      .eq("obra_id", id)
+      .order("aberto_em", { ascending: false }),
+    supabase.rpc("identidade_membros", { p_empresa_id: atual.empresaId }),
   ]);
   if (!obra) notFound();
+  for (const r of [justificativasRes, escalonamentosRes, identidades]) if (r.error) throw r.error;
   const navegacao = montarNavegacao(lista.obras, filtros, id);
 
   const { resumo, gestao } = obra;
@@ -72,6 +83,30 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
     : null;
   const estornados = new Set((lancamentos.data ?? []).map((l) => l.estorna_id).filter(Boolean));
   const entrega = etapas[0] ? { contratada: etapas[0].entrega_contratada, prevista: etapas.at(-1)!.previsao_fim, material: etapas[0].entrega_material_prevista } : null;
+
+  // Atrasos próprios de etapa (e etapas que já têm justificativa), na ordem do cronograma.
+  const nomes = new Map((identidades.data ?? []).map((m) => [m.membro_id, m.nome]));
+  const justificativas = justificativasPorEtapa(justificativasRes.data ?? [], nomes);
+  const atrasos = atrasosDaObra({
+    etapas,
+    justificativas,
+    membroId: atual.membroId,
+    autorizacao: (setor) => gestaoDoSetor(setor)?.permissoes.autorizacao,
+  });
+  const cancelada = resumo.situacao === "cancelada";
+  const escalonamentos = (escalonamentosRes.data ?? []).map((e) => ({
+    id: e.id,
+    titulo: e.titulo,
+    valor: e.valor == null ? null : Number(e.valor),
+    abertoPor: (e.aberto_por && nomes.get(e.aberto_por)) || "Usuário não identificado",
+    abertoEm: e.aberto_em,
+    resolucao: e.resolucao,
+    fechadoPor: e.fechado_em ? (e.fechado_por && nomes.get(e.fechado_por)) || "Usuário não identificado" : null,
+    fechadoEm: e.fechado_em,
+  }));
+  // Espelho da RPC: gestor, admin ou quem atua no Operacional da obra.
+  const podeEscalonar =
+    !cancelada && pode(atual.papel, ESCALONAMENTO_OBRA) && (atual.papel === "gestor" || gestaoDoSetor("operacional")?.permissoes.autorizacao != null);
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-4">
@@ -160,6 +195,23 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
             hoje={hojeEmSaoPaulo()}
           />
         </Cartao>
+      )}
+
+      {atrasos.length > 0 && (
+        <div id="atrasos" className="scroll-mt-4">
+          <Cartao titulo="Atrasos e justificativas">
+            <AtrasosObra key={resumo.id} obraId={resumo.id} atrasos={atrasos} podePedir={pode(atual.papel, OPR_COMPLETA) && !cancelada} />
+          </Cartao>
+        </div>
+      )}
+
+      {/* Escalonamentos: mesma visibilidade dos custos. */}
+      {custos && (
+        <div id="escalonamentos" className="scroll-mt-4">
+          <Cartao titulo="Escalonamentos">
+            <EscalonamentosObra key={resumo.id} obraId={resumo.id} itens={escalonamentos} podeEscalonar={podeEscalonar} />
+          </Cartao>
+        </div>
       )}
 
       {gestao?.bloqueio && <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-900">{gestao.bloqueio}</p>}

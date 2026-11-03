@@ -4,9 +4,9 @@ import { ddmm, montarCronograma, SETOR_ETAPA } from "../cronograma";
 import { montarCustos, resultadoObra } from "../custos";
 import { carregarDetalheObra } from "../detalhe";
 import { setorConcluido } from "../derivados";
+import { COLUNAS_JUSTIFICATIVA, dicasPorEtapa, justificativasPorEtapa } from "../justificativas";
 import { ROTULO_ALERTA_OBRA, ROTULO_SETOR } from "../rotulos";
-import { planejamentoDemonstracao } from "./demo";
-import type { ApresentacaoObraVM, FinanceiroVM, PendenciaVM, PlanejamentoObra } from "./tipos";
+import type { ApresentacaoObraVM, FinanceiroVM, PendenciaVM } from "./tipos";
 
 /** Hoje no fuso de Brasília (AAAA-MM-DD). */
 export const hojeBrasilia = (agora = new Date()) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(agora);
@@ -17,16 +17,15 @@ export const hojeBrasilia = (agora = new Date()) => new Intl.DateTimeFormat("en-
  *
  * Dinheiro: os custos entram no VM de quem a RLS deixa ler o orçamento DESTA obra (admin, gestor
  * que vê a obra, quem atua no Operacional dela); venda, lucro e margem só para quem lê o valor
- * vendido (`obra_dados_comerciais`: admin, vendedor da venda, gestor da equipe dele). Para os
+ * vendido (`obra_dados_comerciais`: admin, gestor e o vendedor da venda). Para os
  * demais o bloco é `sem_permissao` e nenhum valor sai do servidor.
  *
- * Cronograma e entrega contratada: sempre do banco (`cronograma_obra`, que devolve zero linhas a
- * quem não vê a obra). Avanço físico: o banco ainda não tem; sem a demonstração local, fica null.
- * Avanço nunca é derivado do status dos setores.
+ * Cronograma, entrega contratada e progresso: sempre do banco (`cronograma_obra` e `prazos_obras`,
+ * que devolvem zero linhas a quem não vê a obra). O progresso nunca é derivado do status dos setores.
  */
 export async function carregarApresentacaoObra(
   supabase: SupabaseServidor,
-  entrada: { empresaId: string; papel: string | null | undefined; obraId: string; hojeIso?: string; env?: Record<string, string | undefined> },
+  entrada: { empresaId: string; papel: string | null | undefined; obraId: string; hojeIso?: string },
 ): Promise<ApresentacaoObraVM | null> {
   const obra = await carregarDetalheObra(supabase, { empresaId: entrada.empresaId, papel: entrada.papel, obraId: entrada.obraId, comGestao: false });
   if (!obra) return null;
@@ -53,8 +52,16 @@ export async function carregarApresentacaoObra(
     ...obra.marcos.filter((m) => m.status !== "concluido" && m.status !== "nao_se_aplica").map((m) => `${m.rotulo} (pendente)`),
   ];
 
-  const { data: linhas, error } = await supabase.rpc("cronograma_obra", { p_obra_id: entrada.obraId });
-  if (error) throw error;
+  const [cronogramaRes, prazosRes, justificativasRes, identidadesRes] = await Promise.all([
+    supabase.rpc("cronograma_obra", { p_obra_id: entrada.obraId }),
+    supabase.rpc("prazos_obras", { p_obra_ids: [entrada.obraId] }),
+    supabase.from("obra_justificativas_atraso").select(COLUNAS_JUSTIFICATIVA).eq("obra_id", entrada.obraId),
+    supabase.rpc("identidade_membros", { p_empresa_id: entrada.empresaId }),
+  ]);
+  for (const r of [cronogramaRes, prazosRes, justificativasRes, identidadesRes]) if (r.error) throw r.error;
+  const linhas = cronogramaRes.data;
+  const nomes = new Map((identidadesRes.data ?? []).map((m) => [m.membro_id, m.nome]));
+  const justificativas = dicasPorEtapa(justificativasPorEtapa(justificativasRes.data ?? [], nomes));
   const entregaContratada = linhas?.[0]?.entrega_contratada ?? null;
   const responsavel = new Map(setores.map((s) => [s.setor, s.responsavel]));
   const cronograma = entregaContratada
@@ -67,10 +74,9 @@ export async function carregarApresentacaoObra(
           const nome = responsavel.get(setor);
           return nome ? `${ROTULO_SETOR[setor]} · ${nome}` : ROTULO_SETOR[setor];
         },
+        justificativas,
       })
     : null;
-
-  const plano: PlanejamentoObra | null = planejamentoDemonstracao(resumo.clienteNome, entrada.env);
 
   // A RLS devolve orçamento e lançamentos só a quem vê os custos da obra.
   const [orcamento, lancamentos, deducoes] = await Promise.all([
@@ -104,9 +110,8 @@ export async function carregarApresentacaoObra(
     proximasEntregas,
     entregaContratada,
     entregaPrevista: cronograma?.entregaPrevista ?? null,
-    avancoFisico: plano?.avancoFisico ?? null,
+    progresso: prazosRes.data?.[0]?.progresso ?? null,
     cronograma,
     financeiro,
-    demonstracao: plano !== null,
   };
 }

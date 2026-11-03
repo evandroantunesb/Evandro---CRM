@@ -48,8 +48,5 @@ export default defineConfig({
     // Nunca reaproveita um servidor já de pé: a identidade dele não seria comprovada.
     reuseExistingServer: false,
     timeout: 900_000,
-    // Demonstração da Apresentação (dados fictícios): só aqui, e o próprio app ainda exige
-    // Supabase local para ligá-la (src/lib/obras/apresentacao/demo.ts).
-    env: { RAION_DEMO_APRESENTACAO: "1" },
   },
 });

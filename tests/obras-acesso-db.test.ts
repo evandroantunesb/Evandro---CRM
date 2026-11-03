@@ -441,10 +441,9 @@ describe("papéis comerciais: visibilidade inalterada", () => {
     }
   });
 
-  it("outro vendedor e gestor fora da equipe não veem, mesmo constando como participantes", async () => {
-    for (const usuario of [vendedor2, gestorFora]) {
-      expect(await enxerga(usuario, obraA)).toEqual(NADA);
-    }
+  it("outro vendedor não vê, mesmo constando como participante; o gestor vê todas as obras da empresa (OPR)", async () => {
+    expect(await enxerga(vendedor2, obraA)).toEqual(NADA);
+    expect(await enxerga(gestorFora, obraA)).not.toEqual(NADA);
   });
 
   it("SDR que só é participante (não é o SDR de origem) não vê; nenhum comercial vê obra de outra empresa", async () => {

@@ -7,10 +7,12 @@ import { ModosObras } from "@/components/obras/modos-obras";
 import { NavegacaoObras } from "@/components/obras/navegacao-obras";
 import { carregarApresentacaoObra, hojeBrasilia } from "@/lib/obras/apresentacao/dados";
 import type { ApresentacaoObraVM } from "@/lib/obras/apresentacao/tipos";
+import { carregarCompleta } from "@/lib/obras/completa";
 import { carregarObras } from "@/lib/obras/dados";
-import { filtrosDeParams, hrefObra, montarNavegacao, queryDosFiltros } from "@/lib/obras/navegacao";
+import { filtrosDeParams, hrefObra, montarNavegacao, navegacaoDaLista, queryDosFiltros, type NavegacaoObra } from "@/lib/obras/navegacao";
 import { ROTULO_SETOR, ROTULO_SITUACAO_OBRA } from "@/lib/obras/rotulos";
-import { OBRAS } from "@/lib/permissoes";
+import { filtrarCompleta, filtrosCompletaDeParams, queryCompleta, usaVisaoCompleta } from "@/lib/obras/semaforo";
+import { OBRAS, OPR_COMPLETA, pode } from "@/lib/permissoes";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 
@@ -20,25 +22,36 @@ const kwp = (v: number | null) => (v == null ? null : `${new Intl.NumberFormat("
 
 /**
  * Modo Apresentação (OPR 3B, V1): visão executiva de UMA obra, somente leitura, navegável como
- * slides pela lista filtrada (mesma empresa, RLS e filtros da listagem). O cronograma e a entrega
- * contratada, os custos e o lucro vêm do banco; o avanço, sem fonte real, mostra estado vazio e o
- * valor fictício só aparece com a demonstração local ligada, sempre com o selo "Dados fictícios".
+ * slides pela lista filtrada (mesma empresa, RLS e filtros da listagem; para admin e gestor, a ordem
+ * e os filtros da visão Completa). Cronograma, entrega contratada, progresso, justificativas, custos e
+ * lucro vêm do banco.
  */
 export default async function ApresentacaoObra({ params, searchParams }: PageProps<"/obras/apresentacao/[id]">) {
   const { atual } = await exigirPapel(...OBRAS);
   const { id } = await params;
-  const filtros = filtrosDeParams(await searchParams);
-  const query = queryDosFiltros(filtros);
+  const parametros = await searchParams;
+  // Pedir e cobrar justificativa: admin e gestor, em qualquer visão.
+  const podeCobrar = pode(atual.papel, OPR_COMPLETA);
+  const completa = usaVisaoCompleta(podeCobrar, parametros);
   const hoje = hojeBrasilia();
 
   const supabase = await criarClienteServidor();
-  const [obra, lista] = await Promise.all([
-    carregarApresentacaoObra(supabase, { empresaId: atual.empresaId, papel: atual.papel, obraId: id, hojeIso: hoje }),
-    carregarObras(supabase, { empresaId: atual.empresaId, papel: atual.papel, comResponsaveis: false }),
-  ]);
+  const entrada = { empresaId: atual.empresaId, papel: atual.papel };
+  let query: string;
+  let lista: Promise<NavegacaoObra>;
+  if (completa) {
+    const filtros = filtrosCompletaDeParams(parametros);
+    query = queryCompleta(filtros);
+    lista = carregarCompleta(supabase, { ...entrada, hoje }).then((c) => navegacaoDaLista(filtrarCompleta(c.obras, filtros), id));
+  } else {
+    const filtros = filtrosDeParams(parametros);
+    query = queryDosFiltros(filtros);
+    lista = carregarObras(supabase, { ...entrada, comResponsaveis: false }).then((l) => montarNavegacao(l.obras, filtros, id));
+  }
+  const [obra, navegacao] = await Promise.all([carregarApresentacaoObra(supabase, { ...entrada, obraId: id, hojeIso: hoje }), lista]);
   if (!obra) notFound();
-  const navegacao = montarNavegacao(lista.obras, filtros, id);
   const href = (destino: string | null) => (destino ? hrefObra(BASE, destino, query) : null);
+  const hrefGestao = completa ? `/obras${query ? `?${query}` : ""}` : hrefObra("/obras", id, query);
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-4">
@@ -47,27 +60,22 @@ export default async function ApresentacaoObra({ params, searchParams }: PagePro
         proximaHref={href(navegacao.proximaId)}
         barra={
           <>
-            <ModosObras modo="apresentacao" hrefGestao={hrefObra("/obras", id, query)} hrefApresentacao={hrefObra(BASE, id, query)} />
+            <ModosObras modo="apresentacao" rotuloGestao={completa ? "Completa" : "Gestão"} hrefGestao={hrefGestao} hrefApresentacao={hrefObra(BASE, id, query)} />
             {/* key: o seletor recomeça a cada obra. */}
             <NavegacaoObras key={id} navegacao={navegacao} atualId={id} base={BASE} query={query} />
           </>
         }
       >
-        <Slide obra={obra} hoje={hoje} />
+        <Slide obra={obra} hoje={hoje} cobrarHref={podeCobrar ? `/obras/${id}#atrasos` : null} />
       </PalcoApresentacao>
     </div>
   );
 }
 
-function Slide({ obra, hoje }: { obra: ApresentacaoObraVM; hoje: string }) {
+function Slide({ obra, hoje, cobrarHref }: { obra: ApresentacaoObraVM; hoje: string; cobrarHref: string | null }) {
   const responsaveis = obra.setores.filter((s) => s.responsavel);
   return (
     <article aria-label={`Apresentação da obra ${obra.numero}`} className="flex flex-col gap-4">
-      {obra.demonstracao && (
-        <p role="note" className="rounded-lg border border-dashed border-zinc-300 bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
-          <span className="font-semibold text-zinc-800">Dados fictícios</span> — o avanço físico desta obra é de demonstração local e não existe no banco.
-        </p>
-      )}
 
       {/* Cabeçalho */}
       <header className="flex flex-col gap-3 rounded-xl border border-zinc-200/80 bg-white p-5 shadow-[0_1px_2px_rgba(15,15,16,0.04)]">
@@ -90,16 +98,16 @@ function Slide({ obra, hoje }: { obra: ApresentacaoObraVM; hoje: string }) {
 
       {/* Indicadores */}
       <section aria-label="Resumo executivo" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Indicador rotulo="Avanço físico">
-          {obra.avancoFisico != null ? (
+        <Indicador rotulo="Progresso">
+          {obra.progresso != null ? (
             <>
-              <span className="text-3xl font-semibold text-zinc-900 tabular-nums">{obra.avancoFisico}%</span>
+              <span className="text-3xl font-semibold text-zinc-900 tabular-nums">{obra.progresso}%</span>
               <span className="mt-2 block h-1.5 rounded-full bg-zinc-200">
-                <span className="block h-full rounded-full bg-dourado" style={{ width: `${obra.avancoFisico}%` }} />
+                <span className="block h-full rounded-full bg-dourado" style={{ width: `${obra.progresso}%` }} />
               </span>
             </>
           ) : (
-            <SemFonte>Sem medição registrada</SemFonte>
+            <SemFonte>Sem cronograma</SemFonte>
           )}
         </Indicador>
         <Indicador rotulo="Entrega prevista">
@@ -153,7 +161,7 @@ function Slide({ obra, hoje }: { obra: ApresentacaoObraVM; hoje: string }) {
       <Bloco titulo="Etapas da obra">
         {obra.cronograma && obra.entregaContratada ? (
           <div className="flex flex-col gap-2">
-            <Gantt cronograma={obra.cronograma} />
+            <Gantt cronograma={obra.cronograma} cobrarHref={cobrarHref} />
             <LegendaGantt hoje={hoje} entregaContratada={obra.entregaContratada} />
           </div>
         ) : (

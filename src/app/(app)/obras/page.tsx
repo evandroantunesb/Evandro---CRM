@@ -1,7 +1,10 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { Completa } from "@/components/obras/completa";
 import { ModosObras } from "@/components/obras/modos-obras";
 import { Botao, Selecao, Selo } from "@/components/ui";
+import { hojeBrasilia } from "@/lib/obras/apresentacao/dados";
+import { carregarCompleta } from "@/lib/obras/completa";
 import { carregarObras, type KpisObras, type ObraListaVM, type SetorObraVM } from "@/lib/obras/dados";
 import { filtrarObras } from "@/lib/obras/derivados";
 import { filtrosDeParams, hrefObra, queryDosFiltros, temFiltroAtivo } from "@/lib/obras/navegacao";
@@ -17,7 +20,8 @@ import {
   type AlertaObra,
   type SituacaoObra,
 } from "@/lib/obras/rotulos";
-import { OBRAS } from "@/lib/permissoes";
+import { VISAO_SETORES, filtrosCompletaDeParams, queryCompleta, usaVisaoCompleta } from "@/lib/obras/semaforo";
+import { OBRAS, OPR_COMPLETA, pode } from "@/lib/permissoes";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 
@@ -34,10 +38,29 @@ const cidadeUf = (o: ObraListaVM) => [o.cidade, o.uf].filter(Boolean).join("/") 
 export default async function Obras({ searchParams }: PageProps<"/obras">) {
   // Lista positiva (OBRAS): os quatro papéis comerciais e `operacao`. A RLS decide o que cada um vê.
   const { atual } = await exigirPapel(...OBRAS);
-  const filtros = filtrosDeParams(await searchParams);
-  const query = queryDosFiltros(filtros);
-
+  const params = await searchParams;
   const supabase = await criarClienteServidor();
+
+  // Admin e gestor: a visão Completa (semáforo de todas as obras), do desenho aprovado. A lista por setor continua
+  // ao alcance deles (`?visao=setores`, ou com um filtro dela na URL, como na volta da ficha).
+  const completa = pode(atual.papel, OPR_COMPLETA);
+  if (usaVisaoCompleta(completa, params)) {
+    const hoje = hojeBrasilia();
+    const filtrosCompleta = filtrosCompletaDeParams(params);
+    const q = queryCompleta(filtrosCompleta);
+    const completa = await carregarCompleta(supabase, { empresaId: atual.empresaId, papel: atual.papel, hoje });
+    return (
+      <Completa
+        completa={completa}
+        filtros={filtrosCompleta}
+        hoje={hoje}
+        modos={<ModosObras modo="gestao" rotuloGestao="Completa" escuro hrefGestao={`/obras${q ? `?${q}` : ""}`} hrefApresentacao={`/obras/apresentacao${q ? `?${q}` : ""}`} />}
+      />
+    );
+  }
+
+  const filtros = filtrosDeParams(params);
+  const query = queryDosFiltros(filtros);
   const { obras, kpis } = await carregarObras(supabase, { empresaId: atual.empresaId, papel: atual.papel });
 
   const { busca = "", situacao, alerta, setor, estado } = filtros;
@@ -54,6 +77,11 @@ export default async function Obras({ searchParams }: PageProps<"/obras">) {
           <p className="text-sm text-zinc-500">Vendas já pagas e o andamento de cada setor da obra.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {completa && (
+            <Link href="/obras" className="text-sm text-zinc-600 underline hover:text-zinc-900">
+              ‹ Visão Completa
+            </Link>
+          )}
           <ModosObras modo="gestao" hrefGestao={`/obras${query ? `?${query}` : ""}`} hrefApresentacao={`/obras/apresentacao${query ? `?${query}` : ""}`} />
           {visiveis.length > 0 && (
             <Link
@@ -69,6 +97,7 @@ export default async function Obras({ searchParams }: PageProps<"/obras">) {
       <Indicadores kpis={kpis} />
 
       <form action="/obras" className="flex flex-wrap items-center gap-2">
+        {completa && <input type="hidden" name="visao" value={VISAO_SETORES} />}
         <input
           name="q"
           defaultValue={busca}
@@ -110,7 +139,7 @@ export default async function Obras({ searchParams }: PageProps<"/obras">) {
         <Botao type="submit" variante="secundario">
           Filtrar
         </Botao>
-        <Link href="/obras" className="text-xs text-zinc-500 underline hover:text-zinc-800">
+        <Link href={completa ? `/obras?visao=${VISAO_SETORES}` : "/obras"} className="text-xs text-zinc-500 underline hover:text-zinc-800">
           Limpar filtros
         </Link>
       </form>

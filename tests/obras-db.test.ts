@@ -351,8 +351,9 @@ describe("RLS de leitura", () => {
     }
   });
 
-  it("gestor fora da equipe, outro vendedor e outra empresa não veem nada", async () => {
-    for (const usuario of [gestorFora, vendedor2, outraEmpresa]) {
+  it("gestor fora da equipe vê todas as obras da empresa, com o valor (OPR); outro vendedor e outra empresa não", async () => {
+    expect(await enxerga(gestorFora)).toEqual({ obra: 1, valor: 1, fluxos: 3, historico: 1 });
+    for (const usuario of [vendedor2, outraEmpresa]) {
       expect(await enxerga(usuario)).toEqual({ obra: 0, valor: 0, fluxos: 0, historico: 0 });
     }
   });

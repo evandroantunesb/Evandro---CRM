@@ -29,7 +29,7 @@ test.describe("navegação entre obras", () => {
   test.beforeEach(async ({ page }) => entrarComo(page, usuarios.admin, senha));
 
   test("Próxima percorre as 12 em ordem estável; Anterior volta; nas pontas os botões ficam desativados", async ({ page }) => {
-    await page.goto("/obras");
+    await page.goto("/obras?visao=setores");
     await page.getByRole("link", { name: /Percorrer as 12 obras/ }).click();
     await expect(nav(page)).toContainText("Obra 1 de 12");
     await expect(nav(page).getByLabel("Obra anterior")).toHaveCount(0);

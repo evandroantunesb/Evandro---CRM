@@ -51,6 +51,10 @@ const MATRIZ: Record<string, string[]> = {
   PRAZOS_OBRA: ["admin", "gestor"],
   // Orçamento da obra e deduções do lucro: mesma barreira da RPC e das políticas.
   FINANCEIRO_OBRA: ["admin", "gestor"],
+  // Visão Completa e pedido de justificativa de atraso: mesma barreira da RPC.
+  OPR_COMPLETA: ["admin", "gestor"],
+  // Abrir e fechar escalonamento: a RPC decide qual obra.
+  ESCALONAMENTO_OBRA: ["admin", "gestor", "operacao"],
   GAMIFICACAO: ["admin", "gestor", "vendedor", "sdr"],
   PARTICIPANTES_GAMIFICACAO: ["vendedor", "sdr"],
   OBRAS: ["admin", "gestor", "vendedor", "sdr", "operacao"],

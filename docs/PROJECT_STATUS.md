@@ -6,9 +6,9 @@ Telas aprovadas no canvas "Raion — Nova interface": `ObrasCompleta.dc.html` (p
 
 | PR | Escopo | Estado |
 | --- | --- | --- |
-| 1 | Prazos das etapas, entrega contratada, "material entregue" e cronograma calculado | PR #290; migration `20261104100000_obras_cronograma.sql` aplicada em produção em 02/11/2026 (tag `migracao-pr290-a960dc4`); merge pendente |
-| 2 | Custos (orçamento por categoria pré-preenchido pela calculadora, lançamentos sem apagar) e deduções do lucro | branch `feat/obras-opr-custos`, migration `20261105100000_obras_custos.sql` (não aplicada) |
-| 3 | Visão Completa, semáforo, justificativa de atraso e escalonamento (gestor e Operacional abrem e fecham); gestor vê todas as obras | a fazer |
+| 1 | Prazos das etapas, entrega contratada, "material entregue" e cronograma calculado | #290 mesclada em 02/11/2026; migration `20261104100000_obras_cronograma.sql` aplicada (tag `migracao-pr290-a960dc4`) |
+| 2 | Custos (orçamento por categoria pré-preenchido pela calculadora, lançamentos sem apagar) e deduções do lucro | #291 mesclada em 02/11/2026; migration `20261105100000_obras_custos.sql` aplicada (tag `migracao-pr291-f48ad81`) |
+| 3 | Visão Completa, semáforo, justificativa de atraso e escalonamento (gestor e Operacional abrem e fecham); gestor vê todas as obras | branch `feat/obras-opr-completa`, migration `20261106100000_obras_opr_completa.sql` (não aplicada) |
 
 Decisões da PR 1:
 - Sete etapas em sequência, com prazo padrão em dias úteis que admin ou gestor editam em Configurações › Prazos das etapas: projeto 7, homologação 15, compra 5, entrega do material 7, instalação 5, vistoria 7, conexão 5. A entrega contratada é a chegada da obra mais 51 dias úteis; fica gravada na obra e admin ou gestor ajustam com motivo.
@@ -22,6 +22,14 @@ Decisões da PR 2 (lógica do desenho "Obras — Apresentação"):
 - Lucro líquido previsto = venda − custo projetado − impostos e comissões (% da venda, em Configurações › Impostos e comissões, admin e gestor).
 - Custos: admin, gestor que vê a obra e o Operacional dela. Venda, lucro e margem: quem vê o valor vendido. Nenhum valor vai para o histórico da obra.
 - Pendente: o setor Compras ainda não existe. Hoje a previsão do material é do admin ou de quem é da Operação com Compras na obra; o gestor não escreve em Compras.
+Decisões da PR 3 (desenho "Obras — Completa"):
+- Admin e gestor abrem `/obras` na visão Completa: obras em execução, os sete números (cores, escalonamentos abertos, valor em execução, margem projetada, margem líquida prevista), barra do semáforo, lista com vermelhas primeiro (filtros por cor, concluídas e busca), escalonamentos abertos e as regras. Os demais papéis seguem com a lista por setor; para admin e gestor ela fica em "Lista por setor" (`?visao=setores`, ou com um filtro dela na URL). A Apresentação percorre as obras na ordem e nos filtros da Completa.
+- O gestor vê todas as obras da empresa, com o valor vendido (`pode_ver_obra` e `pode_ver_valor_vendido_obra`); antes, só as da equipe dele. Vendedor e SDR seguem só com as próprias vendas.
+- Semáforo (pior cor vale): vermelha = entrega prevista mais de 5 dias úteis depois da contratada ou margem projetada negativa; amarela = atraso de até 5 dias úteis (entrega ou etapa), categoria de custo ainda em andamento a partir de 90% do planejado, ou prazo de etapa ou da entrega vencendo em até 3 dias úteis. Dias úteis da empresa, calculados no banco (`prazos_obras`). Motivo exibido: a justificativa respondida mais recente da obra; sem ela, a regra que deu a cor.
+- Progresso = dias úteis previstos das etapas concluídas + o já corrido da etapa em andamento (até o prazo dela), sobre o total previsto; 100% só com todas concluídas. Substitui o avanço físico de demonstração da Apresentação (removido).
+- Justificativa de atraso: admin ou gestor pede a justificativa de uma etapa com atraso próprio ao responsável principal do setor da etapa (Projeto, Homologação, Vistoria e Conexão: Engenharia; Compra e Entrega do material: Compras; Instalação: Operacional, como no cronograma), com 2 dias úteis; pedir de novo a pendente é "cobrar" (renova o prazo). Responde quem recebeu o pedido, o admin ou quem coordena o setor, na ficha (cartão "Atrasos e justificativas"). Na Apresentação, o atraso sublinhado mostra a justificativa ou "pendente" com "Cobrar justificativa". Atraso só herdado continua com o motivo calculado.
+- Escalonamento: gestor, admin e quem atua no Operacional da obra abrem (título e valor opcional fora do programado) e fecham (com a decisão), na ficha (cartão "Escalonamentos"); vê quem vê os custos da obra. O histórico registra o fato, sem valores.
+- Pendente: quem recebe o pedido de justificativa ainda não é avisado (não há notificação); ele vê o pedido no cartão da ficha.
 
 ## Condições de pagamento na proposta — plano em 4 PRs (aprovado pelo Evandro em 01/11/2026; concluído em 02/11/2026)
 
