@@ -31,6 +31,7 @@ import { obterSessao } from "@/lib/sessao";
 import { GESTAO_COMERCIAL, NEGOCIOS, PROPOSTA_E_CONTRATO, TAREFAS, TAREFAS_DO_SETOR, pode } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { ROTULO_PAPEL, type TipoTarefa } from "@/lib/tipos";
+import { CabecalhoPagina, CLASSE_ACAO_CABECALHO } from "@/components/cabecalho-pagina";
 import { NovoNegocio } from "@/components/novo-negocio";
 import { eletropostoDisponivel } from "@/lib/eletroposto-servidor";
 import { GraficoDesempenho } from "./grafico-desempenho";
@@ -523,21 +524,13 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
 
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-4">
-      {/* Abertura com a paisagem da marca: sempre escura (foto), igual nos dois temas. */}
-      <section className="relative isolate overflow-hidden rounded-3xl bg-carvao text-offwhite">
-        <div aria-hidden className="absolute inset-0 -z-10 bg-[url(/marca/paisagem.jpg)] bg-cover bg-[center_62%]" />
-        <div aria-hidden className="absolute inset-0 -z-10 bg-gradient-to-r from-carvao/90 via-carvao/65 to-carvao/15" />
-        <div className="flex flex-wrap items-end justify-between gap-6 px-6 py-8 md:px-10 md:py-12">
-          <div className="max-w-xl">
-            <p className="text-[11px] font-semibold tracking-[0.14em] text-offwhite/70 uppercase">
-              {agora.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long", timeZone: "America/Sao_Paulo" })}
-            </p>
-            <h1 className="mt-2 text-4xl font-light tracking-tight text-offwhite md:text-5xl">
-              {saudacao(agora)}, {primeiroNome}.
-            </h1>
-            <p className="mt-2 text-sm text-offwhite/75">{subtitulo}</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
+      <CabecalhoPagina
+        destaque
+        sobretitulo={agora.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long", timeZone: "America/Sao_Paulo" })}
+        titulo={`${saudacao(agora)}, ${primeiroNome}.`}
+        descricao={subtitulo}
+        acoes={
+          <>
             {podeVerEquipe && (
               <div className="inline-flex rounded-full border border-white/15 bg-white/10 p-1 backdrop-blur-md">
                 <Link
@@ -558,16 +551,13 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
                 </Link>
               </div>
             )}
-            <NovoNegocio
-              eletroposto={eletroposto}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-dourado px-5 text-sm font-semibold text-carvao transition-[box-shadow,transform] duration-200 ease-raion hover:shadow-[0_10px_30px_rgb(212_175_55/0.35)] active:scale-[0.98]"
-            >
+            <NovoNegocio eletroposto={eletroposto} className={CLASSE_ACAO_CABECALHO}>
               <Plus size={16} />
               Novo negócio
             </NovoNegocio>
-          </div>
-        </div>
-      </section>
+          </>
+        }
+      />
 
       {/* Indicadores numa superfície só, separados por fios (sem um cartão por número). */}
       <div className="painel grid grid-cols-2 lg:grid-cols-4 [&>*]:border-linha max-lg:[&>*:nth-child(-n+2)]:border-b max-lg:[&>*:nth-child(odd)]:border-r lg:[&>*:not(:last-child)]:border-r">
