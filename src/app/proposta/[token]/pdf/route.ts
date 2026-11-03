@@ -2,6 +2,7 @@ import { renderToBuffer } from "@react-pdf/renderer";
 import { NextResponse } from "next/server";
 import { PropostaPdfDocument } from "@/lib/pdf-proposta";
 import type { TipoBloco } from "@/lib/propostas/blocos";
+import { situacaoDaEmissao } from "@/lib/propostas/emissao-preservada";
 import { montarDadosSistemaProposta } from "@/lib/propostas/pdf-dados";
 import { ModeloPdfDocument } from "@/lib/propostas/pdf";
 import { criarClienteAdmin } from "@/lib/supabase/admin";
@@ -18,7 +19,7 @@ export async function GET(_: Request, { params }: RouteContext<"/proposta/[token
 
   const { data: proposta } = await admin
     .from("propostas")
-    .select("empresa_id, negocio_id, modo_preco, mensagem, modelo_id, capa_variante, blocos_emitidos, negocios(titulo, contatos(nome, endereco, cidade, uf))")
+    .select("empresa_id, negocio_id, created_at, modo_preco, mensagem, modelo_id, capa_variante, blocos_emitidos, negocios(titulo, contatos(nome, endereco, cidade, uf))")
     .eq("token", token)
     .maybeSingle();
   if (!proposta) return new NextResponse("Proposta não encontrada.", { status: 404 });
@@ -29,6 +30,13 @@ export async function GET(_: Request, { params }: RouteContext<"/proposta/[token
   } | null;
   const contato = negocio?.contatos;
 
+  if (!contato) return new NextResponse("Proposta não encontrada.", { status: 404 });
+
+  // Os dados da emissão (sistema, economia, preço) não foram preservados: hoje, para qualquer proposta, o PDF é
+  // indisponível (409, mesmo texto da página pública). Nunca gerar o PDF com dados lidos ao vivo.
+  const situacao = situacaoDaEmissao(proposta);
+  if (!situacao.disponivel) return new NextResponse(situacao.mensagem, { status: 409 });
+
   const { data: calculo } = await admin
     .from("calculos_solares")
     .select(
@@ -36,18 +44,21 @@ export async function GET(_: Request, { params }: RouteContext<"/proposta/[token
     )
     .eq("negocio_id", proposta.negocio_id)
     .maybeSingle();
-  if (!calculo || !contato) return new NextResponse("Proposta não encontrada.", { status: 404 });
+  if (!calculo) return new NextResponse("Proposta não encontrada.", { status: 404 });
 
   const modoPreco = proposta.modo_preco as ModoPreco;
+
+  const { data: componentesData } = await admin
+    .from("kit_componentes")
+    .select("tipo, descricao, potencia_w, quantidade")
+    .eq("negocio_id", proposta.negocio_id)
+    .order("ordem");
 
   // Proposta emitida com um modelo do construtor: usa o motor novo (capa +
   // blocos, com paginação A4 de verdade). Sem modelo (proposta antiga, ou
   // empresa que ainda não montou nenhum modelo): mantém o PDF de sempre.
   if (proposta.modelo_id && proposta.blocos_emitidos && proposta.capa_variante) {
-    const [{ data: componentesData }, { data: identidadeData }] = await Promise.all([
-      admin.from("kit_componentes").select("tipo, descricao, potencia_w, quantidade").eq("negocio_id", proposta.negocio_id).order("ordem"),
-      admin.from("proposta_identidades").select("*").eq("empresa_id", proposta.empresa_id).maybeSingle(),
-    ]);
+    const { data: identidadeData } = await admin.from("proposta_identidades").select("*").eq("empresa_id", proposta.empresa_id).maybeSingle();
 
     async function assinar(caminho: string | null) {
       if (!caminho) return null;

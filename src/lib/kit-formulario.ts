@@ -27,11 +27,12 @@ const numeroBr = formatarNumeroBr;
 /**
  * Estado do formulário do kit exatamente como está gravado. Usado ao abrir o cartão e no
  * Cancelar: sem kit salvo, volta tudo vazio (descarta os itens não gravados); com kit salvo,
- * volta aos dados persistidos. Consumo e valor da conta vêm do cálculo ou, sem ele, do negócio.
+ * volta aos dados persistidos. Consumo e valor da conta vêm sempre do negócio (valores atuais), nunca do cálculo
+ * salvo (hoje sempre legado): salvar sem editar não pode levar ao negócio o valor antigo. Sem o dado, o campo abre vazio.
  */
 export function estadoSalvoDoKit(k: KitSalvo): EstadoFormularioKit {
-  const fatura = k.calculo ? k.calculo.valorFaturaMedio : k.valorFaturaMedioPadrao;
-  const consumo = k.calculo ? k.calculo.consumoMedioKwh : k.consumoMedioKwhPadrao;
+  const fatura = k.valorFaturaMedioPadrao;
+  const consumo = k.consumoMedioKwhPadrao;
   return {
     linhas: k.componentesSalvos.map((c) => ({
       tipo: c.tipo,

@@ -39,3 +39,42 @@ Tratamento tributário (ICMS/PIS/COFINS) sobre a energia compensada/Fio B; outra
 3. Integrar Jay+Kara, rodar typecheck/lint/vitest puros em cópia limpa.
 4. Só depois, Kevin: fluxo recolhido e mensagem "Economia pendente de configuração da tarifa" (ficha, proposta, PDF, Obras — Obras ainda não foi inspecionada).
 5. Relatório final ao Evandro (itens 1–6 do pedido dele).
+
+## Integração local (Nora, 2026-10-21, desktop) — SEM commit/push
+Worktree R:/wt-m2-p0-int, branch aurora/m2-p0-integracao = origin/aurora/m2-p0-jay (2780a53) + cherry-pick -n de 27b4ed3 (Kara) + 1 correção.
+- typecheck e lint: passaram (node_modules por junção de R:/wt-m2-int).
+- Testes puros (7 arquivos): 370 passaram, 5 falharam antes da correção; 1 falha restante.
+- Correção (defeito no código do Jay, contra o próprio comentário): `percentualLegalFioB` só olhava gd e ano; agora exige classe, modalidade, gd e ano do RECORTE_P0 (B2, Branca, classe/modalidade nulas => null). Resolveu 4 falhas.
+- FALHA RESTANTE (decisão de domínio, NÃO resolvida): tests/fio-b-hipotese.test.ts, varredura — com consumo C=0 (ou C<custo de disponibilidade) a economia sai negativa (-30 com T=1), porque `contaSemSolar = C*T` ignora o custo de disponibilidade e `contaComSolar` aplica o piso D*T. Decidir: a conta sem solar também tem piso max(C,D)*T? (Evandro/REN 1.000 art. 655-I) ou o teste deve aceitar economia < 0.
+- NÃO rodado: suíte -db (calculadora-persistencia-db, exige Supabase local), suíte completa, build.
+
+## Rodada M2-B3/Q3/Q4 (Nora, 21/10, desktop) — conta sem solar com piso — SEM commit/push/PR
+Decisão do Evandro: sem solar = max(C,D)×T; com solar mantida max(D×T,(C−K)×T+K×N) (piso sobre o faturamento total, K×N dentro dele; sem Fio B por fora). Economia calculada sobre as contas arredondadas; contas iguais => economia 0 e `paybackDisponivel=false`. Contrato final: `.aurora/contratos/m2-p0-conta-solar.md`. Copel continua PENDENTE de validação oficial; testes usam valores fictícios.
+Mudanças: Jay — `fio-b-hipotese.ts` (+ contrato); Nora — `percentualLegalFioB` exige o recorte inteiro e economia sobre contas arredondadas; Kara — `fio-b-hipotese.test.ts` (80 testes, mutação provou sensibilidade) e `negocios-gravacao-db.test.ts` (teste antigo agora informa 315,79 kWh; teste novo da estimativa incompleta com/sem cálculo prévio).
+Validação (versão integrada, worktree R:/wt-m2-p0-int, base 2780a53 + locais, banco descartável aurora-m2-q1): typecheck ok; lint 0 erros/3 warnings preexistentes; puros 397/397; suíte completa 1896/1898 (2 falhas = baseline CRLF Windows de negocios-gravacao.test.ts, preexistente); build ok (node_modules real; uma junção causou falha de Turbopack, não do código).
+NÃO rodado: e2e/visual. Kevin ainda não entrou. Aguarda: Evandro confirmar Copel "Tarifa de Aplicação" vs REH 3.592; autorização de commit/push.
+
+## Incidente de Auth na suíte completa (21/10, 21:21) — falha TRANSITÓRIA, causa NÃO comprovada
+Suíte completa (validação interrompida, versão = cópia LF R:/wt-m2-p0-lf): 4 arquivos falharam. 2 testes = baseline CRLF (passam em LF). 3 suítes de banco caíram no setup (blindagem-comercial-db, obras-escrita-db "Obras 3b-3", travas-kit-sdr-db; 97 testes pulados) com `AuthRetryableFetchError: Database error creating new user / querying schema`; log do container supabase_auth_aurora-m2-q1 no mesmo minuto: `couldn't start a new transaction: context canceled` (500, >1 s). Reexecução isolada das 3 na mesma versão: 97/97 passaram (.aurora/logs/crlf/3-suites-reexec-lf.log). Hipótese (não comprovada): saturação do banco descartável sob carga paralela. Na validação final: execuções pesadas sem concorrência; se necessário, suítes de banco com paralelismo reduzido (comando documentado), sem excluir testes.
+
+## Diretriz de fechamento (Evandro, 21/10 noite) — escopo congelado
+Motor real: regra ou dado pendente => estimativa incompleta, sem recorrer ao cálculo financeiro antigo; dimensionamento e kit preservados. Propostas: "conjunto emitido" só com dados preservados; sem snapshot/migration/reconstrução nesta rodada (desenho separado). Vigência: comparar entradas que determinam o resultado; sem fonte independente (tarifa, ligação) => registrar impossibilidade. Sem refatorações.
+
+## Diagnóstico M2-B7 (Jay) e decisões de Nora para a implementação (21/10 noite) — dentro das diretrizes do Evandro
+Diagnóstico completo: .aurora/contratos/m2-p0-diagnostico-b7.md. Motor real = `calcular` (calculadora.ts:42), cobrança antiga (sem piso; Fio B = compensado × tarifa cheia × percentual). Nenhum dado exigido pela estimativa nova existe no app (enquadramento, Fio B da distribuidora com origem/vigência, base tributária) => toda estimativa é incompleta hoje. calculos_solares tem colunas financeiras NOT NULL => incompleto não grava linha (sem migration). Propostas não preservam nada do cálculo; PDF gerado a cada acesso; só contrato fora de rascunho é preservado.
+Decisões (aplicação direta das diretrizes; nenhuma decisão nova de produto):
+1. Enquadramento: sem campo => pendência (não assumir premissa fixa).
+2. Estado incompleto: nada financeiro (nem conta sem solar isolada); mostra geração/dimensionamento/kit e pendências.
+3. Propostas já emitidas: dados da emissão não preservados => página pública informa indisponibilidade (sem números de sistema, economia ou preço lidos ao vivo); link válido; PDF 409 com a mesma mensagem.
+4. Nova proposta: exige conjunto coerente e vigente => bloqueada enquanto a estimativa for incompleta ou o cálculo for legado (consequência, registrada como limitação).
+5. Migrations (colunas anuláveis/estado/método; snapshot propostas_emissoes): só desenho, fora desta rodada.
+6. Validação de dados/regra (Copel, TUSD Fio B, tributos, art. 655-I, 60%): Evandro; segue pendente.
+7. Vigência sem fonte independente (tarifa, tipo de ligação, Fio B, enquadramento): `naoVerificavel` explícito, registrado; não comparar o cálculo consigo mesmo; não rotular como "atual".
+8. Linhas legadas de calculos_solares: histórico "cálculo anterior (fórmula antiga, não validada)", nunca como resultado atual; sem reprocessar. Obras (cópia na venda): fora da rodada, registrado.
+9. Contrato: inalterado no que não depende da fórmula (potência/consumo/geração); guarda de vigência só pelos motivos que afetam o contrato; sem linha de cálculo, comportamento atual (camposSemDado) mantido; limitação registrada.
+
+## Ajuste de Nora após M2-F4 (21/10 noite)
+Beco sem saída apontado pelo Kevin: com cálculo legado, "Atualizar preço" é recusado, mas o contrato exigia preço do cálculo = valor do negócio. Como o legado não aparece como atual e a proposta não mostra preço, a guarda de preço deixa de valer para cálculo legado: src/lib/contratos-geracao.ts (pula a guarda e o motivo "preco" quando legado; o contrato usa o valor atual do negócio) e src/app/(app)/negocios/[id]/page.tsx (precoDesatualizado só para cálculo não legado). typecheck fora de tests/: 0 erros; eslint ok.
+
+## Ajuste de Nora após M2-Q6
+Revertida a alteração da Kara em tests/negocios-gravacao.test.ts (normalizava CRLF na leitura do fonte): a diretriz é preservar a suíte original; as 2 falhas "regressões de tela" seguem atribuídas a CRLF do working copy e são reconfirmadas em cópia LF da versão final (kit-personalizado.tsx e novo/formulario.tsx mudaram nesta rodada).

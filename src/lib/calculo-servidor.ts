@@ -9,7 +9,7 @@ export type { LinhaCalculo };
  * Monta a linha de `calculos_solares` a partir do kit (personalizado, por
  * componentes) e dos parâmetros da empresa. Compartilhado entre "salvar kit
  * e cálculo" (negócio já existe) e a criação de negócio com calculadora
- * embutida (nova proposta).
+ * embutida (nova proposta). Com o motor atual o resultado é `incompleta` (sem linha): ver `ResultadoLinha`.
  */
 export async function montarLinhaCalculo(
   supabase: SupabaseServidor,

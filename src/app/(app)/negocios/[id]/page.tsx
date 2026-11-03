@@ -12,6 +12,8 @@ import { carregarConfiguracao, formatarDataHora, formatarMoeda } from "@/lib/crm
 import { env } from "@/lib/env";
 import { hojeEmSaoPaulo } from "@/lib/formatacao";
 import { precoDoCalculoDesatualizado } from "@/lib/calculo-preco";
+import { calculoEhLegado, carregarVigencia, ENTRADAS_NAO_VERIFICAVEIS, mensagemDeRecusa, motivosDaAcao, type MotivoDesatualizacao } from "@/lib/calculo-vigencia";
+import { mensagemPropostaIncompleta, pendenciasSemDados } from "@/lib/estimativa-financeira";
 import { descreverAtividade } from "@/lib/linha-do-tempo";
 import { exigirPapel } from "@/lib/sessao";
 import { ARQUIVAR_NEGOCIO, ATRIBUIR_TAREFA_A_OUTROS, EDITAR_VALOR_NEGOCIO, ESCOLHER_RESPONSAVEL_NEGOCIO, NEGOCIOS, PAGAMENTO_SOLO, PROPOSTA_E_CONTRATO, RESPONSAVEL_COMERCIAL, pode } from "@/lib/permissoes";
@@ -97,7 +99,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
       supabase
         .from("calculos_solares")
         .select(
-          "id, kit_nome, kit_preco, tipo_ligacao, consumo_medio_kwh, valor_fatura_medio, tarifa_kwh, geracao_estimada_kwh_mes, economia_mensal, payback_meses, observacoes",
+          "id, kit_nome, kit_potencia_kwp, kit_preco, tipo_ligacao, consumo_medio_kwh, valor_fatura_medio, tarifa_kwh, geracao_estimada_kwh_mes, economia_mensal, payback_meses, observacoes",
         )
         .eq("negocio_id", id)
         .maybeSingle(),
@@ -197,7 +199,34 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
 
   // Arquivado (P1a-0): somente leitura no banco; a ficha esconde as ações que seriam recusadas.
   const arquivado = negocio.arquivado_em != null;
-  const precoDesatualizado = !!calculo && precoDoCalculoDesatualizado(calculo.kit_preco, negocio.valor);
+  // Preço do cálculo x valor do negócio só importa para cálculo não legado: o legado não aparece como atual, a proposta
+  // não mostra preço e o contrato usa o valor do negócio (mesma regra de contratos-geracao.ts).
+  const precoDesatualizado = !!calculo && !calculoEhLegado(calculo) && precoDoCalculoDesatualizado(calculo.kit_preco, negocio.valor);
+  // Vigência do cálculo salvo: toda linha existente é legada (fórmula antiga, não validada) e nunca vale como resultado
+  // atual. Falha de leitura também nunca vale como vigente: cai no motivo `legado`, que vale para toda linha hoje.
+  const carregamento = calculo ? await carregarVigencia(supabase, id) : null;
+  const leituraOk = carregamento?.ok === true && carregamento.calculo != null;
+  const motivosCalculo: MotivoDesatualizacao[] = !calculo
+    ? []
+    : carregamento?.ok === true && carregamento.calculo != null
+      ? carregamento.vigencia.motivos
+      : ["legado"];
+  const vigenciaDaTela = calculo
+    ? {
+        motivos: motivosCalculo,
+        naoVerificavel: carregamento?.ok === true && carregamento.calculo != null ? carregamento.vigencia.naoVerificavel : [...ENTRADAS_NAO_VERIFICAVEIS],
+      }
+    : null;
+  // Mensagens de bloqueio (as mesmas que o servidor devolve). Proposta: sempre bloqueada hoje (sem linha = estimativa
+  // incompleta; linha legada = fórmula antiga). Contrato: só o que o afeta (não bloqueia por `legado`); o preço tem aviso próprio.
+  const motivosProposta = motivosDaAcao(motivosCalculo, "proposta");
+  const bloqueioProposta = !calculo
+    ? mensagemPropostaIncompleta(pendenciasSemDados())
+    : motivosProposta.length > 0
+      ? mensagemDeRecusa(motivosProposta, "proposta")
+      : null;
+  const motivosContrato = motivosDaAcao(motivosCalculo, "contrato").filter((m) => m !== "preco");
+  const bloqueioContrato = calculo && leituraOk && motivosContrato.length > 0 ? mensagemDeRecusa(motivosContrato, "contrato") : null;
   const responsavelAtual = config.membros.find((m) => m.id === negocio.responsavel_id);
   const responsavelInativo = negocio.responsavel_id != null && !responsavelAtual?.ativo;
 
@@ -414,6 +443,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
                   : null
               }
               precoDesatualizado={precoDesatualizado}
+              vigencia={vigenciaDaTela}
               calculo={
                 calculo
                   ? {
@@ -504,8 +534,8 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
             <Cartao titulo="Proposta">
               <Proposta
                 negocioId={negocio.id}
-                temCalculo={!!calculo}
                 precoDesatualizado={precoDesatualizado}
+                bloqueio={bloqueioProposta}
                 siteUrl={env.siteUrl}
                 modelos={(modelosProposta ?? []).map((m) => ({ id: m.id, nome: m.nome, padrao: m.padrao }))}
                 proposta={
@@ -530,6 +560,7 @@ export default async function DetalheNegocio({ params, searchParams }: PageProps
                   negocioId={negocio.id}
                   siteUrl={env.siteUrl}
                   precoDesatualizado={precoDesatualizado}
+                  bloqueio={bloqueioContrato}
                   contrato={contrato ? { token: contrato.token, status: contrato.status as StatusContrato } : null}
                 />
               </Cartao>
