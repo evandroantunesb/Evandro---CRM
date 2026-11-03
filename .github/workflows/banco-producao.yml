@@ -232,12 +232,12 @@ jobs:
       # Trava fail-closed: o conjunto do dry-run acima precisa ser exatamente o autorizado, senão o
       # job termina aqui, antes da aplicação. Sem credenciais. Para autorizar outro conjunto, a lista
       # abaixo muda por commit revisado (e uma nova tag), nunca por entrada do operador.
-      # Obras OPR, PR 3: gestor vê todas as obras, justificativa de atraso, escalonamentos e prazos para o
-      # semáforo; os custos das obras (20261105100000) já têm de estar aplicados.
+      # Obras OPR: aviso no sininho da justificativa de atraso; a visão Completa (20261106100000) já tem de
+      # estar aplicada.
       - name: Conferir que o conjunto pendente é exatamente o autorizado
         env:
           MIGRATIONS_AUTORIZADAS: |
-                        20261106100000_obras_opr_completa.sql
+                        20261107100000_obras_justificativa_aviso.sql
         run: bash .github/scripts/validar-conjunto-migrations.sh "$RUNNER_TEMP/dry-run.txt"
       - name: Aplicar (supabase db push --include-all)
         env:
