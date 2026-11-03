@@ -4,6 +4,18 @@ import type { ReactNode } from "react";
 export const CLASSE_ACAO_CABECALHO =
   "inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-dourado px-5 text-sm font-semibold text-carvao outline-none transition-[box-shadow,transform] duration-200 ease-raion hover:shadow-[0_10px_30px_rgb(212_175_55/0.35)] focus-visible:ring-2 focus-visible:ring-offwhite/80 focus-visible:ring-offset-2 focus-visible:ring-offset-carvao active:scale-[0.98]";
 
+/** Ação secundária sobre a faixa: pílula de vidro clara (`r-btn-vidro` do canvas). */
+export const CLASSE_VIDRO_CABECALHO =
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-white/15 bg-white/10 px-[18px] text-sm font-medium whitespace-nowrap text-offwhite outline-none backdrop-blur-md transition-colors duration-200 ease-raion hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-offwhite/80 focus-visible:ring-offset-2 focus-visible:ring-offset-carvao";
+
+/** Seletor de visão sobre a faixa (`r-seg-escuro` do canvas): trilho de vidro; o item atual fica dourado. */
+export const CLASSE_SEGMENTO_CABECALHO = "inline-flex gap-0.5 rounded-full border border-white/15 bg-white/10 p-1 backdrop-blur-md";
+export function classeItemSegmentoCabecalho(atual: boolean) {
+  return `inline-flex min-h-10 items-center gap-1.5 rounded-full px-4 md:min-h-9 text-sm font-medium whitespace-nowrap outline-none transition-colors duration-200 ease-raion focus-visible:ring-2 focus-visible:ring-offwhite/80 ${
+    atual ? "bg-dourado text-carvao" : "text-offwhite/80 hover:text-offwhite"
+  }`;
+}
+
 /**
  * Abertura das telas principais: paisagem da marca sob degradê carvão, sempre escura (igual nos dois temas).
  * `destaque` é a versão alta do Início; as demais telas usam a faixa compacta.

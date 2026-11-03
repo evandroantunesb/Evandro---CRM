@@ -1,6 +1,7 @@
-import { Briefcase, CalendarClock, Plus, Search, Settings2, Thermometer, TrendingUp, Wallet, X } from "lucide-react";
+import { Briefcase, CalendarClock, ChartLine, Plus, Search, Settings2, Thermometer, TrendingUp, Wallet, X } from "lucide-react";
 import { cookies } from "next/headers";
 import Link from "next/link";
+import { CabecalhoPagina, CLASSE_ACAO_CABECALHO, CLASSE_VIDRO_CABECALHO } from "@/components/cabecalho-pagina";
 import { Botao, CLASSE_ENTRADA, Campo, Selecao } from "@/components/ui";
 import {
   carregarConfiguracao,
@@ -234,46 +235,30 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
 
   return (
     <div className="flex animate-entrar flex-col gap-5">
-      <header className="flex flex-wrap items-end gap-3">
-        <div className="min-w-0">
-          <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Negócios</h1>
-          <p className="text-sm text-texto-2">{funisAtivos.length > 1 ? `Funil ${funil.nome}` : "Seu funil de vendas, etapa por etapa."}</p>
-        </div>
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          {status === "aberto" && <VisaoToggle visao={visao} query={queryVisao ? `${queryVisao}&` : ""} />}
-          {atual.papel === "admin" && (
-            <Link
-              href="/configuracoes/funil"
-              aria-label="Editar etapas"
-              title="Editar etapas"
-              className="hidden min-h-9 items-center gap-1.5 rounded-lg border border-linha bg-superficie px-3 text-sm font-medium text-texto transition-colors hover:border-dourado md:inline-flex"
-            >
-              <Settings2 className="h-4 w-4" aria-hidden />
-              Editar etapas
+      <CabecalhoPagina
+        sobretitulo="Comercial"
+        titulo="Negócios"
+        descricao={funisAtivos.length > 1 ? `Funil ${funil.nome}` : "Seu funil de vendas, etapa por etapa."}
+        acoes={
+          <>
+            {status === "aberto" && <VisaoToggle visao={visao} query={queryVisao ? `${queryVisao}&` : ""} />}
+            <Link href="/forecast" className={CLASSE_VIDRO_CABECALHO}>
+              <ChartLine size={16} aria-hidden />
+              Forecast
             </Link>
-          )}
-          {pode(atual.papel, REGRAS_TEMPERATURA) && (
-            <Link
-              href="/configuracoes/temperatura"
-              aria-label="Regras de temperatura"
-              title="Regras de temperatura"
-              className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-linha bg-superficie px-3 text-sm font-medium text-texto transition-colors hover:border-dourado md:min-h-9"
-            >
-              <Thermometer className="h-4 w-4" aria-hidden />
-              <span className="hidden md:inline">Temperatura</span>
-            </Link>
-          )}
-          <NovoNegocio
-            href={`/negocios/novo?funil=${funil.id}`}
-            eletroposto={eletroposto}
-            aria-label="Adicionar negócio"
-            className="inline-flex min-h-11 w-11 items-center justify-center gap-1.5 rounded-lg bg-acao px-0 py-2 text-sm font-medium text-sobre-acao transition-[background-color,transform] duration-200 ease-raion outline-none hover:bg-acao-forte focus-visible:ring-2 focus-visible:ring-dourado/60 focus-visible:ring-offset-2 focus-visible:ring-offset-fundo active:scale-[0.98] md:min-h-9 md:w-auto md:px-4"
-          >
-            <Plus className="h-5 w-5 md:h-4 md:w-4" aria-hidden />
-            <span className="hidden md:inline">Adicionar negócio</span>
-          </NovoNegocio>
-        </div>
-      </header>
+            {atual.papel === "admin" && (
+              <Link href="/configuracoes/funil" className={`${CLASSE_VIDRO_CABECALHO} max-md:hidden`}>
+                <Settings2 size={16} aria-hidden />
+                Editar etapas
+              </Link>
+            )}
+            <NovoNegocio href={`/negocios/novo?funil=${funil.id}`} eletroposto={eletroposto} className={CLASSE_ACAO_CABECALHO}>
+              <Plus size={16} aria-hidden />
+              Adicionar negócio
+            </NovoNegocio>
+          </>
+        }
+      />
 
       <nav aria-label="Situação" className="-mx-4 flex gap-1 overflow-x-auto border-b border-linha px-4 [scrollbar-width:none] md:mx-0 md:px-0">
         {situacoes.map((s) => (
@@ -376,6 +361,17 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
               <Botao type="submit">Aplicar filtros</Botao>
             </div>
           </BotaoFiltros>
+          {/* O gestor não abre Configurações: as regras de temperatura ficam a um toque daqui. */}
+          {pode(atual.papel, REGRAS_TEMPERATURA) && (
+            <Link
+              href="/configuracoes/temperatura"
+              aria-label="Regras de temperatura"
+              title="Regras de temperatura"
+              className="inline-flex min-h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-linha bg-superficie text-texto-2 transition-colors duration-200 ease-raion hover:border-dourado hover:text-texto md:min-h-10 md:w-10"
+            >
+              <Thermometer className="h-4 w-4" aria-hidden />
+            </Link>
+          )}
         </div>
         {chips.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5">

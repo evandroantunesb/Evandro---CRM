@@ -2,6 +2,7 @@ import { Briefcase, Building2, TrendingUp, Users } from "lucide-react";
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import { Avatar } from "@/components/avatar";
+import { CabecalhoPagina } from "@/components/cabecalho-pagina";
 import { Cartao, Selo } from "@/components/ui";
 import { exigirPapel } from "@/lib/sessao";
 import { CARTEIRA_CONTATOS } from "@/lib/permissoes";
@@ -49,10 +50,7 @@ export default async function Contatos({ searchParams }: PageProps<"/contatos">)
 
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-4">
-      <div>
-        <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Contatos</h1>
-        <p className="text-sm text-zinc-500">Carteira de contatos cadastrados na empresa.</p>
-      </div>
+      <CabecalhoPagina sobretitulo="Comercial · Carteira" titulo="Contatos" descricao="Carteira de contatos cadastrados na empresa." />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <KpiContato Icone={Users} tom="neutro" valor={totalGeral ?? 0} legenda="Total de contatos" rodape="Em toda a empresa" />
