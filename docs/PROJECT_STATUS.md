@@ -1,5 +1,19 @@
 # Estado do projeto — Raion CRM
 
+## Início do engenheiro e autoconfirmação de pagamento — concluídos em 03/11/2026
+
+| PR | Escopo | Estado |
+| --- | --- | --- |
+| #300 | Início do engenheiro, PR 1: tela com os dados que já existem | Mesclada em 03/11/2026, sem migration |
+| #302 | Início do engenheiro, PR 2: "Sua trajetória", "Trajetória da equipe" e "Engenharia concluída no mês" (função `trajetoria_engenharia`) | Mesclada em 03/11/2026; migration `20261108100000_engenharia_trajetoria.sql` aplicada |
+| #303 | Admin e gestor confirmam o pagamento da própria venda, no Solo e no Pro, contando normalmente para pontos e comissão | Mesclada em 03/11/2026; migration `20261109100000_autoconfirmacao_pagamento.sql` aplicada |
+| #304 | Lista de migrations autorizadas do `banco-producao.yml` para a #302 e a #303 | Mesclada; aplicação em 03/11/2026 (run 41682703029, `main` em `29acf00`) |
+
+Pendências (decisão do Evandro):
+- **"Concluída no mês" no Resumo da Engenharia:** no desenho, a última fase se chama assim; no código, a coluna mostra as obras com a Engenharia concluída que ainda seguem nos outros setores. Manter ou trocar pelo número do mês.
+- **Pagamento no Pro:** o vendedor não tem como avisar que o cliente pagou, e ninguém é avisado dos pagamentos a confirmar (só quem abre o negócio vê). Ideias: "o cliente pagou" pelo vendedor (data e comprovante opcional, sem confirmar), aviso ou lista "Pagamentos a confirmar" para admin e gestor e, se o Evandro quiser, confirmação por um setor (Operacional ou Financeiro), com setor específico, porque a confirmação libera pontos e cria a Obra.
+- **Solo:** o registro sozinho do pagamento (antes do contrato) continua só para a empresa Solo com 1 pessoa ativa; com equipe, o dono confirma a própria venda pela confirmação (#303), depois do contrato assinado. O registro do Solo também não cria Obra.
+
 ## Obras = One Page Result (OPR) — plano em 3 PRs (aprovado pelo Evandro em 02/11/2026; concluído em 03/11/2026)
 
 Telas aprovadas no canvas "Raion — Nova interface": `ObrasCompleta.dc.html` (painel de todas as obras) e `ObrasApresentacao.dc.html` (uma obra por tela). Regra: **sempre seguir os desenhos**.
