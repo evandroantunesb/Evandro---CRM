@@ -6696,6 +6696,16 @@ export type Database = {
         Args: { p_pergunta: string; p_resposta: string };
         Returns: boolean;
       };
+      salvar_configuracoes_empresa: {
+        Args: {
+          p_dias_considerado_parado?: number;
+          p_empresa_id: string;
+          p_horas_considerado_sem_contato?: number;
+          p_modo_distribuicao_leads?: Database["public"]["Enums"]["modo_distribuicao_leads"];
+          p_percentual_leads_sdr?: number;
+        };
+        Returns: undefined;
+      };
       salvar_enquadramento_engenharia: {
         Args: { p_obra_id: string; p_respostas: Json };
         Returns: undefined;

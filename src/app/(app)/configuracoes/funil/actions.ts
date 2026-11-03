@@ -189,7 +189,8 @@ export async function definirDiasConsideradoParado(_: ResultadoAcao, formData: F
   if (!dias.success) return { ok: false, mensagem: dias.error.issues[0].message };
 
   const supabase = await criarClienteServidor();
-  const { error } = await supabase.from("empresas").update({ dias_considerado_parado: dias.data }).eq("id", atual.empresaId);
+  // `empresas` só aceita UPDATE do super-admin: a configuração passa pela função, que limita ao admin e a estas colunas.
+  const { error } = await supabase.rpc("salvar_configuracoes_empresa", { p_empresa_id: atual.empresaId, p_dias_considerado_parado: dias.data });
   if (error) return { ok: false, mensagem: "Não foi possível salvar." };
 
   revalidatePath(CAMINHO);
@@ -204,7 +205,7 @@ export async function definirHorasConsideradoSemContato(_: ResultadoAcao, formDa
   if (!horas.success) return { ok: false, mensagem: horas.error.issues[0].message };
 
   const supabase = await criarClienteServidor();
-  const { error } = await supabase.from("empresas").update({ horas_considerado_sem_contato: horas.data }).eq("id", atual.empresaId);
+  const { error } = await supabase.rpc("salvar_configuracoes_empresa", { p_empresa_id: atual.empresaId, p_horas_considerado_sem_contato: horas.data });
   if (error) return { ok: false, mensagem: "Não foi possível salvar." };
 
   revalidatePath(CAMINHO);
