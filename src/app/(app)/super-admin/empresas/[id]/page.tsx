@@ -1,6 +1,6 @@
-import Link from "next/link";
+import { CabecalhoPagina, CLASSE_ACAO_CABECALHO, SeloCabecalho } from "@/components/cabecalho-pagina";
 import { notFound } from "next/navigation";
-import { Botao, Cartao, Selo } from "@/components/ui";
+import { Cartao, Selo } from "@/components/ui";
 import { trocarEmpresa } from "@/lib/acoes/empresa-atual";
 import { exigirSuperAdmin } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
@@ -36,20 +36,28 @@ export default async function Empresa({ params }: PageProps<"/super-admin/empres
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-4">
-      <Link href="/super-admin" className="text-sm text-zinc-600 hover:underline">
-        ← Empresas
-      </Link>
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">{empresa.nome}</h1>
-        <SeloSituacao situacao={empresa.situacao} />
-        {ehAtual && <Selo>Empresa atual</Selo>}
-        {vinculo && (
-          <form action={trocarEmpresa} className="ml-auto">
-            <input type="hidden" name="empresaId" value={empresa.id} />
-            <Botao>Entrar na empresa</Botao>
-          </form>
-        )}
-      </div>
+      <CabecalhoPagina
+        detalhe
+        voltar={{ href: "/super-admin", rotulo: "Empresas" }}
+        sobretitulo="Super-admin · empresa"
+        titulo={empresa.nome}
+        selos={
+          <>
+            <SeloSituacao situacao={empresa.situacao} naFaixa />
+            {ehAtual && <SeloCabecalho>Empresa atual</SeloCabecalho>}
+          </>
+        }
+        acoes={
+          vinculo && (
+            <form action={trocarEmpresa}>
+              <input type="hidden" name="empresaId" value={empresa.id} />
+              <button type="submit" className={CLASSE_ACAO_CABECALHO}>
+                Entrar na empresa
+              </button>
+            </form>
+          )
+        }
+      />
       {!vinculo && (
         <p className="text-sm text-zinc-500">Para entrar nesta empresa, você precisa ser membro ativo dela e ela precisa estar ativa.</p>
       )}

@@ -1,4 +1,5 @@
-import { Cartao, Selo, Voltar } from "@/components/ui";
+import { CabecalhoPagina } from "@/components/cabecalho-pagina";
+import { Cartao, Selo } from "@/components/ui";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { alternarEquipeAtiva, alternarGestor, removerDaEquipe } from "./actions";
@@ -30,8 +31,13 @@ export default async function Equipes() {
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-4">
-      <Voltar href="/configuracoes">Configurações</Voltar>
-      <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Equipes</h1>
+      <CabecalhoPagina
+        detalhe
+        voltar={{ href: "/configuracoes", rotulo: "Configurações" }}
+        sobretitulo="Configurações · Pessoas"
+        titulo="Equipes"
+        descricao="Equipes e seus gestores."
+      />
       <Cartao titulo="Nova equipe">
         <FormularioEquipe />
       </Cartao>

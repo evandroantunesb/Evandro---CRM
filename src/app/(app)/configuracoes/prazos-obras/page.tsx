@@ -1,4 +1,5 @@
-import { Cartao, Voltar } from "@/components/ui";
+import { CabecalhoPagina } from "@/components/cabecalho-pagina";
+import { Cartao } from "@/components/ui";
 import { CHAVES_PRAZO_OBRA, type ChavePrazoObra } from "@/lib/obras/cronograma";
 import { PRAZOS_OBRA } from "@/lib/permissoes";
 import { exigirPapel } from "@/lib/sessao";
@@ -18,14 +19,17 @@ export default async function PrazosObras() {
   return (
     <div className="mx-auto flex max-w-3xl animate-entrar flex-col gap-6">
       {/* O gestor chega pela Apresentação da obra (o hub de Configurações é só do admin). */}
-      {atual.papel === "admin" ? <Voltar href="/configuracoes">Configurações</Voltar> : <Voltar href="/obras">Obras</Voltar>}
-      <header className="flex flex-col gap-2">
-        <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Prazos das etapas</h1>
-        <p className="text-sm text-texto-2">
-          Quantos dias úteis cada etapa da obra deve levar. É o que forma o previsto do cronograma e a entrega contratada. Os prazos da
-          Engenharia (protocolo, exigência, vistoria) continuam em Configurações › Engenharia.
-        </p>
-      </header>
+      <CabecalhoPagina
+        detalhe
+        voltar={atual.papel === "admin" ? { href: "/configuracoes", rotulo: "Configurações" } : { href: "/obras", rotulo: "Obras" }}
+        sobretitulo="Configurações · Obras"
+        titulo="Prazos das etapas"
+        descricao="Dias úteis de cada etapa da obra e da entrega contratada."
+      />
+      <p className="text-sm text-texto-2">
+        Quantos dias úteis cada etapa da obra deve levar. É o que forma o previsto do cronograma e a entrega contratada. Os prazos da
+        Engenharia (protocolo, exigência, vistoria) continuam em Configurações › Engenharia.
+      </p>
       <Cartao titulo="Dias úteis">
         <FormularioPrazosObra prazos={prazos} />
       </Cartao>

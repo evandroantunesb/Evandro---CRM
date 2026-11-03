@@ -1,4 +1,6 @@
-import { Cartao, Voltar } from "@/components/ui";
+import { Plus } from "lucide-react";
+import { CabecalhoPagina, CLASSE_ACAO_CABECALHO } from "@/components/cabecalho-pagina";
+import { Cartao } from "@/components/ui";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import type { Papel, PerfilGamificacao, StatusMembro, TipoVendedor } from "@/lib/tipos";
@@ -34,11 +36,24 @@ export default async function Usuarios() {
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-4">
-      <Voltar href="/configuracoes">Configurações</Voltar>
-      <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Usuários</h1>
-      <Cartao titulo="Convidar pessoa">
-        <FormularioConvite />
-      </Cartao>
+      <CabecalhoPagina
+        detalhe
+        voltar={{ href: "/configuracoes", rotulo: "Configurações" }}
+        sobretitulo="Configurações · Equipe"
+        titulo="Usuários"
+        descricao="Quem entra no Raion, com qual perfil e em quais setores atua."
+        acoes={
+          <a href="#convidar" className={CLASSE_ACAO_CABECALHO}>
+            <Plus size={16} aria-hidden />
+            Convidar pessoa
+          </a>
+        }
+      />
+      <div id="convidar" className="scroll-mt-4">
+        <Cartao titulo="Convidar pessoa">
+          <FormularioConvite />
+        </Cartao>
+      </div>
       <Cartao titulo={`Equipe (${membros.length})`}>
         <p id="perfil-gamificacao" className="scroll-mt-4 text-sm text-zinc-600">
           O perfil de gamificação (SDR/Closer/CS Farmer) de cada pessoa é definido abaixo, junto com o restante do cadastro.

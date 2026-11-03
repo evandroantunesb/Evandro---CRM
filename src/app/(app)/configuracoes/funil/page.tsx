@@ -1,4 +1,5 @@
-import { Cartao, Selo, Voltar } from "@/components/ui";
+import { CabecalhoPagina } from "@/components/cabecalho-pagina";
+import { Cartao, Selo } from "@/components/ui";
 import { carregarConfiguracao } from "@/lib/crm";
 import { exigirPapel } from "@/lib/sessao";
 import { alternarFunil, definirInicial, reordenarEtapa } from "./actions";
@@ -21,8 +22,13 @@ export default async function ConfigFunil() {
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
-      <Voltar href="/configuracoes">Configurações</Voltar>
-      <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Funis e etapas</h1>
+      <CabecalhoPagina
+        detalhe
+        voltar={{ href: "/configuracoes", rotulo: "Configurações" }}
+        sobretitulo="Configurações · Comercial"
+        titulo="Funis e etapas"
+        descricao="Etapas do Kanban e regras de cada funil."
+      />
       <p className="text-sm text-zinc-600">
         A etapa inicial é onde os negócios novos entram. Ganho e perdido ficam como status do negócio, separado da
         etapa — mas se quiser, pode marcar uma etapa pra fechar o negócio sozinha ao entrar nela (ganho direto, ou

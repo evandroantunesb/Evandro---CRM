@@ -1,3 +1,6 @@
+import { Avatar } from "@/components/avatar";
+import { CabecalhoPagina } from "@/components/cabecalho-pagina";
+import { ROTULO_PAPEL } from "@/lib/tipos";
 import Link from "next/link";
 import { Botao, Cartao } from "@/components/ui";
 import { assinarAvatares } from "@/lib/avatares";
@@ -38,7 +41,17 @@ export default async function Perfil({ searchParams }: PageProps<"/perfil">) {
 
   return (
     <div className="mx-auto flex max-w-xl flex-col gap-4">
-      <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Meu perfil</h1>
+      <CabecalhoPagina
+        detalhe
+        inicio={
+          <span className="hidden sm:block">
+            <Avatar nome={sessao.nome} tamanho={72} src={urlAvatar} />
+          </span>
+        }
+        sobretitulo="Minha conta"
+        titulo="Meu perfil"
+        descricao={sessao.atual ? `${sessao.nome} · ${ROTULO_PAPEL[sessao.atual.papel]} na ${sessao.atual.empresaNome}` : sessao.nome}
+      />
       <Cartao titulo="Foto">
         <FotoPerfil userId={sessao.userId} nome={sessao.nome} avatarUrl={urlAvatar} temFoto={Boolean(sessao.avatarCaminho)} />
       </Cartao>

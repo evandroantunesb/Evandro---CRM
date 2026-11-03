@@ -1,3 +1,4 @@
+import { CabecalhoPagina, CLASSE_ACAO_CABECALHO, CLASSE_VIDRO_CABECALHO, SeloCabecalho } from "@/components/cabecalho-pagina";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { GestaoFixacao, GestaoSetor } from "@/app/(app)/obras/[id]/gestao";
@@ -152,34 +153,49 @@ export default async function CardEngenharia({ params }: PageProps<"/engenharia/
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-3">
-      <Link href="/engenharia" className="w-fit text-sm text-zinc-600 hover:text-zinc-900">
-        ‹ Engenharia
-      </Link>
-
-      <p className="sobretitulo -mb-2">Obras · Engenharia</p>
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">{resumo.clienteNome}</h1>
-        <Selo>Obra #{resumo.numero}</Selo>
-        <Selo tom={TOM_SITUACAO[resumo.situacao]}>{ROTULO_SITUACAO_OBRA[resumo.situacao]}</Selo>
-        {resumo.alertas.map((a) => (
-          <Selo key={a} tom={TOM_ALERTA[a]}>
-            {ROTULO_ALERTA_OBRA[a]}
-          </Selo>
-        ))}
-      </div>
-      <div className="-mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-        {linhaObra && <span className="text-texto-2">{linhaObra}</span>}
-        {pode(atual.papel, OBRAS) && (
-          <Link href={`/obras/${resumo.id}`} className="text-zinc-600 underline hover:text-zinc-900">
-            Ver obra completa
-          </Link>
-        )}
-        {resumo.negocioId && pode(atual.papel, VER_NEGOCIO_DA_OBRA) && (
-          <Link href={`/negocios/${resumo.negocioId}`} className="text-zinc-600 underline hover:text-zinc-900">
-            Ver negócio
-          </Link>
-        )}
-      </div>
+      <CabecalhoPagina
+        detalhe
+        voltar={{ href: "/engenharia", rotulo: "Engenharia" }}
+        sobretitulo={`Obras · Engenharia · Obra nº ${resumo.numero}`}
+        titulo={resumo.clienteNome}
+        selos={
+          <>
+            {atualPasso && resumo.situacao === "em_andamento" && (
+              <SeloCabecalho tom="destaque">
+                Passo {atualPasso.numero} de {passos.length} · {atualPasso.titulo}
+              </SeloCabecalho>
+            )}
+            {resumo.situacao !== "em_andamento" && (
+              <SeloCabecalho tom={TOM_SITUACAO[resumo.situacao]}>{ROTULO_SITUACAO_OBRA[resumo.situacao]}</SeloCabecalho>
+            )}
+            {linhaObra && <SeloCabecalho>{linhaObra}</SeloCabecalho>}
+            {resumo.alertas.map((a) => (
+              <SeloCabecalho key={a} tom={TOM_ALERTA[a]}>
+                {ROTULO_ALERTA_OBRA[a]}
+              </SeloCabecalho>
+            ))}
+          </>
+        }
+        acoes={
+          <>
+            {pode(atual.papel, OBRAS) && (
+              <Link href={`/obras/${resumo.id}`} className={CLASSE_VIDRO_CABECALHO}>
+                Ver obra completa
+              </Link>
+            )}
+            {resumo.negocioId && pode(atual.papel, VER_NEGOCIO_DA_OBRA) && (
+              <Link href={`/negocios/${resumo.negocioId}`} className={CLASSE_VIDRO_CABECALHO}>
+                Ver negócio
+              </Link>
+            )}
+            {gestaoEngenharia && (
+              <a href="#passo-1" className={CLASSE_ACAO_CABECALHO}>
+                Atualizar Engenharia
+              </a>
+            )}
+          </>
+        }
+      />
 
       {resumo.pausaMotivo && (
         <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-900">

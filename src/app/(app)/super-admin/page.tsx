@@ -1,3 +1,5 @@
+import { Plus } from "lucide-react";
+import { CabecalhoPagina, CLASSE_ACAO_CABECALHO } from "@/components/cabecalho-pagina";
 import Link from "next/link";
 import { Cartao } from "@/components/ui";
 import { exigirSuperAdmin } from "@/lib/sessao";
@@ -15,10 +17,22 @@ export default async function SuperAdmin() {
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-4">
-      <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Super-admin</h1>
-      <Cartao titulo="Nova empresa">
-        <FormularioEmpresa />
-      </Cartao>
+      <CabecalhoPagina
+        sobretitulo="Super-admin · plataforma"
+        titulo="Empresas"
+        descricao="Todas as empresas que usam o Raion. O super-admin não vê os dados delas: só cadastro, plano e situação."
+        acoes={
+          <a href="#nova-empresa" className={CLASSE_ACAO_CABECALHO}>
+            <Plus size={16} aria-hidden />
+            Nova empresa
+          </a>
+        }
+      />
+      <div id="nova-empresa" className="scroll-mt-4">
+        <Cartao titulo="Nova empresa">
+          <FormularioEmpresa />
+        </Cartao>
+      </div>
       <Cartao titulo={`Empresas (${empresas?.length ?? 0})`}>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">

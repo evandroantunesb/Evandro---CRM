@@ -1,4 +1,5 @@
-import { Cartao, Voltar } from "@/components/ui";
+import { CabecalhoPagina } from "@/components/cabecalho-pagina";
+import { Cartao } from "@/components/ui";
 import { MEIOS_PARCELAMENTO, ROTULO_MEIO_PARCELAMENTO, preferenciasDaEmpresa, valorNegocioDaEmpresa } from "@/lib/condicoes-pagamento";
 import { CONDICOES_PAGAMENTO } from "@/lib/permissoes";
 import { exigirPapel } from "@/lib/sessao";
@@ -25,14 +26,17 @@ export default async function CondicoesPagamento() {
   return (
     <div className="mx-auto flex max-w-3xl animate-entrar flex-col gap-6">
       {/* O gestor chega pela proposta na ficha do negócio (o hub de Configurações é só do admin). */}
-      {atual.papel === "admin" ? <Voltar href="/configuracoes">Configurações</Voltar> : <Voltar href="/negocios">Negócios</Voltar>}
-      <header className="flex flex-col gap-2">
-        <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Condições de pagamento</h1>
-        <p className="text-sm text-texto-2">
-          O que o vendedor pode oferecer na proposta: desconto à vista, parcelamento no cartão e no boleto, financiamento e acordos personalizados.
-          Mudanças valem para as próximas propostas; as já emitidas não mudam.
-        </p>
-      </header>
+      <CabecalhoPagina
+        detalhe
+        voltar={atual.papel === "admin" ? { href: "/configuracoes", rotulo: "Configurações" } : { href: "/negocios", rotulo: "Negócios" }}
+        sobretitulo="Configurações · Venda"
+        titulo="Condições de pagamento"
+        descricao="Descontos, parcelas e taxas do cartão e do boleto."
+      />
+      <p className="text-sm text-texto-2">
+        O que o vendedor pode oferecer na proposta: desconto à vista, parcelamento no cartão e no boleto, financiamento e acordos personalizados.
+        Mudanças valem para as próximas propostas; as já emitidas não mudam.
+      </p>
       <Cartao titulo="Descontos e Personalizado">
         <FormularioPreferencias preferencias={preferenciasDaEmpresa(preferencias)} />
       </Cartao>

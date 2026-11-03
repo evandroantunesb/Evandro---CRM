@@ -1,4 +1,5 @@
-import { Cartao, Voltar } from "@/components/ui";
+import { CabecalhoPagina } from "@/components/cabecalho-pagina";
+import { Cartao } from "@/components/ui";
 import { lerCondicoes } from "@/lib/engenharia-enquadramento-regras";
 import { carregarConfigPrazos, carregarFeriadosEmpresa } from "@/lib/engenharia-prazos";
 import { CHAVES_PRAZO_DISTRIBUIDORA, CHAVES_PRAZO_INTERNO, type ChavePrazo } from "@/lib/engenharia-prazos-regras";
@@ -27,11 +28,13 @@ export default async function ConfigEngenharia() {
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-4">
-      <Voltar href="/configuracoes">Configurações</Voltar>
-      <div className="flex flex-col gap-1">
-        <p className="sobretitulo">Configurações · Obras</p>
-        <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Engenharia</h1>
-      </div>
+      <CabecalhoPagina
+        detalhe
+        voltar={{ href: "/configuracoes", rotulo: "Configurações" }}
+        sobretitulo="Configurações · Obras"
+        titulo="Engenharia"
+        descricao="Checklist de documentos, prazos e feriados da empresa."
+      />
 
       <h2 className="sobretitulo mt-4 px-1">Checklist de documentos</h2>
       <p className="text-sm text-zinc-600">

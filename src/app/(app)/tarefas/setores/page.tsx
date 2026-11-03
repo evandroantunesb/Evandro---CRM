@@ -1,3 +1,4 @@
+import { CabecalhoPagina, CLASSE_VIDRO_CABECALHO } from "@/components/cabecalho-pagina";
 import Link from "next/link";
 import { ListaTarefasSetor } from "@/components/tarefas-setor";
 import { Cartao } from "@/components/ui";
@@ -42,28 +43,31 @@ export default async function TarefasSetores({ searchParams }: PageProps<"/taref
 
   return (
     <div className="mx-auto flex max-w-[1100px] flex-col gap-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">{operacao ? "Tarefas" : "Pedidos aos setores"}</h1>
-          <p className="text-sm text-zinc-500">
+      <CabecalhoPagina
+        sobretitulo="Operação · Compras, Engenharia e Operacional"
+        titulo={operacao ? "Tarefas" : "Pedidos aos setores"}
+        descricao={
+          <>
             {operacao
               ? "O que Compras, Engenharia e Operacional precisam fazer nas obras e nos pedidos do comercial."
               : "Pedidos a Compras, Engenharia e Operacional. Para pedir, abra o negócio ou a obra."}
-          </p>
-          {operacao && (
-            <p className="mt-1 text-sm text-zinc-700">
-              {atuacao
-                ? `Você atua em: ${atuacao}.`
-                : "Você ainda não atua em nenhum setor nesta empresa. Peça ao admin para configurar em Configurações › Usuários."}
-            </p>
-          )}
-        </div>
-        {pode(atual.papel, TAREFAS) && (
-          <Link href="/tarefas" className="text-sm text-amber-700 hover:underline">
-            Minhas tarefas comerciais
-          </Link>
-        )}
-      </div>
+            {operacao && (
+              <span className="mt-1 block text-offwhite/90">
+                {atuacao
+                  ? `Você atua em: ${atuacao}.`
+                  : "Você ainda não atua em nenhum setor nesta empresa. Peça ao admin para configurar em Configurações › Usuários."}
+              </span>
+            )}
+          </>
+        }
+        acoes={
+          pode(atual.papel, TAREFAS) && (
+            <Link href="/tarefas" className={CLASSE_VIDRO_CABECALHO}>
+              Minhas tarefas comerciais
+            </Link>
+          )
+        }
+      />
 
       <nav aria-label="Filtro" className="flex flex-wrap gap-2">
         {FILTROS_TAREFAS_SETOR.map((f) => {

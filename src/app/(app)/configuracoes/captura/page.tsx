@@ -1,5 +1,6 @@
+import { CabecalhoPagina } from "@/components/cabecalho-pagina";
 import QRCode from "qrcode";
-import { Voltar } from "@/components/ui";
+
 import { carregarConfiguracao } from "@/lib/crm";
 import { env } from "@/lib/env";
 import { exigirPapel } from "@/lib/sessao";
@@ -49,8 +50,13 @@ export default async function ConfigCaptura() {
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4">
-      <Voltar href="/configuracoes">Configurações</Voltar>
-      <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Captura de leads</h1>
+      <CabecalhoPagina
+        detalhe
+        voltar={{ href: "/configuracoes", rotulo: "Configurações" }}
+        sobretitulo="Configurações · Aquisição"
+        titulo="Captura de leads"
+        descricao="Formulários, links e QR Codes para divulgar."
+      />
       <p className="text-sm text-zinc-600">
         Crie um link (e QR Code) para divulgar. Quem preencher o formulário vira um lead novo, já distribuído
         automaticamente entre os vendedores marcados para receber leads.

@@ -1,3 +1,4 @@
+import { CabecalhoPagina } from "@/components/cabecalho-pagina";
 import { AlarmClock, BellRing, CalendarX, CirclePause, HardHat, Hourglass, Inbox, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -98,7 +99,7 @@ export default async function Engenharia({ searchParams }: PageProps<"/engenhari
   if (atual.papel === "operacao" && !atua) {
     return (
       <div className="mx-auto flex max-w-[1100px] flex-col gap-4">
-        <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Engenharia</h1>
+        <CabecalhoPagina sobretitulo="Obras · Engenharia" titulo="Engenharia" />
         <p className="text-sm text-zinc-600">Você não atua em Engenharia nesta empresa. Peça ao admin para configurar em Configurações › Usuários.</p>
       </div>
     );
@@ -140,14 +141,18 @@ export default async function Engenharia({ searchParams }: PageProps<"/engenhari
 
   return (
     <div className="mx-auto flex max-w-[1100px] flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <p className="sobretitulo">Obras · Engenharia</p>
-        <h1 className="text-3xl font-light tracking-tight text-texto md:text-4xl">Engenharia</h1>
-        <p className="text-sm text-zinc-500">O que precisa de você hoje, o que espera terceiros e as obras por etapa do projeto.</p>
-        {atual.papel === "operacao" && (
-          <p className="mt-1 text-sm text-zinc-700">Você atua em Engenharia como {coordenaSetor ? "coordenador" : "executor"}.</p>
-        )}
-      </div>
+      <CabecalhoPagina
+        sobretitulo="Obras · Engenharia"
+        titulo="Engenharia"
+        descricao={
+          <>
+            O que precisa de você hoje, o que espera terceiros e as obras por etapa do projeto.
+            {atual.papel === "operacao" && (
+              <span className="mt-1 block text-offwhite/90">Você atua em Engenharia como {coordenaSetor ? "coordenador" : "executor"}.</span>
+            )}
+          </>
+        }
+      />
 
       <nav aria-label="Visão" className="flex flex-wrap gap-2">
         <Aba href="/engenharia" atual={filtro === null}>
