@@ -1,7 +1,8 @@
 import type { PeriodoIndicadores } from "@/lib/engenharia-prazos-regras";
+import type { MetricaTrajetoria } from "@/lib/engenharia-trajetoria";
 import type { FiltroTarefasSetor } from "@/lib/tarefas-setor-regras";
 
-/** Escolhas da tela, todas na URL: visão (Pessoal/Equipe), carteira, período do Desempenho e aba das tarefas. */
+/** Escolhas da tela, todas na URL: visão (Pessoal/Equipe), carteira, período do Desempenho, aba das tarefas e métrica da trajetória. */
 export type VisaoEngenharia = "pessoal" | "equipe";
 export type VisaoCarteira = "resumo" | "kanban" | "lista";
 
@@ -18,6 +19,8 @@ export type EstadoEngenharia = {
   /** Período escolhido de propósito: mantém o Desempenho aberto. */
   periodoNaUrl: boolean;
   ver: Filtro;
+  /** O que os gráficos da trajetória mostram: obras ou kWp. */
+  metrica: MetricaTrajetoria;
 };
 
 export function lerCarteira(valor: unknown): VisaoCarteira {
@@ -36,5 +39,6 @@ export function hrefEngenharia(estado: EstadoEngenharia, mudanca: Partial<Omit<E
   if (e.carteira !== "resumo") q.set("carteira", e.carteira);
   if (e.periodoNaUrl || e.periodo !== 30) q.set("periodo", String(e.periodo));
   if (e.ver !== "abertas") q.set("ver", e.ver);
+  if (e.metrica !== "obras") q.set("trajetoria", e.metrica);
   return q.size ? `/engenharia?${q}` : "/engenharia";
 }

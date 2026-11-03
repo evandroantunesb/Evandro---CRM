@@ -6763,6 +6763,7 @@ export type Database = {
           temperatura: string;
         }[];
       };
+      trajetoria_engenharia: { Args: { p_empresa_id: string }; Returns: Json };
       travar_negocio_retificacao: {
         Args: { p_negocio_id: string };
         Returns: {
