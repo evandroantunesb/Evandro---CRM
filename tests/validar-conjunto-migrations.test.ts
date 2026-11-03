@@ -8,9 +8,13 @@ import { afterAll, describe, expect, it } from "vitest";
 
 const SCRIPT = ".github/scripts/validar-conjunto-migrations.sh";
 const WORKFLOW = ".github/workflows/banco-producao.yml";
-// Trajetória da Engenharia (#302) e autoconfirmação de pagamento (#303): só as duas, nenhuma a mais ou a menos.
-const AUTORIZADAS = ["20261108100000_engenharia_trajetoria.sql", "20261109100000_autoconfirmacao_pagamento.sql"];
+// Marcos da trajetória da Engenharia (#306): só ela, nenhuma a mais ou a menos.
+const AUTORIZADAS = ["20261110100000_engenharia_marcos.sql"];
 const LISTA = AUTORIZADAS.join("\n");
+// Trajetória da Engenharia (#302) e autoconfirmação de pagamento (#303): aplicadas em 03/11/2026, antes desta. Se
+// voltarem a aparecer como pendentes, não são autorizadas.
+const TRAJETORIA = "20261108100000_engenharia_trajetoria.sql";
+const AUTOCONFIRMACAO = "20261109100000_autoconfirmacao_pagamento.sql";
 // Aviso no sininho da justificativa de atraso (#295): aplicada em 03/11/2026, antes destas. Se voltar a aparecer como
 // pendente, não é autorizada.
 const JUSTIFICATIVA = "20261107100000_obras_justificativa_aviso.sql";
@@ -159,7 +163,7 @@ describe("conjunto exatamente igual ao autorizado", () => {
   });
 
   it("vários itens autorizados, em qualquer ordem, e o dry-run lista os mesmos: passa", () => {
-    const r = validar(dryRunCom(...[...AUTORIZADAS].reverse()), `${AUTORIZADAS[1]} ${AUTORIZADAS[0]}\n`);
+    const r = validar(dryRunCom(JA_APLICADA, ...AUTORIZADAS), `${LISTA}\n${JA_APLICADA}\n`);
     expect(r.codigo).toBe(0);
   });
 });
@@ -201,7 +205,7 @@ describe("conjunto diferente do autorizado: encerra com erro", () => {
   });
 
   it("falta uma das autorizadas (dois itens autorizados, um listado)", () => {
-    for (const listada of AUTORIZADAS) expect(validar(dryRunCom(listada)).codigo, listada).toBe(1);
+    expect(validar(dryRunCom(...AUTORIZADAS), `${LISTA} ${JA_APLICADA}`).codigo).toBe(1);
   });
 
   it("migration autorizada listada em duplicidade no dry-run, com extra: não passa", () => {
@@ -209,8 +213,8 @@ describe("conjunto diferente do autorizado: encerra com erro", () => {
   });
 
   it("nome parecido com o autorizado (sufixo ou prefixo a mais) não passa", () => {
-    expect(validar(dryRunCom(AUTORIZADAS[0].replace(".sql", "_v2.sql"), AUTORIZADAS[1])).codigo).toBe(1);
-    expect(validar(dryRunCom(`x${AUTORIZADAS[0]}`, AUTORIZADAS[1])).codigo).toBe(1);
+    expect(validar(dryRunCom(AUTORIZADAS[0].replace(".sql", "_v2.sql"), ...AUTORIZADAS.slice(1))).codigo).toBe(1);
+    expect(validar(dryRunCom(`x${AUTORIZADAS[0]}`, ...AUTORIZADAS.slice(1))).codigo).toBe(1);
   });
 
   it("versão extra citada sem o nome do arquivo (não interpretável)", () => {
@@ -247,12 +251,12 @@ describe("entradas inválidas: encerra com erro antes de qualquer aplicação", 
 });
 
 describe("protocolos da Engenharia", () => {
-  it("só elas pendentes (justificativa, checklist, tarefas de setor, dados do cliente, dados pessoais da obra, fixação, validade da proposta, eletroposto SDR, eletroposto, temperatura e calculadora já aplicados): passa", () => {
+  it("só ela pendente (trajetória, autoconfirmação, justificativa, checklist, tarefas de setor, dados do cliente, dados pessoais da obra, fixação, validade da proposta, eletroposto SDR, eletroposto, temperatura e calculadora já aplicados): passa", () => {
     expect(validar(dryRunCom(...AUTORIZADAS)).codigo).toBe(0);
   });
 
-  it("justificativa, checklist, tarefas de setor, dados do cliente, dados pessoais da obra, fixação, validade da proposta, eletroposto SDR, eletroposto, temperatura ou qualquer migration da calculadora pendente junto, ou sozinha, não passa", () => {
-    for (const m of [JUSTIFICATIVA, COMPLETA, CUSTOS, CRONOGRAMA, CONDICAO_ESCOLHIDA, DESCONTOS, CONDICOES_CONFIG, CAPTURA_LIMITE, PRIVILEGIOS_TABELAS, FUNCOES_SEM_LOGIN, INICIAR_ATUACAO, ENQUADRAMENTO, PASSOS, TAREFAS_AUTOMATICAS, PRAZOS, VISTORIA, PROTOCOLOS, CHECKLIST, NOTIFICACOES, ANEXOS_TAREFA, TAREFAS_SETOR, DADOS_CLIENTE, CLIENTE_OCULTO, FIXACAO, VALIDADE_PROPOSTA, ELETROPOSTO_SDR, ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) {
+  it("trajetória, autoconfirmação, justificativa, checklist, tarefas de setor, dados do cliente, dados pessoais da obra, fixação, validade da proposta, eletroposto SDR, eletroposto, temperatura ou qualquer migration da calculadora pendente junto, ou sozinha, não passa", () => {
+    for (const m of [TRAJETORIA, AUTOCONFIRMACAO, JUSTIFICATIVA, COMPLETA, CUSTOS, CRONOGRAMA, CONDICAO_ESCOLHIDA, DESCONTOS, CONDICOES_CONFIG, CAPTURA_LIMITE, PRIVILEGIOS_TABELAS, FUNCOES_SEM_LOGIN, INICIAR_ATUACAO, ENQUADRAMENTO, PASSOS, TAREFAS_AUTOMATICAS, PRAZOS, VISTORIA, PROTOCOLOS, CHECKLIST, NOTIFICACOES, ANEXOS_TAREFA, TAREFAS_SETOR, DADOS_CLIENTE, CLIENTE_OCULTO, FIXACAO, VALIDADE_PROPOSTA, ELETROPOSTO_SDR, ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) {
       expect(validar(dryRunCom(...AUTORIZADAS, m)).codigo, m).toBe(1);
       expect(validar(dryRunCom(m)).codigo, m).toBe(1);
     }
@@ -270,7 +274,7 @@ describe("protocolos da Engenharia", () => {
       expect(existsSync(`supabase/migrations/${m}`), m).toBe(true);
       expect(texto, m).toContain(m);
     }
-    for (const m of [JUSTIFICATIVA, COMPLETA, CUSTOS, CRONOGRAMA, CONDICAO_ESCOLHIDA, DESCONTOS, CONDICOES_CONFIG, CAPTURA_LIMITE, PRIVILEGIOS_TABELAS, FUNCOES_SEM_LOGIN, INICIAR_ATUACAO, ENQUADRAMENTO, PASSOS, TAREFAS_AUTOMATICAS, PRAZOS, VISTORIA, PROTOCOLOS, CHECKLIST, NOTIFICACOES, ANEXOS_TAREFA, TAREFAS_SETOR, DADOS_CLIENTE, CLIENTE_OCULTO, FIXACAO, VALIDADE_PROPOSTA, ELETROPOSTO_SDR, ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) expect(texto, m).not.toContain(m);
+    for (const m of [TRAJETORIA, AUTOCONFIRMACAO, JUSTIFICATIVA, COMPLETA, CUSTOS, CRONOGRAMA, CONDICAO_ESCOLHIDA, DESCONTOS, CONDICOES_CONFIG, CAPTURA_LIMITE, PRIVILEGIOS_TABELAS, FUNCOES_SEM_LOGIN, INICIAR_ATUACAO, ENQUADRAMENTO, PASSOS, TAREFAS_AUTOMATICAS, PRAZOS, VISTORIA, PROTOCOLOS, CHECKLIST, NOTIFICACOES, ANEXOS_TAREFA, TAREFAS_SETOR, DADOS_CLIENTE, CLIENTE_OCULTO, FIXACAO, VALIDADE_PROPOSTA, ELETROPOSTO_SDR, ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) expect(texto, m).not.toContain(m);
   });
 });
 
