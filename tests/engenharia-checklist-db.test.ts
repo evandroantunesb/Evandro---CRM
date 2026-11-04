@@ -156,7 +156,7 @@ describe("Engenharia: checklist e documentos (ordem importa)", { concurrent: fal
 
   it("empresa nova já nasce com o modelo inicial; só o admin edita; ninguém apaga", async () => {
     const { data } = await servico.from("engenharia_checklist_modelo").select("id, titulo, obrigatorio, ativo").eq("empresa_id", empresa);
-    expect(data).toHaveLength(11);
+    expect(data).toHaveLength(20);
     expect(data!.filter((m) => !m.obrigatorio)).toHaveLength(3);
 
     const criado = await admin.cliente
@@ -183,17 +183,17 @@ describe("Engenharia: checklist e documentos (ordem importa)", { concurrent: fal
     }
     const r = await aplicar(execEng);
     expect(r.error).toBeNull();
-    expect(r.data).toBe(11);
+    expect(r.data).toBe(20);
     expect((await aplicar(coordEng)).data).toBe(0);
     const lista = await itens();
-    expect(lista).toHaveLength(11);
+    expect(lista).toHaveLength(20);
     expect(lista.every((i) => i.status === "pendente")).toBe(true);
     obrigatorio = lista.find((i) => i.obrigatorio)!.id;
     opcional = lista.find((i) => !i.obrigatorio)!.id;
 
     const h = await historico("checklist_engenharia_aplicado");
     expect(h).toHaveLength(1);
-    expect(h[0]).toMatchObject({ setor: "engenharia", autor_membro_id: membro[execEng.id], dados: { itens: 11, autorizacao: "executar" } });
+    expect(h[0]).toMatchObject({ setor: "engenharia", autor_membro_id: membro[execEng.id], dados: { itens: 20, autorizacao: "executar" } });
   });
 
   it("válido exige arquivo; arquivo novo vira versão e manda o item para conferência", async () => {
@@ -244,7 +244,7 @@ describe("Engenharia: checklist e documentos (ordem importa)", { concurrent: fal
     // O gestor sem equipe não vê esta obra (regra de Obras): só confere que não lê documentos.
     for (const quem of [admin, vendedor, execCompras, execEng]) {
       const { data } = await quem.cliente.from("obra_engenharia_itens").select("id").eq("obra_id", obra);
-      expect(data, quem.email).toHaveLength(11);
+      expect(data, quem.email).toHaveLength(20);
     }
     const { data: doc } = await servico.from("obra_engenharia_documentos").select("caminho").eq("item_id", obrigatorio).eq("versao", 1).single();
     for (const quem of [admin, coordEng, execEng]) {

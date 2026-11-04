@@ -9,10 +9,32 @@ export const PERGUNTAS_ENQUADRAMENTO = [
     chave: "tipo_solicitacao",
     rotulo: "Tipo de solicitação",
     opcoes: [
-      { valor: "nova_conexao", rotulo: "Nova conexão" },
+      { valor: "nova_conexao", rotulo: "Nova conexão (geração)" },
       { valor: "ampliacao", rotulo: "Ampliação" },
       { valor: "regularizacao", rotulo: "Regularização" },
+      { valor: "troca_titularidade", rotulo: "Troca de titularidade" },
+      { valor: "aumento_carga", rotulo: "Aumento de carga" },
+      { valor: "ligacao_nova", rotulo: "Ligação nova" },
+      { valor: "cadastro_compensacao", rotulo: "Cadastro de compensação" },
       { valor: "outro", rotulo: "Outra" },
+    ],
+  },
+  {
+    chave: "tensao",
+    rotulo: "Tensão",
+    opcoes: [
+      { valor: "baixa", rotulo: "Baixa tensão" },
+      { valor: "media", rotulo: "Média tensão" },
+      { valor: "verificar", rotulo: "Verificar" },
+    ],
+  },
+  {
+    chave: "zona",
+    rotulo: "Zona",
+    opcoes: [
+      { valor: "urbana", rotulo: "Urbana" },
+      { valor: "rural", rotulo: "Rural" },
+      { valor: "verificar", rotulo: "Verificar" },
     ],
   },
   {
@@ -31,6 +53,7 @@ export const PERGUNTAS_ENQUADRAMENTO = [
       { valor: "ate_10kw", rotulo: "Até 10 kW" },
       { valor: "de_10_a_75kw", rotulo: "Acima de 10 até 75 kW" },
       { valor: "mini", rotulo: "Minigeração" },
+      { valor: "nao_se_aplica", rotulo: "Não se aplica" },
     ],
   },
   {
@@ -149,4 +172,24 @@ export function textoCondicoes(condicoes: CondicoesItem): string {
     (p) => `${p.rotulo}: ${condicoes[p.chave]!.map((v) => rotuloResposta(p.chave, v)).join(" ou ")}`,
   );
   return partes.length ? partes.join(" · ") : "Vale sempre";
+}
+
+/** Tipos de solicitação de geração distribuída (projeto de micro ou minigeração). */
+const TIPOS_GERACAO = ["nova_conexao", "ampliacao", "regularizacao"];
+
+/**
+ * Por onde o pedido entra na Copel (informativo; decisão do Evandro em 04/11/2026): projetos de geração, ligação nova
+ * em baixa tensão (padrão individual) e aumento de carga em baixa tensão vão pelo PEW; os demais pelos sites da
+ * Copel. Null quando ainda não dá para dizer (sem tipo, "Outra", ou tensão não definida em ligação nova e aumento de carga).
+ */
+export function canalCopel(respostas: RespostasEnquadramento | null): "pew" | "site" | null {
+  const tipo = respostas?.tipo_solicitacao;
+  if (!tipo || tipo === "outro") return null;
+  if (TIPOS_GERACAO.includes(tipo)) return "pew";
+  if (tipo === "ligacao_nova" || tipo === "aumento_carga") {
+    if (respostas?.tensao === "baixa") return "pew";
+    if (respostas?.tensao === "media") return "site";
+    return null;
+  }
+  return "site";
 }

@@ -3287,9 +3287,11 @@ export type Database = {
           potencia_inversores_kw: number | null;
           potencia_modulos_kwp: number | null;
           situacao_ambiental: string | null;
+          tensao: string | null;
           tipo_instalacao: string | null;
           tipo_solicitacao: string | null;
           titularidade: string | null;
+          zona: string | null;
         };
         Insert: {
           atualizado_em?: string;
@@ -3306,9 +3308,11 @@ export type Database = {
           potencia_inversores_kw?: number | null;
           potencia_modulos_kwp?: number | null;
           situacao_ambiental?: string | null;
+          tensao?: string | null;
           tipo_instalacao?: string | null;
           tipo_solicitacao?: string | null;
           titularidade?: string | null;
+          zona?: string | null;
         };
         Update: {
           atualizado_em?: string;
@@ -3325,9 +3329,11 @@ export type Database = {
           potencia_inversores_kw?: number | null;
           potencia_modulos_kwp?: number | null;
           situacao_ambiental?: string | null;
+          tensao?: string | null;
           tipo_instalacao?: string | null;
           tipo_solicitacao?: string | null;
           titularidade?: string | null;
+          zona?: string | null;
         };
         Relationships: [
           {

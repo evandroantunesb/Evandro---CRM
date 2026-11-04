@@ -22,6 +22,8 @@ let licenca: string;
 
 const BASE = {
   tipo_solicitacao: "nova_conexao",
+  tensao: "baixa",
+  zona: "urbana",
   categoria: "micro",
   faixa_formulario: "ate_10kw",
   tipo_instalacao: "telhado",
@@ -161,7 +163,9 @@ describe("Engenharia: enquadramento e checklist condicional (ordem importa)", { 
     expect(await item(procuracao)).toBeNull();
     expect(await item(licenca)).toBeNull();
     const { count } = await servico.from("obra_engenharia_itens").select("id", { count: "exact", head: true }).eq("obra_id", obra);
-    expect(count).toBe(9);
+    // Lista padrão da Copel (20 itens) menos os que não valem para a BASE: PJ (3), DCA, faturas do cadastro de
+    // compensação, beneficiárias, e a procuração e a licença com as condições deste teste.
+    expect(count).toBe(12);
   });
 
   it("salvar a ficha reconcilia: entra o que passou a valer; pendente que deixou de valer sai e volta", async () => {
@@ -196,5 +200,59 @@ describe("Engenharia: enquadramento e checklist condicional (ordem importa)", { 
     expect((await salvar(execEng, { ...BASE, justificativa_ambiental: "Sobra" })).error).toBeNull();
     const { data: b } = await servico.from("obra_engenharia_enquadramento").select("justificativa_ambiental").eq("obra_id", obra).single();
     expect(b!.justificativa_ambiental).toBeNull();
+  });
+});
+
+describe("Enquadramento Copel: tipos, tensão, zona e checklist padrão novo", () => {
+  async function itemPorTitulo(titulo: string) {
+    const { data } = await servico
+      .from("obra_engenharia_itens")
+      .select("status, motivo, descricao")
+      .eq("obra_id", obra)
+      .eq("titulo", titulo)
+      .maybeSingle();
+    return data;
+  }
+
+  it("aceita os tipos novos, tensão e zona; recusa resposta fora das opções", async () => {
+    expect((await salvar(execEng, { ...BASE, tensao: "alta" })).error?.message).toContain('"tensao"');
+    expect((await salvar(execEng, { ...BASE, zona: "litoral" })).error?.message).toContain('"zona"');
+    expect((await salvar(execEng, { ...BASE, tipo_solicitacao: "troca_titularidade", tensao: "media", zona: "rural" })).error).toBeNull();
+    const { data } = await servico.from("obra_engenharia_enquadramento").select("tipo_solicitacao, tensao, zona").eq("obra_id", obra).single();
+    expect(data).toEqual({ tipo_solicitacao: "troca_titularidade", tensao: "media", zona: "rural" });
+  });
+
+  it("o checklist acompanha o tipo e a titularidade; a procuração traz a orientação da Copel", async () => {
+    expect((await salvar(execEng, { ...BASE, tipo_solicitacao: "aumento_carga", titularidade: "pj" })).error).toBeNull();
+    expect(await itemPorTitulo("DCA (declaração de carga)")).toMatchObject({ status: "pendente" });
+    expect(await itemPorTitulo("Cartão CNPJ")).toMatchObject({ status: "pendente" });
+    // Itens de geração deixam de valer num aumento de carga.
+    expect(await itemPorTitulo("Memorial descritivo")).toMatchObject({ status: "dispensado", motivo: "Fora do enquadramento" });
+
+    expect((await salvar(execEng, BASE)).error).toBeNull();
+    expect(await itemPorTitulo("Memorial descritivo")).toMatchObject({ status: "pendente" });
+    expect(await itemPorTitulo("DCA (declaração de carga)")).toMatchObject({ status: "dispensado", motivo: "Fora do enquadramento" });
+
+    const { data: modelo } = await servico
+      .from("engenharia_checklist_modelo")
+      .select("descricao")
+      .eq("empresa_id", empresa)
+      .eq("titulo", "Procuração no modelo da Engenharia, com os documentos do cliente")
+      .single();
+    expect(modelo!.descricao).toContain("gov.br");
+  });
+
+  it("faixa do formulário aceita 'não se aplica' (pedido que não é de geração)", async () => {
+    expect((await salvar(execEng, { ...BASE, tipo_solicitacao: "troca_titularidade", faixa_formulario: "nao_se_aplica" })).error).toBeNull();
+    const { data } = await servico.from("obra_engenharia_enquadramento").select("faixa_formulario").eq("obra_id", obra).single();
+    expect(data!.faixa_formulario).toBe("nao_se_aplica");
+  });
+
+  it("o passo 2 exige tensão e zona respondidas", async () => {
+    for (const falta of ["tensao", "zona"]) {
+      expect((await salvar(execEng, { ...BASE, [falta]: null })).error).toBeNull();
+      const { error } = await execEng.cliente.rpc("registrar_passo_engenharia", { p_obra_id: obra, p_passo: 2, p_acao: "confirmado" });
+      expect(error?.message, falta).toContain("Responda todas as perguntas");
+    }
   });
 });
