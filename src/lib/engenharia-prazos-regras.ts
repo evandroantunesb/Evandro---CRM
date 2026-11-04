@@ -12,7 +12,10 @@ export const CHAVES_PRAZO_DISTRIBUIDORA = [
   "distribuidora_vistoria",
   "distribuidora_conexao",
 ] as const;
-export const CHAVES_PRAZO = [...CHAVES_PRAZO_INTERNO, ...CHAVES_PRAZO_DISTRIBUIDORA] as const;
+/** Os que o admin configura (Configurações › Engenharia). */
+export const CHAVES_PRAZO_CONFIG = [...CHAVES_PRAZO_INTERNO, ...CHAVES_PRAZO_DISTRIBUIDORA] as const;
+/** Mais o da obra de rede, que vem da obra (prazo que a distribuidora informou no orçamento). */
+export const CHAVES_PRAZO = [...CHAVES_PRAZO_CONFIG, "distribuidora_obra_rede"] as const;
 export type ChavePrazo = (typeof CHAVES_PRAZO)[number];
 
 export const ROTULO_PRAZO: Record<ChavePrazo, string> = {
@@ -25,6 +28,7 @@ export const ROTULO_PRAZO: Record<ChavePrazo, string> = {
   distribuidora_analise_rural: "Aprovação do projeto pela distribuidora, zona rural",
   distribuidora_vistoria: "Vistoria pela distribuidora",
   distribuidora_conexao: "Conexão pela distribuidora",
+  distribuidora_obra_rede: "Obra de rede da distribuidora",
 };
 
 /** De onde cada prazo conta (texto da configuração). */
@@ -38,10 +42,11 @@ export const MARCO_PRAZO: Record<ChavePrazo, string> = {
   distribuidora_analise_rural: "desde o protocolo ou o último reenvio, quando o enquadramento diz zona rural",
   distribuidora_vistoria: "desde o pedido de vistoria",
   distribuidora_conexao: "desde a vistoria aprovada",
+  distribuidora_obra_rede: "desde o pagamento à distribuidora, no prazo informado no orçamento",
 };
 
 export const ehChavePrazo = (v: string): v is ChavePrazo => (CHAVES_PRAZO as readonly string[]).includes(v);
-export const prazoDaDistribuidora = (c: ChavePrazo) => (CHAVES_PRAZO_DISTRIBUIDORA as readonly string[]).includes(c);
+export const prazoDaDistribuidora = (c: ChavePrazo) => c === "distribuidora_obra_rede" || (CHAVES_PRAZO_DISTRIBUIDORA as readonly string[]).includes(c);
 
 export const CONTAGENS_PRAZO = ["uteis", "corridos"] as const;
 export type ContagemPrazo = (typeof CONTAGENS_PRAZO)[number];

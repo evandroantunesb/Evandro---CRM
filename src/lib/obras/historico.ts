@@ -58,11 +58,20 @@ const ROTULO_TIPO: Record<string, string> = {
   justificativa_atraso_respondida: "Justificativa de atraso respondida",
   escalonamento_aberto: "Escalonamento aberto",
   escalonamento_fechado: "Escalonamento fechado",
+  obra_rede_engenharia: "Obra de rede",
+};
+
+const ROTULO_ETAPA_OBRA_REDE: Record<string, string> = {
+  documentos: "Documentação enviada ao cliente",
+  pagamento: "Pagamento à distribuidora",
+  concluida: "Obra de rede concluída",
 };
 
 // Perguntas do enquadramento (mesmas de `engenharia-enquadramento-regras`, sem importar regra de tela).
 const ROTULO_PERGUNTA_ENQUADRAMENTO: Record<string, string> = {
   tipo_solicitacao: "tipo de solicitação",
+  tensao: "tensão",
+  zona: "zona",
   categoria: "categoria",
   faixa_formulario: "faixa do formulário",
   tipo_instalacao: "tipo de instalação",
@@ -276,6 +285,14 @@ function descrever(linha: LinhaHistoricoObra, nomes: ReadonlyMap<string, string>
       const nome = rotulo(ROTULO_PASSO_ENGENHARIA, typeof passo === "number" ? String(passo) : passo) ?? "Passo";
       const acao = rotulo(ROTULO_ACAO_PASSO, ler(dados, "acao"));
       return acao ? `${nome}: ${acao}` : nome;
+    }
+    // Obra de rede: a etapa e as datas; o motivo da correção é texto livre e não aparece.
+    case "obra_rede_engenharia": {
+      const etapa = rotulo(ROTULO_ETAPA_OBRA_REDE, ler(dados, "etapa")) ?? "Etapa";
+      const data = dataHistorico(ler(dados, "data"));
+      const de = dataHistorico(ler(dados, "de"));
+      if (de && data) return `${etapa}: ${de} → ${data} (correção)`;
+      return data ? `${etapa} em ${data}` : etapa;
     }
     // O motivo do ajuste é texto livre: não aparece.
     case "entrega_contratada_ajustada": {

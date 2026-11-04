@@ -3481,6 +3481,57 @@ export type Database = {
           },
         ];
       };
+      obra_engenharia_obra_rede: {
+        Row: {
+          atualizado_em: string;
+          atualizado_por: string | null;
+          concluida_em: string | null;
+          created_at: string;
+          documentos_enviados_em: string | null;
+          empresa_id: string;
+          obra_id: string;
+          pagamento_em: string | null;
+          prazo_dias: number | null;
+        };
+        Insert: {
+          atualizado_em?: string;
+          atualizado_por?: string | null;
+          concluida_em?: string | null;
+          created_at?: string;
+          documentos_enviados_em?: string | null;
+          empresa_id: string;
+          obra_id: string;
+          pagamento_em?: string | null;
+          prazo_dias?: number | null;
+        };
+        Update: {
+          atualizado_em?: string;
+          atualizado_por?: string | null;
+          concluida_em?: string | null;
+          created_at?: string;
+          documentos_enviados_em?: string | null;
+          empresa_id?: string;
+          obra_id?: string;
+          pagamento_em?: string | null;
+          prazo_dias?: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "obra_engenharia_obra_rede_atualizado_por_fkey";
+            columns: ["atualizado_por"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "obra_engenharia_obra_rede_empresa_id_obra_id_fkey";
+            columns: ["empresa_id", "obra_id"];
+            isOneToOne: false;
+            referencedRelation: "obras";
+            referencedColumns: ["empresa_id", "id"];
+          },
+        ];
+      };
       obra_engenharia_passo_registros: {
         Row: {
           acao: string;
@@ -6641,6 +6692,7 @@ export type Database = {
       obra_da_pasta_engenharia: { Args: { p_caminho: string }; Returns: string };
       obra_snapshot_comercial: { Args: { p_negocio_id: string }; Returns: Json };
       obra_snapshot_tecnico: { Args: { p_negocio_id: string }; Returns: Json };
+      obra_tem_orcamento_conexao: { Args: { p_obra_id: string }; Returns: boolean };
       obras_operacao: {
         Args: { p_obra_id?: string };
         Returns: {
@@ -6893,6 +6945,16 @@ export type Database = {
       };
       registrar_historico_tarefa_setor: {
         Args: { p_dados: Json; p_empresa_id: string; p_tarefa_id: string; p_tipo: string };
+        Returns: undefined;
+      };
+      registrar_obra_rede_engenharia: {
+        Args: {
+          p_data: string;
+          p_etapa: string;
+          p_motivo?: string;
+          p_obra_id: string;
+          p_prazo_dias?: number;
+        };
         Returns: undefined;
       };
       registrar_pacote_protocolo: { Args: { p_evento_id: string }; Returns: number };

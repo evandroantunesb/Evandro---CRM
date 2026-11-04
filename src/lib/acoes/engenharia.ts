@@ -317,3 +317,28 @@ export async function concluirEngenhariaSemConexao(_: ResultadoAcao, formData: F
   revalidar(d.data.obraId);
   return { ok: true, mensagem: "Engenharia concluída sem a conexão confirmada." };
 }
+
+const esquemaObraRede = comObra.extend({
+  etapa: z.enum(["documentos", "pagamento", "concluida"]),
+  data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Informe a data."),
+  prazoDias: z.union([z.literal(""), z.coerce.number().int().min(1).max(365)]).optional(),
+  motivo: z.string().trim().max(500, "Motivo muito longo.").optional(),
+});
+
+/** Obra de rede com custo: registra (ou corrige, com motivo) uma etapa. A RPC confere orçamento, ordem e datas. */
+export async function registrarObraRedeEngenharia(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  await exigirPapel(...ENGENHARIA);
+  const d = esquemaObraRede.safeParse(Object.fromEntries(formData));
+  if (!d.success) return { ok: false, mensagem: d.error.issues[0]?.message ?? "Dados inválidos." };
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.rpc("registrar_obra_rede_engenharia", {
+    p_obra_id: d.data.obraId,
+    p_etapa: d.data.etapa,
+    p_data: d.data.data,
+    ...(typeof d.data.prazoDias === "number" ? { p_prazo_dias: d.data.prazoDias } : {}),
+    ...(d.data.motivo ? { p_motivo: d.data.motivo } : {}),
+  });
+  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível registrar a obra de rede.") };
+  revalidar(d.data.obraId);
+  return { ok: true, mensagem: "Registrado." };
+}
