@@ -1,12 +1,16 @@
 import type { ReactNode } from "react";
 import type { Categoria } from "@/lib/forecast";
-/** Filtros da tela, na URL: mês escolhido, categoria, carteira (admin e gestor) e lista completa. */
-export type FiltrosForecast = { mes: string; categoria?: Categoria; carteira?: "minha"; todos?: boolean };
+/**
+ * Filtros da tela, na URL: mês escolhido, semana (esta ou a próxima; com ela, a lista mostra só a semana e os números
+ * ficam no mês atual), categoria, carteira (admin e gestor) e lista completa.
+ */
+export type FiltrosForecast = { mes: string; semana?: "esta" | "proxima"; categoria?: Categoria; carteira?: "minha"; todos?: boolean };
 
 export function queryForecast(f: FiltrosForecast, mesAtual: string) {
   const p = new URLSearchParams();
   if (f.carteira) p.set("carteira", f.carteira);
-  if (f.mes !== mesAtual) p.set("mes", f.mes.slice(0, 7));
+  if (f.semana) p.set("semana", f.semana);
+  else if (f.mes !== mesAtual) p.set("mes", f.mes.slice(0, 7));
   if (f.categoria) p.set("categoria", f.categoria);
   if (f.todos) p.set("todos", "1");
   const q = p.toString();

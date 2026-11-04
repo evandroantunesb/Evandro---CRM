@@ -6,8 +6,10 @@ import {
   MOTIVOS_FORA,
   ROTULO_CATEGORIA,
   ROTULO_MOTIVO_FORA,
+  diaMes,
   mesCurto,
   nomeDoMes,
+  semana,
   type ForecastVM,
   type NegocioForecast,
 } from "@/lib/forecast";
@@ -37,14 +39,19 @@ export function ListaForecast({
   vm,
   filtros,
   mesAtual,
+  hoje,
   nomeDe,
 }: {
   vm: ForecastVM;
   filtros: FiltrosForecast;
   mesAtual: string;
+  hoje: string;
   nomeDe: (membroId: string | null) => string;
 }) {
-  const doMes = vm.negocios.filter((n) => n.mes === filtros.mes);
+  const periodo = filtros.semana ? semana(hoje, filtros.semana === "esta" ? 0 : 1) : null;
+  const doMes = periodo
+    ? vm.negocios.filter((n) => n.data >= periodo.de && n.data <= periodo.ate)
+    : vm.negocios.filter((n) => n.mes === filtros.mes);
   const visiveis = filtros.categoria ? doMes.filter((n) => n.categoria === filtros.categoria) : doMes;
   const mostrados = filtros.todos ? visiveis : visiveis.slice(0, LIMITE_LISTA);
   return (
@@ -70,12 +77,19 @@ export function ListaForecast({
           ]}
         />
         <Segmento
-          rotulo="Mês"
-          itens={vm.meses.map((m) => ({
-            href: queryForecast({ ...filtros, mes: m.mes, todos: false }, mesAtual),
-            ativo: filtros.mes === m.mes,
-            texto: nomeDoMes(m.mes),
-          }))}
+          rotulo="Período"
+          itens={[
+            ...(["esta", "proxima"] as const).map((s) => ({
+              href: queryForecast({ ...filtros, semana: s, mes: mesAtual, todos: false }, mesAtual),
+              ativo: filtros.semana === s,
+              texto: s === "esta" ? "Esta semana" : "Próxima semana",
+            })),
+            ...vm.meses.map((m) => ({
+              href: queryForecast({ ...filtros, semana: undefined, mes: m.mes, todos: false }, mesAtual),
+              ativo: !filtros.semana && filtros.mes === m.mes,
+              texto: nomeDoMes(m.mes),
+            })),
+          ]}
         />
       </div>
 
@@ -110,7 +124,7 @@ export function ListaForecast({
           </div>
         )}
         <p className="border-t border-linha px-4 py-3.5 text-xs text-texto-2">
-          Mais prováveis primeiro · mostrando {mostrados.length} de {visiveis.length}
+          {periodo && `${diaMes(periodo.de)} a ${diaMes(periodo.ate)} · `}Mais prováveis primeiro · mostrando {mostrados.length} de {visiveis.length}
           {!filtros.todos && visiveis.length > mostrados.length && (
             <>
               {" · "}
@@ -145,7 +159,7 @@ function CartaoNegocio({ n, responsavel }: { n: NegocioForecast; responsavel: st
         <span className="tabular-nums">
           {n.chance}% de {formatarMoeda(n.valor)}
         </span>
-        <span>{mesCurto(n.mes)}</span>
+        <span>{n.previstoNoDia ? diaMes(n.data) : mesCurto(n.mes)}</span>
       </div>
       {n.risco && (
         <div>
@@ -181,7 +195,7 @@ function LinhaNegocio({ n, responsavel }: { n: NegocioForecast; responsavel: str
       </td>
       <td className="px-4 py-3 tabular-nums whitespace-nowrap">{formatarMoeda(n.valor)}</td>
       <td className="px-4 py-3 font-semibold tabular-nums whitespace-nowrap">{formatarMoeda(n.ponderado)}</td>
-      <td className="px-4 py-3 tabular-nums">{mesCurto(n.mes)}</td>
+      <td className="px-4 py-3 tabular-nums">{n.previstoNoDia ? diaMes(n.data) : mesCurto(n.mes)}</td>
       <td className="px-4 py-3">{responsavel}</td>
       <td className="px-4 py-3">{n.risco ? <Selo tom="atencao">{n.risco}</Selo> : <span className="text-texto-2">—</span>}</td>
     </tr>
@@ -235,7 +249,7 @@ export function RegrasForecast({ exemplo }: { exemplo: string }) {
   const regras = [
     ["Chance base pela etapa", `${exemplo}. Definida em Configurações › Funis e etapas.`],
     ["Ajuste pela temperatura", "Quente +10 pontos, Frio −10 pontos."],
-    ["Só entra quem tem chance real", "Chance a partir de 20%, com valor e com mês previsto de fechamento."],
+    ["Só entra quem tem chance real", "Chance a partir de 20%, com valor e com data prevista de fechamento a partir de hoje."],
   ];
   return (
     <section className="min-w-0 rounded-2xl border border-linha bg-superficie p-5">

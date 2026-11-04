@@ -1,7 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Etapa } from "@/lib/crm";
-import { inicioDoMes, mesesDoForecast, montarForecast, somarMeses, type MetaReceita, type NegocioForecastEntrada } from "@/lib/forecast";
+import { fimDoMes, inicioDoMes, mesesDoForecast, montarForecast, type MetaReceita, type NegocioForecastEntrada } from "@/lib/forecast";
 import { carregarLeadsParados } from "@/lib/leads-parados";
 import type { Database } from "@/lib/supabase/database.types";
 import { carregarTemperaturas } from "@/lib/temperatura";
@@ -17,11 +17,11 @@ export async function carregarForecast(
 ) {
   const { empresaId, hoje, etapas, diasParado, responsavelId } = opcoes;
   const meses = mesesDoForecast(hoje);
-  const fimDoPeriodo = new Date(Date.parse(`${somarMeses(meses[2], 1)}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+  const fimDoPeriodo = fimDoMes(meses[2]);
 
   let consulta = supabase
     .from("negocios")
-    .select("id, numero, titulo, valor, fechamento_previsto, etapa_id, responsavel_id, contatos(nome)")
+    .select("id, numero, titulo, valor, fechamento_previsto, fechamento_previsto_em, etapa_id, responsavel_id, contatos(nome)")
     .eq("empresa_id", empresaId)
     .eq("status", "aberto")
     .is("arquivado_em", null);
@@ -62,7 +62,9 @@ export async function carregarForecast(
       temperatura: temperatura?.temperatura ?? null,
       risco: temperatura?.temperatura === "frio" ? temperatura.porque : null,
       valor: n.valor,
-      fechamentoPrevisto: n.fechamento_previsto,
+      // Mês legado (de antes da data com dia) vale até o último dia do mês.
+      fechamentoPrevisto: n.fechamento_previsto_em ?? (n.fechamento_previsto ? fimDoMes(n.fechamento_previsto) : null),
+      previstoNoDia: n.fechamento_previsto_em != null,
       parado: idsParados.has(n.id),
       responsavelId: n.responsavel_id,
     };

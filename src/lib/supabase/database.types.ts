@@ -2665,6 +2665,7 @@ export type Database = {
           etapa_id: string;
           fechado_em: string | null;
           fechamento_previsto: string | null;
+          fechamento_previsto_em: string | null;
           funil_id: string;
           handoff_origem_id: string | null;
           id: string;
@@ -2712,6 +2713,7 @@ export type Database = {
           etapa_id: string;
           fechado_em?: string | null;
           fechamento_previsto?: string | null;
+          fechamento_previsto_em?: string | null;
           funil_id: string;
           handoff_origem_id?: string | null;
           id?: string;
@@ -2759,6 +2761,7 @@ export type Database = {
           etapa_id?: string;
           fechado_em?: string | null;
           fechamento_previsto?: string | null;
+          fechamento_previsto_em?: string | null;
           funil_id?: string;
           handoff_origem_id?: string | null;
           id?: string;
@@ -7143,6 +7146,7 @@ export type Database = {
           etapa_id: string;
           fechado_em: string | null;
           fechamento_previsto: string | null;
+          fechamento_previsto_em: string | null;
           funil_id: string;
           handoff_origem_id: string | null;
           id: string;
@@ -7199,6 +7203,7 @@ export type Database = {
           etapa_id: string;
           fechado_em: string | null;
           fechamento_previsto: string | null;
+          fechamento_previsto_em: string | null;
           funil_id: string;
           handoff_origem_id: string | null;
           id: string;

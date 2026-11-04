@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
 import { entrarComo, lerBase } from "./ajuda";
 
-// Forecast: a base cria, para a vendedora da empresa A, Alfa (proposta, R$ 80 mil, mês atual: 60% → Provável),
-// Beta (visita, R$ 40 mil, mês seguinte: 40% → Provável) e Gama (sem valor → fora do forecast), e a meta de receita
+// Forecast: a base cria, para a vendedora da empresa A, Alfa (proposta, R$ 80 mil, previsto para hoje: 60% → Provável),
+// Beta (visita, R$ 40 mil, dia 10 do mês seguinte: 40% → Provável) e Gama (sem valor → fora do forecast), e a meta de receita
 // de R$ 100 mil no mês atual. Outros testes criam negócios abertos sem data: as conferências não contam o total.
 test("admin vê o previsto, filtra o mês e a vendedora vê só a carteira dela", async ({ page }) => {
   const { usuarios, senha } = lerBase();
@@ -26,7 +26,15 @@ test("admin vê o previsto, filtra o mês e a vendedora vê só a carteira dela"
   await fora.getByText("sem valor").click();
   await expect(fora.getByRole("link", { name: /Cliente Forecast Gama/ })).toBeVisible();
 
-  await page.getByRole("navigation", { name: "Mês" }).getByRole("link").nth(1).click();
+  // Esta semana: Alfa (previsto para hoje, com o dia na coluna "Previsto"); Beta é do mês seguinte.
+  const periodo = page.getByRole("navigation", { name: "Período" });
+  await periodo.getByRole("link", { name: "Esta semana" }).click();
+  await expect(alfa).toBeVisible();
+  const hoje = new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" });
+  await expect(alfa).toContainText(hoje);
+  await expect(lista).not.toContainText("Cliente Forecast Beta");
+
+  await periodo.getByRole("link").nth(3).click(); // mês seguinte
   await expect(lista.getByRole("row").filter({ hasText: "Cliente Forecast Beta" })).toContainText("40%");
   await expect(lista).not.toContainText("Cliente Forecast Alfa");
 

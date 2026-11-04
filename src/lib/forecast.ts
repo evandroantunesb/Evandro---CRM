@@ -4,9 +4,10 @@ import type { Temperatura } from "@/lib/temperatura";
  * Regras do Forecast (desenho aprovado "Forecast", decisões do Evandro de 02 e 04/11/2026), sem acesso ao banco.
  *
  * Chance = chance base da etapa (Configurações › Funis e etapas) + temperatura (quente +10, frio −10), entre 0 e 100.
- * Entra no Forecast o negócio aberto com chance ≥ 20%, valor e mês previsto de fechamento a partir do mês atual.
+ * Entra no Forecast o negócio aberto com chance ≥ 20%, valor e data prevista de fechamento a partir de hoje (o mês
+ * legado, de antes da data com dia, vale até o último dia do mês).
  * Categorias: Compromisso (≥ 70%), Provável (40% a 69%), Possível (20% a 39%). Ponderado = valor × chance.
- * "Fora do forecast": negócio aberto que não entra por falta de dado (sem data prevista, data já passada, sem valor),
+ * "Fora do forecast": negócio aberto que não entra por falta de dado (sem data prevista, data vencida, sem valor),
  * parado ou em etapa sem chance; cada um conta uma vez, no primeiro motivo dessa ordem.
  * Meta do mês: soma das metas de receita que cobrem o mês; meta de período maior entra pela fração de dias no mês.
  */
@@ -23,7 +24,7 @@ export const MOTIVOS_FORA = ["sem_data", "data_passada", "sem_valor", "parado", 
 export type MotivoFora = (typeof MOTIVOS_FORA)[number];
 export const ROTULO_MOTIVO_FORA: Record<MotivoFora, (dias: number) => string> = {
   sem_data: () => "sem data prevista de fechamento",
-  data_passada: () => "com a data prevista já passada",
+  data_passada: () => "com a data prevista vencida",
   sem_valor: () => "sem valor",
   parado: (dias) => `parados há mais de ${dias} ${dias === 1 ? "dia" : "dias"}`,
   etapa_sem_chance: () => "em etapa sem chance definida",
@@ -41,13 +42,22 @@ export type NegocioForecastEntrada = {
   /** Por que a temperatura é fria (risco mostrado na lista); nulo quando não é fria. */
   risco: string | null;
   valor: number | null;
-  /** 1º dia do mês previsto ("2026-11-01"). */
+  /** Data prevista ("2026-11-15"); no mês legado, o último dia do mês. */
   fechamentoPrevisto: string | null;
+  /** A data tem dia informado (falso no mês legado, que vale até o fim do mês). */
+  previstoNoDia: boolean;
   parado: boolean;
   responsavelId: string | null;
 };
 
-export type NegocioForecast = NegocioForecastEntrada & { chance: number; categoria: Categoria; valor: number; mes: string; ponderado: number };
+export type NegocioForecast = NegocioForecastEntrada & {
+  chance: number;
+  categoria: Categoria;
+  valor: number;
+  data: string;
+  mes: string;
+  ponderado: number;
+};
 export type NegocioFora = NegocioForecastEntrada & { motivo: MotivoFora };
 
 export type MetaReceita = { membroId: string; valorAlvo: number; periodoInicio: string; periodoFim: string };
@@ -62,6 +72,22 @@ export function somarMeses(inicio: string, n: number) {
   const d = new Date(Date.UTC(ano, mes, 1));
   return d.toISOString().slice(0, 10);
 }
+
+/** Último dia do mês de `dataIso`. */
+export function fimDoMes(dataIso: string) {
+  return new Date(Date.parse(`${somarMeses(inicioDoMes(dataIso), 1)}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+}
+
+/** Segunda a domingo da semana de `hoje` (`n` = 0) ou das seguintes. */
+export function semana(hoje: string, n = 0): { de: string; ate: string } {
+  const d = new Date(`${hoje}T00:00:00Z`);
+  const segunda = d.getTime() - ((d.getUTCDay() + 6) % 7) * 86_400_000 + n * 7 * 86_400_000;
+  const iso = (t: number) => new Date(t).toISOString().slice(0, 10);
+  return { de: iso(segunda), ate: iso(segunda + 6 * 86_400_000) };
+}
+
+/** "2026-11-15" → "15/11". */
+export const diaMes = (data: string) => `${data.slice(8, 10)}/${data.slice(5, 7)}`;
 
 /** Mês atual e os dois seguintes. */
 export const mesesDoForecast = (hoje: string) => [0, 1, 2].map((n) => somarMeses(inicioDoMes(hoje), n));
@@ -88,10 +114,10 @@ export type Classificacao =
   /** Chance abaixo de 20%: não entra e não é problema de dado. */
   | { tipo: "abaixo" };
 
-export function classificar(n: NegocioForecastEntrada, mesAtual: string): Classificacao {
+export function classificar(n: NegocioForecastEntrada, hoje: string): Classificacao {
   const motivo: MotivoFora | null = !n.fechamentoPrevisto
     ? "sem_data"
-    : n.fechamentoPrevisto < mesAtual
+    : n.fechamentoPrevisto < hoje
       ? "data_passada"
       : n.valor == null || n.valor <= 0
         ? "sem_valor"
@@ -108,7 +134,15 @@ export function classificar(n: NegocioForecastEntrada, mesAtual: string): Classi
   const valor = n.valor!;
   return {
     tipo: "dentro",
-    negocio: { ...n, chance, categoria, valor, mes: n.fechamentoPrevisto!, ponderado: (valor * chance) / 100 },
+    negocio: {
+      ...n,
+      chance,
+      categoria,
+      valor,
+      data: n.fechamentoPrevisto!,
+      mes: inicioDoMes(n.fechamentoPrevisto!),
+      ponderado: (valor * chance) / 100,
+    },
   };
 }
 
@@ -117,8 +151,7 @@ const dias = (de: string, ate: string) => Math.round((Date.parse(`${ate}T00:00:0
 
 /** Parte da meta que cai no mês: inteira se o período está dentro do mês; senão, pela fração de dias. */
 export function metaNoMes(meta: MetaReceita, mes: string) {
-  const fimDoMes = somarMeses(mes, 1);
-  const ultimoDia = new Date(Date.parse(`${fimDoMes}T00:00:00Z`) - DIA).toISOString().slice(0, 10);
+  const ultimoDia = fimDoMes(mes);
   const de = meta.periodoInicio > mes ? meta.periodoInicio : mes;
   const ate = meta.periodoFim < ultimoDia ? meta.periodoFim : ultimoDia;
   if (de > ate) return 0;
@@ -153,7 +186,7 @@ export function montarForecast(entrada: NegocioForecastEntrada[], metas: MetaRec
   const negocios: NegocioForecast[] = [];
   const fora: NegocioFora[] = [];
   for (const n of entrada) {
-    const c = classificar(n, meses[0]);
+    const c = classificar(n, hoje);
     if (c.tipo === "dentro" && meses.includes(c.negocio.mes)) negocios.push(c.negocio);
     else if (c.tipo === "fora") fora.push(c.negocio);
   }

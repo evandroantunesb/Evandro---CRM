@@ -236,6 +236,22 @@ describe("ciclo completo com contato novo", () => {
     f = await reabrir(vendedor, r.negocioId);
     expect(f.negocio).toMatchObject({ consumo_medio_kwh: 506, consumo_estimado_kwh: null, tarifa_efetiva_kwh: null });
   });
+  it("data prevista com dia: salvar grava a data e limpa o mês legado; vazio limpa a previsão", async () => {
+    const r = await criar(vendedor, novoNegocio());
+    // Negócio de antes da data com dia: só o mês (legado).
+    await servico.from("negocios").update({ fechamento_previsto: "2026-12-01" }).eq("id", r.negocioId!);
+    const f = await reabrir(vendedor, r.negocioId!);
+    const previsao = async () =>
+      (await servico.from("negocios").select("fechamento_previsto, fechamento_previsto_em").eq("id", r.negocioId!).single()).data;
+
+    expect((await editarNegocioComCliente(cliente(vendedor), atual[vendedor.id], edicaoAtual(r.negocioId!, f.negocio, { fechamento_previsto_em: "2026-12-15" }))).ok).toBe(true);
+    expect(await previsao()).toEqual({ fechamento_previsto: null, fechamento_previsto_em: "2026-12-15" });
+
+    expect((await editarNegocioComCliente(cliente(vendedor), atual[vendedor.id], edicaoAtual(r.negocioId!, f.negocio, { fechamento_previsto_em: "2026-13-01" }))).ok).toBe(false);
+    expect((await editarNegocioComCliente(cliente(vendedor), atual[vendedor.id], edicaoAtual(r.negocioId!, f.negocio, { fechamento_previsto_em: "" }))).ok).toBe(true);
+    expect(await previsao()).toEqual({ fechamento_previsto: null, fechamento_previsto_em: null });
+  });
+
   it("criar → reabrir → editar negócio e contato → reabrir preserva tudo", async () => {
     const r = await criar(
       vendedor,

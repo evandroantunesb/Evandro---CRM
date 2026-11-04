@@ -8,6 +8,7 @@ import { registrarAnexo } from "@/lib/acoes/anexos";
 import { editarNegocio } from "@/lib/acoes/negocios";
 import { enviarArquivos } from "@/lib/anexos-navegador";
 import { arquivosEscolhidos, metaArquivo, problemaArquivo } from "@/lib/anexos-regras";
+import { formatarMesAno } from "@/lib/formatacao";
 import { criarClienteNavegador } from "@/lib/supabase/navegador";
 import type { ResultadoAcao } from "@/lib/tipos";
 
@@ -44,7 +45,9 @@ export function EdicaoNegocio({
     consumoEstimadoKwh: number | null;
     tarifaEfetivaKwh: number | null;
     valorContaEnergia: number | null;
-    /** AAAA-MM-01 ou nulo. */
+    /** Data prevista (AAAA-MM-DD) ou nula. */
+    fechamentoPrevistoEm: string | null;
+    /** Legado: mês previsto (AAAA-MM-01), de antes da data com dia. */
     fechamentoPrevisto: string | null;
   };
   origens: Opcao[];
@@ -123,7 +126,12 @@ export function EdicaoNegocio({
             placeholder={eletroposto ? "Vazio até o cliente escolher o modelo" : undefined}
             defaultValue={negocio.valor != null ? String(negocio.valor).replace(".", ",") : ""}
           />
-          <MesPrevisto inicial={negocio.fechamentoPrevisto?.slice(0, 7) ?? ""} />
+          <div className="flex flex-col gap-1">
+            <Campo rotulo="Data prevista de fechamento" name="fechamento_previsto_em" type="date" defaultValue={negocio.fechamentoPrevistoEm ?? ""} />
+            {!negocio.fechamentoPrevistoEm && negocio.fechamentoPrevisto && (
+              <p className="text-xs text-texto-2">Antes: previsto para {formatarMesAno(negocio.fechamentoPrevisto)}. Informe o dia.</p>
+            )}
+          </div>
           <label className="flex flex-col gap-1 text-sm md:col-span-2">
             <span className="font-medium text-texto-2">Descrição</span>
             <textarea
@@ -183,49 +191,5 @@ export function EdicaoNegocio({
         <Mensagem resultado={resultado} />
       </div>
     </form>
-  );
-}
-
-const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
-
-/**
- * Mês e ano em duas listas, em vez do `type="month"` (que no Firefox e no Safari vira um texto "aaaa-mm").
- * Envia AAAA-MM no mesmo campo de antes; mês em branco limpa a previsão.
- */
-function MesPrevisto({ inicial }: { inicial: string }) {
-  const [ano, setAno] = useState(inicial.slice(0, 4));
-  const [mes, setMes] = useState(inicial.slice(5, 7));
-  const anoAtual = new Date().getFullYear();
-  const primeiro = Math.min(anoAtual, Number(ano) || anoAtual);
-  const anos = Array.from({ length: anoAtual + 3 - primeiro + 1 }, (_, i) => String(primeiro + i));
-  return (
-    <fieldset className="flex flex-col gap-1">
-      <legend className="mb-1 text-sm font-medium text-texto-2">Mês previsto de fechamento</legend>
-      <input type="hidden" name="fechamento_previsto" value={ano && mes ? `${ano}-${mes}` : ""} />
-      <div className="grid grid-cols-[minmax(0,1fr)_112px] gap-2">
-        <Selecao
-          aria-label="Mês previsto"
-          value={mes}
-          onChange={(e) => {
-            setMes(e.target.value);
-            if (e.target.value && !ano) setAno(String(anoAtual));
-          }}
-        >
-          <option value="">Sem previsão</option>
-          {MESES.map((nome, i) => (
-            <option key={nome} value={String(i + 1).padStart(2, "0")}>
-              {nome}
-            </option>
-          ))}
-        </Selecao>
-        <Selecao aria-label="Ano previsto" value={ano} onChange={(e) => setAno(e.target.value)} disabled={!mes}>
-          {anos.map((a) => (
-            <option key={a} value={a}>
-              {a}
-            </option>
-          ))}
-        </Selecao>
-      </div>
-    </fieldset>
   );
 }

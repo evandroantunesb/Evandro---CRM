@@ -3,10 +3,12 @@ import {
   categoriaDaChance,
   chanceAjustada,
   classificar,
+  fimDoMes,
   mesCurto,
   mesesDoForecast,
   metaNoMes,
   montarForecast,
+  semana,
   type NegocioForecastEntrada,
 } from "@/lib/forecast";
 
@@ -20,7 +22,8 @@ const base: NegocioForecastEntrada = {
   temperatura: "morno",
   risco: null,
   valor: 50_000,
-  fechamentoPrevisto: "2026-11-01",
+  fechamentoPrevisto: "2026-11-20",
+  previstoNoDia: true,
   parado: false,
   responsavelId: "m1",
 };
@@ -46,19 +49,20 @@ describe("chance e categoria", () => {
 });
 
 describe("classificar", () => {
-  const mes = "2026-11-01";
+  const hoje = "2026-11-04";
   it("entra com chance, valor e mês previsto; ponderado = valor × chance", () => {
-    const c = classificar(neg({ temperatura: "quente" }), mes);
+    const c = classificar(neg({ temperatura: "quente" }), hoje);
     expect(c).toMatchObject({ tipo: "dentro", negocio: { chance: 70, categoria: "compromisso", ponderado: 35_000 } });
   });
 
   it("fora do forecast pelo primeiro motivo, nesta ordem", () => {
     const motivo = (p: Partial<NegocioForecastEntrada>) => {
-      const c = classificar(neg(p), mes);
+      const c = classificar(neg(p), hoje);
       return c.tipo === "fora" ? c.negocio.motivo : c.tipo;
     };
     expect(motivo({ fechamentoPrevisto: null, valor: null, parado: true })).toBe("sem_data");
-    expect(motivo({ fechamentoPrevisto: "2026-10-01" })).toBe("data_passada");
+    expect(motivo({ fechamentoPrevisto: "2026-11-03" })).toBe("data_passada"); // vence no dia seguinte
+    expect(motivo({ fechamentoPrevisto: "2026-11-04" })).toBe("dentro");
     expect(motivo({ valor: null, parado: true })).toBe("sem_valor");
     expect(motivo({ valor: 0 })).toBe("sem_valor");
     expect(motivo({ parado: true, chanceBase: null })).toBe("parado");
@@ -66,7 +70,7 @@ describe("classificar", () => {
   });
 
   it("chance abaixo de 20% não entra e não é problema de dado", () => {
-    expect(classificar(neg({ chanceBase: 20, temperatura: "frio" }), mes)).toEqual({ tipo: "abaixo" });
+    expect(classificar(neg({ chanceBase: 20, temperatura: "frio" }), hoje)).toEqual({ tipo: "abaixo" });
   });
 });
 
@@ -85,12 +89,20 @@ describe("montarForecast", () => {
     expect(mesCurto("2027-01-01")).toBe("jan/27");
   });
 
+  it("semana de segunda a domingo e fim do mês", () => {
+    expect(semana("2026-11-04")).toEqual({ de: "2026-11-02", ate: "2026-11-08" }); // quarta
+    expect(semana("2026-11-08", 1)).toEqual({ de: "2026-11-09", ate: "2026-11-15" }); // domingo → próxima
+    expect(semana("2026-12-29", 1)).toEqual({ de: "2027-01-04", ate: "2027-01-10" });
+    expect(fimDoMes("2026-02-01")).toBe("2026-02-28");
+    expect(fimDoMes("2026-11-15")).toBe("2026-11-30");
+  });
+
   it("soma por mês e categoria, ordena pela chance e separa o que está fora", () => {
     const vm = montarForecast(
       [
         neg({ id: "a", numero: 1, chanceBase: 80, valor: 100_000 }),
         neg({ id: "b", numero: 2, chanceBase: 40, valor: 50_000, responsavelId: "m2" }),
-        neg({ id: "c", numero: 3, chanceBase: 20, valor: 10_000, fechamentoPrevisto: "2026-12-01" }),
+        neg({ id: "c", numero: 3, chanceBase: 20, valor: 10_000, fechamentoPrevisto: "2026-12-10" }),
         neg({ id: "d", numero: 4, fechamentoPrevisto: "2027-02-01" }), // além dos três meses
         neg({ id: "e", numero: 5, valor: null }),
         neg({ id: "f", numero: 6, chanceBase: 10 }),

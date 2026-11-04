@@ -27,8 +27,12 @@ export default async function Forecast({ searchParams }: PageProps<"/forecast">)
   const mesParam = um(params.mes);
   const categoriaParam = um(params.categoria);
   const veEquipe = atual.papel === "admin" || atual.papel === "gestor";
+  const semanaParam = um(params.semana);
+  const semanaFiltro = semanaParam === "esta" || semanaParam === "proxima" ? semanaParam : undefined;
   const filtros: FiltrosForecast = {
-    mes: meses.find((m) => m.slice(0, 7) === mesParam) ?? meses[0],
+    // Com a semana escolhida, os números ficam no mês atual; a lista mostra só a semana.
+    mes: (!semanaFiltro && meses.find((m) => m.slice(0, 7) === mesParam)) || meses[0],
+    semana: semanaFiltro,
     categoria: CATEGORIAS.includes(categoriaParam as Categoria) ? (categoriaParam as Categoria) : undefined,
     carteira: veEquipe && um(params.carteira) === "minha" ? "minha" : undefined,
     todos: um(params.todos) === "1",
@@ -109,7 +113,7 @@ export default async function Forecast({ searchParams }: PageProps<"/forecast">)
         />
       </div>
 
-      <ListaForecast vm={vm} filtros={filtros} mesAtual={meses[0]} nomeDe={nomeDe} />
+      <ListaForecast vm={vm} filtros={filtros} mesAtual={meses[0]} hoje={hoje} nomeDe={nomeDe} />
 
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
         <ForaDoForecast vm={vm} diasParado={config.diasConsideradoParado} />

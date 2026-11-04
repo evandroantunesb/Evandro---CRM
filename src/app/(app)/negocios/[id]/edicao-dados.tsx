@@ -26,6 +26,7 @@ export function EdicaoDados({ ficha, secao }: { ficha: Ficha; secao: "comercial"
         consumoEstimadoKwh: negocio.consumo_estimado_kwh,
         tarifaEfetivaKwh: negocio.tarifa_efetiva_kwh,
         valorContaEnergia: negocio.valor_conta_energia,
+        fechamentoPrevistoEm: negocio.fechamento_previsto_em,
         fechamentoPrevisto: negocio.fechamento_previsto,
       }}
       origens={config.origens.filter((o) => o.ativa || o.id === negocio.origem_id)}
