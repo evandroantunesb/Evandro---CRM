@@ -14,6 +14,8 @@ export type Etapa = {
   fechaComo: "ganho" | "perdido" | null;
   /** Se marcada, a primeira entrada de um negócio nesta etapa pontua "entrou em negociação" na gamificação. */
   marcaNegociacao: boolean;
+  /** Chance base (%) de um negócio aberto nesta etapa fechar, usada no Forecast; nula = fora do Forecast. */
+  chanceFechamento: number | null;
 };
 export type Funil = { id: string; nome: string; ativo: boolean };
 export type Origem = { id: string; nome: string; cor: string | null; ativa: boolean; prazoAutoAprovacaoMinutos: number };
@@ -41,7 +43,7 @@ export async function carregarConfiguracao(empresaId: string) {
     supabase.from("funis").select("id, nome, ativo").eq("empresa_id", empresaId).order("ordem").order("created_at"),
     supabase
       .from("etapas")
-      .select("id, funil_id, nome, ordem, inicial, ativa, cor, campos_obrigatorios, fecha_como, marca_negociacao")
+      .select("id, funil_id, nome, ordem, inicial, ativa, cor, campos_obrigatorios, fecha_como, marca_negociacao, chance_fechamento")
       .eq("empresa_id", empresaId)
       .order("ordem"),
     supabase
@@ -76,6 +78,7 @@ export async function carregarConfiguracao(empresaId: string) {
       camposObrigatorios: e.campos_obrigatorios,
       fechaComo: e.fecha_como,
       marcaNegociacao: e.marca_negociacao,
+      chanceFechamento: e.chance_fechamento,
     })) as Etapa[],
     origens: (origens.data ?? []).map((o) => ({
       id: o.id,

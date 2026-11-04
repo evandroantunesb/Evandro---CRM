@@ -1586,6 +1586,7 @@ export type Database = {
         Row: {
           ativa: boolean;
           campos_obrigatorios: string[];
+          chance_fechamento: number | null;
           cor: string | null;
           created_at: string;
           empresa_id: string;
@@ -1601,6 +1602,7 @@ export type Database = {
         Insert: {
           ativa?: boolean;
           campos_obrigatorios?: string[];
+          chance_fechamento?: number | null;
           cor?: string | null;
           created_at?: string;
           empresa_id: string;
@@ -1616,6 +1618,7 @@ export type Database = {
         Update: {
           ativa?: boolean;
           campos_obrigatorios?: string[];
+          chance_fechamento?: number | null;
           cor?: string | null;
           created_at?: string;
           empresa_id?: string;
@@ -2662,6 +2665,7 @@ export type Database = {
           etapa_id: string;
           fechado_em: string | null;
           fechamento_previsto: string | null;
+          fechamento_previsto_em: string | null;
           funil_id: string;
           handoff_origem_id: string | null;
           id: string;
@@ -2709,6 +2713,7 @@ export type Database = {
           etapa_id: string;
           fechado_em?: string | null;
           fechamento_previsto?: string | null;
+          fechamento_previsto_em?: string | null;
           funil_id: string;
           handoff_origem_id?: string | null;
           id?: string;
@@ -2756,6 +2761,7 @@ export type Database = {
           etapa_id?: string;
           fechado_em?: string | null;
           fechamento_previsto?: string | null;
+          fechamento_previsto_em?: string | null;
           funil_id?: string;
           handoff_origem_id?: string | null;
           id?: string;
@@ -6175,6 +6181,10 @@ export type Database = {
         Args: { p_motivo: string; p_tarefa_id: string };
         Returns: undefined;
       };
+      chance_padrao_etapa: {
+        Args: { p_marca_negociacao: boolean; p_nome: string };
+        Returns: number;
+      };
       compartilha_empresa: { Args: { p_user_id: string }; Returns: boolean };
       compartilha_empresa_comercial: { Args: { p_user_id: string }; Returns: boolean };
       compartilha_empresa_identidade: { Args: { p_user_id: string }; Returns: boolean };
@@ -7136,6 +7146,7 @@ export type Database = {
           etapa_id: string;
           fechado_em: string | null;
           fechamento_previsto: string | null;
+          fechamento_previsto_em: string | null;
           funil_id: string;
           handoff_origem_id: string | null;
           id: string;
@@ -7192,6 +7203,7 @@ export type Database = {
           etapa_id: string;
           fechado_em: string | null;
           fechamento_previsto: string | null;
+          fechamento_previsto_em: string | null;
           funil_id: string;
           handoff_origem_id: string | null;
           id: string;

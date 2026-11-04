@@ -116,6 +116,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
           ...(pode(papel, TAREFAS_DO_SETOR) ? [{ href: "/tarefas/setores", rotulo: "Tarefas" }] : []),
           ...(pode(papel, GESTAO_COMERCIAL) ? [{ href: "/leads-a-distribuir", rotulo: "Leads a distribuir", secao: "Comercial" }] : []),
           ...(pode(papel, NEGOCIOS) ? [{ href: "/negocios", rotulo: "Negócios", secao: "Comercial" }] : []),
+          ...(pode(papel, NEGOCIOS) ? [{ href: "/forecast", rotulo: "Forecast", secao: "Comercial" }] : []),
           ...(pode(papel, CARTEIRA_CONTATOS) ? [{ href: "/contatos", rotulo: "Contatos", secao: "Comercial" }] : []),
           // SDR não gera proposta nem contrato (spec RAION_SDR_REGRAS_PERMISSOES §40/§41).
           ...(pode(papel, PROPOSTA_E_CONTRATO) ? [{ href: "/propostas-contratos", rotulo: "Propostas e contratos", secao: "Comercial" }] : []),

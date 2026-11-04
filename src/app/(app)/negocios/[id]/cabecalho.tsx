@@ -4,7 +4,7 @@ import { Plus } from "lucide-react";
 import { NovoNegocio } from "@/components/novo-negocio";
 import { CabecalhoPagina, CLASSE_ACAO_CABECALHO, SeloCabecalho } from "@/components/cabecalho-pagina";
 import { formatarDataHora, formatarMoeda } from "@/lib/crm";
-import { formatarMesAno } from "@/lib/formatacao";
+import { formatarDataIso, formatarMesAno } from "@/lib/formatacao";
 import { SeloTemperatura } from "@/components/selo-temperatura";
 import type { Ficha } from "./dados-ficha";
 
@@ -36,8 +36,11 @@ export function Cabecalho({ ficha }: { ficha: Ficha }) {
             )}
             {arquivado && <SeloCabecalho>Arquivado</SeloCabecalho>}
             {temperatura && <SeloTemperatura valor={temperatura} detalhado naFaixa />}
-            {negocio.fechamento_previsto && negocio.status === "aberto" && (
-              <SeloCabecalho>Previsto para {formatarMesAno(negocio.fechamento_previsto)}</SeloCabecalho>
+            {negocio.status === "aberto" && (negocio.fechamento_previsto_em || negocio.fechamento_previsto) && (
+              <SeloCabecalho>
+                Previsto para{" "}
+                {negocio.fechamento_previsto_em ? formatarDataIso(negocio.fechamento_previsto_em) : formatarMesAno(negocio.fechamento_previsto!)}
+              </SeloCabecalho>
             )}
             {config.etiquetas
               .filter((e) => etiquetasMarcadas.has(e.id))

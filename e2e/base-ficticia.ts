@@ -348,5 +348,49 @@ export async function criarBaseFicticia(): Promise<BaseFicticia> {
   await noBancoLocal("update public.obras set pausada_em = now(), pausa_motivo = 'Cliente pediu para aguardar (fictício)' where id = $1", [obras.o07]);
   await noBancoLocal("update public.obras set cancelada_em = now(), cancelamento_motivo = 'Desistência do cliente (fictício)' where id = $1", [obras.o08]);
 
+  // Forecast: negócios abertos da vendedora na empresa A (hoje e o dia 10 do mês seguinte) e a meta de receita do mês.
+  const hojeSp = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+  const mesAtual = `${hojeSp.slice(0, 7)}-01`;
+  const [anoMes, mesMes] = mesAtual.split("-").map(Number);
+  const dia10DoSeguinte = new Date(Date.UTC(anoMes, mesMes, 10)).toISOString().slice(0, 10);
+  const fimDoMes = new Date(Date.UTC(anoMes, mesMes, 0)).toISOString().slice(0, 10);
+  const funilA = ok(await servico.from("funis").select("id").eq("empresa_id", empresaA).single(), "funil A");
+  const etapasA = ok(await servico.from("etapas").select("id, nome").eq("funil_id", funilA.id), "etapas A");
+  const etapaA = (nome: string) => etapasA.find((e) => e.nome === nome)!.id;
+  const forecast: [string, string, number | null, string][] = [
+    ["Cliente Forecast Alfa", "Proposta enviada", 80000, hojeSp],
+    ["Cliente Forecast Beta", "Visita agendada", 40000, dia10DoSeguinte],
+    ["Cliente Forecast Gama", "Proposta enviada", null, hojeSp],
+  ];
+  for (const [nome, etapaNome, valor, data] of forecast) {
+    const contato = ok(await servico.from("contatos").insert({ empresa_id: empresaA, nome, telefone: "(45) 90000-0001" }).select("id").single(), "contato forecast");
+    feito(
+      await servico.from("negocios").insert({
+        empresa_id: empresaA,
+        titulo: `Forecast — ${nome}`,
+        contato_id: contato.id,
+        funil_id: funilA.id,
+        etapa_id: etapaA(etapaNome),
+        responsavel_id: usuarios.vendedor.membroId,
+        valor,
+        fechamento_previsto_em: data,
+      }),
+      "negócio forecast",
+    );
+  }
+  feito(
+    // `metas` não aceita escrita do service_role: entra pelo admin, como na tela de Metas.
+    await clientes.admin.from("metas").insert({
+      empresa_id: empresaA,
+      membro_id: usuarios.vendedor.membroId,
+      titulo: "Receita do mês (fictícia)",
+      metrica: "receita",
+      valor_alvo: 100000,
+      periodo_inicio: mesAtual,
+      periodo_fim: fimDoMes,
+    }),
+    "meta forecast",
+  );
+
   return { senha: SENHA_E2E, empresaA, empresaB, usuarios, obras, obrasB, clientesB };
 }

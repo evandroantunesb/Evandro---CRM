@@ -211,9 +211,16 @@ describe("mês previsto de fechamento", () => {
     await servico.from("etapas").update({ campos_obrigatorios: ["fechamento_previsto"] }).eq("id", etapas[3]);
     const n = await novoNegocio();
     const { error } = await vendedor.cliente.from("negocios").update({ etapa_id: etapas[3] }).eq("id", n);
-    expect(error?.message).toMatch(/preencha: mês previsto de fechamento\.$/);
+    expect(error?.message).toMatch(/preencha: data prevista de fechamento\.$/);
 
+    // Mês legado ainda satisfaz a exigência (negócios de antes da data com dia).
     const { error: ok } = await vendedor.cliente.from("negocios").update({ etapa_id: etapas[3], fechamento_previsto: "2026-12-01" }).eq("id", n);
     expect(ok).toBeNull();
+  });
+
+  it("a data prevista com dia (fechamento_previsto_em) também satisfaz a exigência", async () => {
+    const n = await novoNegocio();
+    const { error } = await vendedor.cliente.from("negocios").update({ etapa_id: etapas[3], fechamento_previsto_em: "2026-12-15" }).eq("id", n);
+    expect(error).toBeNull();
   });
 });

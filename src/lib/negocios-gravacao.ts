@@ -365,11 +365,11 @@ const esquemaEdicao = z.object({
   consumo_medio_kwh: numeroBrOpcional,
   tarifa_efetiva_kwh: numeroBrOpcional,
   valor_conta_energia: numeroBrOpcional,
-  // Campo "month" do navegador (AAAA-MM); vazio limpa a previsão. Gravado como 1º dia do mês.
-  fechamento_previsto: z
-    .union([z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Mês previsto inválido"), z.literal("")])
+  // Data prevista (AAAA-MM-DD); vazio limpa a previsão. Salvar a data limpa o mês legado (`fechamento_previsto`).
+  fechamento_previsto_em: z
+    .union([z.string().regex(/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/, "Data prevista inválida"), z.literal("")])
     .optional()
-    .transform((v) => (v === undefined ? undefined : v ? `${v}-01` : null)),
+    .transform((v) => (v === undefined ? undefined : v || null)),
 });
 
 /**
@@ -416,7 +416,7 @@ export async function editarNegocioComCliente(
             titulo: d.titulo!,
             origem_id: d.origem_id,
             descricao: d.descricao || null,
-            ...(d.fechamento_previsto !== undefined ? { fechamento_previsto: d.fechamento_previsto } : {}),
+            ...(d.fechamento_previsto_em !== undefined ? { fechamento_previsto_em: d.fechamento_previsto_em, fechamento_previsto: null } : {}),
             // SDR não pode alterar o valor financeiro do negócio (spec RAION_SDR_REGRAS_PERMISSOES §39) — só na criação.
             ...(pode(atual.papel, EDITAR_VALOR_NEGOCIO) ? { valor: d.valor } : {}),
             ...(pode(atual.papel, ESCOLHER_RESPONSAVEL_NEGOCIO) && d.responsavel_id ? { responsavel_id: d.responsavel_id } : {}),
