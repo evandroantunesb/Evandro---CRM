@@ -22,11 +22,11 @@ test("admin aplica o checklist, anexa, confere e marca 'não se aplica'", async 
   await fatura.getByRole("button", { name: "Marcar válido" }).click();
   await expect(fatura.getByText("Válido", { exact: true })).toBeVisible();
 
-  const procuracao = checklist.getByRole("listitem").filter({ hasText: "Procuração e documento do procurador" });
-  await procuracao.getByRole("button", { name: "Não se aplica" }).click();
-  await procuracao.getByLabel("Por que não se aplica?").fill("Titular assina pessoalmente");
-  await procuracao.getByRole("button", { name: "Confirmar" }).click();
-  await expect(procuracao.getByText("Motivo: Titular assina pessoalmente")).toBeVisible();
+  const unifilar = checklist.getByRole("listitem").filter({ hasText: "Diagrama unifilar" });
+  await unifilar.getByRole("button", { name: "Não se aplica" }).click();
+  await unifilar.getByLabel("Por que não se aplica?").fill("Sistema simples, sem unifilar");
+  await unifilar.getByRole("button", { name: "Confirmar" }).click();
+  await expect(unifilar.getByText("Motivo: Sistema simples, sem unifilar")).toBeVisible();
 
   // O link do documento redireciona para um endereço temporário do Storage.
   const href = await fatura.getByRole("link", { name: "fatura.pdf" }).first().getAttribute("href");

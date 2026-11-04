@@ -40,7 +40,9 @@ test("executor vê os oito passos, confirma o enquadramento e reabre com motivo"
 
   // Passo 2 exige o enquadramento completo (P6c): sem ele, o botão não aparece e a tela explica.
   const respostas: [string, string][] = [
-    ["Tipo de solicitação", "Nova conexão"],
+    ["Tipo de solicitação", "Nova conexão (geração)"],
+    ["Tensão", "Baixa tensão"],
+    ["Zona", "Urbana"],
     ["Categoria", "Microgeração"],
     ["Faixa do formulário", "Até 10 kW"],
     ["Tipo de instalação", "Telhado"],

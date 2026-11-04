@@ -7,7 +7,7 @@ const cartao = (page: import("@playwright/test").Page, titulo: string): Locator 
 // Engenharia (P3): na o11 (estado inicial, nenhum outro teste grava nela), o admin resolve o checklist, registra o
 // protocolo (a Engenharia vai para "Enviado à concessionária" sozinha), recebe uma exigência e reenvia.
 test("admin registra o protocolo depois do checklist, recebe exigência e reenvia", async ({ page }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(240_000);
   const { usuarios, senha, obras } = lerBase();
   await entrarComo(page, usuarios.admin, senha);
   await page.goto(`/engenharia/${obras.o11}`);
@@ -24,7 +24,7 @@ test("admin registra o protocolo depois do checklist, recebe exigência e reenvi
   const dispensar = checklist.getByRole("button", { name: "Não se aplica" });
   // O botão some ao abrir o formulário: espera o formulário fechar (gravou) antes do próximo item.
   const motivo = checklist.getByLabel("Por que não se aplica?");
-  for (let i = 0; i < 15 && (await dispensar.count()) > 0; i++) {
+  for (let i = 0; i < 25 && (await dispensar.count()) > 0; i++) {
     await dispensar.first().click();
     await motivo.fill("Teste E2E");
     await checklist.getByRole("button", { name: "Confirmar" }).click();
