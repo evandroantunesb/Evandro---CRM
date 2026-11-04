@@ -247,7 +247,9 @@ export async function salvarEnquadramentoEngenharia(_: ResultadoAcao, formData: 
   for (const chave of CHAVES_PERGUNTA) {
     const v = String(formData.get(chave) ?? "").trim();
     if (v && !respostaValida(chave, v)) return { ok: false, mensagem: "Resposta inválida." };
-    respostas[chave] = v || null;
+    // Só as respondidas: para a RPC, pergunta ausente é "sem resposta", e um banco ainda sem a pergunta nova (preview
+    // antes da migration) continua aceitando a ficha.
+    if (v) respostas[chave] = v;
   }
   const modulos = potencia.safeParse(formData.get("potenciaModulosKwp") ?? "");
   const inversores = potencia.safeParse(formData.get("potenciaInversoresKw") ?? "");
