@@ -14,10 +14,11 @@ import {
 import { COOKIE_VISAO_NEGOCIOS, exigirPapel } from "@/lib/sessao";
 import { FILTRAR_NEGOCIOS_POR_RESPONSAVEL, NEGOCIOS, REGRAS_TEMPERATURA, pode } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { carregarTemperaturas, type TemperaturaNegocio } from "@/lib/temperatura";
+import { carregarTemperaturas, type Temperatura, type TemperaturaNegocio } from "@/lib/temperatura";
 import { NovoNegocio } from "@/components/novo-negocio";
 import { eletropostoDisponivel } from "@/lib/eletroposto-servidor";
 import { BotaoFiltros } from "./filtros";
+import { FiltroTemperatura, TEMPERATURAS } from "./filtro-temperatura";
 import { Indicadores, type Indicador } from "./indicadores";
 import { Kanban, type Card } from "./kanban";
 import { ListaArquivados, ListaFechados, ListaNegocios } from "./lista";
@@ -50,6 +51,8 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
   const valorMax = texto("valorMax") ? Number(texto("valorMax")) : null;
   const atrasados = texto("atrasados") === "1";
   const semProxima = texto("semProxima") === "1";
+  // Temperatura só existe para negócio aberto: nas outras situações o filtro não vale.
+  const temperatura = status === "aberto" ? (TEMPERATURAS.find((t) => t === texto("temperatura")) ?? null) : null;
 
   const visao = (["kanban", "lista"] as const).find((v) => v === texto("visao")) ?? ((await cookies()).get(COOKIE_VISAO_NEGOCIOS)?.value as "kanban" | "lista" | undefined) ?? "kanban";
 
@@ -133,6 +136,11 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
   let cards = montarCards(data ?? [], config, pendentes ?? [], notas ?? [], temperaturas);
   if (atrasados) cards = cards.filter((c) => c.tarefa === "atrasada");
   if (semProxima) cards = cards.filter((c) => c.tarefa === "nenhuma");
+  // Contagem dos chips com os demais filtros aplicados, antes do filtro de temperatura.
+  const contagemTemperatura = Object.fromEntries(
+    TEMPERATURAS.map((t) => [t, cards.filter((c) => c.temperatura?.temperatura === t).length]),
+  ) as Record<Temperatura, number>;
+  if (temperatura) cards = cards.filter((c) => c.temperatura?.temperatura === temperatura);
 
   const podeFiltrarResponsavel = pode(atual.papel, FILTRAR_NEGOCIOS_POR_RESPONSAVEL);
 
@@ -153,6 +161,7 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
     valorMax: texto("valorMax"),
     atrasados: atrasados ? "1" : "",
     semProxima: semProxima ? "1" : "",
+    temperatura: temperatura ?? "",
   })) {
     if (valor) baseParams[chave] = valor;
   }
@@ -203,8 +212,17 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
     { valor: "perdido", rotulo: "Perdidos" },
     { valor: "arquivado", rotulo: "Arquivados" },
   ] as const;
-  const linkSituacao = (s: (typeof situacoes)[number]["valor"]) =>
-    `/negocios?${paraQuery({ ...baseParams, status: s })}${visao !== "kanban" ? `&visao=${visao}` : ""}`;
+  const linkSituacao = (s: (typeof situacoes)[number]["valor"]) => {
+    const p: Record<string, string> = { ...baseParams, status: s };
+    if (s !== "aberto") delete p.temperatura;
+    return `/negocios?${paraQuery(p)}${visao !== "kanban" ? `&visao=${visao}` : ""}`;
+  };
+  const linkTemperatura = (t: Temperatura | null) => {
+    const p = { ...baseParams };
+    if (t) p.temperatura = t;
+    else delete p.temperatura;
+    return `/negocios?${paraQuery(p)}${visao !== "kanban" ? `&visao=${visao}` : ""}`;
+  };
 
   const agora = agoraMs();
   const indicadores: Indicador[] = [
@@ -279,99 +297,103 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
         <input type="hidden" name="status" value={status} />
         {visao !== "kanban" && <input type="hidden" name="visao" value={visao} />}
         {funisAtivos.length <= 1 && <input type="hidden" name="funil" value={funil.id} />}
-        <div className="flex items-center gap-2">
-          <label className="relative min-w-0 flex-1">
-            <span className="sr-only">Buscar</span>
-            <Search size={16} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-texto-2" aria-hidden />
-            <input name="q" type="search" defaultValue={busca} placeholder="Buscar por nome, telefone ou e-mail" className={`${CLASSE_ENTRADA} w-full pl-9 text-sm`} />
-          </label>
-          <BotaoFiltros ativos={filtrosAtivos}>
-            {funisAtivos.length > 1 && (
-              <Selecao rotulo="Funil" name="funil" defaultValue={funil.id}>
-                {funisAtivos.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.nome}
-                  </option>
-                ))}
-              </Selecao>
-            )}
-            {podeFiltrarResponsavel && (
-              <Selecao rotulo="Responsável" name="responsavel" defaultValue={texto("responsavel")}>
-                <option value="">Todos os responsáveis</option>
-                {config.membros
-                  .filter((m) => m.ativo)
-                  .map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.nome}
-                    </option>
-                  ))}
-              </Selecao>
-            )}
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Selecao rotulo="Etapa" name="etapa" defaultValue={etapaFiltro?.id ?? ""}>
-                <option value="">Todas as etapas</option>
-                {colunas.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nome}
-                  </option>
-                ))}
-              </Selecao>
-              <Selecao rotulo="Origem" name="origem" defaultValue={texto("origem")}>
-                <option value="">Todas as origens</option>
-                {config.origens.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.nome}
-                  </option>
-                ))}
-              </Selecao>
-              {config.etiquetas.length > 0 && (
-                <Selecao rotulo="Etiqueta" name="etiqueta" defaultValue={etiqueta?.id ?? ""}>
-                  <option value="">Todas as etiquetas</option>
-                  {config.etiquetas.map((e) => (
-                    <option key={e.id} value={e.id}>
-                      {e.nome}
+        {temperatura && <input type="hidden" name="temperatura" value={temperatura} />}
+        <div className="flex flex-col gap-2 md:flex-row md:items-center">
+          {status === "aberto" && <FiltroTemperatura ativa={temperatura} contagem={contagemTemperatura} link={linkTemperatura} />}
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <label className="relative min-w-0 flex-1">
+              <span className="sr-only">Buscar</span>
+              <Search size={16} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-texto-2" aria-hidden />
+              <input name="q" type="search" defaultValue={busca} placeholder="Buscar por nome, telefone ou e-mail" className={`${CLASSE_ENTRADA} w-full pl-9 text-sm`} />
+            </label>
+            <BotaoFiltros ativos={filtrosAtivos}>
+              {funisAtivos.length > 1 && (
+                <Selecao rotulo="Funil" name="funil" defaultValue={funil.id}>
+                  {funisAtivos.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.nome}
                     </option>
                   ))}
                 </Selecao>
               )}
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <Campo rotulo="Criado de" type="date" name="criadoDe" defaultValue={texto("criadoDe")} />
-              <Campo rotulo="Criado até" type="date" name="criadoAte" defaultValue={texto("criadoAte")} />
-              <Campo rotulo="Valor mínimo" type="number" name="valorMin" defaultValue={texto("valorMin")} min={0} />
-              <Campo rotulo="Valor máximo" type="number" name="valorMax" defaultValue={texto("valorMax")} min={0} />
-            </div>
-            <div className="flex flex-col gap-1 text-sm text-texto">
-              <label className="flex min-h-11 items-center gap-2.5">
-                <input type="checkbox" name="atrasados" value="1" defaultChecked={atrasados} className="h-4 w-4" />
-                Só com tarefa atrasada
-              </label>
-              <label className="flex min-h-11 items-center gap-2.5">
-                <input type="checkbox" name="semProxima" value="1" defaultChecked={semProxima} className="h-4 w-4" />
-                Sem próxima atividade
-              </label>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
+              {podeFiltrarResponsavel && (
+                <Selecao rotulo="Responsável" name="responsavel" defaultValue={texto("responsavel")}>
+                  <option value="">Todos os responsáveis</option>
+                  {config.membros
+                    .filter((m) => m.ativo)
+                    .map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.nome}
+                      </option>
+                    ))}
+                </Selecao>
+              )}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Selecao rotulo="Etapa" name="etapa" defaultValue={etapaFiltro?.id ?? ""}>
+                  <option value="">Todas as etapas</option>
+                  {colunas.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.nome}
+                    </option>
+                  ))}
+                </Selecao>
+                <Selecao rotulo="Origem" name="origem" defaultValue={texto("origem")}>
+                  <option value="">Todas as origens</option>
+                  {config.origens.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.nome}
+                    </option>
+                  ))}
+                </Selecao>
+                {config.etiquetas.length > 0 && (
+                  <Selecao rotulo="Etiqueta" name="etiqueta" defaultValue={etiqueta?.id ?? ""}>
+                    <option value="">Todas as etiquetas</option>
+                    {config.etiquetas.map((e) => (
+                      <option key={e.id} value={e.id}>
+                        {e.nome}
+                      </option>
+                    ))}
+                  </Selecao>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <Campo rotulo="Criado de" type="date" name="criadoDe" defaultValue={texto("criadoDe")} />
+                <Campo rotulo="Criado até" type="date" name="criadoAte" defaultValue={texto("criadoAte")} />
+                <Campo rotulo="Valor mínimo" type="number" name="valorMin" defaultValue={texto("valorMin")} min={0} />
+                <Campo rotulo="Valor máximo" type="number" name="valorMax" defaultValue={texto("valorMax")} min={0} />
+              </div>
+              <div className="flex flex-col gap-1 text-sm text-texto">
+                <label className="flex min-h-11 items-center gap-2.5">
+                  <input type="checkbox" name="atrasados" value="1" defaultChecked={atrasados} className="h-4 w-4" />
+                  Só com tarefa atrasada
+                </label>
+                <label className="flex min-h-11 items-center gap-2.5">
+                  <input type="checkbox" name="semProxima" value="1" defaultChecked={semProxima} className="h-4 w-4" />
+                  Sem próxima atividade
+                </label>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <Link
+                  href={linkLimpar}
+                  className="inline-flex min-h-11 items-center justify-center rounded-lg border border-linha text-sm font-medium text-texto hover:border-dourado md:min-h-9"
+                >
+                  Limpar
+                </Link>
+                <Botao type="submit">Aplicar filtros</Botao>
+              </div>
+            </BotaoFiltros>
+            {/* O gestor não abre Configurações: as regras de temperatura ficam a um toque daqui. */}
+            {pode(atual.papel, REGRAS_TEMPERATURA) && (
               <Link
-                href={linkLimpar}
-                className="inline-flex min-h-11 items-center justify-center rounded-lg border border-linha text-sm font-medium text-texto hover:border-dourado md:min-h-9"
+                href="/configuracoes/temperatura"
+                aria-label="Regras de temperatura"
+                title="Regras de temperatura"
+                className="inline-flex min-h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-linha bg-superficie text-texto-2 transition-colors duration-200 ease-raion hover:border-dourado hover:text-texto md:min-h-10 md:w-10"
               >
-                Limpar
+                <Thermometer className="h-4 w-4" aria-hidden />
               </Link>
-              <Botao type="submit">Aplicar filtros</Botao>
-            </div>
-          </BotaoFiltros>
-          {/* O gestor não abre Configurações: as regras de temperatura ficam a um toque daqui. */}
-          {pode(atual.papel, REGRAS_TEMPERATURA) && (
-            <Link
-              href="/configuracoes/temperatura"
-              aria-label="Regras de temperatura"
-              title="Regras de temperatura"
-              className="inline-flex min-h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-linha bg-superficie text-texto-2 transition-colors duration-200 ease-raion hover:border-dourado hover:text-texto md:min-h-10 md:w-10"
-            >
-              <Thermometer className="h-4 w-4" aria-hidden />
-            </Link>
-          )}
+            )}
+          </div>
         </div>
         {chips.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5">
