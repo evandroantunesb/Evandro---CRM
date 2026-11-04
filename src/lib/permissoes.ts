@@ -45,6 +45,15 @@ export const EDITAR_MODELO_CONTRATO = ["admin"] as const satisfies ListaPapeis;
 /** Confirmar ou estornar pagamento (a RPC no banco exige o mesmo). */
 export const CONFIRMAR_PAGAMENTO = ["admin", "gestor"] as const satisfies ListaPapeis;
 
+/** Informar que o cliente pagou, com comprovante (a RPC `informar_pagamento` exige o mesmo e que veja o negócio). */
+export const INFORMAR_PAGAMENTO = ["admin", "gestor", "vendedor"] as const satisfies ListaPapeis;
+
+/**
+ * Tela "Pagamentos a confirmar": confirmar ou devolver o pagamento informado. `operacao` só se atua no setor
+ * Operacional (a RPC `pagamentos_a_confirmar` e as de confirmar/devolver decidem).
+ */
+export const PAGAMENTOS_A_CONFIRMAR = ["admin", "gestor", "operacao"] as const satisfies ListaPapeis;
+
 /** Mudar o valor de negócio ganho (correção com motivo; a RPC `corrigir_valor_negocio` exige o mesmo). */
 export const CORRIGIR_VALOR_GANHO = ["admin", "gestor"] as const satisfies ListaPapeis;
 

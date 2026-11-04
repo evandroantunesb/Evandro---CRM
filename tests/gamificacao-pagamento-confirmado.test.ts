@@ -103,7 +103,7 @@ describe("confirmar_pagamento", () => {
 
     const { error } = await closer.cliente.rpc("confirmar_pagamento", { p_contrato_id: contratoId });
     expect(error).not.toBeNull();
-    expect(error!.message).toContain("gestor ou admin");
+    expect(error!.message).toContain("Só gestor, admin ou o Operacional");
   });
 
   it("gestor confirma: evento ator=gestor beneficiário=closer, só o closer pontua", async () => {

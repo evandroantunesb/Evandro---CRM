@@ -214,6 +214,115 @@ export type Database = {
           },
         ];
       };
+      avisos_pagamento: {
+        Row: {
+          comprovante_caminho: string;
+          comprovante_nome: string;
+          comprovante_tamanho: number;
+          comprovante_tipo: string | null;
+          confirmacao_id: string | null;
+          contrato_id: string;
+          data_pagamento: string;
+          empresa_id: string;
+          encerrado_em: string | null;
+          encerrado_por_membro_id: string | null;
+          encerrado_por_user_id: string | null;
+          id: string;
+          informado_em: string;
+          informado_por_membro_id: string;
+          informado_por_user_id: string;
+          motivo_devolucao: string | null;
+          negocio_id: string;
+          observacao: string | null;
+          situacao: string;
+        };
+        Insert: {
+          comprovante_caminho: string;
+          comprovante_nome: string;
+          comprovante_tamanho: number;
+          comprovante_tipo?: string | null;
+          confirmacao_id?: string | null;
+          contrato_id: string;
+          data_pagamento: string;
+          empresa_id: string;
+          encerrado_em?: string | null;
+          encerrado_por_membro_id?: string | null;
+          encerrado_por_user_id?: string | null;
+          id?: string;
+          informado_em?: string;
+          informado_por_membro_id: string;
+          informado_por_user_id: string;
+          motivo_devolucao?: string | null;
+          negocio_id: string;
+          observacao?: string | null;
+          situacao?: string;
+        };
+        Update: {
+          comprovante_caminho?: string;
+          comprovante_nome?: string;
+          comprovante_tamanho?: number;
+          comprovante_tipo?: string | null;
+          confirmacao_id?: string | null;
+          contrato_id?: string;
+          data_pagamento?: string;
+          empresa_id?: string;
+          encerrado_em?: string | null;
+          encerrado_por_membro_id?: string | null;
+          encerrado_por_user_id?: string | null;
+          id?: string;
+          informado_em?: string;
+          informado_por_membro_id?: string;
+          informado_por_user_id?: string;
+          motivo_devolucao?: string | null;
+          negocio_id?: string;
+          observacao?: string | null;
+          situacao?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "avisos_pagamento_confirmacao_id_fkey";
+            columns: ["confirmacao_id"];
+            isOneToOne: false;
+            referencedRelation: "confirmacoes_pagamento";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "avisos_pagamento_contrato_id_fkey";
+            columns: ["contrato_id"];
+            isOneToOne: false;
+            referencedRelation: "contratos";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "avisos_pagamento_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "avisos_pagamento_encerrado_por_membro_id_fkey";
+            columns: ["encerrado_por_membro_id"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "avisos_pagamento_informado_por_membro_id_fkey";
+            columns: ["informado_por_membro_id"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "avisos_pagamento_negocio_id_fkey";
+            columns: ["negocio_id"];
+            isOneToOne: false;
+            referencedRelation: "negocios";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       calculos_solares: {
         Row: {
           atualizado_por: string | null;
@@ -5895,6 +6004,7 @@ export type Database = {
         Args: { p_membro_id?: string; p_tarefa_id: string };
         Returns: undefined;
       };
+      atua_no_operacional: { Args: { p_empresa_id: string }; Returns: boolean };
       atualizar_marco_obra: {
         Args: {
           p_marco: Database["public"]["Enums"]["marco_obra"];
@@ -5971,6 +6081,36 @@ export type Database = {
         };
         Returns: number;
       };
+      cancelar_aviso_pagamento: {
+        Args: { p_aviso_id: string };
+        Returns: {
+          comprovante_caminho: string;
+          comprovante_nome: string;
+          comprovante_tamanho: number;
+          comprovante_tipo: string | null;
+          confirmacao_id: string | null;
+          contrato_id: string;
+          data_pagamento: string;
+          empresa_id: string;
+          encerrado_em: string | null;
+          encerrado_por_membro_id: string | null;
+          encerrado_por_user_id: string | null;
+          id: string;
+          informado_em: string;
+          informado_por_membro_id: string;
+          informado_por_user_id: string;
+          motivo_devolucao: string | null;
+          negocio_id: string;
+          observacao: string | null;
+          situacao: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "avisos_pagamento";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       cancelar_tarefa_setor: {
         Args: { p_motivo: string; p_tarefa_id: string };
         Returns: undefined;
@@ -6038,6 +6178,7 @@ export type Database = {
           uf: string;
         }[];
       };
+      contrato_da_pasta_comprovante: { Args: { p_caminho: string }; Returns: string };
       corrigir_registro_pagamento: {
         Args: {
           p_data_recebimento: string;
@@ -6153,6 +6294,36 @@ export type Database = {
       desarquivar_negocio: {
         Args: { p_motivo: string; p_negocio_id: string; p_novo_responsavel?: string };
         Returns: undefined;
+      };
+      devolver_aviso_pagamento: {
+        Args: { p_aviso_id: string; p_motivo: string };
+        Returns: {
+          comprovante_caminho: string;
+          comprovante_nome: string;
+          comprovante_tamanho: number;
+          comprovante_tipo: string | null;
+          confirmacao_id: string | null;
+          contrato_id: string;
+          data_pagamento: string;
+          empresa_id: string;
+          encerrado_em: string | null;
+          encerrado_por_membro_id: string | null;
+          encerrado_por_user_id: string | null;
+          id: string;
+          informado_em: string;
+          informado_por_membro_id: string;
+          informado_por_user_id: string;
+          motivo_devolucao: string | null;
+          negocio_id: string;
+          observacao: string | null;
+          situacao: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "avisos_pagamento";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
       };
       devolver_handoff: {
         Args: { p_handoff_id: string; p_motivo: string };
@@ -6337,6 +6508,42 @@ export type Database = {
       incrementar_preenchimento_formulario: { Args: { p_id: string }; Returns: undefined };
       incrementar_visualizacao_formulario: { Args: { p_id: string }; Returns: undefined };
       indicadores_engenharia: { Args: { p_desde: string; p_empresa_id: string }; Returns: Json };
+      informar_pagamento: {
+        Args: {
+          p_caminho: string;
+          p_contrato_id: string;
+          p_data_pagamento: string;
+          p_nome: string;
+          p_observacao: string;
+        };
+        Returns: {
+          comprovante_caminho: string;
+          comprovante_nome: string;
+          comprovante_tamanho: number;
+          comprovante_tipo: string | null;
+          confirmacao_id: string | null;
+          contrato_id: string;
+          data_pagamento: string;
+          empresa_id: string;
+          encerrado_em: string | null;
+          encerrado_por_membro_id: string | null;
+          encerrado_por_user_id: string | null;
+          id: string;
+          informado_em: string;
+          informado_por_membro_id: string;
+          informado_por_user_id: string;
+          motivo_devolucao: string | null;
+          negocio_id: string;
+          observacao: string | null;
+          situacao: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "avisos_pagamento";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       iniciar_atuacao_engenharia: { Args: { p_obra_id: string }; Returns: string };
       inserir_checklist_engenharia_padrao: { Args: { p_empresa_id: string }; Returns: undefined };
       inserir_fixacoes_telhado_padrao: { Args: { p_empresa_id: string }; Returns: undefined };
@@ -6418,6 +6625,10 @@ export type Database = {
       };
       meu_limite_desconto: { Args: { p_empresa_id: string }; Returns: number };
       meu_membro_id: { Args: { p_empresa_id: string }; Returns: string };
+      notificar_aviso_pagamento: {
+        Args: { p_aviso: Database["public"]["Tables"]["avisos_pagamento"]["Row"]; p_tipo: string };
+        Returns: undefined;
+      };
       obra_da_pasta_engenharia: { Args: { p_caminho: string }; Returns: string };
       obra_snapshot_comercial: { Args: { p_negocio_id: string }; Returns: Json };
       obra_snapshot_tecnico: { Args: { p_negocio_id: string }; Returns: Json };
@@ -6485,6 +6696,26 @@ export type Database = {
           planejado: number;
         }[];
       };
+      pagamentos_a_confirmar: {
+        Args: { p_empresa_id: string };
+        Returns: {
+          aviso_id: string;
+          cidade: string;
+          cliente_nome: string;
+          comprovante_caminho: string;
+          comprovante_nome: string;
+          condicao: string;
+          contrato_id: string;
+          data_pagamento: string;
+          informado_em: string;
+          informado_por_membro_id: string;
+          negocio_id: string;
+          negocio_numero: number;
+          observacao: string;
+          uf: string;
+          valor: number;
+        }[];
+      };
       pedir_justificativa_atraso: { Args: { p_etapa: string; p_obra_id: string }; Returns: string };
       pendencias_contrato_contato: { Args: { p_contato_id: string }; Returns: string[] };
       pode_decidir_desconto: {
@@ -6498,9 +6729,14 @@ export type Database = {
       pode_enviar_pasta_tarefa_setor: { Args: { p_caminho: string }; Returns: boolean };
       pode_enviar_pasta_vistoria: { Args: { p_caminho: string }; Returns: boolean };
       pode_escalonar_obra: { Args: { p_obra_id: string }; Returns: boolean };
+      pode_informar_pagamento: { Args: { p_contrato_id: string }; Returns: boolean };
       pode_registrar_pagamento_negocio: { Args: { p_negocio_id: string }; Returns: boolean };
       pode_responder_handoff: { Args: { p_handoff_id: string }; Returns: boolean };
       pode_ver_avatar: { Args: { p_pasta: string }; Returns: boolean };
+      pode_ver_comprovante_pagamento: {
+        Args: { p_caminho: string; p_dono: string };
+        Returns: boolean;
+      };
       pode_ver_contato: { Args: { p_contato_id: string }; Returns: boolean };
       pode_ver_contato_linha: {
         Args: { p_contato_id: string; p_criado_por: string; p_empresa_id: string };

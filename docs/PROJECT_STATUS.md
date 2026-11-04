@@ -1,5 +1,15 @@
 # Estado do projeto — Raion CRM
 
+## Pagamento informado pelo vendedor (Pro) — em revisão (03/11/2026)
+
+Branch `feat/vendedor-informa-pagamento`; migration `20261113100000_aviso_pagamento_vendedor.sql` (ainda não aplicada em produção). Prévia aprovada: https://claude.ai/artifact/BqPcYg11kVfWS2VELQSE8v
+
+Decisões do Evandro (03/11/2026):
+- O vendedor marca "o cliente pagou" na ficha, com data, **comprovante obrigatório** (foto ou PDF, até 10 MB) e observação; pode cancelar o próprio aviso enquanto ninguém confirmou.
+- Confirmam admin, gestor e **qualquer pessoa do setor Operacional**. Quem confere pode devolver com motivo ("não encontrei o pagamento"); o vendedor é avisado e informa de novo.
+- O Operacional não abre ficha, proposta nem contrato: tela própria "Pagamentos a confirmar" (`/pagamentos`) com número, cliente, cidade, valor, condição gravada no contrato, data, comprovante e quem informou. Sininho mostra quantos esperam conferência.
+- Não muda: pontos e comissão só na confirmação, para o responsável congelado na assinatura; gestor e admin confirmam direto, sem aviso; estorno só admin e gestor; Solo autônomo segue com o registro próprio.
+
 ## Início do engenheiro e autoconfirmação de pagamento — concluídos em 03/11/2026
 
 | PR | Escopo | Estado |
@@ -12,7 +22,7 @@
 | #308 | Correção: o admin não gravava dias para considerar parado, horas sem contato e distribuição de leads (a RLS de `empresas` só aceita o super-admin; a tela dizia "Salvo."). Função `salvar_configuracoes_empresa` | Mesclada em 03/11/2026; migration `20261111100000_configuracoes_empresa_admin.sql` aplicada (autorização #309). Os admins precisam salvar de novo essas configurações: todas as empresas estavam nos padrões |
 
 Pendências (decisão do Evandro):
-- **Pagamento no Pro:** o vendedor não tem como avisar que o cliente pagou, e ninguém é avisado dos pagamentos a confirmar (só quem abre o negócio vê). Ideias: "o cliente pagou" pelo vendedor (data e comprovante opcional, sem confirmar), aviso ou lista "Pagamentos a confirmar" para admin e gestor e, se o Evandro quiser, confirmação por um setor (Operacional ou Financeiro), com setor específico, porque a confirmação libera pontos e cria a Obra.
+- **Pagamento no Pro:** em andamento (seção "Pagamento informado pelo vendedor", acima).
 - **Solo:** o registro sozinho do pagamento (antes do contrato) continua só para a empresa Solo com 1 pessoa ativa; com equipe, o dono confirma a própria venda pela confirmação (#303), depois do contrato assinado. O registro do Solo também não cria Obra.
 - **Teste instável:** `tests/gamificacao-ranking-historico.test.ts` usa cortes com `Date.now()` e às vezes falha sob carga (passa sozinho).
 

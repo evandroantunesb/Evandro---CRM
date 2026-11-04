@@ -7,7 +7,8 @@ import { LogoRaion } from "@/components/marca";
 import { carregarDiasConsideradoParado, carregarHorasConsideradoSemContato } from "@/lib/crm";
 import { carregarNotificacoesNaoLidas, contarPendencias, pendenciasDosSetores, temConquistaNaoVisualizada } from "@/lib/notificacoes";
 import { linksPendencias, type ContagemPendencias } from "@/lib/pendencias";
-import { CARTEIRA_CONTATOS, ENGENHARIA, GAMIFICACAO, GESTAO_COMERCIAL, NEGOCIOS, OBRAS, PARTICIPANTES_GAMIFICACAO, PEDIDOS_AOS_SETORES, PROPOSTA_E_CONTRATO, TAREFAS, TAREFAS_DO_SETOR, pode } from "@/lib/permissoes";
+import { CARTEIRA_CONTATOS, ENGENHARIA, GAMIFICACAO, GESTAO_COMERCIAL, NEGOCIOS, OBRAS, PAGAMENTOS_A_CONFIRMAR, PARTICIPANTES_GAMIFICACAO, PEDIDOS_AOS_SETORES, PROPOSTA_E_CONTRATO, TAREFAS, TAREFAS_DO_SETOR, pode } from "@/lib/permissoes";
+import { contarPagamentosAConfirmar } from "@/lib/avisos-pagamento";
 import { obterSessao } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { trocarEmpresa } from "@/lib/acoes/empresa-atual";
@@ -65,6 +66,9 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
   let pendencias: ContagemPendencias = { leadsADistribuir: 0, demais: 0 };
   let notificacoes: Awaited<ReturnType<typeof carregarNotificacoesNaoLidas>> = [];
   let conquistaNova = false;
+  // Pagamentos informados pelo vendedor esperando conferência (admin, gestor e o Operacional): item no menu e no sininho.
+  let pagamentosAConfirmar = 0;
+  let verPagamentosAConfirmar = false;
   if (sessao.atual) {
     const [dias, horas] = await Promise.all([
       carregarDiasConsideradoParado(sessao.atual.empresaId),
@@ -77,8 +81,22 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
       carregarNotificacoesNaoLidas(sessao.atual.empresaId, sessao.atual.membroId),
       temConquistaNaoVisualizada(sessao.atual.empresaId, sessao.atual.membroId),
     ]);
+    if (pode(papel, PAGAMENTOS_A_CONFIRMAR)) {
+      const supabase = await criarClienteServidor();
+      const [contagem, operacional] = await Promise.all([
+        contarPagamentosAConfirmar(supabase, sessao.atual.empresaId),
+        // Da Operação, só quem atua no setor Operacional confere pagamento.
+        papel === "operacao" ? supabase.rpc("atua_no_operacional", { p_empresa_id: sessao.atual.empresaId }).then((r) => r.data === true) : true,
+      ]);
+      pagamentosAConfirmar = contagem;
+      verPagamentosAConfirmar = operacional;
+    }
   }
-  const avisos = { notificacoes, pendencias: linksPendencias(papel, pendencias) };
+  const linkPagamentos =
+    pagamentosAConfirmar > 0
+      ? [{ href: "/pagamentos", texto: `${pagamentosAConfirmar} pagamento${pagamentosAConfirmar === 1 ? "" : "s"} a confirmar` }]
+      : [];
+  const avisos = { notificacoes, pendencias: [...linkPagamentos, ...linksPendencias(papel, pendencias)] };
 
   // Foto do próprio usuário (sidebar desktop e menu do celular): uma assinatura com a sessão dele.
   const urlAvatar = sessao.avatarCaminho
@@ -105,6 +123,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
           ...(pode(papel, OBRAS) ? [{ href: "/obras", rotulo: "Obras", secao: "Operação" }] : []),
           ...(pode(papel, ENGENHARIA) ? [{ href: "/engenharia", rotulo: "Engenharia", secao: "Operação" }] : []),
           ...(pode(papel, PEDIDOS_AOS_SETORES) ? [{ href: "/tarefas/setores", rotulo: "Pedidos aos setores", secao: "Operação" }] : []),
+          ...(verPagamentosAConfirmar ? [{ href: "/pagamentos", rotulo: "Pagamentos a confirmar", secao: "Operação" }] : []),
           ...(pode(papel, GESTAO_COMERCIAL) ? [{ href: "/painel", rotulo: "Painel", secao: "Gestão" }] : []),
           ...itensGamificacao(papel, conquistaNova),
         ]
@@ -173,7 +192,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
         <Link href="/inicio" aria-label="Início">
           <LogoRaion tom="claro" altura={24} />
         </Link>
-        {sessao.atual && <BotaoAvisos {...avisos} total={notificacoes.length + pendencias.leadsADistribuir + pendencias.demais} />}
+        {sessao.atual && <BotaoAvisos {...avisos} total={notificacoes.length + pendencias.leadsADistribuir + pendencias.demais + pagamentosAConfirmar} />}
       </header>
 
       <aside className="barra-lateral hidden flex-col gap-5 border-r border-white/5 bg-carvao p-5 text-offwhite md:sticky md:top-0 md:flex md:h-screen md:w-64 md:overflow-y-auto">
