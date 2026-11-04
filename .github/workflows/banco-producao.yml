@@ -232,12 +232,13 @@ jobs:
       # Trava fail-closed: o conjunto do dry-run acima precisa ser exatamente o autorizado, senão o
       # job termina aqui, antes da aplicação. Sem credenciais. Para autorizar outro conjunto, a lista
       # abaixo muda por commit revisado (e uma nova tag), nunca por entrada do operador.
-      # Enquadramento Copel (#314); conjunto conferido no dry-run de 04/11/2026
-      # (run 41817425614), com a 20261113100000 já aplicada.
+      # Prazos da Copel (#316) e obra de rede (#317); conjunto conferido no dry-run de 04/11/2026
+      # (run 41825458855), com a 20261114100000 já aplicada.
       - name: Conferir que o conjunto pendente é exatamente o autorizado
         env:
           MIGRATIONS_AUTORIZADAS: |
-                        20261114100000_engenharia_enquadramento_copel.sql
+                        20261115100000_engenharia_prazos_copel.sql
+                        20261116100000_engenharia_obra_rede.sql
         run: bash .github/scripts/validar-conjunto-migrations.sh "$RUNNER_TEMP/dry-run.txt"
       - name: Aplicar (supabase db push --include-all)
         env:
