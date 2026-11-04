@@ -1,8 +1,8 @@
 # Estado do projeto — Raion CRM
 
-## Pagamento informado pelo vendedor (Pro) — em revisão (03/11/2026)
+## Pagamento informado pelo vendedor (Pro) — concluído (03 e 04/11/2026)
 
-Branch `feat/vendedor-informa-pagamento`; migration `20261113100000_aviso_pagamento_vendedor.sql` (ainda não aplicada em produção). Prévia aprovada: https://claude.ai/artifact/BqPcYg11kVfWS2VELQSE8v
+#312 mesclada em 03/11/2026; migration `20261113100000_aviso_pagamento_vendedor.sql` aplicada em 04/11/2026 (autorização #313, run 41808982799, `main` em `a93826c`). Para conferir pagamentos, a pessoa da Operação precisa ter o setor Operacional. Prévia aprovada: https://claude.ai/artifact/BqPcYg11kVfWS2VELQSE8v
 
 Decisões do Evandro (03/11/2026):
 - O vendedor marca "o cliente pagou" na ficha, com data, **comprovante obrigatório** (foto ou PDF, até 10 MB) e observação; pode cancelar o próprio aviso enquanto ninguém confirmou.
@@ -22,7 +22,7 @@ Decisões do Evandro (03/11/2026):
 | #308 | Correção: o admin não gravava dias para considerar parado, horas sem contato e distribuição de leads (a RLS de `empresas` só aceita o super-admin; a tela dizia "Salvo."). Função `salvar_configuracoes_empresa` | Mesclada em 03/11/2026; migration `20261111100000_configuracoes_empresa_admin.sql` aplicada (autorização #309). Os admins precisam salvar de novo essas configurações: todas as empresas estavam nos padrões |
 
 Pendências (decisão do Evandro):
-- **Pagamento no Pro:** em andamento (seção "Pagamento informado pelo vendedor", acima).
+- **Pagamento no Pro:** resolvido (seção "Pagamento informado pelo vendedor", acima).
 - **Solo:** o registro sozinho do pagamento (antes do contrato) continua só para a empresa Solo com 1 pessoa ativa; com equipe, o dono confirma a própria venda pela confirmação (#303), depois do contrato assinado. O registro do Solo também não cria Obra.
 - **Teste instável:** `tests/gamificacao-ranking-historico.test.ts` usa cortes com `Date.now()` e às vezes falha sob carga (passa sozinho).
 
@@ -32,7 +32,12 @@ O engenheiro respondeu o levantamento de documentos, ART, protocolo, exigências
 
 Feito: **"não se aplica" por qualquer engenheiro**, inclusive em documento obrigatório, sempre com motivo (migration `20261112100000_engenharia_nao_se_aplica.sql`).
 
-Falta, numa PR "enquadramento Copel" (confirmar a lista de tipos com o Evandro antes):
+Enquadramento Copel em 3 PRs (decisões do Evandro em 03 e 04/11/2026; prévia: https://claude.ai/artifact/4hnWogguBmCABvgC788crQ):
+- **PR 1 — em revisão** (branch `feat/enquadramento-copel`, migration `20261114100000_engenharia_enquadramento_copel.sql`): itens 1, 2 e 6 abaixo. Tipo de solicitação em lista única (nova conexão, ampliação, regularização, troca de titularidade, aumento de carga, ligação nova, cadastro de compensação, outra); tensão e zona como perguntas separadas; canal (PEW ou site da Copel) só informativo na ficha. Checklist padrão novo com condições: fatura recente e ART em todo pedido; procuração em todo pedido, com a orientação da Copel no item; unifilar opcional em todo pedido; formulário de acesso, memorial e datasheets como "Produzido pela Engenharia". Substitui a lista nas empresas que nunca editaram o modelo; quem editou mantém o seu.
+- **PR 2:** prazos (itens 3 e 4), cada prazo em dias úteis ou corridos.
+- **PR 3:** obra de rede com custo (item 5).
+
+Levantamento original:
 1. **Tipos de pedido** além de nova conexão, ampliação e regularização: troca de titularidade (site da Copel, mesmos documentos), aumento de carga e ligação nova em baixa tensão (+ DCA), aumento de carga e ligação nova em média tensão (+ DCA e unifilar), cadastro de compensação (+ fatura ou faturas cadastradas). Canal: projetos, padrão individual e aumento de carga em BT pelo PEW; os demais pelos sites da Copel.
 2. **Perguntas novas no enquadramento:** baixa × média tensão e zona rural (muda documentos e prazos).
 3. **Prazos em dias corridos:** aprovação do projeto em 15 dias corridos (30 na zona rural); hoje só há dias úteis e os prazos da distribuidora estão vazios na configuração.

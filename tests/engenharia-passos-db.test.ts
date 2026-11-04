@@ -51,6 +51,8 @@ const registrar = (quem: Usuario, passo: number, acao: string, observacao?: stri
   quem.cliente.rpc("registrar_passo_engenharia", { p_obra_id: obra, p_passo: passo, p_acao: acao, ...(observacao ? { p_observacao: observacao } : {}) });
 
 const ENQUADRAMENTO_COMPLETO = {
+  tensao: "baixa",
+  zona: "urbana",
   tipo_solicitacao: "nova_conexao",
   categoria: "micro",
   faixa_formulario: "ate_10kw",

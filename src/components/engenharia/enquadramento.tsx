@@ -3,9 +3,29 @@
 import { useActionState, useState } from "react";
 import { Botao, CLASSE_ENTRADA, Mensagem } from "@/components/ui";
 import { salvarEnquadramentoEngenharia } from "@/lib/acoes/engenharia";
-import { PERGUNTAS_ENQUADRAMENTO, rotuloResposta, type EnquadramentoVM } from "@/lib/engenharia-enquadramento-regras";
+import {
+  canalCopel,
+  PERGUNTAS_ENQUADRAMENTO,
+  rotuloResposta,
+  type EnquadramentoVM,
+  type RespostasEnquadramento,
+} from "@/lib/engenharia-enquadramento-regras";
 
 const numero = (n: number | null) => (n == null ? "" : String(n).replace(".", ","));
+/** Canal da Copel calculado das respostas (só informativo). */
+function Canal({ respostas }: { respostas: RespostasEnquadramento | null }) {
+  const canal = canalCopel(respostas);
+  if (!canal) return null;
+  return (
+    <p className="rounded-lg bg-superficie-2 px-3 py-2 text-sm text-texto">
+      <span className="font-medium">Canal: {canal === "pew" ? "PEW" : "site da Copel"}.</span>{" "}
+      <span className="text-texto-2">
+        Projetos de geração, ligação nova e aumento de carga em baixa tensão vão pelo PEW; os demais pelos sites da Copel.
+      </span>
+    </p>
+  );
+}
+
 const dataHora = (iso: string) => new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" }).format(new Date(iso));
 
 /**
@@ -25,22 +45,25 @@ export function EnquadramentoEngenharia({
   kit: { potenciaKwp: number | null; inversores: string | null };
 }) {
   const [resultado, acao, pendente] = useActionState(salvarEnquadramentoEngenharia, null);
-  const [ambiental, setAmbiental] = useState(enquadramento?.respostas.situacao_ambiental ?? "");
+  const [respostas, setRespostas] = useState<RespostasEnquadramento>(enquadramento?.respostas ?? {});
 
   if (!podeEditar) {
     if (!enquadramento) return <p className="text-sm text-zinc-500">Enquadramento ainda não preenchido.</p>;
     return (
-      <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-        {PERGUNTAS_ENQUADRAMENTO.map((p) => {
-          const r = enquadramento.respostas[p.chave];
-          return (
-            <div key={p.chave}>
-              <dt className="text-xs text-zinc-500">{p.rotulo}</dt>
-              <dd className="text-zinc-900">{r ? rotuloResposta(p.chave, r) : "—"}</dd>
-            </div>
-          );
-        })}
-      </dl>
+      <div className="flex flex-col gap-3">
+        <Canal respostas={enquadramento.respostas} />
+        <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+          {PERGUNTAS_ENQUADRAMENTO.map((p) => {
+            const r = enquadramento.respostas[p.chave];
+            return (
+              <div key={p.chave}>
+                <dt className="text-xs text-zinc-500">{p.rotulo}</dt>
+                <dd className="text-zinc-900">{r ? rotuloResposta(p.chave, r) : "—"}</dd>
+              </div>
+            );
+          })}
+        </dl>
+      </div>
     );
   }
 
@@ -54,7 +77,7 @@ export function EnquadramentoEngenharia({
             <select
               name={p.chave}
               defaultValue={enquadramento?.respostas[p.chave] ?? ""}
-              onChange={p.chave === "situacao_ambiental" ? (e) => setAmbiental(e.target.value) : undefined}
+              onChange={(e) => setRespostas((r) => ({ ...r, [p.chave]: e.target.value || undefined }))}
               className={CLASSE_ENTRADA}
             >
               <option value="">Sem resposta</option>
@@ -67,7 +90,8 @@ export function EnquadramentoEngenharia({
           </label>
         ))}
       </div>
-      {ambiental === "nao_aplicavel" && (
+      <Canal respostas={respostas} />
+      {respostas.situacao_ambiental === "nao_aplicavel" && (
         <label className="flex flex-col gap-1 text-xs text-zinc-600">
           Por que a questão ambiental não se aplica?
           <input
