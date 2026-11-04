@@ -8,9 +8,12 @@ import { afterAll, describe, expect, it } from "vitest";
 
 const SCRIPT = ".github/scripts/validar-conjunto-migrations.sh";
 const WORKFLOW = ".github/workflows/banco-producao.yml";
-// "Não se aplica" por qualquer engenheiro (#310): só ela, nenhuma a mais ou a menos.
-const AUTORIZADAS = ["20261112100000_engenharia_nao_se_aplica.sql"];
+// Pagamento informado pelo vendedor (#312): só ela, nenhuma a mais ou a menos.
+const AUTORIZADAS = ["20261113100000_aviso_pagamento_vendedor.sql"];
 const LISTA = AUTORIZADAS.join("\n");
+// "Não se aplica" por qualquer engenheiro (#310): aplicada em 03/11/2026, antes desta. Se voltar a aparecer como
+// pendente, não é autorizada.
+const NAO_SE_APLICA = "20261112100000_engenharia_nao_se_aplica.sql";
 // Configurações da empresa pelo admin (#308): aplicada em 03/11/2026, antes desta. Se voltar a aparecer como pendente,
 // não é autorizada.
 const CONFIG_EMPRESA = "20261111100000_configuracoes_empresa_admin.sql";
@@ -257,12 +260,12 @@ describe("entradas inválidas: encerra com erro antes de qualquer aplicação", 
 });
 
 describe("protocolos da Engenharia", () => {
-  it("só ela pendente (configurações da empresa, marcos, trajetória, autoconfirmação, justificativa, checklist, tarefas de setor, dados do cliente, dados pessoais da obra, fixação, validade da proposta, eletroposto SDR, eletroposto, temperatura e calculadora já aplicados): passa", () => {
+  it("só ela pendente (\"não se aplica\" da Engenharia, configurações da empresa, marcos, trajetória, autoconfirmação, justificativa, checklist, tarefas de setor, dados do cliente, dados pessoais da obra, fixação, validade da proposta, eletroposto SDR, eletroposto, temperatura e calculadora já aplicados): passa", () => {
     expect(validar(dryRunCom(...AUTORIZADAS)).codigo).toBe(0);
   });
 
-  it("configurações da empresa, marcos, trajetória, autoconfirmação, justificativa, checklist, tarefas de setor, dados do cliente, dados pessoais da obra, fixação, validade da proposta, eletroposto SDR, eletroposto, temperatura ou qualquer migration da calculadora pendente junto, ou sozinha, não passa", () => {
-    for (const m of [CONFIG_EMPRESA, MARCOS, TRAJETORIA, AUTOCONFIRMACAO, JUSTIFICATIVA, COMPLETA, CUSTOS, CRONOGRAMA, CONDICAO_ESCOLHIDA, DESCONTOS, CONDICOES_CONFIG, CAPTURA_LIMITE, PRIVILEGIOS_TABELAS, FUNCOES_SEM_LOGIN, INICIAR_ATUACAO, ENQUADRAMENTO, PASSOS, TAREFAS_AUTOMATICAS, PRAZOS, VISTORIA, PROTOCOLOS, CHECKLIST, NOTIFICACOES, ANEXOS_TAREFA, TAREFAS_SETOR, DADOS_CLIENTE, CLIENTE_OCULTO, FIXACAO, VALIDADE_PROPOSTA, ELETROPOSTO_SDR, ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) {
+  it("\"não se aplica\" da Engenharia, configurações da empresa, marcos, trajetória, autoconfirmação, justificativa, checklist, tarefas de setor, dados do cliente, dados pessoais da obra, fixação, validade da proposta, eletroposto SDR, eletroposto, temperatura ou qualquer migration da calculadora pendente junto, ou sozinha, não passa", () => {
+    for (const m of [NAO_SE_APLICA, CONFIG_EMPRESA, MARCOS, TRAJETORIA, AUTOCONFIRMACAO, JUSTIFICATIVA, COMPLETA, CUSTOS, CRONOGRAMA, CONDICAO_ESCOLHIDA, DESCONTOS, CONDICOES_CONFIG, CAPTURA_LIMITE, PRIVILEGIOS_TABELAS, FUNCOES_SEM_LOGIN, INICIAR_ATUACAO, ENQUADRAMENTO, PASSOS, TAREFAS_AUTOMATICAS, PRAZOS, VISTORIA, PROTOCOLOS, CHECKLIST, NOTIFICACOES, ANEXOS_TAREFA, TAREFAS_SETOR, DADOS_CLIENTE, CLIENTE_OCULTO, FIXACAO, VALIDADE_PROPOSTA, ELETROPOSTO_SDR, ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) {
       expect(validar(dryRunCom(...AUTORIZADAS, m)).codigo, m).toBe(1);
       expect(validar(dryRunCom(m)).codigo, m).toBe(1);
     }
@@ -280,7 +283,7 @@ describe("protocolos da Engenharia", () => {
       expect(existsSync(`supabase/migrations/${m}`), m).toBe(true);
       expect(texto, m).toContain(m);
     }
-    for (const m of [CONFIG_EMPRESA, MARCOS, TRAJETORIA, AUTOCONFIRMACAO, JUSTIFICATIVA, COMPLETA, CUSTOS, CRONOGRAMA, CONDICAO_ESCOLHIDA, DESCONTOS, CONDICOES_CONFIG, CAPTURA_LIMITE, PRIVILEGIOS_TABELAS, FUNCOES_SEM_LOGIN, INICIAR_ATUACAO, ENQUADRAMENTO, PASSOS, TAREFAS_AUTOMATICAS, PRAZOS, VISTORIA, PROTOCOLOS, CHECKLIST, NOTIFICACOES, ANEXOS_TAREFA, TAREFAS_SETOR, DADOS_CLIENTE, CLIENTE_OCULTO, FIXACAO, VALIDADE_PROPOSTA, ELETROPOSTO_SDR, ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) expect(texto, m).not.toContain(m);
+    for (const m of [NAO_SE_APLICA, CONFIG_EMPRESA, MARCOS, TRAJETORIA, AUTOCONFIRMACAO, JUSTIFICATIVA, COMPLETA, CUSTOS, CRONOGRAMA, CONDICAO_ESCOLHIDA, DESCONTOS, CONDICOES_CONFIG, CAPTURA_LIMITE, PRIVILEGIOS_TABELAS, FUNCOES_SEM_LOGIN, INICIAR_ATUACAO, ENQUADRAMENTO, PASSOS, TAREFAS_AUTOMATICAS, PRAZOS, VISTORIA, PROTOCOLOS, CHECKLIST, NOTIFICACOES, ANEXOS_TAREFA, TAREFAS_SETOR, DADOS_CLIENTE, CLIENTE_OCULTO, FIXACAO, VALIDADE_PROPOSTA, ELETROPOSTO_SDR, ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) expect(texto, m).not.toContain(m);
   });
 });
 
