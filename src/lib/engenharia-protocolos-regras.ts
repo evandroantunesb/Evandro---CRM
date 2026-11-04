@@ -11,11 +11,25 @@ export const ROTULO_CANAL: Record<(typeof CANAIS_PROTOCOLO)[number], string> = {
   outro: "Outro",
 };
 
-export const TIPOS_SOLICITACAO = ["nova_conexao", "ampliacao", "regularizacao", "outro"] as const;
+/** Os mesmos tipos do enquadramento (a RPC valida pela mesma lista). */
+export const TIPOS_SOLICITACAO = [
+  "nova_conexao",
+  "ampliacao",
+  "regularizacao",
+  "troca_titularidade",
+  "aumento_carga",
+  "ligacao_nova",
+  "cadastro_compensacao",
+  "outro",
+] as const;
 export const ROTULO_TIPO_SOLICITACAO: Record<(typeof TIPOS_SOLICITACAO)[number], string> = {
   nova_conexao: "Nova conexão",
   ampliacao: "Ampliação",
   regularizacao: "Regularização",
+  troca_titularidade: "Troca de titularidade",
+  aumento_carga: "Aumento de carga",
+  ligacao_nova: "Ligação nova",
+  cadastro_compensacao: "Cadastro de compensação",
   outro: "Outro",
 };
 

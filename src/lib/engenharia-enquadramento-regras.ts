@@ -53,6 +53,7 @@ export const PERGUNTAS_ENQUADRAMENTO = [
       { valor: "ate_10kw", rotulo: "Até 10 kW" },
       { valor: "de_10_a_75kw", rotulo: "Acima de 10 até 75 kW" },
       { valor: "mini", rotulo: "Minigeração" },
+      { valor: "nao_se_aplica", rotulo: "Não se aplica" },
     ],
   },
   {

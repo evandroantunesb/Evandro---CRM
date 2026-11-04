@@ -242,6 +242,12 @@ describe("Enquadramento Copel: tipos, tensão, zona e checklist padrão novo", (
     expect(modelo!.descricao).toContain("gov.br");
   });
 
+  it("faixa do formulário aceita 'não se aplica' (pedido que não é de geração)", async () => {
+    expect((await salvar(execEng, { ...BASE, tipo_solicitacao: "troca_titularidade", faixa_formulario: "nao_se_aplica" })).error).toBeNull();
+    const { data } = await servico.from("obra_engenharia_enquadramento").select("faixa_formulario").eq("obra_id", obra).single();
+    expect(data!.faixa_formulario).toBe("nao_se_aplica");
+  });
+
   it("o passo 2 exige tensão e zona respondidas", async () => {
     for (const falta of ["tensao", "zona"]) {
       expect((await salvar(execEng, { ...BASE, [falta]: null })).error).toBeNull();

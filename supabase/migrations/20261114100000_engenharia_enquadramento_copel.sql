@@ -9,7 +9,9 @@
 --    que continuam ganham grupo, ordem, obrigatoriedade e condição novos, e os novos entram. Quem editou mantém o seu.
 --  * Obras com checklist aplicado não mudam aqui. Ao salvar o enquadramento depois, vale a regra de sempre
 --    (reconciliar_checklist_engenharia): entram os itens ativos que passaram a valer.
---  * A ficha completa (passo 2) passa a incluir tensão e zona.
+--  * A ficha completa (passo 2) passa a incluir tensão e zona. "Faixa do formulário" ganha "não se aplica", para os
+--    pedidos que não são de geração (troca de titularidade, por exemplo) concluírem o passo 2.
+--  * O protocolo aceita os mesmos tipos de solicitação do enquadramento (uma lista só).
 -- O canal (PEW ou site da Copel) é só informativo e calculado na tela.
 -- Depende de: 20261030100000_engenharia_checklist.sql, 20261101120000_engenharia_enquadramento.sql.
 
@@ -28,7 +30,7 @@ as $$
     "tensao": ["baixa", "media", "verificar"],
     "zona": ["urbana", "rural", "verificar"],
     "categoria": ["micro", "mini", "indefinida"],
-    "faixa_formulario": ["ate_10kw", "de_10_a_75kw", "mini"],
+    "faixa_formulario": ["ate_10kw", "de_10_a_75kw", "mini", "nao_se_aplica"],
     "tipo_instalacao": ["telhado", "solo", "outra"],
     "modalidade_scee": ["local", "remoto", "multiplas_ucs", "compartilhada", "outra"],
     "titularidade": ["pf", "pj", "terceiro_procuracao"],
@@ -260,5 +262,99 @@ where empresa_id in (select empresa_id from modelo_inalterado)
   );
 
 select public.inserir_checklist_engenharia_padrao(empresa_id) from modelo_inalterado;
+
+-- ---------------------------------------------------------------------------
+-- Protocolo: os mesmos tipos do enquadramento
+-- ---------------------------------------------------------------------------
+
+alter table public.obra_engenharia_protocolos drop constraint obra_engenharia_protocolos_tipo_solicitacao_check;
+alter table public.obra_engenharia_protocolos add constraint obra_engenharia_protocolos_tipo_solicitacao_check
+  check (public.resposta_enquadramento_valida('tipo_solicitacao', tipo_solicitacao));
+
+-- Igual à de 20261030120000, exceto que o tipo vale pela lista do enquadramento.
+create or replace function public.registrar_protocolo_engenharia(
+  p_obra_id uuid,
+  p_distribuidora text,
+  p_canal text,
+  p_numero text,
+  p_tipo_solicitacao text,
+  p_protocolado_em date,
+  p_observacao text default null
+)
+returns uuid
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_aut text := public.preparar_escrita_obra(p_obra_id, 'engenharia', true);
+  v_empresa uuid;
+  v_faltam text;
+  v_protocolo uuid;
+  v_evento uuid;
+  v_documentos integer;
+  v_etapa text;
+begin
+  select empresa_id into v_empresa from public.obras where id = p_obra_id;
+
+  if length(btrim(coalesce(p_numero, ''))) not between 1 and 60 then
+    raise exception 'Informe o número do protocolo.' using errcode = 'check_violation', hint = 'mensagem_usuario';
+  end if;
+  if length(btrim(coalesce(p_distribuidora, ''))) not between 2 and 60 then
+    raise exception 'Informe a distribuidora.' using errcode = 'check_violation', hint = 'mensagem_usuario';
+  end if;
+  if p_canal is null or p_canal not in ('pew', 'caw', 'atendimento', 'outro') then
+    raise exception 'Canal inválido.' using errcode = 'check_violation', hint = 'mensagem_usuario';
+  end if;
+  if p_tipo_solicitacao is null or not public.resposta_enquadramento_valida('tipo_solicitacao', p_tipo_solicitacao) then
+    raise exception 'Tipo de solicitação inválido.' using errcode = 'check_violation', hint = 'mensagem_usuario';
+  end if;
+  if p_protocolado_em is null or p_protocolado_em > public.hoje_brasilia() then
+    raise exception 'Informe a data do protocolo (não pode ser futura).' using errcode = 'check_violation', hint = 'mensagem_usuario';
+  end if;
+  if p_observacao is not null and length(p_observacao) > 1000 then
+    raise exception 'Observação muito longa (máximo 1000 caracteres).' using errcode = 'check_violation', hint = 'mensagem_usuario';
+  end if;
+
+  -- Gate G2: checklist aplicado e obrigatórios resolvidos.
+  if not exists (select 1 from public.obra_engenharia_itens where obra_id = p_obra_id) then
+    raise exception 'Aplique o checklist e resolva os itens obrigatórios antes de registrar o protocolo.' using errcode = 'check_violation', hint = 'mensagem_usuario';
+  end if;
+  select string_agg(titulo, '; ' order by ordem) into v_faltam
+  from public.obra_engenharia_itens
+  where obra_id = p_obra_id and obrigatorio and status not in ('valido', 'dispensado');
+  if v_faltam is not null then
+    raise exception 'Itens obrigatórios do checklist ainda não resolvidos: %.', v_faltam using errcode = 'check_violation', hint = 'mensagem_usuario';
+  end if;
+
+  if exists (
+    select 1 from public.obra_engenharia_protocolos
+    where obra_id = p_obra_id and status not in ('indeferido', 'cancelado', 'encerrado')
+  ) then
+    raise exception 'Esta obra já tem um protocolo em andamento.' using errcode = 'check_violation', hint = 'mensagem_usuario';
+  end if;
+
+  insert into public.obra_engenharia_protocolos (empresa_id, obra_id, distribuidora, canal, numero, tipo_solicitacao, protocolado_em, observacao, registrado_por)
+  values (v_empresa, p_obra_id, btrim(p_distribuidora), p_canal, btrim(p_numero), p_tipo_solicitacao, p_protocolado_em,
+    nullif(btrim(coalesce(p_observacao, '')), ''), public.meu_membro_id(v_empresa))
+  returning id into v_protocolo;
+
+  insert into public.obra_engenharia_protocolo_eventos (empresa_id, obra_id, protocolo_id, tipo, status_de, status_para, ocorrido_em, autor_membro_id)
+  values (v_empresa, p_obra_id, v_protocolo, 'registrado', null, 'protocolado', p_protocolado_em, public.meu_membro_id(v_empresa))
+  returning id into v_evento;
+  v_documentos := public.registrar_pacote_protocolo(v_evento);
+
+  perform public.registrar_historico_obra(p_obra_id, 'protocolo_engenharia_registrado', 'engenharia', jsonb_build_object(
+    'distribuidora', btrim(p_distribuidora),
+    'canal', p_canal,
+    'documentos', v_documentos,
+    'autorizacao', v_aut
+  ));
+
+  select status into v_etapa from public.obra_fluxos where obra_id = p_obra_id and setor = 'engenharia';
+  if v_etapa in ('a_iniciar', 'projeto_em_elaboracao') then
+    perform public.gravar_status_fluxo_obra(p_obra_id, 'engenharia', 'enviado_concessionaria', v_aut, 'protocolo');
+  end if;
+  return v_protocolo;
+end;
+$$;
 
 reset lock_timeout;

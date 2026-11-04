@@ -261,7 +261,9 @@ describe("Engenharia: protocolos (ordem importa)", { concurrent: false, shuffle:
     expect(ex![0].status).toBe("resolvida");
     expect(ex![0].resolvida_em).not.toBeNull();
     expect((await evento(coordEng, protocolo, "encerrado")).error).toBeNull();
-    expect((await registrar(execEng, { p_numero: `P2-${sufixo}`, p_tipo_solicitacao: "ampliacao" })).error).toBeNull();
+    expect((await registrar(execEng, { p_numero: `P2-${sufixo}`, p_tipo_solicitacao: "inventado" })).error?.message).toContain("Tipo de solicitação inválido");
+    // Tipos do enquadramento Copel também valem no protocolo.
+    expect((await registrar(execEng, { p_numero: `P2-${sufixo}`, p_tipo_solicitacao: "troca_titularidade" })).error).toBeNull();
     // Já estava adiante do projeto: a etapa não volta nem muda.
     expect(await fluxoEngenharia()).toBe("enviado_concessionaria");
   });
