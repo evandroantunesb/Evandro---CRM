@@ -24,7 +24,7 @@ Decisões do Evandro (03/11/2026):
 Pendências (decisão do Evandro):
 - **Pagamento no Pro:** resolvido (seção "Pagamento informado pelo vendedor", acima).
 - **Solo:** o registro sozinho do pagamento (antes do contrato) continua só para a empresa Solo com 1 pessoa ativa; com equipe, o dono confirma a própria venda pela confirmação (#303), depois do contrato assinado. O registro do Solo também não cria Obra.
-- **Teste instável:** `tests/gamificacao-ranking-historico.test.ts` usa cortes com `Date.now()` e às vezes falha sob carga (passa sozinho).
+- **Teste instável (resolvido em 04/11/2026):** `tests/gamificacao-ranking-historico.test.ts` tirava os cortes do relógio do computador; agora usa o `clock_timestamp()` do Postgres, o mesmo relógio que grava os lançamentos.
 
 ## Engenharia × respostas do engenheiro (03/11/2026) — concluído em 04/11/2026
 
@@ -302,7 +302,7 @@ Integrado (#245; ajuste visual #246) e migration `20261029150000_obras_fixacao_t
 - **Decisões do Evandro (26/10/2026):** "Novo negócio" abre um pop-up **obrigatório** de escolha entre Energia solar (fluxo atual) e Eletroposto (carregador DC 80 kW, modelos IBS Basic R$ 99.900, Full R$ 119.900 e Full Screen R$ 149.900, preços fixos de catálogo, sem edição). Cadastro: nome, WhatsApp, endereço do cliente, local próprio (sim/não) e usina FV (sim/não) — os dois últimos só para o vendedor, não mudam a proposta. Vários modelos = negócio sem valor até o cliente escolher. Proposta fiel ao modelo de 4 páginas da IBS, na identidade visual do Raion por enquanto; consultor = responsável pelo negócio.
 - **Migration `20261026120000_eletroposto.sql`:** `empresas.eletroposto_ativo` (padrão desligado; o super-admin liga em Super-admin › empresa › Módulos), `negocios.tipo` (`solar` | `eletroposto`, imutável) e `negocios_eletroposto` (modelos, preços congelados, token do link; RLS como a proposta emitida: SDR não lê). Testes em `tests/eletroposto.test.ts` e `tests/eletroposto-db.test.ts`.
 - **App:** `src/lib/eletroposto.ts` (catálogo e simulação; números conferidos com o modelo: R$ 6.412/mês, payback 16/19/17 meses), `/negocios/novo?tipo=eletroposto`, aba Eletroposto na ficha, proposta pública em `/proposta/eletroposto/[token]` (imprimir / salvar PDF pelo navegador).
-- **Pendências:** ligar o módulo para a IBS em produção (pelo super-admin, depois da migration aplicada); ("Dados do negócio" com valor opcional e sem campos solares no eletroposto: resolvido em 27/10/2026); sem registro de abertura do link; contrato, pagamento e comissão do eletroposto fora desta entrega.
+- **Pendências:** (ligar o módulo para a IBS em produção: feito pelo Evandro no super-admin em 04/11/2026); ("Dados do negócio" com valor opcional e sem campos solares no eletroposto: resolvido em 27/10/2026); sem registro de abertura do link; contrato, pagamento e comissão do eletroposto fora desta entrega.
 
 ### Eletroposto: SDR e pontuação (2026-10-27, branch `feat/eletroposto-sdr-pontuacao`)
 
