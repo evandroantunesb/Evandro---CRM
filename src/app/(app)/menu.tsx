@@ -16,6 +16,7 @@ import {
   Settings,
   ShieldCheck,
   Trophy,
+  TrendingUp,
   UsersRound,
   type LucideIcon,
 } from "lucide-react";
@@ -27,6 +28,7 @@ import { Janela } from "@/components/janela";
 const ICONES: Record<string, LucideIcon> = {
   "/inicio": Home,
   "/negocios": KanbanSquare,
+  "/forecast": TrendingUp,
   "/tarefas": CheckSquare,
   "/contatos": UsersRound,
   "/leads-a-distribuir": Inbox,

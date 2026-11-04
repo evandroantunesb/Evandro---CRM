@@ -6,6 +6,7 @@ import { alternarFunil, definirInicial, reordenarEtapa } from "./actions";
 import {
   AlternarEtapa,
   CamposObrigatorios,
+  ChanceEtapa,
   CorEtapa,
   DiasConsideradoParado,
   FechaComoEtapa,
@@ -33,7 +34,8 @@ export default async function ConfigFunil() {
         A etapa inicial é onde os negócios novos entram. Ganho e perdido ficam como status do negócio, separado da
         etapa — mas se quiser, pode marcar uma etapa pra fechar o negócio sozinha ao entrar nela (ganho direto, ou
         perdido pedindo o motivo no popup de mover). Em cada etapa você pode exigir campos preenchidos (ex.: valor
-        antes de &quot;Proposta enviada&quot;).
+        antes de &quot;Proposta enviada&quot;). A chance de cada etapa é a base do Forecast: vazia, a etapa
+        não entra na previsão.
       </p>
       {funis.map((funil) => {
         const doFunil = etapas.filter((e) => e.funilId === funil.id);
@@ -85,6 +87,7 @@ export default async function ConfigFunil() {
                   <AlternarEtapa etapaId={etapa.id} ativa={etapa.ativa} />
                   <FechaComoEtapa etapaId={etapa.id} fechaComo={etapa.fechaComo} />
                   <MarcaNegociacaoEtapa etapaId={etapa.id} marcaNegociacao={etapa.marcaNegociacao} />
+                  {!etapa.fechaComo && <ChanceEtapa etapaId={etapa.id} chance={etapa.chanceFechamento} />}
                   <CamposObrigatorios etapaId={etapa.id} campos={etapa.camposObrigatorios} />
                 </li>
               ))}

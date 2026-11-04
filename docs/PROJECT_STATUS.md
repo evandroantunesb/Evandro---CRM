@@ -1,5 +1,17 @@
 # Estado do projeto — Raion CRM
 
+## Forecast — em revisão (04/11/2026)
+
+Tela `/forecast` (menu Comercial, abaixo de Negócios; botão na faixa de Negócios), pelo desenho aprovado "Forecast" do canvas. Migration `20261117100000_forecast_chance_etapa.sql` (coluna `etapas.chance_fechamento`), ainda não aplicada em produção: **o preview da Vercel quebra em Funis e etapas e no Forecast até a aplicação**.
+
+Decisões do Evandro (02 e 04/11/2026):
+- Chance = chance base da etapa (Configurações › Funis e etapas, 0 a 100; vazia tira a etapa do Forecast) + temperatura (quente +10, frio −10). Entra o negócio aberto com chance ≥ 20%, valor e mês previsto de fechamento. Compromisso ≥ 70%, Provável 40–69%, Possível 20–39%; ponderado = valor × chance.
+- Etapas existentes recebem a chance pelo nome: negociação (ou marcada como negociação) 80, proposta 60, visita 40, qualificação/contato 20, novo lead 10; outro nome fica sem chance. Etapa nova recebe o mesmo padrão; etapa que fecha o negócio (ganho/perdido) fica sem chance.
+- Meta do mês = metas de receita ativas que cobrem o mês; período maior entra pela fração de dias.
+- Vendedor e SDR veem a própria carteira; admin e gestor abrem na equipe (o que a RLS mostra) e trocam para "Minha carteira".
+- "Fora do forecast", na ordem: sem mês previsto, mês previsto já passado, sem valor, parado (dias de "considerado parado" da empresa), etapa sem chance. A "data passada" não estava no desenho: sem ela, esses negócios sumiriam da conta sem aviso.
+- Diferenças do desenho: o banco guarda só o mês previsto (não o dia), então a lista mostra "nov/26"; o risco é o porquê da temperatura fria; os percentuais por vendedor ficam em dourado (verde só no WhatsApp, pelo CLAUDE.md); no celular a lista vira cartões.
+
 ## Pagamento informado pelo vendedor (Pro) — concluído (03 e 04/11/2026)
 
 #312 mesclada em 03/11/2026; migration `20261113100000_aviso_pagamento_vendedor.sql` aplicada em 04/11/2026 (autorização #313, run 41808982799, `main` em `a93826c`). Para conferir pagamentos, a pessoa da Operação precisa ter o setor Operacional. Prévia aprovada: https://claude.ai/artifact/BqPcYg11kVfWS2VELQSE8v

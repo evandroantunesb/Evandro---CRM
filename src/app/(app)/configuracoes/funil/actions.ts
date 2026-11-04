@@ -183,6 +183,20 @@ export async function definirMarcaNegociacaoEtapa(formData: FormData) {
   concluir("");
 }
 
+/** Chance base da etapa no Forecast (0 a 100); vazio tira a etapa do Forecast. */
+export async function definirChanceEtapa(formData: FormData) {
+  await exigirPapel("admin");
+  const etapaId = z.string().uuid().safeParse(formData.get("etapaId"));
+  const chance = z
+    .union([z.literal("").transform(() => null), z.coerce.number().int().min(0).max(100)])
+    .safeParse(String(formData.get("chance") ?? "").trim());
+  if (!etapaId.success || !chance.success) return;
+
+  const supabase = await criarClienteServidor();
+  await supabase.from("etapas").update({ chance_fechamento: chance.data }).eq("id", etapaId.data);
+  concluir("");
+}
+
 export async function definirDiasConsideradoParado(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
   const { atual } = await exigirPapel("admin");
   const dias = z.coerce.number().int().min(1, "Informe pelo menos 1 dia").max(365, "No máximo 365 dias").safeParse(formData.get("dias"));

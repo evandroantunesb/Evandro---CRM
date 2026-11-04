@@ -12,6 +12,7 @@ import {
   definirDiasConsideradoParado,
   definirFechaComoEtapa,
   definirHorasConsideradoSemContato,
+  definirChanceEtapa,
   definirMarcaNegociacaoEtapa,
   renomear,
 } from "./actions";
@@ -167,6 +168,31 @@ export function MarcaNegociacaoEtapa({ etapaId, marcaNegociacao }: { etapaId: st
           onChange={(e) => e.currentTarget.form?.requestSubmit()}
         />
         Negociação
+      </label>
+    </form>
+  );
+}
+
+/** Chance base da etapa no Forecast; grava ao sair do campo. Vazio: a etapa não entra no Forecast. */
+export function ChanceEtapa({ etapaId, chance }: { etapaId: string; chance: number | null }) {
+  return (
+    <form action={definirChanceEtapa} title="Chance base de um negócio nesta etapa fechar, usada no Forecast">
+      <input type="hidden" name="etapaId" value={etapaId} />
+      <label className="flex items-center gap-1 text-sm text-zinc-600">
+        Chance
+        <input
+          name="chance"
+          type="number"
+          inputMode="numeric"
+          min={0}
+          max={100}
+          defaultValue={chance ?? ""}
+          onBlur={(e) => {
+            if (e.currentTarget.value !== String(chance ?? "")) e.currentTarget.form?.requestSubmit();
+          }}
+          className="w-16 rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm text-zinc-700"
+        />
+        %
       </label>
     </form>
   );
