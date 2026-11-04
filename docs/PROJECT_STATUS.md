@@ -1,8 +1,10 @@
 # Estado do projeto — Raion CRM
 
-## Forecast — em revisão (04/11/2026)
+## Forecast — concluído (04/11/2026)
 
-Tela `/forecast` (menu Comercial, abaixo de Negócios; botão na faixa de Negócios), pelo desenho aprovado "Forecast" do canvas. Migration `20261117100000_forecast_chance_etapa.sql` (colunas `etapas.chance_fechamento` e `negocios.fechamento_previsto_em`), ainda não aplicada em produção: **o preview da Vercel quebra em Funis e etapas, na ficha do negócio e no Forecast até a aplicação**.
+Tela `/forecast` (menu Comercial, abaixo de Negócios; botão na faixa de Negócios), pelo desenho aprovado "Forecast" do canvas. #322 mesclada em 04/11/2026; migration `20261117100000_forecast_chance_etapa.sql` (colunas `etapas.chance_fechamento` e `negocios.fechamento_previsto_em`) aplicada em 04/11/2026 (autorização #323, run 41870993047, `main` em `78099e6`).
+
+Depois da entrega: o admin confere a chance de cada etapa em Configurações › Funis e etapas (etapa com nome fora do padrão ficou sem chance e aparece em "Fora do forecast"). Filtro de temperatura em Negócios (decidido em 02/11): chips Quente/Morno/Frio com contagem na barra de ferramentas, só em "Em andamento" (#325, mesclada em 04/11/2026, sem migration).
 
 Decisões do Evandro (02 e 04/11/2026):
 - Chance = chance base da etapa (Configurações › Funis e etapas, 0 a 100; vazia tira a etapa do Forecast) + temperatura (quente +10, frio −10). Entra o negócio aberto com chance ≥ 20%, valor e mês previsto de fechamento. Compromisso ≥ 70%, Provável 40–69%, Possível 20–39%; ponderado = valor × chance.
