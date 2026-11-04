@@ -8,9 +8,13 @@ import { afterAll, describe, expect, it } from "vitest";
 
 const SCRIPT = ".github/scripts/validar-conjunto-migrations.sh";
 const WORKFLOW = ".github/workflows/banco-producao.yml";
-// Prazos da Copel (#316) e obra de rede (#317): só elas, nenhuma a mais ou a menos.
-const AUTORIZADAS = ["20261115100000_engenharia_prazos_copel.sql", "20261116100000_engenharia_obra_rede.sql"];
+// Forecast (#322): só ela, nenhuma a mais ou a menos.
+const AUTORIZADAS = ["20261117100000_forecast_chance_etapa.sql"];
 const LISTA = AUTORIZADAS.join("\n");
+// Prazos da Copel (#316) e obra de rede (#317): aplicadas em 04/11/2026, antes desta. Se voltarem a aparecer como
+// pendentes, não são autorizadas.
+const PRAZOS_COPEL = "20261115100000_engenharia_prazos_copel.sql";
+const OBRA_REDE = "20261116100000_engenharia_obra_rede.sql";
 // Enquadramento Copel (#314): aplicada em 04/11/2026, antes destas. Se voltar a aparecer como pendente, não é
 // autorizada.
 const ENQUADRAMENTO_COPEL = "20261114100000_engenharia_enquadramento_copel.sql";
@@ -270,8 +274,8 @@ describe("protocolos da Engenharia", () => {
     expect(validar(dryRunCom(...AUTORIZADAS)).codigo).toBe(0);
   });
 
-  it("enquadramento Copel, pagamento informado pelo vendedor, \"não se aplica\" da Engenharia, configurações da empresa, marcos, trajetória, autoconfirmação, justificativa, checklist, tarefas de setor, dados do cliente, dados pessoais da obra, fixação, validade da proposta, eletroposto SDR, eletroposto, temperatura ou qualquer migration da calculadora pendente junto, ou sozinha, não passa", () => {
-    for (const m of [ENQUADRAMENTO_COPEL, AVISO_PAGAMENTO, NAO_SE_APLICA, CONFIG_EMPRESA, MARCOS, TRAJETORIA, AUTOCONFIRMACAO, JUSTIFICATIVA, COMPLETA, CUSTOS, CRONOGRAMA, CONDICAO_ESCOLHIDA, DESCONTOS, CONDICOES_CONFIG, CAPTURA_LIMITE, PRIVILEGIOS_TABELAS, FUNCOES_SEM_LOGIN, INICIAR_ATUACAO, ENQUADRAMENTO, PASSOS, TAREFAS_AUTOMATICAS, PRAZOS, VISTORIA, PROTOCOLOS, CHECKLIST, NOTIFICACOES, ANEXOS_TAREFA, TAREFAS_SETOR, DADOS_CLIENTE, CLIENTE_OCULTO, FIXACAO, VALIDADE_PROPOSTA, ELETROPOSTO_SDR, ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) {
+  it("prazos da Copel, obra de rede, enquadramento Copel, pagamento informado pelo vendedor, \"não se aplica\" da Engenharia, configurações da empresa, marcos, trajetória, autoconfirmação, justificativa, checklist, tarefas de setor, dados do cliente, dados pessoais da obra, fixação, validade da proposta, eletroposto SDR, eletroposto, temperatura ou qualquer migration da calculadora pendente junto, ou sozinha, não passa", () => {
+    for (const m of [PRAZOS_COPEL, OBRA_REDE, ENQUADRAMENTO_COPEL, AVISO_PAGAMENTO, NAO_SE_APLICA, CONFIG_EMPRESA, MARCOS, TRAJETORIA, AUTOCONFIRMACAO, JUSTIFICATIVA, COMPLETA, CUSTOS, CRONOGRAMA, CONDICAO_ESCOLHIDA, DESCONTOS, CONDICOES_CONFIG, CAPTURA_LIMITE, PRIVILEGIOS_TABELAS, FUNCOES_SEM_LOGIN, INICIAR_ATUACAO, ENQUADRAMENTO, PASSOS, TAREFAS_AUTOMATICAS, PRAZOS, VISTORIA, PROTOCOLOS, CHECKLIST, NOTIFICACOES, ANEXOS_TAREFA, TAREFAS_SETOR, DADOS_CLIENTE, CLIENTE_OCULTO, FIXACAO, VALIDADE_PROPOSTA, ELETROPOSTO_SDR, ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) {
       expect(validar(dryRunCom(...AUTORIZADAS, m)).codigo, m).toBe(1);
       expect(validar(dryRunCom(m)).codigo, m).toBe(1);
     }
@@ -289,7 +293,7 @@ describe("protocolos da Engenharia", () => {
       expect(existsSync(`supabase/migrations/${m}`), m).toBe(true);
       expect(texto, m).toContain(m);
     }
-    for (const m of [ENQUADRAMENTO_COPEL, AVISO_PAGAMENTO, NAO_SE_APLICA, CONFIG_EMPRESA, MARCOS, TRAJETORIA, AUTOCONFIRMACAO, JUSTIFICATIVA, COMPLETA, CUSTOS, CRONOGRAMA, CONDICAO_ESCOLHIDA, DESCONTOS, CONDICOES_CONFIG, CAPTURA_LIMITE, PRIVILEGIOS_TABELAS, FUNCOES_SEM_LOGIN, INICIAR_ATUACAO, ENQUADRAMENTO, PASSOS, TAREFAS_AUTOMATICAS, PRAZOS, VISTORIA, PROTOCOLOS, CHECKLIST, NOTIFICACOES, ANEXOS_TAREFA, TAREFAS_SETOR, DADOS_CLIENTE, CLIENTE_OCULTO, FIXACAO, VALIDADE_PROPOSTA, ELETROPOSTO_SDR, ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) expect(texto, m).not.toContain(m);
+    for (const m of [PRAZOS_COPEL, OBRA_REDE, ENQUADRAMENTO_COPEL, AVISO_PAGAMENTO, NAO_SE_APLICA, CONFIG_EMPRESA, MARCOS, TRAJETORIA, AUTOCONFIRMACAO, JUSTIFICATIVA, COMPLETA, CUSTOS, CRONOGRAMA, CONDICAO_ESCOLHIDA, DESCONTOS, CONDICOES_CONFIG, CAPTURA_LIMITE, PRIVILEGIOS_TABELAS, FUNCOES_SEM_LOGIN, INICIAR_ATUACAO, ENQUADRAMENTO, PASSOS, TAREFAS_AUTOMATICAS, PRAZOS, VISTORIA, PROTOCOLOS, CHECKLIST, NOTIFICACOES, ANEXOS_TAREFA, TAREFAS_SETOR, DADOS_CLIENTE, CLIENTE_OCULTO, FIXACAO, VALIDADE_PROPOSTA, ELETROPOSTO_SDR, ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) expect(texto, m).not.toContain(m);
   });
 });
 
