@@ -91,8 +91,18 @@ export const BUCKET_ARQUIVOS_VISTORIA = "vistoria-arquivos";
 export const aceitaDataFutura = (t: TipoRegistroVistoria) => t === "agendada";
 
 /** Por que ainda não dá para pedir a vistoria (gate G5), ou null se dá. */
-export function bloqueioPedidoVistoria({ protocoloAprovado, instalacaoConcluida }: { protocoloAprovado: boolean; instalacaoConcluida: boolean }): string | null {
+export function bloqueioPedidoVistoria({
+  protocoloAprovado,
+  instalacaoConcluida,
+  obraRedePendente = false,
+}: {
+  protocoloAprovado: boolean;
+  instalacaoConcluida: boolean;
+  /** Houve orçamento de conexão e a obra de rede ainda não foi concluída. */
+  obraRedePendente?: boolean;
+}): string | null {
   if (!protocoloAprovado) return "A vistoria pode ser pedida depois que o protocolo for aprovado (ou o orçamento de conexão emitido).";
+  if (obraRedePendente) return "Com orçamento de conexão, a vistoria pode ser pedida depois da obra de rede concluída (passo 7).";
   if (!instalacaoConcluida) return "A vistoria pode ser pedida depois que o Operacional concluir a instalação.";
   return null;
 }

@@ -5,6 +5,7 @@ import { GestaoFixacao, GestaoSetor } from "@/app/(app)/obras/[id]/gestao";
 import { ChecklistEngenharia } from "@/components/engenharia/checklist";
 import { EnquadramentoEngenharia } from "@/components/engenharia/enquadramento";
 import { IniciarAtuacao } from "@/components/engenharia/iniciar-atuacao";
+import { ObraRedeEngenharia } from "@/components/engenharia/obra-rede";
 import { RegistroPasso, ResumoPassos, SecaoPasso } from "@/components/engenharia/passos";
 import { ProtocolosEngenharia } from "@/components/engenharia/protocolos";
 import { VistoriaEngenharia } from "@/components/engenharia/vistoria";
@@ -17,6 +18,7 @@ import { carregarEnquadramento } from "@/lib/engenharia-enquadramento";
 import { enquadramentoCompleto, perguntasSemResposta } from "@/lib/engenharia-enquadramento-regras";
 import { carregarRegistrosPassos } from "@/lib/engenharia-passos";
 import { acoesPasso, montarPassosEngenharia, passoAtual, type PassoComRegistro } from "@/lib/engenharia-passos-regras";
+import { carregarObraRede } from "@/lib/engenharia-obra-rede";
 import { carregarPrazosObras } from "@/lib/engenharia-prazos";
 import { seloPrazo } from "@/lib/engenharia-prazos-regras";
 import { carregarProtocolosEngenharia } from "@/lib/engenharia-protocolos";
@@ -46,7 +48,7 @@ export default async function CardEngenharia({ params }: PageProps<"/engenharia/
   const { id } = await params;
   const supabase = await criarClienteServidor();
 
-  const [obra, tarefas, { data: meusSetores }, checklist, protocolos, vistorias, registros, prazos, enquadramento] = await Promise.all([
+  const [obra, tarefas, { data: meusSetores }, checklist, protocolos, vistorias, registros, prazos, enquadramento, obraRede] = await Promise.all([
     carregarDetalheObra(supabase, { empresaId: atual.empresaId, papel: atual.papel, obraId: id, membroId: atual.membroId }),
     carregarTarefasSetor(supabase, {
       empresaId: atual.empresaId,
@@ -68,6 +70,7 @@ export default async function CardEngenharia({ params }: PageProps<"/engenharia/
     carregarRegistrosPassos(supabase, { empresaId: atual.empresaId, obraId: id }),
     carregarPrazosObras(supabase, atual.empresaId),
     carregarEnquadramento(supabase, { empresaId: atual.empresaId, obraId: id }),
+    carregarObraRede(supabase, { empresaId: atual.empresaId, obraId: id }),
   ]);
   // Operação só entra no card de quem atua em Engenharia (mesma regra da lista).
   if (!obra || (atual.papel === "operacao" && (meusSetores ?? []).length === 0)) notFound();
@@ -85,9 +88,12 @@ export default async function CardEngenharia({ params }: PageProps<"/engenharia/
     : null;
   // Gate G5: protocolo aprovado (ou orçamento emitido) e instalação concluída pelo Operacional.
   const operacional = obra.setores.find((s) => s.setor === "operacional");
+  // Obra de rede com custo: a distribuidora emitiu orçamento em algum protocolo (a RPC confere o mesmo).
+  const temOrcamento = protocolos.some((p) => p.eventos.some((e) => e.tipo === "orcamento_emitido"));
   const bloqueioVistoria = bloqueioPedidoVistoria({
     protocoloAprovado: protocolos.some((p) => p.status === "aprovado" || p.status === "orcamento_emitido" || p.status === "encerrado"),
     instalacaoConcluida: operacional?.status === "instalacao_concluida" || operacional?.status === "concluido",
+    obraRedePendente: temOrcamento && !obraRede?.concluidaEm,
   });
   const local = [resumo.cidade, resumo.uf].filter(Boolean).join("/");
   // Linha do topo no lugar do antigo cartão "Resumo"; o resto da venda fica em "Dados da venda".
@@ -317,6 +323,11 @@ export default async function CardEngenharia({ params }: PageProps<"/engenharia/
 
       <SecaoPasso passo={passos[6]} titulo={tituloPasso(7)} {...secao(7)}>
         <p className="mb-3 text-sm text-zinc-600">{passos[6].ajuda}</p>
+        {autorizacaoEngenharia !== null && (temOrcamento || obraRede) && (
+          <div className="mb-4">
+            <ObraRedeEngenharia obraId={resumo.id} obraRede={obraRede} podeAgir={resumo.situacao !== "cancelada"} />
+          </div>
+        )}
         {registro(7)}
       </SecaoPasso>
 

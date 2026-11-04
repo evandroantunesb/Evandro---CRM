@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { CHAVES_PERGUNTA, respostaValida, type CondicoesItem } from "@/lib/engenharia-enquadramento-regras";
-import { CHAVES_PRAZO, lerContagem, type ContagemPrazo } from "@/lib/engenharia-prazos-regras";
+import { CHAVES_PRAZO_CONFIG, lerContagem, type ContagemPrazo } from "@/lib/engenharia-prazos-regras";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import type { ResultadoAcao } from "@/lib/tipos";
@@ -83,8 +83,8 @@ const dias = z.union([z.literal(""), z.coerce.number().int("Use dias inteiros").
 /** Vazio = sem prazo. Só os dias mudam: as linhas nascem com a empresa. */
 export async function salvarPrazos(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
   const { atual } = await exigirPapel("admin");
-  const valores: { chave: (typeof CHAVES_PRAZO)[number]; dias: number | null; contagem: ContagemPrazo }[] = [];
-  for (const chave of CHAVES_PRAZO) {
+  const valores: { chave: (typeof CHAVES_PRAZO_CONFIG)[number]; dias: number | null; contagem: ContagemPrazo }[] = [];
+  for (const chave of CHAVES_PRAZO_CONFIG) {
     const d = dias.safeParse(String(formData.get(chave) ?? "").trim());
     if (!d.success) return { ok: false, mensagem: d.error.issues[0].message };
     valores.push({ chave, dias: d.data === "" ? null : d.data, contagem: lerContagem(formData.get(`${chave}_contagem`)) });
