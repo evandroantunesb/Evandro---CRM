@@ -91,7 +91,7 @@ export function ProximosPrazos({ agenda, dias }: { agenda: DiaAgenda[]; dias: nu
                       </Link>
                       {i.diasRestantes <= 1 && (
                         <span className="mt-1 block w-fit">
-                          <Selo tom="atencao">{i.diasRestantes === 0 ? "Vence hoje" : "Vence no próximo dia útil"}</Selo>
+                          <Selo tom="atencao">{i.diasRestantes === 0 ? "Vence hoje" : i.contagem === "corridos" ? "Vence amanhã" : "Vence no próximo dia útil"}</Selo>
                         </span>
                       )}
                     </li>

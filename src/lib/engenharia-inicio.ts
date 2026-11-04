@@ -1,4 +1,4 @@
-import { ROTULO_PRAZO, type PrazoObra } from "@/lib/engenharia-prazos-regras";
+import { ROTULO_PRAZO, type ContagemPrazo, type PrazoObra } from "@/lib/engenharia-prazos-regras";
 import type { ObraNaEngenharia } from "@/lib/engenharia-regras";
 import type { TarefaSetorVM } from "@/lib/tarefas-setor-regras";
 
@@ -113,7 +113,10 @@ export function montarMeuDia({
   return dia;
 }
 
-export type DiaAgenda = { data: string; itens: { chave: string; rotulo: string; obra: string; href: string; diasRestantes: number }[] };
+export type DiaAgenda = {
+  data: string;
+  itens: { chave: string; rotulo: string; obra: string; href: string; diasRestantes: number; contagem: ContagemPrazo }[];
+};
 
 /**
  * Próximos prazos: os da Engenharia (em dias úteis) que vencem de hoje até `dias` dias úteis à frente, agrupados por
@@ -125,7 +128,7 @@ export function agendaPrazos(obras: readonly ObraNaEngenharia[], prazos: Readonl
     for (const p of prazos.get(o.id) ?? []) {
       if (p.diasRestantes < 0 || p.diasRestantes > dias) continue;
       const lista = porDia.get(p.limite) ?? [];
-      lista.push({ chave: `${o.id}-${p.chave}`, rotulo: ROTULO_PRAZO[p.chave], obra: nomeObra(o), href: `/engenharia/${o.id}`, diasRestantes: p.diasRestantes });
+      lista.push({ chave: `${o.id}-${p.chave}`, rotulo: ROTULO_PRAZO[p.chave], obra: nomeObra(o), href: `/engenharia/${o.id}`, diasRestantes: p.diasRestantes, contagem: p.contagem });
       porDia.set(p.limite, lista);
     }
   }

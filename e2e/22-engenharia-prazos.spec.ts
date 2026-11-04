@@ -8,16 +8,20 @@ test("prazos configuráveis, feriado da empresa e desempenho na Central", async 
   await entrarComo(page, usuarios.admin, senha);
 
   await page.goto("/configuracoes/engenharia");
-  const aIniciar = page.getByLabel("A iniciar: dias úteis");
+  const aIniciar = page.getByLabel("A iniciar: dias", { exact: true });
   await expect(aIniciar).toHaveValue("2");
-  await expect(page.getByLabel("Análise do protocolo pela distribuidora: dias úteis")).toHaveValue("");
+  // Copel (04/11/2026): aprovação do projeto em 15 dias corridos; na zona rural, 30.
+  await expect(page.getByLabel("Aprovação do projeto pela distribuidora: dias", { exact: true })).toHaveValue("15");
+  await expect(page.getByLabel("Aprovação do projeto pela distribuidora: contagem", { exact: true })).toHaveValue("corridos");
+  await expect(page.getByLabel("Aprovação do projeto pela distribuidora, zona rural: dias", { exact: true })).toHaveValue("30");
+  await expect(page.getByLabel("A iniciar: contagem", { exact: true })).toHaveValue("uteis");
   await aIniciar.fill("3");
   await page.getByRole("button", { name: "Salvar prazos" }).click();
   await expect(page.getByText("Prazos salvos.")).toBeVisible();
   await page.reload();
-  await expect(page.getByLabel("A iniciar: dias úteis")).toHaveValue("3");
+  await expect(page.getByLabel("A iniciar: dias", { exact: true })).toHaveValue("3");
   // Volta ao padrão para não mudar o que outros testes veem.
-  await page.getByLabel("A iniciar: dias úteis").fill("2");
+  await page.getByLabel("A iniciar: dias", { exact: true }).fill("2");
   await page.getByRole("button", { name: "Salvar prazos" }).click();
   await expect(page.getByText("Prazos salvos.")).toBeVisible();
 

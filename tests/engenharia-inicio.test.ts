@@ -36,7 +36,7 @@ const tarefa = (id: string, prazo: string, extra: Partial<TarefaSetorVM> = {}): 
     ...extra,
   }) as TarefaSetorVM;
 
-const prazo = (diasRestantes: number, limite: string, chave: PrazoObra["chave"] = "projeto_em_elaboracao"): PrazoObra => ({ chave, limite, diasRestantes });
+const prazo = (diasRestantes: number, limite: string, chave: PrazoObra["chave"] = "projeto_em_elaboracao"): PrazoObra => ({ chave, limite, diasRestantes, contagem: "uteis" });
 
 describe("dataCurta", () => {
   it("dia da semana e data, sem fuso", () => {

@@ -1472,18 +1472,21 @@ export type Database = {
       engenharia_prazos: {
         Row: {
           chave: string;
+          contagem: string;
           dias_uteis: number | null;
           empresa_id: string;
           updated_at: string;
         };
         Insert: {
           chave: string;
+          contagem?: string;
           dias_uteis?: number | null;
           empresa_id: string;
           updated_at?: string;
         };
         Update: {
           chave?: string;
+          contagem?: string;
           dias_uteis?: number | null;
           empresa_id?: string;
           updated_at?: string;
@@ -6771,10 +6774,15 @@ export type Database = {
         Args: { p_empresa_id: string; p_hoje: string; p_limite: string };
         Returns: number;
       };
+      prazo_restante: {
+        Args: { p_contagem: string; p_empresa_id: string; p_hoje: string; p_limite: string };
+        Returns: number;
+      };
       prazos_engenharia: {
         Args: { p_empresa_id: string };
         Returns: {
           chave: string;
+          contagem: string;
           dias_restantes: number;
           inicio: string;
           limite: string;
@@ -7018,6 +7026,10 @@ export type Database = {
           p_observacao?: string;
           p_solicitada_em: string;
         };
+        Returns: string;
+      };
+      somar_dias_prazo: {
+        Args: { p_contagem: string; p_dias: number; p_empresa_id: string; p_inicio: string };
         Returns: string;
       };
       somar_dias_uteis: {
