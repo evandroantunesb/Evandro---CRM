@@ -1,9 +1,11 @@
 import "server-only";
 import {
   ehChavePrazo,
+  lerContagem,
   lerIndicadores,
   porUrgencia,
   type ChavePrazo,
+  type ContagemPrazo,
   type IndicadoresEngenharia,
   type PeriodoIndicadores,
   type PrazoObra,
@@ -18,7 +20,7 @@ export async function carregarPrazosObras(supabase: SupabaseServidor, empresaId:
   for (const p of data ?? []) {
     if (!ehChavePrazo(p.chave)) continue;
     const lista = mapa.get(p.obra_id) ?? [];
-    lista.push({ chave: p.chave, limite: p.limite, diasRestantes: p.dias_restantes });
+    lista.push({ chave: p.chave, limite: p.limite, diasRestantes: p.dias_restantes, contagem: lerContagem(p.contagem) });
     mapa.set(p.obra_id, lista);
   }
   for (const lista of mapa.values()) lista.sort(porUrgencia);
@@ -38,11 +40,13 @@ export async function carregarIndicadoresEngenharia(
   return error ? null : lerIndicadores(data);
 }
 
-export type ConfigPrazo = { chave: ChavePrazo; diasUteis: number | null };
+export type ConfigPrazo = { chave: ChavePrazo; dias: number | null; contagem: ContagemPrazo };
 
 export async function carregarConfigPrazos(supabase: SupabaseServidor, empresaId: string): Promise<ConfigPrazo[]> {
-  const { data } = await supabase.from("engenharia_prazos").select("chave, dias_uteis").eq("empresa_id", empresaId);
-  return (data ?? []).flatMap((p) => (ehChavePrazo(p.chave) ? [{ chave: p.chave, diasUteis: p.dias_uteis }] : []));
+  const { data } = await supabase.from("engenharia_prazos").select("chave, dias_uteis, contagem").eq("empresa_id", empresaId);
+  return (data ?? []).flatMap((p) =>
+    ehChavePrazo(p.chave) ? [{ chave: p.chave, dias: p.dias_uteis, contagem: lerContagem(p.contagem) }] : [],
+  );
 }
 
 export async function carregarFeriadosEmpresa(supabase: SupabaseServidor, empresaId: string) {

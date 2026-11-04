@@ -195,33 +195,46 @@ describe("Engenharia: prazos e indicadores (ordem importa)", { concurrent: false
   });
 
   it("prazos padrão nascem com a empresa; o admin só muda os dias", async () => {
-    const { data } = await admin.cliente.from("engenharia_prazos").select("chave, dias_uteis").eq("empresa_id", empresa).order("chave");
-    expect(Object.fromEntries((data ?? []).map((p) => [p.chave, p.dias_uteis]))).toEqual({
-      a_iniciar: 2,
-      projeto_em_elaboracao: 5,
-      exigencia: 3,
-      correcao_campo: 5,
-      distribuidora_analise: null,
-      distribuidora_vistoria: null,
-      distribuidora_conexao: null,
+    const { data } = await admin.cliente.from("engenharia_prazos").select("chave, dias_uteis, contagem").eq("empresa_id", empresa).order("chave");
+    // Valores do engenheiro para a Copel (20261115100000): aprovação em dias corridos (30 na zona rural), vistoria em 7
+    // dias úteis e a ART em 1 dia útil.
+    expect(Object.fromEntries((data ?? []).map((p) => [p.chave, `${p.dias_uteis ?? "-"} ${p.contagem}`]))).toEqual({
+      a_iniciar: "2 uteis",
+      projeto_em_elaboracao: "5 uteis",
+      exigencia: "3 uteis",
+      correcao_campo: "5 uteis",
+      art: "1 uteis",
+      distribuidora_analise: "15 corridos",
+      distribuidora_analise_rural: "30 corridos",
+      distribuidora_vistoria: "7 uteis",
+      distribuidora_conexao: "- uteis",
     });
     expect((await admin.cliente.from("engenharia_prazos").insert({ empresa_id: empresa, chave: "a_iniciar", dias_uteis: 1 })).error?.code).toBe("42501");
     expect((await admin.cliente.from("engenharia_prazos").delete().eq("empresa_id", empresa)).error?.code).toBe("42501");
     expect((await admin.cliente.from("engenharia_prazos").update({ chave: "exigencia" }).eq("empresa_id", empresa).eq("chave", "a_iniciar")).error?.code).toBe("42501");
     expect((await admin.cliente.from("engenharia_prazos").update({ dias_uteis: 0 }).eq("empresa_id", empresa).eq("chave", "a_iniciar")).error?.code).toBe("23514");
+    expect((await admin.cliente.from("engenharia_prazos").update({ contagem: "semanas" }).eq("empresa_id", empresa).eq("chave", "a_iniciar")).error?.code).toBe("23514");
     for (const quem of [vendedor, execEng, adminB]) {
       await quem.cliente.from("engenharia_prazos").update({ dias_uteis: 9 }).eq("empresa_id", empresa).eq("chave", "a_iniciar");
     }
     const { data: igual } = await servico.from("engenharia_prazos").select("dias_uteis").eq("empresa_id", empresa).eq("chave", "a_iniciar").single();
     expect(igual!.dias_uteis).toBe(2);
-    ok(await admin.cliente.from("engenharia_prazos").update({ dias_uteis: 10 }).eq("empresa_id", empresa).eq("chave", "distribuidora_analise"), "configurar");
+    // O resto do teste usa 10 dias úteis na análise (as contas de dia útil já estão cobertas aqui).
+    ok(
+      await admin.cliente.from("engenharia_prazos").update({ dias_uteis: 10, contagem: "uteis" }).eq("empresa_id", empresa).eq("chave", "distribuidora_analise"),
+      "configurar",
+    );
   });
 
   it("prazo da etapa: obra nova em 'A iniciar' conta 2 dias úteis a partir de hoje", async () => {
     const lista = await prazos(execEng);
-    expect(lista).toEqual([{ obra_id: obra, chave: "a_iniciar", inicio: hoje(), limite: await vence(hoje(), 2), dias_restantes: 2 }]);
+    // A ART (TRT) corre junto: 1 dia útil desde o pagamento confirmado, com o checklist ainda não aplicado.
+    expect(lista.sort((a, b) => a.chave.localeCompare(b.chave))).toEqual([
+      { obra_id: obra, chave: "a_iniciar", inicio: hoje(), limite: await vence(hoje(), 2), dias_restantes: 2, contagem: "uteis" },
+      { obra_id: obra, chave: "art", inicio: hoje(), limite: await vence(hoje(), 1), dias_restantes: 1, contagem: "uteis" },
+    ]);
     // O vendedor vê a etapa da obra dele; o admin de outra empresa, nada.
-    expect((await prazos(vendedor)).map((p) => p.chave)).toEqual(["a_iniciar"]);
+    expect((await prazos(vendedor)).map((p) => p.chave).sort()).toEqual(["a_iniciar", "art"]);
     const { data: deB } = await adminB.cliente.rpc("prazos_engenharia", { p_empresa_id: empresa });
     expect(deB ?? []).toEqual([]);
   });
@@ -246,7 +259,7 @@ describe("Engenharia: prazos e indicadores (ordem importa)", { concurrent: false
     protocolo = r.data as string;
     const analise = await vence(inicio, 10);
     expect(await prazos(execEng)).toEqual([
-      { obra_id: obra, chave: "distribuidora_analise", inicio, limite: analise, dias_restantes: await restantes(analise) },
+      { obra_id: obra, chave: "distribuidora_analise", inicio, limite: analise, dias_restantes: await restantes(analise), contagem: "uteis" },
     ]);
     // Quem não vê os registros da Engenharia não recebe o prazo do protocolo.
     expect(await prazos(vendedor)).toEqual([]);
@@ -264,7 +277,7 @@ describe("Engenharia: prazos e indicadores (ordem importa)", { concurrent: false
       "exigência",
     );
     const exigencia = await vence(inicio, 3);
-    const esperado = [{ obra_id: obra, chave: "exigencia", inicio, limite: exigencia, dias_restantes: await restantes(exigencia) }];
+    const esperado = [{ obra_id: obra, chave: "exigencia", inicio, limite: exigencia, dias_restantes: await restantes(exigencia), contagem: "uteis" }];
     expect(await prazos(execEng)).toEqual(esperado);
     expect(esperado[0].dias_restantes).toBeLessThan(0);
 
@@ -312,5 +325,45 @@ describe("Engenharia: prazos e indicadores (ordem importa)", { concurrent: false
     expect(await prazos(admin)).toEqual([]);
     await noBanco("update public.obras set pausada_em = null, pausa_motivo = null where id = $1", [obra]);
     expect(await prazos(execEng)).toHaveLength(1);
+  });
+});
+
+describe("Engenharia: prazos em dias corridos, zona rural e ART (Copel, 04/11/2026)", { concurrent: false, shuffle: false }, () => {
+  async function prazoDe(chave: string) {
+    return (await prazos(execEng)).find((p) => p.chave === chave);
+  }
+
+  it("aprovação em dias corridos: vence no marco + N e conta dias corridos", async () => {
+    ok(
+      await admin.cliente.from("engenharia_prazos").update({ dias_uteis: 15, contagem: "corridos" }).eq("empresa_id", empresa).eq("chave", "distribuidora_analise"),
+      "corridos",
+    );
+    const { data: p } = await servico.from("obra_engenharia_protocolos").select("id").eq("obra_id", obra).single();
+    ok(await execEng.cliente.rpc("registrar_evento_protocolo_engenharia", { p_protocolo_id: p!.id, p_tipo: "reenvio", p_ocorrido_em: hoje() }), "reenvio");
+    const fim = new Date(`${hoje()}T12:00:00Z`);
+    fim.setUTCDate(fim.getUTCDate() + 15);
+    expect(await prazoDe("distribuidora_analise")).toMatchObject({ inicio: hoje(), limite: fim.toISOString().slice(0, 10), dias_restantes: 15, contagem: "corridos" });
+  });
+
+  it("zona rural no enquadramento usa o prazo rural (a chave devolvida continua a da análise)", async () => {
+    ok(
+      await admin.cliente
+        .from("engenharia_prazos")
+        .update({ dias_uteis: 30, contagem: "corridos" })
+        .eq("empresa_id", empresa)
+        .eq("chave", "distribuidora_analise_rural"),
+      "rural",
+    );
+    ok(await execEng.cliente.rpc("salvar_enquadramento_engenharia", { p_obra_id: obra, p_respostas: { zona: "rural" } as never }), "zona rural");
+    expect(await prazoDe("distribuidora_analise")).toMatchObject({ dias_restantes: 30, contagem: "corridos" });
+    ok(await execEng.cliente.rpc("salvar_enquadramento_engenharia", { p_obra_id: obra, p_respostas: { zona: "urbana" } as never }), "zona urbana");
+    expect(await prazoDe("distribuidora_analise")).toMatchObject({ dias_restantes: 15 });
+  });
+
+  it("a ART sai quando o item da ART fica resolvido", async () => {
+    // Nesta obra o item da ART já foi dispensado (obrigatórios dispensados antes do protocolo): não há prazo da ART.
+    expect(await prazoDe("art")).toBeUndefined();
+    const { data: art } = await servico.from("obra_engenharia_itens").select("id, status").eq("obra_id", obra).ilike("titulo", "ART %").single();
+    expect(art!.status).toBe("dispensado");
   });
 });

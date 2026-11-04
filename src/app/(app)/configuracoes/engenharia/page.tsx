@@ -26,8 +26,8 @@ export default async function ConfigEngenharia() {
     supabase.from("engenharia_marcos").select("obras, kwp").eq("empresa_id", atual.empresaId).maybeSingle(),
   ]);
   const itens = (data ?? []).map((i) => ({ ...i, condicoes: lerCondicoes(i.condicoes) }));
-  const dias = new Map(prazos.map((p) => [p.chave, p.diasUteis]));
-  const linhas = (chaves: readonly ChavePrazo[]) => chaves.filter((c) => dias.has(c)).map((chave) => ({ chave, diasUteis: dias.get(chave) ?? null }));
+  const porChave = new Map(prazos.map((p) => [p.chave, p]));
+  const linhas = (chaves: readonly ChavePrazo[]) => chaves.flatMap((c) => porChave.get(c) ?? []);
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-4">
@@ -60,8 +60,9 @@ export default async function ConfigEngenharia() {
 
       <h2 className="sobretitulo mt-4 px-1">Prazos</h2>
       <p className="text-sm text-zinc-600">
-        Contam em dias úteis a partir do dia útil seguinte ao marco: sem sábado, domingo, feriados nacionais (inclusive
-        Carnaval, Sexta-feira Santa e Corpus Christi) e os feriados da empresa abaixo. Prazo vencido aparece na Central da
+        Cada prazo conta em dias úteis ou corridos. Em dias úteis, a partir do dia útil seguinte ao marco: sem sábado,
+        domingo, feriados nacionais (inclusive Carnaval, Sexta-feira Santa e Corpus Christi) e os feriados da empresa
+        abaixo. Em dias corridos, todos os dias contam. Prazo vencido aparece na Central da
         Engenharia; não muda a etapa nem bloqueia nada. Campo vazio = sem prazo.
       </p>
       <Cartao titulo="Prazos da Engenharia">
@@ -73,7 +74,7 @@ export default async function ConfigEngenharia() {
               { titulo: "Internos", ajuda: "Metas da própria equipe. Os valores iniciais são sugestões: ajuste à rotina da empresa.", prazos: linhas(CHAVES_PRAZO_INTERNO) },
               {
                 titulo: "Da distribuidora",
-                ajuda: "Prazos que a Copel/ANEEL dá à distribuidora. Preencha com o responsável técnico; vazio, a tela não mostra.",
+                ajuda: "Prazos que a Copel/ANEEL dá à distribuidora, com os valores informados pelo engenheiro. Ajuste com o responsável técnico; vazio, a tela não mostra.",
                 prazos: linhas(CHAVES_PRAZO_DISTRIBUIDORA),
               },
             ]}

@@ -2,13 +2,17 @@
 
 import { useActionState } from "react";
 import { Botao, CLASSE_ENTRADA, Mensagem } from "@/components/ui";
-import { MARCO_PRAZO, ROTULO_PRAZO, type ChavePrazo } from "@/lib/engenharia-prazos-regras";
+import { CONTAGENS_PRAZO, MARCO_PRAZO, ROTULO_CONTAGEM, ROTULO_PRAZO, type ChavePrazo, type ContagemPrazo } from "@/lib/engenharia-prazos-regras";
 import { adicionarFeriado, removerFeriado, salvarPrazos } from "./actions";
 
 const entrada = `min-w-0 text-sm ${CLASSE_ENTRADA}`;
 
-/** Dias úteis de cada prazo. Vazio = sem prazo. */
-export function FormPrazos({ grupos }: { grupos: { titulo: string; ajuda: string; prazos: { chave: ChavePrazo; diasUteis: number | null }[] }[] }) {
+/** Dias de cada prazo e se contam úteis ou corridos. Vazio = sem prazo. */
+export function FormPrazos({
+  grupos,
+}: {
+  grupos: { titulo: string; ajuda: string; prazos: { chave: ChavePrazo; dias: number | null; contagem: ContagemPrazo }[] }[];
+}) {
   const [resultado, acao, pendente] = useActionState(salvarPrazos, null);
   return (
     <form action={acao} className="flex flex-col gap-4">
@@ -28,12 +32,23 @@ export function FormPrazos({ grupos }: { grupos: { titulo: string; ajuda: string
                   type="number"
                   min={1}
                   max={365}
-                  defaultValue={p.diasUteis ?? ""}
+                  defaultValue={p.dias ?? ""}
                   placeholder="Sem prazo"
-                  aria-label={`${ROTULO_PRAZO[p.chave]}: dias úteis`}
+                  aria-label={`${ROTULO_PRAZO[p.chave]}: dias`}
                   className={`${entrada} w-28`}
                 />
-                <span className="text-xs text-zinc-500">dias úteis</span>
+                <select
+                  name={`${p.chave}_contagem`}
+                  defaultValue={p.contagem}
+                  aria-label={`${ROTULO_PRAZO[p.chave]}: contagem`}
+                  className={`${entrada} w-36`}
+                >
+                  {CONTAGENS_PRAZO.map((c) => (
+                    <option key={c} value={c}>
+                      {ROTULO_CONTAGEM[c]}
+                    </option>
+                  ))}
+                </select>
               </span>
             </label>
           ))}

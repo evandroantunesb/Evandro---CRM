@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { CHAVES_PERGUNTA, respostaValida, type CondicoesItem } from "@/lib/engenharia-enquadramento-regras";
-import { CHAVES_PRAZO } from "@/lib/engenharia-prazos-regras";
+import { CHAVES_PRAZO, lerContagem, type ContagemPrazo } from "@/lib/engenharia-prazos-regras";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import type { ResultadoAcao } from "@/lib/tipos";
@@ -78,28 +78,32 @@ export async function salvarCondicoesModelo(_: ResultadoAcao, formData: FormData
 // Prazos e feriados (P5)
 // ---------------------------------------------------------------------------
 
-const dias = z.union([z.literal(""), z.coerce.number().int("Use dias inteiros").min(1, "Mínimo de 1 dia útil").max(365, "Máximo de 365 dias úteis")]);
+const dias = z.union([z.literal(""), z.coerce.number().int("Use dias inteiros").min(1, "Mínimo de 1 dia").max(365, "Máximo de 365 dias")]);
 
 /** Vazio = sem prazo. Só os dias mudam: as linhas nascem com a empresa. */
 export async function salvarPrazos(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
   const { atual } = await exigirPapel("admin");
-  const valores: { chave: (typeof CHAVES_PRAZO)[number]; dias: number | null }[] = [];
+  const valores: { chave: (typeof CHAVES_PRAZO)[number]; dias: number | null; contagem: ContagemPrazo }[] = [];
   for (const chave of CHAVES_PRAZO) {
     const d = dias.safeParse(String(formData.get(chave) ?? "").trim());
     if (!d.success) return { ok: false, mensagem: d.error.issues[0].message };
-    valores.push({ chave, dias: d.data === "" ? null : d.data });
+    valores.push({ chave, dias: d.data === "" ? null : d.data, contagem: lerContagem(formData.get(`${chave}_contagem`)) });
   }
 
   // Só o que mudou: cada linha gravada vira um registro de auditoria, e menos escritas deixam menos espaço para um
   // salvamento parcial se uma delas falhar.
   const supabase = await criarClienteServidor();
-  const { data: atuais, error: erroLeitura } = await supabase.from("engenharia_prazos").select("chave, dias_uteis").eq("empresa_id", atual.empresaId);
+  const { data: atuais, error: erroLeitura } = await supabase
+    .from("engenharia_prazos")
+    .select("chave, dias_uteis, contagem")
+    .eq("empresa_id", atual.empresaId);
   if (erroLeitura) return { ok: false, mensagem: "Não foi possível salvar os prazos." };
-  const antes = new Map((atuais ?? []).map((p) => [p.chave, p.dias_uteis]));
-  for (const v of valores.filter((v) => antes.get(v.chave) !== v.dias)) {
+  const antes = new Map((atuais ?? []).map((p) => [p.chave, p]));
+  const mudou = (v: (typeof valores)[number]) => antes.get(v.chave)?.dias_uteis !== v.dias || antes.get(v.chave)?.contagem !== v.contagem;
+  for (const v of valores.filter(mudou)) {
     const { error } = await supabase
       .from("engenharia_prazos")
-      .update({ dias_uteis: v.dias })
+      .update({ dias_uteis: v.dias, contagem: v.contagem })
       .eq("empresa_id", atual.empresaId)
       .eq("chave", v.chave);
     if (error) return { ok: false, mensagem: "Não foi possível salvar os prazos." };

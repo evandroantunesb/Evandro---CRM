@@ -13,23 +13,28 @@ import {
 
 describe("prazos da Engenharia: selo", () => {
   it("interno e da distribuidora, no prazo, vence hoje e vencido", () => {
-    expect(seloPrazo({ chave: "a_iniciar", limite: "2026-11-03", diasRestantes: 2 })).toEqual({ texto: "Prazo interno: 2 dias úteis", tom: "neutro" });
-    expect(seloPrazo({ chave: "exigencia", limite: "2026-11-03", diasRestantes: 1 })).toEqual({ texto: "Prazo interno: 1 dia útil", tom: "neutro" });
-    expect(seloPrazo({ chave: "distribuidora_vistoria", limite: "2026-11-03", diasRestantes: 0 })).toEqual({
+    expect(seloPrazo({ chave: "a_iniciar", limite: "2026-11-03", diasRestantes: 2, contagem: "uteis" })).toEqual({ texto: "Prazo interno: 2 dias úteis", tom: "neutro" });
+    expect(seloPrazo({ chave: "exigencia", limite: "2026-11-03", diasRestantes: 1, contagem: "uteis" })).toEqual({ texto: "Prazo interno: 1 dia útil", tom: "neutro" });
+    expect(seloPrazo({ chave: "distribuidora_vistoria", limite: "2026-11-03", diasRestantes: 0, contagem: "uteis" })).toEqual({
       texto: "Prazo da distribuidora vence hoje",
       tom: "atencao",
     });
-    expect(seloPrazo({ chave: "distribuidora_analise", limite: "2026-11-03", diasRestantes: -3 })).toEqual({
+    expect(seloPrazo({ chave: "distribuidora_analise", limite: "2026-11-03", diasRestantes: -3, contagem: "uteis" })).toEqual({
       texto: "Prazo da distribuidora vencido há 3 dias úteis",
       tom: "negativo",
     });
-    expect(seloPrazo({ chave: "correcao_campo", limite: "2026-11-03", diasRestantes: -1 }).texto).toBe("Prazo interno vencido há 1 dia útil");
+    expect(seloPrazo({ chave: "correcao_campo", limite: "2026-11-03", diasRestantes: -1, contagem: "uteis" }).texto).toBe("Prazo interno vencido há 1 dia útil");
+    // Dias corridos: o texto não fala em "úteis".
+    expect(seloPrazo({ chave: "distribuidora_analise", limite: "2026-11-19", diasRestantes: 9, contagem: "corridos" }).texto).toBe("Prazo da distribuidora: 9 dias");
+    expect(seloPrazo({ chave: "distribuidora_analise_rural", limite: "2026-11-01", diasRestantes: -1, contagem: "corridos" }).texto).toBe(
+      "Prazo da distribuidora vencido há 1 dia",
+    );
   });
 
   it("mais urgente primeiro; toda chave tem rótulo e marco", () => {
     const lista = [
-      { chave: "a_iniciar" as const, limite: "", diasRestantes: 3 },
-      { chave: "exigencia" as const, limite: "", diasRestantes: -1 },
+      { chave: "a_iniciar" as const, limite: "", diasRestantes: 3, contagem: "uteis" as const },
+      { chave: "exigencia" as const, limite: "", diasRestantes: -1, contagem: "uteis" as const },
     ].sort(porUrgencia);
     expect(lista.map((p) => p.chave)).toEqual(["exigencia", "a_iniciar"]);
     for (const c of CHAVES_PRAZO) {

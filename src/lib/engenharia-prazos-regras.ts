@@ -1,32 +1,41 @@
 /**
- * Prazos da Engenharia (P5), decididos pelo Evandro em 30/10/2026: contam em dias úteis a partir do dia útil seguinte
- * ao marco registrado; os internos nascem com um padrão que o admin edita; os da distribuidora nascem vazios e só o
- * engenheiro ou o Evandro preenche. Prazo vencido só sinaliza: não muda etapa nem bloqueia nada. O cálculo é do banco
+ * Prazos da Engenharia (P5), decididos pelo Evandro em 30/10/2026: contam a partir do marco registrado (em dias úteis,
+ * do dia útil seguinte; desde 04/11/2026 cada prazo pode contar em dias corridos); os internos nascem com um padrão que
+ * o admin edita; os da distribuidora vêm com os valores do engenheiro para a Copel (20261115100000). Prazo vencido só sinaliza: não muda etapa nem bloqueia nada. O cálculo é do banco
  * (`prazos_engenharia`); aqui ficam os nomes e o texto do selo.
  */
 
-export const CHAVES_PRAZO_INTERNO = ["a_iniciar", "projeto_em_elaboracao", "exigencia", "correcao_campo"] as const;
-export const CHAVES_PRAZO_DISTRIBUIDORA = ["distribuidora_analise", "distribuidora_vistoria", "distribuidora_conexao"] as const;
+export const CHAVES_PRAZO_INTERNO = ["art", "a_iniciar", "projeto_em_elaboracao", "exigencia", "correcao_campo"] as const;
+export const CHAVES_PRAZO_DISTRIBUIDORA = [
+  "distribuidora_analise",
+  "distribuidora_analise_rural",
+  "distribuidora_vistoria",
+  "distribuidora_conexao",
+] as const;
 export const CHAVES_PRAZO = [...CHAVES_PRAZO_INTERNO, ...CHAVES_PRAZO_DISTRIBUIDORA] as const;
 export type ChavePrazo = (typeof CHAVES_PRAZO)[number];
 
 export const ROTULO_PRAZO: Record<ChavePrazo, string> = {
+  art: "Emitir a ART (TRT)",
   a_iniciar: "A iniciar",
   projeto_em_elaboracao: "Projeto em elaboração",
   exigencia: "Responder exigência da concessionária",
   correcao_campo: "Correção de campo após não conformidade",
-  distribuidora_analise: "Análise do protocolo pela distribuidora",
+  distribuidora_analise: "Aprovação do projeto pela distribuidora",
+  distribuidora_analise_rural: "Aprovação do projeto pela distribuidora, zona rural",
   distribuidora_vistoria: "Vistoria pela distribuidora",
   distribuidora_conexao: "Conexão pela distribuidora",
 };
 
 /** De onde cada prazo conta (texto da configuração). */
 export const MARCO_PRAZO: Record<ChavePrazo, string> = {
+  art: "desde o pagamento confirmado, até o item da ART no checklist resolvido (sem checklist, até o protocolo)",
   a_iniciar: "desde a entrada na etapa",
   projeto_em_elaboracao: "desde a entrada na etapa",
   exigencia: "desde o registro da exigência (o prazo digitado na exigência vale mais)",
   correcao_campo: "desde a não conformidade",
   distribuidora_analise: "desde o protocolo ou o último reenvio",
+  distribuidora_analise_rural: "desde o protocolo ou o último reenvio, quando o enquadramento diz zona rural",
   distribuidora_vistoria: "desde o pedido de vistoria",
   distribuidora_conexao: "desde a vistoria aprovada",
 };
@@ -34,20 +43,27 @@ export const MARCO_PRAZO: Record<ChavePrazo, string> = {
 export const ehChavePrazo = (v: string): v is ChavePrazo => (CHAVES_PRAZO as readonly string[]).includes(v);
 export const prazoDaDistribuidora = (c: ChavePrazo) => (CHAVES_PRAZO_DISTRIBUIDORA as readonly string[]).includes(c);
 
-export type PrazoObra = { chave: ChavePrazo; limite: string; diasRestantes: number };
+export const CONTAGENS_PRAZO = ["uteis", "corridos"] as const;
+export type ContagemPrazo = (typeof CONTAGENS_PRAZO)[number];
+export const ROTULO_CONTAGEM: Record<ContagemPrazo, string> = { uteis: "dias úteis", corridos: "dias corridos" };
+export const lerContagem = (v: unknown): ContagemPrazo => (v === "corridos" ? "corridos" : "uteis");
 
-const diasUteis = (n: number) => (n === 1 ? "1 dia útil" : `${n} dias úteis`);
+export type PrazoObra = { chave: ChavePrazo; limite: string; diasRestantes: number; contagem: ContagemPrazo };
 
-/** Texto e tom do selo: atrasado, vence hoje ou quantos dias úteis faltam. */
+/** "1 dia útil", "3 dias úteis"; em dias corridos, "1 dia", "3 dias". */
+export const textoDias = (n: number, contagem: ContagemPrazo) =>
+  contagem === "corridos" ? (n === 1 ? "1 dia" : `${n} dias`) : n === 1 ? "1 dia útil" : `${n} dias úteis`;
+
+/** Texto e tom do selo: atrasado, vence hoje ou quantos dias faltam (na contagem do prazo). */
 export function seloPrazo(p: PrazoObra): { texto: string; tom: "negativo" | "atencao" | "neutro" } {
   const quem = prazoDaDistribuidora(p.chave) ? "Prazo da distribuidora" : "Prazo interno";
   if (p.diasRestantes < 0) {
     const n = -p.diasRestantes;
-    return { texto: `${quem} vencido há ${diasUteis(n)}`, tom: "negativo" };
+    return { texto: `${quem} vencido há ${textoDias(n, p.contagem)}`, tom: "negativo" };
   }
   if (p.diasRestantes === 0) return { texto: `${quem} vence hoje`, tom: "atencao" };
   const n = p.diasRestantes;
-  return { texto: `${quem}: ${diasUteis(n)}`, tom: "neutro" };
+  return { texto: `${quem}: ${textoDias(n, p.contagem)}`, tom: "neutro" };
 }
 
 /** Mais urgente primeiro (menos dias restantes). */
