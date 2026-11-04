@@ -24,7 +24,7 @@ Decisões do Evandro (03/11/2026):
 Pendências (decisão do Evandro):
 - **Pagamento no Pro:** resolvido (seção "Pagamento informado pelo vendedor", acima).
 - **Solo:** o registro sozinho do pagamento (antes do contrato) continua só para a empresa Solo com 1 pessoa ativa; com equipe, o dono confirma a própria venda pela confirmação (#303), depois do contrato assinado. O registro do Solo também não cria Obra.
-- **Teste instável:** `tests/gamificacao-ranking-historico.test.ts` usa cortes com `Date.now()` e às vezes falha sob carga (passa sozinho).
+- **Teste instável (resolvido em 04/11/2026):** `tests/gamificacao-ranking-historico.test.ts` tirava os cortes do relógio do computador; agora usa o `clock_timestamp()` do Postgres, o mesmo relógio que grava os lançamentos.
 
 ## Engenharia × respostas do engenheiro (03/11/2026) — concluído em 04/11/2026
 

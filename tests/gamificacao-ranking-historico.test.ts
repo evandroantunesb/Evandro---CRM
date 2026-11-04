@@ -14,8 +14,10 @@
  * ou negócio ganho/reaberto → `estornar_lancamentos_evento`), nunca por insert direto.
  */
 import { randomUUID } from "node:crypto";
-import { beforeAll, describe, expect, it } from "vitest";
+import type { Client } from "pg";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
+import { novoClienteBanco } from "./banco-local";
 
 let admin: Usuario;
 let membroA: Usuario;
@@ -25,8 +27,11 @@ let funil: string;
 let etapaInicial: string;
 let contato: string;
 const membro: Record<string, string> = {};
+let banco: Client;
 
 beforeAll(async () => {
+  banco = novoClienteBanco();
+  await banco.connect();
   [admin, membroA, membroB] = await Promise.all(["rh-admin", "rh-a", "rh-b"].map(criarUsuario));
   const { data: emp } = await servico.from("empresas").insert({ nome: `Ranking histórico ${sufixo}` }).select("id").single();
   empresa = emp!.id;
@@ -53,6 +58,20 @@ beforeAll(async () => {
   // (reabrir um negócio ganho estorna automaticamente o XP daquele negócio).
   await admin.cliente.from("gamification_rules").insert({ empresa_id: empresa, nome: "Venda (ranking histórico)", evento_tipo: "deal.won", xp: 100, moedas: 0 });
 });
+
+afterAll(async () => {
+  await banco?.end();
+});
+
+/**
+ * Corte no relógio do Postgres, o mesmo que grava `created_at` e `estornado_em` (`now()`). O relógio do
+ * computador pode divergir do contêiner por alguns milissegundos e, sob carga, punha o corte do lado errado
+ * dos lançamentos. Texto, para não perder os microssegundos na conversão para `Date`.
+ */
+async function corteAgora(): Promise<string> {
+  const { rows } = await banco.query<{ agora: string }>("select clock_timestamp()::text as agora");
+  return rows[0].agora;
+}
 
 async function criarEGanharNegocio(titulo: string, responsavelUsuario: Usuario) {
   const { data, error } = await servico
@@ -102,7 +121,7 @@ describe("ranking_gamificacao: p_ate — reconstrução causal do ledger num ins
     const negocioA2 = await criarEGanharNegocio("Venda A2", membroA);
     await criarEGanharNegocio("Venda B1", membroB);
 
-    const corte = new Date().toISOString();
+    const corte = await corteAgora();
 
     // Depois do corte, A reabre os 2 negócios — o estorno automático (deal.won) zera o
     // XP ao vivo de A, mas created_at (antes do corte) e estornado_em (depois) preservam
@@ -138,7 +157,7 @@ describe("ranking_gamificacao: p_ate — reconstrução causal do ledger num ins
     const negocio = await criarEGanharNegocio("Venda estornada antes do corte", membroC);
     await reabrirNegocio(negocio, membroC); // estorno antes do corte abaixo
 
-    const corte = new Date().toISOString();
+    const corte = await corteAgora();
 
     const historico = await ranking(corte);
     const aoVivo = await ranking();
@@ -147,7 +166,7 @@ describe("ranking_gamificacao: p_ate — reconstrução causal do ledger num ins
   });
 
   it("XP criado depois do corte não conta no histórico, mas conta ao vivo", async () => {
-    const corte = new Date().toISOString();
+    const corte = await corteAgora();
     const historicoAntes = totalDe(await ranking(corte), membro[membroB.id]);
     const aoVivoAntes = totalDe(await ranking(), membro[membroB.id]);
 
