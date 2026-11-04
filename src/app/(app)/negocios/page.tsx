@@ -14,10 +14,11 @@ import {
 import { COOKIE_VISAO_NEGOCIOS, exigirPapel } from "@/lib/sessao";
 import { FILTRAR_NEGOCIOS_POR_RESPONSAVEL, NEGOCIOS, REGRAS_TEMPERATURA, pode } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { carregarTemperaturas, type TemperaturaNegocio } from "@/lib/temperatura";
+import { carregarTemperaturas, type Temperatura, type TemperaturaNegocio } from "@/lib/temperatura";
 import { NovoNegocio } from "@/components/novo-negocio";
 import { eletropostoDisponivel } from "@/lib/eletroposto-servidor";
 import { BotaoFiltros } from "./filtros";
+import { FiltroTemperatura, TEMPERATURAS } from "./filtro-temperatura";
 import { Indicadores, type Indicador } from "./indicadores";
 import { Kanban, type Card } from "./kanban";
 import { ListaArquivados, ListaFechados, ListaNegocios } from "./lista";
@@ -50,6 +51,8 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
   const valorMax = texto("valorMax") ? Number(texto("valorMax")) : null;
   const atrasados = texto("atrasados") === "1";
   const semProxima = texto("semProxima") === "1";
+  // Temperatura só existe para negócio aberto: nas outras situações o filtro não vale.
+  const temperatura = status === "aberto" ? (TEMPERATURAS.find((t) => t === texto("temperatura")) ?? null) : null;
 
   const visao = (["kanban", "lista"] as const).find((v) => v === texto("visao")) ?? ((await cookies()).get(COOKIE_VISAO_NEGOCIOS)?.value as "kanban" | "lista" | undefined) ?? "kanban";
 
@@ -133,6 +136,11 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
   let cards = montarCards(data ?? [], config, pendentes ?? [], notas ?? [], temperaturas);
   if (atrasados) cards = cards.filter((c) => c.tarefa === "atrasada");
   if (semProxima) cards = cards.filter((c) => c.tarefa === "nenhuma");
+  // Contagem dos chips com os demais filtros aplicados, antes do filtro de temperatura.
+  const contagemTemperatura = Object.fromEntries(
+    TEMPERATURAS.map((t) => [t, cards.filter((c) => c.temperatura?.temperatura === t).length]),
+  ) as Record<Temperatura, number>;
+  if (temperatura) cards = cards.filter((c) => c.temperatura?.temperatura === temperatura);
 
   const podeFiltrarResponsavel = pode(atual.papel, FILTRAR_NEGOCIOS_POR_RESPONSAVEL);
 
@@ -153,6 +161,7 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
     valorMax: texto("valorMax"),
     atrasados: atrasados ? "1" : "",
     semProxima: semProxima ? "1" : "",
+    temperatura: temperatura ?? "",
   })) {
     if (valor) baseParams[chave] = valor;
   }
@@ -203,8 +212,17 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
     { valor: "perdido", rotulo: "Perdidos" },
     { valor: "arquivado", rotulo: "Arquivados" },
   ] as const;
-  const linkSituacao = (s: (typeof situacoes)[number]["valor"]) =>
-    `/negocios?${paraQuery({ ...baseParams, status: s })}${visao !== "kanban" ? `&visao=${visao}` : ""}`;
+  const linkSituacao = (s: (typeof situacoes)[number]["valor"]) => {
+    const p = { ...baseParams, status: s };
+    if (s !== "aberto") delete p.temperatura;
+    return `/negocios?${paraQuery(p)}${visao !== "kanban" ? `&visao=${visao}` : ""}`;
+  };
+  const linkTemperatura = (t: Temperatura | null) => {
+    const p = { ...baseParams };
+    if (t) p.temperatura = t;
+    else delete p.temperatura;
+    return `/negocios?${paraQuery(p)}${visao !== "kanban" ? `&visao=${visao}` : ""}`;
+  };
 
   const agora = agoraMs();
   const indicadores: Indicador[] = [
@@ -279,7 +297,10 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
         <input type="hidden" name="status" value={status} />
         {visao !== "kanban" && <input type="hidden" name="visao" value={visao} />}
         {funisAtivos.length <= 1 && <input type="hidden" name="funil" value={funil.id} />}
-        <div className="flex items-center gap-2">
+        {temperatura && <input type="hidden" name="temperatura" value={temperatura} />}
+        <div className="flex flex-col gap-2 md:flex-row md:items-center">
+        {status === "aberto" && <FiltroTemperatura ativa={temperatura} contagem={contagemTemperatura} link={linkTemperatura} />}
+        <div className="flex min-w-0 flex-1 items-center gap-2">
           <label className="relative min-w-0 flex-1">
             <span className="sr-only">Buscar</span>
             <Search size={16} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-texto-2" aria-hidden />
@@ -372,6 +393,7 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
               <Thermometer className="h-4 w-4" aria-hidden />
             </Link>
           )}
+        </div>
         </div>
         {chips.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5">
