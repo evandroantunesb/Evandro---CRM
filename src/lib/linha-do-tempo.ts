@@ -56,6 +56,13 @@ export function descreverAtividade(tipo: string, dadosJson: Json, nomes: Nomes):
       return "Pagamento confirmado";
     case "pagamento_estornado":
       return `Confirmação de pagamento estornada${d.motivo ? `: ${d.motivo}` : ""}`;
+    // Pagamento informado pelo vendedor, com comprovante (20261113100000_aviso_pagamento_vendedor.sql).
+    case "pagamento_informado":
+      return `Pagamento informado${typeof d.data_pagamento === "string" ? ` (pago em ${formatarDataIso(d.data_pagamento)})` : ""}, aguardando confirmação`;
+    case "pagamento_aviso_devolvido":
+      return `Pagamento não encontrado${d.motivo ? `: ${d.motivo}` : ""}`;
+    case "pagamento_aviso_cancelado":
+      return "Aviso de pagamento cancelado por quem informou";
     // Registro manual do Solo (PR #186): o corrigido vem acompanhado de um novo "registrado".
     case "pagamento_registrado":
       return `Pagamento registrado manualmente${typeof d.data_recebimento === "string" ? ` (recebido em ${formatarDataIso(d.data_recebimento)})` : ""}`;

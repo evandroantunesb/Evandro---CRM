@@ -27,7 +27,10 @@ export type Notificacao = {
     // Justificativa de atraso das obras (20261107100000_obras_justificativa_aviso.sql).
     | "justificativa_atraso_pedida"
     | "justificativa_atraso_cobrada"
-    | "justificativa_atraso_respondida";
+    | "justificativa_atraso_respondida"
+    // Pagamento informado pelo vendedor (20261113100000_aviso_pagamento_vendedor.sql).
+    | "pagamento_aviso_confirmado"
+    | "pagamento_aviso_devolvido";
   mensagem: string;
   link: string | null;
 };

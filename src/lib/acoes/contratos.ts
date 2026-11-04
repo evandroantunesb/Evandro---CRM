@@ -74,6 +74,7 @@ export async function confirmarPagamento(_: ResultadoAcao, formData: FormData): 
   if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível confirmar o pagamento.") };
 
   revalidatePath(`/negocios/${dados.data.negocioId}`);
+  revalidatePath("/pagamentos");
   return { ok: true, mensagem: "Pagamento confirmado." };
 }
 

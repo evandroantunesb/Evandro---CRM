@@ -1,7 +1,19 @@
 import { Cartao } from "@/components/ui";
 import { env } from "@/lib/env";
 import { formatarMoeda, hojeEmSaoPaulo } from "@/lib/formatacao";
-import { CORRIGIR_VALOR_GANHO, PAGAMENTO_SOLO, PROPOSTA_E_CONTRATO, VALIDADE_PROPOSTA, pode } from "@/lib/permissoes";
+import type { ComponentProps } from "react";
+import { carregarUltimoAviso } from "@/lib/avisos-pagamento";
+import { pastaComprovante } from "@/lib/avisos-pagamento-regras";
+import { criarClienteServidor } from "@/lib/supabase/server";
+import {
+  CONFIRMAR_PAGAMENTO,
+  CORRIGIR_VALOR_GANHO,
+  INFORMAR_PAGAMENTO,
+  PAGAMENTO_SOLO,
+  PROPOSTA_E_CONTRATO,
+  VALIDADE_PROPOSTA,
+  pode,
+} from "@/lib/permissoes";
 import { type ModoPreco, type StatusContrato, type StatusPagamentoContrato } from "@/lib/tipos";
 import { Contrato } from "./contrato";
 import { DescontoNegocio } from "./desconto";
@@ -211,12 +223,15 @@ export function AbaProposta({ ficha }: { ficha: Ficha }) {
                 />
               )}
               {mostrarPagamentoPro && contrato && (
-                <Pagamento
+                <PagamentoPro
+                  atual={atual}
                   negocioId={negocio.id}
                   contratoId={contrato.id}
                   status={statusPagamento as StatusPagamentoContrato}
-                  podeConfirmar={souAdmin || atual.papel === "gestor"}
-                  motivoSemConfirmar="Só gestor ou admin pode confirmar o pagamento."
+                  podeConfirmar={pode(atual.papel, CONFIRMAR_PAGAMENTO)}
+                  podeInformar={!arquivado && pode(atual.papel, INFORMAR_PAGAMENTO)}
+                  pastaComprovante={pastaComprovante(atual.empresaId, contrato.id)}
+                  hoje={hojeEmSaoPaulo()}
                 />
               )}
             </div>
@@ -225,4 +240,13 @@ export function AbaProposta({ ficha }: { ficha: Ficha }) {
       )}
     </div>
   );
+}
+
+/** Cartão do Pro com o último aviso do vendedor ("o cliente pagou", com comprovante), lido só quando há contrato. */
+async function PagamentoPro({
+  atual,
+  ...props
+}: Omit<ComponentProps<typeof Pagamento>, "aviso"> & { atual: { empresaId: string; membroId: string } }) {
+  const aviso = await carregarUltimoAviso(await criarClienteServidor(), atual, props.contratoId);
+  return <Pagamento {...props} aviso={aviso} />;
 }
