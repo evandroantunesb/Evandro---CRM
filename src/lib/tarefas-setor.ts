@@ -78,10 +78,11 @@ export async function carregarTarefasSetor(
   const nomes = new Map((identidades ?? []).map((m) => [m.membro_id, m.nome]));
   const contexto = new Map((contextos ?? []).map((c) => [c.tarefa_id, c]));
   const capacidade = new Map((meusSetores ?? []).map((s) => [s.setor, s.capacidade]));
-  const admin = papel === "admin";
+  // Admin e gestor agem em todos os setores (o gestor como coordenador, 20261122100000).
+  const admin = papel === "admin" || papel === "gestor";
   const hoje = hojeBrasilia(agora);
 
-  // Quem pode escolher o responsável recebe a lista do setor (a RPC só a entrega a admin e coordenador).
+  // Quem pode escolher o responsável recebe a lista do setor (a RPC só a entrega a admin, gestor e coordenador).
   const setoresAtribuiveis = SETORES_TAREFA.filter((s) => admin || capacidade.get(s) === "coordenar");
   const membrosPorSetor: Partial<Record<SetorTarefa, MembroOpcao[]>> = {};
   await Promise.all(
@@ -127,6 +128,7 @@ export async function carregarTarefasSetor(
         obraId: t.obra_id,
         negocioId: t.negocio_id,
         podeAgir: status === "aberta" && (admin || atuaNoSetor),
+        podeAssumir: status === "aberta" && atuaNoSetor && t.responsavel_id === null,
         podeAtribuir: status === "aberta" && coordena,
         podeCancelar: status === "aberta" && (pedi || coordena),
         podeReabrir: status === "concluida" && (admin || atuaNoSetor || pedi),

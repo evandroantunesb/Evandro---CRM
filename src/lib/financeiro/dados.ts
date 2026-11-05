@@ -25,7 +25,7 @@ export type FinanceiroVM = {
   nfFornecedor: ContaFinanceiroVM[];
   nfCliente: NfClientePendenteVM[];
   pagamentosAConfirmar: PagamentoAConfirmarVM[];
-  /** Obras em que a pessoa pode lançar conta (as mesmas da ficha: não canceladas, Administrativo da obra ou admin). */
+  /** Obras em que a pessoa pode lançar conta (as mesmas da ficha: não canceladas, Administrativo da obra, gestor ou admin). */
   obrasParaLancar: { id: string; rotulo: string }[];
   fornecedores: string[];
 };

@@ -24,8 +24,14 @@ describe("autorizacaoSetor (espelho de autorizacao_setor_obra)", () => {
     }
   });
 
-  it("gestor, vendedor, SDR e papel ausente nunca atuam, mesmo com setor/participação nos dados", () => {
-    for (const papel of ["gestor", "vendedor", "sdr", null, undefined, "desconhecido"]) {
+  it("gestor coordena todos os setores, sem precisar de setor nem participação (20261122100000)", () => {
+    for (const setor of ["compras", "engenharia", "operacional", "administrativo"] as const) {
+      expect(autorizacaoSetor(entrada({ papel: "gestor" }), setor)).toBe("coordenar");
+    }
+  });
+
+  it("vendedor, SDR e papel ausente nunca atuam, mesmo com setor/participação nos dados", () => {
+    for (const papel of ["vendedor", "sdr", null, undefined, "desconhecido"]) {
       const e = entrada({ papel, setoresDoMembro: [{ setor: "engenharia", capacidade: "coordenar" }], setoresParticipando: ["engenharia"] });
       expect(autorizacaoSetor(e, "engenharia"), String(papel)).toBeNull();
     }
@@ -74,7 +80,14 @@ describe("permissoesSetor", () => {
     expect(marcosAtualizaveis(coordenador, ATIVA)).toEqual([]);
     expect(marcosAtualizaveis(entrada({ papel: "admin" }), ATIVA)).toEqual(["nf_cliente", "garantia"]);
     expect(marcosAtualizaveis(entrada({ papel: "admin" }), { cancelada: false, pausada: true })).toEqual([]);
-    expect(marcosAtualizaveis(entrada({ papel: "gestor" }), ATIVA)).toEqual([]);
+    expect(marcosAtualizaveis(entrada({ papel: "gestor" }), ATIVA)).toEqual(["nf_cliente", "garantia"]);
+    expect(marcosAtualizaveis(entrada({ papel: "vendedor" }), ATIVA)).toEqual([]);
+  });
+
+  it("gestor gere participantes e altera fluxo como coordenador; obra cancelada continua fechada", () => {
+    const gestor = entrada({ papel: "gestor" });
+    expect(permissoesSetor(gestor, "administrativo", ATIVA)).toEqual({ autorizacao: "coordenar", alterarFluxo: true, gerirParticipantes: true });
+    expect(permissoesSetor(gestor, "compras", { cancelada: true, pausada: false })).toMatchObject({ alterarFluxo: false, gerirParticipantes: false });
   });
 
   it("mensagem de bloqueio da obra", () => {
@@ -83,8 +96,9 @@ describe("permissoesSetor", () => {
     expect(bloqueioDaObra({ cancelada: false, pausada: true })).toMatch(/pausada/);
   });
 
-  it("GERIR_OBRAS: só admin e operacao; todos estão dentro de OBRAS", () => {
-    for (const papel of ["gestor", "vendedor", "sdr"]) expect(pode(papel, GERIR_OBRAS), papel).toBe(false);
+  it("GERIR_OBRAS: admin, gestor e operacao; todos estão dentro de OBRAS", () => {
+    expect(pode("gestor", GERIR_OBRAS)).toBe(true);
+    for (const papel of ["vendedor", "sdr"]) expect(pode(papel, GERIR_OBRAS), papel).toBe(false);
     for (const papel of GERIR_OBRAS) expect(pode(papel, OBRAS)).toBe(true);
   });
 });
@@ -224,7 +238,7 @@ const identidades = [
   { membro_id: "m-bia", nome: "Bia", avatar_caminho: null },
 ];
 
-function cenario(extra: { setoresMembro?: Linha[]; obra?: Linha; membros?: Linha[] } = {}) {
+function cenario(extra: { setoresMembro?: Linha[]; obra?: Linha; membros?: Linha[]; rpcs?: Record<string, Linha[]> } = {}) {
   return criarFake({
     tabelas: {
       obras: [{ ...linhaObra, ...extra.obra }],
@@ -239,6 +253,7 @@ function cenario(extra: { setoresMembro?: Linha[]; obra?: Linha; membros?: Linha
     rpcs: {
       identidade_membros: identidades,
       obras_operacao: [{ ...linhaObra, ...extra.obra, obra_id: OBRA }],
+      ...extra.rpcs,
     },
   });
 }
@@ -304,8 +319,29 @@ describe("navegação com 12 obras carregadas do jeito real (carregarObras + fil
 });
 
 describe("carregarDetalheObra — bloco gestao", () => {
-  it("gestor, vendedor e SDR: gestao nula e nenhuma consulta de setores/membros", async () => {
-    for (const papel of ["gestor", "vendedor", "sdr"]) {
+  it("gestor: todos os setores como coordenador; candidatos de membros_do_setor, sem coordenadores", async () => {
+    const { cliente, chamadas } = cenario({
+      rpcs: {
+        membros_do_setor: [
+          { membro_id: "m-bia", capacidade: "executar" },
+          { membro_id: "m-ana", capacidade: "coordenar" },
+        ],
+      },
+    });
+    const obra = await carregarDetalheObra(cliente, { empresaId: EMPRESA, papel: "gestor", obraId: OBRA, membroId: "m-gestor" });
+    const g = obra?.gestao;
+    expect(g?.setores.map((s) => s.permissoes.autorizacao)).toEqual(["coordenar", "coordenar", "coordenar", "coordenar"]);
+    expect(g?.marcosAtualizaveis).toEqual(["nf_cliente", "garantia"]);
+    const compras = g?.setores.find((s) => s.setor === "compras");
+    expect(compras?.candidatosVerificados).toBe(true);
+    expect(compras?.candidatos).toEqual([{ membroId: "m-bia", nome: "Bia", detalhe: "Executa no setor" }]);
+    // Não lê os setores dos colegas direto (a RLS não deixa): só pela RPC.
+    expect(chamadas).not.toContain("from:membro_setores_obra");
+    expect(chamadas).toContain("rpc:membros_do_setor");
+  });
+
+  it("vendedor e SDR: gestao nula e nenhuma consulta de setores/membros", async () => {
+    for (const papel of ["vendedor", "sdr"]) {
       const { cliente, chamadas } = cenario();
       const obra = await carregarDetalheObra(cliente, { empresaId: EMPRESA, papel, obraId: OBRA, membroId: "m-x" });
       expect(obra?.gestao, papel).toBeNull();

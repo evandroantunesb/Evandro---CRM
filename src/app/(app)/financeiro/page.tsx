@@ -18,7 +18,7 @@ import { NotasPendentes, TabelaAPagar, TabelaPagos } from "./tabelas";
  * Financeiro (desenho aprovado "Perfis · Administrativo › Financeiro", A2b): contas a pagar a fornecedores de todas as
  * obras, pagamentos do cliente a confirmar (a antiga /pagamentos), notas fiscais pendentes e pagos. Admin e gestor veem
  * tudo; quem é da Operação vê as quatro abas se atua no Administrativo, ou só "Pagamentos a confirmar" se confere
- * pagamento pelo Operacional. Escrever segue a ficha da obra: Administrativo da obra ou admin; o banco decide de novo.
+ * pagamento pelo Operacional. Escrever segue a ficha da obra: Administrativo da obra, gestor ou admin; o banco decide de novo.
  */
 
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;

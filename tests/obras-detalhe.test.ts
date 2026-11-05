@@ -187,6 +187,17 @@ describe("montarHistorico", () => {
     expect(montarHistorico([linha("pagamento_reconfirmado", {})], nomes)[0].tipoRotulo).toBe("Pagamento reconfirmado");
   });
 
+  it("autor: \"(gestor)\" quando a ação veio do gestor; outro papel ou contexto estranho, só o nome", () => {
+    const autor = (extra: Partial<LinhaHistoricoObra>) => montarHistorico([linha("fluxo_alterado", {}, extra)], nomes)[0].autor;
+    expect(autor({ autor_contexto: { papel: "gestor" } })).toBe("Ana (gestor)");
+    expect(autor({ autor_contexto: { papel: "admin" } })).toBe("Ana");
+    expect(autor({ autor_contexto: { papel: "operacao" } })).toBe("Ana");
+    expect(autor({ autor_contexto: "gestor" })).toBe("Ana");
+    expect(autor({ autor_contexto: null })).toBe("Ana");
+    expect(autor({ autor_membro_id: "m-sumido", autor_contexto: { papel: "gestor" } })).toBe("Usuário não identificado (gestor)");
+    expect(autor({ autor_membro_id: null, autor_contexto: { papel: "gestor" } })).toBe("Sistema");
+  });
+
   it("venda alterada", () => {
     expect(descricaoDe(linha("venda_alterada", { tecnico: true, comercial: true }))).toBe("Dados técnicos e comerciais da venda mudaram");
     expect(descricaoDe(linha("venda_alterada", { tecnico: true, comercial: false }))).toBe("Dados técnicos da venda mudaram");

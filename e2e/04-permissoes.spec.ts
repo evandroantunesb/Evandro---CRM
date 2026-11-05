@@ -26,15 +26,24 @@ const cartao = (page: Page, titulo: string) =>
 test.describe("permissões na interface", () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 
-  for (const papel of ["gestor", "vendedor"] as const) {
-    test(`${papel}: lê a obra, sem nenhum controle de escrita`, async ({ page }) => {
-      await entrarComo(page, usuarios[papel], senha);
-      await page.goto(`/obras/${obras.o01}`);
-      await expect(page.getByRole("heading", { name: "Família Almeida (fictícia)" })).toBeVisible();
-      await expect(page.getByText(GESTAO)).toHaveCount(0);
-      await expect(page.getByRole("button", { name: /Salvar|Atribuir|Encerrar|Marcar como parado/ })).toHaveCount(0);
-    });
-  }
+  test("vendedor: lê a obra, sem nenhum controle de escrita", async ({ page }) => {
+    await entrarComo(page, usuarios.vendedor, senha);
+    await page.goto(`/obras/${obras.o01}`);
+    await expect(page.getByRole("heading", { name: "Família Almeida (fictícia)" })).toBeVisible();
+    await expect(page.getByText(GESTAO)).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Salvar|Atribuir|Encerrar|Marcar como parado/ })).toHaveCount(0);
+  });
+
+  test("gestor: coordena todos os setores, com participantes e marcos", async ({ page }) => {
+    await entrarComo(page, usuarios.gestor, senha);
+    await page.goto(`/obras/${obras.o12}`);
+    for (const setor of ["Compras", "Engenharia", "Operacional"]) {
+      await expect(cartao(page, setor).getByText(`Atualizar ${setor}`)).toBeVisible();
+    }
+    await cartao(page, "Engenharia").getByText("Atualizar Engenharia").click();
+    await expect(cartao(page, "Engenharia").getByRole("button", { name: "Adicionar participante" })).toBeVisible();
+    await expect(cartao(page, "Marcos").getByRole("button", { name: "Salvar" }).first()).toBeVisible();
+  });
 
   test("SDR: sem nenhum controle de escrita (e sem obra fora do seu acesso)", async ({ page }) => {
     await entrarComo(page, usuarios.sdr, senha);
@@ -141,8 +150,25 @@ test.describe("permissões reais no banco local (RPC direta)", () => {
     );
   });
 
-  test("gestor, vendedor e SDR: nenhuma escrita operacional", async () => {
-    for (const papel of ["gestor", "vendedor", "sdr"] as const) {
+  test("gestor: escreve como coordenador em todos os setores; não atribui coordenador nem conclui sem conexão", async () => {
+    const gestor = await clienteDe(usuarios.gestor, senha);
+    // o12 já é mexida pelos testes acima (o11 fica no estado inicial).
+    aceita(await gestor.rpc("definir_aguardando_fluxo_obra", { p_obra_id: obras.o12, p_setor: "compras", p_aguardando: "cliente" }));
+    aceita(await gestor.rpc("definir_aguardando_fluxo_obra", { p_obra_id: obras.o12, p_setor: "compras" }));
+    aceita(await gestor.rpc("marcar_parado_fluxo_obra", { p_obra_id: obras.o12, p_setor: "operacional", p_parado: true, p_motivo: "Teste do gestor" }));
+    aceita(await gestor.rpc("marcar_parado_fluxo_obra", { p_obra_id: obras.o12, p_setor: "operacional", p_parado: false }));
+    // Coordenador só o admin atribui.
+    recusada(
+      await gestor.rpc("atribuir_participante_obra", { p_obra_id: obras.o12, p_membro_id: usuarios.coordEng.membroId, p_setor: "engenharia", p_funcao: "apoio" }),
+    );
+    recusada(await gestor.rpc("concluir_engenharia_sem_conexao", { p_obra_id: obras.o12, p_motivo: "Obra sem conexão nova (teste)" }));
+    // Obra cancelada: nada; outra empresa: nada.
+    recusada(await gestor.rpc("alterar_status_fluxo_obra", { p_obra_id: obras.o08, p_setor: "compras", p_status: "pedido_realizado" }));
+    recusada(await gestor.rpc("alterar_status_fluxo_obra", { p_obra_id: obrasB.b1, p_setor: "compras", p_status: "cotando" }));
+  });
+
+  test("vendedor e SDR: nenhuma escrita operacional", async () => {
+    for (const papel of ["vendedor", "sdr"] as const) {
       const c = await clienteDe(usuarios[papel], senha);
       recusada(await c.rpc("alterar_status_fluxo_obra", { p_obra_id: obras.o11, p_setor: "compras", p_status: "cotando" }));
       recusada(await c.rpc("marcar_parado_fluxo_obra", { p_obra_id: obras.o11, p_setor: "compras", p_parado: true, p_motivo: "x" }));

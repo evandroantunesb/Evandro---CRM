@@ -128,12 +128,14 @@ describe("Engenharia: passos guiados (ordem importa)", { concurrent: false, shuf
     if (e) throw e;
   });
 
-  it("só admin, coordenador e participante ativo da Engenharia registram; os demais são recusados", async () => {
-    for (const quem of [vendedor, gestor, engSemObra, adminB]) {
+  it("só admin, gestor, coordenador e participante ativo da Engenharia registram; os demais são recusados", async () => {
+    for (const quem of [vendedor, engSemObra, adminB]) {
       const r = await registrar(quem, 2, "confirmado");
       expect(r.error?.code, quem.email).toBe("42501");
     }
-    // Passo 2 exige a ficha de enquadramento completa (P6c).
+    // Passo 2 exige a ficha de enquadramento completa (P6c). O gestor passa da autorização (coordena todos os
+    // setores, 20261122100000) e esbarra na mesma regra.
+    expect((await registrar(gestor, 2, "confirmado")).error?.message).toMatch(/Responda todas as perguntas do enquadramento/);
     expect((await registrar(execEng, 2, "confirmado")).error?.message).toMatch(/Responda todas as perguntas do enquadramento/);
     const ficha = await execEng.cliente.rpc("salvar_enquadramento_engenharia", { p_obra_id: obra, p_respostas: ENQUADRAMENTO_COMPLETO });
     expect(ficha.error).toBeNull();

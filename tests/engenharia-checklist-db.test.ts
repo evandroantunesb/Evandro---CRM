@@ -178,13 +178,15 @@ describe("Engenharia: checklist e documentos (ordem importa)", { concurrent: fal
   });
 
   it("só quem atua em Engenharia na obra aplica o checklist (cópia dos ativos, sem repetir)", async () => {
-    for (const quem of [gestor, vendedor, execCompras, engSemObra, adminB]) {
+    for (const quem of [vendedor, execCompras, engSemObra, adminB]) {
       expect((await aplicar(quem)).error?.code).toBe("42501");
     }
     const r = await aplicar(execEng);
     expect(r.error).toBeNull();
     expect(r.data).toBe(20);
     expect((await aplicar(coordEng)).data).toBe(0);
+    // O gestor coordena todos os setores (20261122100000): passa da autorização e também não repete.
+    expect(await aplicar(gestor)).toMatchObject({ error: null, data: 0 });
     const lista = await itens();
     expect(lista).toHaveLength(20);
     expect(lista.every((i) => i.status === "pendente")).toBe(true);
@@ -241,21 +243,21 @@ describe("Engenharia: checklist e documentos (ordem importa)", { concurrent: fal
   });
 
   it("checklist é visto por quem vê a obra; documentos e arquivos só por admin e Engenharia da obra", async () => {
-    // O gestor sem equipe não vê esta obra (regra de Obras): só confere que não lê documentos.
     for (const quem of [admin, vendedor, execCompras, execEng]) {
       const { data } = await quem.cliente.from("obra_engenharia_itens").select("id").eq("obra_id", obra);
       expect(data, quem.email).toHaveLength(20);
     }
     const { data: doc } = await servico.from("obra_engenharia_documentos").select("caminho").eq("item_id", obrigatorio).eq("versao", 1).single();
-    for (const quem of [admin, coordEng, execEng]) {
+    // O gestor coordena a Engenharia (20261122100000): vê os documentos como o coordenador.
+    for (const quem of [admin, gestor, coordEng, execEng]) {
       expect((await quem.cliente.from("obra_engenharia_documentos").select("id").eq("obra_id", obra)).data, quem.email).toHaveLength(2);
       expect((await quem.cliente.storage.from(BUCKET).download(doc!.caminho)).error, quem.email).toBeNull();
     }
-    for (const quem of [gestor, vendedor, execCompras, engSemObra, adminB]) {
+    for (const quem of [vendedor, execCompras, engSemObra, adminB]) {
       expect((await quem.cliente.from("obra_engenharia_documentos").select("id").eq("obra_id", obra)).data, quem.email).toHaveLength(0);
       expect((await quem.cliente.storage.from(BUCKET).download(doc!.caminho)).data, quem.email).toBeNull();
     }
-    for (const quem of [gestor, execCompras]) {
+    for (const quem of [execCompras]) {
       const r = await enviar(quem, obrigatorio);
       expect(r.upload, quem.email).not.toBeNull();
     }

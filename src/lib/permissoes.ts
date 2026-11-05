@@ -153,11 +153,12 @@ export const OBRAS = ["admin", "gestor", "vendedor", "sdr", "operacao"] as const
 export const VER_NEGOCIO_DA_OBRA = ["admin", "gestor", "vendedor"] as const satisfies ListaPapeis;
 
 /**
- * Ações do modo Gestão de Obras (fluxos, marcos, participantes). Espelha quem as RPCs da 3b-3
- * aceitam: admin e `operacao` (este conforme os próprios setores). Gestor, vendedor e SDR só leem.
- * A RPC no banco continua sendo a única autorização de fato.
+ * Ações do modo Gestão de Obras (fluxos, marcos, participantes, contas). Espelha quem as RPCs da 3b-3
+ * aceitam: admin, gestor (como coordenador de todos os setores, 20261122100000) e `operacao` (este
+ * conforme os próprios setores). Vendedor e SDR só leem. A RPC no banco continua sendo a única
+ * autorização de fato.
  */
-export const GERIR_OBRAS = ["admin", "operacao"] as const satisfies ListaPapeis;
+export const GERIR_OBRAS = ["admin", "gestor", "operacao"] as const satisfies ListaPapeis;
 
 // --- Gamificação -------------------------------------------------------------
 

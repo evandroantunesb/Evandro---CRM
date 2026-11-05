@@ -64,7 +64,7 @@ const MATRIZ: Record<string, string[]> = {
   OBRAS: ["admin", "gestor", "vendedor", "sdr", "operacao"],
   VER_NEGOCIO_DA_OBRA: ["admin", "gestor", "vendedor"],
   // Modo GestÃ£o de Obras: espelha as RPCs da 3b-3. Gestor, vendedor e SDR sÃ³ leem.
-  GERIR_OBRAS: ["admin", "operacao"],
+  GERIR_OBRAS: ["admin", "gestor", "operacao"],
   // Tela Engenharia: operação só vê se atua no setor (checado na página e na RLS).
   ENGENHARIA: ["admin", "gestor", "operacao"],
 };

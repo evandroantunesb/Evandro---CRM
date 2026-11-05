@@ -53,7 +53,7 @@ for (const [resolucao, tamanho] of Object.entries(RESOLUCOES) as [Resolucao, { w
       await capturar(page, resolucao, "06-navegacao-entre-obras");
     });
 
-    test("coordenador de Engenharia e usuário somente leitura (gestor)", async ({ page }) => {
+    test("coordenador de Engenharia, gestor (todos os setores) e usuário somente leitura (vendedor)", async ({ page }) => {
       const { usuarios, obras, senha } = lerBase();
       await entrarComo(page, usuarios.coordEng, senha);
       await page.goto(`/obras/${obras.o01}`);
@@ -61,11 +61,18 @@ for (const [resolucao, tamanho] of Object.entries(RESOLUCOES) as [Resolucao, { w
       await semRolagemHorizontal(page, "coordenador");
       await capturar(page, resolucao, "07-visao-coordenador");
 
+      // O gestor coordena todos os setores (20261122100000): os quatro painéis "Atualizar" aparecem.
       await entrarComo(page, usuarios.gestor, senha);
+      await page.goto(`/obras/${obras.o01}`);
+      await page.getByText("Atualizar Operacional").click();
+      await semRolagemHorizontal(page, "gestor");
+      await capturar(page, resolucao, "08-visao-gestor");
+
+      await entrarComo(page, usuarios.vendedor, senha);
       await page.goto(`/obras/${obras.o01}`);
       await expect(page.getByRole("heading", { name: "Família Almeida (fictícia)" })).toBeVisible();
       await semRolagemHorizontal(page, "somente leitura");
-      await capturar(page, resolucao, "08-visao-somente-leitura-gestor");
+      await capturar(page, resolucao, "08-visao-somente-leitura-vendedor");
     });
   });
 }

@@ -306,7 +306,7 @@ export async function carregarDetalheObra(
     supabase.from("obra_participantes").select("id, setor, membro_id, funcao, principal").eq("obra_id", obraId).eq("empresa_id", empresaId).is("fim", null),
     supabase
       .from("obra_historico")
-      .select("setor, tipo, dados, autor_membro_id, created_at")
+      .select("setor, tipo, dados, autor_membro_id, autor_contexto, created_at")
       .eq("obra_id", obraId)
       .eq("empresa_id", empresaId)
       .order("created_at", { ascending: false })
@@ -537,10 +537,37 @@ async function carregarCandidatos(
   const porNome = (a: CandidatoParticipanteVM, b: CandidatoParticipanteVM) => a.nome.localeCompare(b.nome, "pt-BR");
 
   if (papel === "admin") return carregarCandidatosAdmin(supabase, empresaId, nomes, porNome);
+  if (papel === "gestor") return carregarCandidatosGestor(supabase, empresaId, nomes, porNome);
 
   const todos = [...nomes.entries()].filter(([id]) => id !== membroId).map(([id, nome]) => ({ membroId: id, nome, detalhe: null }));
   todos.sort(porNome);
   return { verificados: false, lista: () => todos };
+}
+
+/**
+ * Gestor: não lê os setores dos colegas (`membro_setores_obra` só mostra a própria linha); recebe de
+ * `membros_do_setor` quem atua em cada setor. Coordenadores ficam de fora: só o admin os atribui a uma obra.
+ */
+async function carregarCandidatosGestor(
+  supabase: SupabaseServidor,
+  empresaId: string,
+  nomes: ReadonlyMap<string, string>,
+  porNome: (a: CandidatoParticipanteVM, b: CandidatoParticipanteVM) => number,
+): Promise<{ verificados: boolean; lista: (setor: SetorObra) => CandidatoParticipanteVM[] }> {
+  const respostas = await Promise.all(SETORES_OBRA.map((setor) => supabase.rpc("membros_do_setor", { p_empresa_id: empresaId, p_setor: setor })));
+  const porSetor = new Map<SetorObra, CandidatoParticipanteVM[]>();
+  SETORES_OBRA.forEach((setor, i) => {
+    const { data, error } = respostas[i];
+    if (error) throw error;
+    porSetor.set(
+      setor,
+      (data ?? [])
+        .filter((m) => m.capacidade !== "coordenar")
+        .map((m) => ({ membroId: m.membro_id, nome: nomes.get(m.membro_id) || "Usuário não identificado", detalhe: ROTULO_CAPACIDADE[m.capacidade] ?? null }))
+        .sort(porNome),
+    );
+  });
+  return { verificados: true, lista: (setor) => porSetor.get(setor) ?? [] };
 }
 
 /** Admin: lê vínculos e setores da empresa e lista só `operacao` ativos com o setor. */

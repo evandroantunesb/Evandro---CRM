@@ -8,9 +8,10 @@ import type { SetorObra } from "./rotulos";
  * esconder um controle aqui nunca é a barreira, e mostrá-lo nunca concede nada.
  *
  *   admin da empresa ................................ 'admin'      (qualquer setor operacional)
+ *   gestor da empresa ............................... 'coordenar'  (todos os setores; 20261122100000)
  *   operacao que COORDENA o setor ................... 'coordenar'  (mesmo sem participar)
  *   operacao com o setor E participante ativo nele .. 'executar'
- *   qualquer outro (gestor, vendedor, SDR, ...) ..... null
+ *   qualquer outro (vendedor, SDR, ...) ............. null
  *
  * Coordenar e admin gerem participantes; executar só altera fluxo e marcos. Obra cancelada
  * não aceita nada; obra pausada bloqueia fluxos e marcos, mas permite gerir participantes.
@@ -30,6 +31,7 @@ export type EntradaAutorizacao = {
 
 export function autorizacaoSetor(entrada: EntradaAutorizacao, setor: SetorObra): AutorizacaoSetor | null {
   if (entrada.papel === "admin") return "admin";
+  if (entrada.papel === "gestor") return "coordenar";
   // Lista positiva: só `operacao` chega aos setores; qualquer outro papel cai no null final.
   if (entrada.papel === "operacao") {
     const meu = entrada.setoresDoMembro.find((s) => s.setor === setor);

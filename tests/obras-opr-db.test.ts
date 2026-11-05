@@ -170,7 +170,9 @@ describe("Obras OPR: visão Completa (ordem importa)", { concurrent: false, shuf
   it("responde quem recebeu o pedido (ou admin, ou quem coordena o setor); uma vez só", async () => {
     const responder = (quem: Usuario, texto = "Cliente enviou a documentação com atraso.") =>
       quem.cliente.rpc("responder_justificativa_atraso", { p_justificativa_id: justificativa, p_texto: texto });
-    for (const quem of [operacional, gestor, vendedor, adminB]) expect((await responder(quem)).error?.code, quem.email).toBe("42501");
+    for (const quem of [operacional, vendedor, adminB]) expect((await responder(quem)).error?.code, quem.email).toBe("42501");
+    // O gestor coordena o setor (20261122100000): passa da autorização e esbarra na validação do texto.
+    expect((await responder(gestor, "ok")).error?.message).toContain("3 a 500");
     expect((await responder(engenheiro, "ok")).error?.message).toContain("3 a 500");
     ok(await responder(engenheiro), "resposta");
     expect((await responder(engenheiro)).error?.message).toContain("já foi respondida");

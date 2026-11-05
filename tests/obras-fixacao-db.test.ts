@@ -194,12 +194,18 @@ describe("Obras: fixação do telhado (ordem importa)", { concurrent: false, shu
     expect(h[1].dados).toMatchObject({ de: "Gancho teste", para: "Trilho teste", autorizacao: "executar" });
   });
 
-  it("sem setor na obra (operação fora da obra, gestor, vendedor, outra empresa) não altera", async () => {
-    for (const quem of [opSemObra, gestor, vendedor, adminB]) {
+  it("sem setor na obra (operação fora da obra, vendedor, outra empresa) não altera", async () => {
+    for (const quem of [opSemObra, vendedor, adminB]) {
       const r = await definir(quem, gancho);
       expect(r.error?.code).toBe("42501");
     }
     expect(await escolha()).toBe(trilho);
+  });
+
+  it("o gestor passa da autorização (coordena todos os setores): a mesma opção não grava nada", async () => {
+    expect((await definir(gestor, trilho)).error).toBeNull();
+    expect(await escolha()).toBe(trilho);
+    expect(await historico()).toHaveLength(2);
   });
 
   it("opção de outra empresa ou desativada é recusada", async () => {
