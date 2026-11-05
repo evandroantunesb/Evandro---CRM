@@ -2,7 +2,7 @@
 
 ## Perfis e setores — B: Usuários com perfil único (em andamento, 05/11/2026)
 
-Branch `feat/usuarios-perfil-unico`. Tela Configurações › Usuários pelo desenho aprovado `PerfisUsuarios`: lista com perfil e "Também atua em", painel lateral (no celular, tela cheia) para editar ou cadastrar, indicadores no topo, abas Ativos/Inativos/Desligados e busca. Migration `20261120100000_setor_principal_membro.sql`: `membro_setores_obra.principal` (um por pessoa), gravado por `definir_setores_membro` (`"principal": true`); existentes recebem o setor que coordenam ou o primeiro da ordem.
+Branch `feat/usuarios-perfil-unico`, PR #334. Migration aplicada em produção em 05/11/2026, antes do merge (tag `migracao-pr334-be2cce8`, run 42010781758). Tela Configurações › Usuários pelo desenho aprovado `PerfisUsuarios`: lista com perfil e "Também atua em", painel lateral (no celular, tela cheia) para editar ou cadastrar, indicadores no topo, abas Ativos/Inativos/Desligados e busca. Migration `20261120100000_setor_principal_membro.sql`: `membro_setores_obra.principal` (um por pessoa), gravado por `definir_setores_membro` (`"principal": true`); existentes recebem o setor que coordenam ou o primeiro da ordem.
 
 Decisões do Evandro (05/11/2026): setor principal gravado no banco; tipo de vendedor, "Recebe leads" e ranking abaixo do perfil (Gestor e Admin: só o ranking; "Recebe leads" deles não é tocado, o rodízio só usa Vendedor e SDR); abas pelo status (sem convites pendentes); cadastro no mesmo painel.
 
