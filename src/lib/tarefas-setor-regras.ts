@@ -39,6 +39,8 @@ export type TarefaSetorVM = {
   referencia: { rotulo: string; href: string | null };
   obraId: string | null;
   negocioId: string | null;
+  /** A sessão é o substituto do setor nesta obra e a tarefa está com o principal: o nome dele. */
+  substituindo: string | null;
   /** Concluir com resposta. */
   podeAgir: boolean;
   /** Assumir para si: só quem atua no setor (admin e gestor não assumem; atribuem). */
@@ -79,19 +81,49 @@ export function somarDiasUteis(data: string, dias: number): string {
 /** AAAA-MM-DD → DD/MM/AAAA. */
 export const dataBr = (data: string) => data.split("-").reverse().join("/");
 
-type LinhaAberta = { responsavel_id: string | null; criado_por: string | null; setor: string };
+type LinhaAberta = { responsavel_id: string | null; criado_por: string | null; setor: string; obra_id?: string | null };
+
+/** Onde a pessoa é substituta (`minhas_substituicoes`, 20261123100000): obra, setor e o principal (pode faltar). */
+export type Substituicao = { obraId: string; setor: string; principalId: string | null };
+
+/**
+ * A tarefa conta como "comigo" para o substituto quando é da obra e do setor em que ele substitui e está com o
+ * responsável principal (decisão de 05/11/2026: a tarefa não muda de dono; o substituto recebe junto).
+ */
+export function substituicaoDaTarefa(
+  t: { obra_id?: string | null; setor: string; responsavel_id: string | null },
+  substituicoes: readonly Substituicao[],
+): Substituicao | null {
+  if (!t.obra_id || !t.responsavel_id) return null;
+  return substituicoes.find((s) => s.obraId === t.obra_id && s.setor === t.setor && s.principalId === t.responsavel_id) ?? null;
+}
+
+const comigo = (t: LinhaAberta, membroId: string, substituicoes: readonly Substituicao[]) =>
+  t.responsavel_id === membroId || substituicaoDaTarefa(t, substituicoes) != null;
 
 /** Quantas tarefas abertas há em cada aba (Concluídas não conta: não é pendência). */
-export function contarAbertasPorAba(linhas: LinhaAberta[], membroId: string): Record<Exclude<FiltroTarefasSetor, "concluidas">, number> {
+export function contarAbertasPorAba(
+  linhas: LinhaAberta[],
+  membroId: string,
+  substituicoes: readonly Substituicao[] = [],
+): Record<Exclude<FiltroTarefasSetor, "concluidas">, number> {
   return {
     abertas: linhas.length,
-    minhas: linhas.filter((t) => t.responsavel_id === membroId).length,
+    minhas: linhas.filter((t) => comigo(t, membroId, substituicoes)).length,
     fila: linhas.filter((t) => t.responsavel_id === null).length,
     pedidas: linhas.filter((t) => t.criado_por === membroId).length,
   };
 }
 
-/** Pendências de quem executa: as tarefas abertas com a pessoa e as da fila dos setores em que ela atua. */
-export function contarPendenciasDoSetor(linhas: LinhaAberta[], membroId: string, meusSetores: readonly string[]): number {
-  return linhas.filter((t) => t.responsavel_id === membroId || (t.responsavel_id === null && meusSetores.includes(t.setor))).length;
+/**
+ * Pendências de quem executa: as tarefas abertas com a pessoa (ou com o principal que ela substitui) e as da fila
+ * dos setores em que ela atua.
+ */
+export function contarPendenciasDoSetor(
+  linhas: LinhaAberta[],
+  membroId: string,
+  meusSetores: readonly string[],
+  substituicoes: readonly Substituicao[] = [],
+): number {
+  return linhas.filter((t) => comigo(t, membroId, substituicoes) || (t.responsavel_id === null && meusSetores.includes(t.setor))).length;
 }

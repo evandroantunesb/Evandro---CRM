@@ -1,6 +1,12 @@
 # Estado do projeto — Raion CRM
 
-## Perfis e setores — C: gestor escreve em todos os setores (em andamento, 05/11/2026)
+## Perfis e setores — A3: substituto por obra (em andamento, 05/11/2026)
+
+Branch `feat/substituto-obra` (worktree `C:\dev\crm-substituto`). Migration `20261123100000_substituto_obra.sql`: no máximo um substituto ativo por setor na obra (índice único; `atribuir_participante_obra` pede a substituição e não deixa o principal ser o próprio substituto); `minhas_substituicoes` (obra, setor e principal de onde a sessão substitui); `notificar_tarefa_setor` avisa também o substituto quando a tarefa da obra vai para o (ou é reaberta com o) principal do setor; `avisar_justificativa_atraso` avisa o substituto no pedido e na cobrança; `responder_justificativa_atraso` aceita o substituto. A migration para, sem aplicar nada, se alguma obra já tiver dois substitutos ativos no mesmo setor. No app: "Comigo" e as contagens das tarefas (abas e sininho) incluem as tarefas do principal que a pessoa substitui, com o selo "Você substitui Fulano"; a Engenharia mostra as justificativas pedidas ao principal; a ficha mostra "Responder" ao substituto; escolher "Substituto" num setor que já tem um vira a troca dele.
+
+Decisões do Evandro (05/11/2026): substituto por obra (não cobertura de ausência), em todos os setores; um por setor na obra; a tarefa continua com o principal e o substituto recebe o aviso e a vê em "Comigo"; na justificativa de atraso, recebe o aviso e responde. O substituto já agia no setor desde a 3b-3 (participante ativo = 'executar').
+
+## Perfis e setores — C: gestor escreve em todos os setores (mesclada na #338, 05/11/2026; migration aplicada antes do merge, tag `migracao-pr338-f4d0d2d`, run 42080446990)
 
 Branch `feat/gestor-escreve-setores` (worktree `C:\dev\crm-gestor`). Migration `20261122100000_gestor_escreve_setores.sql`: `autorizacao_setor_obra` e `autorizacao_tarefa_setor` devolvem 'coordenar' para o gestor, e as RPCs que passam por elas herdam a regra (fluxos, marcos, participantes, Engenharia, contas a pagar, NF do cliente, tarefas). `criar_tarefa_setor` e `membros_do_setor` aceitam o gestor para escolher o responsável. No app: `GERIR_OBRAS` inclui o gestor, o espelho `autorizacaoSetor` também, os candidatos a participante do gestor vêm de `membros_do_setor` (sem coordenadores), e o histórico da obra mostra "Nome (gestor)" pelo `autor_contexto.papel` que o banco já gravava.
 

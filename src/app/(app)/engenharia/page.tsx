@@ -18,6 +18,7 @@ import { carregarObras } from "@/lib/obras/dados";
 import { rotuloStatus } from "@/lib/obras/rotulos";
 import { ENGENHARIA, OBRAS, pode } from "@/lib/permissoes";
 import { exigirPapel } from "@/lib/sessao";
+import { carregarJustificativasComigo, carregarSubstituicoes } from "@/lib/substituicoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { carregarTarefasSetor, contarAbasTarefasSetor } from "@/lib/tarefas-setor";
 import { ROTULO_FILTRO_TAREFAS_SETOR, type TarefaSetorVM } from "@/lib/tarefas-setor-regras";
@@ -112,13 +113,13 @@ export default async function Engenharia({ searchParams }: PageProps<"/engenhari
     carregarStatusProtocolos(supabase, atual.empresaId),
     // "Minhas obras": onde participo hoje da Engenharia (responsável, apoio ou substituto).
     supabase.from("obra_participantes").select("obra_id").eq("empresa_id", atual.empresaId).eq("membro_id", atual.membroId).eq("setor", "engenharia").is("fim", null),
-    // Pedidos de justificativa de atraso ainda sem resposta, feitos a mim.
-    supabase.from("obra_justificativas_atraso").select("id, obra_id, etapa, prazo").eq("empresa_id", atual.empresaId).eq("pedido_a", atual.membroId).is("respondido_em", null),
+    // Pedidos de justificativa de atraso sem resposta, feitos a mim ou ao principal que eu substituo (20261123100000).
+    carregarSubstituicoes(supabase, atual.empresaId, atual.papel).then((s) => carregarJustificativasComigo(supabase, atual.empresaId, atual.membroId, s)),
     // Obras e kWp com a Engenharia concluída, por mês (a minha e, para quem vê a equipe, a do setor).
     supabase.rpc("trajetoria_engenharia", { p_empresa_id: atual.empresaId }),
     supabase.from("engenharia_marcos").select("obras, kwp").eq("empresa_id", atual.empresaId).maybeSingle(),
   ]);
-  for (const r of [participacoes, pedidos]) if (r.error) throw r.error;
+  if (participacoes.error) throw participacoes.error;
   // Sem a trajetória, a tela segue sem o painel (como o Desempenho sem os indicadores); sem os marcos, vale o padrão.
   const historico = trajetoria.error ? null : lerTrajetoria(trajetoria.data);
   const marcos = lerMarcos(marcosRes.error ? null : marcosRes.data);
@@ -148,10 +149,10 @@ export default async function Engenharia({ searchParams }: PageProps<"/engenhari
   const vencidos = prazosEmCurso.filter((p) => p.diasRestantes < 0).length;
 
   const tarefas = abertas.tarefas.map(paraCard);
-  // Minhas tarefas e as da fila que eu posso assumir.
-  const tarefasMinhas = tarefas.filter((t) => t.responsavel?.id === atual.membroId || (!t.responsavel && t.podeAgir));
+  // Minhas tarefas (também as do principal que eu substituo) e as da fila que eu posso assumir.
+  const tarefasMinhas = tarefas.filter((t) => t.responsavel?.id === atual.membroId || t.substituindo != null || (!t.responsavel && t.podeAgir));
   const obraPorId = new Map(obras.map((o) => [o.id, o]));
-  const justificativas: JustificativaPendente[] = (pedidos.data ?? []).flatMap((j) => {
+  const justificativas: JustificativaPendente[] = pedidos.flatMap((j) => {
     const o = obraPorId.get(j.obra_id);
     if (!o || !(ETAPAS_OBRA as readonly string[]).includes(j.etapa)) return [];
     return [{ id: j.id, obraId: j.obra_id, obra: `Obra #${o.numero} · ${o.clienteNome}`, etapa: ROTULO_ETAPA_CURTO[j.etapa as EtapaObra], prazo: j.prazo }];

@@ -35,6 +35,7 @@ import { prazosDaLinha, ROTULO_COR, semaforoObra, type CorSemaforo } from "@/lib
 import { COLUNAS_JUSTIFICATIVA, atrasosDaObra, justificativasPorEtapa } from "@/lib/obras/justificativas";
 import { hojeEmSaoPaulo } from "@/lib/formatacao";
 import { exigirPapel } from "@/lib/sessao";
+import { carregarSubstituicoes } from "@/lib/substituicoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 
 type Tom = "neutro" | "positivo" | "negativo" | "atencao";
@@ -55,7 +56,7 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
 
   const supabase = await criarClienteServidor();
   // A lista navegável é recalculada aqui, a cada obra: mesma empresa, mesma RLS, mesmos filtros.
-  const [obra, lista, tarefasSetor, vistoria, vistorias, cronograma, orcamento, lancamentos, justificativasRes, escalonamentosRes, identidades, prazosRes] = await Promise.all([
+  const [obra, lista, tarefasSetor, vistoria, vistorias, cronograma, orcamento, lancamentos, justificativasRes, escalonamentosRes, identidades, prazosRes, substituicoes] = await Promise.all([
     carregarDetalheObra(supabase, { empresaId: atual.empresaId, papel: atual.papel, obraId: id, membroId: atual.membroId }),
     carregarObras(supabase, { empresaId: atual.empresaId, papel: atual.papel, comResponsaveis: false }),
     carregarTarefasSetor(supabase, { empresaId: atual.empresaId, membroId: atual.membroId, papel: atual.papel, obraId: id, filtro: "todas" }),
@@ -77,6 +78,8 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
     supabase.rpc("identidade_membros", { p_empresa_id: atual.empresaId }),
     // Semáforo da faixa: os mesmos prazos em dias úteis da visão Completa.
     supabase.rpc("prazos_obras", { p_obra_ids: [id] }),
+    // Onde sou o substituto do setor (responde a justificativa pedida ao principal).
+    carregarSubstituicoes(supabase, atual.empresaId, atual.papel),
   ]);
   if (!obra) notFound();
   for (const r of [justificativasRes, escalonamentosRes, identidades, prazosRes]) if (r.error) throw r.error;
@@ -104,6 +107,7 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
     justificativas,
     membroId: atual.membroId,
     autorizacao: (setor) => gestaoDoSetor(setor)?.permissoes.autorizacao,
+    substituo: (setor) => substituicoes.some((s) => s.obraId === id && s.setor === setor),
   });
   const cancelada = resumo.situacao === "cancelada";
   const hoje = hojeEmSaoPaulo();
