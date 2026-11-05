@@ -27,6 +27,7 @@ function revalidar(obraId: string) {
   revalidatePath(`/obras/${obraId}`);
   revalidatePath(`/obras/apresentacao/${obraId}`);
   revalidatePath("/obras");
+  revalidatePath("/financeiro");
 }
 
 async function chamar(obraId: string, rpc: () => PromiseLike<{ error: unknown }>, padrao: string, sucesso: string): Promise<ResultadoAcao> {

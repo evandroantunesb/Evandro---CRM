@@ -17,7 +17,7 @@ const id = z.string().uuid();
 const negocioOpcional = z.union([id, z.literal("")]).optional();
 
 function revalidar(negocioId?: string) {
-  revalidatePath("/pagamentos");
+  revalidatePath("/financeiro");
   if (negocioId) revalidatePath(`/negocios/${negocioId}`);
 }
 

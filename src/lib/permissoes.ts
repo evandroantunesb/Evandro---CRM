@@ -54,6 +54,12 @@ export const INFORMAR_PAGAMENTO = ["admin", "gestor", "vendedor"] as const satis
  */
 export const PAGAMENTOS_A_CONFIRMAR = ["admin", "gestor", "operacao"] as const satisfies ListaPapeis;
 
+/**
+ * Tela Financeiro (A pagar, Pagamentos a confirmar, Notas fiscais, Pagos). Admin e gestor veem tudo; `operacao` vê as
+ * quatro abas se atua no Administrativo e só "Pagamentos a confirmar" se só confere pagamento (`acessoFinanceiro`).
+ */
+export const FINANCEIRO = ["admin", "gestor", "operacao"] as const satisfies ListaPapeis;
+
 /** Mudar o valor de negócio ganho (correção com motivo; a RPC `corrigir_valor_negocio` exige o mesmo). */
 export const CORRIGIR_VALOR_GANHO = ["admin", "gestor"] as const satisfies ListaPapeis;
 

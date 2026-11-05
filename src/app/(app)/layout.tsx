@@ -94,7 +94,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
   }
   const linkPagamentos =
     pagamentosAConfirmar > 0
-      ? [{ href: "/pagamentos", texto: `${pagamentosAConfirmar} pagamento${pagamentosAConfirmar === 1 ? "" : "s"} a confirmar` }]
+      ? [{ href: "/financeiro?aba=confirmar", texto: `${pagamentosAConfirmar} pagamento${pagamentosAConfirmar === 1 ? "" : "s"} a confirmar` }]
       : [];
   const avisos = { notificacoes, pendencias: [...linkPagamentos, ...linksPendencias(papel, pendencias)] };
 
@@ -124,7 +124,9 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
           ...(pode(papel, OBRAS) ? [{ href: "/obras", rotulo: "Obras", secao: "Operação" }] : []),
           ...(pode(papel, ENGENHARIA) ? [{ href: "/engenharia", rotulo: "Engenharia", secao: "Operação" }] : []),
           ...(pode(papel, PEDIDOS_AOS_SETORES) ? [{ href: "/tarefas/setores", rotulo: "Pedidos aos setores", secao: "Operação" }] : []),
-          ...(verPagamentosAConfirmar ? [{ href: "/pagamentos", rotulo: "Pagamentos a confirmar", secao: "Operação" }] : []),
+          // Financeiro (A pagar, Pagamentos a confirmar, Notas fiscais, Pagos): da Operação, quem atua no Operacional ou no
+          // Administrativo (`confirma_pagamento_cliente`); a tela escolhe as abas de cada um.
+          ...(verPagamentosAConfirmar ? [{ href: "/financeiro", rotulo: "Financeiro", secao: "Operação", ativoEm: ["/pagamentos"] }] : []),
           ...(pode(papel, GESTAO_COMERCIAL) ? [{ href: "/painel", rotulo: "Painel", secao: "Gestão" }] : []),
           ...itensGamificacao(papel, conquistaNova),
         ]

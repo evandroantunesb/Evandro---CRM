@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Banknote,
   BarChart3,
   Building2,
   CheckSquare,
@@ -34,6 +35,7 @@ const ICONES: Record<string, LucideIcon> = {
   "/leads-a-distribuir": Inbox,
   "/propostas-contratos": FileSignature,
   "/obras": HardHat,
+  "/financeiro": Banknote,
   "/painel": BarChart3,
   "/gamificacao": LayoutDashboard,
   "/gamificacao/ranking": Trophy,

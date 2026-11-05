@@ -7,7 +7,7 @@ import { BUCKET_FINANCEIRO_OBRA, TIPOS_ANEXO_FINANCEIRO, caminhoFinanceiro, prob
 import { criarClienteNavegador } from "@/lib/supabase/navegador";
 import type { ResultadoAcao } from "@/lib/tipos";
 
-/** Peças comuns dos cartões do financeiro da obra (envio de arquivo ao Storage e selos). */
+/** Peças comuns do financeiro (ficha da obra e tela Financeiro): envio de arquivo ao Storage, selos e documentos. */
 
 export const dataCompleta = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
 const ACEITA = TIPOS_ANEXO_FINANCEIRO.join(",");
@@ -44,6 +44,17 @@ export const TOM_SELO = {
   aberto: "bg-zinc-100 text-zinc-700",
   encerrado: "bg-zinc-100 text-zinc-500 line-through decoration-zinc-400/60",
 } as const;
+
+/** Documento anexado (comprovante, NF): link assinado quando há, senão só a marca. */
+export function Documento({ rotulo, url }: { rotulo: string; url: string | null }) {
+  return url ? (
+    <a href={url} target="_blank" rel="noreferrer" className="text-energia underline-offset-2 hover:underline">
+      ✓ {rotulo}
+    </a>
+  ) : (
+    <span className="text-energia">✓ {rotulo}</span>
+  );
+}
 
 /** Envio com arquivo: o navegador sobe ao Storage e a ação recebe só o caminho. */
 export function useEnvioComArquivo(executar: (form: FormData) => Promise<ResultadoAcao>) {
