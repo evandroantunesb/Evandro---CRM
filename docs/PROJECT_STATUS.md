@@ -2,7 +2,7 @@
 
 ## Perfis e setores — A1: setor Administrativo no banco (em andamento, 05/11/2026)
 
-Branch `feat/setor-administrativo`, PR #332 (aguardando revisão; migration ainda não aplicada em produção). Ordem das entregas: A1 (esta) → B (Usuários com perfil único) → A2 (contas a pagar a fornecedores, NF do cliente, tela Financeiro) → C (gestor escreve em todos os setores, com histórico) → A3 (Compras com substituto) → D/E (prazos pela Operação; funil pelo gestor). Migrations `20261119100000_setor_administrativo_enum.sql` (só o valor do enum) e `20261119100100_setor_administrativo.sql`.
+#332 mesclada em 05/11/2026 (06:20, Brasília); migrations aplicadas em produção logo depois (06:33; tag `migracao-pr332-72fefb7`, run 42003095398). Nesses 13 minutos o app em produção rodou sem a migration. Ordem das entregas: A1 (esta) → B (Usuários com perfil único) → A2 (contas a pagar a fornecedores, NF do cliente, tela Financeiro) → C (gestor escreve em todos os setores, com histórico) → A3 (Compras com substituto) → D/E (prazos pela Operação; funil pelo gestor). Migrations `20261119100000_setor_administrativo_enum.sql` (só o valor do enum) e `20261119100100_setor_administrativo.sql`.
 
 Decisões do Evandro (05/11/2026):
 - A obra só nasce com o pagamento do cliente confirmado, então o Administrativo na obra vai de **pagando fornecedores → fornecedores pagos → concluído**. Nada exige nota fiscal anexada.
