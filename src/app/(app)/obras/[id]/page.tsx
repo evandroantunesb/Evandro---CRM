@@ -11,6 +11,8 @@ import { carregarObras } from "@/lib/obras/dados";
 import { filtrosDeParams, hrefObra, montarNavegacao, queryDosFiltros, temFiltroAtivo } from "@/lib/obras/navegacao";
 import { AjusteEntregaContratada, GestaoFixacao, GestaoMarco, GestaoSetor } from "./gestao";
 import { CustosObraFicha } from "./custos";
+import { PagamentosFornecedores } from "./financeiro";
+import { NotaFiscalCliente, PagamentoCliente } from "./financeiro-cliente";
 import { AtrasosObra, EscalonamentosObra } from "./opr";
 import { VistoriaEngenharia } from "@/components/engenharia/vistoria";
 import { ResumoVistoria } from "@/components/engenharia/vistoria-resumo";
@@ -19,6 +21,8 @@ import { ListaTarefasSetor, NovaTarefaSetor } from "@/components/tarefas-setor";
 import { carregarTarefasSetor } from "@/lib/tarefas-setor";
 import { carregarSituacaoVistoria, carregarVistoriasEngenharia } from "@/lib/engenharia-vistoria";
 import { carregarDetalheObra, type MarcoDetalheVM } from "@/lib/obras/detalhe";
+import { carregarFinanceiroObra } from "@/lib/obras/financeiro";
+import { resumoContas } from "@/lib/obras/financeiro-regras";
 import {
   ROTULO_ALERTA_OBRA,
   ROTULO_SITUACAO_OBRA,
@@ -102,6 +106,20 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
     autorizacao: (setor) => gestaoDoSetor(setor)?.permissoes.autorizacao,
   });
   const cancelada = resumo.situacao === "cancelada";
+  const hoje = hojeEmSaoPaulo();
+  // Financeiro (contas a fornecedor, pagamento e NF do cliente): mesma visibilidade dos custos; a NF do cliente, sem o
+  // Operacional. Escreve quem atua no Administrativo da obra (ou admin); a obra pausada também aceita.
+  const autorizacaoAdministrativo = gestaoDoSetor("administrativo")?.permissoes.autorizacao ?? null;
+  const financeiro = custos
+    ? await carregarFinanceiroObra(supabase, {
+        empresaId: atual.empresaId,
+        obraId: id,
+        podeVerNfCliente: atual.papel === "admin" || atual.papel === "gestor" || autorizacaoAdministrativo != null,
+        nomes,
+      })
+    : null;
+  const podeFinanceiro = autorizacaoAdministrativo != null && !cancelada;
+  const resumoFinanceiro = financeiro ? resumoContas(financeiro.contas, hoje) : null;
   const escalonamentos = (escalonamentosRes.data ?? []).map((e) => ({
     id: e.id,
     titulo: e.titulo,
@@ -123,7 +141,7 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
   const linhaPrazos = prazosRes.data?.[0];
   const semaforo =
     resumo.situacao === "em_andamento" && linhaPrazos
-      ? semaforoObra({ prazos: prazosDaLinha(linhaPrazos), custos: custosValidos, margemProjetadaPct: margemPct })
+      ? semaforoObra({ prazos: prazosDaLinha(linhaPrazos), custos: custosValidos, margemProjetadaPct: margemPct, contasVencidas: resumoFinanceiro?.vencidas })
       : null;
   const ultimaJustificativa = [...(justificativasRes.data ?? [])]
     .filter((j) => j.texto && j.respondido_em)
@@ -246,10 +264,38 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
                 estornado: estornados.has(l.id),
               }))}
             podeAjustar={pode(atual.papel, FINANCEIRO_OBRA) && resumo.situacao !== "cancelada"}
-            podeLancar={gestaoDoSetor("operacional")?.permissoes.autorizacao != null && resumo.situacao !== "cancelada"}
-            hoje={hojeEmSaoPaulo()}
+            podeLancar={(gestaoDoSetor("operacional")?.permissoes.autorizacao != null || autorizacaoAdministrativo != null) && !cancelada}
+            hoje={hoje}
           />
         </Cartao>
+      )}
+
+      {financeiro && (
+        <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
+          <Cartao titulo="Pagamentos a fornecedores">
+            <PagamentosFornecedores
+              key={resumo.id}
+              obra={{ obraId: resumo.id, empresaId: atual.empresaId }}
+              contas={financeiro.contas}
+              planejado={custos?.planejado ?? null}
+              podeEscrever={podeFinanceiro}
+              hoje={hoje}
+              fornecedores={financeiro.fornecedores}
+            />
+          </Cartao>
+          <div className="flex flex-col gap-4">
+            {financeiro.cliente?.situacao && (
+              <Cartao titulo="Pagamento do cliente">
+                <PagamentoCliente cliente={financeiro.cliente} />
+              </Cartao>
+            )}
+            {financeiro.nfCliente && (
+              <Cartao titulo="Nota fiscal do cliente">
+                <NotaFiscalCliente key={resumo.id} obra={{ obraId: resumo.id, empresaId: atual.empresaId }} nf={financeiro.nfCliente.nf} podeAnexar={podeFinanceiro} />
+              </Cartao>
+            )}
+          </div>
+        </div>
       )}
 
       {atrasos.length > 0 && (
@@ -299,6 +345,11 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
                   ) : (
                     vistoria && <ResumoVistoria situacao={vistoria} />
                   ))}
+                {s.setor === "administrativo" && resumoFinanceiro && resumoFinanceiro.total > 0 && (
+                  <p className="text-xs text-texto-2">
+                    {resumoFinanceiro.pagas} de {resumoFinanceiro.total} {resumoFinanceiro.total === 1 ? "pagamento a fornecedor pago" : "pagamentos a fornecedores pagos"}
+                  </p>
+                )}
                 {g && (
                   <GestaoSetor
                     key={resumo.id}

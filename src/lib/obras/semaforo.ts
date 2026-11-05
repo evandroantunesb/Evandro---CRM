@@ -6,7 +6,8 @@ import type { CustosObraVM } from "./custos";
  * Semáforo da obra (OPR), pelas regras do desenho aprovado "Obras — Completa" ("Como o semáforo decide"):
  *  - VERMELHA: entrega prevista mais de 5 dias úteis depois da contratada, ou margem projetada negativa;
  *  - AMARELA: custo de uma categoria ainda em andamento a partir de 90% do planejado; prazo de etapa ou da entrega
- *    vencendo em até 3 dias úteis; ou algum atraso (de etapa ou da entrega, até 5 dias úteis);
+ *    vencendo em até 3 dias úteis; algum atraso (de etapa ou da entrega, até 5 dias úteis); ou pagamento a fornecedor
+ *    vencido e não pago (decisão de 05/11/2026, desenho "Ficha da obra · Administrativo");
  *  - VERDE: o resto. Vale a pior cor.
  * Os dias úteis vêm prontos do banco (`prazos_obras`); aqui só se aplicam as regras e o motivo exibido.
  */
@@ -78,8 +79,14 @@ export type SemaforoVM = { cor: CorSemaforo; motivo: string | null };
  * Cor e motivo calculado (o da regra mais grave). `custos` e `margemProjetadaPct` só chegam a quem vê os valores;
  * sem eles, valem as regras de prazo.
  */
-export function semaforoObra(entrada: { prazos: PrazosObra; custos: CustosObraVM | null; margemProjetadaPct: number | null }): SemaforoVM {
-  const { prazos: p, custos, margemProjetadaPct: margem } = entrada;
+export function semaforoObra(entrada: {
+  prazos: PrazosObra;
+  custos: CustosObraVM | null;
+  margemProjetadaPct: number | null;
+  /** Contas a fornecedor vencidas e não pagas (só chega a quem vê os custos). */
+  contasVencidas?: number;
+}): SemaforoVM {
+  const { prazos: p, custos, margemProjetadaPct: margem, contasVencidas = 0 } = entrada;
 
   if (p.atrasoEntrega > LIMITE_ATRASO_DIAS) return { cor: "vermelha", motivo: "Entrega prevista após o contratado" };
   if (margem != null && margem < 0) {
@@ -88,6 +95,7 @@ export function semaforoObra(entrada: { prazos: PrazosObra; custos: CustosObraVM
   }
 
   if (p.atrasoEntrega > 0) return { cor: "amarela", motivo: `Entrega prevista ${dias(p.atrasoEntrega)} após o contratado` };
+  if (contasVencidas > 0) return { cor: "amarela", motivo: `${contasVencidas} ${contasVencidas === 1 ? "pagamento vencido" : "pagamentos vencidos"}` };
   if (p.maiorAtraso > 0 && p.maiorAtrasoEtapa) return { cor: "amarela", motivo: `Atraso de ${dias(p.maiorAtraso)} em ${nomeEtapa(p.maiorAtrasoEtapa)}` };
   const perto = custos?.categorias.find((c) => !c.encerrada && c.planejado > 0 && (c.realizado / c.planejado) * 100 >= LIMITE_CUSTO_PCT);
   if (perto) return { cor: "amarela", motivo: `Custo de ${perto.nome.toLowerCase()} perto do limite` };
