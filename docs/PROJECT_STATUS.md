@@ -1,5 +1,20 @@
 # Estado do projeto — Raion CRM
 
+## Perfis e setores — A1: setor Administrativo no banco (em andamento, 05/11/2026)
+
+Branch `feat/setor-administrativo`, sem PR ainda. Ordem das entregas: A1 (esta) → B (Usuários com perfil único) → A2 (contas a pagar a fornecedores, NF do cliente, tela Financeiro) → C (gestor escreve em todos os setores, com histórico) → A3 (Compras com substituto) → D/E (prazos pela Operação; funil pelo gestor). Migrations `20261119100000_setor_administrativo_enum.sql` (só o valor do enum) e `20261119100100_setor_administrativo.sql`.
+
+Decisões do Evandro (05/11/2026):
+- A obra só nasce com o pagamento do cliente confirmado, então o Administrativo na obra vai de **pagando fornecedores → fornecedores pagos → concluído**. Nada exige nota fiscal anexada.
+- Obras existentes: em andamento → "pagando fornecedores"; concluídas ou canceladas → "concluído" (com a data da conclusão ou do cancelamento).
+- A obra concluída exige os **4** setores no fim e os 2 marcos resolvidos. O marco "NF do cliente" passa ao Administrativo ("não se aplica" resolve); a garantia continua com o Operacional.
+- Dados pessoais do cliente para o participante do Administrativo: endereço e CPF/CNPJ (sem telefone).
+- Tarefas automáticas novas (empresas novas e existentes): Compras "faturado pelo fornecedor" → Administrativo "Pagar fornecedor"; Operacional "instalação concluída" → Administrativo "Emitir nota fiscal do cliente".
+- Pagamento do cliente: o Operacional **ou** o Administrativo confirma ou devolve (`confirma_pagamento_cliente`).
+- Conta a pagar (A2) fica separada e só vira custo real quando paga; o Operacional continua lançando custo real. Na A1, custos da obra seguem só com o Operacional.
+
+Pendências: `atua_no_operacional` ficou no banco para o app anterior ao deploy (remover numa PR depois desta); a inscrição estadual do cliente (NF de PJ) não foi liberada ao Administrativo (decidir na A2).
+
 ## Tela de entrada configurável — concluída (04/11/2026)
 
 Configurações › Empresa › Tela de entrada (só o admin), pelos desenhos aprovados "Configurações · Tela de entrada" e "Acesso · Entrar". #326 mesclada em 04/11/2026; migration `20261118100000_tela_entrada.sql` (tabela `empresa_tela_entrada` e bucket público `tela-entrada`) aplicada em 05/11/2026 (autorização #327, dry-run 41943161896, aplicação 41943434745, `main` em `135aad2`). Conferido em produção sem login: Entrar e Recuperar senha abrem com o padrão e a logo acima do formulário; Configurações › Tela de entrada exige login. Falta o admin testar a troca de imagem e textos com a própria conta.

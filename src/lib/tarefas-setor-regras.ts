@@ -3,7 +3,7 @@
  * formato que a tela recebe (montado em `@/lib/tarefas-setor`).
  */
 
-export const SETORES_TAREFA = ["compras", "engenharia", "operacional"] as const;
+export const SETORES_TAREFA = ["compras", "engenharia", "operacional", "administrativo"] as const;
 export type SetorTarefa = (typeof SETORES_TAREFA)[number];
 export type StatusTarefaSetor = "aberta" | "concluida" | "cancelada";
 

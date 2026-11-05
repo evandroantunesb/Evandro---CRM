@@ -7,7 +7,7 @@
 import { describe, expect, it } from "vitest";
 import { carregarObras } from "@/lib/obras/dados";
 import { carregarDetalheObra } from "@/lib/obras/detalhe";
-import { autorizacaoSetor, bloqueioDaObra, permissoesSetor, podeAtualizarMarcos, type EntradaAutorizacao } from "@/lib/obras/gestao";
+import { autorizacaoSetor, bloqueioDaObra, marcosAtualizaveis, permissoesSetor, type EntradaAutorizacao } from "@/lib/obras/gestao";
 import { filtrosDeParams, hrefObra, montarNavegacao, queryDosFiltros, temFiltroAtivo } from "@/lib/obras/navegacao";
 import { GERIR_OBRAS, OBRAS, pode } from "@/lib/permissoes";
 import type { SupabaseServidor } from "@/lib/supabase/server";
@@ -19,7 +19,7 @@ const entrada = (e: Partial<EntradaAutorizacao>): EntradaAutorizacao => ({ papel
 
 describe("autorizacaoSetor (espelho de autorizacao_setor_obra)", () => {
   it("admin atua em qualquer setor operacional, sem precisar de setor nem participação", () => {
-    for (const setor of ["compras", "engenharia", "operacional"] as const) {
+    for (const setor of ["compras", "engenharia", "operacional", "administrativo"] as const) {
       expect(autorizacaoSetor(entrada({ papel: "admin" }), setor)).toBe("admin");
     }
   });
@@ -67,12 +67,14 @@ describe("permissoesSetor", () => {
     expect(permissoesSetor(executor, "operacional", { cancelada: false, pausada: true })).toMatchObject({ alterarFluxo: false, gerirParticipantes: false });
   });
 
-  it("marcos: só quem atua no Operacional e com a obra ativa", () => {
-    expect(podeAtualizarMarcos(executor, ATIVA)).toBe(true);
-    expect(podeAtualizarMarcos(coordenador, ATIVA)).toBe(false);
-    expect(podeAtualizarMarcos(entrada({ papel: "admin" }), ATIVA)).toBe(true);
-    expect(podeAtualizarMarcos(entrada({ papel: "admin" }), { cancelada: false, pausada: true })).toBe(false);
-    expect(podeAtualizarMarcos(entrada({ papel: "gestor" }), ATIVA)).toBe(false);
+  it("marcos: NF do cliente é do Administrativo e garantia do Operacional, com a obra ativa", () => {
+    const administrativo = entrada({ papel: "operacao", setoresDoMembro: [{ setor: "administrativo", capacidade: "coordenar" }] });
+    expect(marcosAtualizaveis(executor, ATIVA)).toEqual(["garantia"]);
+    expect(marcosAtualizaveis(administrativo, ATIVA)).toEqual(["nf_cliente"]);
+    expect(marcosAtualizaveis(coordenador, ATIVA)).toEqual([]);
+    expect(marcosAtualizaveis(entrada({ papel: "admin" }), ATIVA)).toEqual(["nf_cliente", "garantia"]);
+    expect(marcosAtualizaveis(entrada({ papel: "admin" }), { cancelada: false, pausada: true })).toEqual([]);
+    expect(marcosAtualizaveis(entrada({ papel: "gestor" }), ATIVA)).toEqual([]);
   });
 
   it("mensagem de bloqueio da obra", () => {
@@ -329,8 +331,8 @@ describe("carregarDetalheObra — bloco gestao", () => {
     const obra = await carregarDetalheObra(cliente, { empresaId: EMPRESA, papel: "admin", obraId: OBRA, membroId: "m-adm" });
     const g = obra?.gestao;
     expect(g?.bloqueio).toBeNull();
-    expect(g?.podeAtualizarMarcos).toBe(true);
-    expect(g?.setores.map((s) => s.permissoes.autorizacao)).toEqual(["admin", "admin", "admin"]);
+    expect(g?.marcosAtualizaveis).toEqual(["nf_cliente", "garantia"]);
+    expect(g?.setores.map((s) => s.permissoes.autorizacao)).toEqual(["admin", "admin", "admin", "admin"]);
     const compras = g?.setores.find((s) => s.setor === "compras");
     expect(compras?.candidatosVerificados).toBe(true);
     expect(compras?.candidatos).toEqual([{ membroId: "m-bia", nome: "Bia", detalhe: "Executa no setor" }]);
@@ -347,9 +349,9 @@ describe("carregarDetalheObra — bloco gestao", () => {
     const { cliente, chamadas } = cenario({ setoresMembro: [{ empresa_id: EMPRESA, membro_id: "m-eu", setor: "compras", capacidade: "executar" }] });
     const obra = await carregarDetalheObra(cliente, { empresaId: EMPRESA, papel: "operacao", obraId: OBRA, membroId: "m-eu" });
     const g = obra?.gestao;
-    expect(g?.setores.map((s) => s.permissoes.autorizacao)).toEqual(["executar", null, null]);
+    expect(g?.setores.map((s) => s.permissoes.autorizacao)).toEqual(["executar", null, null, null]);
     expect(g?.setores[0].permissoes).toMatchObject({ alterarFluxo: true, gerirParticipantes: false });
-    expect(g?.podeAtualizarMarcos).toBe(false);
+    expect(g?.marcosAtualizaveis).toEqual([]);
     for (const s of g?.setores ?? []) {
       expect(s.participantes).toEqual([]);
       expect(s.candidatos).toEqual([]);
@@ -387,7 +389,7 @@ describe("carregarDetalheObra — bloco gestao", () => {
     });
     expect(cancelada?.gestao?.bloqueio).toMatch(/cancelada/);
     expect(cancelada?.gestao?.setores.every((s) => !s.permissoes.alterarFluxo && !s.permissoes.gerirParticipantes)).toBe(true);
-    expect(cancelada?.gestao?.podeAtualizarMarcos).toBe(false);
+    expect(cancelada?.gestao?.marcosAtualizaveis).toEqual([]);
 
     const pausada = await carregarDetalheObra(cenario({ obra: { pausada_em: "2026-10-05T00:00:00Z" } }).cliente, {
       empresaId: EMPRESA,

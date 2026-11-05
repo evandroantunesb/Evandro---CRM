@@ -27,6 +27,7 @@ const esquemaSetores = z.object({
   compras: z.enum(["sem_acesso", "executar", "coordenar"]),
   engenharia: z.enum(["sem_acesso", "executar", "coordenar"]),
   operacional: z.enum(["sem_acesso", "executar", "coordenar"]),
+  administrativo: z.enum(["sem_acesso", "executar", "coordenar"]),
 });
 
 function setoresSelecionados(escolhas: z.infer<typeof esquemaSetores>) {

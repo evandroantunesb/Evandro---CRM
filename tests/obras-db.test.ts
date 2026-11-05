@@ -158,6 +158,7 @@ describe("criação da obra", () => {
       { setor: "compras", status: "a_comprar" },
       { setor: "engenharia", status: "a_iniciar" },
       { setor: "operacional", status: "aguardando_liberacao" },
+      { setor: "administrativo", status: "pagando_fornecedores" },
     ]);
 
     const { data: marcos } = await servico.from("obra_marcos").select("marco, status").eq("obra_id", obra.id).order("marco");
@@ -347,12 +348,12 @@ describe("RLS de leitura", () => {
 
   it("admin, vendedor da venda e gestor da equipe veem a obra e o valor", async () => {
     for (const usuario of [admin, vendedor, gestor]) {
-      expect(await enxerga(usuario)).toEqual({ obra: 1, valor: 1, fluxos: 3, historico: 1 });
+      expect(await enxerga(usuario)).toEqual({ obra: 1, valor: 1, fluxos: 4, historico: 1 });
     }
   });
 
   it("gestor fora da equipe vê todas as obras da empresa, com o valor (OPR); outro vendedor e outra empresa não", async () => {
-    expect(await enxerga(gestorFora)).toEqual({ obra: 1, valor: 1, fluxos: 3, historico: 1 });
+    expect(await enxerga(gestorFora)).toEqual({ obra: 1, valor: 1, fluxos: 4, historico: 1 });
     for (const usuario of [vendedor2, outraEmpresa]) {
       expect(await enxerga(usuario)).toEqual({ obra: 0, valor: 0, fluxos: 0, historico: 0 });
     }

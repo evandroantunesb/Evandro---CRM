@@ -1,7 +1,7 @@
 /**
  * Pagamento informado pelo vendedor (Evandro, 03/11/2026; 20261113100000_aviso_pagamento_vendedor.sql): o vendedor
- * avisa que o cliente pagou, com comprovante obrigatório; admin, gestor ou qualquer pessoa do setor Operacional
- * confirma ou devolve com motivo. O Operacional não vê o negócio: só a lista `pagamentos_a_confirmar`.
+ * avisa que o cliente pagou, com comprovante obrigatório; admin, gestor ou qualquer pessoa do setor Operacional ou
+ * Administrativo (20261119100100_setor_administrativo.sql) confirma ou devolve com motivo. O Operacional não vê o negócio: só a lista `pagamentos_a_confirmar`.
  */
 import { randomUUID } from "node:crypto";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -15,6 +15,7 @@ let gestor: Usuario;
 let admin: Usuario;
 let operacional: Usuario;
 let compras: Usuario;
+let administrativo: Usuario;
 let gestorOutra: Usuario;
 let empresa: string;
 const membro: Record<string, string> = {};
@@ -23,8 +24,8 @@ let etapa: string;
 let contato: string;
 
 beforeAll(async () => {
-  [vendedor, vendedor2, gestor, admin, operacional, compras, gestorOutra] = await Promise.all(
-    ["ap-vendedor", "ap-vendedor2", "ap-gestor", "ap-admin", "ap-operacional", "ap-compras", "ap-outra"].map(criarUsuario),
+  [vendedor, vendedor2, gestor, admin, operacional, compras, gestorOutra, administrativo] = await Promise.all(
+    ["ap-vendedor", "ap-vendedor2", "ap-gestor", "ap-admin", "ap-operacional", "ap-compras", "ap-outra", "ap-administrativo"].map(criarUsuario),
   );
   const { data: emp } = await servico.from("empresas").insert({ nome: `Aviso pagamento ${sufixo}` }).select("id").single();
   empresa = emp!.id;
@@ -37,6 +38,7 @@ beforeAll(async () => {
       { empresa_id: empresa, user_id: admin.id, papel: "admin" },
       { empresa_id: empresa, user_id: operacional.id, papel: "operacao" },
       { empresa_id: empresa, user_id: compras.id, papel: "operacao" },
+      { empresa_id: empresa, user_id: administrativo.id, papel: "operacao" },
     ])
     .select("id, user_id");
   for (const v of vinculos!) membro[v.user_id] = v.id;
@@ -44,6 +46,7 @@ beforeAll(async () => {
   for (const [quem, setor] of [
     [operacional, "operacional"],
     [compras, "compras"],
+    [administrativo, "administrativo"],
   ] as const) {
     const { error } = await admin.cliente.rpc("definir_setores_membro", {
       p_membro_id: membro[quem.id],
@@ -216,8 +219,9 @@ describe("pagamentos_a_confirmar e o que o Operacional vê", () => {
       expect(error).not.toBeNull();
     }
     const { error } = await compras.cliente.rpc("confirmar_pagamento", { p_contrato_id: contratoId });
-    expect(error?.message).toContain("Só gestor, admin ou o Operacional");
+    expect(error?.message).toBe("Só gestor, admin, o Operacional ou o Administrativo pode confirmar pagamento.");
     const { error: dev } = await compras.cliente.rpc("devolver_aviso_pagamento", { p_aviso_id: aviso!.id, p_motivo: "x" });
+    expect(dev?.message).toBe("Só gestor, admin, o Operacional ou o Administrativo pode devolver o aviso de pagamento.");
     expect(dev).not.toBeNull();
   });
 
@@ -302,6 +306,34 @@ describe("devolver, cancelar e confirmar", () => {
     expect(aposConfirmar?.message).toContain("já está confirmado");
   });
 
+  it("Administrativo vê a lista, devolve e confirma como o Operacional", async () => {
+    const { contratoId, negocioId } = await criarContrato();
+    const { data: aviso } = await informar(vendedor, contratoId);
+
+    const { data: lista, error: erroLista } = await administrativo.cliente.rpc("pagamentos_a_confirmar", { p_empresa_id: empresa });
+    expect(erroLista).toBeNull();
+    expect(lista!.some((l) => l.aviso_id === aviso!.id)).toBe(true);
+    const { data: arquivo } = await administrativo.cliente.storage.from(BUCKET).download(aviso!.comprovante_caminho);
+    expect(arquivo).not.toBeNull();
+    const { data: negocios } = await administrativo.cliente.from("negocios").select("id").eq("id", negocioId);
+    expect(negocios).toEqual([]);
+
+    const { data: devolvido, error: erroDevolver } = await administrativo.cliente.rpc("devolver_aviso_pagamento", {
+      p_aviso_id: aviso!.id,
+      p_motivo: "Não achei o PIX.",
+    });
+    expect(erroDevolver).toBeNull();
+    expect(devolvido).toMatchObject({ situacao: "devolvido", encerrado_por_membro_id: membro[administrativo.id] });
+
+    const { error: semAviso } = await administrativo.cliente.rpc("confirmar_pagamento", { p_contrato_id: contratoId });
+    expect(semAviso?.message).toBe("O Operacional e o Administrativo confirmam só pagamento informado pelo vendedor.");
+
+    await informar(vendedor, contratoId);
+    const { data: conf, error } = await administrativo.cliente.rpc("confirmar_pagamento", { p_contrato_id: contratoId });
+    expect(error).toBeNull();
+    expect(conf).toMatchObject({ confirmado_por_membro_id: membro[administrativo.id], beneficiario_membro_id: membro[vendedor.id] });
+  });
+
   it("Operacional não confirma sem aviso do vendedor; gestor confirma direto, como antes", async () => {
     const { contratoId } = await criarContrato();
     const { error } = await operacional.cliente.rpc("confirmar_pagamento", { p_contrato_id: contratoId });
@@ -323,6 +355,6 @@ describe("devolver, cancelar e confirmar", () => {
     const { contratoId } = await criarContrato();
     await informar(vendedor, contratoId);
     const { error } = await vendedor.cliente.rpc("confirmar_pagamento", { p_contrato_id: contratoId });
-    expect(error?.message).toContain("Só gestor, admin ou o Operacional");
+    expect(error?.message).toBe("Só gestor, admin, o Operacional ou o Administrativo pode confirmar pagamento.");
   });
 });

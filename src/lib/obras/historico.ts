@@ -1,6 +1,6 @@
 import { ETAPAS_OBRA, ROTULO_ETAPA, type EtapaObra } from "./cronograma";
 import { ROTULO_CATEGORIA_CUSTO, ehCategoriaCusto } from "./custos";
-import { AGUARDANDO_OBRA, ROTULO_MARCO_OBRA, ROTULO_SETOR, ROTULO_STATUS_MARCO_OBRA, STATUS_POR_SETOR, rotuloAguardando, rotuloStatus, type SetorObra } from "./rotulos";
+import { AGUARDANDO_OBRA, ROTULO_MARCO_OBRA, ROTULO_SETOR, ROTULO_STATUS_MARCO_OBRA, SETORES_OBRA, STATUS_POR_SETOR, rotuloAguardando, rotuloStatus, type SetorObra } from "./rotulos";
 
 /**
  * Histórico da obra para a tela de detalhe. Monta o texto SÓ com campos seguros e rótulos próprios:
@@ -142,7 +142,7 @@ const ehRegistro = (v: unknown): v is Registro => typeof v === "object" && v !==
 const ler = (r: Registro | null, chave: string): unknown => (r && Object.hasOwn(r, chave) ? r[chave] : undefined);
 const rotulo = (tabela: Record<string, string>, codigo: unknown): string | null =>
   typeof codigo === "string" && Object.hasOwn(tabela, codigo) ? tabela[codigo] : null;
-const ehSetorFluxo = (setor: string | null): setor is SetorObra => setor === "compras" || setor === "engenharia" || setor === "operacional";
+const ehSetorFluxo = (setor: string | null): setor is SetorObra => (SETORES_OBRA as readonly (string | null)[]).includes(setor);
 
 function descreverFluxo(setor: string | null, dados: Registro | null): string {
   const campo = ler(dados, "campo");

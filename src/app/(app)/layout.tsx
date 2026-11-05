@@ -85,8 +85,8 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
       const supabase = await criarClienteServidor();
       const [contagem, operacional] = await Promise.all([
         contarPagamentosAConfirmar(supabase, sessao.atual.empresaId),
-        // Da Operação, só quem atua no setor Operacional confere pagamento.
-        papel === "operacao" ? supabase.rpc("atua_no_operacional", { p_empresa_id: sessao.atual.empresaId }).then((r) => r.data === true) : true,
+        // Da Operação, só quem atua no Operacional ou no Administrativo confere pagamento.
+        papel === "operacao" ? supabase.rpc("confirma_pagamento_cliente", { p_empresa_id: sessao.atual.empresaId }).then((r) => r.data === true) : true,
       ]);
       pagamentosAConfirmar = contagem;
       verPagamentosAConfirmar = operacional;

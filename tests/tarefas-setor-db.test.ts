@@ -135,7 +135,7 @@ describe("tarefas de setor (ordem importa)", { concurrent: false, shuffle: false
     const passado = await vendedor.cliente.rpc("criar_tarefa_setor", { p_setor: "engenharia", p_titulo: "3D", p_prazo: "2020-01-01", p_negocio_id: negocio });
     expect(passado.error?.message).toBe("O prazo não pode ser no passado.");
     const comercial = await vendedor.cliente.rpc("criar_tarefa_setor", { p_setor: "comercial", p_titulo: "3D", p_prazo: amanha(), p_negocio_id: negocio });
-    expect(comercial.error?.message).toBe("Escolha Compras, Engenharia ou Operacional.");
+    expect(comercial.error?.message).toBe("Escolha Compras, Engenharia, Operacional ou Administrativo.");
     const { data, error } = await vendedor.cliente.rpc("criar_tarefa_setor", {
       p_setor: "engenharia",
       p_titulo: "Projeto 3D do telhado",

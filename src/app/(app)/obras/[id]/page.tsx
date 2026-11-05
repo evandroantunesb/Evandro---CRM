@@ -334,7 +334,7 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
         <ul className="flex flex-col gap-3 text-sm">
           {obra.marcos.map((m) => (
             <ItemMarco key={m.marco} marco={m}>
-              {gestao?.podeAtualizarMarcos && <GestaoMarco key={resumo.id} obraId={resumo.id} marco={m} />}
+              {gestao?.marcosAtualizaveis.includes(m.marco) && <GestaoMarco key={resumo.id} obraId={resumo.id} marco={m} />}
             </ItemMarco>
           ))}
         </ul>

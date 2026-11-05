@@ -1,4 +1,4 @@
-import type { AlertaObra, EstadoSetor, SetorObra, SituacaoObra } from "./rotulos";
+import { SETORES_OBRA, type AlertaObra, type EstadoSetor, type SetorObra, type SituacaoObra } from "./rotulos";
 
 /**
  * Derivações puras e factuais da lista de Obras, a partir de campos que o banco já guarda.
@@ -34,7 +34,7 @@ export const MARCOS_OBRA = ["nf_cliente", "garantia"] as const;
 
 /**
  * Situação geral: cancelada > pausada > concluída > em andamento.
- * Concluída exige os 3 setores no status final e os 2 marcos fixos presentes e resolvidos
+ * Concluída exige os 4 setores no status final e os 2 marcos fixos presentes e resolvidos
  * (marco ausente nunca conta como resolvido).
  */
 export function situacaoObra(entrada: {
@@ -45,11 +45,11 @@ export function situacaoObra(entrada: {
 }): SituacaoObra {
   if (entrada.canceladaEm) return "cancelada";
   if (entrada.pausadaEm) return "pausada";
-  const tresSetoresConcluidos = (["compras", "engenharia", "operacional"] as const).every((setor) =>
+  const setoresConcluidos = SETORES_OBRA.every((setor) =>
     entrada.fluxos.some((f) => f.setor === setor && setorConcluido(setor, f.status)),
   );
   const marcosResolvidos = MARCOS_OBRA.every((marco) => entrada.marcos.some((m) => m.marco === marco && marcoResolvido(m.status)));
-  if (tresSetoresConcluidos && marcosResolvidos) return "concluida";
+  if (setoresConcluidos && marcosResolvidos) return "concluida";
   return "em_andamento";
 }
 

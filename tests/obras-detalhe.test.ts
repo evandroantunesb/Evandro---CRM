@@ -454,6 +454,7 @@ const filhas = (): Record<string, Linha[]> => ({
     fluxo("compras", "material_entregue"),
     fluxo("engenharia", "aprovado", { parado: true, parado_motivo: "Falta documento" }),
     fluxo("operacional", "agendada", { aguardando: "cliente" }),
+    fluxo("administrativo", "pagando_fornecedores"),
     // Outra obra e outra empresa: nunca devem aparecer.
     { ...fluxo("compras", "cotando"), obra_id: "outra-obra" },
     { ...fluxo("compras", "cotando"), empresa_id: OUTRA },
@@ -670,10 +671,10 @@ describe("carregarDetalheObra: view model", () => {
       negocioId: NEGOCIO,
     });
 
-    expect(vm.setores.map((s) => s.setor)).toEqual(["compras", "engenharia", "operacional"]);
-    expect(vm.setores.map((s) => s.statusRotulo)).toEqual(["Material entregue", "Aprovado", "Agendada"]);
-    expect(vm.setores.map((s) => s.estado)).toEqual(["concluido", "parado", "aguardando"]);
-    expect(vm.setores.map((s) => s.paradoMotivo)).toEqual([null, "Falta documento", null]);
+    expect(vm.setores.map((s) => s.setor)).toEqual(["compras", "engenharia", "operacional", "administrativo"]);
+    expect(vm.setores.map((s) => s.statusRotulo)).toEqual(["Material entregue", "Aprovado", "Agendada", "Pagando fornecedores"]);
+    expect(vm.setores.map((s) => s.estado)).toEqual(["concluido", "parado", "aguardando", "em_andamento"]);
+    expect(vm.setores.map((s) => s.paradoMotivo)).toEqual([null, "Falta documento", null, null]);
     expect(vm.setores[2].aguardando).toBe("Aguardando cliente");
     expect(vm.setores[1].statusDesde).toBe("2026-10-02T12:00:00Z");
     // Só participantes ativos, principal primeiro; Caio (encerrado) fora.
@@ -701,7 +702,12 @@ describe("carregarDetalheObra: view model", () => {
   it("marcos ausentes aparecem como 'Sem informação'; obra concluída exige os 2 marcos", async () => {
     const tabelas = filhas();
     tabelas.obra_marcos = [];
-    tabelas.obra_fluxos = [fluxo("compras", "material_entregue"), fluxo("engenharia", "concluido"), fluxo("operacional", "concluido")];
+    tabelas.obra_fluxos = [
+      fluxo("compras", "material_entregue"),
+      fluxo("engenharia", "concluido"),
+      fluxo("operacional", "concluido"),
+      fluxo("administrativo", "concluido"),
+    ];
     const f = criarFake({ tabelas: { obras: [obraTabela()], ...tabelas }, rpcs: { identidade_membros: identidades } });
     const vm = await carregarDetalheObra(f.cliente, { empresaId: EMPRESA, papel: "gestor", obraId: OBRA });
     expect(vm?.marcos.map((m) => [m.marco, m.statusRotulo, m.motivo])).toEqual([
@@ -717,6 +723,7 @@ describe("carregarDetalheObra: view model", () => {
     const f = criarFake({ tabelas: { obras: [obraTabela()], ...tabelas }, rpcs: { identidade_membros: identidades } });
     const vm = await carregarDetalheObra(f.cliente, { empresaId: EMPRESA, papel: "admin", obraId: OBRA });
     expect(vm?.setores.map((s) => [s.status, s.statusRotulo, s.estado])).toEqual([
+      [null, "Sem informação", "em_andamento"],
       [null, "Sem informação", "em_andamento"],
       [null, "Sem informação", "em_andamento"],
       [null, "Sem informação", "em_andamento"],

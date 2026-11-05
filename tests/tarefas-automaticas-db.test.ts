@@ -112,18 +112,21 @@ describe("tarefas automáticas (ordem importa)", { concurrent: false, shuffle: f
     }
   });
 
-  it("toda empresa nasce com as duas regras do Evandro, ativas", async () => {
+  it("toda empresa nasce com as quatro regras do Evandro (duas do Administrativo), ativas", async () => {
     const { data } = await admin.cliente
       .from("tarefas_automaticas_regras")
       .select("id, gatilho_setor, gatilho_status, setor, titulo, prazo_dias_uteis, ativa")
       .eq("empresa_id", empresa)
-      .order("gatilho_setor");
+      .order("gatilho_setor")
+      .order("setor");
     expect(data).toEqual([
       expect.objectContaining({ gatilho_setor: "compras", gatilho_status: "faturado_fornecedor", setor: "operacional", titulo: "Agendar instalação com o cliente", prazo_dias_uteis: 2, ativa: true }),
+      expect.objectContaining({ gatilho_setor: "compras", gatilho_status: "faturado_fornecedor", setor: "administrativo", titulo: "Pagar fornecedor", prazo_dias_uteis: 2, ativa: true }),
       expect.objectContaining({ gatilho_setor: "operacional", gatilho_status: "instalacao_concluida", setor: "engenharia", titulo: "Cadastro do cliente no app e pedido de vistoria", prazo_dias_uteis: 2, ativa: true }),
+      expect.objectContaining({ gatilho_setor: "operacional", gatilho_status: "instalacao_concluida", setor: "administrativo", titulo: "Emitir nota fiscal do cliente", prazo_dias_uteis: 2, ativa: true }),
     ]);
     regraAgendar = data![0].id;
-    regraVistoria = data![1].id;
+    regraVistoria = data![2].id;
   });
 
   it("só o admin cria e edita; ninguém apaga; outra empresa não vê; gatilho precisa ser um status do setor", async () => {
@@ -145,6 +148,14 @@ describe("tarefas automáticas (ordem importa)", { concurrent: false, shuffle: f
 
   it("status do gatilho abre a tarefa para o responsável principal, com prazo em dias úteis, e avisa", async () => {
     await status("operacional", "instalacao_concluida");
+    // A mesma transição abre a NF do cliente na fila do Administrativo (ninguém do setor participa da obra).
+    const { data: regraNf } = await servico
+      .from("tarefas_automaticas_regras")
+      .select("id")
+      .eq("empresa_id", empresa)
+      .eq("titulo", "Emitir nota fiscal do cliente")
+      .single();
+    expect(await tarefasDaRegra(regraNf!.id)).toEqual([expect.objectContaining({ setor: "administrativo", responsavel_id: null, origem: "automatica" })]);
     const [t, ...resto] = await tarefasDaRegra(regraVistoria);
     expect(resto).toHaveLength(0);
     const { data: prazo } = await admin.cliente.rpc("somar_dias_uteis", { p_empresa_id: empresa, p_inicio: hoje(), p_dias: 2 });
