@@ -56,7 +56,7 @@ export function LancarConta({
   return (
     <details id="lancar" className="rounded-xl border border-linha bg-superficie" open={aberto}>
       <summary className="cursor-pointer list-none px-3 py-2 text-sm font-semibold text-texto select-none">+ Lançar pagamento</summary>
-      <form onSubmit={enviar} className="grid gap-3 p-3 sm:grid-cols-2">
+      <form onSubmit={enviar} className="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2">
         {obraId ? (
           <input type="hidden" name="obraId" value={obraId} />
         ) : (
@@ -127,7 +127,7 @@ export function RegistrarPagamento({ obra, contaId, hoje }: { obra: Obra; contaI
     return registrarPagamentoConta({ obraId: obra.obraId, contaId, pagoEm: String(form.get("pagoEm") ?? ""), comprovante: enviado, nf });
   });
   return (
-    <form onSubmit={enviar} className="grid gap-3 rounded-xl border border-linha bg-superficie p-3 sm:grid-cols-2">
+    <form onSubmit={enviar} className="grid grid-cols-1 gap-3 rounded-xl border border-linha bg-superficie p-3 sm:grid-cols-2">
       <label className="flex flex-col gap-1 text-sm">
         <span className="font-medium text-texto-2">Data do pagamento</span>
         <input name="pagoEm" type="date" required max={hoje} defaultValue={hoje} className={CLASSE_ENTRADA} />

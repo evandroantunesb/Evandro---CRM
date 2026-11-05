@@ -32,7 +32,8 @@ export function CampoArquivo({ rotulo, name, required, ajuda }: { rotulo: string
   return (
     <label className="flex flex-col gap-1 text-sm">
       <span className="font-medium text-texto-2">{rotulo}</span>
-      <input name={name} type="file" accept={ACEITA} required={required} className={CLASSE_ENTRADA} />
+      {/* `w-full min-w-0`: o campo de arquivo tem largura própria (~300px) e estourava a tela de 320px. */}
+      <input name={name} type="file" accept={ACEITA} required={required} className={`${CLASSE_ENTRADA} w-full min-w-0 text-sm`} />
       {ajuda && <span className="text-xs text-texto-2">{ajuda}</span>}
     </label>
   );
