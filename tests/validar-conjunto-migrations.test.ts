@@ -8,8 +8,10 @@ import { afterAll, describe, expect, it } from "vitest";
 
 const SCRIPT = ".github/scripts/validar-conjunto-migrations.sh";
 const WORKFLOW = ".github/workflows/banco-producao.yml";
-// Substituto por obra (#339): só ela, nenhuma a mais ou a menos.
-const AUTORIZADAS = ["20261123100000_substituto_obra.sql"];
+// Prazos pela Operação e funil pelo gestor (#341): só ela, nenhuma a mais ou a menos.
+const AUTORIZADAS = ["20261124100000_prazos_operacao_funil_gestor.sql"];
+// Substituto por obra (#339): aplicada em 05/11/2026, antes desta. Se voltar a aparecer como pendente, não é autorizada.
+const SUBSTITUTO = "20261123100000_substituto_obra.sql";
 // Gestor escreve em todos os setores (#338): aplicada em 05/11/2026, antes desta. Se voltar a aparecer como pendente, não é autorizada.
 const GESTOR_SETORES = "20261122100000_gestor_escreve_setores.sql";
 // Contas a pagar da obra (#335): aplicada em 05/11/2026, antes desta. Se voltar a aparecer como pendente, não é autorizada.
@@ -286,8 +288,8 @@ describe("protocolos da Engenharia", () => {
     expect(validar(dryRunCom(...AUTORIZADAS)).codigo).toBe(0);
   });
 
-  it("gestor em todos os setores, contas a pagar, setor principal, setor Administrativo, tela de entrada, forecast, prazos da Copel, obra de rede, enquadramento Copel, pagamento informado pelo vendedor, \"não se aplica\" da Engenharia, configurações da empresa, marcos, trajetória, autoconfirmação, justificativa, checklist, tarefas de setor, dados do cliente, dados pessoais da obra, fixação, validade da proposta, eletroposto SDR, eletroposto, temperatura ou qualquer migration da calculadora pendente junto, ou sozinha, não passa", () => {
-    for (const m of [GESTOR_SETORES, CONTAS_PAGAR, SETOR_PRINCIPAL, ...SETOR_ADMINISTRATIVO, TELA_ENTRADA, FORECAST, PRAZOS_COPEL, OBRA_REDE, ENQUADRAMENTO_COPEL, AVISO_PAGAMENTO, NAO_SE_APLICA, CONFIG_EMPRESA, MARCOS, TRAJETORIA, AUTOCONFIRMACAO, JUSTIFICATIVA, COMPLETA, CUSTOS, CRONOGRAMA, CONDICAO_ESCOLHIDA, DESCONTOS, CONDICOES_CONFIG, CAPTURA_LIMITE, PRIVILEGIOS_TABELAS, FUNCOES_SEM_LOGIN, INICIAR_ATUACAO, ENQUADRAMENTO, PASSOS, TAREFAS_AUTOMATICAS, PRAZOS, VISTORIA, PROTOCOLOS, CHECKLIST, NOTIFICACOES, ANEXOS_TAREFA, TAREFAS_SETOR, DADOS_CLIENTE, CLIENTE_OCULTO, FIXACAO, VALIDADE_PROPOSTA, ELETROPOSTO_SDR, ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) {
+  it("substituto por obra, gestor em todos os setores, contas a pagar, setor principal, setor Administrativo, tela de entrada, forecast, prazos da Copel, obra de rede, enquadramento Copel, pagamento informado pelo vendedor, \"não se aplica\" da Engenharia, configurações da empresa, marcos, trajetória, autoconfirmação, justificativa, checklist, tarefas de setor, dados do cliente, dados pessoais da obra, fixação, validade da proposta, eletroposto SDR, eletroposto, temperatura ou qualquer migration da calculadora pendente junto, ou sozinha, não passa", () => {
+    for (const m of [SUBSTITUTO, GESTOR_SETORES, CONTAS_PAGAR, SETOR_PRINCIPAL, ...SETOR_ADMINISTRATIVO, TELA_ENTRADA, FORECAST, PRAZOS_COPEL, OBRA_REDE, ENQUADRAMENTO_COPEL, AVISO_PAGAMENTO, NAO_SE_APLICA, CONFIG_EMPRESA, MARCOS, TRAJETORIA, AUTOCONFIRMACAO, JUSTIFICATIVA, COMPLETA, CUSTOS, CRONOGRAMA, CONDICAO_ESCOLHIDA, DESCONTOS, CONDICOES_CONFIG, CAPTURA_LIMITE, PRIVILEGIOS_TABELAS, FUNCOES_SEM_LOGIN, INICIAR_ATUACAO, ENQUADRAMENTO, PASSOS, TAREFAS_AUTOMATICAS, PRAZOS, VISTORIA, PROTOCOLOS, CHECKLIST, NOTIFICACOES, ANEXOS_TAREFA, TAREFAS_SETOR, DADOS_CLIENTE, CLIENTE_OCULTO, FIXACAO, VALIDADE_PROPOSTA, ELETROPOSTO_SDR, ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) {
       expect(validar(dryRunCom(...AUTORIZADAS, m)).codigo, m).toBe(1);
       expect(validar(dryRunCom(m)).codigo, m).toBe(1);
     }
@@ -305,7 +307,7 @@ describe("protocolos da Engenharia", () => {
       expect(existsSync(`supabase/migrations/${m}`), m).toBe(true);
       expect(texto, m).toContain(m);
     }
-    for (const m of [GESTOR_SETORES, CONTAS_PAGAR, SETOR_PRINCIPAL, ...SETOR_ADMINISTRATIVO, TELA_ENTRADA, FORECAST, PRAZOS_COPEL, OBRA_REDE, ENQUADRAMENTO_COPEL, AVISO_PAGAMENTO, NAO_SE_APLICA, CONFIG_EMPRESA, MARCOS, TRAJETORIA, AUTOCONFIRMACAO, JUSTIFICATIVA, COMPLETA, CUSTOS, CRONOGRAMA, CONDICAO_ESCOLHIDA, DESCONTOS, CONDICOES_CONFIG, CAPTURA_LIMITE, PRIVILEGIOS_TABELAS, FUNCOES_SEM_LOGIN, INICIAR_ATUACAO, ENQUADRAMENTO, PASSOS, TAREFAS_AUTOMATICAS, PRAZOS, VISTORIA, PROTOCOLOS, CHECKLIST, NOTIFICACOES, ANEXOS_TAREFA, TAREFAS_SETOR, DADOS_CLIENTE, CLIENTE_OCULTO, FIXACAO, VALIDADE_PROPOSTA, ELETROPOSTO_SDR, ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) expect(texto, m).not.toContain(m);
+    for (const m of [SUBSTITUTO, GESTOR_SETORES, CONTAS_PAGAR, SETOR_PRINCIPAL, ...SETOR_ADMINISTRATIVO, TELA_ENTRADA, FORECAST, PRAZOS_COPEL, OBRA_REDE, ENQUADRAMENTO_COPEL, AVISO_PAGAMENTO, NAO_SE_APLICA, CONFIG_EMPRESA, MARCOS, TRAJETORIA, AUTOCONFIRMACAO, JUSTIFICATIVA, COMPLETA, CUSTOS, CRONOGRAMA, CONDICAO_ESCOLHIDA, DESCONTOS, CONDICOES_CONFIG, CAPTURA_LIMITE, PRIVILEGIOS_TABELAS, FUNCOES_SEM_LOGIN, INICIAR_ATUACAO, ENQUADRAMENTO, PASSOS, TAREFAS_AUTOMATICAS, PRAZOS, VISTORIA, PROTOCOLOS, CHECKLIST, NOTIFICACOES, ANEXOS_TAREFA, TAREFAS_SETOR, DADOS_CLIENTE, CLIENTE_OCULTO, FIXACAO, VALIDADE_PROPOSTA, ELETROPOSTO_SDR, ELETROPOSTO, TEMPERATURA, ...CALCULADORA]) expect(texto, m).not.toContain(m);
   });
 });
 
