@@ -1,11 +1,10 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Botao, Mensagem } from "@/components/ui";
-import { anexarNfCliente } from "@/lib/acoes/financeiro-obra";
+import { TOM_SELO, dataCompleta, type Obra } from "@/components/financeiro/comum";
+import { FormNfCliente } from "@/components/financeiro/formularios";
 import { formatarMoeda } from "@/lib/formatacao";
 import type { NfClienteVM, PagamentoClienteVM } from "@/lib/obras/financeiro";
-import { CampoArquivo, TOM_SELO, arquivoDe, dataCompleta, enviarArquivo, useEnvioComArquivo, type Obra } from "./financeiro-comum";
 
 /** Cartões "Pagamento do cliente" e "Nota fiscal do cliente" da ficha da obra (desenho "Ficha da obra · Administrativo"). */
 
@@ -45,24 +44,7 @@ export function PagamentoCliente({ cliente }: { cliente: PagamentoClienteVM }) {
 }
 
 export function NotaFiscalCliente({ obra, nf, podeAnexar }: { obra: Obra; nf: NfClienteVM | null; podeAnexar: boolean }) {
-  const { enviar, enviando, resultado } = useEnvioComArquivo(async (form) => {
-    const nota = arquivoDe(form, "nf");
-    if (!nota) return { ok: false, mensagem: "Escolha o arquivo da nota." };
-    const enviado = await enviarArquivo(obra, "cliente", nota);
-    if (typeof enviado === "string") return { ok: false, mensagem: enviado };
-    return anexarNfCliente({ obraId: obra.obraId, ...enviado });
-  });
-  const formulario = (
-    <form onSubmit={enviar} className="flex flex-col gap-2">
-      <CampoArquivo rotulo={nf ? "Nova nota fiscal do cliente" : "Nota fiscal do cliente"} name="nf" required />
-      <div className="flex flex-wrap items-center gap-2">
-        <Botao type="submit" variante={nf ? "secundario" : "primario"} disabled={enviando}>
-          {enviando ? "Enviando..." : nf ? "Substituir" : "Anexar nota fiscal"}
-        </Botao>
-        <Mensagem resultado={resultado} />
-      </div>
-    </form>
-  );
+  const formulario = <FormNfCliente obra={obra} substituir={nf != null} />;
   return (
     <div className="flex flex-col gap-3">
       <span className={`w-fit rounded-full px-2 py-0.5 text-xs font-medium ${nf ? TOM_SELO.pago : TOM_SELO.vencido}`}>{nf ? "Anexada" : "Pendente"}</span>

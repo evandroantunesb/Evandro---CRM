@@ -28,10 +28,55 @@ export type FinanceiroObraVM = {
   fornecedores: string[];
 };
 
-async function assinar(supabase: SupabaseServidor, bucket: string, caminhos: string[]): Promise<Map<string, string>> {
+export async function assinar(supabase: SupabaseServidor, bucket: string, caminhos: string[]): Promise<Map<string, string>> {
   if (!caminhos.length) return new Map();
   const { data } = await supabase.storage.from(bucket).createSignedUrls(caminhos, EXPIRA_SEGUNDOS);
   return new Map((data ?? []).flatMap((d) => (d.path && d.signedUrl ? [[d.path, d.signedUrl] as const] : [])));
+}
+
+/** Colunas de `obra_contas_pagar` que viram `ContaPagarVM` (com `obra_id` para a tela Financeiro). */
+export const COLUNAS_CONTA = "id, obra_id, fornecedor, categoria, descricao, valor, vencimento, situacao, pago_em, comprovante_caminho, comprovante_nome, nf_caminho, nf_nome, motivo";
+
+type LinhaConta = {
+  id: string;
+  fornecedor: string;
+  categoria: string;
+  descricao: string | null;
+  valor: number | string;
+  vencimento: string;
+  situacao: string;
+  pago_em: string | null;
+  comprovante_caminho: string | null;
+  comprovante_nome: string | null;
+  nf_caminho: string | null;
+  nf_nome: string | null;
+  motivo: string | null;
+};
+
+/** Descarta linha com categoria ou situação desconhecida (o app não saberia mostrar). */
+export const contaValida = <T extends Pick<LinhaConta, "categoria" | "situacao">>(c: T) =>
+  ehCategoriaCusto(c.categoria) && (SITUACOES_CONTA as readonly string[]).includes(c.situacao);
+
+/** Caminhos de anexo a assinar. */
+export const anexosDasContas = (linhas: readonly Pick<LinhaConta, "comprovante_caminho" | "nf_caminho">[]) =>
+  linhas.flatMap((c) => [c.comprovante_caminho, c.nf_caminho]).filter((c): c is string => !!c);
+
+export function contaDaLinha(c: LinhaConta, urls: Map<string, string>): ContaPagarVM {
+  return {
+    id: c.id,
+    fornecedor: c.fornecedor,
+    categoria: c.categoria as ContaPagarVM["categoria"],
+    descricao: c.descricao,
+    valor: Number(c.valor),
+    vencimento: c.vencimento,
+    situacao: c.situacao as SituacaoConta,
+    pagoEm: c.pago_em,
+    comprovanteNome: c.comprovante_nome,
+    comprovanteUrl: c.comprovante_caminho ? (urls.get(c.comprovante_caminho) ?? null) : null,
+    nfNome: c.nf_nome,
+    nfUrl: c.nf_caminho ? (urls.get(c.nf_caminho) ?? null) : null,
+    motivo: c.motivo,
+  };
 }
 
 /**
@@ -56,8 +101,8 @@ export async function carregarFinanceiroObra(
   for (const r of [contasRes, clienteRes, fornecedoresRes]) if (r.error) throw r.error;
   if (nfRes?.error) throw nfRes.error;
 
-  const linhas = (contasRes.data ?? []).filter((c) => ehCategoriaCusto(c.categoria) && (SITUACOES_CONTA as readonly string[]).includes(c.situacao));
-  const caminhos = linhas.flatMap((c) => [c.comprovante_caminho, c.nf_caminho]).filter((c): c is string => !!c);
+  const linhas = (contasRes.data ?? []).filter(contaValida);
+  const caminhos = anexosDasContas(linhas);
   const linhaCliente = clienteRes.data?.[0] ?? null;
   const nf = nfRes?.data ?? null;
   const [urls, urlComprovanteCliente] = await Promise.all([
@@ -65,21 +110,7 @@ export async function carregarFinanceiroObra(
     assinar(supabase, BUCKET_COMPROVANTES, linhaCliente?.comprovante_caminho ? [linhaCliente.comprovante_caminho] : []),
   ]);
 
-  const contas: ContaPagarVM[] = linhas.map((c) => ({
-    id: c.id,
-    fornecedor: c.fornecedor,
-    categoria: c.categoria as ContaPagarVM["categoria"],
-    descricao: c.descricao,
-    valor: Number(c.valor),
-    vencimento: c.vencimento,
-    situacao: c.situacao as SituacaoConta,
-    pagoEm: c.pago_em,
-    comprovanteNome: c.comprovante_nome,
-    comprovanteUrl: c.comprovante_caminho ? (urls.get(c.comprovante_caminho) ?? null) : null,
-    nfNome: c.nf_nome,
-    nfUrl: c.nf_caminho ? (urls.get(c.nf_caminho) ?? null) : null,
-    motivo: c.motivo,
-  }));
+  const contas: ContaPagarVM[] = linhas.map((c) => contaDaLinha(c, urls));
 
   const cliente: PagamentoClienteVM | null = linhaCliente
     ? {

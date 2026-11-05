@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 
-export type Indicador = { Icone: LucideIcon; valor: string; legenda: string };
+/** `rodape`: linha pequena sob o valor (ex.: "5 pagamentos"). */
+export type Indicador = { Icone: LucideIcon; valor: string; legenda: string; rodape?: string };
 
 /**
  * Indicadores no topo da tela de Negócios (dados reais do escopo/filtro atual), numa superfície só
@@ -16,6 +17,7 @@ export function Indicadores({ itens }: { itens: Indicador[] }) {
             <span className="truncate">{it.legenda}</span>
           </p>
           <p className="truncate font-titulo text-xl font-light tracking-tight text-texto tabular-nums md:text-3xl">{it.valor}</p>
+          {it.rodape && <p className="truncate text-xs text-texto-2">{it.rodape}</p>}
         </div>
       ))}
     </div>

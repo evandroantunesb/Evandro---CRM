@@ -28,6 +28,8 @@ const MATRIZ: Record<string, string[]> = {
   CONFIRMAR_PAGAMENTO: ["admin", "gestor"],
   INFORMAR_PAGAMENTO: ["admin", "gestor", "vendedor"],
   PAGAMENTOS_A_CONFIRMAR: ["admin", "gestor", "operacao"],
+  // Tela Financeiro: operacao ve as abas conforme o setor (Administrativo: todas; Operacional: so a de confirmar).
+  FINANCEIRO: ["admin", "gestor", "operacao"],
   CORRIGIR_VALOR_GANHO: ["admin", "gestor"],
   // Registro manual do Solo (PR #186/#188): espelha as RPCs de registro, estorno e correção.
   PAGAMENTO_SOLO: ["admin"],

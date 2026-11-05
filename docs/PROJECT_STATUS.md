@@ -1,5 +1,13 @@
 # Estado do projeto — Raion CRM
 
+## Perfis e setores — A2b: tela Financeiro (em andamento, 05/11/2026)
+
+Branch `feat/financeiro-tela` (worktree `C:\dev\crm-financeiro`). Sem migration. Tela `/financeiro` pelo desenho aprovado "Perfis · Administrativo › Financeiro", base visual das próximas telas do Administrativo: cabeçalho com "Lançar pagamento" (escolhe a obra), 4 indicadores (a pagar em 7 dias, vencidos, pagamentos do cliente a confirmar, notas pendentes), abas A pagar, Pagamentos a confirmar (a antiga `/pagamentos`, que agora redireciona), Notas fiscais (de fornecedor: contas pagas sem NF; do cliente: marco pendente com a instalação concluída) e Pagos (200 mais recentes), e busca por fornecedor, cliente ou obra. No menu, "Pagamentos a confirmar" virou "Financeiro". Os formulários da ficha da obra foram para `src/components/financeiro/` e servem às duas telas.
+
+Decisões do Evandro (05/11/2026): lançar pela tela pede a obra; o Operacional que só confere pagamento vê só a aba "Pagamentos a confirmar" (só na tela: pelo banco ele continua lendo as contas das obras dele); o gestor vê tudo (sem escrever até a C); os botões aparecem para o Administrativo da obra e o admin, como na ficha.
+
+Pendências: "A pagar em 7 dias" conta de hoje até 7 dias e deixa as vencidas só no indicador delas (o número do desenho somava diferente); testes de banco e e2e não rodaram localmente (sem Docker), só lint, typecheck, build e o CI.
+
 ## Perfis e setores — A2a: contas a pagar e NF do cliente na obra (em andamento, 05/11/2026)
 
 Branch `feat/contas-pagar-obra`. Migration `20261121100000_contas_pagar_obra.sql`. Ficha da obra pelo desenho aprovado "Ficha da obra · Administrativo": cartões "Pagamentos a fornecedores", "Pagamento do cliente" e "Nota fiscal do cliente"; o setor Administrativo mostra "N de M pagamentos pagos". A tela Financeiro (abas A pagar, Pagamentos a confirmar, Notas fiscais e Pagos) é a A2b.

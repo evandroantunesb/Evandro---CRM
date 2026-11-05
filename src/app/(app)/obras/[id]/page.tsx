@@ -271,7 +271,7 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
       )}
 
       {financeiro && (
-        <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
+        <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
           <Cartao titulo="Pagamentos a fornecedores">
             <PagamentosFornecedores
               key={resumo.id}
