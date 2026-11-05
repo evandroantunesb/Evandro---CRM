@@ -1339,6 +1339,54 @@ export type Database = {
           },
         ];
       };
+      empresa_tela_entrada: {
+        Row: {
+          atualizado_por: string | null;
+          created_at: string;
+          empresa_id: string;
+          frase: string | null;
+          id: string;
+          imagem_caminho: string | null;
+          texto: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          atualizado_por?: string | null;
+          created_at?: string;
+          empresa_id: string;
+          frase?: string | null;
+          id?: string;
+          imagem_caminho?: string | null;
+          texto?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          atualizado_por?: string | null;
+          created_at?: string;
+          empresa_id?: string;
+          frase?: string | null;
+          id?: string;
+          imagem_caminho?: string | null;
+          texto?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "empresa_tela_entrada_atualizado_por_fkey";
+            columns: ["atualizado_por"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "empresa_tela_entrada_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: true;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       empresas: {
         Row: {
           cnpj: string | null;
