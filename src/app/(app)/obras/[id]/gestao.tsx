@@ -327,8 +327,11 @@ function FormAtribuir({ obraId, gestao }: { obraId: string; gestao: SetorGestaoV
   const [funcao, setFuncao] = useState<string>("apoio");
   const [principal, setPrincipal] = useState(false);
   const principalAtual = gestao.participantes.find((p) => p.principal);
-  // Já há responsável principal: entrar outro como principal é uma substituição (a RPC exige o id).
-  const substituindo = principal && principalAtual ? principalAtual : null;
+  const substitutoAtual = gestao.participantes.find((p) => p.funcao === "substituto");
+  // Já há responsável principal (ou substituto, um por setor): entrar outro no lugar é uma substituição (a RPC exige o id).
+  const substituindo =
+    principal && principalAtual ? principalAtual : funcao === "substituto" && substitutoAtual ? substitutoAtual : null;
+  const papelSubstituido = substituindo === principalAtual ? "o responsável principal" : "o substituto do setor";
 
   if (!aberto) {
     return (
@@ -387,7 +390,7 @@ function FormAtribuir({ obraId, gestao }: { obraId: string; gestao: SetorGestaoV
       )}
       {substituindo && (
         <p className="rounded-md bg-amber-50 p-2 text-amber-900">
-          {substituindo.nome} deixa de ser o responsável principal: a participação dele é encerrada e substituída por esta.
+          {substituindo.nome} deixa de ser {papelSubstituido}: a participação dele é encerrada e substituída por esta.
         </p>
       )}
       <div className="flex flex-wrap gap-2">

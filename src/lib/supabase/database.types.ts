@@ -6899,6 +6899,14 @@ export type Database = {
       };
       meu_limite_desconto: { Args: { p_empresa_id: string }; Returns: number };
       meu_membro_id: { Args: { p_empresa_id: string }; Returns: string };
+      minhas_substituicoes: {
+        Args: { p_empresa_id: string };
+        Returns: {
+          obra_id: string;
+          principal_id: string;
+          setor: Database["public"]["Enums"]["setor_obra"];
+        }[];
+      };
       notificar_aviso_pagamento: {
         Args: { p_aviso: Database["public"]["Tables"]["avisos_pagamento"]["Row"]; p_tipo: string };
         Returns: undefined;
@@ -7386,6 +7394,10 @@ export type Database = {
       status_pagamento_contrato: {
         Args: { p_contrato_id: string };
         Returns: Database["public"]["Enums"]["status_pagamento_contrato"];
+      };
+      substituto_ativo_obra: {
+        Args: { p_obra_id: string; p_setor: Database["public"]["Enums"]["setor_obra"] };
+        Returns: string;
       };
       tarefa_da_pasta_anexo: { Args: { p_caminho: string }; Returns: string };
       tem_acesso_comercial: { Args: { p_empresa_id: string }; Returns: boolean };

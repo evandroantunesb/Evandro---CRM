@@ -144,6 +144,7 @@ export function ListaTarefasSetor({
             <Selo>{t.setorRotulo}</Selo>
             {t.status !== "aberta" && <Selo tom={t.status === "cancelada" ? "negativo" : "neutro"}>{ROTULO_STATUS[t.status]}</Selo>}
             {t.automatica && <Selo>Automática</Selo>}
+            {t.substituindo && t.status === "aberta" && <Selo>Você substitui {t.substituindo}</Selo>}
             <p className={`min-w-0 flex-1 font-medium ${t.status === "aberta" ? "text-zinc-900" : "text-zinc-500"}`}>{t.titulo}</p>
           </div>
           <p className="flex flex-wrap gap-x-3 text-xs text-zinc-500">

@@ -3,17 +3,28 @@ import { ROTULO_SETOR } from "@/lib/obras/rotulos";
 import { NEGOCIOS, OBRAS, pode } from "@/lib/permissoes";
 import type { SupabaseServidor } from "@/lib/supabase/server";
 import type { Papel } from "@/lib/tipos";
+import { carregarSubstituicoes } from "@/lib/substituicoes";
 import {
   contarAbertasPorAba,
   contarPendenciasDoSetor,
   hojeBrasilia,
   SETORES_TAREFA,
+  substituicaoDaTarefa,
   type FiltroTarefasSetor,
   type MembroOpcao,
   type SetorTarefa,
   type StatusTarefaSetor,
+  type Substituicao,
   type TarefaSetorVM,
 } from "@/lib/tarefas-setor-regras";
+
+/** Filtro PostgREST de "Comigo": responsável é a pessoa, ou (obra, setor, principal) de uma substituição dela. */
+function filtroComigo(membroId: string, substituicoes: readonly Substituicao[]): string {
+  const extras = substituicoes
+    .filter((s) => s.principalId)
+    .map((s) => `and(obra_id.eq.${s.obraId},setor.eq.${s.setor},responsavel_id.eq.${s.principalId})`);
+  return [`responsavel_id.eq.${membroId}`, ...extras].join(",");
+}
 
 /**
  * Tarefas de setor (20261029210000_tarefas_setor.sql): pedidos do comercial no negócio e tarefas da obra para
@@ -57,7 +68,9 @@ export async function carregarTarefasSetor(
   if (setor) consulta = consulta.eq("setor", setor);
   if (filtro === "concluidas") consulta = consulta.eq("status", "concluida");
   else if (filtro !== "todas") consulta = consulta.eq("status", "aberta");
-  if (filtro === "minhas") consulta = consulta.eq("responsavel_id", membroId);
+  // "Comigo": as da pessoa e, para o substituto, as que estão com o principal que ele substitui (20261123100000).
+  const substituicoes = await carregarSubstituicoes(supabase, empresaId, papel);
+  if (filtro === "minhas") consulta = consulta.or(filtroComigo(membroId, substituicoes));
   if (filtro === "fila") consulta = consulta.is("responsavel_id", null);
   if (filtro === "pedidas") consulta = consulta.eq("criado_por", membroId);
 
@@ -127,6 +140,7 @@ export async function carregarTarefasSetor(
         referencia,
         obraId: t.obra_id,
         negocioId: t.negocio_id,
+        substituindo: substituicaoDaTarefa(t, substituicoes) ? (nomes.get(t.responsavel_id as string) ?? "Membro") : null,
         podeAgir: status === "aberta" && (admin || atuaNoSetor),
         podeAssumir: status === "aberta" && atuaNoSetor && t.responsavel_id === null,
         podeAtribuir: status === "aberta" && coordena,
@@ -149,22 +163,24 @@ export async function carregarTarefasSetor(
 }
 
 async function abertasVisiveis(supabase: SupabaseServidor, empresaId: string, setor?: SetorTarefa) {
-  let consulta = supabase.from("tarefas_setor").select("responsavel_id, criado_por, setor").eq("empresa_id", empresaId).eq("status", "aberta");
+  let consulta = supabase.from("tarefas_setor").select("responsavel_id, criado_por, setor, obra_id").eq("empresa_id", empresaId).eq("status", "aberta");
   if (setor) consulta = consulta.eq("setor", setor);
   const { data } = await consulta.limit(1000);
   return data ?? [];
 }
 
-/** Números das abas da tela de tarefas: abertas que a pessoa vê em cada aba. */
+/** Números das abas da tela de tarefas: abertas que a pessoa vê em cada aba (o substituto conta as do principal). */
 export async function contarAbasTarefasSetor(supabase: SupabaseServidor, empresaId: string, membroId: string, setor?: SetorTarefa) {
-  return contarAbertasPorAba(await abertasVisiveis(supabase, empresaId, setor), membroId);
+  const [linhas, substituicoes] = await Promise.all([abertasVisiveis(supabase, empresaId, setor), carregarSubstituicoes(supabase, empresaId)]);
+  return contarAbertasPorAba(linhas, membroId, substituicoes);
 }
 
-/** Pendências de tarefas do setor para o sininho de quem executa nos setores. */
+/** Pendências de tarefas do setor para o sininho de quem executa nos setores (o substituto conta as do principal). */
 export async function contarPendenciasTarefasSetor(supabase: SupabaseServidor, empresaId: string, membroId: string): Promise<number> {
-  const [linhas, { data: setores }] = await Promise.all([
+  const [linhas, { data: setores }, substituicoes] = await Promise.all([
     abertasVisiveis(supabase, empresaId),
     supabase.from("membro_setores_obra").select("setor").eq("empresa_id", empresaId).eq("membro_id", membroId),
+    carregarSubstituicoes(supabase, empresaId),
   ]);
-  return contarPendenciasDoSetor(linhas, membroId, (setores ?? []).map((s) => s.setor));
+  return contarPendenciasDoSetor(linhas, membroId, (setores ?? []).map((s) => s.setor), substituicoes);
 }

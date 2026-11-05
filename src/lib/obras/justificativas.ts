@@ -92,25 +92,29 @@ export type AtrasoEtapaVM = {
     texto: string | null;
     respondidoPor: string | null;
     respondidoEm: string | null;
-    /** A sessão pode responder (quem recebeu o pedido, o admin ou quem coordena o setor). */
+    /** A sessão pode responder (quem recebeu o pedido, o substituto do setor, o admin ou quem coordena o setor). */
     podeResponder: boolean;
   } | null;
 };
 
 /**
  * Atrasos da ficha: as etapas com atraso próprio (e as que já têm justificativa), na ordem do cronograma. Responde
- * quem recebeu o pedido, o admin ou quem coordena o setor da etapa (espelho da RPC, só para mostrar o formulário).
+ * quem recebeu o pedido, o substituto do setor da etapa na obra, o admin ou quem coordena o setor (espelho da RPC,
+ * só para mostrar o formulário).
  */
 export function atrasosDaObra(entrada: {
   etapas: readonly { etapa: string; atraso_proprio: number }[];
   justificativas: ReadonlyMap<EtapaObra, JustificativaVM>;
   membroId: string;
   autorizacao: (setor: SetorObra) => string | null | undefined;
+  /** A sessão é o substituto deste setor na obra (20261123100000). */
+  substituo?: (setor: SetorObra) => boolean;
 }): AtrasoEtapaVM[] {
   const atrasoProprio = new Map(entrada.etapas.map((e) => [e.etapa, e.atraso_proprio]));
   return ETAPAS_OBRA.filter((e) => (atrasoProprio.get(e) ?? 0) > 0 || entrada.justificativas.has(e)).map((etapa) => {
     const j = entrada.justificativas.get(etapa);
-    const coordena = ["admin", "coordenar"].includes(entrada.autorizacao(SETOR_ETAPA[etapa]) ?? "");
+    const setor = SETOR_ETAPA[etapa];
+    const coordena = ["admin", "coordenar"].includes(entrada.autorizacao(setor) ?? "") || (entrada.substituo?.(setor) ?? false);
     return {
       etapa,
       atraso: atrasoProprio.get(etapa) ?? 0,
