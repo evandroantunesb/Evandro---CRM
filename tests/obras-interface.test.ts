@@ -38,7 +38,8 @@ describe("rótulos de Obras", () => {
     expect(rotuloStatus("compras", "material_entregue")).toBe("Material entregue");
     expect(rotuloStatus("engenharia", "enviado_concessionaria")).toBe("Enviado à concessionária");
     expect(rotuloStatus("operacional", "liberada_agendamento")).toBe("Liberada para agendamento");
-    expect(ROTULO_SETOR).toEqual({ compras: "Compras", engenharia: "Engenharia", operacional: "Operacional" });
+    expect(rotuloStatus("administrativo", "fornecedores_pagos")).toBe("Fornecedores pagos");
+    expect(ROTULO_SETOR).toEqual({ compras: "Compras", engenharia: "Engenharia", operacional: "Operacional", administrativo: "Administrativo" });
   });
 
   it("status desconhecido devolve o código cru, sem quebrar", () => {
@@ -70,6 +71,7 @@ const FLUXOS_FINAIS = [
   { setor: "compras", status: "material_entregue" },
   { setor: "engenharia", status: "concluido" },
   { setor: "operacional", status: "concluido" },
+  { setor: "administrativo", status: "concluido" },
 ] as const;
 
 describe("derivados de Obras", () => {
@@ -99,10 +101,11 @@ describe("derivados de Obras", () => {
   ];
   const entrada = { canceladaEm: null, pausadaEm: null, fluxos: FLUXOS_FINAIS, marcos: marcosOk };
 
-  it("situação: concluída exige 3 setores finais e marcos resolvidos", () => {
+  it("situação: concluída exige os 4 setores finais e marcos resolvidos", () => {
     expect(situacaoObra(entrada)).toBe("concluida");
+    expect(situacaoObra({ ...entrada, fluxos: [...FLUXOS_FINAIS.slice(0, 3), { setor: "administrativo", status: "fornecedores_pagos" }] })).toBe("em_andamento");
     expect(situacaoObra({ ...entrada, marcos: [marcosOk[0], { marco: "garantia", status: "pendente" }] })).toBe("em_andamento");
-    expect(situacaoObra({ ...entrada, fluxos: [FLUXOS_FINAIS[0], FLUXOS_FINAIS[1], { setor: "operacional", status: "agendada" }] })).toBe("em_andamento");
+    expect(situacaoObra({ ...entrada, fluxos: [FLUXOS_FINAIS[0], FLUXOS_FINAIS[1], { setor: "operacional", status: "agendada" }, FLUXOS_FINAIS[3]] })).toBe("em_andamento");
     expect(situacaoObra({ ...entrada, fluxos: FLUXOS_FINAIS.slice(0, 2) })).toBe("em_andamento");
   });
 
@@ -240,9 +243,11 @@ const tabelasFilhas = {
     fluxo("o1", "compras", "material_entregue"),
     fluxo("o1", "engenharia", "aprovado", { parado: true }),
     fluxo("o1", "operacional", "agendada", { aguardando: "cliente" }),
+    fluxo("o1", "administrativo", "pagando_fornecedores"),
     fluxo("o2", "compras", "material_entregue"),
     fluxo("o2", "engenharia", "concluido"),
     fluxo("o2", "operacional", "concluido"),
+    fluxo("o2", "administrativo", "concluido"),
   ],
   obra_marcos: [
     { obra_id: "o1", empresa_id: EMPRESA, marco: "nf_cliente", status: "pendente" },
@@ -329,12 +334,12 @@ describe("carregarObras", () => {
     const { obras, kpis } = await carregarObras(f.cliente, { empresaId: EMPRESA, papel: "gestor" });
     const [o2, o1] = obras;
 
-    expect(o1.setores.map((s) => s.setor)).toEqual(["compras", "engenharia", "operacional"]);
-    expect(o1.setores.map((s) => s.statusRotulo)).toEqual(["Material entregue", "Aprovado", "Agendada"]);
-    expect(o1.setores.map((s) => s.estado)).toEqual(["concluido", "parado", "aguardando"]);
+    expect(o1.setores.map((s) => s.setor)).toEqual(["compras", "engenharia", "operacional", "administrativo"]);
+    expect(o1.setores.map((s) => s.statusRotulo)).toEqual(["Material entregue", "Aprovado", "Agendada", "Pagando fornecedores"]);
+    expect(o1.setores.map((s) => s.estado)).toEqual(["concluido", "parado", "aguardando", "em_andamento"]);
     expect(o1.setores[2].aguardando).toBe("Aguardando cliente");
     // Só o principal ativo vale: Bia encerrada e Caio não principal ficam de fora.
-    expect(o1.setores.map((s) => s.principalNome)).toEqual([null, "Ana", null]);
+    expect(o1.setores.map((s) => s.principalNome)).toEqual([null, "Ana", null, null]);
     expect(o1.situacao).toBe("em_andamento");
     expect(o1.alertas).toEqual(["estorno", "parado", "aguardando"]);
     expect(o1.potenciaKwp).toBe(5.4);

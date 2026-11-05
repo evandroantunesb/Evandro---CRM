@@ -1,3 +1,4 @@
+import type { MARCOS_OBRA } from "./derivados";
 import type { SetorObra } from "./rotulos";
 
 /**
@@ -58,9 +59,12 @@ export function permissoesSetor(entrada: EntradaAutorizacao, setor: SetorObra, o
   };
 }
 
-/** Marcos (NF do cliente, garantia) pertencem ao setor operacional. */
-export const podeAtualizarMarcos = (entrada: EntradaAutorizacao, obra: EstadoEscritaObra) =>
-  permissoesSetor(entrada, "operacional", obra).alterarFluxo;
+/** Setor dono de cada marco, como em `atualizar_marco_obra`: NF do cliente é do Administrativo; garantia, do Operacional. */
+export const SETOR_MARCO: Record<(typeof MARCOS_OBRA)[number], SetorObra> = { nf_cliente: "administrativo", garantia: "operacional" };
+
+/** Marcos que a pessoa pode atualizar agora (código desconhecido nunca entra). */
+export const marcosAtualizaveis = (entrada: EntradaAutorizacao, obra: EstadoEscritaObra): string[] =>
+  (Object.keys(SETOR_MARCO) as (keyof typeof SETOR_MARCO)[]).filter((marco) => permissoesSetor(entrada, SETOR_MARCO[marco], obra).alterarFluxo);
 
 /** Motivo do bloqueio para exibir quando a pessoa teria permissão, mas a obra não aceita. */
 export function bloqueioDaObra(obra: EstadoEscritaObra): string | null {

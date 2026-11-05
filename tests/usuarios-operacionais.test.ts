@@ -22,6 +22,7 @@ const formularioSetores = () => {
   f.set("compras", "sem_acesso");
   f.set("engenharia", "sem_acesso");
   f.set("operacional", "executar");
+  f.set("administrativo", "sem_acesso");
   return f;
 };
 
@@ -38,7 +39,7 @@ describe("cadastro de operação", () => {
     mocks.criarClienteServidor.mockResolvedValue({ from: vi.fn().mockReturnValue({ insert }), rpc });
     mocks.criarUsuarioDireto.mockResolvedValue({ userId: membroId, novo: false });
     const f = new FormData();
-    for (const [campo, valor] of Object.entries({ nome: "Pessoa", email: "pessoa@example.test", papel: "operacao", tipo_vendedor: "interno", perfil_gamificacao: "closer", recebe_leads: "on", compras: "coordenar", engenharia: "sem_acesso", operacional: "executar" })) f.set(campo, valor);
+    for (const [campo, valor] of Object.entries({ nome: "Pessoa", email: "pessoa@example.test", papel: "operacao", tipo_vendedor: "interno", perfil_gamificacao: "closer", recebe_leads: "on", compras: "coordenar", engenharia: "sem_acesso", operacional: "executar", administrativo: "sem_acesso" })) f.set(campo, valor);
     expect((await convidarMembro(null, f))?.ok).toBe(true);
     expect(insert).toHaveBeenCalledWith(expect.objectContaining({ papel: "operacao", perfil_gamificacao: null, recebe_leads: false, empresa_id: empresaId }));
     expect(rpc).toHaveBeenCalledWith("definir_setores_membro", {
@@ -49,7 +50,7 @@ describe("cadastro de operação", () => {
 
   it("recusa setores inválidos antes de criar a conta", async () => {
     const f = new FormData();
-    for (const [campo, valor] of Object.entries({ nome: "Pessoa", email: "pessoa@example.test", papel: "operacao", tipo_vendedor: "interno", compras: "administrar", engenharia: "sem_acesso", operacional: "executar" })) f.set(campo, valor);
+    for (const [campo, valor] of Object.entries({ nome: "Pessoa", email: "pessoa@example.test", papel: "operacao", tipo_vendedor: "interno", compras: "administrar", engenharia: "sem_acesso", operacional: "executar", administrativo: "sem_acesso" })) f.set(campo, valor);
     expect((await convidarMembro(null, f))?.ok).toBe(false);
     expect(mocks.criarUsuarioDireto).not.toHaveBeenCalled();
   });
@@ -61,7 +62,7 @@ describe("cadastro de operação", () => {
     mocks.criarClienteServidor.mockResolvedValue({ from: vi.fn().mockReturnValue({ insert }), rpc });
     mocks.criarUsuarioDireto.mockResolvedValue({ userId: membroId, novo: true });
     const f = new FormData();
-    for (const [campo, valor] of Object.entries({ nome: "Pessoa", email: "pessoa@example.test", papel: "operacao", tipo_vendedor: "interno", compras: "sem_acesso", engenharia: "sem_acesso", operacional: "executar", senha: "temporaria123" })) f.set(campo, valor);
+    for (const [campo, valor] of Object.entries({ nome: "Pessoa", email: "pessoa@example.test", papel: "operacao", tipo_vendedor: "interno", compras: "sem_acesso", engenharia: "sem_acesso", operacional: "executar", administrativo: "sem_acesso", senha: "temporaria123" })) f.set(campo, valor);
     const resultado = await convidarMembro(null, f);
     expect(resultado).toEqual(expect.objectContaining({ ok: false, mensagem: expect.stringContaining("Os setores não foram salvos") }));
     expect(resultado?.mensagem).toContain("Usuário criado");
@@ -87,7 +88,7 @@ describe("cadastro de operação", () => {
     const rpc = vi.fn().mockResolvedValue({ error: null });
     mocks.criarClienteServidor.mockResolvedValue({ from: vi.fn().mockReturnValue({ update }), rpc });
     const f = new FormData();
-    for (const [campo, valor] of Object.entries({ membroId, papel: "operacao", tipo_vendedor: "interno", status: "ativo", compras: "sem_acesso", engenharia: "coordenar", operacional: "executar" })) f.set(campo, valor);
+    for (const [campo, valor] of Object.entries({ membroId, papel: "operacao", tipo_vendedor: "interno", status: "ativo", compras: "sem_acesso", engenharia: "coordenar", operacional: "executar", administrativo: "sem_acesso" })) f.set(campo, valor);
     expect((await atualizarMembro(null, f))?.ok).toBe(true);
     expect(rpc).toHaveBeenCalledWith("definir_setores_membro", {
       p_membro_id: membroId,
@@ -118,11 +119,12 @@ describe("configuração de setores", () => {
     });
   });
 
-  it("permite que a mesma pessoa atue em Engenharia, Compras e Operacional com capacidades distintas", async () => {
+  it("permite que a mesma pessoa atue em Engenharia, Compras, Operacional e Administrativo com capacidades distintas", async () => {
     const { rpc } = cliente({ id: membroId });
     const f = formularioSetores();
     f.set("compras", "coordenar");
     f.set("engenharia", "executar");
+    f.set("administrativo", "coordenar");
     expect((await salvarSetoresMembro(null, f))?.ok).toBe(true);
     expect(rpc).toHaveBeenCalledWith("definir_setores_membro", {
       p_membro_id: membroId,
@@ -130,6 +132,7 @@ describe("configuração de setores", () => {
         { setor: "compras", capacidade: "coordenar" },
         { setor: "engenharia", capacidade: "executar" },
         { setor: "operacional", capacidade: "executar" },
+        { setor: "administrativo", capacidade: "coordenar" },
       ],
     });
   });

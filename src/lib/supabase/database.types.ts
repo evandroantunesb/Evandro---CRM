@@ -6245,6 +6245,7 @@ export type Database = {
         Returns: undefined;
       };
       condicoes_checklist_validas: { Args: { p: Json }; Returns: boolean };
+      confirma_pagamento_cliente: { Args: { p_empresa_id: string }; Returns: boolean };
       confirmar_pagamento: {
         Args: { p_contrato_id: string };
         Returns: {
@@ -7354,7 +7355,7 @@ export type Database = {
         | "realizada"
         | "no_show"
         | "cancelada";
-      setor_obra: "comercial" | "compras" | "engenharia" | "operacional";
+      setor_obra: "comercial" | "compras" | "engenharia" | "operacional" | "administrativo";
       situacao_empresa: "ativa" | "suspensa" | "cancelada";
       status_atribuicao_lead: "pendente" | "aprovada" | "reatribuida" | "expirada";
       status_comissao: "aberta" | "fechada";
@@ -7521,7 +7522,7 @@ export const Constants = {
         "no_show",
         "cancelada",
       ],
-      setor_obra: ["comercial", "compras", "engenharia", "operacional"],
+      setor_obra: ["comercial", "compras", "engenharia", "operacional", "administrativo"],
       situacao_empresa: ["ativa", "suspensa", "cancelada"],
       status_atribuicao_lead: ["pendente", "aprovada", "reatribuida", "expirada"],
       status_comissao: ["aberta", "fechada"],

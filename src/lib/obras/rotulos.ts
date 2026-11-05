@@ -5,13 +5,14 @@
  * ele aparece cru (`rotuloStatus`).
  */
 
-export const SETORES_OBRA = ["compras", "engenharia", "operacional"] as const;
+export const SETORES_OBRA = ["compras", "engenharia", "operacional", "administrativo"] as const;
 export type SetorObra = (typeof SETORES_OBRA)[number];
 
 export const ROTULO_SETOR: Record<SetorObra, string> = {
   compras: "Compras",
   engenharia: "Engenharia",
   operacional: "Operacional",
+  administrativo: "Administrativo",
 };
 
 /** Status válidos de cada setor, na ordem do fluxo (só para listar; a posição não indica progresso). */
@@ -19,6 +20,7 @@ export const STATUS_POR_SETOR: Record<SetorObra, readonly string[]> = {
   compras: ["a_comprar", "cotando", "pedido_realizado", "faturado_fornecedor", "material_entregue"],
   engenharia: ["a_iniciar", "projeto_em_elaboracao", "enviado_concessionaria", "aprovado", "aguardando_vistoria", "concluido"],
   operacional: ["aguardando_liberacao", "liberada_agendamento", "agendada", "em_instalacao", "instalacao_concluida", "concluido"],
+  administrativo: ["pagando_fornecedores", "fornecedores_pagos", "concluido"],
 };
 
 const ROTULO_STATUS: Record<SetorObra, Record<string, string>> = {
@@ -43,6 +45,11 @@ const ROTULO_STATUS: Record<SetorObra, Record<string, string>> = {
     agendada: "Agendada",
     em_instalacao: "Em instalação",
     instalacao_concluida: "Instalação concluída",
+    concluido: "Concluído",
+  },
+  administrativo: {
+    pagando_fornecedores: "Pagando fornecedores",
+    fornecedores_pagos: "Fornecedores pagos",
     concluido: "Concluído",
   },
 };

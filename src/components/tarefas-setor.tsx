@@ -30,7 +30,7 @@ import {
 } from "@/lib/tarefas-setor-regras";
 import type { ResultadoAcao } from "@/lib/tipos";
 
-const ROTULO_SETOR: Record<SetorTarefa, string> = { compras: "Compras", engenharia: "Engenharia", operacional: "Operacional" };
+const ROTULO_SETOR: Record<SetorTarefa, string> = { compras: "Compras", engenharia: "Engenharia", operacional: "Operacional", administrativo: "Administrativo" };
 
 type Acao = (estado: ResultadoAcao, dados: FormData) => Promise<ResultadoAcao>;
 

@@ -240,7 +240,7 @@ export async function criarBaseFicticia(): Promise<BaseFicticia> {
 
   // --- Estados pelas RPCs reais (como admin) --------------------------------------
   const admin = clientes.admin;
-  const status = async (obra: string, setor: "compras" | "engenharia" | "operacional", novo: string) =>
+  const status = async (obra: string, setor: "compras" | "engenharia" | "operacional" | "administrativo", novo: string) =>
     feito(await admin.rpc("alterar_status_fluxo_obra", { p_obra_id: obra, p_setor: setor, p_status: novo }), `status ${setor}`);
   // Avançar a Engenharia além do projeto exige protocolo (20261030120000), e o protocolo exige o checklist
   // resolvido: segue o fluxo real (aplica, o admin marca os obrigatórios como "não se aplica" e registra).
@@ -313,12 +313,13 @@ export async function criarBaseFicticia(): Promise<BaseFicticia> {
   await status(obras.o04, "operacional", "agendada");
   await aguardando(obras.o04, "operacional", "cliente");
   await atribuir(obras.o04, "execOp", "operacional", "responsavel", true);
-  // o05: concluída (3 setores finais + marcos resolvidos).
+  // o05: concluída (4 setores finais + marcos resolvidos).
   await status(obras.o05, "compras", "material_entregue");
   await protocolar(obras.o05);
   await status(obras.o05, "operacional", "concluido");
   await conectar(obras.o05);
   await status(obras.o05, "engenharia", "concluido");
+  await status(obras.o05, "administrativo", "concluido");
   await marco(obras.o05, "nf_cliente", "concluido");
   await marco(obras.o05, "garantia", "nao_se_aplica", "Garantia direta do fabricante (fictício)");
   // o06: Usina Solar Fazenda Modelo — obra principal da Apresentação (instalação em andamento, NF concluída).

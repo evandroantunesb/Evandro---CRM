@@ -60,6 +60,7 @@ let superAdmin: Usuario;
 let adminB: Usuario;
 let coordB: Usuario;
 let vendedorB: Usuario;
+let coordAdm: Usuario;
 let empresa: string;
 let empresaB: string;
 const membro: Record<string, string> = {};
@@ -139,7 +140,7 @@ async function criarVenda(
   return obra!.id;
 }
 
-type Setor = "compras" | "engenharia" | "operacional" | "comercial";
+type Setor = "compras" | "engenharia" | "operacional" | "administrativo" | "comercial";
 type Funcao = "responsavel" | "apoio" | "substituto" | "vendedor" | "sdr";
 
 const atribuir = (
@@ -282,6 +283,7 @@ describe(
         adminB,
         coordB,
         vendedorB,
+        coordAdm,
       ] = await Promise.all(
         [
           "oe-admin",
@@ -307,6 +309,7 @@ describe(
           "oe-admin-b",
           "oe-coord-b",
           "oe-vendedor-b",
+          "oe-coord-adm",
         ].map(criarUsuario),
       );
       await servico.from("plataforma_admins").insert({ user_id: superAdmin.id });
@@ -342,6 +345,7 @@ describe(
           opConc1,
           opConc2,
           coordTemp,
+          coordAdm,
         ].map((u): [Usuario, string, object] => [u, empresa, operacao]),
         [adminB, empresaB, { papel: "admin" }],
         [coordB, empresaB, operacao],
@@ -375,6 +379,7 @@ describe(
         [admin, execEng2, [{ setor: "engenharia", capacidade: "executar" }]],
         [admin, execOp, [{ setor: "operacional", capacidade: "executar" }]],
         [admin, execCompras, [{ setor: "compras", capacidade: "executar" }]],
+        [admin, coordAdm, [{ setor: "administrativo", capacidade: "coordenar" }]],
         [admin, opInativo, [{ setor: "engenharia", capacidade: "executar" }]],
         [admin, opDesativar, [{ setor: "engenharia", capacidade: "executar" }]],
         [admin, opTrocaPapel, [{ setor: "engenharia", capacidade: "executar" }]],
@@ -809,26 +814,26 @@ describe(
     });
 
     describe("marcos", () => {
-      it("só o setor operacional: executor operacional, coordenador operacional e admin", async () => {
-        expect((await marco(execEng, obraA, "nf_cliente", "concluido")).error).not.toBeNull();
-        expect((await marco(coordEng, obraA, "nf_cliente", "concluido")).error).not.toBeNull();
-        expect((await marco(gestor, obraA, "nf_cliente", "concluido")).error).not.toBeNull();
-        expect((await marco(execOp, obraA, "nf_cliente", "concluido")).error).toBeNull();
+      it("garantia: só o setor operacional (executor, coordenador) e admin", async () => {
+        expect((await marco(execEng, obraA, "garantia", "concluido")).error).not.toBeNull();
+        expect((await marco(coordEng, obraA, "garantia", "concluido")).error).not.toBeNull();
+        expect((await marco(gestor, obraA, "garantia", "concluido")).error).not.toBeNull();
+        expect((await marco(execOp, obraA, "garantia", "concluido")).error).toBeNull();
         const { data: m1 } = await servico
           .from("obra_marcos")
           .select("*")
           .eq("obra_id", obraA)
-          .eq("marco", "nf_cliente")
+          .eq("marco", "garantia")
           .single();
         expect(m1!.concluido_em).not.toBeNull();
         expect(m1!.concluido_por_membro_id).toBe(membro[execOp.id]);
 
-        expect((await marco(coordOp, obraA, "nf_cliente", "pendente")).error).toBeNull();
+        expect((await marco(coordOp, obraA, "garantia", "pendente")).error).toBeNull();
         const { data: m2 } = await servico
           .from("obra_marcos")
           .select("*")
           .eq("obra_id", obraA)
-          .eq("marco", "nf_cliente")
+          .eq("marco", "garantia")
           .single();
         expect(m2).toMatchObject({
           status: "pendente",
@@ -852,8 +857,39 @@ describe(
         expect(linhas[1]).toMatchObject({
           setor: "operacional",
           autor_user_id: coordOp.id,
-          dados: { marco: "nf_cliente", de: { status: "concluido" }, para: { status: "pendente" } },
+          dados: { marco: "garantia", de: { status: "concluido" }, para: { status: "pendente" } },
         });
+      });
+
+      it("NF do cliente: só o Administrativo e o admin; o Operacional não altera mais", async () => {
+        expect((await marco(execOp, obraA, "nf_cliente", "concluido")).error?.message).toContain("permissão");
+        expect((await marco(coordOp, obraA, "nf_cliente", "concluido")).error?.message).toContain("permissão");
+        expect((await marco(coordAdm, obraA, "garantia", "concluido")).error?.message).toContain("permissão");
+        expect((await marco(coordAdm, obraA, "nf_cliente", "concluido")).error).toBeNull();
+        expect((await marco(admin, obraA, "nf_cliente", "pendente")).error).toBeNull();
+        const linhas = (await historico(obraA, "marco_alterado")).filter((h) => (h.dados as { marco: string }).marco === "nf_cliente");
+        expect(linhas.map((h) => [h.setor, (h.dados as { autorizacao: string }).autorizacao])).toEqual([
+          ["administrativo", "coordenar"],
+          ["administrativo", "admin"],
+        ]);
+      });
+
+      it("Administrativo: pagando fornecedores → fornecedores pagos → concluído, só no próprio setor", async () => {
+        expect((await status(coordAdm, obraA, "administrativo", "agendada")).error?.message).toBe("Status inválido para este setor.");
+        expect((await status(coordAdm, obraA, "operacional", "agendada")).error?.message).toContain("permissão");
+        expect((await status(execOp, obraA, "administrativo", "fornecedores_pagos")).error?.message).toContain("permissão");
+        expect((await status(coordAdm, obraA, "administrativo", "fornecedores_pagos")).error).toBeNull();
+        expect((await status(coordAdm, obraA, "administrativo", "concluido")).error).toBeNull();
+        const { data: fluxo } = await servico
+          .from("obra_fluxos")
+          .select("status, iniciado_em, concluido_em")
+          .eq("obra_id", obraA)
+          .eq("setor", "administrativo")
+          .single();
+        expect(fluxo!.status).toBe("concluido");
+        expect(fluxo!.iniciado_em).not.toBeNull();
+        expect(fluxo!.concluido_em).not.toBeNull();
+        expect((await status(coordAdm, obraA, "administrativo", "pagando_fornecedores")).error).toBeNull();
       });
 
       it("obra pausada e cancelada bloqueiam marcos", async () => {

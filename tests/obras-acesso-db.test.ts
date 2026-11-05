@@ -31,6 +31,7 @@ let opInativoCoordena: Usuario;
 let opAlvo: Usuario;
 let opInstalador: Usuario;
 let opComprador: Usuario;
+let opFinanceiro: Usuario;
 let adminB: Usuario;
 let opCoordenaB: Usuario;
 let vendedorB: Usuario;
@@ -178,6 +179,7 @@ beforeAll(async () => {
     adminB,
     opCoordenaB,
     vendedorB,
+    opFinanceiro,
   ] = await Promise.all(
     [
       "oa-admin",
@@ -199,6 +201,7 @@ beforeAll(async () => {
       "oa-admin-b",
       "oa-op-coordena-b",
       "oa-vendedor-b",
+      "oa-op-financeiro",
     ].map(criarUsuario),
   );
 
@@ -239,6 +242,7 @@ beforeAll(async () => {
       { empresa_id: empresa, user_id: opAlvo.id, papel: "operacao" },
       { empresa_id: empresa, user_id: opInstalador.id, papel: "operacao" },
       { empresa_id: empresa, user_id: opComprador.id, papel: "operacao" },
+      { empresa_id: empresa, user_id: opFinanceiro.id, papel: "operacao" },
       { empresa_id: empresaB, user_id: adminB.id, papel: "admin" },
       { empresa_id: empresaB, user_id: opCoordenaB.id, papel: "operacao" },
       {
@@ -340,6 +344,7 @@ beforeAll(async () => {
   // engenharia). O coordenador já foi principal de engenharia na A, mas encerrou.
   await participar(obraA, empresa, membro[opInstalador.id], { setor: "operacional" });
   await participar(obraA, empresa, membro[opComprador.id], { setor: "compras" });
+  await participar(obraA, empresa, membro[opFinanceiro.id], { setor: "administrativo" });
   await participar(obraA, empresa, membro[opCoordena.id], {
     setor: "engenharia",
     principal: true,
@@ -433,7 +438,7 @@ describe("papéis comerciais: visibilidade inalterada", () => {
         obra: 1,
         rpc: 0,
         valor: 1,
-        fluxos: 3,
+        fluxos: 4,
         marcos: 2,
         participantes,
         historico: await historicoEsperado(obraA),
@@ -470,7 +475,7 @@ describe("operacao: visibilidade de obras", () => {
       obra: 0,
       rpc: 1,
       valor: 0,
-      fluxos: 3,
+      fluxos: 4,
       marcos: 2,
       participantes,
       historico: await historicoEsperado(obraA),
@@ -499,7 +504,7 @@ describe("operacao: visibilidade de obras", () => {
         obra: 0,
         rpc: 1,
         valor: 0,
-        fluxos: 3,
+        fluxos: 4,
         marcos: 2,
         historico: await historicoEsperado(obra),
       });
@@ -566,14 +571,16 @@ describe("operacao: dados pessoais do cliente (obras_operacao)", () => {
   /** Confere os campos pessoais e que nada além do autorizado aparece serializado. */
   function confere(
     l: Awaited<ReturnType<typeof linha>>,
-    esperado: { endereco: boolean; telefone: boolean; documento: boolean },
+    esperado: { endereco: boolean; telefone: boolean; documento: boolean; cpfCnpj?: boolean },
   ) {
+    // `cpfCnpj` sozinho (Administrativo, para a nota fiscal); `documento` = identificação completa (Engenharia).
+    const cpfCnpj = esperado.cpfCnpj ?? esperado.documento;
     expect(Object.keys(l).sort()).toEqual(COLUNAS);
     expect(l.cliente_endereco).toBe(esperado.endereco ? PESSOAIS.endereco : null);
     expect(l.cliente_telefone).toBe(esperado.telefone ? PESSOAIS.telefone : null);
     expect(l.cliente_telefone2).toBe(esperado.telefone ? PESSOAIS.telefone2 : null);
     // `documento` = identificação do cliente, só para a Engenharia (20261029190000_dados_cliente_contrato.sql).
-    expect(l.cliente_documento).toBe(esperado.documento ? PESSOAIS.documento : null);
+    expect(l.cliente_documento).toBe(cpfCnpj ? PESSOAIS.documento : null);
     expect(l.cliente_rg).toBe(esperado.documento ? PESSOAIS.rg : null);
     expect(l.cliente_data_nascimento).toBe(esperado.documento ? PESSOAIS.data_nascimento : null);
     expect(l.cliente_email).toBe(esperado.documento ? PESSOAIS.email : null);
@@ -590,8 +597,9 @@ describe("operacao: dados pessoais do cliente (obras_operacao)", () => {
       expect(json).not.toContain(PESSOAIS.telefone);
       expect(json).not.toContain(PESSOAIS.telefone2);
     }
+    if (!cpfCnpj) expect(json).not.toContain(PESSOAIS.documento);
     if (!esperado.documento) {
-      for (const valor of [PESSOAIS.documento, PESSOAIS.rg, PESSOAIS.data_nascimento, PESSOAIS.email]) expect(json).not.toContain(valor);
+      for (const valor of [PESSOAIS.rg, PESSOAIS.data_nascimento, PESSOAIS.email]) expect(json).not.toContain(valor);
     }
     // Nenhum valor em dinheiro.
     expect(Object.keys(l).some((k) => k.includes("valor"))).toBe(false);
@@ -613,7 +621,8 @@ describe("operacao: dados pessoais do cliente (obras_operacao)", () => {
     }
   });
 
-  it("matriz: operacional recebe endereço e telefones; engenharia, tudo; compras, só o endereço", async () => {
+  it("matriz: operacional recebe endereço e telefones; engenharia, tudo; compras, só o endereço; administrativo, endereço e CPF/CNPJ", async () => {
+    confere(await linha(opFinanceiro, obraA), { endereco: true, telefone: false, documento: false, cpfCnpj: true });
     confere(await linha(opInstalador, obraA), { endereco: true, telefone: true, documento: false });
     confere(await linha(opParticipante, obraA), {
       endereco: true,

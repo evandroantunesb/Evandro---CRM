@@ -21,7 +21,7 @@ import { extrairDadosTecnicos, type DadosTecnicosVM } from "./tecnico";
 import {
   bloqueioDaObra,
   permissoesSetor,
-  podeAtualizarMarcos,
+  marcosAtualizaveis,
   type EntradaAutorizacao,
   type EstadoEscritaObra,
   type PermissoesSetor,
@@ -163,7 +163,8 @@ export type GestaoObraVM = {
   /** Motivo de a obra não aceitar alterações agora (cancelada/pausada); null se aceita. */
   bloqueio: string | null;
   setores: SetorGestaoVM[];
-  podeAtualizarMarcos: boolean;
+  /** Marcos que a pessoa pode atualizar (cada marco tem um setor dono). */
+  marcosAtualizaveis: string[];
 };
 
 /** Teto de eventos do histórico por carga. */
@@ -513,7 +514,7 @@ async function montarGestao(
     };
   });
 
-  return { bloqueio: bloqueioDaObra(estado), setores, podeAtualizarMarcos: podeAtualizarMarcos(autorizacao, estado) };
+  return { bloqueio: bloqueioDaObra(estado), setores, marcosAtualizaveis: marcosAtualizaveis(autorizacao, estado) };
 }
 
 const ROTULO_CAPACIDADE: Record<string, string> = { coordenar: "Coordena o setor", executar: "Executa no setor" };
