@@ -6438,6 +6438,10 @@ export type Database = {
         }[];
       };
       contrato_da_pasta_comprovante: { Args: { p_caminho: string }; Returns: string };
+      coordena_setor: {
+        Args: { p_empresa_id: string; p_setor: Database["public"]["Enums"]["setor_obra"] };
+        Returns: boolean;
+      };
       corrigir_registro_pagamento: {
         Args: {
           p_data_recebimento: string;
@@ -7333,6 +7337,10 @@ export type Database = {
       };
       setor_etapa_obra: {
         Args: { p_etapa: string };
+        Returns: Database["public"]["Enums"]["setor_obra"];
+      };
+      setor_prazo_obra: {
+        Args: { p_chave: string };
         Returns: Database["public"]["Enums"]["setor_obra"];
       };
       setor_registro_vistoria: {
