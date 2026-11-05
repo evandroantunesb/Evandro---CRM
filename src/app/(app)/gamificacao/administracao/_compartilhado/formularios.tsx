@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useState, useTransition, type MouseEvent } from "react";
+import { useEnvioSemReset } from "@/components/envio-sem-reset";
 import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
 import { CabecalhoItemGf, StatusAtivoGf } from "../../_compartilhado/formulario-ui";
 import { BadgeGf, formatarNumeroGf } from "../../_compartilhado/ui";
@@ -78,13 +79,31 @@ function SeletorPerfil({ defaultValue }: { defaultValue: PerfilGamificacao | "" 
   );
 }
 
+/**
+ * Botão "Apagar" de um formulário de edição que envia sem reset (`useEnvioSemReset`): manda os dados do
+ * próprio formulário (o id) à ação, numa transição, sem depender de `formAction`.
+ */
+function useApagar(acao: (dados: FormData) => Promise<unknown>) {
+  const [, iniciar] = useTransition();
+  return (evento: MouseEvent<HTMLButtonElement>) => {
+    const formulario = evento.currentTarget.form;
+    if (!formulario) return;
+    const dados = new FormData(formulario);
+    iniciar(async () => {
+      await acao(dados);
+    });
+  };
+}
+
 export function NovaRegra({ eventos }: { eventos: readonly EventoOpcao[] }) {
   const [resultado, acao, pendente] = useActionState(criarRegra, null);
   const [eventoTipo, setEventoTipo] = useState(eventos[0]?.tipo ?? "");
   const campos = eventos.find((e) => e.tipo === eventoTipo)?.campos ?? [];
 
   return (
-    <form action={acao} className="flex flex-col gap-3">
+    // Depois de criar, o React limpa o formulário e o <select> volta à primeira opção: o estado volta junto,
+    // senão a tela mostraria um evento e a próxima regra seria criada com outro (e as condições do anterior).
+    <form action={acao} onReset={() => setEventoTipo(eventos[0]?.tipo ?? "")} className="flex flex-col gap-3">
       <div className="grid gap-3 @min-[560px]:grid-cols-2">
         <Campo rotulo="Nome da regra" name="nome" placeholder="Ex.: Negócio ganho acima de R$ 5 mil" required />
         <Selecao rotulo="Evento" name="eventoTipo" value={eventoTipo} onChange={(e) => setEventoTipo(e.target.value)}>
@@ -117,11 +136,13 @@ export function NovaRegra({ eventos }: { eventos: readonly EventoOpcao[] }) {
 
 export function LinhaRegra({ regra, eventos }: { regra: RegraSalva; eventos: readonly EventoOpcao[] }) {
   const [resultado, acao, pendente] = useActionState(editarRegra, null);
+  const enviar = useEnvioSemReset(acao);
+  const apagar = useApagar(apagarRegra);
   const [eventoTipo, setEventoTipo] = useState(regra.eventoTipo);
   const campos = eventos.find((e) => e.tipo === eventoTipo)?.campos ?? [];
 
   return (
-    <form action={acao} className="gf-item-edicao flex flex-col gap-4">
+    <form onSubmit={enviar} className="gf-item-edicao flex flex-col gap-4">
       <input type="hidden" name="id" value={regra.id} />
       <CabecalhoItemGf titulo={regra.nome}>
         {regra.tipoNegocio === "eletroposto" && <BadgeGf>{ROTULO_TIPO_NEGOCIO.eletroposto}</BadgeGf>}
@@ -177,7 +198,7 @@ export function LinhaRegra({ regra, eventos }: { regra: RegraSalva; eventos: rea
         <Botao type="submit" variante="secundario" disabled={pendente}>
           Salvar
         </Botao>
-        <button type="submit" formAction={apagarRegra} className="gf-botao-texto sm:ml-auto">
+        <button type="button" onClick={apagar} className="gf-botao-texto sm:ml-auto">
           Apagar
         </button>
         <Mensagem resultado={resultado} />
@@ -353,7 +374,8 @@ export function NovaConquista() {
   const [resultado, acao, pendente] = useActionState(criarConquista, null);
   const [metrica, setMetrica] = useState<"xp_acumulado" | "marco_contagem">("xp_acumulado");
   return (
-    <form action={acao} className="flex flex-col gap-3">
+    // Depois de criar, o <select> volta à primeira opção (XP acumulado): o estado volta junto.
+    <form action={acao} onReset={() => setMetrica("xp_acumulado")} className="flex flex-col gap-3">
       <div className="grid gap-3 @min-[480px]:grid-cols-[5.5rem_1fr]">
         <Campo rotulo="Ícone" name="icone" defaultValue="🏆" maxLength={8} />
         <Campo rotulo="Nome" name="nome" placeholder="Ex.: Veterano" required />
@@ -377,9 +399,11 @@ export function NovaConquista() {
 
 export function LinhaConquista({ conquista }: { conquista: ConquistaSalva }) {
   const [resultado, acao, pendente] = useActionState(editarConquista, null);
+  const enviar = useEnvioSemReset(acao);
+  const apagar = useApagar(apagarConquista);
   const [metrica, setMetrica] = useState<"xp_acumulado" | "marco_contagem">(conquista.metrica);
   return (
-    <form action={acao} className="gf-item-edicao flex flex-col gap-4">
+    <form onSubmit={enviar} className="gf-item-edicao flex flex-col gap-4">
       <input type="hidden" name="id" value={conquista.id} />
       <CabecalhoItemGf titulo={`${conquista.icone} ${conquista.nome}`}>
         {conquista.xpBonus > 0 && <BadgeGf tom="positivo">+{formatarNumeroGf(conquista.xpBonus)} XP bônus</BadgeGf>}
@@ -413,7 +437,7 @@ export function LinhaConquista({ conquista }: { conquista: ConquistaSalva }) {
         <Botao type="submit" variante="secundario" disabled={pendente}>
           Salvar
         </Botao>
-        <button type="submit" formAction={apagarConquista} className="gf-botao-texto sm:ml-auto">
+        <button type="button" onClick={apagar} className="gf-botao-texto sm:ml-auto">
           Apagar
         </button>
         <Mensagem resultado={resultado} />

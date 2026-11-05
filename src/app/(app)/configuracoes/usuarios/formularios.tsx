@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useEffect, useState, useTransition, type FormEvent } from "react";
+import { useActionState, useEffect, useState, useTransition } from "react";
+import { useEnvioSemReset } from "@/components/envio-sem-reset";
 import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
 import { ROTULO_SETOR, SETORES_OBRA } from "@/lib/obras/rotulos";
 import {
@@ -19,19 +20,6 @@ import {
 } from "@/lib/tipos";
 import { atualizarMembro, carregarCarteiraAberta, convidarMembro, desligarComTransferencia, salvarSetoresMembro, type CarteiraAberta } from "./actions";
 
-/**
- * Envia pela ação do servidor SEM o reset automático do React 19. Com `action={...}`, o React reseta o
- * formulário ao terminar: o <select> controlado volta à opção padrão do HTML (a primeira, "Admin") enquanto o
- * estado guarda o valor salvo, e o próximo Salvar grava o que está na tela.
- */
-function enviarSemReset(acao: (dados: FormData) => void, iniciar: (f: () => void) => void) {
-  return (evento: FormEvent<HTMLFormElement>) => {
-    evento.preventDefault();
-    const dados = new FormData(evento.currentTarget);
-    iniciar(() => acao(dados));
-  };
-}
-
 export function FormularioConvite() {
   const [papel, setPapel] = useState<Papel>("vendedor");
   const [versao, setVersao] = useState(0);
@@ -44,9 +32,10 @@ export function FormularioConvite() {
     }
     return r;
   }, null);
-  const [, iniciar] = useTransition();
+  // Sem o reset do React 19: ele voltaria o <select> da função à primeira opção (Admin) com o estado em outra.
+  const enviar = useEnvioSemReset(acao);
   return (
-    <form key={versao} onSubmit={enviarSemReset(acao, iniciar)} className="grid gap-3 md:grid-cols-2">
+    <form key={versao} onSubmit={enviar} className="grid gap-3 md:grid-cols-2">
       <Campo rotulo="Nome" name="nome" required />
       <Campo rotulo="E-mail" name="email" type="email" required />
       <Selecao rotulo="Perfil" name="papel" value={papel} onChange={(e) => setPapel(e.target.value as Papel)}>
@@ -111,7 +100,9 @@ const PAPEIS_CONVERTIVEIS_EM_OPERACAO: readonly Papel[] = ["admin", "gestor", "v
 
 export function LinhaMembro({ membro }: { membro: MembroLinha }) {
   const [resultado, acao, pendente] = useActionState(atualizarMembro, null);
-  const [, iniciar] = useTransition();
+  // Sem o reset do React 19: ele voltaria o <select> da função à primeira opção (Admin) com o estado em outra,
+  // e o próximo Salvar gravaria o que está na tela.
+  const enviar = useEnvioSemReset(acao);
   const [papel, setPapel] = useState<Papel>(membro.papel);
   const [status, setStatus] = useState<StatusMembro>(membro.status);
   const [carteira, setCarteira] = useState<CarteiraAberta | null>(null);
@@ -143,7 +134,7 @@ export function LinhaMembro({ membro }: { membro: MembroLinha }) {
 
   return (
     <div className="border-t border-zinc-100 py-3">
-    <form onSubmit={enviarSemReset(acao, iniciar)} className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center">
+    <form onSubmit={enviar} className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center">
       <input type="hidden" name="membroId" value={membro.id} />
       {/* Largura mínima para o e-mail: os seletores descem de linha antes de esmagá-lo; e-mail longo quebra. */}
       <div className="min-w-0 flex-1 md:min-w-64">
