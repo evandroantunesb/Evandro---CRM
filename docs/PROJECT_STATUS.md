@@ -1,10 +1,20 @@
 # Estado do projeto — Raion CRM
 
-## Perfis e setores — A2b: tela Financeiro (em andamento, 05/11/2026)
+## Perfis e setores — C: gestor escreve em todos os setores (em andamento, 05/11/2026)
+
+Branch `feat/gestor-escreve-setores` (worktree `C:\dev\crm-gestor`). Migration `20261122100000_gestor_escreve_setores.sql`: `autorizacao_setor_obra` e `autorizacao_tarefa_setor` devolvem 'coordenar' para o gestor, e as RPCs que passam por elas herdam a regra (fluxos, marcos, participantes, Engenharia, contas a pagar, NF do cliente, tarefas). `criar_tarefa_setor` e `membros_do_setor` aceitam o gestor para escolher o responsável. No app: `GERIR_OBRAS` inclui o gestor, o espelho `autorizacaoSetor` também, os candidatos a participante do gestor vêm de `membros_do_setor` (sem coordenadores), e o histórico da obra mostra "Nome (gestor)" pelo `autor_contexto.papel` que o banco já gravava.
+
+Decisões do Evandro (05/11/2026): o gestor age como coordenador em todos os setores, sem se atribuir e sem atribuir coordenador; o que é só do admin continua só do admin (concluir a Engenharia sem conexão, tabelas de configuração); o gestor também conclui, responde, atribui e cancela tarefas de qualquer setor (não "assume" para si: o botão Assumir agora aparece só para quem atua no setor, o que também o tira do admin, que o banco já recusava); "(gestor)" ao lado do autor no histórico.
+
+Validação local (Docker + Supabase local): lint, typecheck, build, Vitest (2.705 testes) e e2e (107; a vistoria da Engenharia falhou uma vez no link assinado do anexo e passou ao repetir, sem relação com esta mudança).
+
+Produção: a migration só vai pelo `banco-producao.yml`, aprovado pelo Evandro, antes ou junto do deploy do app (sem ela, a tela mostra os controles ao gestor e o banco recusa).
+
+## Perfis e setores — A2b: tela Financeiro (mesclada na #337, 05/11/2026)
 
 Branch `feat/financeiro-tela` (worktree `C:\dev\crm-financeiro`). Sem migration. Tela `/financeiro` pelo desenho aprovado "Perfis · Administrativo › Financeiro", base visual das próximas telas do Administrativo: cabeçalho com "Lançar pagamento" (escolhe a obra), 4 indicadores (a pagar em 7 dias, vencidos, pagamentos do cliente a confirmar, notas pendentes), abas A pagar, Pagamentos a confirmar (a antiga `/pagamentos`, que agora redireciona), Notas fiscais (de fornecedor: contas pagas sem NF; do cliente: marco pendente com a instalação concluída) e Pagos (200 mais recentes), e busca por fornecedor, cliente ou obra. No menu, "Pagamentos a confirmar" virou "Financeiro". Os formulários da ficha da obra foram para `src/components/financeiro/` e servem às duas telas.
 
-Decisões do Evandro (05/11/2026): lançar pela tela pede a obra; o Operacional que só confere pagamento vê só a aba "Pagamentos a confirmar" (só na tela: pelo banco ele continua lendo as contas das obras dele); o gestor vê tudo (sem escrever até a C); os botões aparecem para o Administrativo da obra e o admin, como na ficha.
+Decisões do Evandro (05/11/2026): lançar pela tela pede a obra; o Operacional que só confere pagamento vê só a aba "Pagamentos a confirmar" (só na tela: pelo banco ele continua lendo as contas das obras dele); o gestor vê tudo (escreve desde a C); os botões aparecem para o Administrativo da obra e o admin, como na ficha.
 
 Pendências: "A pagar em 7 dias" conta de hoje até 7 dias e deixa as vencidas só no indicador delas (o número do desenho somava diferente); testes de banco e e2e não rodaram localmente (sem Docker), só lint, typecheck, build e o CI.
 

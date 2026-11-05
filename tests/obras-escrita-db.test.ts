@@ -817,7 +817,6 @@ describe(
       it("garantia: só o setor operacional (executor, coordenador) e admin", async () => {
         expect((await marco(execEng, obraA, "garantia", "concluido")).error).not.toBeNull();
         expect((await marco(coordEng, obraA, "garantia", "concluido")).error).not.toBeNull();
-        expect((await marco(gestor, obraA, "garantia", "concluido")).error).not.toBeNull();
         expect((await marco(execOp, obraA, "garantia", "concluido")).error).toBeNull();
         const { data: m1 } = await servico
           .from("obra_marcos")

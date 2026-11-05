@@ -39,7 +39,10 @@ export type TarefaSetorVM = {
   referencia: { rotulo: string; href: string | null };
   obraId: string | null;
   negocioId: string | null;
+  /** Concluir com resposta. */
   podeAgir: boolean;
+  /** Assumir para si: só quem atua no setor (admin e gestor não assumem; atribuem). */
+  podeAssumir: boolean;
   podeAtribuir: boolean;
   podeCancelar: boolean;
   podeReabrir: boolean;

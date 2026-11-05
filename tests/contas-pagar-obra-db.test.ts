@@ -117,8 +117,8 @@ describe("Contas a pagar da obra (ordem importa)", { concurrent: false, shuffle:
     obra = await criarObra("Contas");
   });
 
-  it("lança só o Administrativo (ou admin); o histórico diz fornecedor e categoria, nunca o valor", async () => {
-    for (const quem of [operacional, gestor, vendedor, adminB]) expect((await lancar(quem, obra)).error?.code, quem.email).toBe("42501");
+  it("lança só o Administrativo (ou gestor e admin); o histórico diz fornecedor e categoria, nunca o valor", async () => {
+    for (const quem of [operacional, vendedor, adminB]) expect((await lancar(quem, obra)).error?.code, quem.email).toBe("42501");
     expect((await lancar(administrativo, obra, { p_fornecedor: "X" })).error?.message).toContain("fornecedor");
     expect((await lancar(administrativo, obra, { p_valor: 0 })).error?.message).toContain("maior que zero");
     expect((await lancar(administrativo, obra, { p_categoria: "outra" })).error?.message).toContain("Categoria");
@@ -128,6 +128,18 @@ describe("Contas a pagar da obra (ordem importa)", { concurrent: false, shuffle:
     const [h] = await historico(obra, "conta_pagar_lancada");
     expect(h).toMatchObject({ setor: "administrativo", dados: { fornecedor: "Distribuidora Solar Sul", categoria: "equipamentos" } });
     expect(JSON.stringify(h)).not.toContain("1800");
+  });
+
+  it("o gestor lança e cancela como coordenador do Administrativo; o histórico guarda o papel gestor", async () => {
+    const { data: id } = ok(await lancar(gestor, obra, { p_fornecedor: "Lançada pelo gestor" }), "gestor lança");
+    ok(await gestor.cliente.rpc("cancelar_conta_pagar", { p_conta_id: id as string, p_motivo: "Teste do gestor" }), "gestor cancela");
+    const { data: linhas } = await servico
+      .from("obra_historico")
+      .select("autor_membro_id, autor_contexto")
+      .eq("obra_id", obra)
+      .eq("tipo", "conta_pagar_lancada")
+      .eq("autor_membro_id", membro[gestor.id]);
+    expect(linhas).toEqual([{ autor_membro_id: membro[gestor.id], autor_contexto: { papel: "gestor" } }]);
   });
 
   it("veem as contas: admin, gestor, Administrativo e Operacional; vendedor e outra empresa não", async () => {

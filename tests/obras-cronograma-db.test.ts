@@ -164,7 +164,8 @@ describe("Obras OPR: cronograma (ordem importa)", { concurrent: false, shuffle: 
   it("previsão do material: só quem escreve em Compras; vale no lugar do prazo padrão e vira a causa seguinte", async () => {
     const longe = await somar(hoje(), 80);
     expect((await vendedor.cliente.rpc("definir_entrega_material_prevista", { p_obra_id: obra, p_data: longe })).error?.code).toBe("42501");
-    expect((await gestor.cliente.rpc("definir_entrega_material_prevista", { p_obra_id: obra, p_data: longe })).error?.code).toBe("42501");
+    // O gestor coordena Compras (20261122100000): grava; o admin, com a mesma data, não grava de novo.
+    ok(await gestor.cliente.rpc("definir_entrega_material_prevista", { p_obra_id: obra, p_data: longe }), "previsão do gestor");
     ok(await admin.cliente.rpc("definir_entrega_material_prevista", { p_obra_id: obra, p_data: longe }), "previsão");
 
     const linhas = await cronograma(admin, obra);
@@ -174,7 +175,7 @@ describe("Obras OPR: cronograma (ordem importa)", { concurrent: false, shuffle: 
     expect(linhas.find((l) => l.etapa === "instalacao")).toMatchObject({ causa_etapa: "entrega_material", atraso_proprio: 0 });
 
     const { data: h } = await servico.from("obra_historico").select("setor, dados").eq("obra_id", obra).eq("tipo", "entrega_material_prevista");
-    expect(h).toEqual([{ setor: "compras", dados: expect.objectContaining({ de: null, para: longe, autorizacao: "admin" }) }]);
+    expect(h).toEqual([{ setor: "compras", dados: expect.objectContaining({ de: null, para: longe, autorizacao: "coordenar" }) }]);
   });
 
   it("Compras termina em 'material entregue': faturado deixa de concluir e as etapas ganham o fim real", async () => {

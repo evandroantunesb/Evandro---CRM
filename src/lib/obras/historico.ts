@@ -15,6 +15,8 @@ export type LinhaHistoricoObra = {
   setor: string | null;
   dados: unknown;
   autor_membro_id: string | null;
+  /** `{ papel }` de quem agiu, gravado por `registrar_historico_obra`. jsonb: tratado como não confiável. */
+  autor_contexto?: unknown;
 };
 
 export type ItemHistoricoVM = {
@@ -330,6 +332,17 @@ function dataHistorico(v: unknown): string | null {
   return typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? `${v.slice(8, 10)}/${v.slice(5, 7)}/${v.slice(0, 4)}` : null;
 }
 
+/**
+ * Autor do item. O gestor escreve em todos os setores sem atuar neles (20261122100000): o "(gestor)" mostra que a
+ * ação veio da gestão, não de quem atua no setor. Vale o papel do momento da ação, não o de hoje.
+ */
+function autorDoItem(linha: LinhaHistoricoObra, nomes: ReadonlyMap<string, string>): string {
+  if (linha.autor_membro_id == null) return "Sistema";
+  const nome = nomes.get(linha.autor_membro_id) || SEM_NOME;
+  const contexto = ehRegistro(linha.autor_contexto) ? linha.autor_contexto : null;
+  return ler(contexto, "papel") === "gestor" ? `${nome} (gestor)` : nome;
+}
+
 const instante = (iso: string): number => {
   const t = Date.parse(iso);
   return Number.isNaN(t) ? 0 : t;
@@ -344,6 +357,6 @@ export function montarHistorico(linhas: readonly LinhaHistoricoObra[], nomes: Re
       tipoRotulo: rotulo(ROTULO_TIPO, l.tipo) ?? "Evento",
       setorRotulo: rotulo(ROTULO_SETOR_HISTORICO, l.setor),
       descricao: descrever(l, nomes),
-      autor: l.autor_membro_id == null ? "Sistema" : nomes.get(l.autor_membro_id) || SEM_NOME,
+      autor: autorDoItem(l, nomes),
     }));
 }

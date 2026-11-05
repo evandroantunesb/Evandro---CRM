@@ -12,7 +12,7 @@ import type { ResultadoAcao } from "@/lib/tipos";
 
 /*
  * Contas a pagar da obra e nota fiscal do cliente (20261121100000_contas_pagar_obra.sql). Cada ação só valida a forma e
- * chama a RPC: quem pode (Administrativo da obra ou admin), obra cancelada, anexo da pasta certa e auditoria ficam no
+ * chama a RPC: quem pode (Administrativo da obra, gestor ou admin), obra cancelada, anexo da pasta certa e auditoria ficam no
  * banco. Arquivo nunca passa por Server Action: o navegador envia ao Storage e a ação recebe só o caminho.
  * `exigirPapel(...GERIR_OBRAS)` só corta cedo quem nunca escreve.
  */

@@ -14,7 +14,7 @@ export const ABAS_FINANCEIRO = [
 ] as const;
 export type AbaFinanceiro = (typeof ABAS_FINANCEIRO)[number]["valor"];
 
-/** Conta a pagar com a obra a que pertence e se a pessoa pode agir sobre ela (Administrativo da obra ou admin). */
+/** Conta a pagar com a obra a que pertence e se a pessoa pode agir sobre ela (Administrativo da obra, gestor ou admin). */
 export type ContaFinanceiroVM = ContaPagarVM & { obraId: string; obraNumero: number | null; clienteNome: string | null; podeEscrever: boolean };
 
 /** Obra com a instalação concluída e a nota fiscal do cliente ainda por anexar. */

@@ -146,7 +146,8 @@ describe("Obras OPR: custos (ordem importa)", { concurrent: false, shuffle: fals
   it("custo real: só o admin ou o Operacional da obra lança, com dados válidos", async () => {
     const lancar = (quem: Usuario, extra: Record<string, unknown> = {}) =>
       quem.cliente.rpc("lancar_custo_obra", { p_obra_id: obra, p_categoria: "mao_de_obra", p_valor: 1250.5, p_data: hoje(), p_descricao: "Diária da equipe", ...extra } as never);
-    expect((await lancar(gestor)).error?.code).toBe("42501");
+    // O gestor coordena o Operacional (20261122100000): passa da autorização e esbarra na validação.
+    expect((await lancar(gestor, { p_valor: 0 })).error?.message).toContain("maior que zero");
     expect((await lancar(vendedor)).error?.code).toBe("42501");
     expect((await lancar(operacional, { p_valor: 0 })).error?.message).toContain("maior que zero");
     expect((await lancar(operacional, { p_data: "2999-01-01" })).error?.message).toContain("data");
@@ -166,7 +167,9 @@ describe("Obras OPR: custos (ordem importa)", { concurrent: false, shuffle: fals
       expect((await cliente.from("obra_custos").update({ valor: 1 }).eq("id", lancamento)).error?.code).toBe("42501");
       expect((await cliente.from("obra_custos").delete().eq("id", lancamento)).error?.code).toBe("42501");
     }
-    expect((await gestor.cliente.rpc("estornar_custo_obra", { p_custo_id: lancamento, p_motivo: "Lançado em dobro" })).error?.code).toBe("42501");
+    // O gestor passa da autorização (coordena o Operacional) e esbarra no motivo; o estorno de fato fica com o Operacional.
+    expect((await gestor.cliente.rpc("estornar_custo_obra", { p_custo_id: lancamento, p_motivo: "" })).error?.message).toContain("motivo");
+    expect((await vendedor.cliente.rpc("estornar_custo_obra", { p_custo_id: lancamento, p_motivo: "Lançado em dobro" })).error?.code).toBe("42501");
     expect((await operacional.cliente.rpc("estornar_custo_obra", { p_custo_id: lancamento, p_motivo: "" })).error?.message).toContain("motivo");
     ok(await operacional.cliente.rpc("estornar_custo_obra", { p_custo_id: lancamento, p_motivo: "Lançado em dobro" }), "estorno");
     expect((await operacional.cliente.rpc("estornar_custo_obra", { p_custo_id: lancamento, p_motivo: "De novo" })).error?.message).toContain("já foi estornado");

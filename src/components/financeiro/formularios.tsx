@@ -10,7 +10,7 @@ import { CampoArquivo, arquivoDe, enviarArquivo, useEnvioComArquivo, type Obra }
 
 /**
  * Formulários das contas a pagar e da nota fiscal do cliente, usados na ficha da obra e na tela Financeiro. Cada um só
- * monta o envio: quem pode (Administrativo da obra ou admin) o banco decide de novo.
+ * monta o envio: quem pode (Administrativo da obra, gestor ou admin) o banco decide de novo.
  */
 
 /** Ação recolhida atrás de um link ("Registrar pagamento", "Cancelar"…). */

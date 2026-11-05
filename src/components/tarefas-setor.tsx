@@ -172,7 +172,7 @@ export function ListaTarefasSetor({
           {t.motivoCancelamento && <p className="text-xs text-zinc-500">Motivo do cancelamento: {t.motivoCancelamento}</p>}
           <AnexosTarefa tarefa={t} />
           <div className="flex flex-wrap items-start gap-2">
-            {t.podeAgir && t.responsavel === null && <BotaoAcao tarefa={t} acao={assumirTarefaSetor} rotulo="Assumir" />}
+            {t.podeAssumir && <BotaoAcao tarefa={t} acao={assumirTarefaSetor} rotulo="Assumir" />}
             {t.podeAgir && (
               <AcaoComTexto
                 tarefa={t}
