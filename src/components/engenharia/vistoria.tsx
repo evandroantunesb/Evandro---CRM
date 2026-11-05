@@ -217,7 +217,8 @@ function NovoRegistro({ obraId, pasta, vistoria, possiveis }: { obraId: string; 
   const atual = possiveis.includes(tipo) ? tipo : possiveis[0];
 
   return (
-    <form action={acao} className="flex flex-col gap-3 rounded-lg border border-linha p-3">
+    // Depois de registrar, o React limpa o formulário e o <select> volta à primeira opção: o estado volta junto.
+    <form action={acao} onReset={() => setTipo(possiveis[0])} className="flex flex-col gap-3 rounded-lg border border-linha p-3">
       <input type="hidden" name="obraId" value={obraId} />
       <input type="hidden" name="vistoriaId" value={vistoria.id} />
       <p className="text-sm font-medium text-texto">Registrar andamento</p>
