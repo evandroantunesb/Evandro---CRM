@@ -162,7 +162,9 @@ jobs:
         with:
           name: obras-capturas
           path: e2e-capturas/
-          retention-days: 7
+          # 2 dias: as capturas servem para conferir a PR logo depois do teste; 7 dias enchiam a cota de
+          # armazenamento do Actions (1,5 GB em 05/11/2026) e o envio passava a falhar.
+          retention-days: 2
           if-no-files-found: warn
       - name: Publicar relatório e falhas
         if: ${{ !cancelled() }}
@@ -172,5 +174,7 @@ jobs:
           path: |
             e2e-relatorio/
             e2e-resultados/
-          retention-days: 7
+          # 2 dias: as capturas servem para conferir a PR logo depois do teste; 7 dias enchiam a cota de
+          # armazenamento do Actions (1,5 GB em 05/11/2026) e o envio passava a falhar.
+          retention-days: 2
           if-no-files-found: warn
