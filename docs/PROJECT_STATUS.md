@@ -1,8 +1,8 @@
 # Estado do projeto — Raion CRM
 
-## Tela de entrada configurável — em revisão (04/11/2026)
+## Tela de entrada configurável — concluída (04/11/2026)
 
-Configurações › Empresa › Tela de entrada (só o admin), pelos desenhos aprovados "Configurações · Tela de entrada" e "Acesso · Entrar". Migration `20261118100000_tela_entrada.sql` (tabela `empresa_tela_entrada` e bucket público `tela-entrada`), ainda não aplicada em produção: até lá, a tela nova de Configurações falha no preview e o login cai no padrão (não quebra).
+Configurações › Empresa › Tela de entrada (só o admin), pelos desenhos aprovados "Configurações · Tela de entrada" e "Acesso · Entrar". #326 mesclada em 04/11/2026; migration `20261118100000_tela_entrada.sql` (tabela `empresa_tela_entrada` e bucket público `tela-entrada`) aplicada em 05/11/2026 (autorização #327, dry-run 41943161896, aplicação 41943434745, `main` em `135aad2`). Conferido em produção sem login: Entrar e Recuperar senha abrem com o padrão e a logo acima do formulário; Configurações › Tela de entrada exige login. Falta o admin testar a troca de imagem e textos com a própria conta.
 
 Decisões do Evandro (04/11/2026):
 - O aparelho lembra a empresa: o login grava a empresa em uso no cookie `raion_empresa` (1 ano, continua depois de sair). Primeiro acesso ou aparelho novo = tela padrão do Raion. Crie sua senha usa a empresa do convite; Entrar, Recuperar senha e Sem acesso, a lembrada.
