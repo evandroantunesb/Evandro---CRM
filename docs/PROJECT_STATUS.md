@@ -1,5 +1,11 @@
 # Estado do projeto — Raion CRM
 
+## Perfis e setores — A2a: contas a pagar e NF do cliente na obra (em andamento, 05/11/2026)
+
+Branch `feat/contas-pagar-obra`. Migration `20261121100000_contas_pagar_obra.sql`. Ficha da obra pelo desenho aprovado "Ficha da obra · Administrativo": cartões "Pagamentos a fornecedores", "Pagamento do cliente" e "Nota fiscal do cliente"; o setor Administrativo mostra "N de M pagamentos pagos". A tela Financeiro (abas A pagar, Pagamentos a confirmar, Notas fiscais e Pagos) é a A2b.
+
+Decisões do Evandro (05/11/2026): fornecedor em nome livre com sugestão (sem cadastro); registrar pagamento pede data e comprovante, a nota do fornecedor pode vir depois; conta paga vira custo real (`obra_custos`) na categoria dela, e o custo de conta paga só se estorna pela conta (fica "estornada"; o certo é lançado de novo); conta a pagar se cancela com motivo; o Administrativo também lança custo real direto; anexar a NF do cliente só conclui o marco "NF do cliente" (nada exige a nota); "fornecedores pagos" é manual; conta vencida e não paga deixa o semáforo no mínimo amarelo, sem passar por cima do vermelho. Veem contas, custos e o pagamento do cliente: admin, gestor, Administrativo e Operacional da obra; o arquivo da NF do cliente, só admin, gestor e Administrativo. O gestor só vê até a PR C.
+
 ## Perfis e setores — A1: setor Administrativo no banco (em andamento, 05/11/2026)
 
 #332 mesclada em 05/11/2026 (06:20, Brasília); migrations aplicadas em produção logo depois (06:33; tag `migracao-pr332-72fefb7`, run 42003095398). Nesses 13 minutos o app em produção rodou sem a migration. Ordem das entregas: A1 (esta) → B (Usuários com perfil único) → A2 (contas a pagar a fornecedores, NF do cliente, tela Financeiro) → C (gestor escreve em todos os setores, com histórico) → A3 (Compras com substituto) → D/E (prazos pela Operação; funil pelo gestor). Migrations `20261119100000_setor_administrativo_enum.sql` (só o valor do enum) e `20261119100100_setor_administrativo.sql`.

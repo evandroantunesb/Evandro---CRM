@@ -84,7 +84,7 @@ export async function carregarCompleta(
   const ativas = lista.filter((o) => o.situacao !== "cancelada");
   const ids = ativas.map((o) => o.id);
 
-  const [prazos, orcamento, custos, vendas, justificativas, escalonamentos, deducoes, identidades] = await Promise.all([
+  const [prazos, orcamento, custos, vendas, justificativas, escalonamentos, deducoes, identidades, vencidas] = await Promise.all([
     emLotes(ids, (l) => supabase.rpc("prazos_obras", { p_obra_ids: l })),
     emLotes(ids, (l) => supabase.from("obra_orcamento").select("obra_id, categoria, planejado").in("obra_id", l)),
     emLotes(ids, (l) => supabase.from("obra_custos").select("obra_id, categoria, valor").in("obra_id", l)),
@@ -100,6 +100,8 @@ export async function carregarCompleta(
       .order("aberto_em", { ascending: false }),
     supabase.from("obra_deducoes").select("impostos_percentual, comissoes_percentual").eq("empresa_id", empresaId).maybeSingle(),
     supabase.rpc("identidade_membros", { p_empresa_id: empresaId }),
+    // Contas a fornecedor vencidas e não pagas (a RLS devolve só das obras cujos custos a pessoa vê).
+    emLotes(ids, (l) => supabase.from("obra_contas_pagar").select("obra_id").eq("situacao", "a_pagar").lt("vencimento", hoje).in("obra_id", l)),
   ]);
   for (const r of [escalonamentos, deducoes, identidades]) if (r.error) throw r.error;
 
@@ -107,6 +109,8 @@ export async function carregarCompleta(
   const orcamentoPorObra = agrupar(orcamento);
   const custosPorObra = agrupar(custos);
   const vendaPorObra = new Map(vendas.map((v) => [v.obra_id, Number(v.valor_vendido)]));
+  const vencidasPorObra = new Map<string, number>();
+  for (const v of vencidas) vencidasPorObra.set(v.obra_id, (vencidasPorObra.get(v.obra_id) ?? 0) + 1);
   // A justificativa mais recente de cada obra entra como motivo.
   const justificativaPorObra = new Map<string, string>();
   for (const j of [...justificativas].sort((a, b) => (a.respondido_em ?? "").localeCompare(b.respondido_em ?? ""))) {
@@ -125,7 +129,7 @@ export async function carregarCompleta(
     const c = montado && (montado.planejado > 0 || montado.realizado > 0) ? montado : null;
     const venda = vendaPorObra.get(o.id) ?? null;
     const resultado = c && venda != null ? resultadoObra(venda, c, deducoesPct) : null;
-    const semaforo = semaforoObra({ prazos: p, custos: c, margemProjetadaPct: resultado?.margemProjetadaPct ?? null });
+    const semaforo = semaforoObra({ prazos: p, custos: c, margemProjetadaPct: resultado?.margemProjetadaPct ?? null, contasVencidas: vencidasPorObra.get(o.id) });
     calculos.push({
       custos: c,
       lucro: resultado?.lucro ?? null,
