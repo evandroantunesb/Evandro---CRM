@@ -57,13 +57,21 @@ describe("salvar_configuracoes_empresa", () => {
     });
   });
 
-  it("gestor e admin de outra empresa não mudam; nada muda", async () => {
+  it("admin de outra empresa não muda; o gestor não muda a distribuição dos leads (Origens); nada muda", async () => {
     const antes = await ler(empresa);
-    for (const quem of [gestor, adminB]) {
-      const { error } = await quem.cliente.rpc("salvar_configuracoes_empresa", { p_empresa_id: empresa, p_dias_considerado_parado: 30 });
-      expect(error?.message).toContain("Só o admin");
+    const { error } = await adminB.cliente.rpc("salvar_configuracoes_empresa", { p_empresa_id: empresa, p_dias_considerado_parado: 30 });
+    expect(error?.message).toContain("Só o admin");
+    for (const valores of [{ p_modo_distribuicao_leads: "somente_vendedores" as const }, { p_percentual_leads_sdr: 10 }, { p_dias_considerado_parado: 30, p_percentual_leads_sdr: 10 }]) {
+      const r = await gestor.cliente.rpc("salvar_configuracoes_empresa", { p_empresa_id: empresa, ...valores });
+      expect(r.error?.message, JSON.stringify(valores)).toContain("Só o admin");
     }
     expect(await ler(empresa)).toEqual(antes);
+  });
+
+  it("o gestor muda as regras do funil (parado e sem contato) desde 20261124100000", async () => {
+    const antes = await ler(empresa);
+    expect((await gestor.cliente.rpc("salvar_configuracoes_empresa", { p_empresa_id: empresa, p_dias_considerado_parado: 9, p_horas_considerado_sem_contato: 4 })).error).toBeNull();
+    expect(await ler(empresa)).toEqual({ ...antes, dias_considerado_parado: 9, horas_considerado_sem_contato: 4 });
   });
 
   it("valor fora do limite é recusado pelo banco", async () => {

@@ -29,7 +29,7 @@ import {
   type AlertaObra,
   type SituacaoObra,
 } from "@/lib/obras/rotulos";
-import { ESCALONAMENTO_OBRA, FINANCEIRO_OBRA, OBRAS, OPR_COMPLETA, PRAZOS_OBRA, pode } from "@/lib/permissoes";
+import { ESCALONAMENTO_OBRA, FINANCEIRO_OBRA, OBRAS, OPR_COMPLETA, pode } from "@/lib/permissoes";
 import { ehCategoriaCusto, montarCustos, resultadoObra, type CategoriaCustoObra } from "@/lib/obras/custos";
 import { prazosDaLinha, ROTULO_COR, semaforoObra, type CorSemaforo } from "@/lib/obras/semaforo";
 import { COLUNAS_JUSTIFICATIVA, atrasosDaObra, justificativasPorEtapa } from "@/lib/obras/justificativas";
@@ -88,6 +88,10 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
   const { resumo, gestao } = obra;
   const local = [resumo.cidade, resumo.uf].filter(Boolean).join("/");
   const gestaoDoSetor = (setor: string) => gestao?.setores.find((s) => s.setor === setor) ?? null;
+  // Coordenar um setor (admin, gestor ou o coordenador) dá os prazos padrão dele; o Operacional, também a entrega.
+  const coordena = (a: string | null | undefined) => a === "admin" || a === "coordenar";
+  const coordenaOperacional = coordena(gestaoDoSetor("operacional")?.permissoes.autorizacao);
+  const coordenaAlgum = (gestao?.setores ?? []).some((s) => coordena(s.permissoes.autorizacao));
   const etapas = cronograma.data ?? [];
   const custos = (orcamento.data ?? []).length
     ? montarCustos({
@@ -243,8 +247,15 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
               <Campo rotulo="Entrega contratada">{dataBr(entrega.contratada)}</Campo>
               <Campo rotulo="Entrega prevista">{dataBr(entrega.prevista)}</Campo>
             </dl>
-            {pode(atual.papel, PRAZOS_OBRA) && resumo.situacao !== "cancelada" && (
+            {/* Quem coordena o Operacional ajusta (admin, gestor ou o coordenador; 20261124100000). */}
+            {coordenaOperacional && resumo.situacao !== "cancelada" && (
               <AjusteEntregaContratada key={resumo.id} obraId={resumo.id} data={entrega.contratada} />
+            )}
+            {/* Os outros coordenadores chegam aos prazos padrão do seu setor por aqui (o ajuste já tem o atalho). */}
+            {!coordenaOperacional && coordenaAlgum && (
+              <Link href="/configuracoes/prazos-obras" className="w-fit text-xs text-zinc-600 underline hover:text-zinc-900">
+                Prazos padrão das etapas
+              </Link>
             )}
           </div>
         </Cartao>

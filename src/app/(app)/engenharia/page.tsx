@@ -1,6 +1,6 @@
 import { AlarmClock, BadgeCheck, BellRing, CalendarClock, CalendarX, CirclePause, HardHat, Hourglass, Inbox, type LucideIcon } from "lucide-react";
 import Link from "next/link";
-import { CabecalhoPagina, CLASSE_ACAO_CABECALHO, CLASSE_SEGMENTO_CABECALHO, classeItemSegmentoCabecalho } from "@/components/cabecalho-pagina";
+import { CabecalhoPagina, CLASSE_ACAO_CABECALHO, CLASSE_SEGMENTO_CABECALHO, CLASSE_VIDRO_CABECALHO, classeItemSegmentoCabecalho } from "@/components/cabecalho-pagina";
 import { IniciarAtuacao } from "@/components/engenharia/iniciar-atuacao";
 import { ListaTarefasSetor } from "@/components/tarefas-setor";
 import { Cartao, CartaoRecolhivel } from "@/components/ui";
@@ -95,8 +95,8 @@ export default async function Engenharia({ searchParams }: PageProps<"/engenhari
     metrica: lerMetrica(params.trajetoria),
   };
   const pessoal = estado.visao === "pessoal";
-  // Definir responsável é do admin e do coordenador (quem a RPC deixa gerir a obra); o gestor só acompanha.
-  const coordena = atual.papel === "admin" || coordenaSetor;
+  // Definir responsável e os prazos: admin, gestor (coordena todos os setores, 20261122100000) e o coordenador.
+  const coordena = gestao || coordenaSetor;
   // Iniciar atuação é de quem atua na Engenharia (mesma regra da RPC); admin e gestor não iniciam.
   const podeIniciar = atual.papel === "operacao" && atua;
   const filtroTarefas = { empresaId: atual.empresaId, membroId: atual.membroId, papel: atual.papel, setor: "engenharia" as const };
@@ -190,6 +190,7 @@ export default async function Engenharia({ searchParams }: PageProps<"/engenhari
                 Definir responsável da próxima obra
               </Link>
             )}
+            {!pessoal && coordena && <Link href="/configuracoes/engenharia" className={CLASSE_VIDRO_CABECALHO}>Prazos</Link>}
           </>
         }
       />

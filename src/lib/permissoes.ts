@@ -127,11 +127,15 @@ export const REGRAS_TEMPERATURA = ["admin", "gestor"] as const satisfies ListaPa
 export const VALIDADE_PROPOSTA = ["admin", "gestor"] as const satisfies ListaPapeis;
 // Condições de pagamento (descontos, Personalizado, parcelas e taxas): mesma barreira das políticas no banco.
 export const CONDICOES_PAGAMENTO = ["admin", "gestor"] as const satisfies ListaPapeis;
+// Funis e etapas (Configurações › Funil) e as regras de parado e sem contato: mesma barreira das políticas e da RPC
+// `salvar_configuracoes_empresa` no banco (20261124100000).
+export const FUNIL = ["admin", "gestor"] as const satisfies ListaPapeis;
 
 // --- Obras -------------------------------------------------------------------
 
-// Prazos das etapas da obra e ajuste da entrega contratada: mesma barreira das políticas e da RPC no banco.
-export const PRAZOS_OBRA = ["admin", "gestor"] as const satisfies ListaPapeis;
+// Prazos das etapas da obra, prazos da Engenharia e ajuste da entrega contratada (20261124100000): admin e gestor
+// editam todos; `operacao` entra, mas só edita os do setor que coordena (`prazosObraEditaveis`). O banco decide.
+export const PRAZOS_OBRA = ["admin", "gestor", "operacao"] as const satisfies ListaPapeis;
 // Orçamento da obra e deduções do lucro (impostos e comissões): mesma barreira da RPC e das políticas no banco.
 export const FINANCEIRO_OBRA = ["admin", "gestor"] as const satisfies ListaPapeis;
 // Visão Completa (semáforo de todas as obras) e pedido de justificativa de atraso: mesma barreira da RPC no banco.

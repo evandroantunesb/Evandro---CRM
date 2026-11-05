@@ -12,7 +12,7 @@ import {
   tempoDesde,
 } from "@/lib/crm";
 import { COOKIE_VISAO_NEGOCIOS, exigirPapel } from "@/lib/sessao";
-import { FILTRAR_NEGOCIOS_POR_RESPONSAVEL, NEGOCIOS, REGRAS_TEMPERATURA, pode } from "@/lib/permissoes";
+import { FILTRAR_NEGOCIOS_POR_RESPONSAVEL, FUNIL, NEGOCIOS, REGRAS_TEMPERATURA, pode } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { carregarTemperaturas, type Temperatura, type TemperaturaNegocio } from "@/lib/temperatura";
 import { NovoNegocio } from "@/components/novo-negocio";
@@ -264,7 +264,7 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
               <ChartLine size={16} aria-hidden />
               Forecast
             </Link>
-            {atual.papel === "admin" && (
+            {pode(atual.papel, FUNIL) && (
               <Link href="/configuracoes/funil" className={`${CLASSE_VIDRO_CABECALHO} max-md:hidden`}>
                 <Settings2 size={16} aria-hidden />
                 Editar etapas
