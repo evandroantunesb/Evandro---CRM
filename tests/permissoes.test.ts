@@ -175,10 +175,7 @@ function ocorrencias(padrao: RegExp) {
  * Comparações negativas legítimas: não concedem acesso, só ajustam um campo de cadastro.
  * Para incluir uma nova, justifique aqui por que ela não dá poder a quem não está na lista.
  */
-const NEGATIVAS_PERMITIDAS = [
-  // Cadastro de usuário: o campo "Tipo de vendedor" só vale para o papel vendedor.
-  /^src\/app\/\(app\)\/configuracoes\/usuarios\/formularios\.tsx:\d+: .*papel !== "vendedor"/,
-];
+const NEGATIVAS_PERMITIDAS: RegExp[] = [];
 
 describe("varredura: nenhum acesso concedido por exclusão", () => {
   it("nenhuma guarda sem papel (exigirPapel())", () => {

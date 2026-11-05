@@ -2432,6 +2432,7 @@ export type Database = {
           definido_por_user_id: string | null;
           empresa_id: string;
           membro_id: string;
+          principal: boolean;
           setor: Database["public"]["Enums"]["setor_obra"];
           updated_at: string;
         };
@@ -2441,6 +2442,7 @@ export type Database = {
           definido_por_user_id?: string | null;
           empresa_id: string;
           membro_id: string;
+          principal?: boolean;
           setor: Database["public"]["Enums"]["setor_obra"];
           updated_at?: string;
         };
@@ -2450,6 +2452,7 @@ export type Database = {
           definido_por_user_id?: string | null;
           empresa_id?: string;
           membro_id?: string;
+          principal?: boolean;
           setor?: Database["public"]["Enums"]["setor_obra"];
           updated_at?: string;
         };

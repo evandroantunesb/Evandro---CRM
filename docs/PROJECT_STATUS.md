@@ -5,6 +5,13 @@
 Branch `feat/contas-pagar-obra`. Migration `20261121100000_contas_pagar_obra.sql`. Ficha da obra pelo desenho aprovado "Ficha da obra · Administrativo": cartões "Pagamentos a fornecedores", "Pagamento do cliente" e "Nota fiscal do cliente"; o setor Administrativo mostra "N de M pagamentos pagos". A tela Financeiro (abas A pagar, Pagamentos a confirmar, Notas fiscais e Pagos) é a A2b.
 
 Decisões do Evandro (05/11/2026): fornecedor em nome livre com sugestão (sem cadastro); registrar pagamento pede data e comprovante, a nota do fornecedor pode vir depois; conta paga vira custo real (`obra_custos`) na categoria dela, e o custo de conta paga só se estorna pela conta (fica "estornada"; o certo é lançado de novo); conta a pagar se cancela com motivo; o Administrativo também lança custo real direto; anexar a NF do cliente só conclui o marco "NF do cliente" (nada exige a nota); "fornecedores pagos" é manual; conta vencida e não paga deixa o semáforo no mínimo amarelo, sem passar por cima do vermelho. Veem contas, custos e o pagamento do cliente: admin, gestor, Administrativo e Operacional da obra; o arquivo da NF do cliente, só admin, gestor e Administrativo. O gestor só vê até a PR C.
+## Perfis e setores — B: Usuários com perfil único (em andamento, 05/11/2026)
+
+Branch `feat/usuarios-perfil-unico`, PR #334. Migration aplicada em produção em 05/11/2026, antes do merge (tag `migracao-pr334-be2cce8`, run 42010781758). Tela Configurações › Usuários pelo desenho aprovado `PerfisUsuarios`: lista com perfil e "Também atua em", painel lateral (no celular, tela cheia) para editar ou cadastrar, indicadores no topo, abas Ativos/Inativos/Desligados e busca. Migration `20261120100000_setor_principal_membro.sql`: `membro_setores_obra.principal` (um por pessoa), gravado por `definir_setores_membro` (`"principal": true`); existentes recebem o setor que coordenam ou o primeiro da ordem.
+
+Decisões do Evandro (05/11/2026): setor principal gravado no banco; tipo de vendedor, "Recebe leads" e ranking abaixo do perfil (Gestor e Admin: só o ranking; "Recebe leads" deles não é tocado, o rodízio só usa Vendedor e SDR); abas pelo status (sem convites pendentes); cadastro no mesmo painel.
+
+Pendências: o "de N do plano" do indicador ficou de fora, porque o admin da empresa não lê `planos_empresa` (só o super-admin); o menu lateral de Configurações do desenho vale para a seção inteira e não entrou; as descrições de Gestor ("tudo fica no histórico") e Administrativo ("anexa notas fiscais") seguem o desenho e só ficam verdadeiras com a C e a A2; a PR antiga #232 (cartões de usuários, 29/10) é anterior ao desenho aprovado e conflita com esta.
 
 ## Perfis e setores — A1: setor Administrativo no banco (em andamento, 05/11/2026)
 
