@@ -6,6 +6,17 @@ import { criarClienteServidor } from "@/lib/supabase/server";
 import type { Papel, PerfilGamificacao, TipoVendedor } from "@/lib/tipos";
 
 export const COOKIE_EMPRESA = "raion_empresa";
+/**
+ * Empresa em uso, por aparelho (1 ano). Gravada no login e na troca de empresa; continua depois de sair,
+ * para a tela de entrada mostrar a imagem da empresa (Configurações › Tela de entrada).
+ */
+export const OPCOES_COOKIE_EMPRESA = {
+  httpOnly: true,
+  sameSite: "lax",
+  secure: process.env.NODE_ENV === "production",
+  path: "/",
+  maxAge: 60 * 60 * 24 * 365,
+} as const;
 /** Preferência de visualização (Kanban/Lista) da tela de Negócios, por navegador. */
 export const COOKIE_VISAO_NEGOCIOS = "raion_negocios_visao";
 

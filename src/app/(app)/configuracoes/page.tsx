@@ -8,6 +8,7 @@ import {
   FileSignature,
   FileText,
   Gift,
+  Image as ImageIcon,
   ListChecks,
   ListTree,
   Medal,
@@ -71,6 +72,13 @@ const GRUPOS: { id: string; titulo: string; itens: Item[] }[] = [
       { href: "/configuracoes/prazos-obras", titulo: "Prazos das etapas", descricao: "Dias úteis de cada etapa da obra e da entrega contratada (o gestor também edita).", Icone: CalendarClock },
       { href: "/configuracoes/deducoes-obras", titulo: "Impostos e comissões", descricao: "Percentuais da venda descontados no lucro das obras (o gestor também edita).", Icone: BadgeDollarSign },
       { href: "/configuracoes/tarefas-automaticas", titulo: "Tarefas automáticas", descricao: "Tarefas que nascem para um setor quando outro chega a um status.", Icone: Workflow },
+    ],
+  },
+  {
+    id: "empresa",
+    titulo: "Empresa",
+    itens: [
+      { href: "/configuracoes/tela-entrada", titulo: "Tela de entrada", descricao: "Imagem, frase e texto que a equipe vê ao entrar.", Icone: ImageIcon },
     ],
   },
   {

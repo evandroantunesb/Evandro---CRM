@@ -1,5 +1,15 @@
 # Estado do projeto — Raion CRM
 
+## Tela de entrada configurável — em revisão (04/11/2026)
+
+Configurações › Empresa › Tela de entrada (só o admin), pelos desenhos aprovados "Configurações · Tela de entrada" e "Acesso · Entrar". Migration `20261118100000_tela_entrada.sql` (tabela `empresa_tela_entrada` e bucket público `tela-entrada`), ainda não aplicada em produção: até lá, a tela nova de Configurações falha no preview e o login cai no padrão (não quebra).
+
+Decisões do Evandro (04/11/2026):
+- O aparelho lembra a empresa: o login grava a empresa em uso no cookie `raion_empresa` (1 ano, continua depois de sair). Primeiro acesso ou aparelho novo = tela padrão do Raion. Crie sua senha usa a empresa do convite; Entrar, Recuperar senha e Sem acesso, a lembrada.
+- Imagem: JPG, PNG ou WebP até 5 MB, com pelo menos 1600 px de largura, reduzida no navegador para até 2400 px. Bucket público (a foto aparece antes do login). Frase até 60 caracteres, texto até 140; campo vazio = padrão do Raion. "Voltar ao padrão" apaga a personalização e a foto.
+- No celular continua só a faixa da imagem no topo, sem a frase. A logo do Raion fica acima do formulário, fora da imagem.
+- Sem função liberada para quem não fez login (#276 continua sem exceção): o servidor lê só frase, texto e imagem de empresa ativa com a chave de serviço, como captura, proposta e contrato.
+
 ## Forecast — concluído (04/11/2026)
 
 Tela `/forecast` (menu Comercial, abaixo de Negócios; botão na faixa de Negócios), pelo desenho aprovado "Forecast" do canvas. #322 mesclada em 04/11/2026; migration `20261117100000_forecast_chance_etapa.sql` (colunas `etapas.chance_fechamento` e `negocios.fechamento_previsto_em`) aplicada em 04/11/2026 (autorização #323, run 41870993047, `main` em `78099e6`).
