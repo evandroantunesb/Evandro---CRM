@@ -371,6 +371,18 @@ describe("A1: workflows de teste preparam o Docker para publicar em loopback", (
       );
     });
 
+    it("roda também quando muda a Engenharia (e2e 18 a 24 e 26) e as ações da OPR", () => {
+      expect(caminhosDoGatilho()).toEqual(
+        expect.arrayContaining([
+          "src/app/(app)/engenharia/**",
+          "src/components/engenharia/**",
+          "src/lib/engenharia*.ts",
+          "src/lib/acoes/engenharia*.ts",
+          "src/lib/acoes/obras-opr.ts",
+        ]),
+      );
+    });
+
     it("inclui os arquivos que decidem em que stack o e2e grava e como o app é construído", () => {
       expect(caminhosDoGatilho()).toEqual(
         expect.arrayContaining([

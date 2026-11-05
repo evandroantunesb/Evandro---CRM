@@ -14,6 +14,12 @@ on:
       - "src/components/obras/**"
       - "src/lib/obras/**"
       - "src/lib/acoes/obras.ts"
+      - "src/lib/acoes/obras-opr.ts"
+      # Engenharia (telas, componentes, regras e ações): os e2e 18 a 24 e 26 cobrem o módulo.
+      - "src/app/(app)/engenharia/**"
+      - "src/components/engenharia/**"
+      - "src/lib/engenharia*.ts"
+      - "src/lib/acoes/engenharia*.ts"
       - "e2e/**"
       - "playwright.config.ts"
       - ".github/workflows/navegador-obras.yml"
