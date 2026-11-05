@@ -4,38 +4,60 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { criarUsuarioDireto } from "@/lib/convites";
 import { mensagemErro } from "@/lib/erros";
-import { SETORES_OBRA } from "@/lib/obras/rotulos";
+import { SETORES_OBRA, type SetorObra } from "@/lib/obras/rotulos";
+import { ATUACOES, CAPACIDADES, PERFIS_USUARIO, ehPerfilSetor, papelDoPerfil, setoresParaSalvar } from "@/lib/perfis-usuario";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { PAPEIS_CADASTRAVEIS, PERFIS_GAMIFICACAO, TIPOS_VENDEDOR, STATUS_MEMBRO, type ResultadoAcao } from "@/lib/tipos";
+import { PERFIS_GAMIFICACAO, STATUS_MEMBRO, TIPOS_VENDEDOR, type ResultadoAcao } from "@/lib/tipos";
 
-const esquemaConvite = z.object({
+const vazioComoAusente = <T extends z.ZodType>(esquema: T) => esquema.optional().or(z.literal("").transform(() => undefined));
+
+/**
+ * Perfil único (desenho aprovado em 05/11/2026). Para a Operação, `capacidade` é a do setor do perfil e `outro_<setor>`
+ * diz se a pessoa também atua nos demais. Vendedor: tipo, ranking e "Recebe leads"; SDR: ranking e "Recebe leads";
+ * Gestor e Admin: só o ranking (opcional).
+ */
+const esquemaPerfil = z.object({
+  perfil: z.enum(PERFIS_USUARIO, "Escolha o perfil"),
+  capacidade: vazioComoAusente(z.enum(CAPACIDADES)),
+  tipo_vendedor: vazioComoAusente(z.enum(TIPOS_VENDEDOR)),
+  perfil_gamificacao: vazioComoAusente(z.enum(PERFIS_GAMIFICACAO)),
+  recebe_leads: z.enum(["on"]).optional(),
+  ...Object.fromEntries(SETORES_OBRA.map((s) => [`outro_${s}`, vazioComoAusente(z.enum(ATUACOES))])),
+});
+type DadosPerfil = z.infer<typeof esquemaPerfil> & Partial<Record<`outro_${SetorObra}`, (typeof ATUACOES)[number]>>;
+
+/** Colunas de `empresa_membros` que o perfil define. "Recebe leads" de Gestor e Admin não é tocado (o rodízio só usa Vendedor e SDR). */
+function colunasDoPerfil(d: DadosPerfil) {
+  const papel = papelDoPerfil(d.perfil);
+  const ranking = d.perfil_gamificacao ?? null;
+  const leads = d.recebe_leads === "on";
+  switch (papel) {
+    case "operacao":
+      return { papel, tipo_vendedor: null, perfil_gamificacao: null, recebe_leads: false };
+    case "vendedor":
+      return { papel, tipo_vendedor: d.tipo_vendedor ?? "interno", perfil_gamificacao: ranking, recebe_leads: leads };
+    case "sdr":
+      return { papel, tipo_vendedor: null, perfil_gamificacao: ranking, recebe_leads: leads };
+    case "gestor":
+    case "admin":
+      return { papel, tipo_vendedor: null, perfil_gamificacao: ranking };
+  }
+}
+
+/** Setores a gravar (só Operação): o do perfil como principal e os outros marcados. Null se faltar a capacidade. */
+function setoresDoPerfil(d: DadosPerfil) {
+  if (!ehPerfilSetor(d.perfil)) return [];
+  if (!d.capacidade) return null;
+  const outros = Object.fromEntries(SETORES_OBRA.map((s) => [s, d[`outro_${s}`]]));
+  return setoresParaSalvar(d.perfil, d.capacidade, outros);
+}
+
+const esquemaConvite = esquemaPerfil.extend({
   nome: z.string().trim().min(2, "Informe o nome"),
   email: z.string().trim().email("E-mail inválido"),
-  papel: z.enum(PAPEIS_CADASTRAVEIS),
-  tipo_vendedor: z.enum(TIPOS_VENDEDOR),
-  perfil_gamificacao: z.enum(PERFIS_GAMIFICACAO).optional().or(z.literal("").transform(() => undefined)),
-  senha: z
-    .string()
-    .trim()
-    .min(8, "A senha precisa ter pelo menos 8 caracteres")
-    .optional()
-    .or(z.literal("").transform(() => undefined)),
+  senha: vazioComoAusente(z.string().trim().min(8, "A senha precisa ter pelo menos 8 caracteres")),
 });
-
-const esquemaSetores = z.object({
-  compras: z.enum(["sem_acesso", "executar", "coordenar"]),
-  engenharia: z.enum(["sem_acesso", "executar", "coordenar"]),
-  operacional: z.enum(["sem_acesso", "executar", "coordenar"]),
-  administrativo: z.enum(["sem_acesso", "executar", "coordenar"]),
-});
-
-function setoresSelecionados(escolhas: z.infer<typeof esquemaSetores>) {
-  return SETORES_OBRA.flatMap((setor) => {
-    const capacidade = escolhas[setor];
-    return capacidade === "sem_acesso" ? [] : [{ setor, capacidade }];
-  });
-}
 
 function gerarSenhaTemporaria(): string {
   const alfabeto = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
@@ -44,34 +66,32 @@ function gerarSenhaTemporaria(): string {
   return senha;
 }
 
-/** Cadastra vendedor/representante direto, com senha própria — sem depender de convite por e-mail. */
+/** Cadastra a pessoa direto, com senha própria (sem convite por e-mail), já com o perfil e os setores. */
 export async function convidarMembro(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
   const { atual } = await exigirPapel("admin");
   const dados = esquemaConvite.safeParse(Object.fromEntries(formData));
   if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
-  const escolhas = dados.data.papel === "operacao" ? esquemaSetores.safeParse(Object.fromEntries(formData)) : null;
-  if (escolhas && !escolhas.success) return { ok: false, mensagem: "Confira os setores desta pessoa." };
+  const d = dados.data as DadosPerfil & typeof dados.data;
+  const setores = setoresDoPerfil(d);
+  if (!setores) return { ok: false, mensagem: "Escolha se a pessoa executa ou coordena no setor." };
 
-  const senha = dados.data.senha ?? gerarSenhaTemporaria();
+  const senha = d.senha ?? gerarSenhaTemporaria();
   let userId: string;
   let novo: boolean;
   try {
-    ({ userId, novo } = await criarUsuarioDireto(dados.data.email, dados.data.nome, senha));
+    ({ userId, novo } = await criarUsuarioDireto(d.email, d.nome, senha));
   } catch (e) {
     return { ok: false, mensagem: (e as Error).message };
   }
 
   // O vínculo é gravado com a sessão do admin: o RLS confere a permissão de novo.
   const supabase = await criarClienteServidor();
-  const { data: membro, error } = await supabase.from("empresa_membros").insert({
-    empresa_id: atual.empresaId,
-    user_id: userId,
-    papel: dados.data.papel,
-    tipo_vendedor: dados.data.papel === "vendedor" ? dados.data.tipo_vendedor : null,
-    ...(dados.data.papel === "operacao"
-      ? { perfil_gamificacao: null, recebe_leads: false }
-      : { perfil_gamificacao: dados.data.perfil_gamificacao ?? null }),
-  }).select("id").single();
+  const colunas = colunasDoPerfil(d);
+  const { data: membro, error } = await supabase
+    .from("empresa_membros")
+    .insert({ empresa_id: atual.empresaId, user_id: userId, ...colunas })
+    .select("id")
+    .single();
   if (error) {
     if (error.code === "23505") return { ok: false, mensagem: "Essa pessoa já faz parte da empresa." };
     return { ok: false, mensagem: "Não foi possível adicionar o usuário." };
@@ -79,116 +99,74 @@ export async function convidarMembro(_: ResultadoAcao, formData: FormData): Prom
 
   const mensagemCriacao = novo
     ? `Usuário criado. Senha temporária: ${senha} — repasse pra pessoa (ela pode trocar em Meu perfil).`
-    : `${dados.data.email} já tinha conta e foi adicionado à empresa.`;
-  if (escolhas?.success) {
-    if (!membro) {
-      revalidatePath("/configuracoes/usuarios");
-      return { ok: false, mensagem: `${mensagemCriacao} Não foi possível identificar o vínculo para salvar os setores. Configure-os na lista abaixo.` };
-    }
-    const { error: erroSetores } = await supabase.rpc("definir_setores_membro", {
-      p_membro_id: membro.id,
-      p_setores: setoresSelecionados(escolhas.data),
-    });
+    : `${d.email} já tinha conta e foi adicionado à empresa.`;
+  if (colunas.papel === "operacao") {
+    const { error: erroSetores } = await supabase.rpc("definir_setores_membro", { p_membro_id: membro.id, p_setores: setores });
     if (erroSetores) {
       revalidatePath("/configuracoes/usuarios");
-      return { ok: false, mensagem: `${mensagemCriacao} Os setores não foram salvos: ${mensagemErro(erroSetores, "tente novamente")}. Configure-os na lista abaixo.` };
+      return { ok: false, mensagem: `${mensagemCriacao} Os setores não foram salvos: ${mensagemErro(erroSetores, "tente novamente")}. Abra a pessoa na lista e salve de novo.` };
     }
   }
   revalidatePath("/configuracoes/usuarios");
   return { ok: true, mensagem: mensagemCriacao };
 }
 
-const esquemaAtualizacao = z.object({
+const esquemaAtualizacao = esquemaPerfil.extend({
   membroId: z.string().uuid(),
-  papel: z.enum(PAPEIS_CADASTRAVEIS),
-  tipo_vendedor: z.enum(TIPOS_VENDEDOR),
-  perfil_gamificacao: z.enum(PERFIS_GAMIFICACAO).optional().or(z.literal("").transform(() => undefined)),
-  recebe_leads: z.enum(["on"]).optional(),
   status: z.enum(STATUS_MEMBRO),
 });
 
+/** Salva perfil, setores e status. Desligar quem tem carteira passa por `desligarComTransferencia`. */
 export async function atualizarMembro(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
   const { atual } = await exigirPapel("admin");
   const dados = esquemaAtualizacao.safeParse(Object.fromEntries(formData));
   if (!dados.success) return { ok: false, mensagem: "Dados inválidos." };
-  const escolhas = dados.data.papel === "operacao" && formData.has("compras")
-    ? esquemaSetores.safeParse(Object.fromEntries(formData))
-    : null;
-  if (escolhas && !escolhas.success) return { ok: false, mensagem: "Confira os setores desta pessoa." };
+  const d = dados.data as DadosPerfil & typeof dados.data;
+  const setores = setoresDoPerfil(d);
+  if (!setores) return { ok: false, mensagem: "Escolha se a pessoa executa ou coordena no setor." };
 
   const supabase = await criarClienteServidor();
 
-  // Desligar com negócios em aberto passa pela transferência de carteira
-  // (desligarComTransferencia) — aqui é só uma trava de segurança. Arquivados ficam fora: são somente leitura e,
-  // ao desarquivar, o banco exige um novo responsável se este não estiver mais ativo.
-  if (dados.data.status === "desligado") {
+  // Desligar com negócios em aberto passa pela transferência de carteira (desligarComTransferencia); aqui é só uma
+  // trava. Arquivados ficam fora: são somente leitura e, ao desarquivar, o banco exige um responsável ativo.
+  if (d.status === "desligado") {
     const { count } = await supabase
       .from("negocios")
       .select("id", { count: "exact", head: true })
       .eq("empresa_id", atual.empresaId)
-      .eq("responsavel_id", dados.data.membroId)
+      .eq("responsavel_id", d.membroId)
       .eq("status", "aberto")
       .is("arquivado_em", null);
     if (count && count > 0) {
-      return { ok: false, mensagem: "Esse vendedor tem negócios em aberto — use a opção de desligar com transferência de carteira." };
+      return { ok: false, mensagem: "Essa pessoa tem negócios em aberto: use Desligar, que transfere a carteira." };
     }
   }
 
-  const { error } = await supabase
+  const colunas = colunasDoPerfil(d);
+  const { data: atualizado, error } = await supabase
     .from("empresa_membros")
-    .update({
-      papel: dados.data.papel,
-      tipo_vendedor: dados.data.papel === "vendedor" ? dados.data.tipo_vendedor : null,
-      ...(dados.data.papel === "operacao"
-        ? { perfil_gamificacao: null, recebe_leads: false }
-        : { perfil_gamificacao: dados.data.perfil_gamificacao ?? null, recebe_leads: dados.data.recebe_leads === "on" }),
-      status: dados.data.status,
-    })
-    .eq("id", dados.data.membroId)
-    .eq("empresa_id", atual.empresaId);
-
+    .update({ ...colunas, status: d.status })
+    .eq("id", d.membroId)
+    .eq("empresa_id", atual.empresaId)
+    .select("id");
   if (error) {
-    if (error.message.includes("admin ativo")) {
-      return { ok: false, mensagem: "A empresa precisa ter pelo menos um admin ativo." };
-    }
+    if (error.message.includes("admin ativo")) return { ok: false, mensagem: "A empresa precisa ter pelo menos um admin ativo." };
     return { ok: false, mensagem: "Não foi possível salvar." };
   }
-  if (escolhas?.success) {
-    const { error: erroSetores } = await supabase.rpc("definir_setores_membro", {
-      p_membro_id: dados.data.membroId,
-      p_setores: setoresSelecionados(escolhas.data),
-    });
+  // Pessoa de outra empresa (o admin pode ser admin de mais de uma): nada é gravado, nem os setores.
+  if (!atualizado?.length) return { ok: false, mensagem: "Não foi possível acessar esta pessoa na empresa atual." };
+
+  // Inativo perde os setores no banco (obra_ao_alterar_membro); ao reativar, o admin salva de novo.
+  if (colunas.papel === "operacao" && d.status === "ativo") {
+    const { error: erroSetores } = await supabase.rpc("definir_setores_membro", { p_membro_id: d.membroId, p_setores: setores });
     if (erroSetores) {
       revalidatePath("/configuracoes/usuarios");
-      return { ok: false, mensagem: `Perfil salvo, mas os setores não foram: ${mensagemErro(erroSetores, "tente novamente")}. Configure-os na lista desta pessoa.` };
+      return { ok: false, mensagem: `Perfil salvo, mas os setores não: ${mensagemErro(erroSetores, "tente novamente")}` };
     }
   }
   revalidatePath("/configuracoes/usuarios");
-  return { ok: true, mensagem: "Salvo." };
-}
-
-/** Configuração independente do cadastro: a RPC valida e audita cada alteração no banco. */
-export async function salvarSetoresMembro(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  const { atual } = await exigirPapel("admin");
-  const dados = esquemaSetores.extend({ membroId: z.string().uuid() }).safeParse(Object.fromEntries(formData));
-  if (!dados.success) return { ok: false, mensagem: "Confira os setores e tente novamente." };
-
-  const supabase = await criarClienteServidor();
-  // A RPC aceita administradores da empresa do membro; esta consulta também exige a empresa atual.
-  const { data: membro, error: erroMembro } = await supabase
-    .from("empresa_membros")
-    .select("id")
-    .eq("empresa_id", atual.empresaId)
-    .eq("id", dados.data.membroId)
-    .maybeSingle();
-  if (erroMembro || !membro) return { ok: false, mensagem: "Não foi possível acessar este usuário na empresa atual." };
-
-  const { error } = await supabase.rpc("definir_setores_membro", { p_membro_id: membro.id, p_setores: setoresSelecionados(dados.data) });
-  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível salvar os setores.") };
-
-  revalidatePath("/configuracoes/usuarios");
   revalidatePath("/obras");
-  return { ok: true, mensagem: "Setores atualizados." };
+  return { ok: true, mensagem: "Salvo." };
 }
 
 export type CarteiraAberta = {
