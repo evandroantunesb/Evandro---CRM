@@ -1111,6 +1111,64 @@ describe(
       });
     });
 
+    describe("setor principal (perfil na tela de Usuários)", () => {
+      const principais = async (alvo: Usuario) => {
+        const { data } = await servico
+          .from("membro_setores_obra")
+          .select("setor, principal")
+          .eq("membro_id", membro[alvo.id])
+          .order("setor");
+        return data!.filter((l) => l.principal).map((l) => l.setor);
+      };
+
+      it("marcado vale; sem marca mantém o atual, senão o que coordena e depois a ordem; nunca dois", async () => {
+        expect(await principais(coordAdm)).toEqual(["administrativo"]);
+        expect(
+          (await definirSetores(admin, coordAdm, [
+            { setor: "compras", capacidade: "executar", principal: true },
+            { setor: "administrativo", capacidade: "coordenar" },
+          ])).error,
+        ).toBeNull();
+        expect(await principais(coordAdm)).toEqual(["compras"]);
+        // Sem marca: o principal atual continua.
+        await definirSetores(admin, coordAdm, [
+          { setor: "compras", capacidade: "executar" },
+          { setor: "administrativo", capacidade: "coordenar" },
+        ]);
+        expect(await principais(coordAdm)).toEqual(["compras"]);
+        // O principal saiu da lista: passa ao que coordena.
+        await definirSetores(admin, coordAdm, [
+          { setor: "engenharia", capacidade: "executar" },
+          { setor: "administrativo", capacidade: "coordenar" },
+        ]);
+        expect(await principais(coordAdm)).toEqual(["administrativo"]);
+        // Ninguém coordena: o primeiro da ordem dos setores.
+        await definirSetores(admin, coordAdm, [
+          { setor: "operacional", capacidade: "executar" },
+          { setor: "engenharia", capacidade: "executar" },
+        ]);
+        expect(await principais(coordAdm)).toEqual(["engenharia"]);
+
+        expect(
+          (await definirSetores(admin, coordAdm, [
+            { setor: "compras", capacidade: "executar", principal: true },
+            { setor: "engenharia", capacidade: "executar", principal: true },
+          ])).error?.message,
+        ).toBe("Escolha um só setor principal.");
+        expect((await definirSetores(admin, coordAdm, [{ setor: "compras", capacidade: "executar", principal: "sim" }])).error?.message).toBe(
+          "Setor principal inválido.",
+        );
+        expect(await principais(coordAdm)).toEqual(["engenharia"]);
+
+        // Ninguém escreve o principal direto.
+        const { error } = await admin.cliente.from("membro_setores_obra").update({ principal: true }).eq("membro_id", membro[coordAdm.id]).eq("setor", "operacional");
+        expect(error).not.toBeNull();
+
+        await definirSetores(admin, coordAdm, [{ setor: "administrativo", capacidade: "coordenar" }]);
+        expect(await principais(coordAdm)).toEqual(["administrativo"]);
+      });
+    });
+
     describe("auditoria de setores (membro_setores_obra_historico)", () => {
       it("registra antes/depois só do que mudou, com autor real", async () => {
         const contar = async () => {

@@ -1,5 +1,13 @@
 # Estado do projeto — Raion CRM
 
+## Perfis e setores — B: Usuários com perfil único (em andamento, 05/11/2026)
+
+Branch `feat/usuarios-perfil-unico`. Tela Configurações › Usuários pelo desenho aprovado `PerfisUsuarios`: lista com perfil e "Também atua em", painel lateral (no celular, tela cheia) para editar ou cadastrar, indicadores no topo, abas Ativos/Inativos/Desligados e busca. Migration `20261120100000_setor_principal_membro.sql`: `membro_setores_obra.principal` (um por pessoa), gravado por `definir_setores_membro` (`"principal": true`); existentes recebem o setor que coordenam ou o primeiro da ordem.
+
+Decisões do Evandro (05/11/2026): setor principal gravado no banco; tipo de vendedor, "Recebe leads" e ranking abaixo do perfil (Gestor e Admin: só o ranking; "Recebe leads" deles não é tocado, o rodízio só usa Vendedor e SDR); abas pelo status (sem convites pendentes); cadastro no mesmo painel.
+
+Pendências: o "de N do plano" do indicador ficou de fora, porque o admin da empresa não lê `planos_empresa` (só o super-admin); o menu lateral de Configurações do desenho vale para a seção inteira e não entrou; as descrições de Gestor ("tudo fica no histórico") e Administrativo ("anexa notas fiscais") seguem o desenho e só ficam verdadeiras com a C e a A2; a PR antiga #232 (cartões de usuários, 29/10) é anterior ao desenho aprovado e conflita com esta.
+
 ## Perfis e setores — A1: setor Administrativo no banco (em andamento, 05/11/2026)
 
 #332 mesclada em 05/11/2026 (06:20, Brasília); migrations aplicadas em produção logo depois (06:33; tag `migracao-pr332-72fefb7`, run 42003095398). Nesses 13 minutos o app em produção rodou sem a migration. Ordem das entregas: A1 (esta) → B (Usuários com perfil único) → A2 (contas a pagar a fornecedores, NF do cliente, tela Financeiro) → C (gestor escreve em todos os setores, com histórico) → A3 (Compras com substituto) → D/E (prazos pela Operação; funil pelo gestor). Migrations `20261119100000_setor_administrativo_enum.sql` (só o valor do enum) e `20261119100100_setor_administrativo.sql`.
