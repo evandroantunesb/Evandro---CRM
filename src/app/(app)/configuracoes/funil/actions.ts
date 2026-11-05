@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { FUNIL } from "@/lib/permissoes";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { CAMPOS_OBRIGATORIOS, type ResultadoAcao } from "@/lib/tipos";
@@ -16,7 +17,7 @@ function concluir(mensagem: string): ResultadoAcao {
 }
 
 export async function criarFunil(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  const { atual } = await exigirPapel("admin");
+  const { atual } = await exigirPapel(...FUNIL);
   const n = nome.safeParse(formData.get("nome"));
   if (!n.success) return { ok: false, mensagem: n.error.issues[0].message };
 
@@ -34,7 +35,7 @@ export async function criarFunil(_: ResultadoAcao, formData: FormData): Promise<
 }
 
 export async function criarEtapa(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  const { atual } = await exigirPapel("admin");
+  const { atual } = await exigirPapel(...FUNIL);
   const funilId = z.string().uuid().safeParse(formData.get("funilId"));
   const n = nome.safeParse(formData.get("nome"));
   if (!funilId.success || !n.success) return { ok: false, mensagem: "Informe o nome da etapa." };
@@ -58,7 +59,7 @@ export async function criarEtapa(_: ResultadoAcao, formData: FormData): Promise<
 }
 
 export async function renomear(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  await exigirPapel("admin");
+  await exigirPapel(...FUNIL);
   const dados = z
     .object({ tabela: z.enum(["funis", "etapas"]), id: z.string().uuid(), nome })
     .safeParse(Object.fromEntries(formData));
@@ -72,7 +73,7 @@ export async function renomear(_: ResultadoAcao, formData: FormData): Promise<Re
 
 /** Troca a ordem da etapa com a vizinha de cima ou de baixo. */
 export async function reordenarEtapa(formData: FormData) {
-  await exigirPapel("admin");
+  await exigirPapel(...FUNIL);
   const etapaId = String(formData.get("etapaId"));
   const direcao = formData.get("direcao") === "cima" ? "cima" : "baixo";
   const supabase = await criarClienteServidor();
@@ -95,7 +96,7 @@ export async function reordenarEtapa(formData: FormData) {
 }
 
 export async function alternarEtapa(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  await exigirPapel("admin");
+  await exigirPapel(...FUNIL);
   const etapaId = String(formData.get("etapaId"));
   const ativar = formData.get("ativa") === "true";
   const supabase = await criarClienteServidor();
@@ -118,7 +119,7 @@ export async function alternarEtapa(_: ResultadoAcao, formData: FormData): Promi
 }
 
 export async function definirInicial(formData: FormData) {
-  await exigirPapel("admin");
+  await exigirPapel(...FUNIL);
   const etapaId = String(formData.get("etapaId"));
   const supabase = await criarClienteServidor();
   const { data: etapa } = await supabase.from("etapas").select("funil_id, ativa").eq("id", etapaId).single();
@@ -129,7 +130,7 @@ export async function definirInicial(formData: FormData) {
 }
 
 export async function alternarFunil(formData: FormData) {
-  await exigirPapel("admin");
+  await exigirPapel(...FUNIL);
   const supabase = await criarClienteServidor();
   await supabase
     .from("funis")
@@ -146,7 +147,7 @@ const corHex = z
   .transform((v) => v || null);
 
 export async function definirCorEtapa(formData: FormData) {
-  await exigirPapel("admin");
+  await exigirPapel(...FUNIL);
   const etapaId = z.string().uuid().safeParse(formData.get("etapaId"));
   const cor = corHex.safeParse(formData.get("cor"));
   if (!etapaId.success || !cor.success) return;
@@ -162,7 +163,7 @@ const fechaComo = z
 
 /** Etapa que fecha o negócio sozinha ao entrar nela: ganho direto, ou perdido pedindo o motivo no popup de mover. */
 export async function definirFechaComoEtapa(formData: FormData) {
-  await exigirPapel("admin");
+  await exigirPapel(...FUNIL);
   const etapaId = z.string().uuid().safeParse(formData.get("etapaId"));
   const valor = fechaComo.safeParse(formData.get("fechaComo"));
   if (!etapaId.success || !valor.success) return;
@@ -174,7 +175,7 @@ export async function definirFechaComoEtapa(formData: FormData) {
 
 /** Marca a etapa como representando "entrou em negociação" pra gamificação (pontua só na primeira entrada de cada negócio). */
 export async function definirMarcaNegociacaoEtapa(formData: FormData) {
-  await exigirPapel("admin");
+  await exigirPapel(...FUNIL);
   const etapaId = z.string().uuid().safeParse(formData.get("etapaId"));
   if (!etapaId.success) return;
 
@@ -185,7 +186,7 @@ export async function definirMarcaNegociacaoEtapa(formData: FormData) {
 
 /** Chance base da etapa no Forecast (0 a 100); vazio tira a etapa do Forecast. */
 export async function definirChanceEtapa(formData: FormData) {
-  await exigirPapel("admin");
+  await exigirPapel(...FUNIL);
   const etapaId = z.string().uuid().safeParse(formData.get("etapaId"));
   const chance = z
     .union([z.literal("").transform(() => null), z.coerce.number().int().min(0).max(100)])
@@ -198,7 +199,7 @@ export async function definirChanceEtapa(formData: FormData) {
 }
 
 export async function definirDiasConsideradoParado(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  const { atual } = await exigirPapel("admin");
+  const { atual } = await exigirPapel(...FUNIL);
   const dias = z.coerce.number().int().min(1, "Informe pelo menos 1 dia").max(365, "No máximo 365 dias").safeParse(formData.get("dias"));
   if (!dias.success) return { ok: false, mensagem: dias.error.issues[0].message };
 
@@ -214,7 +215,7 @@ export async function definirDiasConsideradoParado(_: ResultadoAcao, formData: F
 }
 
 export async function definirHorasConsideradoSemContato(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  const { atual } = await exigirPapel("admin");
+  const { atual } = await exigirPapel(...FUNIL);
   const horas = z.coerce.number().int().min(1, "Informe pelo menos 1 hora").max(168, "No máximo 168 horas").safeParse(formData.get("horas"));
   if (!horas.success) return { ok: false, mensagem: horas.error.issues[0].message };
 
@@ -229,7 +230,7 @@ export async function definirHorasConsideradoSemContato(_: ResultadoAcao, formDa
 }
 
 export async function definirCamposObrigatorios(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  await exigirPapel("admin");
+  await exigirPapel(...FUNIL);
   const etapaId = z.string().uuid().safeParse(formData.get("etapaId"));
   const campos = z.array(z.enum(CAMPOS_OBRIGATORIOS)).safeParse(formData.getAll("campos"));
   if (!etapaId.success || !campos.success) return { ok: false, mensagem: "Dados inválidos." };

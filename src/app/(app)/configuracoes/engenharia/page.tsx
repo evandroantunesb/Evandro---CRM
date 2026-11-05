@@ -1,18 +1,48 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
 import { CabecalhoPagina } from "@/components/cabecalho-pagina";
 import { Cartao } from "@/components/ui";
 import { lerCondicoes } from "@/lib/engenharia-enquadramento-regras";
 import { carregarConfigPrazos, carregarFeriadosEmpresa } from "@/lib/engenharia-prazos";
 import { CHAVES_PRAZO_DISTRIBUIDORA, CHAVES_PRAZO_INTERNO, type ChavePrazo } from "@/lib/engenharia-prazos-regras";
 import { lerMarcos } from "@/lib/engenharia-trajetoria";
+import { PRAZOS_OBRA } from "@/lib/permissoes";
+import { coordenaSetor } from "@/lib/prazos-permissao";
 import { exigirPapel } from "@/lib/sessao";
+import { carregarSetoresCoordenados } from "@/lib/setores-coordenados";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { LinhaItemModelo, NovoItemModelo } from "./formularios";
 import { FormMarcos } from "./marcos";
 import { FormPrazos, LinhaFeriado, NovoFeriado } from "./prazos";
 
+/**
+ * Configurações da Engenharia. O admin vê tudo; o gestor e o coordenador da Engenharia, só os prazos
+ * (20261124100000). Checklist, feriados e marcos continuam do admin.
+ */
 export default async function ConfigEngenharia() {
-  const { atual } = await exigirPapel("admin");
+  const { atual } = await exigirPapel(...PRAZOS_OBRA);
   const supabase = await criarClienteServidor();
+  // Lista positiva: só o admin vê a tela inteira.
+  const completa = atual.papel === "admin";
+  if (!completa) {
+    if (!coordenaSetor(atual.papel, await carregarSetoresCoordenados(supabase, atual), "engenharia")) notFound();
+    const prazos = await carregarConfigPrazos(supabase, atual.empresaId);
+    return (
+      <div className="mx-auto flex max-w-4xl flex-col gap-4">
+        <CabecalhoPagina
+          detalhe
+          voltar={{ href: "/engenharia", rotulo: "Engenharia" }}
+          sobretitulo="Configurações · Obras"
+          titulo="Prazos da Engenharia"
+          descricao="Prazos internos da equipe e prazos da distribuidora."
+        />
+        <SecaoPrazos prazos={prazos} />
+        <Link href="/configuracoes/prazos-obras" className="w-fit px-1 text-sm text-zinc-600 underline hover:text-zinc-900">
+          Prazos das etapas da obra (projeto, homologação, vistoria, conexão)
+        </Link>
+      </div>
+    );
+  }
   // Enquanto a migration não estiver aplicada (preview usa o banco de produção), as listas vêm vazias.
   const [{ data }, prazos, feriados, marcosRes] = await Promise.all([
     supabase
@@ -26,8 +56,6 @@ export default async function ConfigEngenharia() {
     supabase.from("engenharia_marcos").select("obras, kwp").eq("empresa_id", atual.empresaId).maybeSingle(),
   ]);
   const itens = (data ?? []).map((i) => ({ ...i, condicoes: lerCondicoes(i.condicoes) }));
-  const porChave = new Map(prazos.map((p) => [p.chave, p]));
-  const linhas = (chaves: readonly ChavePrazo[]) => chaves.flatMap((c) => porChave.get(c) ?? []);
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-4">
@@ -58,29 +86,7 @@ export default async function ConfigEngenharia() {
         {itens.length === 0 ? <p className="text-sm text-zinc-500">Nenhum item cadastrado.</p> : itens.map((i) => <LinhaItemModelo key={i.id} item={i} />)}
       </Cartao>
 
-      <h2 className="sobretitulo mt-4 px-1">Prazos</h2>
-      <p className="text-sm text-zinc-600">
-        Cada prazo conta em dias úteis ou corridos. Em dias úteis, a partir do dia útil seguinte ao marco: sem sábado,
-        domingo, feriados nacionais (inclusive Carnaval, Sexta-feira Santa e Corpus Christi) e os feriados da empresa
-        abaixo. Em dias corridos, todos os dias contam. Prazo vencido aparece na Central da
-        Engenharia; não muda a etapa nem bloqueia nada. Campo vazio = sem prazo.
-      </p>
-      <Cartao titulo="Prazos da Engenharia">
-        {prazos.length === 0 ? (
-          <p className="text-sm text-zinc-500">Prazos indisponíveis.</p>
-        ) : (
-          <FormPrazos
-            grupos={[
-              { titulo: "Internos", ajuda: "Metas da própria equipe. Os valores iniciais são sugestões: ajuste à rotina da empresa.", prazos: linhas(CHAVES_PRAZO_INTERNO) },
-              {
-                titulo: "Da distribuidora",
-                ajuda: "Prazos que a Copel/ANEEL dá à distribuidora, com os valores informados pelo engenheiro. Ajuste com o responsável técnico; vazio, a tela não mostra.",
-                prazos: linhas(CHAVES_PRAZO_DISTRIBUIDORA),
-              },
-            ]}
-          />
-        )}
-      </Cartao>
+      <SecaoPrazos prazos={prazos} />
       <Cartao titulo={`Feriados da empresa (${feriados.length})`}>
         <div className="flex flex-col gap-2">
           <p className="text-xs text-zinc-500">Municipais ou estaduais. Os nacionais já são considerados.</p>
@@ -100,5 +106,38 @@ export default async function ConfigEngenharia() {
         {marcosRes.error || !marcosRes.data ? <p className="text-sm text-zinc-500">Marcos indisponíveis.</p> : <FormMarcos marcos={lerMarcos(marcosRes.data)} />}
       </Cartao>
     </div>
+  );
+}
+
+/** Prazos da Engenharia (internos e da distribuidora): admin, gestor e o coordenador da Engenharia editam. */
+function SecaoPrazos({ prazos }: { prazos: Awaited<ReturnType<typeof carregarConfigPrazos>> }) {
+  const porChave = new Map(prazos.map((p) => [p.chave, p]));
+  const linhas = (chaves: readonly ChavePrazo[]) => chaves.flatMap((c) => porChave.get(c) ?? []);
+  return (
+    <>
+      <h2 className="sobretitulo mt-4 px-1">Prazos</h2>
+      <p className="text-sm text-zinc-600">
+        Cada prazo conta em dias úteis ou corridos. Em dias úteis, a partir do dia útil seguinte ao marco: sem sábado,
+        domingo, feriados nacionais (inclusive Carnaval, Sexta-feira Santa e Corpus Christi) e os feriados da empresa. Em
+        dias corridos, todos os dias contam. Prazo vencido aparece na Central da Engenharia; não muda a etapa nem bloqueia
+        nada. Campo vazio = sem prazo.
+      </p>
+      <Cartao titulo="Prazos da Engenharia">
+        {prazos.length === 0 ? (
+          <p className="text-sm text-zinc-500">Prazos indisponíveis.</p>
+        ) : (
+          <FormPrazos
+            grupos={[
+              { titulo: "Internos", ajuda: "Metas da própria equipe. Os valores iniciais são sugestões: ajuste à rotina da empresa.", prazos: linhas(CHAVES_PRAZO_INTERNO) },
+              {
+                titulo: "Da distribuidora",
+                ajuda: "Prazos que a Copel/ANEEL dá à distribuidora, com os valores informados pelo engenheiro. Ajuste com o responsável técnico; vazio, a tela não mostra.",
+                prazos: linhas(CHAVES_PRAZO_DISTRIBUIDORA),
+              },
+            ]}
+          />
+        )}
+      </Cartao>
+    </>
   );
 }

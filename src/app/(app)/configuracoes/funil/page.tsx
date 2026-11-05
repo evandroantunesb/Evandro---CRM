@@ -1,6 +1,7 @@
 import { CabecalhoPagina } from "@/components/cabecalho-pagina";
 import { Cartao, Selo } from "@/components/ui";
 import { carregarConfiguracao } from "@/lib/crm";
+import { FUNIL } from "@/lib/permissoes";
 import { exigirPapel } from "@/lib/sessao";
 import { alternarFunil, definirInicial, reordenarEtapa } from "./actions";
 import {
@@ -18,14 +19,14 @@ import {
 } from "./formularios";
 
 export default async function ConfigFunil() {
-  const { atual } = await exigirPapel("admin");
+  const { atual } = await exigirPapel(...FUNIL);
   const { funis, etapas, diasConsideradoParado, horasConsideradoSemContato } = await carregarConfiguracao(atual.empresaId);
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-4">
       <CabecalhoPagina
         detalhe
-        voltar={{ href: "/configuracoes", rotulo: "Configurações" }}
+        voltar={atual.papel === "admin" ? { href: "/configuracoes", rotulo: "Configurações" } : { href: "/negocios", rotulo: "Negócios" }}
         sobretitulo="Configurações · Comercial"
         titulo="Funis e etapas"
         descricao="Etapas do Kanban e regras de cada funil."

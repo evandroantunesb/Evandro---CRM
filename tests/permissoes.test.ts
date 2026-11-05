@@ -52,7 +52,8 @@ const MATRIZ: Record<string, string[]> = {
   VALIDADE_PROPOSTA: ["admin", "gestor"],
   CONDICOES_PAGAMENTO: ["admin", "gestor"],
   // Prazos das etapas e entrega contratada da obra: mesma barreira das políticas e da RPC.
-  PRAZOS_OBRA: ["admin", "gestor"],
+  PRAZOS_OBRA: ["admin", "gestor", "operacao"],
+  FUNIL: ["admin", "gestor"],
   // Orçamento da obra e deduções do lucro: mesma barreira da RPC e das políticas.
   FINANCEIRO_OBRA: ["admin", "gestor"],
   // Visão Completa e pedido de justificativa de atraso: mesma barreira da RPC.
