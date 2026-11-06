@@ -8,8 +8,8 @@ import { afterAll, describe, expect, it } from "vitest";
 
 const SCRIPT = ".github/scripts/validar-conjunto-migrations.sh";
 const WORKFLOW = ".github/workflows/banco-producao.yml";
-// Compras, P1: pedidos de compra (#343): só ela, nenhuma a mais ou a menos.
-const AUTORIZADAS = ["20261127100000_compras_pdf_documentos.sql"];
+// Compras, P2c: documentos do cliente na Engenharia e no Administrativo (#350): só ela, nenhuma a mais ou a menos.
+const AUTORIZADAS = ["20261128100000_documentos_cliente_engenharia_administrativo.sql"];
 // Prazos pela Operação e funil pelo gestor (#341): aplicada em 05/11/2026, antes desta. Se voltar a aparecer como pendente, não é autorizada.
 const PRAZOS_FUNIL = "20261124100000_prazos_operacao_funil_gestor.sql";
 // Substituto por obra (#339): aplicada em 05/11/2026, antes desta. Se voltar a aparecer como pendente, não é autorizada.
