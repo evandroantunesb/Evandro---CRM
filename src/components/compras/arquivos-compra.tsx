@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { Acao } from "@/components/financeiro/formularios";
 import { Botao, CLASSE_ENTRADA, Mensagem } from "@/components/ui";
-import { anexarArquivoCompra } from "@/lib/acoes/compras";
+import { anexarArquivoCompra } from "@/lib/acoes/compras-arquivos";
 import { ACEITA_ARQUIVO_COMPRAS, ROTULO_TIPO_ARQUIVO, type ArquivoCompraVM } from "@/lib/compras/orcamentos-regras";
 import { numeroPedido } from "@/lib/compras/regras";
 import type { ResultadoAcao } from "@/lib/tipos";

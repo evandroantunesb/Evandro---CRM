@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { mensagemErro } from "@/lib/erros";
+import { revalidarCompras } from "./compras-comum";
 import { CATEGORIAS_CUSTO_OBRA } from "@/lib/obras/custos";
 import { GERIR_OBRAS } from "@/lib/permissoes";
 import { exigirPapel } from "@/lib/sessao";
@@ -20,13 +21,7 @@ const uuid = z.string().uuid();
 const data = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Informe a data.");
 const dinheiro = z.number({ message: "Valor inválido." }).finite().min(0, "Valor inválido.");
 
-function revalidar(obraId: string) {
-  revalidatePath(`/obras/${obraId}`);
-  revalidatePath(`/obras/${obraId}/compras`);
-  revalidatePath("/obras");
-  revalidatePath("/compras");
-  revalidatePath("/financeiro");
-}
+const revalidar = revalidarCompras;
 
 async function chamar<T = unknown>(
   obraId: string,
@@ -66,6 +61,17 @@ const esquemaPedido = z.object({
   vencimento: data,
   numeroFornecedor: z.string().trim().max(60, "Número do pedido no fornecedor muito longo."),
   frete: dinheiro,
+  freteModalidade: z.enum(["cif", "fob"], "Escolha o frete: CIF ou FOB."),
+  faturarPara: z.enum(["cliente", "empresa"], "Escolha em nome de quem faturar."),
+  /** Nulo = entrega no endereço do faturamento. */
+  entrega: z
+    .object({
+      endereco: z.string().trim().min(5, "Informe o endereço de entrega.").max(300, "Endereço de entrega muito longo."),
+      recebe: z.string().trim().min(2, "Informe quem recebe a entrega.").max(120, "Nome de quem recebe muito longo."),
+      telefone: z.string().trim().max(30, "Telefone muito longo."),
+    })
+    .nullable(),
+  observacao: z.string().trim().max(500, "As observações têm no máximo 500 caracteres."),
   itens: z.array(esquemaItem).min(1, "Inclua ao menos um item no pedido.").max(100, "Um pedido tem no máximo 100 itens."),
 });
 
@@ -81,7 +87,17 @@ export async function salvarPedidoCompra(dados: z.input<typeof esquemaPedido>): 
     p_entrega_prevista: d.data.entregaPrevista,
     p_vencimento: d.data.vencimento,
     p_numero_fornecedor: d.data.numeroFornecedor,
-    p_frete: d.data.frete,
+    p_frete: d.data.freteModalidade === "cif" ? 0 : d.data.frete,
+    p_frete_modalidade: d.data.freteModalidade,
+    p_faturar_para: d.data.faturarPara,
+    ...(d.data.observacao ? { p_observacao: d.data.observacao } : {}),
+    ...(d.data.entrega
+      ? {
+          p_entrega_endereco: d.data.entrega.endereco,
+          p_entrega_recebe: d.data.entrega.recebe,
+          ...(d.data.entrega.telefone ? { p_entrega_telefone: d.data.entrega.telefone } : {}),
+        }
+      : {}),
     p_itens: d.data.itens.map((i) => ({
       kit_indice: i.kitIndice,
       descricao: i.descricao,
@@ -176,120 +192,6 @@ export async function registrarRecebimentoPedido(dados: z.input<typeof esquemaRe
       }),
     "Não foi possível registrar o recebimento.",
     "Recebimento registrado.",
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Orçamentos e arquivos de compra (20261126100000_compras_orcamentos.sql)
-// ---------------------------------------------------------------------------
-
-const arquivo = z.object({ caminho: z.string().min(1).max(400), nome: z.string().trim().min(1).max(200) });
-const textoOpcional = (max: number, msg: string) => z.string().trim().max(max, msg);
-
-const esquemaDadosOrcamento = z
-  .object({
-    obraId: uuid,
-    fornecedor: z.string().trim().min(2, "Informe o fornecedor.").max(120, "Nome do fornecedor muito longo."),
-    valor: z.number({ message: "Valor inválido." }).finite().positive("Informe o valor total do orçamento."),
-    cobertura: z.enum(["kit_completo", "parte"], "Escolha os itens cobertos."),
-    itens: textoOpcional(200, "Descrição dos itens muito longa."),
-    entregaPrevista: data,
-    validoAte: data,
-    condicaoPagamento: textoOpcional(60, "Condição de pagamento muito longa."),
-    observacao: textoOpcional(300, "Observação muito longa."),
-  })
-  .refine((d) => d.cobertura === "kit_completo" || d.itens.length >= 2, { message: "Diga quais itens do kit o orçamento cobre.", path: ["itens"] });
-
-const paramsOrcamento = (d: z.output<typeof esquemaDadosOrcamento>) => ({
-  p_fornecedor: d.fornecedor,
-  p_valor: d.valor,
-  p_cobertura: d.cobertura,
-  p_itens: d.cobertura === "parte" ? d.itens : "",
-  p_entrega_prevista: d.entregaPrevista,
-  p_valido_ate: d.validoAte,
-  p_condicao_pagamento: d.condicaoPagamento,
-  p_observacao: d.observacao,
-});
-
-/** Depois que o navegador enviou o arquivo ao Storage. */
-export async function anexarOrcamentoCompra(dados: z.input<typeof esquemaDadosOrcamento> & { arquivo: z.input<typeof arquivo> }): Promise<ResultadoAcao> {
-  await exigirPapel(...GERIR_OBRAS);
-  const d = esquemaDadosOrcamento.safeParse(dados);
-  if (!d.success) return { ok: false, mensagem: d.error.issues[0].message };
-  const a = arquivo.safeParse(dados.arquivo);
-  if (!a.success) return { ok: false, mensagem: "Envie o arquivo do orçamento." };
-  const supabase = await criarClienteServidor();
-  return chamar(
-    d.data.obraId,
-    () => supabase.rpc("anexar_orcamento_compra", { p_obra_id: d.data.obraId, ...paramsOrcamento(d.data), p_caminho: a.data.caminho, p_nome: a.data.nome }),
-    "Não foi possível anexar o orçamento.",
-    "Orçamento anexado.",
-  );
-}
-
-export async function editarOrcamentoCompra(dados: z.input<typeof esquemaDadosOrcamento> & { orcamentoId: string }): Promise<ResultadoAcao> {
-  await exigirPapel(...GERIR_OBRAS);
-  const d = esquemaDadosOrcamento.safeParse(dados);
-  if (!d.success) return { ok: false, mensagem: d.error.issues[0].message };
-  if (!uuid.safeParse(dados.orcamentoId).success) return { ok: false, mensagem: "Orçamento inválido." };
-  const supabase = await criarClienteServidor();
-  return chamar(
-    d.data.obraId,
-    () => supabase.rpc("editar_orcamento_compra", { p_orcamento_id: dados.orcamentoId, ...paramsOrcamento(d.data) }),
-    "Não foi possível salvar o orçamento.",
-    "Orçamento salvo.",
-  );
-}
-
-const esquemaDescartar = z.object({
-  obraId: uuid,
-  orcamentoId: uuid,
-  motivo: z.string().trim().min(3, "Explique o motivo (pelo menos 3 caracteres).").max(300, "Motivo muito longo."),
-});
-
-export async function descartarOrcamentoCompra(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  await exigirPapel(...GERIR_OBRAS);
-  const d = esquemaDescartar.safeParse(Object.fromEntries(formData));
-  if (!d.success) return { ok: false, mensagem: d.error.issues[0].message };
-  const supabase = await criarClienteServidor();
-  return chamar(
-    d.data.obraId,
-    () => supabase.rpc("descartar_orcamento_compra", { p_orcamento_id: d.data.orcamentoId, p_motivo: d.data.motivo }),
-    "Não foi possível descartar o orçamento.",
-    "Orçamento descartado.",
-  );
-}
-
-const esquemaArquivo = z
-  .object({
-    obraId: uuid,
-    tipo: z.enum(["confirmacao", "outro"], "Escolha o tipo do arquivo."),
-    pedidoId: uuid.nullable(),
-    fornecedor: textoOpcional(120, "Nome do fornecedor muito longo."),
-    arquivo,
-  })
-  .refine((d) => d.tipo === "outro" || d.pedidoId != null, { message: "Escolha o pedido desta confirmação.", path: ["pedidoId"] })
-  .refine((d) => d.fornecedor.length === 0 || d.fornecedor.length >= 2, { message: "Informe o fornecedor (pelo menos 2 caracteres).", path: ["fornecedor"] });
-
-/** Confirmação do pedido ou outro arquivo de compra, depois que o navegador enviou o arquivo ao Storage. */
-export async function anexarArquivoCompra(dados: z.input<typeof esquemaArquivo>): Promise<ResultadoAcao> {
-  await exigirPapel(...GERIR_OBRAS);
-  const d = esquemaArquivo.safeParse(dados);
-  if (!d.success) return { ok: false, mensagem: d.error.issues[0].message };
-  const supabase = await criarClienteServidor();
-  return chamar(
-    d.data.obraId,
-    () =>
-      supabase.rpc("anexar_arquivo_compra", {
-        p_obra_id: d.data.obraId,
-        p_tipo: d.data.tipo,
-        p_caminho: d.data.arquivo.caminho,
-        p_nome: d.data.arquivo.nome,
-        ...(d.data.pedidoId ? { p_pedido_id: d.data.pedidoId } : {}),
-        ...(d.data.tipo === "outro" && d.data.fornecedor ? { p_fornecedor: d.data.fornecedor } : {}),
-      }),
-    "Não foi possível anexar o arquivo.",
-    "Arquivo anexado.",
   );
 }
 

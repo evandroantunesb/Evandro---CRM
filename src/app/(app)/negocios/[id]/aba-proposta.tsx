@@ -19,6 +19,8 @@ import { Contrato } from "./contrato";
 import { DescontoNegocio } from "./desconto";
 import { DadosCliente } from "./dados-cliente";
 import { mensagemPendenciasContrato } from "@/lib/dados-cliente-contrato";
+import { mensagemPendenciasDocumentos, pendenciasDocumentosContrato } from "@/lib/documentos-cliente";
+import { DocumentosCliente } from "./documentos-cliente";
 import { EletropostoNegocio } from "./eletroposto";
 import { normalizarModelos, type ModeloEletroposto } from "@/lib/eletroposto";
 import { Pagamento } from "./pagamento";
@@ -55,6 +57,7 @@ export function AbaProposta({ ficha }: { ficha: Ficha }) {
     aberturas,
     contrato,
     pendenciasCliente,
+    anexos,
     bloqueioContrato,
     mostrarPagamentoSolo,
     mostrarPagamentoPro,
@@ -64,6 +67,8 @@ export function AbaProposta({ ficha }: { ficha: Ficha }) {
     registrosPagamento,
     desconto,
   } = ficha;
+  // Documentos do cliente que faltam nos anexos do negócio (o banco confere de novo ao gerar o contrato).
+  const pendenciasDocumentos = pendenciasDocumentosContrato((anexos ?? []).map((a) => a.categoria), contato?.tipo);
   return ehEletroposto ? (
     <div id="proposta" className="scroll-mt-4">
       <Cartao titulo="Eletroposto">
@@ -172,13 +177,25 @@ export function AbaProposta({ ficha }: { ficha: Ficha }) {
               <DadosCliente negocioId={negocio.id} contato={contato} pendencias={pendenciasCliente} />
             </Cartao>
           )}
+          {!arquivado && (!contrato || contrato.status === "rascunho") && (
+            <Cartao titulo="Documentos do cliente">
+              <DocumentosCliente empresaId={atual.empresaId} negocioId={negocio.id} tipoCliente={contato?.tipo} anexos={anexos ?? []} podeAnexar />
+            </Cartao>
+          )}
           <Cartao titulo="Contrato">
             <Contrato
               negocioId={negocio.id}
               siteUrl={env.siteUrl}
               precoDesatualizado={precoContratoDesatualizado}
               bloqueio={
-                bloqueioContrato ?? (!precoContratoDesatualizado && pendenciasCliente.length ? mensagemPendenciasContrato(pendenciasCliente) : null)
+                bloqueioContrato ??
+                (precoContratoDesatualizado
+                  ? null
+                  : pendenciasCliente.length
+                    ? mensagemPendenciasContrato(pendenciasCliente)
+                    : pendenciasDocumentos.length
+                      ? mensagemPendenciasDocumentos(pendenciasDocumentos)
+                      : null)
               }
               contrato={contrato ? { token: contrato.token, status: contrato.status as StatusContrato } : null}
               escolha={

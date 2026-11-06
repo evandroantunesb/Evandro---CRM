@@ -713,6 +713,8 @@ export type Database = {
         Row: {
           caminho: string;
           created_at: string;
+          descricao: string | null;
+          documento: string | null;
           empresa_id: string;
           enviado_por: string | null;
           fornecedor: string | null;
@@ -725,6 +727,8 @@ export type Database = {
         Insert: {
           caminho: string;
           created_at?: string;
+          descricao?: string | null;
+          documento?: string | null;
           empresa_id: string;
           enviado_por?: string | null;
           fornecedor?: string | null;
@@ -737,6 +741,8 @@ export type Database = {
         Update: {
           caminho?: string;
           created_at?: string;
+          descricao?: string | null;
+          documento?: string | null;
           empresa_id?: string;
           enviado_por?: string | null;
           fornecedor?: string | null;
@@ -775,6 +781,8 @@ export type Database = {
           empresa_id: string;
           entrega_prevista: string;
           fornecedor: string;
+          frete: number;
+          frete_modalidade: string;
           id: string;
           itens_descricao: string | null;
           motivo_descarte: string | null;
@@ -796,6 +804,8 @@ export type Database = {
           empresa_id: string;
           entrega_prevista: string;
           fornecedor: string;
+          frete?: number;
+          frete_modalidade?: string;
           id?: string;
           itens_descricao?: string | null;
           motivo_descarte?: string | null;
@@ -817,6 +827,8 @@ export type Database = {
           empresa_id?: string;
           entrega_prevista?: string;
           fornecedor?: string;
+          frete?: number;
+          frete_modalidade?: string;
           id?: string;
           itens_descricao?: string | null;
           motivo_descarte?: string | null;
@@ -920,9 +932,14 @@ export type Database = {
           created_at: string;
           criado_por: string | null;
           empresa_id: string;
+          entrega_endereco: string | null;
           entrega_prevista: string;
+          entrega_recebe: string | null;
+          entrega_telefone: string | null;
+          faturar_para: string;
           fornecedor: string;
           frete: number;
+          frete_modalidade: string;
           id: string;
           motivo_cancelamento: string | null;
           nf_numero: string | null;
@@ -932,6 +949,7 @@ export type Database = {
           numero: number;
           numero_fornecedor: string | null;
           obra_id: string;
+          observacao: string | null;
           updated_at: string;
           valor_total: number;
           vencimento: string;
@@ -944,9 +962,14 @@ export type Database = {
           created_at?: string;
           criado_por?: string | null;
           empresa_id: string;
+          entrega_endereco?: string | null;
           entrega_prevista: string;
+          entrega_recebe?: string | null;
+          entrega_telefone?: string | null;
+          faturar_para?: string;
           fornecedor: string;
           frete?: number;
+          frete_modalidade?: string;
           id?: string;
           motivo_cancelamento?: string | null;
           nf_numero?: string | null;
@@ -956,6 +979,7 @@ export type Database = {
           numero: number;
           numero_fornecedor?: string | null;
           obra_id: string;
+          observacao?: string | null;
           updated_at?: string;
           valor_total: number;
           vencimento: string;
@@ -968,9 +992,14 @@ export type Database = {
           created_at?: string;
           criado_por?: string | null;
           empresa_id?: string;
+          entrega_endereco?: string | null;
           entrega_prevista?: string;
+          entrega_recebe?: string | null;
+          entrega_telefone?: string | null;
+          faturar_para?: string;
           fornecedor?: string;
           frete?: number;
+          frete_modalidade?: string;
           id?: string;
           motivo_cancelamento?: string | null;
           nf_numero?: string | null;
@@ -980,6 +1009,7 @@ export type Database = {
           numero?: number;
           numero_fornecedor?: string | null;
           obra_id?: string;
+          observacao?: string | null;
           updated_at?: string;
           valor_total?: number;
           vencimento?: string;
@@ -1742,6 +1772,7 @@ export type Database = {
           condicoes: NonNullable<Json>;
           created_at: string;
           descricao: string | null;
+          documento_cliente: string | null;
           empresa_id: string;
           grupo: string;
           id: string;
@@ -1755,6 +1786,7 @@ export type Database = {
           condicoes?: NonNullable<Json>;
           created_at?: string;
           descricao?: string | null;
+          documento_cliente?: string | null;
           empresa_id: string;
           grupo: string;
           id?: string;
@@ -1768,6 +1800,7 @@ export type Database = {
           condicoes?: NonNullable<Json>;
           created_at?: string;
           descricao?: string | null;
+          documento_cliente?: string | null;
           empresa_id?: string;
           grupo?: string;
           id?: string;
@@ -6532,6 +6565,16 @@ export type Database = {
         };
         Returns: string;
       };
+      anexar_documento_cliente_compra: {
+        Args: {
+          p_caminho: string;
+          p_descricao?: string;
+          p_documento: string;
+          p_nome: string;
+          p_obra_id: string;
+        };
+        Returns: string;
+      };
       anexar_nf_cliente_obra: {
         Args: { p_caminho: string; p_nome: string; p_obra_id: string };
         Returns: undefined;
@@ -6547,6 +6590,8 @@ export type Database = {
           p_condicao_pagamento: string;
           p_entrega_prevista: string;
           p_fornecedor: string;
+          p_frete?: number;
+          p_frete_modalidade?: string;
           p_itens: string;
           p_nome: string;
           p_obra_id: string;
@@ -6826,12 +6871,18 @@ export type Database = {
       criar_pedido_compra: {
         Args: {
           p_categoria: string;
+          p_entrega_endereco?: string;
           p_entrega_prevista: string;
+          p_entrega_recebe?: string;
+          p_entrega_telefone?: string;
+          p_faturar_para?: string;
           p_fornecedor: string;
           p_frete: number;
+          p_frete_modalidade?: string;
           p_itens: Json;
           p_numero_fornecedor: string;
           p_obra_id: string;
+          p_observacao?: string;
           p_orcamento_id?: string;
           p_vencimento: string;
         };
@@ -6867,6 +6918,27 @@ export type Database = {
           real_fim: string;
           real_inicio: string;
           situacao: string;
+        }[];
+      };
+      dados_faturamento_obra: {
+        Args: { p_obra_id: string };
+        Returns: {
+          bairro: string;
+          cep: string;
+          cidade: string;
+          complemento: string;
+          data_nascimento: string;
+          documento: string;
+          email: string;
+          endereco: string;
+          inscricao_estadual: string;
+          logradouro: string;
+          nome: string;
+          numero: string;
+          rg: string;
+          telefone: string;
+          tipo: string;
+          uf: string;
         }[];
       };
       data_pascoa: { Args: { p_ano: number }; Returns: string };
@@ -6971,6 +7043,17 @@ export type Database = {
         Args: { p_empresa_id: string; p_fim: string; p_inicio: string };
         Returns: number;
       };
+      documento_cliente_pelo_titulo: { Args: { p_titulo: string }; Returns: string };
+      documentos_cliente_obra: {
+        Args: { p_obra_id: string };
+        Returns: {
+          caminho: string;
+          documento: string;
+          enviado_em: string;
+          nome: string;
+          origem: string;
+        }[];
+      };
       e_closer_de_handoff_pendente: { Args: { p_negocio_id: string }; Returns: boolean };
       e_membro_comercial: { Args: { p_empresa_id: string; p_membro_id: string }; Returns: boolean };
       e_plataforma_admin: { Args: Record<PropertyKey, never>; Returns: boolean };
@@ -6980,6 +7063,8 @@ export type Database = {
           p_condicao_pagamento: string;
           p_entrega_prevista: string;
           p_fornecedor: string;
+          p_frete?: number;
+          p_frete_modalidade?: string;
           p_itens: string;
           p_observacao: string;
           p_orcamento_id: string;
@@ -6991,11 +7076,17 @@ export type Database = {
       editar_pedido_compra: {
         Args: {
           p_categoria: string;
+          p_entrega_endereco?: string;
           p_entrega_prevista: string;
+          p_entrega_recebe?: string;
+          p_entrega_telefone?: string;
+          p_faturar_para?: string;
           p_fornecedor: string;
           p_frete: number;
+          p_frete_modalidade?: string;
           p_itens: Json;
           p_numero_fornecedor: string;
+          p_observacao?: string;
           p_pedido_id: string;
           p_vencimento: string;
         };
@@ -7424,6 +7515,7 @@ export type Database = {
       };
       pedir_justificativa_atraso: { Args: { p_etapa: string; p_obra_id: string }; Returns: string };
       pendencias_contrato_contato: { Args: { p_contato_id: string }; Returns: string[] };
+      pendencias_documentos_contrato: { Args: { p_negocio_id: string }; Returns: string[] };
       pode_decidir_desconto: {
         Args: {
           p_membro_id: string;
@@ -7438,6 +7530,8 @@ export type Database = {
       pode_enviar_pasta_vistoria: { Args: { p_caminho: string }; Returns: boolean };
       pode_escalonar_obra: { Args: { p_obra_id: string }; Returns: boolean };
       pode_informar_pagamento: { Args: { p_contrato_id: string }; Returns: boolean };
+      pode_ler_documento_cliente_anexo: { Args: { p_caminho: string }; Returns: boolean };
+      pode_ler_documento_cliente_engenharia: { Args: { p_caminho: string }; Returns: boolean };
       pode_registrar_pagamento_negocio: { Args: { p_negocio_id: string }; Returns: boolean };
       pode_responder_handoff: { Args: { p_handoff_id: string }; Returns: boolean };
       pode_ver_avatar: { Args: { p_pasta: string }; Returns: boolean };
@@ -8028,6 +8122,14 @@ export type Database = {
           p_vencimento: string;
         };
         Returns: undefined;
+      };
+      validar_entrega_pedido_compra: {
+        Args: { p_endereco: string; p_faturar_para: string; p_recebe: string; p_telefone: string };
+        Returns: undefined;
+      };
+      validar_frete_orcamento_compra: {
+        Args: { p_frete: number; p_modalidade: string };
+        Returns: number;
       };
     };
     Enums: {

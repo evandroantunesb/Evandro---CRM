@@ -6,7 +6,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import type { SupabaseServidor } from "@/lib/supabase/server";
 import { carregarLinhasVenda } from "@/lib/venda";
-import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato } from "./ajuda";
 
 type Empresa = { id: string; funil: string; etapa: string; contato: string };
 const membro: Record<string, string> = {};
@@ -82,6 +82,7 @@ describe("situacao_registro_pagamento", () => {
 describe("visão de vendas lê o registro manual", () => {
   it("negócio com contrato e pagamento registrado aparece como 'registrado'; estornado volta ao status do contrato", async () => {
     const negocioId = await criarNegocio(solo, "Visão de vendas", soloAdmin);
+    await anexarDocumentosContrato(negocioId);
     await soloAdmin.cliente.from("contratos").insert({ empresa_id: solo.id, negocio_id: negocioId, conteudo: "Contrato" });
     await soloAdmin.cliente.rpc("registrar_pagamento_negocio", { p_negocio_id: negocioId });
 

@@ -10,7 +10,7 @@
 import { Client } from "pg";
 import { urlBancoLocal } from "./banco-local";
 import { beforeAll, describe, expect, it } from "vitest";
-import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato } from "./ajuda";
 
 let admin: Usuario;
 let gestor: Usuario;
@@ -88,6 +88,7 @@ async function ganhar(negocioId: string, cliente: Usuario["cliente"]) {
 }
 
 async function assinar(negocioId: string, cliente: Usuario["cliente"]) {
+  await anexarDocumentosContrato(negocioId);
   const { data: contrato, error } = await cliente
     .from("contratos")
     .insert({ empresa_id: empresa, negocio_id: negocioId, conteudo: "Contrato de teste" })

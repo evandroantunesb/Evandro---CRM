@@ -12,7 +12,7 @@ import { hojeEmSaoPaulo } from "@/lib/formatacao";
 import { gravarEmissaoSimples } from "@/lib/propostas/emissoes-gravacao";
 import { montarDadosEmissaoSimples } from "@/lib/propostas/proposta-simples";
 import type { SupabaseServidor } from "@/lib/supabase/server";
-import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
+import { CLIENTE_CONTRATO, anexarDocumentosContrato, criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
 
 let admin: Usuario;
 let vendedor: Usuario;
@@ -112,8 +112,10 @@ async function negocioComProposta(titulo: string) {
   return n!.id;
 }
 
-const gerar = (u: Usuario, negocioId: string, condicao: string | null) =>
-  gerarContratoComCliente(u.cliente as unknown as SupabaseServidor, { empresaId: empresa, membroId: membro[u.id], negocioId, condicao });
+const gerar = async (u: Usuario, negocioId: string, condicao: string | null) => {
+  await anexarDocumentosContrato(negocioId);
+  return gerarContratoComCliente(u.cliente as unknown as SupabaseServidor, { empresaId: empresa, membroId: membro[u.id], negocioId, condicao });
+};
 const valor = async (negocioId: string) => Number((await servico.from("negocios").select("valor").eq("id", negocioId).single()).data!.valor);
 const contrato = async (negocioId: string) =>
   (

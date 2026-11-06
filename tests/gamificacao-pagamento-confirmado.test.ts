@@ -7,7 +7,7 @@
  * (20261001250000_gamificacao_pagamento_confirmado.sql).
  */
 import { beforeAll, describe, expect, it } from "vitest";
-import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato } from "./ajuda";
 
 let closer: Usuario;
 let closer2: Usuario;
@@ -73,6 +73,7 @@ async function criarNegocio(titulo: string, responsavelId: string) {
 }
 
 async function criarEAssinarContrato(negocioId: string, cliente: Usuario["cliente"]) {
+  await anexarDocumentosContrato(negocioId);
   const { data: contrato, error } = await cliente
     .from("contratos")
     .insert({ empresa_id: empresa, negocio_id: negocioId, conteudo: "Contrato de teste" })
@@ -87,6 +88,7 @@ async function criarEAssinarContrato(negocioId: string, cliente: Usuario["client
 describe("confirmar_pagamento", () => {
   it("contrato não assinado: erro", async () => {
     const negocioId = await criarNegocio("Sem contrato", membro[closer.id]);
+    await anexarDocumentosContrato(negocioId);
     const { data: contrato } = await closer.cliente
       .from("contratos")
       .insert({ empresa_id: empresa, negocio_id: negocioId, conteudo: "Rascunho" })

@@ -1,4 +1,5 @@
 import "server-only";
+import { mensagemPendenciasDocumentos, pendenciasDocumentosContrato } from "@/lib/documentos-cliente";
 import {
   camposSemDado,
   contratoProntoParaCliente,
@@ -46,7 +47,7 @@ export async function gerarContratoComCliente(
     agora?: Date;
   },
 ): Promise<NonNullable<ResultadoAcao>> {
-  const [{ data: modelo }, { data: negocio }, { data: calculo }, { data: itensKit }, { data: empresa }, { data: existente }, { data: identidades }] =
+  const [{ data: modelo }, { data: negocio }, { data: calculo }, { data: itensKit }, { data: empresa }, { data: existente }, { data: identidades }, { data: anexos }] =
     await Promise.all([
       supabase.from("modelos_contrato").select("conteudo").eq("empresa_id", empresaId).maybeSingle(),
       supabase
@@ -66,6 +67,8 @@ export async function gerarContratoComCliente(
       supabase.from("contratos").select("id, status").eq("negocio_id", negocioId).maybeSingle(),
       // Nome do vendedor responsável (só nome; nunca e-mail ou telefone).
       supabase.rpc("identidade_membros", { p_empresa_id: empresaId }),
+      // Documentos do cliente anexados no negócio (só as categorias).
+      supabase.from("anexos").select("categoria").eq("negocio_id", negocioId),
     ]);
   if (!modelo?.conteudo.trim()) return { ok: false, mensagem: "Cadastre o modelo de contrato em Configurações antes." };
   if (!negocio) return { ok: false, mensagem: "Negócio não encontrado." };
@@ -127,6 +130,9 @@ export async function gerarContratoComCliente(
   // `pendencias_contrato_contato`). Por último: as recusas que já existiam continuam com a mesma mensagem.
   const pendencias = pendenciasDadosContrato(negocio.contatos as unknown as DadosClienteContrato | null);
   if (pendencias.length) return { ok: false, mensagem: mensagemPendenciasContrato(pendencias) };
+  const tipoCliente = (negocio.contatos as unknown as { tipo: string | null } | null)?.tipo;
+  const faltam = pendenciasDocumentosContrato((anexos ?? []).map((a) => a.categoria), tipoCliente);
+  if (faltam.length) return { ok: false, mensagem: mensagemPendenciasDocumentos(faltam) };
 
   const registrada: CondicaoRegistrada | null =
     escolha && opcao

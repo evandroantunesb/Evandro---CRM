@@ -8,7 +8,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { beforeAll, describe, expect, it } from "vitest";
-import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato } from "./ajuda";
 
 const BUCKET = "compras-obra";
 const XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
@@ -53,6 +53,7 @@ async function criarObra(emp: string, resp: Usuario, confirmador: Usuario, titul
     "kit",
   );
   ok(await resp.cliente.from("negocios").update({ status: "ganho" }).eq("id", neg!.id), "ganho");
+  await anexarDocumentosContrato(neg!.id);
   const { data: contrato } = ok(
     await resp.cliente.from("contratos").insert({ empresa_id: emp, negocio_id: neg!.id, conteudo: "Contrato de teste" }).select("id").single(),
     "contrato",

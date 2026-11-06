@@ -8,7 +8,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { nomeKitPersonalizado } from "@/lib/calculadora";
 import { atualizarStatusContratoComCliente, gerarContratoComCliente } from "@/lib/contratos-geracao";
 import type { SupabaseServidor } from "@/lib/supabase/server";
-import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
+import { CLIENTE_CONTRATO, anexarDocumentosContrato, criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
 
 let admin: Usuario;
 let vendedor: Usuario;
@@ -59,8 +59,10 @@ async function negocio(titulo: string, contato: Record<string, string | null> = 
   return n!.id;
 }
 
-const gerar = (negocioId: string) =>
-  gerarContratoComCliente(vendedor.cliente as unknown as SupabaseServidor, { empresaId: empresa, membroId: membro[vendedor.id], negocioId });
+const gerar = async (negocioId: string) => {
+  await anexarDocumentosContrato(negocioId);
+  return gerarContratoComCliente(vendedor.cliente as unknown as SupabaseServidor, { empresaId: empresa, membroId: membro[vendedor.id], negocioId });
+};
 const status = (negocioId: string, novo: "rascunho" | "aguardando_assinatura" | "assinado") =>
   atualizarStatusContratoComCliente(vendedor.cliente as unknown as SupabaseServidor, { membroId: membro[vendedor.id], negocioId, status: novo });
 const contrato = async (negocioId: string) =>

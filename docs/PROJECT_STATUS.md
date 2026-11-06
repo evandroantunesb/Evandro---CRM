@@ -1,13 +1,25 @@
 # Estado do projeto — Raion CRM
 
-## Compras — P2: orçamentos e arquivos da obra (#345; migration aplicada em produção em 06/11/2026 antes do merge, tag `migracao-pr345-1fd9c4c`, run 42194062727)
+## Compras — P2b: PDF do pedido, faturamento, frete e documentos do cliente (em andamento, 06/11/2026)
+
+Branch `feat/compras-pdf-documentos` (worktree `C:\dev\crm-compras`). Migration `20261127100000_compras_pdf_documentos.sql`. Prévia aprovada no canvas "Compras · Pedidos de compra" (linha P2b: Pedido: faturamento e entrega; Documentos do cliente; PDF do pedido; Negócio: documentos para o contrato).
+
+- Documentos do cliente nos anexos do negócio, obrigatórios para gerar o contrato (trava no banco, como os dados do cliente; só contratos novos ou regerados): cliente CPF, documento com foto (CNH) e comprovante de residência (fatura de energia); cliente CNPJ, cartão CNPJ (categoria nova de anexo) e comprovante de residência. Cartão "Documentos do cliente" na aba Proposta e contrato.
+- Compras vê todos os dados do cliente da obra (`obras_operacao` e `dados_faturamento_obra`) e os documentos do cliente (`documentos_cliente_obra`): do negócio, dos itens marcados no checklist da Engenharia (coluna nova `documento_cliente` no modelo, marcada pelos títulos padrão) ou anexados por Compras (também "outro documento"). Só quem escreve em Compras na obra (Compras, coordenador, gestor, admin); Administrativo e Operacional ficam para a P2c.
+- Pedido: frete CIF (zero) ou FOB (com valor), "faturar em nome de" cliente (padrão) ou empresa, "entregar em" (mesmo endereço do faturamento ou outro, com quem recebe e telefone; faturando para a empresa, o endereço é obrigatório) e observações para o fornecedor. Orçamento: frete CIF/FOB; "Gerar pedido deste" leva o frete.
+- PDF do pedido gerado na hora (`/compras/pedido/[id]/pdf`), com fornecedor, condições, faturar para, entregar em, itens, frete, total e observações; link no cartão do pedido e na lista de arquivos de compra.
+- Decisões do Evandro (06/11/2026): faturamento normalmente no nome do cliente (CPF ou CNPJ), empresa só em casos raros; a integradora sempre paga a distribuidora (a NF continua gerando a conta a pagar); documentos do negócio reaproveitados por todas as áreas (P2c: Engenharia e Administrativo); e-mail, telefone e nascimento do cliente no faturamento; CIF/FOB no pedido e no orçamento; campo de observações de Compras.
+- Testes: 19 arquivos de teste de banco e a base do e2e passaram a anexar os documentos antes do contrato (`anexarDocumentosContrato`).
+- **P2c (depois):** Engenharia (checklist mostrando o arquivo do negócio, com conferência) e Administrativo usando os documentos do negócio.
+- Produção: a migration só pelo `banco-producao.yml`, aprovada pelo Evandro, antes ou junto do deploy. Atenção: com ela, contrato novo sem os documentos anexados é recusado.
+
+## Compras — P2: orçamentos e arquivos da obra (#345 e #346 mescladas; migration aplicada em produção em 06/11/2026 antes do merge, tag `migracao-pr345-1fd9c4c`, run 42194062727)
 
 Branch `feat/compras-orcamentos` (worktree `C:\dev\crm-compras`). Migration `20261126100000_compras_orcamentos.sql`. Desenho aprovado "Orçamentos e pedidos da obra" (canvas "Compras · Pedidos de compra").
 
 - Banco: `compras_orcamentos` (fornecedor, valor, itens cobertos — kit completo ou parte, com quais itens —, entrega prometida, validade, condição de pagamento e observação opcionais, arquivo obrigatório, pedido gerado, descarte com motivo) e `compras_arquivos` (orçamento, confirmação do pedido ou outro); bucket privado `compras-obra` (pasta `empresa/obra/arquivo`; PDF, imagem, .xlsx e .csv até 10 MB). RPCs `anexar_orcamento_compra`, `editar_orcamento_compra` e `descartar_orcamento_compra` (só sem pedido ativo), `anexar_arquivo_compra`; `criar_pedido_compra` ganhou `p_orcamento_id` opcional ("Gerar pedido deste"; a assinatura antiga saiu). Anexa quem escreve em Compras na obra, depois do "Iniciar compra"; vê quem vê os pedidos. Histórico sem valores.
 - App: tela `/obras/[id]/compras` (cartões dos orçamentos com selos Escolhido, Entrega mais rápida, Parcial e Vencido; novo orçamento; arquivos de compra); link "Orçamentos e arquivos (N)" no cartão Pedidos de compra da ficha; "Gerar pedido deste" abre o novo pedido com fornecedor e entrega do orçamento e mostra o valor dele como referência.
 - Decisões do Evandro (06/11/2026): tela própria (como no desenho); campo "Condição de pagamento" opcional (o cartão do desenho mostrava, o formulário não); arquivo obrigatório; corrigir e descartar com motivo enquanto não virou pedido, sem apagar o arquivo; um orçamento gera no máximo um pedido ativo (pedido cancelado libera); a NF do fornecedor fica fora da lista de arquivos; "Previsto na venda" = planejado de Equipamentos, só para quem vê os custos.
-- **P2b (próxima, aguardando comando):** PDF do pedido gerado pelo Raion, na hora em que alguém abre (sem guardar). Pergunta em aberto: endereço de entrega no PDF é o da obra (cliente) ou o da empresa.
 - Produção: migration aplicada em 06/11/2026 pelo `banco-producao.yml` (dry-run 42193923434 listou só ela; aplicação 42194062727), aprovada pelo Evandro; autorização no workflow pela PR desta branch (`chore/autorizar-migracao-345`).
 
 ## Compras — P1: pedidos de compra (mesclada na #343, 05/11/2026; migration aplicada em produção logo depois, tag `migracao-pr343-0ee2650`, run 42146497255)

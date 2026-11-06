@@ -5,7 +5,7 @@
  * Só autorização de leitura: os fluxos de escrita são cobertos pelas suítes de pagamento.
  */
 import { beforeAll, describe, expect, it } from "vitest";
-import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato } from "./ajuda";
 
 type Empresa = { id: string; funil: string; etapa: string; contato: string };
 
@@ -114,6 +114,7 @@ beforeAll(async () => {
   ]);
   await equipe(pro, proGestor, [proVendedor, proSdr]);
   negocioProSdr = await criarNegocio(pro, "Venda Pro que vai para o SDR", proVendedor);
+  await anexarDocumentosContrato(negocioProSdr);
   const { data: contrato } = await proVendedor.cliente
     .from("contratos")
     .insert({ empresa_id: pro.id, negocio_id: negocioProSdr, conteudo: "Contrato de teste" })

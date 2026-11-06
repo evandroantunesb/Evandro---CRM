@@ -5,6 +5,9 @@ import { CATEGORIAS_CUSTO_OBRA, type CategoriaCustoObra } from "@/lib/obras/cust
  * indicadores e abas da tela /compras. O banco decide de novo tudo o que grava; aqui é só leitura e exibição.
  */
 
+export type ModalidadeFrete = "cif" | "fob";
+export const ROTULO_FRETE: Record<ModalidadeFrete, string> = { cif: "CIF (frete do fornecedor)", fob: "FOB (frete por nossa conta)" };
+
 export const numeroPedido = (n: number) => `P-${String(n).padStart(4, "0")}`;
 
 /** Item do kit vendido, pela posição no kit gravado na obra (`obras.snapshot -> 'kit'`), que é a chave do pedido. */
@@ -45,7 +48,15 @@ export type PedidoVM = {
   vencimento: string;
   numeroFornecedor: string | null;
   frete: number;
+  /** CIF: frete por conta do fornecedor (zero); FOB: por conta da empresa, com o valor em `frete`. */
+  freteModalidade: ModalidadeFrete;
   valorTotal: number;
+  /** Nota fiscal no nome do cliente (padrão) ou da própria empresa. */
+  faturarPara: "cliente" | "empresa";
+  /** Nulo = entrega no endereço do faturamento. */
+  entrega: { endereco: string; recebe: string; telefone: string | null } | null;
+  /** Observações de Compras para o fornecedor (vão no PDF). */
+  observacao: string | null;
   nfNumero: string | null;
   nfValor: number | null;
   temNf: boolean;

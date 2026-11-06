@@ -25,6 +25,28 @@ export const CLIENTE_CONTRATO = {
   uf: "PR",
 };
 
+/**
+ * Documentos do cliente que o contrato exige no negócio (20261127100000_compras_pdf_documentos.sql): documento com foto,
+ * comprovante de residência e cartão CNPJ (este só conta para cliente empresa). Só os registros: a trava lê `anexos`.
+ */
+export async function anexarDocumentosContrato(negocioId: string) {
+  const { data: negocio, error: erroNegocio } = await servico.from("negocios").select("empresa_id").eq("id", negocioId).single();
+  if (erroNegocio) throw erroNegocio;
+  const empresaId = negocio.empresa_id;
+  const { error } = await servico.from("anexos").insert(
+    (["cnh", "fatura_gerador", "cartao_cnpj"] as const).map((categoria) => ({
+      empresa_id: empresaId,
+      negocio_id: negocioId,
+      categoria,
+      caminho: `${empresaId}/${negocioId}/${crypto.randomUUID()}-${categoria}.pdf`,
+      nome: `${categoria}.pdf`,
+      tamanho: 10,
+      tipo_mime: "application/pdf",
+    })),
+  );
+  if (error) throw error;
+}
+
 export async function criarUsuario(nome: string) {
   const email = `${nome}-${sufixo}@teste.raion`;
   const { data, error } = await servico.auth.admin.createUser({

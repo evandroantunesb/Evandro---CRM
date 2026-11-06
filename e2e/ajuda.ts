@@ -87,6 +87,27 @@ export function clienteServico() {
   });
 }
 
+/**
+ * Documentos do cliente que o contrato exige (20261127100000_compras_pdf_documentos.sql): CPF, documento com foto e
+ * comprovante de residência; CNPJ, também o cartão CNPJ. Só os registros, pelo serviço local: a trava lê `anexos`.
+ */
+export async function anexarDocumentosContrato(empresaId: string, negocioId: string) {
+  const { error } = await clienteServico()
+    .from("anexos")
+    .insert(
+      (["cnh", "fatura_gerador", "cartao_cnpj"] as const).map((categoria) => ({
+        empresa_id: empresaId,
+        negocio_id: negocioId,
+        categoria,
+        caminho: `${empresaId}/${negocioId}/${crypto.randomUUID()}-${categoria}.pdf`,
+        nome: `${categoria}.pdf`,
+        tamanho: 10,
+        tipo_mime: "application/pdf",
+      })),
+    );
+  if (error) throw error;
+}
+
 type AbaFicha = "Negócio" | "Conta e sistema" | "Proposta e contrato" | "Atividades" | "Arquivos";
 const PARAMETRO_ABA: Record<AbaFicha, string> = {
   Negócio: "visao",

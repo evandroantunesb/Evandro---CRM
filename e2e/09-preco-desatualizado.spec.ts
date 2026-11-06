@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { abrirAba, CLIENTE_CONTRATO, clienteDe, clienteServico, entrarComo, fichaNaAba, lerBase } from "./ajuda";
+import { abrirAba, anexarDocumentosContrato, CLIENTE_CONTRATO, clienteDe, clienteServico, entrarComo, fichaNaAba, lerBase } from "./ajuda";
 import type { BaseFicticia } from "./base-ficticia";
 
 /**
@@ -44,6 +44,7 @@ async function negocioComCalculo(nome: string) {
     .from("kit_componentes")
     .insert({ empresa_id: base.empresaA, negocio_id: negocio!.id, tipo: "modulo", descricao: "Módulo fictício 550 W", potencia_w: 550, quantidade: 10, ordem: 0 });
   if (e3) throw e3;
+  await anexarDocumentosContrato(base.empresaA, negocio!.id);
   // Linha legada só como fixture, pelo serviço local: o app não a cria e o vendedor não grava `calculos_solares`.
   const { error: e4 } = await clienteServico().from("calculos_solares").insert({
     empresa_id: base.empresaA,

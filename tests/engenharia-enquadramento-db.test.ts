@@ -7,7 +7,7 @@
  * Cenário próprio ("Enquadramento A/B" + sufixo, usuários "eq-*" + sufixo). Os testes seguem em ordem.
  */
 import { beforeAll, describe, expect, it } from "vitest";
-import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato } from "./ajuda";
 
 let admin: Usuario;
 let vendedor: Usuario;
@@ -46,6 +46,7 @@ async function criarVenda(emp: string, responsavel: Usuario, confirmador: Usuari
   if (error) throw error;
   const ganho = await responsavel.cliente.from("negocios").update({ status: "ganho" }).eq("id", neg!.id);
   if (ganho.error) throw ganho.error;
+  await anexarDocumentosContrato(neg!.id);
   const { data: contrato, error: erroContrato } = await responsavel.cliente
     .from("contratos")
     .insert({ empresa_id: emp, negocio_id: neg!.id, conteudo: "Contrato de teste" })

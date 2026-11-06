@@ -130,6 +130,9 @@ export function PedidosCompraObra({
                   <div className="flex flex-wrap items-start gap-3">
                     {!p.temNf && <RegistrarNf obra={obra} pedidoId={p.id} valorPedido={p.valorTotal} vencimento={p.vencimento} />}
                     <RegistrarRecebimento obraId={obra.obraId} pedidoId={p.id} itens={p.itens} />
+                    <a href={`/compras/pedido/${p.id}/pdf`} target="_blank" rel="noreferrer" className="text-xs font-medium text-texto-2 underline hover:text-texto">
+                      PDF do pedido
+                    </a>
                     {pedidoEditavel(p) && (
                       <>
                         <Link

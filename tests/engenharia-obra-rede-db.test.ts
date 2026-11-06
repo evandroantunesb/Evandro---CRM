@@ -7,7 +7,7 @@
  * Cenário próprio ("Obra de rede" + sufixo, usuários "or-*" + sufixo). Os testes seguem em ordem.
  */
 import { beforeAll, describe, expect, it } from "vitest";
-import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato } from "./ajuda";
 
 let admin: Usuario;
 let vendedor: Usuario;
@@ -29,6 +29,7 @@ async function criarVenda(responsavel: Usuario, confirmador: Usuario, titulo: st
     .single();
   if (error) throw error;
   ok(await responsavel.cliente.from("negocios").update({ status: "ganho" }).eq("id", neg!.id), "ganho");
+  await anexarDocumentosContrato(neg!.id);
   const { data: contrato } = ok(
     await responsavel.cliente.from("contratos").insert({ empresa_id: empresa, negocio_id: neg!.id, conteudo: "Contrato de teste" }).select("id").single(),
     "contrato",

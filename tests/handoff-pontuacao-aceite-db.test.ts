@@ -17,7 +17,7 @@ import { join } from "node:path";
 import { Client } from "pg";
 import { urlBancoLocal } from "./banco-local";
 import { beforeAll, describe, expect, it } from "vitest";
-import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato } from "./ajuda";
 
 const NOMES = [
   "admin",
@@ -388,6 +388,7 @@ describe("pontuação do repasse", () => {
       if (error) throw error;
     };
     await status("ganho");
+    await anexarDocumentosContrato(n.negocioId);
     const { data: contrato, error: erroContrato } = await u.closer.cliente
       .from("contratos")
       .insert({ empresa_id: empresa, negocio_id: n.negocioId, conteudo: "Contrato B1a" })

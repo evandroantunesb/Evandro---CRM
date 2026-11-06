@@ -5,6 +5,8 @@ const base: OrcamentoVM = {
   id: "a",
   fornecedor: "Fornecedor",
   valorTotal: 1000,
+  freteModalidade: "cif",
+  frete: 0,
   cobertura: "kit_completo",
   itensDescricao: null,
   entregaPrevista: "2026-11-14",
