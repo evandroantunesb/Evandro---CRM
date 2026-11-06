@@ -1,6 +1,6 @@
 # Estado do projeto — Raion CRM
 
-## Compras — P1: pedidos de compra (em andamento, 05/11/2026)
+## Compras — P1: pedidos de compra (mesclada na #343, 05/11/2026; migration aplicada em produção logo depois, tag `migracao-pr343-0ee2650`, run 42146497255)
 
 Branch `feat/compras-pedidos` (worktree `C:\dev\crm-compras`). Migration `20261125100000_compras_pedidos.sql`. Desenho aprovado no canvas "Compras · Pedidos de compra" (tela /compras, Novo pedido, Compras na ficha da obra). Ordem combinada: P1 pedidos → P2 orçamentos e arquivos da obra → P3 tabela de preços (planilha .xlsx/.csv) → P4 preço da tabela alimentando a calculadora e o kit da proposta (regras da P4 a perguntar).
 
