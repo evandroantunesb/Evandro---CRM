@@ -7,6 +7,24 @@
 export const DOCUMENTOS_CLIENTE = ["documento_foto", "comprovante_residencia", "cartao_cnpj"] as const;
 export type DocumentoCliente = (typeof DOCUMENTOS_CLIENTE)[number];
 
+export const ehDocumentoCliente = (v: string | null | undefined): v is DocumentoCliente => (DOCUMENTOS_CLIENTE as readonly string[]).includes(v ?? "");
+
+/** Documento do negócio que a Engenharia recusou na obra (20261128100000_documentos_cliente_engenharia_administrativo.sql). */
+export type RecusaDocumento = { documento: DocumentoCliente; anexoId: string; motivo: string | null; recusadoPor: string | null; recusadoEm: string | null };
+
+/**
+ * Recusas que ainda valem: o anexo recusado continua o mais recente da categoria no negócio. Anexado outro, a recusa
+ * deixa de aparecer (a Engenharia vê o arquivo novo no item da obra). `anexos` vem do mais novo para o mais antigo.
+ */
+export function recusasAtivas(anexos: readonly { id: string; categoria: string }[], recusas: readonly RecusaDocumento[]): Map<DocumentoCliente, RecusaDocumento> {
+  const ativas = new Map<DocumentoCliente, RecusaDocumento>();
+  for (const r of recusas) {
+    const atual = anexos.find((a) => a.categoria === CATEGORIA_DO_DOCUMENTO[r.documento]);
+    if (atual?.id === r.anexoId) ativas.set(r.documento, r);
+  }
+  return ativas;
+}
+
 export const ROTULO_DOCUMENTO_CLIENTE: Record<DocumentoCliente, string> = {
   documento_foto: "Documento com foto",
   comprovante_residencia: "Comprovante de residência",

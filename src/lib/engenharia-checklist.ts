@@ -1,34 +1,45 @@
 import "server-only";
-import { resumoChecklist, statusItem, type ItemEngenhariaVM } from "@/lib/engenharia-checklist-regras";
+import { resumoChecklist, statusItem, type ArquivoNegocioVM, type ItemEngenhariaVM } from "@/lib/engenharia-checklist-regras";
+import { assinar } from "@/lib/obras/financeiro";
 import type { SupabaseServidor } from "@/lib/supabase/server";
 
 /**
  * Checklist aplicado na obra e as versões dos documentos. A RLS decide: o checklist vem para quem vê a obra; os
- * documentos, só para admin e quem atua em Engenharia nela (para os demais a lista chega vazia).
+ * documentos, só para admin e quem atua em Engenharia nela (para os demais a lista chega vazia). Itens marcados como
+ * documento do cliente trazem o anexo mais recente do negócio (`documentos_negocio_engenharia`, também só para quem
+ * atua na Engenharia).
  */
 export async function carregarChecklistEngenharia(
   supabase: SupabaseServidor,
   { empresaId, obraId }: { empresaId: string; obraId: string },
 ): Promise<ItemEngenhariaVM[]> {
-  const [{ data: itens, error }, { data: documentos }, { data: identidades }] = await Promise.all([
+  const [{ data: itens, error }, { data: documentos }, { data: identidades }, { data: doNegocio }] = await Promise.all([
     supabase
       .from("obra_engenharia_itens")
-      .select("id, grupo, titulo, descricao, obrigatorio, status, motivo, atualizado_por, atualizado_em")
+      .select("id, grupo, titulo, descricao, obrigatorio, status, motivo, atualizado_por, atualizado_em, engenharia_checklist_modelo(documento_cliente)")
       .eq("empresa_id", empresaId)
       .eq("obra_id", obraId)
       .order("ordem")
       .order("titulo"),
     supabase
       .from("obra_engenharia_documentos")
-      .select("id, item_id, nome, versao, enviado_por, created_at")
+      .select("id, item_id, nome, versao, enviado_por, created_at, do_negocio, anexo_origem_id")
       .eq("empresa_id", empresaId)
       .eq("obra_id", obraId)
       .order("versao", { ascending: false }),
     supabase.rpc("identidade_membros", { p_empresa_id: empresaId }),
+    supabase.rpc("documentos_negocio_engenharia", { p_obra_id: obraId }),
   ]);
   if (error) throw error;
   const nomes = new Map((identidades ?? []).map((m) => [m.membro_id, m.nome]));
   const nome = (id: string | null) => (id ? (nomes.get(id) ?? "Membro") : null);
+  const urls = await assinar(supabase, "anexos", (doNegocio ?? []).map((d) => d.caminho));
+  const arquivosNegocio = new Map(
+    (doNegocio ?? []).map((d): [string, ArquivoNegocioVM] => [
+      d.documento,
+      { anexoId: d.anexo_id, nome: d.nome, url: urls.get(d.caminho) ?? null, enviadoPor: nome(d.enviado_por), quando: d.enviado_em },
+    ]),
+  );
 
   return (itens ?? []).map((i) => ({
     id: i.id,
@@ -42,7 +53,16 @@ export async function carregarChecklistEngenharia(
     atualizadoEm: i.atualizado_em,
     documentos: (documentos ?? [])
       .filter((d) => d.item_id === i.id)
-      .map((d) => ({ id: d.id, nome: d.nome, versao: d.versao, enviadoPor: nome(d.enviado_por), quando: d.created_at })),
+      .map((d) => ({
+        id: d.id,
+        nome: d.nome,
+        versao: d.versao,
+        enviadoPor: nome(d.enviado_por),
+        quando: d.created_at,
+        doNegocio: d.do_negocio,
+        anexoOrigemId: d.anexo_origem_id,
+      })),
+    arquivoNegocio: arquivosNegocio.get(i.engenharia_checklist_modelo?.documento_cliente ?? "") ?? null,
   }));
 }
 

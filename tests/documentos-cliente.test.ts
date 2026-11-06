@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { clienteFaturamento, enderecoCompleto } from "@/lib/compras/faturamento";
-import { documentosExigidos, mensagemPendenciasDocumentos, pendenciasDocumentosContrato } from "@/lib/documentos-cliente";
+import { documentosExigidos, ehDocumentoCliente, mensagemPendenciasDocumentos, pendenciasDocumentosContrato, recusasAtivas } from "@/lib/documentos-cliente";
 
 describe("documentos do cliente para o contrato", () => {
   it("CPF: documento com foto e comprovante; CNPJ: cartão CNPJ e comprovante", () => {
@@ -46,5 +46,28 @@ describe("endereço do faturamento", () => {
     });
     expect(c).toMatchObject({ nome: "Cliente", pj: true, documento: "11.222.333/0001-81", endereco: null });
     expect(clienteFaturamento(null)).toBeNull();
+  });
+});
+
+describe("documentos recusados pela Engenharia (P2c)", () => {
+  const recusa = { documento: "comprovante_residencia" as const, anexoId: "a1", motivo: "Fatura antiga", recusadoPor: "Carla", recusadoEm: "2026-11-06T17:32:00Z" };
+
+  it("vale enquanto o anexo recusado é o mais recente da categoria", () => {
+    const anexos = [
+      { id: "a1", categoria: "fatura_gerador" },
+      { id: "c1", categoria: "cnh" },
+    ];
+    expect([...recusasAtivas(anexos, [recusa]).keys()]).toEqual(["comprovante_residencia"]);
+  });
+
+  it("anexado outro (mais novo na frente) ou anexo apagado, a recusa some", () => {
+    expect(recusasAtivas([{ id: "a2", categoria: "fatura_gerador" }, { id: "a1", categoria: "fatura_gerador" }], [recusa]).size).toBe(0);
+    expect(recusasAtivas([], [recusa]).size).toBe(0);
+  });
+
+  it("só os três documentos do cliente", () => {
+    expect(ehDocumentoCliente("cartao_cnpj")).toBe(true);
+    expect(ehDocumentoCliente("outro")).toBe(false);
+    expect(ehDocumentoCliente(null)).toBe(false);
   });
 });

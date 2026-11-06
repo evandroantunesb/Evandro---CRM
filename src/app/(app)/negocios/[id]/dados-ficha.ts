@@ -21,6 +21,7 @@ import { cartaoFechamento } from "@/lib/venda";
 import { type StatusContrato, type StatusPagamentoContrato } from "@/lib/tipos";
 import { type DadosClienteFicha } from "./dados-cliente";
 import { pendenciasDadosContrato } from "@/lib/dados-cliente-contrato";
+import { carregarRecusasDocumentos } from "@/lib/documentos-cliente-recusas";
 import { type SituacaoRegistro } from "./pagamento-solo";
 import { carregarTemperaturas } from "@/lib/temperatura";
 
@@ -341,7 +342,7 @@ export async function carregarFicha(atual: Vinculo, id: string, abaParam: string
     registroManualIndisponivel, registrosPagamento, situacaoPagamentoSolo, mostrarPagamentoSolo, mostrarPagamentoPro, ultimoHandoff,
     podeResponderHandoff, obraDoNegocio, arquivado, precoDesatualizado, precoContratoDesatualizado, escolhaCondicao, condicaoRegistrada, vigenciaDaTela, contextoEstimativa, historicoCalculo,
     bloqueioProposta, bloqueioEmissao, bloqueioContrato, responsavelInativo, cartao, contato, pendenciasCliente, nomes, souAdmin,
-    etiquetasMarcadas, etiquetasVisiveis, abas, aba, pedidosSetor, desconto,
+    etiquetasMarcadas, etiquetasVisiveis, abas, aba, pedidosSetor, desconto, recusasDocumentos: aba === "proposta" && obraDoNegocio ? await carregarRecusasDocumentos(supabase, negocio.id, nomes.membro) : [],
   };
 }
 

@@ -1,8 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { acoesItem, agruparItens, resumoChecklist, statusItem, type ItemEngenhariaVM } from "@/lib/engenharia-checklist-regras";
+import {
+  acoesItem,
+  agruparItens,
+  invalidoAvisaVendedor,
+  ofertaArquivoNegocio,
+  resumoChecklist,
+  statusItem,
+  type ItemEngenhariaVM,
+} from "@/lib/engenharia-checklist-regras";
 import { montarHistorico } from "@/lib/obras/historico";
 
-const doc = { id: "d1", nome: "a.pdf", versao: 1, enviadoPor: null, quando: "2026-10-30T12:00:00Z" };
+const doc = { id: "d1", nome: "a.pdf", versao: 1, enviadoPor: null, quando: "2026-10-30T12:00:00Z", doNegocio: false, anexoOrigemId: null };
 const item = (extra: Partial<ItemEngenhariaVM> = {}): ItemEngenhariaVM => ({
   id: "i",
   grupo: "G",
@@ -14,6 +22,7 @@ const item = (extra: Partial<ItemEngenhariaVM> = {}): ItemEngenhariaVM => ({
   atualizadoPor: null,
   atualizadoEm: null,
   documentos: [],
+  arquivoNegocio: null,
   ...extra,
 });
 
@@ -67,6 +76,26 @@ describe("acoesItem", () => {
     expect(acoesItem(item(), "coordenar", false).dispensar).toBe(true);
     expect(acoesItem(item({ obrigatorio: false }), "executar", false).dispensar).toBe(true);
     expect(acoesItem(item({ status: "dispensado", motivo: "x" }), "admin", false)).toMatchObject({ anexar: false, dispensar: false, reabrir: true });
+  });
+});
+
+describe("arquivo do negócio no item (P2c)", () => {
+  const arquivo = { anexoId: "a1", nome: "cnh.pdf", url: null, enviadoPor: "Rafael", quando: "2026-11-03T12:00:00Z" };
+  const doNegocio = (anexoOrigemId: string | null) => ({ ...doc, doNegocio: true, anexoOrigemId });
+
+  it("item sem versão oferece usar; com outra versão, nova versão; anexo já atual, nada", () => {
+    expect(ofertaArquivoNegocio(item())).toBeNull();
+    expect(ofertaArquivoNegocio(item({ arquivoNegocio: arquivo }))).toBe("usar");
+    expect(ofertaArquivoNegocio(item({ arquivoNegocio: arquivo, documentos: [doc] }))).toBe("nova_versao");
+    expect(ofertaArquivoNegocio(item({ arquivoNegocio: arquivo, documentos: [doNegocio("a1")] }))).toBeNull();
+    expect(ofertaArquivoNegocio(item({ arquivoNegocio: { ...arquivo, anexoId: "a2" }, documentos: [doNegocio("a1")] }))).toBe("nova_versao");
+  });
+
+  it("inválido avisa o vendedor só se a versão atual veio do negócio", () => {
+    expect(invalidoAvisaVendedor(item())).toBe(false);
+    expect(invalidoAvisaVendedor(item({ documentos: [doc] }))).toBe(false);
+    expect(invalidoAvisaVendedor(item({ documentos: [doNegocio(null), doc] }))).toBe(true);
+    expect(invalidoAvisaVendedor(item({ documentos: [doc, doNegocio("a1")] }))).toBe(false);
   });
 });
 

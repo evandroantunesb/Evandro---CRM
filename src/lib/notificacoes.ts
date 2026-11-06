@@ -30,7 +30,9 @@ export type Notificacao = {
     | "justificativa_atraso_respondida"
     // Pagamento informado pelo vendedor (20261113100000_aviso_pagamento_vendedor.sql).
     | "pagamento_aviso_confirmado"
-    | "pagamento_aviso_devolvido";
+    | "pagamento_aviso_devolvido"
+    // Documento do cliente do negócio recusado pela Engenharia (20261128100000_documentos_cliente_engenharia_administrativo.sql).
+    | "documento_cliente_recusado";
   mensagem: string;
   link: string | null;
 };

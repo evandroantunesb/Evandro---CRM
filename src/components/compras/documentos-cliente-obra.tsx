@@ -54,12 +54,22 @@ export function DadosFaturamentoCliente({ cliente }: { cliente: ClienteFaturamen
   );
 }
 
-export function DocumentosClienteObra({ obra, documentos, podeEscrever }: { obra: ObraCompras; documentos: DocumentosClienteVM; podeEscrever: boolean }) {
+export function DocumentosClienteObra({
+  obra,
+  documentos,
+  podeEscrever,
+  descricao = "O que a distribuidora pede para faturar no nome do cliente.",
+}: {
+  obra: ObraCompras;
+  documentos: DocumentosClienteVM;
+  podeEscrever: boolean;
+  descricao?: string;
+}) {
   const com = documentos.exigidos.filter((d) => d.arquivo).length;
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-texto-2">O que a distribuidora pede para faturar no nome do cliente.</p>
+        <p className="text-sm text-texto-2">{descricao}</p>
         <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${com < documentos.exigidos.length ? "bg-dourado/20 text-dourado-texto" : "bg-zinc-100 text-zinc-700"}`}>
           {com} de {documentos.exigidos.length}
         </span>

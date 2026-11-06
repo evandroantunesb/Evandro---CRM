@@ -116,8 +116,9 @@ export type DocumentoClienteObraVM = {
 export type DocumentosClienteObraVM = { exigidos: DocumentoClienteObraVM[]; outros: { descricao: string; nome: string; url: string | null; enviadoEm: string }[] };
 
 /**
- * Documentos do cliente para a distribuidora, com o arquivo mais recente da primeira origem que tiver: negócio,
- * Engenharia, Compras. Nulo para quem não escreve em Compras na obra (o banco devolve vazio).
+ * Documentos do cliente para a distribuidora (Compras) e para a NF do cliente (Administrativo), com o arquivo mais
+ * recente da primeira origem que tiver: negócio, Engenharia, Compras. Vazio para quem não escreve em Compras nem atua
+ * no Administrativo da obra (o banco devolve vazio; 20261128100000 incluiu o Administrativo).
  */
 export async function carregarDocumentosClienteObra(
   supabase: SupabaseServidor,
@@ -125,17 +126,12 @@ export async function carregarDocumentosClienteObra(
 ): Promise<DocumentosClienteObraVM> {
   const [rpcRes, comprasRes] = await Promise.all([
     supabase.rpc("documentos_cliente_obra", { p_obra_id: obraId }),
-    supabase
-      .from("compras_arquivos")
-      .select("documento, descricao, nome, caminho, created_at")
-      .eq("obra_id", obraId)
-      .eq("tipo", "documento_cliente")
-      .order("created_at", { ascending: false }),
+    supabase.rpc("documentos_cliente_compras_obra", { p_obra_id: obraId }),
   ]);
   if (rpcRes.error) throw rpcRes.error;
   if (comprasRes.error) throw comprasRes.error;
   const linhas = rpcRes.data ?? [];
-  const docsCompras = (comprasRes.data ?? []).map((a) => ({ documento: a.documento, descricao: a.descricao, nome: a.nome, caminho: a.caminho, enviadoEm: a.created_at }));
+  const docsCompras = (comprasRes.data ?? []).map((a) => ({ documento: a.documento, descricao: a.descricao, nome: a.nome, caminho: a.caminho, enviadoEm: a.enviado_em }));
   const [urlsNegocio, urlsEngenharia, urlsCompras] = await Promise.all([
     assinar(supabase, "anexos", linhas.filter((l) => l.origem === "negocio").map((l) => l.caminho)),
     assinar(supabase, BUCKET_DOCUMENTOS_ENGENHARIA, linhas.filter((l) => l.origem === "engenharia").map((l) => l.caminho)),

@@ -20,7 +20,20 @@ export const ROTULO_STATUS_ITEM: Record<StatusItemEngenharia, string> = {
 /** Autorização na Engenharia da obra, como `autorizacao_setor_obra`: null = só leitura. */
 export type AutorizacaoEngenharia = "admin" | "coordenar" | "executar" | null;
 
-export type DocumentoEngenhariaVM = { id: string; nome: string; versao: number; enviadoPor: string | null; quando: string };
+export type DocumentoEngenhariaVM = {
+  id: string;
+  nome: string;
+  versao: number;
+  enviadoPor: string | null;
+  quando: string;
+  /** Cópia de um anexo do negócio (20261128100000_documentos_cliente_engenharia_administrativo.sql). */
+  doNegocio: boolean;
+  /** Anexo do negócio copiado; null se não veio do negócio ou se o anexo foi apagado depois. */
+  anexoOrigemId: string | null;
+};
+
+/** Anexo mais recente do negócio para um item que é documento do cliente (só para quem atua na Engenharia). */
+export type ArquivoNegocioVM = { anexoId: string; nome: string; url: string | null; enviadoPor: string | null; quando: string };
 
 export type ItemEngenhariaVM = {
   id: string;
@@ -34,7 +47,23 @@ export type ItemEngenhariaVM = {
   atualizadoEm: string | null;
   /** Versões, da mais nova para a mais antiga; vazio para quem não vê documentos. */
   documentos: DocumentoEngenhariaVM[];
+  /** Item marcado como documento do cliente no modelo: o arquivo dele no negócio, se houver. */
+  arquivoNegocio: ArquivoNegocioVM | null;
 };
+
+/**
+ * O que o item oferece com o arquivo do negócio: "usar" (item ainda sem versão), "nova_versao" (o anexo do negócio
+ * não é a versão atual) ou null (sem arquivo no negócio, ou ele já é a versão atual).
+ */
+export function ofertaArquivoNegocio(item: Pick<ItemEngenhariaVM, "documentos" | "arquivoNegocio">): "usar" | "nova_versao" | null {
+  if (!item.arquivoNegocio) return null;
+  const atual = item.documentos[0];
+  if (!atual) return "usar";
+  return atual.anexoOrigemId === item.arquivoNegocio.anexoId ? null : "nova_versao";
+}
+
+/** Marcar inválido avisa o vendedor quando a versão atual veio do negócio (a RPC decide; a tela só avisa antes). */
+export const invalidoAvisaVendedor = (item: Pick<ItemEngenhariaVM, "documentos">) => item.documentos[0]?.doNegocio === true;
 
 export const statusItem = (s: string): StatusItemEngenharia =>
   (STATUS_ITEM_ENGENHARIA as readonly string[]).includes(s) ? (s as StatusItemEngenharia) : "pendente";
