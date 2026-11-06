@@ -1,6 +1,6 @@
 # Estado do projeto — Raion CRM
 
-## Compras — P2: orçamentos e arquivos da obra (em andamento, 06/11/2026)
+## Compras — P2: orçamentos e arquivos da obra (#345; migration aplicada em produção em 06/11/2026 antes do merge, tag `migracao-pr345-1fd9c4c`, run 42194062727)
 
 Branch `feat/compras-orcamentos` (worktree `C:\dev\crm-compras`). Migration `20261126100000_compras_orcamentos.sql`. Desenho aprovado "Orçamentos e pedidos da obra" (canvas "Compras · Pedidos de compra").
 
@@ -8,7 +8,7 @@ Branch `feat/compras-orcamentos` (worktree `C:\dev\crm-compras`). Migration `202
 - App: tela `/obras/[id]/compras` (cartões dos orçamentos com selos Escolhido, Entrega mais rápida, Parcial e Vencido; novo orçamento; arquivos de compra); link "Orçamentos e arquivos (N)" no cartão Pedidos de compra da ficha; "Gerar pedido deste" abre o novo pedido com fornecedor e entrega do orçamento e mostra o valor dele como referência.
 - Decisões do Evandro (06/11/2026): tela própria (como no desenho); campo "Condição de pagamento" opcional (o cartão do desenho mostrava, o formulário não); arquivo obrigatório; corrigir e descartar com motivo enquanto não virou pedido, sem apagar o arquivo; um orçamento gera no máximo um pedido ativo (pedido cancelado libera); a NF do fornecedor fica fora da lista de arquivos; "Previsto na venda" = planejado de Equipamentos, só para quem vê os custos.
 - **P2b (próxima, aguardando comando):** PDF do pedido gerado pelo Raion, na hora em que alguém abre (sem guardar). Pergunta em aberto: endereço de entrega no PDF é o da obra (cliente) ou o da empresa.
-- Produção: a migration só pelo `banco-producao.yml`, aprovada pelo Evandro, antes ou junto do deploy (o preview usa o banco de produção).
+- Produção: migration aplicada em 06/11/2026 pelo `banco-producao.yml` (dry-run 42193923434 listou só ela; aplicação 42194062727), aprovada pelo Evandro; autorização no workflow pela PR desta branch (`chore/autorizar-migracao-345`).
 
 ## Compras — P1: pedidos de compra (mesclada na #343, 05/11/2026; migration aplicada em produção logo depois, tag `migracao-pr343-0ee2650`, run 42146497255)
 
