@@ -59,7 +59,7 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
 
   const supabase = await criarClienteServidor();
   // A lista navegável é recalculada aqui, a cada obra: mesma empresa, mesma RLS, mesmos filtros.
-  const [obra, lista, tarefasSetor, vistoria, vistorias, cronograma, orcamento, lancamentos, justificativasRes, escalonamentosRes, identidades, prazosRes, substituicoes, pedidosCompra, obraCompras, atuoEmCompras] = await Promise.all([
+  const [obra, lista, tarefasSetor, vistoria, vistorias, cronograma, orcamento, lancamentos, justificativasRes, escalonamentosRes, identidades, prazosRes, substituicoes, pedidosCompra, obraCompras, atuoEmCompras, orcamentosCompra] = await Promise.all([
     carregarDetalheObra(supabase, { empresaId: atual.empresaId, papel: atual.papel, obraId: id, membroId: atual.membroId }),
     carregarObras(supabase, { empresaId: atual.empresaId, papel: atual.papel, comResponsaveis: false }),
     carregarTarefasSetor(supabase, { empresaId: atual.empresaId, membroId: atual.membroId, papel: atual.papel, obraId: id, filtro: "todas" }),
@@ -87,9 +87,11 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
     carregarPedidos(supabase, { empresaId: atual.empresaId, obraId: id }),
     carregarObraParaPedido(supabase, { papel: atual.papel, obraId: id }),
     acessaCompras(supabase, atual.empresaId, atual.papel),
+    // Orçamentos em comparação (mesma visibilidade dos pedidos), para o link "Orçamentos e arquivos".
+    supabase.from("compras_orcamentos").select("id", { count: "exact", head: true }).eq("obra_id", id).is("descartado_em", null),
   ]);
   if (!obra) notFound();
-  for (const r of [justificativasRes, escalonamentosRes, identidades, prazosRes]) if (r.error) throw r.error;
+  for (const r of [justificativasRes, escalonamentosRes, identidades, prazosRes, orcamentosCompra]) if (r.error) throw r.error;
   const navegacao = montarNavegacao(lista.obras, filtros, id);
 
   const { resumo, gestao } = obra;
@@ -140,7 +142,8 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
   const statusCompras = obra.setores.find((x) => x.setor === "compras")?.status ?? null;
   const emAndamento = resumo.situacao === "em_andamento";
   const podeIniciarCompra = statusCompras === "a_comprar" && emAndamento && (autorizacaoCompras != null || atuoEmCompras);
-  const mostrarPedidos = pedidosCompra.length > 0 || autorizacaoCompras != null;
+  const qtdOrcamentos = orcamentosCompra.count ?? 0;
+  const mostrarPedidos = pedidosCompra.length > 0 || qtdOrcamentos > 0 || autorizacaoCompras != null;
   const resumoFinanceiro = financeiro ? resumoContas(financeiro.contas, hoje) : null;
   const escalonamentos = (escalonamentosRes.data ?? []).map((e) => ({
     id: e.id,
@@ -337,6 +340,7 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
               podeEscrever={autorizacaoCompras != null && emAndamento}
               podeNovoPedido={autorizacaoCompras != null && emAndamento && statusCompras != null && statusCompras !== "a_comprar"}
               hoje={hoje}
+              qtdOrcamentos={qtdOrcamentos}
             />
           </Cartao>
         </div>

@@ -3,11 +3,14 @@ import { notFound, redirect } from "next/navigation";
 import { FormularioPedido } from "@/components/compras/formulario-pedido";
 import { CabecalhoPagina } from "@/components/cabecalho-pagina";
 import { acessaCompras, carregarFornecedores, carregarObraParaPedido, carregarPedidos, carregarTelaCompras } from "@/lib/compras/dados";
+import { ROTULO_COBERTURA } from "@/lib/compras/orcamentos-regras";
 import { numeroPedido, pedidoEditavel } from "@/lib/compras/regras";
 import { hojeEmSaoPaulo } from "@/lib/formatacao";
 import { GERIR_OBRAS } from "@/lib/permissoes";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Novo pedido de compra (ou edição de um pedido ainda sem nota e sem recebimento). Sem `?obra=`, a pessoa escolhe entre
@@ -20,6 +23,7 @@ export default async function PedidoCompra({ searchParams }: PageProps<"/compras
   const params = await searchParams;
   const obraId = typeof params.obra === "string" ? params.obra : null;
   const pedidoId = typeof params.pedido === "string" ? params.pedido : null;
+  const orcamentoId = !pedidoId && typeof params.orcamento === "string" && UUID.test(params.orcamento) ? params.orcamento : null;
 
   if (!obraId) {
     const { obrasParaPedido } = await carregarTelaCompras(supabase, { empresaId: atual.empresaId, papel: atual.papel, membroId: atual.membroId });
@@ -45,14 +49,28 @@ export default async function PedidoCompra({ searchParams }: PageProps<"/compras
     );
   }
 
-  const [obra, pedidos, fornecedores] = await Promise.all([
+  const [obra, pedidos, fornecedores, orcamentoRes] = await Promise.all([
     carregarObraParaPedido(supabase, { papel: atual.papel, obraId }),
     carregarPedidos(supabase, { empresaId: atual.empresaId, obraId }),
     carregarFornecedores(supabase, atual.empresaId),
+    // "Gerar pedido deste": o orçamento da obra (a RLS decide quem lê; o banco confere de novo ao criar).
+    orcamentoId
+      ? supabase
+          .from("compras_orcamentos")
+          .select("id, fornecedor, entrega_prevista, valor_total, cobertura, itens_descricao, pedido_id, descartado_em")
+          .eq("id", orcamentoId)
+          .eq("obra_id", obraId)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
   ]);
+  if (orcamentoRes.error) throw orcamentoRes.error;
   if (!obra) notFound();
   const editado = pedidoId ? pedidos.find((p) => p.id === pedidoId) : undefined;
   if (pedidoId && (!editado || !pedidoEditavel(editado))) redirect(`/obras/${obraId}#pedidos-compra`);
+  // Orçamento descartado ou que já virou pedido ativo: volta para a lista de orçamentos.
+  const orc = orcamentoRes.data;
+  const pedidoDoOrcamento = orc?.pedido_id ? pedidos.find((p) => p.id === orc.pedido_id) : undefined;
+  if (orcamentoId && (!orc || orc.descartado_em || (pedidoDoOrcamento && !pedidoDoOrcamento.cancelado))) redirect(`/obras/${obraId}/compras`);
 
   const jaPedido: Record<number, number> = {};
   for (const p of pedidos) {
@@ -70,13 +88,24 @@ export default async function PedidoCompra({ searchParams }: PageProps<"/compras
         descricao={`${obra.clienteNome} · obra #${obra.numero}${obra.cidade ? ` · ${obra.cidade}` : ""}. Os itens vêm do kit vendido: ajuste quantidades e preços, tire o que não vem deste fornecedor e acrescente o que faltar.`}
       />
       <FormularioPedido
-        key={pedidoId ?? "novo"}
+        key={pedidoId ?? orcamentoId ?? "novo"}
         obraId={obra.id}
         kit={obra.kit}
         orcamento={obra.orcamento}
         fornecedores={fornecedores}
         hoje={hojeEmSaoPaulo()}
         jaPedido={jaPedido}
+        doOrcamento={
+          orc
+            ? {
+                id: orc.id,
+                fornecedor: orc.fornecedor,
+                entregaPrevista: orc.entrega_prevista,
+                valorTotal: Number(orc.valor_total),
+                itens: orc.cobertura === "parte" ? (orc.itens_descricao ?? ROTULO_COBERTURA.parte) : ROTULO_COBERTURA.kit_completo,
+              }
+            : undefined
+        }
         inicial={
           editado && {
             pedidoId: editado.id,

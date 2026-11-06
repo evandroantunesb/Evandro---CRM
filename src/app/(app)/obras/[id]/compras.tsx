@@ -37,6 +37,7 @@ export function PedidosCompraObra({
   podeEscrever,
   podeNovoPedido,
   hoje,
+  qtdOrcamentos,
 }: {
   obra: { obraId: string; empresaId: string };
   pedidos: PedidoVM[];
@@ -44,6 +45,8 @@ export function PedidosCompraObra({
   podeEscrever: boolean;
   podeNovoPedido: boolean;
   hoje: string;
+  /** Orçamentos em comparação (sem os descartados). */
+  qtdOrcamentos: number;
 }) {
   const ativos = pedidos.filter((p) => !p.cancelado);
   const linhasKit = kitComprado(kit, pedidos);
@@ -54,14 +57,22 @@ export function PedidosCompraObra({
         <p className="text-sm text-texto-2">
           {ativos.length === 0 ? "Nenhum pedido ainda." : `${ativos.length} ${ativos.length === 1 ? "pedido" : "pedidos"} · ${formatarMoeda(total)}`}
         </p>
-        {podeNovoPedido && (
+        <div className="flex flex-wrap items-center gap-2">
           <Link
-            href={`/compras/pedido?obra=${obra.obraId}`}
+            href={`/obras/${obra.obraId}/compras`}
             className="inline-flex min-h-9 items-center rounded-full border border-linha bg-superficie px-3.5 text-sm font-medium text-texto hover:border-dourado"
           >
-            + Pedido de compra
+            Orçamentos e arquivos{qtdOrcamentos > 0 && ` (${qtdOrcamentos})`}
           </Link>
-        )}
+          {podeNovoPedido && (
+            <Link
+              href={`/compras/pedido?obra=${obra.obraId}`}
+              className="inline-flex min-h-9 items-center rounded-full border border-linha bg-superficie px-3.5 text-sm font-medium text-texto hover:border-dourado"
+            >
+              + Pedido de compra
+            </Link>
+          )}
+        </div>
       </div>
 
       {linhasKit.length > 0 && (
