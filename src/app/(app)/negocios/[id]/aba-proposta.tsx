@@ -19,7 +19,7 @@ import { Contrato } from "./contrato";
 import { DescontoNegocio } from "./desconto";
 import { DadosCliente } from "./dados-cliente";
 import { mensagemPendenciasContrato } from "@/lib/dados-cliente-contrato";
-import { mensagemPendenciasDocumentos, pendenciasDocumentosContrato } from "@/lib/documentos-cliente";
+import { mensagemPendenciasDocumentos, pendenciasDocumentosContrato, recusasAtivas } from "@/lib/documentos-cliente";
 import { DocumentosCliente } from "./documentos-cliente";
 import { EletropostoNegocio } from "./eletroposto";
 import { normalizarModelos, type ModeloEletroposto } from "@/lib/eletroposto";
@@ -66,9 +66,12 @@ export function AbaProposta({ ficha }: { ficha: Ficha }) {
     statusPagamento,
     registrosPagamento,
     desconto,
+    recusasDocumentos,
   } = ficha;
   // Documentos do cliente que faltam nos anexos do negócio (o banco confere de novo ao gerar o contrato).
   const pendenciasDocumentos = pendenciasDocumentosContrato((anexos ?? []).map((a) => a.categoria), contato?.tipo);
+  // Depois do contrato, o cartão volta só quando a Engenharia recusou um documento que continua anexado.
+  const temRecusa = recusasAtivas(anexos ?? [], recusasDocumentos).size > 0;
   return ehEletroposto ? (
     <div id="proposta" className="scroll-mt-4">
       <Cartao titulo="Eletroposto">
@@ -177,10 +180,19 @@ export function AbaProposta({ ficha }: { ficha: Ficha }) {
               <DadosCliente negocioId={negocio.id} contato={contato} pendencias={pendenciasCliente} />
             </Cartao>
           )}
-          {!arquivado && (!contrato || contrato.status === "rascunho") && (
-            <Cartao titulo="Documentos do cliente">
-              <DocumentosCliente empresaId={atual.empresaId} negocioId={negocio.id} tipoCliente={contato?.tipo} anexos={anexos ?? []} podeAnexar />
-            </Cartao>
+          {!arquivado && (!contrato || contrato.status === "rascunho" || temRecusa) && (
+            <div id="documentos-cliente" className="scroll-mt-4">
+              <Cartao titulo="Documentos do cliente">
+                <DocumentosCliente
+                  empresaId={atual.empresaId}
+                  negocioId={negocio.id}
+                  tipoCliente={contato?.tipo}
+                  anexos={anexos ?? []}
+                  recusas={recusasDocumentos}
+                  podeAnexar
+                />
+              </Cartao>
+            </div>
           )}
           <Cartao titulo="Contrato">
             <Contrato

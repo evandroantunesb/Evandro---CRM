@@ -2,16 +2,20 @@
 
 import { Paperclip } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useState, useTransition } from "react";
 import { Botao, CLASSE_ENTRADA, Mensagem, Selo } from "@/components/ui";
 import { alterarItemEngenharia, aplicarChecklistEngenharia, registrarDocumentoEngenharia } from "@/lib/acoes/engenharia";
+import { usarArquivoNegocioEngenharia } from "@/lib/acoes/engenharia-arquivo-negocio";
 import { metaArquivo, nomeSeguro, problemaArquivo } from "@/lib/anexos-regras";
 import {
   BUCKET_DOCUMENTOS_ENGENHARIA,
   ROTULO_STATUS_ITEM,
   acoesItem,
   agruparItens,
+  invalidoAvisaVendedor,
+  ofertaArquivoNegocio,
   resumoChecklist,
+  type ArquivoNegocioVM,
   type AutorizacaoEngenharia,
   type ItemEngenhariaVM,
   type StatusItemEngenharia,
@@ -102,6 +106,7 @@ function Item({ obraId, pasta, item, acoes }: { obraId: string; pasta: string; i
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [comMotivo, setComMotivo] = useState<"invalido" | "dispensado" | null>(null);
+  const oferta = ofertaArquivoNegocio(item);
 
   async function anexar(input: HTMLInputElement) {
     const lista = Array.from(input.files ?? []);
@@ -158,19 +163,28 @@ function Item({ obraId, pasta, item, acoes }: { obraId: string; pasta: string; i
                 v{d.versao}
                 {i === 0 && item.documentos.length > 1 ? " (atual)" : ""} · {d.enviadoPor ?? "—"}, {dataHora(d.quando)}
               </span>
+              {d.doNegocio && <Selo tom="neutro">Do negócio</Selo>}
             </li>
           ))}
         </ul>
       )}
 
+      {oferta && acoes.anexar && !comMotivo && <ArquivoNegocio obraId={obraId} itemId={item.id} arquivo={item.arquivoNegocio!} novo={oferta === "nova_versao"} />}
+
       {comMotivo ? (
-        <FormMotivo obraId={obraId} itemId={item.id} status={comMotivo} fechar={() => setComMotivo(null)} />
+        <FormMotivo
+          obraId={obraId}
+          itemId={item.id}
+          status={comMotivo}
+          avisaVendedor={comMotivo === "invalido" && invalidoAvisaVendedor(item)}
+          fechar={() => setComMotivo(null)}
+        />
       ) : (
         <div className="flex flex-wrap items-center gap-2">
           {acoes.anexar && (
             <label className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-dashed border-zinc-400 px-3 py-1 text-xs text-zinc-700 hover:bg-zinc-50">
               <Paperclip aria-hidden className="size-3.5" />
-              {enviando ? "Enviando..." : item.documentos.length ? "Nova versão" : "Anexar"}
+              {enviando ? "Enviando..." : oferta === "usar" ? "Anexar outro" : item.documentos.length ? "Nova versão" : "Anexar"}
               <input type="file" multiple disabled={enviando} className="hidden" aria-label={`Anexar arquivo: ${item.titulo}`} onChange={(e) => anexar(e.target)} />
             </label>
           )}
@@ -208,7 +222,62 @@ function MudarStatus({ obraId, itemId, status, rotulo }: { obraId: string; itemI
   );
 }
 
-function FormMotivo({ obraId, itemId, status, fechar }: { obraId: string; itemId: string; status: "invalido" | "dispensado"; fechar: () => void }) {
+/**
+ * Anexo do negócio para um item que é documento do cliente (prévia P2c "Engenharia: checklist com o arquivo do
+ * negócio"): "Usar arquivo do negócio" guarda uma cópia na obra como nova versão e o item vai para conferência.
+ */
+function ArquivoNegocio({ obraId, itemId, arquivo, novo }: { obraId: string; itemId: string; arquivo: ArquivoNegocioVM; novo: boolean }) {
+  const router = useRouter();
+  const [pendente, iniciar] = useTransition();
+  const [erro, setErro] = useState<string | null>(null);
+  function usar() {
+    setErro(null);
+    iniciar(async () => {
+      const r = await usarArquivoNegocioEngenharia({ obraId, itemId, anexoId: arquivo.anexoId });
+      if (!r?.ok) setErro(r?.mensagem ?? "Não foi possível usar o arquivo do negócio.");
+      router.refresh();
+    });
+  }
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-dashed border-dourado bg-dourado/5 px-3 py-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0 text-xs">
+          <p className="text-zinc-500">{novo ? "Arquivo novo no negócio" : "No negócio"}</p>
+          {arquivo.url ? (
+            <a href={arquivo.url} target="_blank" rel="noopener" className="inline-flex items-center gap-1 break-all text-amber-700 hover:underline">
+              <Paperclip aria-hidden className="size-3.5" />
+              {arquivo.nome}
+            </a>
+          ) : (
+            <span className="break-all text-texto">{arquivo.nome}</span>
+          )}
+          <span className="text-zinc-500">
+            {" "}
+            · anexado{arquivo.enviadoPor ? ` por ${arquivo.enviadoPor}` : ""} em {dataHora(arquivo.quando)}
+          </span>
+        </div>
+        <Botao type="button" onClick={usar} disabled={pendente}>
+          {pendente ? "Copiando..." : novo ? "Usar como nova versão" : "Usar arquivo do negócio"}
+        </Botao>
+      </div>
+      {erro && <p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-800">{erro}</p>}
+    </div>
+  );
+}
+
+function FormMotivo({
+  obraId,
+  itemId,
+  status,
+  avisaVendedor,
+  fechar,
+}: {
+  obraId: string;
+  itemId: string;
+  status: "invalido" | "dispensado";
+  avisaVendedor: boolean;
+  fechar: () => void;
+}) {
   const [resultado, acao, pendente] = useActionState(alterarItemEngenharia, null);
   useEffect(() => {
     if (resultado?.ok) fechar();
@@ -223,6 +292,7 @@ function FormMotivo({ obraId, itemId, status, fechar }: { obraId: string; itemId
         {rotulo}
         <input name="motivo" required minLength={3} maxLength={500} className={CLASSE_ENTRADA} autoFocus />
       </label>
+      {avisaVendedor && <p className="text-xs text-zinc-600">O arquivo veio do negócio: o vendedor recebe o aviso com este motivo para pedir outro ao cliente.</p>}
       <div className="flex flex-wrap items-center gap-2">
         <Botao type="submit" disabled={pendente}>
           {status === "invalido" ? "Marcar inválido" : "Confirmar"}

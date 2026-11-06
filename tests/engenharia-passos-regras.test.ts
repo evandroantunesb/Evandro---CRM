@@ -79,7 +79,7 @@ describe("montarPassosEngenharia (P6b)", () => {
       detalhe: "Necessita revisão: o checklist mudou depois da revisão",
     });
     // Documento novo também conta.
-    const comDocumento = [{ ...item(true, "valido", "2026-10-19T12:00:00Z"), documentos: [{ id: "d", nome: "a.pdf", versao: 2, enviadoPor: null, quando: "2026-10-22T00:00:00Z" }] }];
+    const comDocumento = [{ ...item(true, "valido", "2026-10-19T12:00:00Z"), documentos: [{ id: "d", nome: "a.pdf", versao: 2, enviadoPor: null, quando: "2026-10-22T00:00:00Z", doNegocio: false, anexoOrigemId: null }] }];
     expect(revisaoDesatualizada(revisao, comDocumento)).toBe(true);
   });
 

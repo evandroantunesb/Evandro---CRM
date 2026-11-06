@@ -5,6 +5,7 @@ import { estornarPagamentoConta } from "@/lib/acoes/financeiro-obra";
 import { prazoConta, rotuloObra, type ContaFinanceiroVM, type NfClientePendenteVM } from "@/lib/financeiro/regras";
 import { formatarMoeda } from "@/lib/formatacao";
 import { ROTULO_CATEGORIA_CUSTO } from "@/lib/obras/custos";
+import { DadosNfLinha } from "./dados-nf-linha";
 import { CabecalhoTabela, LinhaFinanceiro, type AcaoLinha } from "./linha";
 
 /** Tabelas das abas do Financeiro (desenho aprovado "Perfis · Administrativo › Financeiro"). */
@@ -189,7 +190,10 @@ export function NotasPendentes({
                     Instalação concluída
                   </span>,
                 ]}
-                acoes={o.podeEscrever ? [{ rotulo: "Anexar nota fiscal", principal: true, conteudo: <FormNfCliente obra={obraDe(o, empresaId)} /> }] : []}
+                acoes={[
+                  ...(o.podeEscrever ? [{ rotulo: "Anexar nota fiscal", principal: true, conteudo: <FormNfCliente obra={obraDe(o, empresaId)} /> }] : []),
+                  { rotulo: "Dados e documentos", conteudo: <DadosNfLinha obra={obraDe(o, empresaId)} /> },
+                ]}
               />
             ))}
           </ul>

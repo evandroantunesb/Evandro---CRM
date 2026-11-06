@@ -25,6 +25,8 @@ import { carregarTarefasSetor } from "@/lib/tarefas-setor";
 import { carregarSituacaoVistoria, carregarVistoriasEngenharia } from "@/lib/engenharia-vistoria";
 import { carregarDetalheObra, type MarcoDetalheVM } from "@/lib/obras/detalhe";
 import { carregarFinanceiroObra } from "@/lib/obras/financeiro";
+import { carregarDadosNfCliente } from "@/lib/financeiro/dados-nf-cliente";
+import { DadosNfCliente } from "@/components/financeiro/dados-nf-cliente";
 import { resumoContas } from "@/lib/obras/financeiro-regras";
 import {
   ROTULO_ALERTA_OBRA,
@@ -136,6 +138,8 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
       })
     : null;
   const podeFinanceiro = autorizacaoAdministrativo != null && !cancelada;
+  // Dados e documentos para a NF do cliente (P2c): o banco só devolve para quem atua no Administrativo da obra.
+  const dadosNf = financeiro?.nfCliente ? await carregarDadosNfCliente(supabase, id) : null;
   // Compras: escreve quem atua em Compras na obra (ou no setor que atende no lugar dele), o coordenador, o gestor ou o
   // admin; pedidos só depois do "Iniciar compra" e com a obra em andamento (o banco confere de novo).
   const autorizacaoCompras = gestaoDoSetor("compras")?.permissoes.autorizacao ?? null;
@@ -323,7 +327,14 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
             )}
             {financeiro.nfCliente && (
               <Cartao titulo="Nota fiscal do cliente">
-                <NotaFiscalCliente key={resumo.id} obra={{ obraId: resumo.id, empresaId: atual.empresaId }} nf={financeiro.nfCliente.nf} podeAnexar={podeFinanceiro} />
+                <div className="flex flex-col gap-4">
+                  <NotaFiscalCliente key={resumo.id} obra={{ obraId: resumo.id, empresaId: atual.empresaId }} nf={financeiro.nfCliente.nf} podeAnexar={podeFinanceiro} />
+                  {dadosNf && (
+                    <div className="border-t border-linha pt-4">
+                      <DadosNfCliente obra={{ obraId: resumo.id, empresaId: atual.empresaId }} dados={dadosNf} />
+                    </div>
+                  )}
+                </div>
               </Cartao>
             )}
           </div>

@@ -3700,8 +3700,10 @@ export type Database = {
       };
       obra_engenharia_documentos: {
         Row: {
+          anexo_origem_id: string | null;
           caminho: string;
           created_at: string;
+          do_negocio: boolean;
           empresa_id: string;
           enviado_por: string | null;
           id: string;
@@ -3713,8 +3715,10 @@ export type Database = {
           versao: number;
         };
         Insert: {
+          anexo_origem_id?: string | null;
           caminho: string;
           created_at?: string;
+          do_negocio?: boolean;
           empresa_id: string;
           enviado_por?: string | null;
           id?: string;
@@ -3726,8 +3730,10 @@ export type Database = {
           versao: number;
         };
         Update: {
+          anexo_origem_id?: string | null;
           caminho?: string;
           created_at?: string;
+          do_negocio?: boolean;
           empresa_id?: string;
           enviado_por?: string | null;
           id?: string;
@@ -3739,6 +3745,13 @@ export type Database = {
           versao?: number;
         };
         Relationships: [
+          {
+            foreignKeyName: "obra_engenharia_documentos_anexo_origem_id_fkey";
+            columns: ["anexo_origem_id"];
+            isOneToOne: false;
+            referencedRelation: "anexos";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "obra_engenharia_documentos_empresa_id_item_id_fkey";
             columns: ["empresa_id", "item_id"];
@@ -6673,6 +6686,14 @@ export type Database = {
         }[];
       };
       avaliar_condicao_regra: { Args: { p_condicao: Json; p_payload: Json }; Returns: boolean };
+      avisar_documento_cliente_recusado: {
+        Args: {
+          p_documento: string;
+          p_item: Database["public"]["Tables"]["obra_engenharia_itens"]["Row"];
+          p_motivo: string;
+        };
+        Returns: undefined;
+      };
       buscar_contato_duplicado: {
         Args: { p_email: string; p_empresa_id: string; p_telefone: string };
         Returns: {
@@ -6941,6 +6962,24 @@ export type Database = {
           uf: string;
         }[];
       };
+      dados_nf_cliente_obra: {
+        Args: { p_obra_id: string };
+        Returns: {
+          bairro: string;
+          cep: string;
+          cidade: string;
+          complemento: string;
+          documento: string;
+          email: string;
+          endereco: string;
+          inscricao_estadual: string;
+          logradouro: string;
+          nome: string;
+          numero: string;
+          tipo: string;
+          uf: string;
+        }[];
+      };
       data_pascoa: { Args: { p_ano: number }; Returns: string };
       decidir_atribuicao_lead: {
         Args: { p_automatico: boolean; p_id: string; p_membro_final_id: string };
@@ -7043,7 +7082,18 @@ export type Database = {
         Args: { p_empresa_id: string; p_fim: string; p_inicio: string };
         Returns: number;
       };
+      documento_cliente_da_categoria: { Args: { p_categoria: string }; Returns: string };
       documento_cliente_pelo_titulo: { Args: { p_titulo: string }; Returns: string };
+      documentos_cliente_compras_obra: {
+        Args: { p_obra_id: string };
+        Returns: {
+          caminho: string;
+          descricao: string;
+          documento: string;
+          enviado_em: string;
+          nome: string;
+        }[];
+      };
       documentos_cliente_obra: {
         Args: { p_obra_id: string };
         Returns: {
@@ -7052,6 +7102,27 @@ export type Database = {
           enviado_em: string;
           nome: string;
           origem: string;
+        }[];
+      };
+      documentos_negocio_engenharia: {
+        Args: { p_obra_id: string };
+        Returns: {
+          anexo_id: string;
+          caminho: string;
+          documento: string;
+          enviado_em: string;
+          enviado_por: string;
+          nome: string;
+        }[];
+      };
+      documentos_recusados_negocio: {
+        Args: { p_negocio_id: string };
+        Returns: {
+          anexo_id: string;
+          documento: string;
+          motivo: string;
+          recusado_em: string;
+          recusado_por: string;
         }[];
       };
       e_closer_de_handoff_pendente: { Args: { p_negocio_id: string }; Returns: boolean };
@@ -7531,7 +7602,9 @@ export type Database = {
       pode_escalonar_obra: { Args: { p_obra_id: string }; Returns: boolean };
       pode_informar_pagamento: { Args: { p_contrato_id: string }; Returns: boolean };
       pode_ler_documento_cliente_anexo: { Args: { p_caminho: string }; Returns: boolean };
+      pode_ler_documento_cliente_compras: { Args: { p_caminho: string }; Returns: boolean };
       pode_ler_documento_cliente_engenharia: { Args: { p_caminho: string }; Returns: boolean };
+      pode_ler_documentos_cliente_obra: { Args: { p_obra_id: string }; Returns: boolean };
       pode_registrar_pagamento_negocio: { Args: { p_negocio_id: string }; Returns: boolean };
       pode_responder_handoff: { Args: { p_handoff_id: string }; Returns: boolean };
       pode_ver_avatar: { Args: { p_pasta: string }; Returns: boolean };
@@ -8094,6 +8167,10 @@ export type Database = {
           isOneToOne: true;
           isSetofReturn: false;
         };
+      };
+      usar_documento_negocio_engenharia: {
+        Args: { p_anexo_id: string; p_caminho: string; p_item_id: string };
+        Returns: string;
       };
       validar_anexo_financeiro: {
         Args: { p_caminho: string; p_nome: string; p_obra_id: string; p_tipo: string };
