@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { FormularioPedido } from "@/components/compras/formulario-pedido";
 import { CabecalhoPagina } from "@/components/cabecalho-pagina";
+import { carregarFaturamentoObra } from "@/lib/compras/dados-obra";
 import { acessaCompras, carregarFornecedores, carregarObraParaPedido, carregarPedidos, carregarTelaCompras } from "@/lib/compras/dados";
 import { ROTULO_COBERTURA } from "@/lib/compras/orcamentos-regras";
 import { numeroPedido, pedidoEditavel } from "@/lib/compras/regras";
@@ -49,7 +50,7 @@ export default async function PedidoCompra({ searchParams }: PageProps<"/compras
     );
   }
 
-  const [obra, pedidos, fornecedores, orcamentoRes] = await Promise.all([
+  const [obra, pedidos, fornecedores, orcamentoRes, faturamento] = await Promise.all([
     carregarObraParaPedido(supabase, { papel: atual.papel, obraId }),
     carregarPedidos(supabase, { empresaId: atual.empresaId, obraId }),
     carregarFornecedores(supabase, atual.empresaId),
@@ -57,11 +58,12 @@ export default async function PedidoCompra({ searchParams }: PageProps<"/compras
     orcamentoId
       ? supabase
           .from("compras_orcamentos")
-          .select("id, fornecedor, entrega_prevista, valor_total, cobertura, itens_descricao, pedido_id, descartado_em")
+          .select("id, fornecedor, entrega_prevista, valor_total, cobertura, itens_descricao, pedido_id, descartado_em, frete_modalidade, frete")
           .eq("id", orcamentoId)
           .eq("obra_id", obraId)
           .maybeSingle()
       : Promise.resolve({ data: null, error: null }),
+    carregarFaturamentoObra(supabase, { obraId, empresaId: atual.empresaId }),
   ]);
   if (orcamentoRes.error) throw orcamentoRes.error;
   if (!obra) notFound();
@@ -95,6 +97,7 @@ export default async function PedidoCompra({ searchParams }: PageProps<"/compras
         fornecedores={fornecedores}
         hoje={hojeEmSaoPaulo()}
         jaPedido={jaPedido}
+        faturamento={faturamento}
         doOrcamento={
           orc
             ? {
@@ -103,6 +106,8 @@ export default async function PedidoCompra({ searchParams }: PageProps<"/compras
                 entregaPrevista: orc.entrega_prevista,
                 valorTotal: Number(orc.valor_total),
                 itens: orc.cobertura === "parte" ? (orc.itens_descricao ?? ROTULO_COBERTURA.parte) : ROTULO_COBERTURA.kit_completo,
+                freteModalidade: orc.frete_modalidade === "fob" ? "fob" : "cif",
+                frete: Number(orc.frete),
               }
             : undefined
         }
@@ -115,6 +120,10 @@ export default async function PedidoCompra({ searchParams }: PageProps<"/compras
             vencimento: editado.vencimento,
             numeroFornecedor: editado.numeroFornecedor ?? "",
             frete: editado.frete,
+            freteModalidade: editado.freteModalidade,
+            faturarPara: editado.faturarPara,
+            entrega: editado.entrega,
+            observacao: editado.observacao ?? "",
             itens: editado.itens.map((i) => ({ kitIndice: i.kitIndice, descricao: i.descricao, unidade: i.unidade, quantidade: i.quantidade, valorUnitario: i.valorUnitario })),
           }
         }

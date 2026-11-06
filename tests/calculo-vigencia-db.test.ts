@@ -30,7 +30,7 @@ const { gerarLinkProposta } = await import("@/lib/acoes/propostas");
 const { gerarContratoComCliente } = await import("@/lib/contratos-geracao");
 const { atualizarPrecoCalculoComCliente, salvarKitComCliente } = await import("@/lib/negocios-gravacao");
 const { MENSAGEM_CONTRATO_CALCULO_DESATUALIZADO, MENSAGEM_PRECO_CALCULO_LEGADO } = await import("@/lib/calculo-vigencia");
-const { CLIENTE_CONTRATO, criarUsuario, servico, sufixo } = await import("./ajuda");
+const { CLIENTE_CONTRATO, anexarDocumentosContrato, criarUsuario, servico, sufixo } = await import("./ajuda");
 const { nomeKitPersonalizado } = await import("@/lib/calculadora");
 const { mensagemDeRecusa, MENSAGEM_PROPOSTA_ECONOMIA_INDISPONIVEL } = await import("@/lib/calculo-vigencia");
 const { mensagemPropostaIncompleta, pendenciasSemDados } = await import("@/lib/estimativa-financeira");
@@ -161,8 +161,10 @@ const formulario = (negocioId: string) => {
   return f;
 };
 const gerarProposta = (negocioId: string) => gerarLinkProposta(null, formulario(negocioId));
-const gerarContrato = (negocioId: string) =>
-  gerarContratoComCliente(cliente(vendedor), { empresaId: empresa, membroId: membroVendedor, negocioId });
+const gerarContrato = async (negocioId: string) => {
+  await anexarDocumentosContrato(negocioId);
+  return gerarContratoComCliente(cliente(vendedor), { empresaId: empresa, membroId: membroVendedor, negocioId });
+};
 const atualizarPreco = (negocioId: string) => atualizarPrecoCalculoComCliente(cliente(vendedor), atual(), negocioId);
 
 /** Cliente cujas leituras de `kit_componentes` falham (a leitura incerta nunca vale como cálculo vigente). */

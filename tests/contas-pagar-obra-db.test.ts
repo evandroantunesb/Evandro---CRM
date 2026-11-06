@@ -8,7 +8,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { beforeAll, describe, expect, it } from "vitest";
-import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato } from "./ajuda";
 
 const BUCKET = "financeiro-obra";
 
@@ -42,6 +42,7 @@ async function criarObra(titulo: string): Promise<string> {
     "negócio",
   );
   ok(await vendedor.cliente.from("negocios").update({ status: "ganho" }).eq("id", neg!.id), "ganho");
+  await anexarDocumentosContrato(neg!.id);
   const { data: contrato } = ok(
     await vendedor.cliente.from("contratos").insert({ empresa_id: empresa, negocio_id: neg!.id, conteudo: "Contrato de teste" }).select("id").single(),
     "contrato",

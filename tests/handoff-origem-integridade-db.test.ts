@@ -5,7 +5,7 @@
  * (`handoff.contrato_assinado`, `handoff.won`) seguem indo para o SDR de origem.
  */
 import { beforeAll, describe, expect, it } from "vitest";
-import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato } from "./ajuda";
 
 type Empresa = { id: string; funil: string; etapa: string; contato: string };
 
@@ -157,6 +157,7 @@ describe("bônus do SDR vai para o SDR de origem", () => {
     await closer.cliente.from("negocios").update({ handoff_origem_id: outroDaMesmaEmpresa.handoffId }).eq("id", negocioId);
     await closer.cliente.from("negocios").update({ handoff_origem_id: daOutraEmpresa.handoffId }).eq("id", negocioId);
 
+    await anexarDocumentosContrato(negocioId);
     const { data: contrato, error } = await closer.cliente
       .from("contratos")
       .insert({ empresa_id: A.id, negocio_id: negocioId, conteudo: "Contrato de teste" })

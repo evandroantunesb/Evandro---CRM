@@ -1,9 +1,7 @@
 import "server-only";
 import { carregarObras } from "@/lib/obras/dados";
-import { assinar } from "@/lib/obras/financeiro";
 import { autorizacaoSetor, type SetorDoMembro } from "@/lib/obras/gestao";
 import type { SupabaseServidor } from "@/lib/supabase/server";
-import { BUCKET_COMPRAS_OBRA, type ArquivoCompraVM, type OrcamentoVM } from "./orcamentos-regras";
 import { ehCategoria, kitDaObra, type ItemKitCompra, type ObraAComprarVM, type PedidoVM } from "./regras";
 
 /**
@@ -15,7 +13,7 @@ import { ehCategoria, kitDaObra, type ItemKitCompra, type ObraAComprarVM, type P
 const LIMITE_LINHAS = 1000;
 
 const COLUNAS_PEDIDO =
-  "id, obra_id, numero, fornecedor, categoria, entrega_prevista, vencimento, numero_fornecedor, frete, valor_total, nf_numero, nf_valor, nf_registrada_em, cancelado_em, motivo_cancelamento, created_at";
+  "id, obra_id, numero, fornecedor, categoria, entrega_prevista, vencimento, numero_fornecedor, frete, frete_modalidade, valor_total, faturar_para, entrega_endereco, entrega_recebe, entrega_telefone, observacao, nf_numero, nf_valor, nf_registrada_em, cancelado_em, motivo_cancelamento, created_at";
 
 type LinhaPedido = {
   id: string;
@@ -27,7 +25,13 @@ type LinhaPedido = {
   vencimento: string;
   numero_fornecedor: string | null;
   frete: number | string;
+  frete_modalidade: string;
   valor_total: number | string;
+  faturar_para: string;
+  entrega_endereco: string | null;
+  entrega_recebe: string | null;
+  entrega_telefone: string | null;
+  observacao: string | null;
   nf_numero: string | null;
   nf_valor: number | string | null;
   nf_registrada_em: string | null;
@@ -62,7 +66,11 @@ function montarPedidos(linhas: readonly LinhaPedido[], itens: readonly LinhaItem
             vencimento: l.vencimento,
             numeroFornecedor: l.numero_fornecedor,
             frete: Number(l.frete),
+            freteModalidade: l.frete_modalidade === "fob" ? "fob" : "cif",
             valorTotal: Number(l.valor_total),
+            faturarPara: l.faturar_para === "empresa" ? "empresa" : "cliente",
+            observacao: l.observacao,
+            entrega: l.entrega_endereco ? { endereco: l.entrega_endereco, recebe: l.entrega_recebe ?? "", telefone: l.entrega_telefone } : null,
             nfNumero: l.nf_numero,
             nfValor: l.nf_valor == null ? null : Number(l.nf_valor),
             temNf: l.nf_registrada_em != null,
@@ -236,78 +244,4 @@ export async function carregarFornecedores(supabase: SupabaseServidor, empresaId
     supabase.from("obra_contas_pagar").select("fornecedor").eq("empresa_id", empresaId).limit(LIMITE_LINHAS),
   ]);
   return [...new Set([...(p.data ?? []), ...(c.data ?? [])].map((l) => l.fornecedor.trim()))].sort((a, b) => a.localeCompare(b, "pt-BR"));
-}
-
-export type OrcamentosObraVM = { orcamentos: OrcamentoVM[]; arquivos: ArquivoCompraVM[] };
-
-/**
- * Orçamentos e arquivos de compra da obra (20261126100000_compras_orcamentos.sql), com os links assinados. A RLS devolve
- * vazio a quem não vê os pedidos. `pedidos` são os da obra (para o número e o fornecedor); `nomes`, membro → nome.
- */
-export async function carregarOrcamentosObra(
-  supabase: SupabaseServidor,
-  { obraId, pedidos, nomes }: { obraId: string; pedidos: readonly PedidoVM[]; nomes: ReadonlyMap<string, string> },
-): Promise<OrcamentosObraVM> {
-  const [orcRes, arqRes] = await Promise.all([
-    supabase
-      .from("compras_orcamentos")
-      .select(
-        "id, fornecedor, valor_total, cobertura, itens_descricao, entrega_prevista, valido_ate, condicao_pagamento, observacao, arquivo_id, pedido_id, descartado_em, motivo_descarte, created_at",
-      )
-      .eq("obra_id", obraId)
-      .order("created_at")
-      .limit(LIMITE_LINHAS),
-    supabase.from("compras_arquivos").select("id, tipo, pedido_id, fornecedor, caminho, nome, enviado_por, created_at").eq("obra_id", obraId).order("created_at", { ascending: false }).limit(LIMITE_LINHAS),
-  ]);
-  if (orcRes.error) throw orcRes.error;
-  if (arqRes.error) throw arqRes.error;
-  const linhasArq = arqRes.data ?? [];
-  const urls = await assinar(supabase, BUCKET_COMPRAS_OBRA, linhasArq.map((a) => a.caminho));
-  const pedidoPorId = new Map(pedidos.map((p) => [p.id, p]));
-  const arquivoPorId = new Map(linhasArq.map((a) => [a.id, a]));
-
-  const orcamentos = (orcRes.data ?? []).flatMap((o): OrcamentoVM[] => {
-    if (o.cobertura !== "kit_completo" && o.cobertura !== "parte") return [];
-    const arq = arquivoPorId.get(o.arquivo_id);
-    const pedido = o.pedido_id ? pedidoPorId.get(o.pedido_id) : undefined;
-    return [
-      {
-        id: o.id,
-        fornecedor: o.fornecedor,
-        valorTotal: Number(o.valor_total),
-        cobertura: o.cobertura,
-        itensDescricao: o.itens_descricao,
-        entregaPrevista: o.entrega_prevista,
-        validoAte: o.valido_ate,
-        condicaoPagamento: o.condicao_pagamento,
-        observacao: o.observacao,
-        arquivo: { nome: arq?.nome ?? "arquivo", url: arq ? (urls.get(arq.caminho) ?? null) : null },
-        pedido: pedido && !pedido.cancelado ? { id: pedido.id, numero: pedido.numero, criadoEm: pedido.criadoEm } : null,
-        descartado: o.descartado_em != null,
-        motivoDescarte: o.motivo_descarte,
-        criadoEm: o.created_at,
-      },
-    ];
-  });
-
-  const orcamentoDoArquivo = new Map((orcRes.data ?? []).map((o) => [o.arquivo_id, o]));
-  const arquivos = linhasArq.flatMap((a): ArquivoCompraVM[] => {
-    if (a.tipo !== "orcamento" && a.tipo !== "confirmacao" && a.tipo !== "outro") return [];
-    const orc = orcamentoDoArquivo.get(a.id);
-    const pedido = a.pedido_id ? pedidoPorId.get(a.pedido_id) : undefined;
-    return [
-      {
-        id: a.id,
-        tipo: a.tipo,
-        fornecedor: orc?.fornecedor ?? pedido?.fornecedor ?? a.fornecedor,
-        pedidoNumero: pedido?.numero ?? null,
-        nome: a.nome,
-        url: urls.get(a.caminho) ?? null,
-        enviadoPor: a.enviado_por ? (nomes.get(a.enviado_por) ?? null) : null,
-        enviadoEm: a.created_at,
-        descartado: orc?.descartado_em != null,
-      },
-    ];
-  });
-  return { orcamentos, arquivos };
 }

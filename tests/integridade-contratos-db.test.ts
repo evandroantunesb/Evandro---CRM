@@ -7,7 +7,7 @@
 import { Client } from "pg";
 import { urlBancoLocal } from "./banco-local";
 import { beforeAll, describe, expect, it } from "vitest";
-import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato } from "./ajuda";
 
 
 type Empresa = { id: string; funil: string; etapa: string; contato: string };
@@ -52,6 +52,7 @@ const eventosDo = async (negocioId: string) =>
   ((await servico.from("eventos").select("tipo, ator_id, beneficiario_id").eq("entidade_id", negocioId).order("id")).data ?? []);
 
 async function rascunho(u: Usuario, e: Empresa, negocioId: string) {
+  await anexarDocumentosContrato(negocioId);
   const r = await u.cliente
     .from("contratos")
     .insert({ empresa_id: e.id, negocio_id: negocioId, conteudo: "Contrato de teste", criado_por: m(e, u) })
@@ -72,6 +73,7 @@ beforeAll(async () => {
 describe("empresa do contrato = empresa do negócio", () => {
   it("INSERT com empresa_id de outra empresa onde o usuário também tem papel é recusado", async () => {
     const n = await criarNegocio(A, "ic-insert-cruzado", multi);
+    await anexarDocumentosContrato(n);
     const r = await multi.cliente.from("contratos").insert({ empresa_id: B.id, negocio_id: n, conteudo: "x", criado_por: m(A, multi) }).select("id");
     expect(r.error).not.toBeNull();
     expect((await servico.from("contratos").select("id").eq("negocio_id", n)).data).toHaveLength(0);
@@ -113,6 +115,7 @@ describe("empresa do contrato = empresa do negócio", () => {
 describe("a assinatura nasce do UPDATE, com responsável e eventos do banco", () => {
   it("INSERT já assinado é recusado e não emite evento", async () => {
     const n = await criarNegocio(A, "ic-ja-assinado", vendedorA);
+    await anexarDocumentosContrato(n);
     const r = await vendedorA.cliente.from("contratos").insert({ empresa_id: A.id, negocio_id: n, conteudo: "x", criado_por: m(A, vendedorA), status: "assinado" });
     expect(r.error).not.toBeNull();
     expect((await servico.from("contratos").select("id").eq("negocio_id", n)).data).toHaveLength(0);
@@ -129,6 +132,7 @@ describe("a assinatura nasce do UPDATE, com responsável e eventos do banco", ()
 
   it("o gestor dono do negócio não consegue apontar um colega como beneficiário; ao se autoconfirmar, o crédito é dele", async () => {
     const n = await criarNegocio(A, "ic-autoconfirma", gestorA);
+    await anexarDocumentosContrato(n);
     const forjado = await gestorA.cliente
       .from("contratos")
       .insert({ empresa_id: A.id, negocio_id: n, conteudo: "x", criado_por: m(A, gestorA), responsavel_assinatura_id: m(A, vendedorA) })

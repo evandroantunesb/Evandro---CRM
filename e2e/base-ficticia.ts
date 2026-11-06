@@ -203,6 +203,21 @@ export async function criarBaseFicticia(): Promise<BaseFicticia> {
       "negócio",
     );
     feito(await clientes[vendedor].from("negocios").update({ status: "ganho" }).eq("id", negocio.id), "ganho");
+    // Documentos do cliente que o contrato exige (só os registros: a trava do banco lê `anexos`).
+    feito(
+      await servico.from("anexos").insert(
+        (["cnh", "fatura_gerador", "cartao_cnpj"] as const).map((categoria) => ({
+          empresa_id: emp,
+          negocio_id: negocio.id,
+          categoria,
+          caminho: `${emp}/${negocio.id}/${crypto.randomUUID()}-${categoria}.pdf`,
+          nome: `${categoria}.pdf`,
+          tamanho: 10,
+          tipo_mime: "application/pdf",
+        })),
+      ),
+      "documentos do cliente",
+    );
     const contrato = ok(
       await clientes[vendedor].from("contratos").insert({ empresa_id: emp, negocio_id: negocio.id, conteudo: "Contrato fictício (E2E)" }).select("id").single(),
       "contrato",

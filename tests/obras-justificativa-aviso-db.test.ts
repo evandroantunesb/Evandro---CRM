@@ -8,7 +8,7 @@
 import { Client } from "pg";
 import { beforeAll, describe, expect, it } from "vitest";
 import { urlBancoLocal } from "./banco-local";
-import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato } from "./ajuda";
 
 async function noBanco(sql: string, params: unknown[] = []) {
   const banco = new Client({ connectionString: urlBancoLocal() });
@@ -93,6 +93,7 @@ describe("Obras: aviso da justificativa de atraso (ordem importa)", { concurrent
       "negócio",
     );
     ok(await vendedor.cliente.from("negocios").update({ status: "ganho" }).eq("id", neg!.id), "ganho");
+    await anexarDocumentosContrato(neg!.id);
     const { data: contrato } = ok(
       await vendedor.cliente.from("contratos").insert({ empresa_id: empresa, negocio_id: neg!.id, conteudo: "Contrato de teste" }).select("id").single(),
       "contrato",

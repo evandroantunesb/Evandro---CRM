@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { abrirAba, CLIENTE_CONTRATO, clienteDe, clienteServico, entrarComo, fichaNaAba, lerBase } from "./ajuda";
+import { abrirAba, anexarDocumentosContrato, CLIENTE_CONTRATO, clienteDe, clienteServico, entrarComo, fichaNaAba, lerBase } from "./ajuda";
 import type { BaseFicticia } from "./base-ficticia";
 
 /**
@@ -54,6 +54,7 @@ async function novoNegocio(nome: string, { kit = false, legado = false, distribu
     .single();
   if (e2) throw e2;
   const id = negocio!.id;
+  await anexarDocumentosContrato(base.empresaA, id);
   if (kit || legado) {
     const { error } = await c
       .from("kit_componentes")

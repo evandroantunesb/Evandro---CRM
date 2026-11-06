@@ -8,7 +8,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { carregarDetalheObra } from "@/lib/obras/detalhe";
 import type { SupabaseServidor } from "@/lib/supabase/server";
-import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato } from "./ajuda";
 
 const PESSOAIS = {
   documento: "123.456.789-09",
@@ -51,6 +51,7 @@ async function criarVenda(emp: string, responsavel: Usuario, confirmador: Usuari
   if (error) throw error;
   const ganho = await responsavel.cliente.from("negocios").update({ status: "ganho" }).eq("id", neg!.id);
   if (ganho.error) throw ganho.error;
+  await anexarDocumentosContrato(neg!.id);
   const { data: contrato, error: erroContrato } = await responsavel.cliente
     .from("contratos")
     .insert({ empresa_id: emp, negocio_id: neg!.id, conteudo: "Contrato de teste" })
@@ -192,11 +193,11 @@ describe("detalhe da obra com RLS real", () => {
     semPessoais(vm, ["endereco", "documento", "telefone", "email"]);
   });
 
-  it("operacao participante de compras: só o endereço, para cotar o kit (20261029190000_dados_cliente_contrato.sql)", async () => {
+  it("operacao participante de compras: todos os dados do cliente, para faturar o kit no nome dele (20261127100000_compras_pdf_documentos.sql)", async () => {
     const vm = await detalhe(opCompras, "operacao");
     expect(vm).not.toBeNull();
-    expect(vm!.contatoCliente).toMatchObject({ endereco: PESSOAIS.endereco, telefone: null, documento: null, email: null });
-    semPessoais(vm, ["endereco"]);
+    expect(vm!.contatoCliente).toMatchObject({ endereco: PESSOAIS.endereco, documento: PESSOAIS.documento, telefone: PESSOAIS.telefone, email: PESSOAIS.email });
+    semPessoais(vm, ["endereco", "documento", "telefone", "email"]);
   });
 
   it("operacao vê vendedor/SDR da obra (só nome e função), como a RLS da #148 libera", async () => {

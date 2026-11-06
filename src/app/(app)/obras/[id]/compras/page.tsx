@@ -4,7 +4,10 @@ import { ArquivosCompra } from "@/components/compras/arquivos-compra";
 import { CartoesOrcamentos, FormularioOrcamento } from "@/components/compras/orcamentos";
 import { comUnidade } from "@/components/obras/detalhe-obra";
 import { Cartao } from "@/components/ui";
-import { carregarFornecedores, carregarOrcamentosObra, carregarPedidos } from "@/lib/compras/dados";
+import { DadosFaturamentoCliente, DocumentosClienteObra } from "@/components/compras/documentos-cliente-obra";
+import { carregarFornecedores, carregarPedidos } from "@/lib/compras/dados";
+import { carregarDocumentosClienteObra, carregarFaturamentoObra, carregarOrcamentosObra } from "@/lib/compras/dados-obra";
+import { numeroPedido } from "@/lib/compras/regras";
 import { formatarMoeda, hojeEmSaoPaulo } from "@/lib/formatacao";
 import { carregarDetalheObra } from "@/lib/obras/detalhe";
 import { GERIR_OBRAS } from "@/lib/permissoes";
@@ -35,7 +38,13 @@ export default async function ComprasDaObra({ params }: PageProps<"/obras/[id]/c
   if (!obra || podeVer.data !== true) notFound();
 
   const nomes = new Map((identidades.data ?? []).map((m) => [m.membro_id, m.nome]));
-  const { orcamentos, arquivos } = await carregarOrcamentosObra(supabase, { obraId: id, pedidos, nomes });
+  const [{ orcamentos, arquivos }, faturamento] = await Promise.all([
+    carregarOrcamentosObra(supabase, { obraId: id, pedidos, nomes }),
+    carregarFaturamentoObra(supabase, { obraId: id, empresaId: atual.empresaId }),
+  ]);
+  // Dados e documentos do cliente: só para quem escreve em Compras na obra (o banco devolve vazio aos demais).
+  const cliente = faturamento.cliente;
+  const documentos = cliente ? await carregarDocumentosClienteObra(supabase, { obraId: id, pj: cliente.pj }) : null;
 
   const { resumo, gestao } = obra;
   const hoje = hojeEmSaoPaulo();
@@ -89,10 +98,44 @@ export default async function ComprasDaObra({ params }: PageProps<"/obras/[id]/c
         </div>
       )}
 
+      {cliente && (
+        <Cartao titulo="Dados para o faturamento">
+          <DadosFaturamentoCliente cliente={cliente} />
+        </Cartao>
+      )}
+
+      {documentos && (
+        <Cartao titulo="Documentos do cliente">
+          <DocumentosClienteObra obra={obraCompras} documentos={documentos} podeEscrever={podeEscrever} />
+        </Cartao>
+      )}
+
       <Cartao titulo="Arquivos de compra">
         <ArquivosCompra
           obra={obraCompras}
-          arquivos={arquivos}
+          arquivos={
+            cliente
+              ? [
+                  // PDF de cada pedido ativo, gerado na hora (só para quem escreve em Compras na obra).
+                  ...pedidos
+                    .filter((p) => !p.cancelado)
+                    .map((p) => ({
+                      id: `pedido-${p.id}`,
+                      tipo: "pedido" as const,
+                      documento: null,
+                      descricao: null,
+                      fornecedor: p.fornecedor,
+                      pedidoNumero: p.numero,
+                      nome: `pedido-${numeroPedido(p.numero)}.pdf`,
+                      url: `/compras/pedido/${p.id}/pdf`,
+                      enviadoPor: "gerado pelo Raion",
+                      enviadoEm: p.criadoEm,
+                      descartado: false,
+                    })),
+                  ...arquivos,
+                ]
+              : arquivos
+          }
           pedidos={pedidos.filter((p) => !p.cancelado).map((p) => ({ id: p.id, numero: p.numero, fornecedor: p.fornecedor }))}
           podeEscrever={podeEscrever}
         />
@@ -100,7 +143,8 @@ export default async function ComprasDaObra({ params }: PageProps<"/obras/[id]/c
 
       <p className="rounded-xl bg-dourado/10 p-3 text-xs leading-relaxed text-texto">
         &quot;Gerar pedido deste&quot; abre o novo pedido já com o fornecedor e a entrega do orçamento, e o orçamento fica ligado ao pedido. A nota fiscal
-        continua no próprio pedido e vai para o Financeiro. Veem os orçamentos e arquivos: Compras, Administrativo, Operacional, gestor e admin.
+        continua no próprio pedido e vai para o Financeiro. Veem os orçamentos e arquivos: Compras, Administrativo, Operacional, gestor e admin; os dados e
+        os documentos do cliente, quem atua em Compras na obra, o gestor e o admin.
       </p>
     </div>
   );

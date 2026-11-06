@@ -5,7 +5,7 @@
  * eventos causais (`contrato.assinado`, `pagamento.confirmado`) e o beneficiário congelado.
  */
 import { beforeAll, describe, expect, it } from "vitest";
-import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato } from "./ajuda";
 
 type Empresa = { id: string; funil: string; etapa: string; contato: string };
 
@@ -50,6 +50,7 @@ async function criarNegocio(e: Empresa, titulo: string, responsavel: Usuario) {
 }
 
 async function gerarContrato(e: Empresa, negocioId: string, u: Usuario) {
+  await anexarDocumentosContrato(negocioId);
   const { data, error } = await u.cliente
     .from("contratos")
     .insert({ empresa_id: e.id, negocio_id: negocioId, conteudo: "Contrato de teste", criado_por: m(e, u) })
@@ -101,6 +102,7 @@ describe("SDR não escreve em contratos pela API", () => {
 
   it("não cria contrato no próprio negócio", async () => {
     const outroNegocio = await criarNegocio(emp, "SDR tenta gerar", sdr);
+    await anexarDocumentosContrato(outroNegocio);
     const { error } = await sdr.cliente.from("contratos").insert({ empresa_id: emp.id, negocio_id: outroNegocio, conteudo: "Contrato do SDR" });
     expect(error?.code).toBe("42501");
     expect((await servico.from("contratos").select("id").eq("negocio_id", outroNegocio)).data).toEqual([]);
@@ -108,6 +110,7 @@ describe("SDR não escreve em contratos pela API", () => {
 
   it("não cria usando o papel de vendedor que tem em outra empresa", async () => {
     const outroNegocio = await criarNegocio(emp, "SDR tenta pela outra empresa", sdr);
+    await anexarDocumentosContrato(outroNegocio);
     const { error } = await sdr.cliente.from("contratos").insert({ empresa_id: outra.id, negocio_id: outroNegocio, conteudo: "Contrato" });
     expect(error?.code).toBe("42501");
   });

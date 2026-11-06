@@ -12,7 +12,7 @@ import { randomUUID } from "node:crypto";
 import { Client } from "pg";
 import { urlBancoLocal } from "./banco-local";
 import { beforeAll, describe, expect, it } from "vitest";
-import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato } from "./ajuda";
 
 
 let admin: Usuario;
@@ -134,6 +134,7 @@ async function criarVenda(
   const negocioId = neg!.id;
   const ganho = await ator.cliente.from("negocios").update({ status: "ganho" }).eq("id", negocioId);
   if (ganho.error) throw ganho.error;
+  await anexarDocumentosContrato(negocioId);
   const { data: contrato, error: erroContrato } = await ator.cliente
     .from("contratos")
     .insert({ empresa_id: emp, negocio_id: negocioId, conteudo: "Contrato de teste" })
@@ -623,7 +624,7 @@ describe("operacao: dados pessoais do cliente (obras_operacao)", () => {
     }
   });
 
-  it("matriz: operacional recebe endereço e telefones; engenharia, tudo; compras, só o endereço; administrativo, endereço e CPF/CNPJ", async () => {
+  it("matriz: operacional recebe endereço e telefones; engenharia e compras, tudo (compras fatura o kit no nome do cliente, 20261127100000); administrativo, endereço e CPF/CNPJ", async () => {
     confere(await linha(opFinanceiro, obraA), { endereco: true, telefone: false, documento: false, cpfCnpj: true });
     confere(await linha(opInstalador, obraA), { endereco: true, telefone: true, documento: false });
     confere(await linha(opParticipante, obraA), {
@@ -633,8 +634,8 @@ describe("operacao: dados pessoais do cliente (obras_operacao)", () => {
     });
     confere(await linha(opComprador, obraA), {
       endereco: true,
-      telefone: false,
-      documento: false,
+      telefone: true,
+      documento: true,
     });
   });
 

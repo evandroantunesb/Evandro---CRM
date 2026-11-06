@@ -1,4 +1,5 @@
 import { nomeSeguro } from "@/lib/anexos-regras";
+import type { ModalidadeFrete } from "./regras";
 
 /**
  * Regras puras dos orçamentos e arquivos de compra da obra (20261126100000_compras_orcamentos.sql). O banco decide de
@@ -45,6 +46,9 @@ export type OrcamentoVM = {
   id: string;
   fornecedor: string;
   valorTotal: number;
+  freteModalidade: ModalidadeFrete;
+  /** Só em FOB (em CIF, zero). */
+  frete: number;
   cobertura: Cobertura;
   itensDescricao: string | null;
   entregaPrevista: string;
@@ -59,13 +63,24 @@ export type OrcamentoVM = {
   criadoEm: string;
 };
 
-export const TIPOS_ARQUIVO = ["orcamento", "confirmacao", "outro"] as const;
+/** "pedido" = o PDF gerado pelo Raion (não é arquivo guardado; aparece na lista com o link de geração). */
+export const TIPOS_ARQUIVO = ["orcamento", "confirmacao", "outro", "documento_cliente", "pedido"] as const;
 export type TipoArquivoCompra = (typeof TIPOS_ARQUIVO)[number];
-export const ROTULO_TIPO_ARQUIVO: Record<TipoArquivoCompra, string> = { orcamento: "Orçamento", confirmacao: "Confirmação", outro: "Outro" };
+export const ROTULO_TIPO_ARQUIVO: Record<TipoArquivoCompra, string> = {
+  orcamento: "Orçamento",
+  confirmacao: "Confirmação",
+  outro: "Outro",
+  documento_cliente: "Documento do cliente",
+  pedido: "Pedido",
+};
 
 export type ArquivoCompraVM = {
   id: string;
   tipo: TipoArquivoCompra;
+  /** Documento do cliente anexado por Compras (`documento_foto`, `comprovante_residencia`, `cartao_cnpj` ou `outro`). */
+  documento: string | null;
+  /** Em "outro documento": o que é. */
+  descricao: string | null;
   /** Do orçamento, do pedido ou o informado em "Outro". */
   fornecedor: string | null;
   pedidoNumero: number | null;

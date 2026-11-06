@@ -10,12 +10,26 @@ import { CATEGORIAS_ANEXO, ROTULO_CATEGORIA_ANEXO, type CategoriaAnexo } from "@
 
 const LIMITE = 20 * 1024 * 1024;
 
-export function EnviarAnexo({ empresaId, negocioId }: { empresaId: string; negocioId: string }) {
+/**
+ * Envio de anexos do negócio. Com `categoriaFixa` (documentos do cliente), não mostra a escolha da categoria e o botão
+ * leva o `rotulo` informado.
+ */
+export function EnviarAnexo({
+  empresaId,
+  negocioId,
+  categoriaFixa,
+  rotulo,
+}: {
+  empresaId: string;
+  negocioId: string;
+  categoriaFixa?: CategoriaAnexo;
+  rotulo?: string;
+}) {
   const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
-  const [categoria, setCategoria] = useState<CategoriaAnexo>("geral");
+  const [categoria, setCategoria] = useState<CategoriaAnexo>(categoriaFixa ?? "geral");
 
   async function enviar(arquivos: FileList | null) {
     if (!arquivos?.length) return;
@@ -50,6 +64,7 @@ export function EnviarAnexo({ empresaId, negocioId }: { empresaId: string; negoc
 
   return (
     <div className="flex flex-col gap-2">
+      {!categoriaFixa && (
       <Selecao
         rotulo="Categoria do arquivo"
         value={categoria}
@@ -61,12 +76,13 @@ export function EnviarAnexo({ empresaId, negocioId }: { empresaId: string; negoc
           </option>
         ))}
       </Selecao>
+      )}
       <label className="inline-flex cursor-pointer items-center justify-center rounded-md border border-dashed border-zinc-400 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50">
-        {enviando ? "Enviando..." : "Anexar arquivo (foto, conta de luz, PDF)"}
+        {enviando ? "Enviando..." : (rotulo ?? "Anexar arquivo (foto, conta de luz, PDF)")}
         <input
           ref={input}
           type="file"
-          multiple
+          multiple={!categoriaFixa}
           disabled={enviando}
           className="hidden"
           onChange={(e) => enviar(e.target.files)}

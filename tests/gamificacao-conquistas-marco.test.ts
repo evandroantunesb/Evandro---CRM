@@ -9,7 +9,7 @@
  * ausência de dependência de `gamification_rules`/`point_ledger`.
  */
 import { beforeAll, describe, expect, it } from "vitest";
-import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato } from "./ajuda";
 
 let sdr1: Usuario;
 let closer: Usuario;
@@ -79,6 +79,7 @@ async function marcarStatus(negocioId: string, status: "ganho" | "perdido" | "ab
 }
 
 async function criarEAssinarContrato(negocioId: string, cliente: Usuario["cliente"]) {
+  await anexarDocumentosContrato(negocioId);
   const { data: contrato, error } = await cliente
     .from("contratos")
     .insert({ empresa_id: empresa, negocio_id: negocioId, conteudo: "Contrato de teste" })
@@ -465,7 +466,9 @@ describe("marco_contagem: concorrência", () => {
     const conquistaId = await criarConquistaMarco({ nome: "Concorrência contrato", marco: "contrato.assinado", valor: 1, xpBonus: 3 });
     const negocioA = await criarNegocio("Concorrência A", membro[closer2.id]);
     const negocioB = await criarNegocio("Concorrência B", membro[closer2.id]);
+    await anexarDocumentosContrato(negocioA);
     const { data: contratoA } = await closer2.cliente.from("contratos").insert({ empresa_id: empresa, negocio_id: negocioA, conteudo: "x" }).select("id").single();
+    await anexarDocumentosContrato(negocioB);
     const { data: contratoB } = await closer2.cliente.from("contratos").insert({ empresa_id: empresa, negocio_id: negocioB, conteudo: "x" }).select("id").single();
 
     const resultados = await Promise.all([

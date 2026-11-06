@@ -6,7 +6,7 @@ import { useActionState, useId, useState, type FormEvent } from "react";
 import { useEnvioSemReset } from "@/components/envio-sem-reset";
 import { Acao } from "@/components/financeiro/formularios";
 import { Botao, CLASSE_ENTRADA, Mensagem } from "@/components/ui";
-import { anexarOrcamentoCompra, descartarOrcamentoCompra, editarOrcamentoCompra } from "@/lib/acoes/compras";
+import { anexarOrcamentoCompra, descartarOrcamentoCompra, editarOrcamentoCompra } from "@/lib/acoes/compras-arquivos";
 import {
   ACEITA_ARQUIVO_COMPRAS,
   ROTULO_COBERTURA,
@@ -17,7 +17,7 @@ import {
   type OrcamentoVM,
   type SeloOrcamento,
 } from "@/lib/compras/orcamentos-regras";
-import { numeroPedido } from "@/lib/compras/regras";
+import { ROTULO_FRETE, numeroPedido, type ModalidadeFrete } from "@/lib/compras/regras";
 import { formatarMoeda, lerNumeroBr } from "@/lib/formatacao";
 import type { ResultadoAcao } from "@/lib/tipos";
 import { LinkArquivo, Rotulo, arquivoDe, dataCurta, diaDe, dinheiroBr, enviarArquivoCompras, type ObraCompras } from "./orcamentos-comum";
@@ -50,6 +50,7 @@ export function FormularioOrcamento({
   const router = useRouter();
   const lista = useId();
   const [cobertura, setCobertura] = useState<Cobertura>(inicial?.cobertura ?? "kit_completo");
+  const [freteModalidade, setFreteModalidade] = useState<ModalidadeFrete>(inicial?.freteModalidade ?? "cif");
   const [enviando, setEnviando] = useState(false);
   const [resultado, setResultado] = useState<ResultadoAcao>(null);
 
@@ -62,8 +63,15 @@ export function FormularioOrcamento({
       setResultado({ ok: false, mensagem: "Informe o valor total (ex.: 13.250,00)." });
       return;
     }
+    const frete = freteModalidade === "fob" ? lerNumeroBr(String(form.get("frete") ?? "")) : 0;
+    if (frete == null || frete < 0) {
+      setResultado({ ok: false, mensagem: "Informe o valor do frete (ex.: 350,00)." });
+      return;
+    }
     const dados = {
       obraId: obra.obraId,
+      freteModalidade,
+      frete,
       fornecedor: String(form.get("fornecedor") ?? ""),
       valor,
       cobertura,
@@ -89,6 +97,7 @@ export function FormularioOrcamento({
       if (!inicial) {
         formulario.reset();
         setCobertura("kit_completo");
+        setFreteModalidade("cif");
       }
       router.refresh();
     }
@@ -124,6 +133,17 @@ export function FormularioOrcamento({
       <Rotulo texto="Válido até">
         <input name="validoAte" type="date" required min={inicial ? undefined : hoje} defaultValue={inicial?.validoAte} className={CLASSE_ENTRADA} />
       </Rotulo>
+      <Rotulo texto="Frete">
+        <select name="freteModalidade" value={freteModalidade} onChange={(e) => setFreteModalidade(e.target.value as ModalidadeFrete)} className={CLASSE_ENTRADA}>
+          <option value="cif">{ROTULO_FRETE.cif}</option>
+          <option value="fob">{ROTULO_FRETE.fob}</option>
+        </select>
+      </Rotulo>
+      {freteModalidade === "fob" && (
+        <Rotulo texto="Valor do frete (R$)">
+          <input name="frete" inputMode="decimal" required defaultValue={inicial?.freteModalidade === "fob" ? dinheiroBr(inicial.frete) : undefined} placeholder="0,00" className={`${CLASSE_ENTRADA} tabular-nums`} />
+        </Rotulo>
+      )}
       <Rotulo texto="Condição de pagamento (opcional)">
         <input name="condicaoPagamento" maxLength={60} defaultValue={inicial?.condicaoPagamento ?? undefined} placeholder="Ex.: 28 dias, à vista" className={CLASSE_ENTRADA} />
       </Rotulo>
@@ -212,6 +232,8 @@ export function CartoesOrcamentos({
                   <dd className="text-right text-texto tabular-nums">{dataCurta(o.entregaPrevista)}</dd>
                   <dt>Válido até</dt>
                   <dd className="text-right text-texto tabular-nums">{dataCurta(o.validoAte)}</dd>
+                  <dt>Frete</dt>
+                  <dd className="text-right text-texto tabular-nums">{o.freteModalidade === "fob" ? `FOB · ${formatarMoeda(o.frete)}` : "CIF"}</dd>
                   <dt>Pagamento</dt>
                   <dd className="text-right text-texto">{o.condicaoPagamento ?? "—"}</dd>
                   <dt>Itens</dt>

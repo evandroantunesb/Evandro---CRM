@@ -7,7 +7,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { salvarDadosClienteComCliente } from "@/lib/negocios-gravacao";
 import type { SupabaseServidor } from "@/lib/supabase/server";
-import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
+import { CLIENTE_CONTRATO, anexarDocumentosContrato, criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
 
 let vendedor: Usuario;
 let empresa: string;
@@ -49,8 +49,10 @@ async function negocioCom(contato: Record<string, unknown>) {
   return { negocioId: n!.id as string, contatoId: c!.id as string };
 }
 
-const inserirComoVendedor = (negocioId: string) =>
-  vendedor.cliente.from("contratos").insert({ empresa_id: empresa, negocio_id: negocioId, conteudo: "Contrato" }).select("id, status").single();
+const inserirComoVendedor = async (negocioId: string) => {
+  await anexarDocumentosContrato(negocioId);
+  return vendedor.cliente.from("contratos").insert({ empresa_id: empresa, negocio_id: negocioId, conteudo: "Contrato" }).select("id, status").single();
+};
 
 describe("trava no banco: contrato só com os dados do cliente", () => {
   it("usuário do app não cria contrato com dado faltando; a mensagem lista o que falta", async () => {

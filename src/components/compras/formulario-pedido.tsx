@@ -1,5 +1,10 @@
 "use client";
 
+import { FornecedorPedido } from "./fornecedor-pedido";
+import { ReferenciasPedido } from "./referencias-pedido";
+import { FaturamentoEntrega } from "./faturamento-entrega";
+import type { FaturamentoPedidoVM } from "@/lib/compras/faturamento";
+import { ROTULO_FRETE, type ModalidadeFrete } from "@/lib/compras/regras";
 import { useRouter } from "next/navigation";
 import { useId, useState, type FormEvent } from "react";
 import { Botao, CLASSE_ENTRADA, Mensagem } from "@/components/ui";
@@ -25,11 +30,23 @@ export type PedidoInicial = {
   vencimento: string;
   numeroFornecedor: string;
   frete: number;
+  freteModalidade: ModalidadeFrete;
+  faturarPara: "cliente" | "empresa";
+  entrega: { endereco: string; recebe: string; telefone: string | null } | null;
+  observacao: string;
   itens: { kitIndice: number | null; descricao: string; unidade: string; quantidade: number; valorUnitario: number }[];
 };
 
 /** "Gerar pedido deste": o orçamento de onde o pedido nasce (só no pedido novo). */
-export type OrcamentoDoPedido = { id: string; fornecedor: string; entregaPrevista: string; valorTotal: number; itens: string };
+export type OrcamentoDoPedido = {
+  id: string;
+  fornecedor: string;
+  entregaPrevista: string;
+  valorTotal: number;
+  itens: string;
+  freteModalidade: ModalidadeFrete;
+  frete: number;
+};
 
 const numeroBr = (n: number, casas = 2) => n.toLocaleString("pt-BR", { minimumFractionDigits: casas === 2 ? 2 : 0, maximumFractionDigits: casas });
 const ler = (v: string) => lerNumeroBr(v);
@@ -43,6 +60,7 @@ export function FormularioPedido({
   inicial,
   doOrcamento,
   jaPedido,
+  faturamento,
 }: {
   obraId: string;
   kit: ItemKitCompra[];
@@ -51,6 +69,7 @@ export function FormularioPedido({
   hoje: string;
   inicial?: PedidoInicial;
   doOrcamento?: OrcamentoDoPedido;
+  faturamento: FaturamentoPedidoVM;
   /** Quanto de cada item do kit já está em outros pedidos ativos (o restante é a sugestão). */
   jaPedido: Record<number, number>;
 }) {
@@ -68,13 +87,16 @@ export function FormularioPedido({
     ).map((l, i) => ({ ...l, chave: `inicial-${i}` })),
   );
   const [categoria, setCategoria] = useState<CategoriaCustoObra>(inicial?.categoria ?? "equipamentos");
-  const [frete, setFrete] = useState(inicial ? numeroBr(inicial.frete) : "0,00");
+  const [frete, setFrete] = useState(numeroBr(inicial?.frete ?? doOrcamento?.frete ?? 0));
+  const [freteModalidade, setFreteModalidade] = useState<ModalidadeFrete>(inicial?.freteModalidade ?? doOrcamento?.freteModalidade ?? "cif");
+  const [faturarPara, setFaturarPara] = useState<"cliente" | "empresa">(inicial?.faturarPara ?? "cliente");
+  const [mesmaEntrega, setMesmaEntrega] = useState(!inicial?.entrega);
   const [enviando, setEnviando] = useState(false);
   const [resultado, setResultado] = useState<ResultadoAcao>(null);
 
   const mudar = (chave: string, campo: keyof Linha, valor: string) => setLinhas((ls) => ls.map((l) => (l.chave === chave ? { ...l, [campo]: valor } : l)));
   const numericas = linhas.map((l) => ({ quantidade: ler(l.quantidade) ?? 0, valorUnitario: ler(l.valorUnitario) ?? 0 }));
-  const total = totalDoPedido(numericas, ler(frete) ?? 0);
+  const total = totalDoPedido(numericas, freteModalidade === "fob" ? (ler(frete) ?? 0) : 0);
   const previsto = orcamento[categoria];
   const kitNoPedido = new Set(linhas.map((l) => l.kitIndice).filter((i) => i != null));
   const doKitFora = kit.filter((k) => !kitNoPedido.has(k.indice));
@@ -92,8 +114,8 @@ export function FormularioPedido({
       }
       itens.push({ kitIndice: l.kitIndice, descricao: l.descricao, unidade: l.unidade || "un", quantidade, valorUnitario });
     }
-    const valorFrete = ler(frete);
-    if (valorFrete == null) {
+    const valorFrete = freteModalidade === "fob" ? ler(frete) : 0;
+    if (valorFrete == null || valorFrete < 0) {
       setResultado({ ok: false, mensagem: "Confira o frete (ex.: 120,00)." });
       return;
     }
@@ -109,6 +131,17 @@ export function FormularioPedido({
       vencimento: String(f.get("vencimento") ?? ""),
       numeroFornecedor: String(f.get("numeroFornecedor") ?? ""),
       frete: valorFrete,
+      freteModalidade,
+      faturarPara,
+      observacao: String(f.get("observacao") ?? ""),
+      entrega:
+        faturarPara === "cliente" && mesmaEntrega
+          ? null
+          : {
+              endereco: String(f.get("entregaEndereco") ?? ""),
+              recebe: String(f.get("entregaRecebe") ?? ""),
+              telefone: String(f.get("entregaTelefone") ?? ""),
+            },
       itens,
     });
     setEnviando(false);
@@ -119,52 +152,23 @@ export function FormularioPedido({
   return (
     <form onSubmit={enviar} className="flex flex-col gap-4 lg:flex-row lg:items-start">
       <div className="flex min-w-0 flex-1 flex-col gap-4">
-        <section className="painel flex flex-col gap-3 p-4 md:p-6">
-          <h2 className="font-titulo text-lg text-texto">Fornecedor e entrega</h2>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <label className="flex flex-col gap-1 text-sm">
-              <span className="font-medium text-texto-2">Fornecedor</span>
-              <input
-                name="fornecedor"
-                required
-                minLength={2}
-                maxLength={120}
-                list={`${id}-fornecedores`}
-                autoComplete="off"
-                defaultValue={inicial?.fornecedor ?? doOrcamento?.fornecedor}
-                placeholder="Ex.: Distribuidora Solar Sul"
-                className={CLASSE_ENTRADA}
-              />
-              <datalist id={`${id}-fornecedores`}>
-                {fornecedores.map((nome) => (
-                  <option key={nome} value={nome} />
-                ))}
-              </datalist>
-            </label>
-            <label className="flex flex-col gap-1 text-sm">
-              <span className="font-medium text-texto-2">Categoria do custo</span>
-              <select value={categoria} onChange={(e) => setCategoria(e.target.value as CategoriaCustoObra)} className={CLASSE_ENTRADA}>
-                {CATEGORIAS_CUSTO_OBRA.map((c) => (
-                  <option key={c} value={c}>
-                    {ROTULO_CATEGORIA_CUSTO[c]}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-sm">
-              <span className="font-medium text-texto-2">Entrega prevista</span>
-              <input name="entregaPrevista" type="date" required defaultValue={inicial?.entregaPrevista ?? doOrcamento?.entregaPrevista ?? hoje} className={CLASSE_ENTRADA} />
-            </label>
-            <label className="flex flex-col gap-1 text-sm">
-              <span className="font-medium text-texto-2">Vencimento do pagamento</span>
-              <input name="vencimento" type="date" required defaultValue={inicial?.vencimento ?? hoje} className={CLASSE_ENTRADA} />
-            </label>
-            <label className="flex flex-col gap-1 text-sm sm:col-span-2">
-              <span className="font-medium text-texto-2">Nº do pedido no fornecedor (opcional)</span>
-              <input name="numeroFornecedor" maxLength={60} defaultValue={inicial?.numeroFornecedor} placeholder="Ex.: 48213" className={CLASSE_ENTRADA} />
-            </label>
-          </div>
-        </section>
+        <FornecedorPedido
+          fornecedores={fornecedores}
+          categoria={categoria}
+          aoMudarCategoria={setCategoria}
+          hoje={hoje}
+          inicial={inicial}
+          doOrcamento={inicial ? undefined : doOrcamento}
+        />
+
+        <FaturamentoEntrega
+          faturamento={faturamento}
+          faturarPara={faturarPara}
+          aoMudarFaturarPara={setFaturarPara}
+          mesmaEntrega={mesmaEntrega}
+          aoMudarMesmaEntrega={setMesmaEntrega}
+          entregaInicial={inicial?.entrega ?? null}
+        />
 
         <section className="painel overflow-hidden">
           <div className="flex flex-wrap items-center justify-between gap-2 p-4 pb-2 md:px-6">
@@ -286,10 +290,21 @@ export function FormularioPedido({
                 </select>
               )}
             </div>
-            <label className="flex items-center gap-2 text-sm">
-              <span className="font-medium text-texto-2">Frete (R$)</span>
-              <input inputMode="decimal" value={frete} onChange={(e) => setFrete(e.target.value)} className={`${CLASSE_ENTRADA} w-28 text-right tabular-nums`} />
-            </label>
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="flex items-center gap-2 text-sm">
+                <span className="font-medium text-texto-2">Frete</span>
+                <select value={freteModalidade} onChange={(e) => setFreteModalidade(e.target.value as ModalidadeFrete)} className={CLASSE_ENTRADA}>
+                  <option value="cif">{ROTULO_FRETE.cif}</option>
+                  <option value="fob">{ROTULO_FRETE.fob}</option>
+                </select>
+              </label>
+              {freteModalidade === "fob" && (
+                <label className="flex items-center gap-2 text-sm">
+                  <span className="font-medium text-texto-2">Valor do frete (R$)</span>
+                  <input inputMode="decimal" value={frete} onChange={(e) => setFrete(e.target.value)} className={`${CLASSE_ENTRADA} w-28 text-right tabular-nums`} />
+                </label>
+              )}
+            </div>
           </div>
         </section>
       </div>
@@ -300,33 +315,7 @@ export function FormularioPedido({
             <p className="text-xs font-medium text-texto-2">Total do pedido</p>
             <p className="font-titulo text-3xl font-light tracking-tight text-texto tabular-nums">{formatarMoeda(total)}</p>
           </div>
-          {doOrcamento && !inicial && (
-            <div className="flex flex-col gap-1 rounded-xl bg-dourado/10 p-3 text-xs text-texto">
-              <p className="font-medium">
-                Orçamento de {doOrcamento.fornecedor} · {doOrcamento.itens}
-              </p>
-              <p className="tabular-nums">
-                {formatarMoeda(doOrcamento.valorTotal)}
-                {Math.abs(total - doOrcamento.valorTotal) >= 0.01 &&
-                  ` · o pedido está ${formatarMoeda(Math.abs(total - doOrcamento.valorTotal))} ${total > doOrcamento.valorTotal ? "acima" : "abaixo"}`}
-              </p>
-            </div>
-          )}
-          {previsto != null && previsto > 0 && (
-            <div className="flex flex-col gap-2">
-              <div className="flex justify-between text-xs text-texto-2">
-                <span>Previsto na venda · {ROTULO_CATEGORIA_CUSTO[categoria]}</span>
-                <span className="tabular-nums">{formatarMoeda(previsto)}</span>
-              </div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-superficie-2" aria-hidden>
-                <div className="h-full rounded-full bg-dourado" style={{ width: `${Math.min(100, (total / previsto) * 100)}%` }} />
-              </div>
-              <p className="text-xs text-texto-2">
-                {Math.round((total / previsto) * 100)}% do previsto na venda ·{" "}
-                {total <= previsto ? `sobram ${formatarMoeda(previsto - total)}` : `passa ${formatarMoeda(total - previsto)}`}
-              </p>
-            </div>
-          )}
+          <ReferenciasPedido total={total} orcamento={inicial ? undefined : doOrcamento} previsto={previsto} rotuloCategoria={ROTULO_CATEGORIA_CUSTO[categoria]} />
           <div className="flex flex-col gap-2">
             <Botao type="submit" disabled={enviando || linhas.length === 0}>
               {enviando ? "Salvando..." : inicial ? "Salvar pedido" : "Fazer pedido"}
