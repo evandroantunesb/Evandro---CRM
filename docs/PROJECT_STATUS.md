@@ -1,6 +1,6 @@
 # Estado do projeto — Raion CRM
 
-## Compras — P2b: PDF do pedido, faturamento, frete e documentos do cliente (em andamento, 06/11/2026)
+## Compras — P2b: PDF do pedido, faturamento, frete e documentos do cliente (#348; migration aplicada em produção em 06/11/2026 antes do merge, tag `migracao-pr348-66dcd47`, run 42203777239)
 
 Branch `feat/compras-pdf-documentos` (worktree `C:\dev\crm-compras`). Migration `20261127100000_compras_pdf_documentos.sql`. Prévia aprovada no canvas "Compras · Pedidos de compra" (linha P2b: Pedido: faturamento e entrega; Documentos do cliente; PDF do pedido; Negócio: documentos para o contrato).
 
@@ -11,7 +11,7 @@ Branch `feat/compras-pdf-documentos` (worktree `C:\dev\crm-compras`). Migration 
 - Decisões do Evandro (06/11/2026): faturamento normalmente no nome do cliente (CPF ou CNPJ), empresa só em casos raros; a integradora sempre paga a distribuidora (a NF continua gerando a conta a pagar); documentos do negócio reaproveitados por todas as áreas (P2c: Engenharia e Administrativo); e-mail, telefone e nascimento do cliente no faturamento; CIF/FOB no pedido e no orçamento; campo de observações de Compras.
 - Testes: 19 arquivos de teste de banco e a base do e2e passaram a anexar os documentos antes do contrato (`anexarDocumentosContrato`).
 - **P2c (depois):** Engenharia (checklist mostrando o arquivo do negócio, com conferência) e Administrativo usando os documentos do negócio.
-- Produção: a migration só pelo `banco-producao.yml`, aprovada pelo Evandro, antes ou junto do deploy. Atenção: com ela, contrato novo sem os documentos anexados é recusado.
+- Produção: migration aplicada em 06/11/2026 pelo `banco-producao.yml` (dry-run 42203507264 listou só ela; aplicação 42203777239), aprovada pelo Evandro. Desde então, contrato novo sem os documentos do cliente anexados é recusado. Autorização no workflow pela PR da branch `chore/autorizar-migracao-348`.
 
 ## Compras — P2: orçamentos e arquivos da obra (#345 e #346 mescladas; migration aplicada em produção em 06/11/2026 antes do merge, tag `migracao-pr345-1fd9c4c`, run 42194062727)
 
