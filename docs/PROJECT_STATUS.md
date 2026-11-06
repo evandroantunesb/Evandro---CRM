@@ -1,6 +1,6 @@
 # Estado do projeto — Raion CRM
 
-## Compras — P2c: Engenharia e Administrativo usando os documentos do negócio (em andamento, 06/11/2026)
+## Compras — P2c: Engenharia e Administrativo usando os documentos do negócio (#350; migration aplicada em produção em 06/11/2026 antes do merge, tag `migracao-pr350-2e0b569`, run 42222249989)
 
 Branch `feat/compras-documentos-p2c` (worktree `C:\dev\crm-p2c`). Migration `20261128100000_documentos_cliente_engenharia_administrativo.sql`. Prévia aprovada no canvas "Compras · Pedidos de compra" (linha P2c: Engenharia: checklist com o arquivo do negócio; Vendedor: documento recusado pela Engenharia; Administrativo: dados e documentos para a NF).
 
@@ -8,7 +8,7 @@ Branch `feat/compras-documentos-p2c` (worktree `C:\dev\crm-p2c`). Migration `202
 - Inválido: marcar inválido um item cuja versão atual veio do negócio avisa no sininho (`documento_cliente_recusado`) o responsável do negócio; responsável inativo, os gestores das equipes dele; sem responsável, os admins. Versão enviada pela própria Engenharia não avisa. No negócio, o cartão "Documentos do cliente" mostra "Recusado pela Engenharia" com o motivo (`documentos_recusados_negocio`) enquanto o anexo recusado for o mais recente da categoria, e volta a aparecer depois do contrato só nesse caso.
 - Administrativo da obra (quem atua nele, coordenador, gestor e admin): lê os documentos do cliente (do negócio, da Engenharia e os que Compras anexou, por `documentos_cliente_compras_obra` e uma política nova no bucket `compras-obra`) e os dados para a NF (`dados_nf_cliente_obra`: nome, CPF/CNPJ, inscrição estadual, e-mail e endereço; sem telefone). Aparecem no cartão "Nota fiscal do cliente" da ficha e em "Dados e documentos" na aba Notas fiscais do Financeiro (carregado ao abrir a linha). O Operacional continua sem os documentos.
 - Decisões do Evandro (06/11/2026): botão "Usar arquivo do negócio" com cópia na obra; avisar o vendedor na recusa, só quando a versão veio do negócio; responsável inativo, os gestores das equipes dele; negócio sem responsável (sem equipe), os admins (confirmado em 06/11/2026); a Engenharia não é avisada quando chega arquivo novo (o item mostra "Arquivo novo no negócio"); Administrativo vê documentos, inscrição estadual e e-mail; Operacional fora.
-- Produção: a migration só pelo `banco-producao.yml`, aprovada pelo Evandro, antes ou junto do deploy (o preview usa o banco de produção).
+- Produção: migration aplicada em 06/11/2026 pelo `banco-producao.yml` (dry-run 42221730155 listou só ela; aplicação 42222249989), aprovada pelo Evandro. Autorização no workflow pela PR da branch `chore/autorizar-migracao-350` (#351).
 
 ## Compras — P2b: PDF do pedido, faturamento, frete e documentos do cliente (#348; migration aplicada em produção em 06/11/2026 antes do merge, tag `migracao-pr348-66dcd47`, run 42203777239)
 
