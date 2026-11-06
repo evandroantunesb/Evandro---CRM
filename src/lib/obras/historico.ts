@@ -67,6 +67,10 @@ const ROTULO_TIPO: Record<string, string> = {
   pedido_compra_faturado: "Nota fiscal do pedido registrada",
   pedido_compra_recebido: "Material recebido",
   pedido_compra_nf_desfeita: "Nota fiscal do pedido desfeita",
+  orcamento_compra_anexado: "Orçamento de compra anexado",
+  orcamento_compra_editado: "Orçamento de compra alterado",
+  orcamento_compra_descartado: "Orçamento de compra descartado",
+  arquivo_compra_anexado: "Arquivo de compra anexado",
 };
 
 const ROTULO_ETAPA_OBRA_REDE: Record<string, string> = {
@@ -340,6 +344,17 @@ function descrever(linha: LinhaHistoricoObra, nomes: ReadonlyMap<string, string>
       if (linha.tipo !== "pedido_compra_recebido") return pedido;
       const completo = ler(dados, "completo");
       return completo === true ? `${pedido}: tudo recebido` : completo === false ? `${pedido}: recebido em parte` : pedido;
+    }
+    // Orçamentos: o fornecedor é texto livre e o valor nunca vai para o histórico.
+    case "orcamento_compra_anexado":
+    case "orcamento_compra_editado":
+    case "orcamento_compra_descartado":
+      return "";
+    case "arquivo_compra_anexado": {
+      const tipo = ler(dados, "tipo");
+      const numero = ler(dados, "numero");
+      const pedido = typeof numero === "number" && Number.isInteger(numero) && numero > 0 ? ` do pedido P-${String(numero).padStart(4, "0")}` : "";
+      return tipo === "confirmacao" ? `Confirmação${pedido}` : tipo === "outro" ? `Outro arquivo${pedido}` : "";
     }
     default:
       return "Evento registrado";

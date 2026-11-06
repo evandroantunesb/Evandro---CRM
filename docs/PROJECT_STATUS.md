@@ -1,5 +1,15 @@
 # Estado do projeto — Raion CRM
 
+## Compras — P2: orçamentos e arquivos da obra (em andamento, 06/11/2026)
+
+Branch `feat/compras-orcamentos` (worktree `C:\dev\crm-compras`). Migration `20261126100000_compras_orcamentos.sql`. Desenho aprovado "Orçamentos e pedidos da obra" (canvas "Compras · Pedidos de compra").
+
+- Banco: `compras_orcamentos` (fornecedor, valor, itens cobertos — kit completo ou parte, com quais itens —, entrega prometida, validade, condição de pagamento e observação opcionais, arquivo obrigatório, pedido gerado, descarte com motivo) e `compras_arquivos` (orçamento, confirmação do pedido ou outro); bucket privado `compras-obra` (pasta `empresa/obra/arquivo`; PDF, imagem, .xlsx e .csv até 10 MB). RPCs `anexar_orcamento_compra`, `editar_orcamento_compra` e `descartar_orcamento_compra` (só sem pedido ativo), `anexar_arquivo_compra`; `criar_pedido_compra` ganhou `p_orcamento_id` opcional ("Gerar pedido deste"; a assinatura antiga saiu). Anexa quem escreve em Compras na obra, depois do "Iniciar compra"; vê quem vê os pedidos. Histórico sem valores.
+- App: tela `/obras/[id]/compras` (cartões dos orçamentos com selos Escolhido, Entrega mais rápida, Parcial e Vencido; novo orçamento; arquivos de compra); link "Orçamentos e arquivos (N)" no cartão Pedidos de compra da ficha; "Gerar pedido deste" abre o novo pedido com fornecedor e entrega do orçamento e mostra o valor dele como referência.
+- Decisões do Evandro (06/11/2026): tela própria (como no desenho); campo "Condição de pagamento" opcional (o cartão do desenho mostrava, o formulário não); arquivo obrigatório; corrigir e descartar com motivo enquanto não virou pedido, sem apagar o arquivo; um orçamento gera no máximo um pedido ativo (pedido cancelado libera); a NF do fornecedor fica fora da lista de arquivos; "Previsto na venda" = planejado de Equipamentos, só para quem vê os custos.
+- **P2b (próxima, aguardando comando):** PDF do pedido gerado pelo Raion, na hora em que alguém abre (sem guardar). Pergunta em aberto: endereço de entrega no PDF é o da obra (cliente) ou o da empresa.
+- Produção: a migration só pelo `banco-producao.yml`, aprovada pelo Evandro, antes ou junto do deploy (o preview usa o banco de produção).
+
 ## Compras — P1: pedidos de compra (mesclada na #343, 05/11/2026; migration aplicada em produção logo depois, tag `migracao-pr343-0ee2650`, run 42146497255)
 
 Branch `feat/compras-pedidos` (worktree `C:\dev\crm-compras`). Migration `20261125100000_compras_pedidos.sql`. Desenho aprovado no canvas "Compras · Pedidos de compra" (tela /compras, Novo pedido, Compras na ficha da obra). Ordem combinada: P1 pedidos → P2 orçamentos e arquivos da obra → P3 tabela de preços (planilha .xlsx/.csv) → P4 preço da tabela alimentando a calculadora e o kit da proposta (regras da P4 a perguntar).

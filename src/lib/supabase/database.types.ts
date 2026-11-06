@@ -709,6 +709,148 @@ export type Database = {
           },
         ];
       };
+      compras_arquivos: {
+        Row: {
+          caminho: string;
+          created_at: string;
+          empresa_id: string;
+          enviado_por: string | null;
+          fornecedor: string | null;
+          id: string;
+          nome: string;
+          obra_id: string;
+          pedido_id: string | null;
+          tipo: string;
+        };
+        Insert: {
+          caminho: string;
+          created_at?: string;
+          empresa_id: string;
+          enviado_por?: string | null;
+          fornecedor?: string | null;
+          id?: string;
+          nome: string;
+          obra_id: string;
+          pedido_id?: string | null;
+          tipo: string;
+        };
+        Update: {
+          caminho?: string;
+          created_at?: string;
+          empresa_id?: string;
+          enviado_por?: string | null;
+          fornecedor?: string | null;
+          id?: string;
+          nome?: string;
+          obra_id?: string;
+          pedido_id?: string | null;
+          tipo?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "compras_arquivos_empresa_id_obra_id_fkey";
+            columns: ["empresa_id", "obra_id"];
+            isOneToOne: false;
+            referencedRelation: "obras";
+            referencedColumns: ["empresa_id", "id"];
+          },
+          {
+            foreignKeyName: "compras_arquivos_empresa_id_pedido_id_fkey";
+            columns: ["empresa_id", "pedido_id"];
+            isOneToOne: false;
+            referencedRelation: "compras_pedidos";
+            referencedColumns: ["empresa_id", "id"];
+          },
+        ];
+      };
+      compras_orcamentos: {
+        Row: {
+          arquivo_id: string;
+          cobertura: string;
+          condicao_pagamento: string | null;
+          created_at: string;
+          criado_por: string | null;
+          descartado_em: string | null;
+          descartado_por: string | null;
+          empresa_id: string;
+          entrega_prevista: string;
+          fornecedor: string;
+          id: string;
+          itens_descricao: string | null;
+          motivo_descarte: string | null;
+          obra_id: string;
+          observacao: string | null;
+          pedido_id: string | null;
+          updated_at: string;
+          valido_ate: string;
+          valor_total: number;
+        };
+        Insert: {
+          arquivo_id: string;
+          cobertura: string;
+          condicao_pagamento?: string | null;
+          created_at?: string;
+          criado_por?: string | null;
+          descartado_em?: string | null;
+          descartado_por?: string | null;
+          empresa_id: string;
+          entrega_prevista: string;
+          fornecedor: string;
+          id?: string;
+          itens_descricao?: string | null;
+          motivo_descarte?: string | null;
+          obra_id: string;
+          observacao?: string | null;
+          pedido_id?: string | null;
+          updated_at?: string;
+          valido_ate: string;
+          valor_total: number;
+        };
+        Update: {
+          arquivo_id?: string;
+          cobertura?: string;
+          condicao_pagamento?: string | null;
+          created_at?: string;
+          criado_por?: string | null;
+          descartado_em?: string | null;
+          descartado_por?: string | null;
+          empresa_id?: string;
+          entrega_prevista?: string;
+          fornecedor?: string;
+          id?: string;
+          itens_descricao?: string | null;
+          motivo_descarte?: string | null;
+          obra_id?: string;
+          observacao?: string | null;
+          pedido_id?: string | null;
+          updated_at?: string;
+          valido_ate?: string;
+          valor_total?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "compras_orcamentos_empresa_id_arquivo_id_fkey";
+            columns: ["empresa_id", "arquivo_id"];
+            isOneToOne: false;
+            referencedRelation: "compras_arquivos";
+            referencedColumns: ["empresa_id", "id"];
+          },
+          {
+            foreignKeyName: "compras_orcamentos_empresa_id_obra_id_fkey";
+            columns: ["empresa_id", "obra_id"];
+            isOneToOne: false;
+            referencedRelation: "obras";
+            referencedColumns: ["empresa_id", "id"];
+          },
+          {
+            foreignKeyName: "compras_orcamentos_empresa_id_pedido_id_fkey";
+            columns: ["empresa_id", "pedido_id"];
+            isOneToOne: false;
+            referencedRelation: "compras_pedidos";
+            referencedColumns: ["empresa_id", "id"];
+          },
+        ];
+      };
       compras_pedido_itens: {
         Row: {
           created_at: string;
@@ -6379,6 +6521,17 @@ export type Database = {
         };
         Returns: undefined;
       };
+      anexar_arquivo_compra: {
+        Args: {
+          p_caminho: string;
+          p_fornecedor?: string;
+          p_nome: string;
+          p_obra_id: string;
+          p_pedido_id?: string;
+          p_tipo: string;
+        };
+        Returns: string;
+      };
       anexar_nf_cliente_obra: {
         Args: { p_caminho: string; p_nome: string; p_obra_id: string };
         Returns: undefined;
@@ -6386,6 +6539,22 @@ export type Database = {
       anexar_nf_conta_pagar: {
         Args: { p_caminho: string; p_conta_id: string; p_nome: string };
         Returns: undefined;
+      };
+      anexar_orcamento_compra: {
+        Args: {
+          p_caminho: string;
+          p_cobertura: string;
+          p_condicao_pagamento: string;
+          p_entrega_prevista: string;
+          p_fornecedor: string;
+          p_itens: string;
+          p_nome: string;
+          p_obra_id: string;
+          p_observacao: string;
+          p_valido_ate: string;
+          p_valor: number;
+        };
+        Returns: string;
       };
       aplicar_checklist_engenharia: { Args: { p_obra_id: string }; Returns: number };
       aprovar_atribuicao_lead: {
@@ -6663,6 +6832,7 @@ export type Database = {
           p_itens: Json;
           p_numero_fornecedor: string;
           p_obra_id: string;
+          p_orcamento_id?: string;
           p_vencimento: string;
         };
         Returns: string;
@@ -6736,6 +6906,10 @@ export type Database = {
         Args: { p_motivo: string; p_negocio_id: string; p_novo_responsavel?: string };
         Returns: undefined;
       };
+      descartar_orcamento_compra: {
+        Args: { p_motivo: string; p_orcamento_id: string };
+        Returns: undefined;
+      };
       devolver_aviso_pagamento: {
         Args: { p_aviso_id: string; p_motivo: string };
         Returns: {
@@ -6800,6 +6974,20 @@ export type Database = {
       e_closer_de_handoff_pendente: { Args: { p_negocio_id: string }; Returns: boolean };
       e_membro_comercial: { Args: { p_empresa_id: string; p_membro_id: string }; Returns: boolean };
       e_plataforma_admin: { Args: Record<PropertyKey, never>; Returns: boolean };
+      editar_orcamento_compra: {
+        Args: {
+          p_cobertura: string;
+          p_condicao_pagamento: string;
+          p_entrega_prevista: string;
+          p_fornecedor: string;
+          p_itens: string;
+          p_observacao: string;
+          p_orcamento_id: string;
+          p_valido_ate: string;
+          p_valor: number;
+        };
+        Returns: undefined;
+      };
       editar_pedido_compra: {
         Args: {
           p_categoria: string;
@@ -6943,6 +7131,17 @@ export type Database = {
           p_valor: number;
         };
         Returns: undefined;
+      };
+      gravar_arquivo_compra: {
+        Args: {
+          p_caminho: string;
+          p_fornecedor: string;
+          p_nome: string;
+          p_obra_id: string;
+          p_pedido_id: string;
+          p_tipo: string;
+        };
+        Returns: string;
       };
       gravar_itens_pedido_compra: {
         Args: {
@@ -7215,6 +7414,7 @@ export type Database = {
           valor: number;
         }[];
       };
+      pasta_compras_obra: { Args: { p_caminho: string }; Returns: string };
       pasta_financeiro_obra: {
         Args: { p_caminho: string };
         Returns: {
@@ -7231,6 +7431,7 @@ export type Database = {
         };
         Returns: boolean;
       };
+      pode_enviar_pasta_compras: { Args: { p_caminho: string }; Returns: boolean };
       pode_enviar_pasta_engenharia: { Args: { p_caminho: string }; Returns: boolean };
       pode_enviar_pasta_financeiro: { Args: { p_caminho: string }; Returns: boolean };
       pode_enviar_pasta_tarefa_setor: { Args: { p_caminho: string }; Returns: boolean };
@@ -7257,6 +7458,7 @@ export type Database = {
       pode_ver_obra: { Args: { p_obra_id: string }; Returns: boolean };
       pode_ver_obra_operacao: { Args: { p_obra_id: string }; Returns: boolean };
       pode_ver_pasta_anexo: { Args: { p_caminho: string }; Returns: boolean };
+      pode_ver_pasta_compras: { Args: { p_caminho: string }; Returns: boolean };
       pode_ver_pasta_engenharia: { Args: { p_caminho: string }; Returns: boolean };
       pode_ver_pasta_financeiro: { Args: { p_caminho: string }; Returns: boolean };
       pode_ver_pasta_tarefa_setor: { Args: { p_caminho: string }; Returns: boolean };
@@ -7311,6 +7513,7 @@ export type Database = {
         Args: { p_modelos: string[]; p_precos: Json };
         Returns: boolean;
       };
+      preparar_escrita_compras_obra: { Args: { p_obra_id: string }; Returns: string };
       preparar_escrita_conta_pagar: {
         Args: { p_conta_id: string };
         Returns: {
@@ -7352,6 +7555,10 @@ export type Database = {
           p_setor: Database["public"]["Enums"]["setor_obra"];
         };
         Returns: string;
+      };
+      preparar_escrita_orcamento_compra: {
+        Args: { p_orcamento_id: string };
+        Returns: Record<string, unknown>;
       };
       preparar_escrita_pedido_compra: {
         Args: { p_pedido_id: string };
@@ -7796,6 +8003,19 @@ export type Database = {
       };
       validar_anexo_financeiro: {
         Args: { p_caminho: string; p_nome: string; p_obra_id: string; p_tipo: string };
+        Returns: undefined;
+      };
+      validar_dados_orcamento_compra: {
+        Args: {
+          p_cobertura: string;
+          p_entrega: string;
+          p_fornecedor: string;
+          p_itens: string;
+          p_observacao: string;
+          p_pagamento: string;
+          p_validade: string;
+          p_valor: number;
+        };
         Returns: undefined;
       };
       validar_dados_pedido_compra: {

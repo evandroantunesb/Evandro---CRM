@@ -28,6 +28,9 @@ export type PedidoInicial = {
   itens: { kitIndice: number | null; descricao: string; unidade: string; quantidade: number; valorUnitario: number }[];
 };
 
+/** "Gerar pedido deste": o orçamento de onde o pedido nasce (só no pedido novo). */
+export type OrcamentoDoPedido = { id: string; fornecedor: string; entregaPrevista: string; valorTotal: number; itens: string };
+
 const numeroBr = (n: number, casas = 2) => n.toLocaleString("pt-BR", { minimumFractionDigits: casas === 2 ? 2 : 0, maximumFractionDigits: casas });
 const ler = (v: string) => lerNumeroBr(v);
 
@@ -38,6 +41,7 @@ export function FormularioPedido({
   fornecedores,
   hoje,
   inicial,
+  doOrcamento,
   jaPedido,
 }: {
   obraId: string;
@@ -46,6 +50,7 @@ export function FormularioPedido({
   fornecedores: string[];
   hoje: string;
   inicial?: PedidoInicial;
+  doOrcamento?: OrcamentoDoPedido;
   /** Quanto de cada item do kit já está em outros pedidos ativos (o restante é a sugestão). */
   jaPedido: Record<number, number>;
 }) {
@@ -97,6 +102,7 @@ export function FormularioPedido({
     const r = await salvarPedidoCompra({
       obraId,
       pedidoId: inicial?.pedidoId ?? null,
+      orcamentoId: inicial ? null : (doOrcamento?.id ?? null),
       fornecedor: String(f.get("fornecedor") ?? ""),
       categoria,
       entregaPrevista: String(f.get("entregaPrevista") ?? ""),
@@ -125,7 +131,7 @@ export function FormularioPedido({
                 maxLength={120}
                 list={`${id}-fornecedores`}
                 autoComplete="off"
-                defaultValue={inicial?.fornecedor}
+                defaultValue={inicial?.fornecedor ?? doOrcamento?.fornecedor}
                 placeholder="Ex.: Distribuidora Solar Sul"
                 className={CLASSE_ENTRADA}
               />
@@ -147,7 +153,7 @@ export function FormularioPedido({
             </label>
             <label className="flex flex-col gap-1 text-sm">
               <span className="font-medium text-texto-2">Entrega prevista</span>
-              <input name="entregaPrevista" type="date" required defaultValue={inicial?.entregaPrevista ?? hoje} className={CLASSE_ENTRADA} />
+              <input name="entregaPrevista" type="date" required defaultValue={inicial?.entregaPrevista ?? doOrcamento?.entregaPrevista ?? hoje} className={CLASSE_ENTRADA} />
             </label>
             <label className="flex flex-col gap-1 text-sm">
               <span className="font-medium text-texto-2">Vencimento do pagamento</span>
@@ -294,6 +300,18 @@ export function FormularioPedido({
             <p className="text-xs font-medium text-texto-2">Total do pedido</p>
             <p className="font-titulo text-3xl font-light tracking-tight text-texto tabular-nums">{formatarMoeda(total)}</p>
           </div>
+          {doOrcamento && !inicial && (
+            <div className="flex flex-col gap-1 rounded-xl bg-dourado/10 p-3 text-xs text-texto">
+              <p className="font-medium">
+                Orçamento de {doOrcamento.fornecedor} · {doOrcamento.itens}
+              </p>
+              <p className="tabular-nums">
+                {formatarMoeda(doOrcamento.valorTotal)}
+                {Math.abs(total - doOrcamento.valorTotal) >= 0.01 &&
+                  ` · o pedido está ${formatarMoeda(Math.abs(total - doOrcamento.valorTotal))} ${total > doOrcamento.valorTotal ? "acima" : "abaixo"}`}
+              </p>
+            </div>
+          )}
           {previsto != null && previsto > 0 && (
             <div className="flex flex-col gap-2">
               <div className="flex justify-between text-xs text-texto-2">
