@@ -27,6 +27,11 @@ export type EntradaAutorizacao = {
   setoresDoMembro: readonly SetorDoMembro[];
   /** Setores em que o próprio membro é participante ATIVO desta obra. */
   setoresParticipando: readonly string[];
+  /**
+   * Setor que atua como Compras na empresa (`setor_atende_compras`): "compras" quando alguém ativo tem o setor; senão o
+   * escolhido pelo admin (Administrativo ou Operacional), ou nulo (só admin e gestor). Ausente = "compras".
+   */
+  setorAtendeCompras?: string | null;
 };
 
 export function autorizacaoSetor(entrada: EntradaAutorizacao, setor: SetorObra): AutorizacaoSetor | null {
@@ -34,7 +39,8 @@ export function autorizacaoSetor(entrada: EntradaAutorizacao, setor: SetorObra):
   if (entrada.papel === "gestor") return "coordenar";
   // Lista positiva: só `operacao` chega aos setores; qualquer outro papel cai no null final.
   if (entrada.papel === "operacao") {
-    const meu = entrada.setoresDoMembro.find((s) => s.setor === setor);
+    const setorDoMembro = setor === "compras" && entrada.setorAtendeCompras !== undefined ? entrada.setorAtendeCompras : setor;
+    const meu = setorDoMembro == null ? undefined : entrada.setoresDoMembro.find((s) => s.setor === setorDoMembro);
     if (meu?.capacidade === "coordenar") return "coordenar";
     if (meu && entrada.setoresParticipando.includes(setor)) return "executar";
   }

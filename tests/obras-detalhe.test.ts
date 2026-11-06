@@ -218,7 +218,7 @@ describe("montarHistorico", () => {
 
   it("fluxo: status, parado, aguardando", () => {
     const f = (dados: unknown, setor: string | null = "compras") => descricaoDe(linha("fluxo_alterado", dados, { setor }));
-    expect(f({ campo: "status", de: "a_comprar", para: "cotando" })).toBe("Status: A comprar → Cotando");
+    expect(f({ campo: "status", de: "a_comprar", para: "cotando" })).toBe("Status: Aguardando Compras → Em cotação");
     expect(f({ campo: "status", de: "aprovado", para: "concluido" }, "engenharia")).toBe("Status: Aprovado → Concluído");
     expect(f({ campo: "parado", de: { parado: false, motivo: null }, para: { parado: true, motivo: "SEGREDO-MOTIVO" } })).toBe("Marcado como parado");
     expect(f({ campo: "parado", de: { parado: true }, para: { parado: false, motivo: null } })).toBe("Retomado");
@@ -229,9 +229,9 @@ describe("montarHistorico", () => {
   it("fluxo: códigos desconhecidos viram texto neutro, nunca o valor cru", () => {
     const f = (dados: unknown, setor: string | null = "compras") => descricaoDe(linha("fluxo_alterado", dados, { setor }));
     expect(f({ campo: "status", de: "SEGREDO-STATUS", para: "OUTRO-SEGREDO" })).toBe("Status alterado");
-    expect(f({ campo: "status", de: "SEGREDO-STATUS", para: "cotando" })).toBe("Status alterado para Cotando");
+    expect(f({ campo: "status", de: "SEGREDO-STATUS", para: "cotando" })).toBe("Status alterado para Em cotação");
     // Status de outro setor não é código válido para este setor.
-    expect(f({ campo: "status", de: "agendada", para: "cotando" })).toBe("Status alterado para Cotando");
+    expect(f({ campo: "status", de: "agendada", para: "cotando" })).toBe("Status alterado para Em cotação");
     expect(f({ campo: "status", de: "a_comprar", para: "cotando" }, "comercial")).toBe("Status alterado");
     expect(f({ campo: "status", de: "a_comprar", para: "cotando" }, null)).toBe("Status alterado");
     expect(f({ campo: "parado", para: "SEGREDO-PARADO" })).toBe("Situação de parada alterada");

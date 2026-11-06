@@ -709,6 +709,156 @@ export type Database = {
           },
         ];
       };
+      compras_pedido_itens: {
+        Row: {
+          created_at: string;
+          descricao: string;
+          empresa_id: string;
+          id: string;
+          kit_indice: number | null;
+          obra_id: string;
+          ordem: number;
+          pedido_id: string;
+          quantidade: number;
+          quantidade_recebida: number;
+          unidade: string;
+          valor_unitario: number;
+        };
+        Insert: {
+          created_at?: string;
+          descricao: string;
+          empresa_id: string;
+          id?: string;
+          kit_indice?: number | null;
+          obra_id: string;
+          ordem?: number;
+          pedido_id: string;
+          quantidade: number;
+          quantidade_recebida?: number;
+          unidade?: string;
+          valor_unitario: number;
+        };
+        Update: {
+          created_at?: string;
+          descricao?: string;
+          empresa_id?: string;
+          id?: string;
+          kit_indice?: number | null;
+          obra_id?: string;
+          ordem?: number;
+          pedido_id?: string;
+          quantidade?: number;
+          quantidade_recebida?: number;
+          unidade?: string;
+          valor_unitario?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "compras_pedido_itens_empresa_id_obra_id_fkey";
+            columns: ["empresa_id", "obra_id"];
+            isOneToOne: false;
+            referencedRelation: "obras";
+            referencedColumns: ["empresa_id", "id"];
+          },
+          {
+            foreignKeyName: "compras_pedido_itens_empresa_id_pedido_id_fkey";
+            columns: ["empresa_id", "pedido_id"];
+            isOneToOne: false;
+            referencedRelation: "compras_pedidos";
+            referencedColumns: ["empresa_id", "id"];
+          },
+        ];
+      };
+      compras_pedidos: {
+        Row: {
+          cancelado_em: string | null;
+          cancelado_por: string | null;
+          categoria: string;
+          conta_id: string | null;
+          created_at: string;
+          criado_por: string | null;
+          empresa_id: string;
+          entrega_prevista: string;
+          fornecedor: string;
+          frete: number;
+          id: string;
+          motivo_cancelamento: string | null;
+          nf_numero: string | null;
+          nf_registrada_em: string | null;
+          nf_registrada_por: string | null;
+          nf_valor: number | null;
+          numero: number;
+          numero_fornecedor: string | null;
+          obra_id: string;
+          updated_at: string;
+          valor_total: number;
+          vencimento: string;
+        };
+        Insert: {
+          cancelado_em?: string | null;
+          cancelado_por?: string | null;
+          categoria: string;
+          conta_id?: string | null;
+          created_at?: string;
+          criado_por?: string | null;
+          empresa_id: string;
+          entrega_prevista: string;
+          fornecedor: string;
+          frete?: number;
+          id?: string;
+          motivo_cancelamento?: string | null;
+          nf_numero?: string | null;
+          nf_registrada_em?: string | null;
+          nf_registrada_por?: string | null;
+          nf_valor?: number | null;
+          numero: number;
+          numero_fornecedor?: string | null;
+          obra_id: string;
+          updated_at?: string;
+          valor_total: number;
+          vencimento: string;
+        };
+        Update: {
+          cancelado_em?: string | null;
+          cancelado_por?: string | null;
+          categoria?: string;
+          conta_id?: string | null;
+          created_at?: string;
+          criado_por?: string | null;
+          empresa_id?: string;
+          entrega_prevista?: string;
+          fornecedor?: string;
+          frete?: number;
+          id?: string;
+          motivo_cancelamento?: string | null;
+          nf_numero?: string | null;
+          nf_registrada_em?: string | null;
+          nf_registrada_por?: string | null;
+          nf_valor?: number | null;
+          numero?: number;
+          numero_fornecedor?: string | null;
+          obra_id?: string;
+          updated_at?: string;
+          valor_total?: number;
+          vencimento?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "compras_pedidos_conta_id_fkey";
+            columns: ["conta_id"];
+            isOneToOne: true;
+            referencedRelation: "obra_contas_pagar";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "compras_pedidos_empresa_id_obra_id_fkey";
+            columns: ["empresa_id", "obra_id"];
+            isOneToOne: false;
+            referencedRelation: "obras";
+            referencedColumns: ["empresa_id", "id"];
+          },
+        ];
+      };
       condicoes_pagamento_preferencias: {
         Row: {
           atualizado_por: string | null;
@@ -1390,6 +1540,7 @@ export type Database = {
       empresas: {
         Row: {
           cnpj: string | null;
+          compras_atendido_por: Database["public"]["Enums"]["setor_obra"] | null;
           created_at: string;
           created_by: string | null;
           dias_considerado_parado: number;
@@ -1401,11 +1552,13 @@ export type Database = {
           nome: string;
           percentual_leads_sdr: number;
           seq_negocio: number;
+          seq_pedido_compra: number;
           situacao: Database["public"]["Enums"]["situacao_empresa"];
           updated_at: string;
         };
         Insert: {
           cnpj?: string | null;
+          compras_atendido_por?: Database["public"]["Enums"]["setor_obra"] | null;
           created_at?: string;
           created_by?: string | null;
           dias_considerado_parado?: number;
@@ -1417,11 +1570,13 @@ export type Database = {
           nome: string;
           percentual_leads_sdr?: number;
           seq_negocio?: number;
+          seq_pedido_compra?: number;
           situacao?: Database["public"]["Enums"]["situacao_empresa"];
           updated_at?: string;
         };
         Update: {
           cnpj?: string | null;
+          compras_atendido_por?: Database["public"]["Enums"]["setor_obra"] | null;
           created_at?: string;
           created_by?: string | null;
           dias_considerado_parado?: number;
@@ -1433,6 +1588,7 @@ export type Database = {
           nome?: string;
           percentual_leads_sdr?: number;
           seq_negocio?: number;
+          seq_pedido_compra?: number;
           situacao?: Database["public"]["Enums"]["situacao_empresa"];
           updated_at?: string;
         };
@@ -6289,6 +6445,7 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      atuo_em_compras: { Args: { p_empresa_id: string }; Returns: boolean };
       autorizacao_setor_obra: {
         Args: { p_obra_id: string; p_setor: Database["public"]["Enums"]["setor_obra"] };
         Returns: string;
@@ -6365,6 +6522,10 @@ export type Database = {
         };
       };
       cancelar_conta_pagar: { Args: { p_conta_id: string; p_motivo: string }; Returns: undefined };
+      cancelar_pedido_compra: {
+        Args: { p_motivo: string; p_pedido_id: string };
+        Returns: undefined;
+      };
       cancelar_tarefa_setor: {
         Args: { p_motivo: string; p_tarefa_id: string };
         Returns: undefined;
@@ -6493,6 +6654,19 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      criar_pedido_compra: {
+        Args: {
+          p_categoria: string;
+          p_entrega_prevista: string;
+          p_fornecedor: string;
+          p_frete: number;
+          p_itens: Json;
+          p_numero_fornecedor: string;
+          p_obra_id: string;
+          p_vencimento: string;
+        };
+        Returns: string;
+      };
       criar_tarefa_setor: {
         Args: {
           p_descricao?: string;
@@ -6540,6 +6714,10 @@ export type Database = {
           p_obra_id: string;
           p_setor: Database["public"]["Enums"]["setor_obra"];
         };
+        Returns: undefined;
+      };
+      definir_atendimento_compras: {
+        Args: { p_empresa_id: string; p_setor?: Database["public"]["Enums"]["setor_obra"] };
         Returns: undefined;
       };
       definir_entrega_material_prevista: {
@@ -6622,6 +6800,19 @@ export type Database = {
       e_closer_de_handoff_pendente: { Args: { p_negocio_id: string }; Returns: boolean };
       e_membro_comercial: { Args: { p_empresa_id: string; p_membro_id: string }; Returns: boolean };
       e_plataforma_admin: { Args: Record<PropertyKey, never>; Returns: boolean };
+      editar_pedido_compra: {
+        Args: {
+          p_categoria: string;
+          p_entrega_prevista: string;
+          p_fornecedor: string;
+          p_frete: number;
+          p_itens: Json;
+          p_numero_fornecedor: string;
+          p_pedido_id: string;
+          p_vencimento: string;
+        };
+        Returns: undefined;
+      };
       eletroposto_ativo: { Args: { p_empresa_id: string }; Returns: boolean };
       empresa_da_pasta_marca: { Args: { p_caminho: string }; Returns: string };
       empresa_solo_autonoma: { Args: { p_empresa_id: string }; Returns: boolean };
@@ -6753,6 +6944,14 @@ export type Database = {
         };
         Returns: undefined;
       };
+      gravar_itens_pedido_compra: {
+        Args: {
+          p_itens: Json;
+          p_kit: Json;
+          p_pedido: Database["public"]["Tables"]["compras_pedidos"]["Row"];
+        };
+        Returns: number;
+      };
       gravar_status_fluxo_obra: {
         Args: {
           p_aut: string;
@@ -6812,6 +7011,7 @@ export type Database = {
         };
       };
       iniciar_atuacao_engenharia: { Args: { p_obra_id: string }; Returns: string };
+      iniciar_compra_obra: { Args: { p_obra_id: string }; Returns: undefined };
       inserir_checklist_engenharia_padrao: { Args: { p_empresa_id: string }; Returns: undefined };
       inserir_fixacoes_telhado_padrao: { Args: { p_empresa_id: string }; Returns: undefined };
       inserir_prazos_engenharia_padrao: { Args: { p_empresa_id: string }; Returns: undefined };
@@ -7062,6 +7262,7 @@ export type Database = {
       pode_ver_pasta_tarefa_setor: { Args: { p_caminho: string }; Returns: boolean };
       pode_ver_pasta_vistoria: { Args: { p_caminho: string }; Returns: boolean };
       pode_ver_pdf_proposta_emitida: { Args: { p_caminho: string }; Returns: boolean };
+      pode_ver_pedidos_compra: { Args: { p_obra_id: string }; Returns: boolean };
       pode_ver_responsavel: {
         Args: { p_empresa_id: string; p_responsavel_id: string };
         Returns: boolean;
@@ -7152,6 +7353,10 @@ export type Database = {
         };
         Returns: string;
       };
+      preparar_escrita_pedido_compra: {
+        Args: { p_pedido_id: string };
+        Returns: Record<string, unknown>;
+      };
       progresso_conquistas_membro: {
         Args: { p_empresa_id: string };
         Returns: {
@@ -7229,6 +7434,16 @@ export type Database = {
         Args: { p_dados: Json; p_empresa_id: string; p_tarefa_id: string; p_tipo: string };
         Returns: undefined;
       };
+      registrar_nf_pedido_compra: {
+        Args: {
+          p_caminho: string;
+          p_nf_numero: string;
+          p_nf_valor: number;
+          p_nome: string;
+          p_pedido_id: string;
+        };
+        Returns: string;
+      };
       registrar_obra_rede_engenharia: {
         Args: {
           p_data: string;
@@ -7292,6 +7507,10 @@ export type Database = {
         };
         Returns: string;
       };
+      registrar_recebimento_pedido_compra: {
+        Args: { p_itens: Json; p_pedido_id: string };
+        Returns: undefined;
+      };
       remover_anexo_tarefa_setor: { Args: { p_anexo_id: string }; Returns: string };
       responder_justificativa_atraso: {
         Args: { p_justificativa_id: string; p_texto: string };
@@ -7331,6 +7550,10 @@ export type Database = {
           sequencia: number;
         }[];
       };
+      setor_atende_compras: {
+        Args: { p_empresa_id: string };
+        Returns: Database["public"]["Enums"]["setor_obra"];
+      };
       setor_custos_obra: {
         Args: { p_obra_id: string };
         Returns: Database["public"]["Enums"]["setor_obra"];
@@ -7347,6 +7570,7 @@ export type Database = {
         Args: { p_obra_id: string; p_tipo: string };
         Returns: Database["public"]["Enums"]["setor_obra"];
       };
+      sincronizar_compras_obra: { Args: { p_aut: string; p_obra_id: string }; Returns: undefined };
       situacao_registro_pagamento: { Args: { p_negocio_id: string }; Returns: string };
       situacao_vistoria_obra: {
         Args: { p_obra_id: string };
@@ -7572,6 +7796,17 @@ export type Database = {
       };
       validar_anexo_financeiro: {
         Args: { p_caminho: string; p_nome: string; p_obra_id: string; p_tipo: string };
+        Returns: undefined;
+      };
+      validar_dados_pedido_compra: {
+        Args: {
+          p_categoria: string;
+          p_entrega: string;
+          p_fornecedor: string;
+          p_frete: number;
+          p_numero_fornecedor: string;
+          p_vencimento: string;
+        };
         Returns: undefined;
       };
     };

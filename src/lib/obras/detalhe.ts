@@ -468,19 +468,22 @@ async function montarGestao(
 
   // `operacao` lê só as próprias linhas de membro_setores_obra (RLS); o admin não precisa delas.
   let setoresDoMembro: SetorDoMembro[] = [];
+  let setorAtendeCompras: string | null = "compras";
   if (papel === "operacao") {
-    const { data, error } = await supabase
-      .from("membro_setores_obra")
-      .select("setor, capacidade")
-      .eq("empresa_id", empresaId)
-      .eq("membro_id", membroId as string);
-    if (error) throw error;
-    setoresDoMembro = data ?? [];
+    const [setoresRes, atendeRes] = await Promise.all([
+      supabase.from("membro_setores_obra").select("setor, capacidade").eq("empresa_id", empresaId).eq("membro_id", membroId as string),
+      supabase.rpc("setor_atende_compras", { p_empresa_id: empresaId }),
+    ]);
+    if (setoresRes.error) throw setoresRes.error;
+    if (atendeRes.error) throw atendeRes.error;
+    setoresDoMembro = setoresRes.data ?? [];
+    setorAtendeCompras = atendeRes.data ?? null;
   }
 
   const autorizacao: EntradaAutorizacao = {
     papel,
     setoresDoMembro,
+    setorAtendeCompras,
     setoresParticipando: participantes.filter((p) => membroId && p.membro_id === membroId).map((p) => p.setor),
   };
   const permissoes = SETORES_OBRA.map((setor) => ({ setor, permissoes: permissoesSetor(autorizacao, setor, estado) }));

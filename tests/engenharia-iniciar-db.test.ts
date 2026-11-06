@@ -121,13 +121,14 @@ describe("Engenharia: iniciar atuação (ordem importa)", { concurrent: false, s
     obraApoio = await criarVenda(empresa, vendedor, admin, `Iniciar apoio ${sufixo}`);
   });
 
-  it("a obra nova aparece para quem atua na Engenharia, sem o contato do cliente; Compras e outra empresa não veem", async () => {
+  it("a obra nova aparece para quem atua na Engenharia, sem o contato do cliente; outra empresa não vê", async () => {
     const [linha] = await ver(eng1, obra);
     expect(linha?.obra_id).toBe(obra);
     expect(linha?.cliente_nome).toBe(`Cliente Iniciar ${sufixo}`);
     expect(linha?.cliente_telefone).toBeNull();
     expect(await ver(eng2, obra)).toHaveLength(1);
-    expect(await ver(execCompras, obra)).toHaveLength(0);
+    // Compras vê a obra pela fila dela (sem responsável em Compras, 20261125100000), não pela da Engenharia.
+    expect(await ver(execCompras, obra)).toHaveLength(1);
     expect(await ver(engB, obra)).toHaveLength(0);
     expect(await etapa(obra)).toBe("a_iniciar");
   });

@@ -18,6 +18,15 @@ const ATIVA = { cancelada: false, pausada: false };
 const entrada = (e: Partial<EntradaAutorizacao>): EntradaAutorizacao => ({ papel: null, setoresDoMembro: [], setoresParticipando: [], ...e });
 
 describe("autorizacaoSetor (espelho de autorizacao_setor_obra)", () => {
+  it("Compras sem ninguém no setor: o setor que atende no lugar dele conta como Compras", () => {
+    const adm = { papel: "operacao", setoresDoMembro: [{ setor: "administrativo", capacidade: "executar" }] };
+    expect(autorizacaoSetor(entrada({ ...adm, setoresParticipando: ["compras"] }), "compras")).toBeNull();
+    expect(autorizacaoSetor(entrada({ ...adm, setoresParticipando: ["compras"], setorAtendeCompras: "administrativo" }), "compras")).toBe("executar");
+    expect(autorizacaoSetor(entrada({ ...adm, setoresParticipando: ["compras"], setorAtendeCompras: null }), "compras")).toBeNull();
+    // Os outros setores não mudam.
+    expect(autorizacaoSetor(entrada({ ...adm, setoresParticipando: ["administrativo"], setorAtendeCompras: "administrativo" }), "administrativo")).toBe("executar");
+  });
+
   it("admin atua em qualquer setor operacional, sem precisar de setor nem participação", () => {
     for (const setor of ["compras", "engenharia", "operacional", "administrativo"] as const) {
       expect(autorizacaoSetor(entrada({ papel: "admin" }), setor)).toBe("admin");
@@ -253,6 +262,7 @@ function cenario(extra: { setoresMembro?: Linha[]; obra?: Linha; membros?: Linha
     rpcs: {
       identidade_membros: identidades,
       obras_operacao: [{ ...linhaObra, ...extra.obra, obra_id: OBRA }],
+      setor_atende_compras: "compras" as unknown as Linha[],
       ...extra.rpcs,
     },
   });

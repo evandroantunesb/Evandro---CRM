@@ -11,6 +11,9 @@ import { carregarObras } from "@/lib/obras/dados";
 import { filtrosDeParams, hrefObra, montarNavegacao, queryDosFiltros, temFiltroAtivo } from "@/lib/obras/navegacao";
 import { AjusteEntregaContratada, GestaoFixacao, GestaoMarco, GestaoSetor } from "./gestao";
 import { CustosObraFicha } from "./custos";
+import { PedidosCompraObra } from "./compras";
+import { IniciarCompra } from "@/components/compras/acoes-pedido";
+import { acessaCompras, carregarObraParaPedido, carregarPedidos } from "@/lib/compras/dados";
 import { PagamentosFornecedores } from "./financeiro";
 import { NotaFiscalCliente, PagamentoCliente } from "./financeiro-cliente";
 import { AtrasosObra, EscalonamentosObra } from "./opr";
@@ -56,7 +59,7 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
 
   const supabase = await criarClienteServidor();
   // A lista navegável é recalculada aqui, a cada obra: mesma empresa, mesma RLS, mesmos filtros.
-  const [obra, lista, tarefasSetor, vistoria, vistorias, cronograma, orcamento, lancamentos, justificativasRes, escalonamentosRes, identidades, prazosRes, substituicoes] = await Promise.all([
+  const [obra, lista, tarefasSetor, vistoria, vistorias, cronograma, orcamento, lancamentos, justificativasRes, escalonamentosRes, identidades, prazosRes, substituicoes, pedidosCompra, obraCompras, atuoEmCompras] = await Promise.all([
     carregarDetalheObra(supabase, { empresaId: atual.empresaId, papel: atual.papel, obraId: id, membroId: atual.membroId }),
     carregarObras(supabase, { empresaId: atual.empresaId, papel: atual.papel, comResponsaveis: false }),
     carregarTarefasSetor(supabase, { empresaId: atual.empresaId, membroId: atual.membroId, papel: atual.papel, obraId: id, filtro: "todas" }),
@@ -80,6 +83,10 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
     supabase.rpc("prazos_obras", { p_obra_ids: [id] }),
     // Onde sou o substituto do setor (responde a justificativa pedida ao principal).
     carregarSubstituicoes(supabase, atual.empresaId, atual.papel),
+    // Pedidos de compra: quem atua em Compras na obra e quem vê os custos (RLS); o kit vendido, pela posição gravada.
+    carregarPedidos(supabase, { empresaId: atual.empresaId, obraId: id }),
+    carregarObraParaPedido(supabase, { papel: atual.papel, obraId: id }),
+    acessaCompras(supabase, atual.empresaId, atual.papel),
   ]);
   if (!obra) notFound();
   for (const r of [justificativasRes, escalonamentosRes, identidades, prazosRes]) if (r.error) throw r.error;
@@ -127,6 +134,13 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
       })
     : null;
   const podeFinanceiro = autorizacaoAdministrativo != null && !cancelada;
+  // Compras: escreve quem atua em Compras na obra (ou no setor que atende no lugar dele), o coordenador, o gestor ou o
+  // admin; pedidos só depois do "Iniciar compra" e com a obra em andamento (o banco confere de novo).
+  const autorizacaoCompras = gestaoDoSetor("compras")?.permissoes.autorizacao ?? null;
+  const statusCompras = obra.setores.find((x) => x.setor === "compras")?.status ?? null;
+  const emAndamento = resumo.situacao === "em_andamento";
+  const podeIniciarCompra = statusCompras === "a_comprar" && emAndamento && (autorizacaoCompras != null || atuoEmCompras);
+  const mostrarPedidos = pedidosCompra.length > 0 || autorizacaoCompras != null;
   const resumoFinanceiro = financeiro ? resumoContas(financeiro.contas, hoje) : null;
   const escalonamentos = (escalonamentosRes.data ?? []).map((e) => ({
     id: e.id,
@@ -313,6 +327,21 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
         </div>
       )}
 
+      {mostrarPedidos && (
+        <div id="pedidos-compra" className="scroll-mt-4">
+          <Cartao titulo="Pedidos de compra">
+            <PedidosCompraObra
+              obra={{ obraId: resumo.id, empresaId: atual.empresaId }}
+              pedidos={pedidosCompra}
+              kit={obraCompras?.kit ?? []}
+              podeEscrever={autorizacaoCompras != null && emAndamento}
+              podeNovoPedido={autorizacaoCompras != null && emAndamento && statusCompras != null && statusCompras !== "a_comprar"}
+              hoje={hoje}
+            />
+          </Cartao>
+        </div>
+      )}
+
       {atrasos.length > 0 && (
         <div id="atrasos" className="scroll-mt-4">
           <Cartao titulo="Atrasos e justificativas">
@@ -360,6 +389,16 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
                   ) : (
                     vistoria && <ResumoVistoria situacao={vistoria} />
                   ))}
+                {s.setor === "compras" && podeIniciarCompra && (
+                  <div className="flex flex-col gap-1">
+                    <p className="text-xs text-texto-2">
+                      {atual.papel === "operacao"
+                        ? "Ao iniciar, você vira o responsável de Compras nesta obra (se ainda não houver) e vai buscar os orçamentos."
+                        : "Ao iniciar, Compras desta obra passa a Em cotação."}
+                    </p>
+                    <IniciarCompra key={resumo.id} obraId={resumo.id} />
+                  </div>
+                )}
                 {s.setor === "administrativo" && resumoFinanceiro && resumoFinanceiro.total > 0 && (
                   <p className="text-xs text-texto-2">
                     {resumoFinanceiro.pagas} de {resumoFinanceiro.total} {resumoFinanceiro.total === 1 ? "pagamento a fornecedor pago" : "pagamentos a fornecedores pagos"}

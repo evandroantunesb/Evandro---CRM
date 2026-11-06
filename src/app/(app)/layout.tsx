@@ -1,4 +1,5 @@
 import { LogOut } from "lucide-react";
+import { acessaCompras } from "@/lib/compras/dados";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { Avatar } from "@/components/avatar";
@@ -69,7 +70,10 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
   // Pagamentos informados pelo vendedor esperando conferência (admin, gestor e o Operacional): item no menu e no sininho.
   let pagamentosAConfirmar = 0;
   let verPagamentosAConfirmar = false;
+  // Compras: admin, gestor e quem atua em Compras (ou no setor que atende no lugar dele).
+  let verCompras = papel === "admin" || papel === "gestor";
   if (sessao.atual) {
+    if (papel === "operacao") verCompras = await acessaCompras(await criarClienteServidor(), sessao.atual.empresaId, papel);
     const [dias, horas] = await Promise.all([
       carregarDiasConsideradoParado(sessao.atual.empresaId),
       carregarHorasConsideradoSemContato(sessao.atual.empresaId),
@@ -123,6 +127,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
           // Obras (somente leitura): comerciais e `operacao` (que hoje só vê Início).
           ...(pode(papel, OBRAS) ? [{ href: "/obras", rotulo: "Obras", secao: "Operação" }] : []),
           ...(pode(papel, ENGENHARIA) ? [{ href: "/engenharia", rotulo: "Engenharia", secao: "Operação" }] : []),
+          ...(verCompras ? [{ href: "/compras", rotulo: "Compras", secao: "Operação" }] : []),
           ...(pode(papel, PEDIDOS_AOS_SETORES) ? [{ href: "/tarefas/setores", rotulo: "Pedidos aos setores", secao: "Operação" }] : []),
           // Financeiro (A pagar, Pagamentos a confirmar, Notas fiscais, Pagos): da Operação, quem atua no Operacional ou no
           // Administrativo (`confirma_pagamento_cliente`); a tela escolhe as abas de cada um.
