@@ -28,7 +28,7 @@ test.describe("Gestão da obra (admin)", () => {
     await expect(page.getByRole("heading", { name: "Família Almeida (fictícia)" })).toBeVisible();
     await expect(page.getByText("Em andamento").first()).toBeVisible();
     await expect(cartao(page, "Resumo")).toContainText("Cascavel/PR");
-    await expect(cartao(page, "Compras")).toContainText("Cotando");
+    await expect(cartao(page, "Compras")).toContainText("Em cotação");
     await expect(cartao(page, "Engenharia")).toContainText("Projeto em elaboração");
     await expect(cartao(page, "Engenharia")).toContainText("Eduardo Executor Eng. (fictício)");
     await expect(cartao(page, "Engenharia")).toContainText("Responsável principal");
@@ -137,7 +137,7 @@ test.describe("formulários depois de navegar (correção do commit 66e430a)", (
   test.beforeEach(async ({ page }) => entrarComo(page, usuarios.admin, senha));
 
   test("escolha não salva na obra A não aparece como pendente na obra B (botão Próxima)", async ({ page }) => {
-    // o10 (Compras: A comprar) → Próxima → o09 (Compras: Cotando).
+    // o10 (Compras: Aguardando Compras) → Próxima → o09 (Compras: Em cotação).
     await page.goto(`/obras/${obras.o10}`);
     let compras = cartao(page, "Compras");
     await compras.getByText("Atualizar Compras").click();
@@ -156,7 +156,7 @@ test.describe("formulários depois de navegar (correção do commit 66e430a)", (
 
     // Nada foi gravado na obra A.
     await page.goto(`/obras/${obras.o10}`);
-    await expect(cartao(page, "Compras")).toContainText("A comprar");
+    await expect(cartao(page, "Compras")).toContainText("Aguardando Compras");
   });
 
   test("o mesmo pela seta do teclado e pelo seletor", async ({ page }) => {

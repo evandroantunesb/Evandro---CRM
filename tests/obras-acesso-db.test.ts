@@ -343,7 +343,8 @@ beforeAll(async () => {
   // Matriz de dados pessoais: operacional e compras participam da obra A (opParticipante é
   // engenharia). O coordenador já foi principal de engenharia na A, mas encerrou.
   await participar(obraA, empresa, membro[opInstalador.id], { setor: "operacional" });
-  await participar(obraA, empresa, membro[opComprador.id], { setor: "compras" });
+  // Principal de Compras na A: a obra sai da fila de Compras (20261125100000) de quem só executa.
+  await participar(obraA, empresa, membro[opComprador.id], { setor: "compras", principal: true });
   await participar(obraA, empresa, membro[opFinanceiro.id], { setor: "administrativo" });
   await participar(obraA, empresa, membro[opCoordena.id], {
     setor: "engenharia",
@@ -517,9 +518,10 @@ describe("operacao: visibilidade de obras", () => {
     expect(await enxerga(opCoordenaB, obraA)).toEqual(NADA);
   });
 
-  it("quem só executa (sem participação) não vê", async () => {
+  it("quem só executa (sem participação) não vê; em Compras, só a obra sem responsável (fila)", async () => {
     expect(await enxerga(opExecuta, obraA)).toEqual(NADA);
-    expect(await enxerga(opExecuta, obraB)).toEqual(NADA);
+    // B não tem responsável principal em Compras: aparece na fila de quem atua em Compras (20261125100000).
+    expect((await enxerga(opExecuta, obraB)).rpc).toBe(1);
   });
 
   it("operacao inativo ou desligado não vê, nem como participante nem como coordenador", async () => {

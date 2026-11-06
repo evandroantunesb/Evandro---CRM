@@ -61,6 +61,12 @@ const ROTULO_TIPO: Record<string, string> = {
   escalonamento_aberto: "Escalonamento aberto",
   escalonamento_fechado: "Escalonamento fechado",
   obra_rede_engenharia: "Obra de rede",
+  pedido_compra_criado: "Pedido de compra feito",
+  pedido_compra_editado: "Pedido de compra alterado",
+  pedido_compra_cancelado: "Pedido de compra cancelado",
+  pedido_compra_faturado: "Nota fiscal do pedido registrada",
+  pedido_compra_recebido: "Material recebido",
+  pedido_compra_nf_desfeita: "Nota fiscal do pedido desfeita",
 };
 
 const ROTULO_ETAPA_OBRA_REDE: Record<string, string> = {
@@ -322,6 +328,19 @@ function descrever(linha: LinhaHistoricoObra, nomes: ReadonlyMap<string, string>
     case "escalonamento_aberto":
     case "escalonamento_fechado":
       return "";
+    // Pedidos de compra: só o número (fornecedor é texto livre; valores nunca vão para o histórico).
+    case "pedido_compra_criado":
+    case "pedido_compra_editado":
+    case "pedido_compra_cancelado":
+    case "pedido_compra_faturado":
+    case "pedido_compra_nf_desfeita":
+    case "pedido_compra_recebido": {
+      const numero = ler(dados, "numero");
+      const pedido = typeof numero === "number" && Number.isInteger(numero) && numero > 0 ? `Pedido P-${String(numero).padStart(4, "0")}` : "Pedido";
+      if (linha.tipo !== "pedido_compra_recebido") return pedido;
+      const completo = ler(dados, "completo");
+      return completo === true ? `${pedido}: tudo recebido` : completo === false ? `${pedido}: recebido em parte` : pedido;
+    }
     default:
       return "Evento registrado";
   }

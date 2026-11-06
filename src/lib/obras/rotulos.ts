@@ -25,8 +25,8 @@ export const STATUS_POR_SETOR: Record<SetorObra, readonly string[]> = {
 
 const ROTULO_STATUS: Record<SetorObra, Record<string, string>> = {
   compras: {
-    a_comprar: "A comprar",
-    cotando: "Cotando",
+    a_comprar: "Aguardando Compras",
+    cotando: "Em cotação",
     pedido_realizado: "Pedido realizado",
     faturado_fornecedor: "Faturado pelo fornecedor",
     material_entregue: "Material entregue",

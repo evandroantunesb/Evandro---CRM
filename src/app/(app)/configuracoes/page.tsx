@@ -15,6 +15,7 @@ import {
   PackageCheck,
   QrCode,
   Radio,
+  ShoppingCart,
   Tags,
   Target,
   Thermometer,
@@ -69,6 +70,7 @@ const GRUPOS: { id: string; titulo: string; itens: Item[] }[] = [
     itens: [
       { href: "/configuracoes/fixacoes", titulo: "Tipos de fixação", descricao: "Opções de fixação do telhado escolhidas na obra.", Icone: Wrench },
       { href: "/configuracoes/engenharia", titulo: "Engenharia", descricao: "Checklist de documentos, prazos, feriados da empresa e marcos da trajetória.", Icone: ListChecks },
+      { href: "/configuracoes/compras", titulo: "Compras", descricao: "Quem atende Compras quando a empresa não tem ninguém no setor.", Icone: ShoppingCart },
       { href: "/configuracoes/prazos-obras", titulo: "Prazos das etapas", descricao: "Dias úteis de cada etapa da obra e da entrega contratada (o gestor também edita).", Icone: CalendarClock },
       { href: "/configuracoes/deducoes-obras", titulo: "Impostos e comissões", descricao: "Percentuais da venda descontados no lucro das obras (o gestor também edita).", Icone: BadgeDollarSign },
       { href: "/configuracoes/tarefas-automaticas", titulo: "Tarefas automáticas", descricao: "Tarefas que nascem para um setor quando outro chega a um status.", Icone: Workflow },
