@@ -150,18 +150,19 @@ revoke all on public.compras_materiais, public.compras_tabelas_preco, public.com
 grant select on public.compras_materiais, public.compras_tabelas_preco, public.compras_precos, public.compras_mapas_colunas
   to authenticated, service_role;
 
--- Preço atual de cada material em cada fornecedor (RLS de quem chama).
+-- Preço atual de cada material em cada fornecedor. Confere quem vê uma vez (InitPlan), em vez da RLS linha a linha.
 create or replace function public.precos_atuais_compra(p_empresa_id uuid)
 returns table (
   material_id uuid, fornecedor text, fornecedor_chave text, preco numeric, data_preco date,
   codigo_fornecedor text, descricao_fornecedor text, tabela_id uuid
 )
-language sql stable set search_path = ''
+language sql stable security definer set search_path = ''
 as $$
   select distinct on (p.material_id, p.fornecedor_chave)
     p.material_id, p.fornecedor, p.fornecedor_chave, p.preco, p.data_preco, p.codigo_fornecedor, p.descricao_fornecedor, p.tabela_id
   from public.compras_precos p
   where p.empresa_id = p_empresa_id
+    and (select public.pode_ver_precos_compra(p_empresa_id))
   order by p.material_id, p.fornecedor_chave, p.data_preco desc, p.created_at desc;
 $$;
 revoke all on function public.precos_atuais_compra(uuid) from public, anon, authenticated, service_role;
@@ -343,8 +344,8 @@ grant execute on function public.lancar_preco_compra(uuid, text, numeric, date, 
 -- p_itens: [{ "material_id": uuid } ou { "novo": { "nome", "categoria", "unidade" } }, mais "codigo", "descricao" e
 -- "preco"]. Material novo com nome já cadastrado usa o existente. Devolve as contagens.
 create or replace function public.importar_tabela_precos(
-  p_empresa_id uuid, p_fornecedor text, p_data_tabela date, p_valido_ate date, p_caminho text, p_nome_arquivo text,
-  p_linhas_lidas integer, p_ignoradas integer, p_mapa jsonb, p_itens jsonb
+  p_empresa_id uuid, p_fornecedor text, p_data_tabela date, p_caminho text, p_nome_arquivo text,
+  p_linhas_lidas integer, p_ignoradas integer, p_mapa jsonb, p_itens jsonb, p_valido_ate date default null
 )
 returns jsonb
 language plpgsql security definer set search_path = ''
@@ -482,7 +483,7 @@ begin
   );
 end;
 $$;
-revoke all on function public.importar_tabela_precos(uuid, text, date, date, text, text, integer, integer, jsonb, jsonb)
+revoke all on function public.importar_tabela_precos(uuid, text, date, text, text, integer, integer, jsonb, jsonb, date)
   from public, anon, authenticated, service_role;
-grant execute on function public.importar_tabela_precos(uuid, text, date, date, text, text, integer, integer, jsonb, jsonb)
+grant execute on function public.importar_tabela_precos(uuid, text, date, text, text, integer, integer, jsonb, jsonb, date)
   to authenticated;

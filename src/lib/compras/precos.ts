@@ -195,9 +195,10 @@ export function montarPrevia({
 }): LinhaPrevia[] {
   const porCodigo = new Map<string, string>();
   const porDescricao = new Map<string, string>();
+  // Vínculos do mais recente ao mais antigo: vale o primeiro de cada código e de cada descrição.
   for (const v of vinculos) {
-    if (v.codigo) porCodigo.set(normalizar(v.codigo), v.materialId);
-    if (v.descricao) porDescricao.set(normalizar(v.descricao), v.materialId);
+    if (v.codigo && !porCodigo.has(normalizar(v.codigo))) porCodigo.set(normalizar(v.codigo), v.materialId);
+    if (v.descricao && !porDescricao.has(normalizar(v.descricao))) porDescricao.set(normalizar(v.descricao), v.materialId);
   }
   const porNome = new Map(materiais.map((m) => [normalizar(m.nome), m.id]));
   const atual = new Map(precosAtuais.map((p) => [p.materialId, p.preco]));

@@ -3,9 +3,11 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Indicadores, type Indicador } from "@/app/(app)/negocios/indicadores";
 import { IniciarCompra } from "@/components/compras/acoes-pedido";
+import { AbasCompras } from "@/components/compras/abas-compras";
 import { CabecalhoPagina, CLASSE_ACAO_CABECALHO } from "@/components/cabecalho-pagina";
 import { FOCO } from "@/components/ui";
 import { acessaCompras, carregarTelaCompras } from "@/lib/compras/dados";
+import { acessoPrecos } from "@/lib/compras/dados-precos";
 import {
   ABAS_COMPRAS,
   ROTULO_SITUACAO_PEDIDO,
@@ -43,6 +45,7 @@ export default async function Compras({ searchParams }: PageProps<"/compras">) {
   const busca = typeof params.q === "string" ? params.q.trim() : "";
   const hoje = hojeEmSaoPaulo();
 
+  const verPrecos = (await acessoPrecos(supabase, atual.empresaId)).ver;
   const dados = await carregarTelaCompras(supabase, { empresaId: atual.empresaId, papel: atual.papel, membroId: atual.membroId });
   const k = kpisCompras({ pedidos: dados.pedidos, aComprar: dados.aComprar.filter((o) => o.status === "a_comprar").length, hoje });
   const indicadores: Indicador[] = [
@@ -81,6 +84,8 @@ export default async function Compras({ searchParams }: PageProps<"/compras">) {
           ) : undefined
         }
       />
+
+      {verPrecos && <AbasCompras atual="pedidos" />}
 
       <Indicadores itens={indicadores} />
 

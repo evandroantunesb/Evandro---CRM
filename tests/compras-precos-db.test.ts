@@ -173,6 +173,8 @@ describe("Compras: tabela de preços (ordem importa)", { concurrent: false, shuf
     // O Administrativo vê preços, mas não o mapa de colunas.
     expect((await administrativo.cliente.from("compras_mapas_colunas").select("fornecedor_chave").eq("empresa_id", empresa)).data).toEqual([]);
     expect((await atuais(administrativo)).length).toBe(4);
+    // A função confere quem vê (não depende da RLS por linha).
+    for (const quem of [operacional, vendedor, adminB]) expect(await atuais(quem)).toEqual([]);
     // A mesma planilha não serve a duas tabelas.
     expect((await importar(comprador, caminho, itens)).error?.message).toContain("Envie a planilha");
   });

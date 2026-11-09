@@ -7555,7 +7555,7 @@ export type Database = {
           p_linhas_lidas: number;
           p_mapa: Json;
           p_nome_arquivo: string;
-          p_valido_ate: string;
+          p_valido_ate?: string;
         };
         Returns: Json;
       };
