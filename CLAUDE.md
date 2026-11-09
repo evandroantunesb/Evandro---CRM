@@ -57,16 +57,15 @@ Este arquivo contém só regras duráveis. Estado atual em `docs/PROJECT_STATUS.
 - **Identidade visual (não alterar):** Carvão `#0F0F10`, Dourado Solar `#D4AF37`, Off-white `#FAF8F3`, Cinza `#6B7280`, Cinza claro `#E5E7EB` (`src/app/globals.css`); Manrope nos títulos, Inter nos textos; logo em `src/components/marca.tsx` + `public/marca/`. Verde só no WhatsApp, vermelho só para perda e erro. **Exceção (só no módulo de gamificação — `/gamificacao` e `/configuracoes/{metas,comissoes,resgates}`):** tema escuro, verde como cor contextual principal, dourado reservado a prestígio/conquistas, vermelho limitado a alertas. **Exceção em Obras (prazo e semáforo, decisão de 02/11/2026):** verde `energia` (`#1f7a4d`) para no prazo, dourado para atenção e vermelho `erro` (`#b42318`) para atraso ou margem negativa.
 - Respostas objetivas: o que mudou, arquivos, testes feitos e pendências.
 
-## Andamento atual (27/10/2026, a pedido do Evandro)
+## Andamento atual (09/11/2026, a pedido do Evandro)
 
-Detalhe e histórico em `docs/PROJECT_STATUS.md`; aqui só o ponto de retomada.
+Detalhe e histórico em `docs/PROJECT_STATUS.md` (seção "Ponto de retomada"); aqui só o resumo.
 
-- **Troca de computador:** backup do trabalho local em `R:\trocapc\2026-10-26` (bundles por worktree, memória do Claude, `LEIAME.txt`). Backups diários de produção (banco e storage) rodando no GitHub, sem falha.
-- **Produção:** `main` em `21d8c4a`. Mescladas em 27/10/2026: #224 (ficha: qualificação SDR aberta e no topo para o SDR; passos do cadastro clicáveis no celular) e #225 (SDR abre negócio de eletroposto sem modelos; pontuação por tipo de negócio), com a migration `20261027100000_eletroposto_sdr_pontuacao.sql` já aplicada (tag `migracao-pr225-0723efd`). Pendente: ligar o eletroposto para a IBS no super-admin (ao ligar, as regras de pontos do solar são copiadas como regras do eletroposto).
-- **Em andamento — novo negócio para o mesmo cliente:** branch `feat/novo-negocio-mesmo-cliente` (worktree `R:\wt-negocio-cliente`). No cartão Contato da ficha: botão "Novo negócio para este cliente" (abre a escolha solar/eletroposto com o cliente já selecionado, `?contato=`) e lista dos outros negócios do cliente. Um negócio por produto (decisão do Evandro: vários produtos no mesmo negócio ficou descartado por ora). Sem migration.
-- **Limpeza pendente (com OK do Evandro):** worktrees `R:\wt-layout` (layout antigo superado), `R:\wt-layout-ficha` e `R:\wt-eletro-sdr` (já mescladas).
-- **Eletroposto (outros):** `feature/eletroposto-identificacao` (selo de tipo no Kanban) está no GitHub, sem PR. Pendências: contrato, pagamento e comissão fora desta entrega.
-- **Ambiente neste desktop:** `node_modules` dentro de `R:\` é lento ou quebrado (links para `E:\`); instale e rode a verificação numa cópia em disco local (`pnpm install --frozen-lockfile` leva ~25 s lá). Se o Supabase local subir sem o Kong, a stack foi criada de um checkout antigo: `supabase stop` e `start` resolvem. Várias outras stacks Supabase locais (temperatura, aurora-*) estão ativas em portas próprias.
+- **Produção:** `main` em `fc2ce78`, todas as migrations até a #350 aplicadas. Backups diários de produção (banco e storage) rodando no GitHub.
+- **Concluídos recentemente:** Perfis e setores (A1 a E, #332–#342) e Compras P1, P2, P2b e P2c (#343–#351).
+- **Próximo:** Compras P3 (tabela de preços por planilha), aguardando comando. P4 (preço da tabela na calculadora e no kit) exige perguntar as regras ao Evandro antes.
+- **Limpeza pendente (com OK do Evandro):** worktrees já mesclados (`prunable`) em `R:\` e `C:\dev\`; triagem das PRs drafts antigas.
+- **Ambiente neste desktop:** `node_modules` dentro de `R:\` é lento ou quebrado (links para `E:\`); instale e rode a verificação numa cópia em disco local (worktrees em `C:\dev\`; `pnpm install --frozen-lockfile` leva ~25 s lá). Se o Supabase local subir sem o Kong, a stack foi criada de um checkout antigo: `supabase stop` e `start` resolvem. Várias outras stacks Supabase locais estão ativas em portas próprias.
 
 ## Segurança
 

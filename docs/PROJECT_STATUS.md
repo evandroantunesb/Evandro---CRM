@@ -1,5 +1,13 @@
 # Estado do projeto — Raion CRM
 
+## Ponto de retomada (09/11/2026)
+
+- **Produção:** `main` em `fc2ce78`; todas as migrations até a #350 (Compras P2c) aplicadas pelo `banco-producao.yml`. Nenhuma PR de funcionalidade aberta; nada novo no GitHub desde 06/11/2026.
+- **Perfis e setores:** concluído (A1 #332, B #334, A2a #335, A2b #337, C #338, A3 #339, D/E #341). Pendências registradas nas seções abaixo (candidatos a participante e tarefas de Compras quando outro setor atende no lugar dele; remover `atua_no_operacional`; "de N do plano" em Usuários).
+- **Compras:** P1, P2, P2b e P2c concluídas. **Próximo passo: P3, tabela de preços** (envio de planilha .xlsx/.csv, desenho "Tabela de preços" e "Enviar tabela de preços" já aprovado no canvas "Compras · Pedidos de compra"), aguardando comando do Evandro. Depois, P4 (preço da tabela alimentando a calculadora e o kit da proposta): as regras são parâmetro da calculadora e precisam ser perguntadas ao Evandro antes.
+- **PRs antigas abertas:** #232 (cartões de Usuários) conflita com a B e foi superada pelo desenho aprovado; as drafts de gamificação (#104–#118), calculadora (#101, #197, #199, #200) e docs antigas (#68, #76, #133, #167, #193) precisam de triagem antes de qualquer retomada; Dependabot (#182, #183, #202, #293) aguarda revisão.
+- **Limpeza local (com OK do Evandro):** vários worktrees em `R:\` e `C:\dev\` já mesclados aparecem como `prunable` em `git worktree list`.
+
 ## Compras — P2c: Engenharia e Administrativo usando os documentos do negócio (#350; migration aplicada em produção em 06/11/2026 antes do merge, tag `migracao-pr350-2e0b569`, run 42222249989)
 
 Branch `feat/compras-documentos-p2c` (worktree `C:\dev\crm-p2c`). Migration `20261128100000_documentos_cliente_engenharia_administrativo.sql`. Prévia aprovada no canvas "Compras · Pedidos de compra" (linha P2c: Engenharia: checklist com o arquivo do negócio; Vendedor: documento recusado pela Engenharia; Administrativo: dados e documentos para a NF).
@@ -42,7 +50,7 @@ Branch `feat/compras-pedidos` (worktree `C:\dev\crm-compras`). Migration `202611
 - Validação local (Docker + Supabase local): lint, typecheck, build, Vitest e e2e (novo `29-compras-pedidos`). Testes de banco ajustados à fila de Compras: `obras-acesso-db` e `engenharia-iniciar-db`.
 - Pendências: candidatos a participante (`membros_do_setor`, `atribuir_participante_obra`) e tarefas do setor Compras ainda não consideram o setor que atende no lugar dele; quando alguém entra em Compras, quem atendia no lugar perde a autorização nas obras que já tinha. Produção: a migration só pelo `banco-producao.yml`, aprovada pelo Evandro, antes ou junto do deploy (o preview usa o banco de produção).
 
-## Perfis e setores — D/E: prazos pela Operação e funil pelo gestor (em andamento, 05/11/2026)
+## Perfis e setores — D/E: prazos pela Operação e funil pelo gestor (mesclada na #341, 05/11/2026; migration aplicada antes do merge, tag `migracao-pr341-ce55738`, run 42131295969; tipos regenerados na #342)
 
 Branch `feat/prazos-operacao-funil-gestor` (worktree `C:\dev\crm-de`). Migration `20261124100000_prazos_operacao_funil_gestor.sql`: `coordena_setor` (admin e gestor coordenam todos; `operacao`, os setores em que tem "coordenar") e `setor_prazo_obra`; a RLS de `obra_prazos_etapas` passa a deixar cada coordenador mudar os prazos das etapas do seu setor (Engenharia: projeto, homologação, vistoria, conexão; Compras: compra, entrega do material; Operacional: instalação e entrega contratada); a de `engenharia_prazos`, o coordenador da Engenharia e o gestor; `ajustar_entrega_contratada_obra` aceita o coordenador do Operacional; `funis` e `etapas` (inserir e editar) e as regras de parado e sem contato de `salvar_configuracoes_empresa` passam a aceitar o gestor (distribuição dos leads e percentual do SDR seguem do admin). No app: Prazos das etapas mostra editáveis só os do setor de quem coordena (os demais para consulta); Configurações › Engenharia mostra só os prazos para gestor e coordenador; atalhos "Prazos" na Engenharia e "Prazos padrão das etapas" na ficha da obra; "Editar etapas" em Negócios para o gestor; as gravações de prazos conferem as linhas gravadas (a RLS recusava sem erro e a tela dizia "salvo").
 
@@ -72,12 +80,13 @@ Decisões do Evandro (05/11/2026): lançar pela tela pede a obra; o Operacional 
 
 Pendências: "A pagar em 7 dias" conta de hoje até 7 dias e deixa as vencidas só no indicador delas (o número do desenho somava diferente); testes de banco e e2e não rodaram localmente (sem Docker), só lint, typecheck, build e o CI.
 
-## Perfis e setores — A2a: contas a pagar e NF do cliente na obra (em andamento, 05/11/2026)
+## Perfis e setores — A2a: contas a pagar e NF do cliente na obra (mesclada na #335, 05/11/2026; migration aplicada antes do merge, tag `migracao-pr335-779328e`, run 42016526745)
 
 Branch `feat/contas-pagar-obra`. Migration `20261121100000_contas_pagar_obra.sql`. Ficha da obra pelo desenho aprovado "Ficha da obra · Administrativo": cartões "Pagamentos a fornecedores", "Pagamento do cliente" e "Nota fiscal do cliente"; o setor Administrativo mostra "N de M pagamentos pagos". A tela Financeiro (abas A pagar, Pagamentos a confirmar, Notas fiscais e Pagos) é a A2b.
 
 Decisões do Evandro (05/11/2026): fornecedor em nome livre com sugestão (sem cadastro); registrar pagamento pede data e comprovante, a nota do fornecedor pode vir depois; conta paga vira custo real (`obra_custos`) na categoria dela, e o custo de conta paga só se estorna pela conta (fica "estornada"; o certo é lançado de novo); conta a pagar se cancela com motivo; o Administrativo também lança custo real direto; anexar a NF do cliente só conclui o marco "NF do cliente" (nada exige a nota); "fornecedores pagos" é manual; conta vencida e não paga deixa o semáforo no mínimo amarelo, sem passar por cima do vermelho. Veem contas, custos e o pagamento do cliente: admin, gestor, Administrativo e Operacional da obra; o arquivo da NF do cliente, só admin, gestor e Administrativo. O gestor só vê até a PR C.
-## Perfis e setores — B: Usuários com perfil único (em andamento, 05/11/2026)
+
+## Perfis e setores — B: Usuários com perfil único (mesclada na #334, 05/11/2026)
 
 Branch `feat/usuarios-perfil-unico`, PR #334. Migration aplicada em produção em 05/11/2026, antes do merge (tag `migracao-pr334-be2cce8`, run 42010781758). Tela Configurações › Usuários pelo desenho aprovado `PerfisUsuarios`: lista com perfil e "Também atua em", painel lateral (no celular, tela cheia) para editar ou cadastrar, indicadores no topo, abas Ativos/Inativos/Desligados e busca. Migration `20261120100000_setor_principal_membro.sql`: `membro_setores_obra.principal` (um por pessoa), gravado por `definir_setores_membro` (`"principal": true`); existentes recebem o setor que coordenam ou o primeiro da ordem.
 
@@ -85,7 +94,7 @@ Decisões do Evandro (05/11/2026): setor principal gravado no banco; tipo de ven
 
 Pendências: o "de N do plano" do indicador ficou de fora, porque o admin da empresa não lê `planos_empresa` (só o super-admin); o menu lateral de Configurações do desenho vale para a seção inteira e não entrou; as descrições de Gestor ("tudo fica no histórico") e Administrativo ("anexa notas fiscais") seguem o desenho e só ficam verdadeiras com a C e a A2; a PR antiga #232 (cartões de usuários, 29/10) é anterior ao desenho aprovado e conflita com esta.
 
-## Perfis e setores — A1: setor Administrativo no banco (em andamento, 05/11/2026)
+## Perfis e setores — A1: setor Administrativo no banco (mesclada na #332, 05/11/2026)
 
 #332 mesclada em 05/11/2026 (06:20, Brasília); migrations aplicadas em produção logo depois (06:33; tag `migracao-pr332-72fefb7`, run 42003095398). Nesses 13 minutos o app em produção rodou sem a migration. Ordem das entregas: A1 (esta) → B (Usuários com perfil único) → A2 (contas a pagar a fornecedores, NF do cliente, tela Financeiro) → C (gestor escreve em todos os setores, com histórico) → A3 (Compras com substituto) → D/E (prazos pela Operação; funil pelo gestor). Migrations `20261119100000_setor_administrativo_enum.sql` (só o valor do enum) e `20261119100100_setor_administrativo.sql`.
 
