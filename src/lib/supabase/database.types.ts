@@ -769,6 +769,76 @@ export type Database = {
           },
         ];
       };
+      compras_mapas_colunas: {
+        Row: {
+          empresa_id: string;
+          fornecedor_chave: string;
+          mapa: NonNullable<Json>;
+          updated_at: string;
+        };
+        Insert: {
+          empresa_id: string;
+          fornecedor_chave: string;
+          mapa: NonNullable<Json>;
+          updated_at?: string;
+        };
+        Update: {
+          empresa_id?: string;
+          fornecedor_chave?: string;
+          mapa?: NonNullable<Json>;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "compras_mapas_colunas_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      compras_materiais: {
+        Row: {
+          categoria: string;
+          created_at: string;
+          criado_por: string | null;
+          empresa_id: string;
+          id: string;
+          nome: string;
+          unidade: string;
+          updated_at: string;
+        };
+        Insert: {
+          categoria?: string;
+          created_at?: string;
+          criado_por?: string | null;
+          empresa_id: string;
+          id?: string;
+          nome: string;
+          unidade?: string;
+          updated_at?: string;
+        };
+        Update: {
+          categoria?: string;
+          created_at?: string;
+          criado_por?: string | null;
+          empresa_id?: string;
+          id?: string;
+          nome?: string;
+          unidade?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "compras_materiais_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       compras_orcamentos: {
         Row: {
           arquivo_id: string;
@@ -1028,6 +1098,138 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "obras";
             referencedColumns: ["empresa_id", "id"];
+          },
+        ];
+      };
+      compras_precos: {
+        Row: {
+          codigo_fornecedor: string | null;
+          created_at: string;
+          data_preco: string;
+          descricao_fornecedor: string | null;
+          empresa_id: string;
+          fornecedor: string;
+          fornecedor_chave: string | null;
+          id: string;
+          lancado_por: string | null;
+          material_id: string;
+          preco: number;
+          tabela_id: string | null;
+        };
+        Insert: {
+          codigo_fornecedor?: string | null;
+          created_at?: string;
+          data_preco: string;
+          descricao_fornecedor?: string | null;
+          empresa_id: string;
+          fornecedor: string;
+          fornecedor_chave?: never;
+          id?: string;
+          lancado_por?: string | null;
+          material_id: string;
+          preco: number;
+          tabela_id?: string | null;
+        };
+        Update: {
+          codigo_fornecedor?: string | null;
+          created_at?: string;
+          data_preco?: string;
+          descricao_fornecedor?: string | null;
+          empresa_id?: string;
+          fornecedor?: string;
+          fornecedor_chave?: never;
+          id?: string;
+          lancado_por?: string | null;
+          material_id?: string;
+          preco?: number;
+          tabela_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "compras_precos_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "compras_precos_empresa_id_material_id_fkey";
+            columns: ["empresa_id", "material_id"];
+            isOneToOne: false;
+            referencedRelation: "compras_materiais";
+            referencedColumns: ["empresa_id", "id"];
+          },
+          {
+            foreignKeyName: "compras_precos_empresa_id_tabela_id_fkey";
+            columns: ["empresa_id", "tabela_id"];
+            isOneToOne: false;
+            referencedRelation: "compras_tabelas_preco";
+            referencedColumns: ["empresa_id", "id"];
+          },
+        ];
+      };
+      compras_tabelas_preco: {
+        Row: {
+          baixaram: number;
+          caminho: string;
+          created_at: string;
+          data_tabela: string;
+          empresa_id: string;
+          enviado_por: string | null;
+          fornecedor: string;
+          fornecedor_chave: string | null;
+          id: string;
+          ignoradas: number;
+          iguais: number;
+          linhas_lidas: number;
+          nome_arquivo: string;
+          novos: number;
+          subiram: number;
+          valido_ate: string | null;
+        };
+        Insert: {
+          baixaram?: number;
+          caminho: string;
+          created_at?: string;
+          data_tabela: string;
+          empresa_id: string;
+          enviado_por?: string | null;
+          fornecedor: string;
+          fornecedor_chave?: never;
+          id?: string;
+          ignoradas?: number;
+          iguais?: number;
+          linhas_lidas: number;
+          nome_arquivo: string;
+          novos?: number;
+          subiram?: number;
+          valido_ate?: string | null;
+        };
+        Update: {
+          baixaram?: number;
+          caminho?: string;
+          created_at?: string;
+          data_tabela?: string;
+          empresa_id?: string;
+          enviado_por?: string | null;
+          fornecedor?: string;
+          fornecedor_chave?: never;
+          id?: string;
+          ignoradas?: number;
+          iguais?: number;
+          linhas_lidas?: number;
+          nome_arquivo?: string;
+          novos?: number;
+          subiram?: number;
+          valido_ate?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "compras_tabelas_preco_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
           },
         ];
       };
@@ -6769,6 +6971,7 @@ export type Database = {
         Args: { p_marca_negociacao: boolean; p_nome: string };
         Returns: number;
       };
+      chave_fornecedor: { Args: { p_nome: string }; Returns: string };
       compartilha_empresa: { Args: { p_user_id: string }; Returns: boolean };
       compartilha_empresa_comercial: { Args: { p_user_id: string }; Returns: boolean };
       compartilha_empresa_identidade: { Args: { p_user_id: string }; Returns: boolean };
@@ -6888,6 +7091,10 @@ export type Database = {
           isOneToOne: true;
           isSetofReturn: false;
         };
+      };
+      criar_material_compra: {
+        Args: { p_categoria: string; p_empresa_id: string; p_nome: string; p_unidade: string };
+        Returns: string;
       };
       criar_pedido_compra: {
         Args: {
@@ -7128,6 +7335,10 @@ export type Database = {
       e_closer_de_handoff_pendente: { Args: { p_negocio_id: string }; Returns: boolean };
       e_membro_comercial: { Args: { p_empresa_id: string; p_membro_id: string }; Returns: boolean };
       e_plataforma_admin: { Args: Record<PropertyKey, never>; Returns: boolean };
+      editar_material_compra: {
+        Args: { p_categoria: string; p_material_id: string; p_nome: string; p_unidade: string };
+        Returns: undefined;
+      };
       editar_orcamento_compra: {
         Args: {
           p_cobertura: string;
@@ -7276,6 +7487,7 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      exigir_editar_precos_compra: { Args: { p_empresa_id: string }; Returns: undefined };
       expirar_atribuicoes_leads: { Args: Record<PropertyKey, never>; Returns: undefined };
       fechar_comissao: { Args: { p_comissao_id: string }; Returns: undefined };
       fechar_escalonamento_obra: {
@@ -7331,6 +7543,21 @@ export type Database = {
           membro_id: string;
           nome: string;
         }[];
+      };
+      importar_tabela_precos: {
+        Args: {
+          p_caminho: string;
+          p_data_tabela: string;
+          p_empresa_id: string;
+          p_fornecedor: string;
+          p_ignoradas: number;
+          p_itens: Json;
+          p_linhas_lidas: number;
+          p_mapa: Json;
+          p_nome_arquivo: string;
+          p_valido_ate: string;
+        };
+        Returns: Json;
       };
       incrementar_preenchimento_formulario: { Args: { p_id: string }; Returns: undefined };
       incrementar_visualizacao_formulario: { Args: { p_id: string }; Returns: undefined };
@@ -7434,6 +7661,16 @@ export type Database = {
           p_valor: number;
         };
         Returns: string;
+      };
+      lancar_preco_compra: {
+        Args: {
+          p_codigo?: string;
+          p_data: string;
+          p_fornecedor: string;
+          p_material_id: string;
+          p_preco: number;
+        };
+        Returns: undefined;
       };
       limite_desconto_membro: { Args: { p_membro_id: string }; Returns: number };
       marcar_parado_fluxo_obra: {
@@ -7577,6 +7814,7 @@ export type Database = {
         }[];
       };
       pasta_compras_obra: { Args: { p_caminho: string }; Returns: string };
+      pasta_compras_precos: { Args: { p_caminho: string }; Returns: string };
       pasta_financeiro_obra: {
         Args: { p_caminho: string };
         Returns: {
@@ -7594,7 +7832,9 @@ export type Database = {
         };
         Returns: boolean;
       };
+      pode_editar_precos_compra: { Args: { p_empresa_id: string }; Returns: boolean };
       pode_enviar_pasta_compras: { Args: { p_caminho: string }; Returns: boolean };
+      pode_enviar_pasta_compras_precos: { Args: { p_caminho: string }; Returns: boolean };
       pode_enviar_pasta_engenharia: { Args: { p_caminho: string }; Returns: boolean };
       pode_enviar_pasta_financeiro: { Args: { p_caminho: string }; Returns: boolean };
       pode_enviar_pasta_tarefa_setor: { Args: { p_caminho: string }; Returns: boolean };
@@ -7626,12 +7866,14 @@ export type Database = {
       pode_ver_obra_operacao: { Args: { p_obra_id: string }; Returns: boolean };
       pode_ver_pasta_anexo: { Args: { p_caminho: string }; Returns: boolean };
       pode_ver_pasta_compras: { Args: { p_caminho: string }; Returns: boolean };
+      pode_ver_pasta_compras_precos: { Args: { p_caminho: string }; Returns: boolean };
       pode_ver_pasta_engenharia: { Args: { p_caminho: string }; Returns: boolean };
       pode_ver_pasta_financeiro: { Args: { p_caminho: string }; Returns: boolean };
       pode_ver_pasta_tarefa_setor: { Args: { p_caminho: string }; Returns: boolean };
       pode_ver_pasta_vistoria: { Args: { p_caminho: string }; Returns: boolean };
       pode_ver_pdf_proposta_emitida: { Args: { p_caminho: string }; Returns: boolean };
       pode_ver_pedidos_compra: { Args: { p_obra_id: string }; Returns: boolean };
+      pode_ver_precos_compra: { Args: { p_empresa_id: string }; Returns: boolean };
       pode_ver_responsavel: {
         Args: { p_empresa_id: string; p_responsavel_id: string };
         Returns: boolean;
@@ -7674,6 +7916,19 @@ export type Database = {
           progresso: number;
           vence_em: number;
           vence_etapa: string;
+        }[];
+      };
+      precos_atuais_compra: {
+        Args: { p_empresa_id: string };
+        Returns: {
+          codigo_fornecedor: string;
+          data_preco: string;
+          descricao_fornecedor: string;
+          fornecedor: string;
+          fornecedor_chave: string;
+          material_id: string;
+          preco: number;
+          tabela_id: string;
         }[];
       };
       precos_eletroposto_validos: {
@@ -8207,6 +8462,14 @@ export type Database = {
       validar_frete_orcamento_compra: {
         Args: { p_frete: number; p_modalidade: string };
         Returns: number;
+      };
+      validar_material_compra: {
+        Args: { p_categoria: string; p_nome: string; p_unidade: string };
+        Returns: undefined;
+      };
+      validar_preco_compra: {
+        Args: { p_codigo: string; p_data: string; p_fornecedor: string; p_preco: number };
+        Returns: undefined;
       };
     };
     Enums: {
