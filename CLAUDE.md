@@ -61,9 +61,9 @@ Este arquivo contém só regras duráveis. Estado atual em `docs/PROJECT_STATUS.
 
 Detalhe e histórico em `docs/PROJECT_STATUS.md` (seção "Ponto de retomada"); aqui só o resumo.
 
-- **Produção:** `main` em `fc2ce78`, todas as migrations até a #350 aplicadas. Backups diários de produção (banco e storage) rodando no GitHub.
-- **Concluídos recentemente:** Perfis e setores (A1 a E, #332–#342) e Compras P1, P2, P2b e P2c (#343–#351).
-- **Próximo:** Compras P3 (tabela de preços por planilha), aguardando comando. P4 (preço da tabela na calculadora e no kit) exige perguntar as regras ao Evandro antes.
+- **Produção:** `main` em `c9aa2f0`, todas as migrations até a #353 aplicadas. Backups diários de produção (banco e storage) rodando no GitHub.
+- **Concluídos recentemente:** Perfis e setores (A1 a E, #332–#342) e Compras P1, P2, P2b, P2c e P3 (#343–#354).
+- **Próximo:** Compras P4 (preço da tabela na calculadora e no kit, margem e venda sugerida), aguardando comando; exige perguntar as regras ao Evandro antes.
 - **Limpeza pendente (com OK do Evandro):** worktrees já mesclados (`prunable`) em `R:\` e `C:\dev\`; triagem das PRs drafts antigas.
 - **Ambiente neste desktop:** `node_modules` dentro de `R:\` é lento ou quebrado (links para `E:\`); instale e rode a verificação numa cópia em disco local (worktrees em `C:\dev\`; `pnpm install --frozen-lockfile` leva ~25 s lá). Se o Supabase local subir sem o Kong, a stack foi criada de um checkout antigo: `supabase stop` e `start` resolvem. Várias outras stacks Supabase locais estão ativas em portas próprias.
 
