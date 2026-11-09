@@ -1,5 +1,6 @@
 import { LogOut } from "lucide-react";
 import { acessaCompras } from "@/lib/compras/dados";
+import { acessoPrecos } from "@/lib/compras/dados-precos";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { Avatar } from "@/components/avatar";
@@ -72,8 +73,14 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
   let verPagamentosAConfirmar = false;
   // Compras: admin, gestor e quem atua em Compras (ou no setor que atende no lugar dele).
   let verCompras = papel === "admin" || papel === "gestor";
+  let verPrecos = false;
   if (sessao.atual) {
-    if (papel === "operacao") verCompras = await acessaCompras(await criarClienteServidor(), sessao.atual.empresaId, papel);
+    if (papel === "operacao") {
+      const supabase = await criarClienteServidor();
+      verCompras = await acessaCompras(supabase, sessao.atual.empresaId, papel);
+      // O Administrativo que não atua em Compras consulta a tabela de preços (só ela).
+      if (!verCompras) verPrecos = (await acessoPrecos(supabase, sessao.atual.empresaId)).ver;
+    }
     const [dias, horas] = await Promise.all([
       carregarDiasConsideradoParado(sessao.atual.empresaId),
       carregarHorasConsideradoSemContato(sessao.atual.empresaId),
@@ -128,6 +135,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
           ...(pode(papel, OBRAS) ? [{ href: "/obras", rotulo: "Obras", secao: "Operação" }] : []),
           ...(pode(papel, ENGENHARIA) ? [{ href: "/engenharia", rotulo: "Engenharia", secao: "Operação" }] : []),
           ...(verCompras ? [{ href: "/compras", rotulo: "Compras", secao: "Operação" }] : []),
+          ...(verPrecos ? [{ href: "/compras/precos", rotulo: "Preços de material", secao: "Operação" }] : []),
           ...(pode(papel, PEDIDOS_AOS_SETORES) ? [{ href: "/tarefas/setores", rotulo: "Pedidos aos setores", secao: "Operação" }] : []),
           // Financeiro (A pagar, Pagamentos a confirmar, Notas fiscais, Pagos): da Operação, quem atua no Operacional ou no
           // Administrativo (`confirma_pagamento_cliente`); a tela escolhe as abas de cada um.

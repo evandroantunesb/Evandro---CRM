@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { FormularioPedido } from "@/components/compras/formulario-pedido";
 import { CabecalhoPagina } from "@/components/cabecalho-pagina";
 import { carregarFaturamentoObra } from "@/lib/compras/dados-obra";
+import { carregarTabelaParaPedido } from "@/lib/compras/dados-precos";
 import { acessaCompras, carregarFornecedores, carregarObraParaPedido, carregarPedidos, carregarTelaCompras } from "@/lib/compras/dados";
 import { ROTULO_COBERTURA } from "@/lib/compras/orcamentos-regras";
 import { numeroPedido, pedidoEditavel } from "@/lib/compras/regras";
@@ -50,7 +51,7 @@ export default async function PedidoCompra({ searchParams }: PageProps<"/compras
     );
   }
 
-  const [obra, pedidos, fornecedores, orcamentoRes, faturamento] = await Promise.all([
+  const [obra, pedidos, fornecedores, orcamentoRes, faturamento, tabelaPrecos] = await Promise.all([
     carregarObraParaPedido(supabase, { papel: atual.papel, obraId }),
     carregarPedidos(supabase, { empresaId: atual.empresaId, obraId }),
     carregarFornecedores(supabase, atual.empresaId),
@@ -64,6 +65,7 @@ export default async function PedidoCompra({ searchParams }: PageProps<"/compras
           .maybeSingle()
       : Promise.resolve({ data: null, error: null }),
     carregarFaturamentoObra(supabase, { obraId, empresaId: atual.empresaId }),
+    carregarTabelaParaPedido(supabase, atual.empresaId),
   ]);
   if (orcamentoRes.error) throw orcamentoRes.error;
   if (!obra) notFound();
@@ -98,6 +100,7 @@ export default async function PedidoCompra({ searchParams }: PageProps<"/compras
         hoje={hojeEmSaoPaulo()}
         jaPedido={jaPedido}
         faturamento={faturamento}
+        tabelaPrecos={tabelaPrecos}
         doOrcamento={
           orc
             ? {

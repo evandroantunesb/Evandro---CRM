@@ -1,15 +1,17 @@
 "use client";
 
 import { FornecedorPedido } from "./fornecedor-pedido";
+import { PrecoDaTabela, type EscolhaDaTabela } from "./preco-da-tabela";
 import { ReferenciasPedido } from "./referencias-pedido";
 import { FaturamentoEntrega } from "./faturamento-entrega";
 import type { FaturamentoPedidoVM } from "@/lib/compras/faturamento";
 import { ROTULO_FRETE, type ModalidadeFrete } from "@/lib/compras/regras";
 import { useRouter } from "next/navigation";
-import { useId, useState, type FormEvent } from "react";
+import { useId, useRef, useState, type FormEvent } from "react";
 import { Botao, CLASSE_ENTRADA, Mensagem } from "@/components/ui";
 import { salvarPedidoCompra } from "@/lib/acoes/compras";
 import { totalDoPedido, type ItemKitCompra } from "@/lib/compras/regras";
+import type { MaterialPedidoVM } from "@/lib/compras/dados-precos";
 import { CATEGORIAS_CUSTO_OBRA, ROTULO_CATEGORIA_CUSTO, type CategoriaCustoObra } from "@/lib/obras/custos";
 import { formatarMoeda, lerNumeroBr } from "@/lib/formatacao";
 import type { ResultadoAcao } from "@/lib/tipos";
@@ -20,7 +22,8 @@ import type { ResultadoAcao } from "@/lib/tipos";
  * nota e sem nada recebido. O banco valida tudo de novo.
  */
 
-type Linha = { chave: string; kitIndice: number | null; descricao: string; unidade: string; quantidade: string; valorUnitario: string };
+/** `daTabela`: de onde veio o valor, quando escolhido na tabela de preços (só na tela). */
+type Linha = { chave: string; kitIndice: number | null; descricao: string; unidade: string; quantidade: string; valorUnitario: string; daTabela?: { materialId: string; origem: string } };
 
 export type PedidoInicial = {
   pedidoId: string;
@@ -61,6 +64,7 @@ export function FormularioPedido({
   doOrcamento,
   jaPedido,
   faturamento,
+  tabelaPrecos = [],
 }: {
   obraId: string;
   kit: ItemKitCompra[];
@@ -70,6 +74,8 @@ export function FormularioPedido({
   inicial?: PedidoInicial;
   doOrcamento?: OrcamentoDoPedido;
   faturamento: FaturamentoPedidoVM;
+  /** Materiais com preço na tabela de preços (vazio para quem não a vê). */
+  tabelaPrecos?: MaterialPedidoVM[];
   /** Quanto de cada item do kit já está em outros pedidos ativos (o restante é a sugestão). */
   jaPedido: Record<number, number>;
 }) {
@@ -94,7 +100,21 @@ export function FormularioPedido({
   const [enviando, setEnviando] = useState(false);
   const [resultado, setResultado] = useState<ResultadoAcao>(null);
 
-  const mudar = (chave: string, campo: keyof Linha, valor: string) => setLinhas((ls) => ls.map((l) => (l.chave === chave ? { ...l, [campo]: valor } : l)));
+  const mudar = (chave: string, campo: "descricao" | "unidade" | "quantidade" | "valorUnitario", valor: string) =>
+    setLinhas((ls) => ls.map((l) => (l.chave === chave ? { ...l, [campo]: valor, ...(campo === "valorUnitario" ? { daTabela: undefined } : {}) } : l)));
+  const formRef = useRef<HTMLFormElement>(null);
+  const fornecedorDigitado = () => {
+    const campo = formRef.current?.elements.namedItem("fornecedor");
+    return campo instanceof HTMLInputElement ? campo.value : "";
+  };
+  const usarDaTabela = (chave: string, e: EscolhaDaTabela) =>
+    setLinhas((ls) =>
+      ls.map((l) =>
+        l.chave === chave
+          ? { ...l, descricao: l.kitIndice == null && !l.descricao.trim() ? e.nome : l.descricao, unidade: e.unidade, valorUnitario: numeroBr(e.preco), daTabela: { materialId: e.materialId, origem: e.origem } }
+          : l,
+      ),
+    );
   const numericas = linhas.map((l) => ({ quantidade: ler(l.quantidade) ?? 0, valorUnitario: ler(l.valorUnitario) ?? 0 }));
   const total = totalDoPedido(numericas, freteModalidade === "fob" ? (ler(frete) ?? 0) : 0);
   const previsto = orcamento[categoria];
@@ -150,7 +170,7 @@ export function FormularioPedido({
   };
 
   return (
-    <form onSubmit={enviar} className="flex flex-col gap-4 lg:flex-row lg:items-start">
+    <form ref={formRef} onSubmit={enviar} className="flex flex-col gap-4 lg:flex-row lg:items-start">
       <div className="flex min-w-0 flex-1 flex-col gap-4">
         <FornecedorPedido
           fornecedores={fornecedores}
@@ -213,6 +233,16 @@ export function FormularioPedido({
                           className={`${CLASSE_ENTRADA} w-full min-w-40`}
                         />
                       )}
+                      {tabelaPrecos.length > 0 && (
+                        <PrecoDaTabela
+                          materiais={tabelaPrecos}
+                          rotulo={`Preço da tabela para ${l.descricao || `item ${i + 1}`}`}
+                          materialId={l.daTabela?.materialId ?? null}
+                          fornecedor={fornecedorDigitado}
+                          aoEscolher={(e) => usarDaTabela(l.chave, e)}
+                        />
+                      )}
+                      {l.daTabela && <span className="mt-1 block text-xs text-texto-2">Tabela: {l.daTabela.origem}</span>}
                     </td>
                     <td className="px-2 py-2">
                       <input
