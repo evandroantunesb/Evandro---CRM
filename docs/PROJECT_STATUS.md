@@ -1,6 +1,6 @@
 # Estado do projeto — Raion CRM
 
-## Compras — P3: tabela de preços de material (em andamento, 09/11/2026)
+## Compras — P3: tabela de preços de material (#353; migration aplicada em produção em 09/11/2026 antes do merge, tag `migracao-pr353-32f77e2`, run 42701825090)
 
 Branch `feat/compras-tabela-precos` (worktree `C:\dev\crm-precos`). Migration `20261129100000_compras_tabela_precos.sql`. Desenho aprovado no canvas "Compras · Pedidos de compra" (linha 2: Tabela de preços e Enviar tabela de preços).
 
@@ -9,6 +9,7 @@ Branch `feat/compras-tabela-precos` (worktree `C:\dev\crm-precos`). Migration `2
 - Decisões do Evandro (09/11/2026): margem por categoria e venda sugerida ficam para a P4 (parâmetro da calculadora); "Preço da tabela" escolhido por linha no pedido (ligação automática kit → material fica para a P4); categorias Módulos, Inversores, Baterias, Estrutura, Cabos e proteção e Outros; Administrativo só consulta; preço à mão permitido; `read-excel-file` para .xlsx (o pacote `xlsx` do npm tem falha conhecida).
 - Na importação entram todas as linhas válidas: as iguais também, para a data do preço acompanhar a tabela mais recente (o desenho contava só mudanças e novos no botão). Preço com mais de 30 dias aparece no indicador "pedir tabela nova".
 - Fora da P3: frete por região (transportadora) e qualquer mudança no kit ou na calculadora.
+- Produção: migration aplicada em 09/11/2026 pelo `banco-producao.yml` (dry-run 42701606715 listou só ela; aplicação 42701825090), aprovada pelo Evandro. Autorização no workflow pela PR da branch `chore/autorizar-migracao-353` (#354).
 
 ## Compras — P2c: Engenharia e Administrativo usando os documentos do negócio (#350; migration aplicada em produção em 06/11/2026 antes do merge, tag `migracao-pr350-2e0b569`, run 42222249989)
 
