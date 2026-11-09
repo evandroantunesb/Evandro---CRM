@@ -37,7 +37,9 @@ test("Compras: tabela de preços, prévia, histórico e preço no pedido", async
 
   await expect(page).toHaveURL(/\/compras\/precos$/);
   const linhaModulo = page.getByRole("row").filter({ hasText: "Módulo 550 W (e2e)" });
-  await expect(linhaModulo.getByText("R$ 780,00")).toBeVisible();
+  // Colunas: material, melhor custo, venda sugerida (margem 0% enquanto ninguém cadastrou), outros, atualizado.
+  await expect(linhaModulo.getByRole("cell").nth(1)).toContainText("R$ 780,00");
+  await expect(linhaModulo.getByRole("cell").nth(2)).toContainText("margem 0%");
   await expect(page.getByRole("link", { name: fornecedor })).toBeVisible();
 
   // 2ª tabela, .xlsx: colunas lembradas, material reconhecido pelo código.
@@ -57,7 +59,7 @@ test("Compras: tabela de preços, prévia, histórico e preço no pedido", async
   await expect(page.getByRole("row").filter({ hasText: "INV 5K MONOF" })).toContainText("Igual");
   await page.getByRole("button", { name: "Importar 2 preços" }).click();
   await expect(page).toHaveURL(/\/compras\/precos$/);
-  await expect(linhaModulo.getByText("R$ 800,00")).toBeVisible();
+  await expect(linhaModulo.getByRole("cell").nth(1)).toContainText("R$ 800,00");
 
   await linhaModulo.getByRole("link", { name: "Histórico" }).click();
   await expect(page.getByRole("heading", { name: "Módulo 550 W (e2e)", level: 1 })).toBeVisible();

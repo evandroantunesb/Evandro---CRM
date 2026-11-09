@@ -3,12 +3,14 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Indicadores, type Indicador } from "@/app/(app)/negocios/indicadores";
 import { AbasCompras } from "@/components/compras/abas-compras";
+import { MargensCategoriaCartao } from "@/components/compras/margens-categoria";
 import { CabecalhoPagina, CLASSE_ACAO_CABECALHO } from "@/components/cabecalho-pagina";
 import { FOCO, Selo } from "@/components/ui";
 import { acessaCompras } from "@/lib/compras/dados";
 import { acessoPrecos, carregarTelaPrecos } from "@/lib/compras/dados-precos";
 import { CATEGORIAS_MATERIAL, DIAS_PRECO_ANTIGO, ROTULO_CATEGORIA_MATERIAL, diasDesde, ehCategoriaMaterial, normalizar } from "@/lib/compras/precos";
-import { formatarMoeda, hojeEmSaoPaulo } from "@/lib/formatacao";
+import { margemEmTexto, vendaSugerida } from "@/lib/compras/margens";
+import { formatarMoeda, formatarNumeroBr, hojeEmSaoPaulo } from "@/lib/formatacao";
 import { GERIR_OBRAS } from "@/lib/permissoes";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
@@ -66,7 +68,7 @@ export default async function PrecosMaterial({ searchParams }: PageProps<"/compr
       <CabecalhoPagina
         sobretitulo="Operação · Compras"
         titulo="Preços de material"
-        descricao="Preço de custo de cada material por fornecedor, atualizado pelas tabelas que os fornecedores mandam. O pedido de compra já vem com o preço da tabela preenchido."
+        descricao="Preço de custo de cada material por fornecedor, atualizado pelas tabelas que os fornecedores mandam, e a venda sugerida pela margem da categoria. O pedido de compra já vem com o preço da tabela preenchido."
         acoes={
           acesso.editar ? (
             <div className="flex flex-wrap gap-2">
@@ -130,11 +132,12 @@ export default async function PrecosMaterial({ searchParams }: PageProps<"/compr
             </p>
           ) : (
             <div className="overflow-x-auto border-t border-linha">
-              <table className="w-full min-w-[720px] text-sm">
+              <table className="w-full min-w-[860px] text-sm">
                 <thead>
                   <tr className="border-b border-linha text-left text-xs text-texto-2">
                     <th className="px-4 py-2 font-medium md:px-6">Material</th>
                     <th className="px-2 py-2 font-medium">Melhor preço de custo</th>
+                    <th className="px-2 py-2 font-medium">Venda sugerida</th>
                     <th className="px-2 py-2 font-medium">Outros fornecedores</th>
                     <th className="px-2 py-2 font-medium">Atualizado</th>
                     <th className="px-4 py-2 md:px-6">
@@ -154,6 +157,7 @@ export default async function PrecosMaterial({ searchParams }: PageProps<"/compr
                           </Link>
                           <span className="block text-xs text-texto-2">
                             {ROTULO_CATEGORIA_MATERIAL[m.categoria]} · {m.unidade}
+                            {m.potenciaW != null && ` · ${formatarNumeroBr(m.potenciaW)} W`}
                           </span>
                         </td>
                         <td className="px-2 py-3">
@@ -164,6 +168,16 @@ export default async function PrecosMaterial({ searchParams }: PageProps<"/compr
                             </>
                           ) : (
                             <span className="text-texto-2">Sem preço</span>
+                          )}
+                        </td>
+                        <td className="px-2 py-3">
+                          {melhor ? (
+                            <>
+                              <span className="font-semibold text-texto tabular-nums">{formatarMoeda(vendaSugerida(melhor.preco, dados.margens[m.categoria]))}</span>
+                              <span className="block text-xs text-texto-2">margem {margemEmTexto(dados.margens[m.categoria])}%</span>
+                            </>
+                          ) : (
+                            <span className="text-texto-2">—</span>
                           )}
                         </td>
                         <td className="px-2 py-3 text-xs text-texto-2">
@@ -200,6 +214,7 @@ export default async function PrecosMaterial({ searchParams }: PageProps<"/compr
         </section>
 
         <aside className="flex flex-col gap-4">
+          <MargensCategoriaCartao margens={dados.margens} podeEditar={atual.papel === "admin" || atual.papel === "gestor"} />
           <section className="painel p-4 md:p-5">
             <p className="text-xs font-medium text-texto-2">Por fornecedor</p>
             <h2 className="font-titulo text-lg text-texto">Tabelas recebidas</h2>
