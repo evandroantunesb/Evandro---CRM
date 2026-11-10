@@ -63,7 +63,7 @@ tela está no conjunto da empresa.
 - **Índice de Configurações:** Captura some com a Captura desligada; Metas, Comissões, Recompensas, Regras de pontos,
   Níveis e conquistas, Perfis de gamificação e Resgates somem com a Gamificação desligada ou no Solo; no Solo também
   Equipes, Tarefas automáticas, Compras, Engenharia, Prazos das etapas, Impostos e comissões e Tipos de fixação.
-- **Travas:** cada área ganha um `layout.tsx` que chama `exigirTela(tela)`; desligada, mostra "Esta tela está
+- **Travas:** cada área ganha um `layout.tsx` que chama `telaPermitida(area)`; desligada, mostra "Esta tela está
   desligada na sua empresa" com link para o Início e, para o admin, para Configurações › Telas da empresa.
 
 | Tela | Endereços travados |
