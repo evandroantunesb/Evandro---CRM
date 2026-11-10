@@ -798,6 +798,38 @@ export type Database = {
           },
         ];
       };
+      compras_margens: {
+        Row: {
+          atualizado_por: string | null;
+          categoria: string;
+          empresa_id: string;
+          margem: number;
+          updated_at: string;
+        };
+        Insert: {
+          atualizado_por?: string | null;
+          categoria: string;
+          empresa_id: string;
+          margem: number;
+          updated_at?: string;
+        };
+        Update: {
+          atualizado_por?: string | null;
+          categoria?: string;
+          empresa_id?: string;
+          margem?: number;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "compras_margens_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       compras_materiais: {
         Row: {
           categoria: string;
@@ -806,6 +838,7 @@ export type Database = {
           empresa_id: string;
           id: string;
           nome: string;
+          potencia_w: number | null;
           unidade: string;
           updated_at: string;
         };
@@ -816,6 +849,7 @@ export type Database = {
           empresa_id: string;
           id?: string;
           nome: string;
+          potencia_w?: number | null;
           unidade?: string;
           updated_at?: string;
         };
@@ -826,6 +860,7 @@ export type Database = {
           empresa_id?: string;
           id?: string;
           nome?: string;
+          potencia_w?: number | null;
           unidade?: string;
           updated_at?: string;
         };
@@ -7093,7 +7128,13 @@ export type Database = {
         };
       };
       criar_material_compra: {
-        Args: { p_categoria: string; p_empresa_id: string; p_nome: string; p_unidade: string };
+        Args: {
+          p_categoria: string;
+          p_empresa_id: string;
+          p_nome: string;
+          p_potencia_w?: number;
+          p_unidade: string;
+        };
         Returns: string;
       };
       criar_pedido_compra: {
@@ -7336,7 +7377,13 @@ export type Database = {
       e_membro_comercial: { Args: { p_empresa_id: string; p_membro_id: string }; Returns: boolean };
       e_plataforma_admin: { Args: Record<PropertyKey, never>; Returns: boolean };
       editar_material_compra: {
-        Args: { p_categoria: string; p_material_id: string; p_nome: string; p_unidade: string };
+        Args: {
+          p_categoria: string;
+          p_material_id: string;
+          p_nome: string;
+          p_potencia_w?: number;
+          p_unidade: string;
+        };
         Returns: undefined;
       };
       editar_orcamento_compra: {
@@ -8163,6 +8210,10 @@ export type Database = {
         Args: { p_obra_id: string; p_respostas: Json };
         Returns: undefined;
       };
+      salvar_margens_compra: {
+        Args: { p_empresa_id: string; p_margens: Json };
+        Returns: undefined;
+      };
       salvar_regras_temperatura: {
         Args: { p_empresa_id: string; p_regras: Json };
         Returns: undefined;
@@ -8467,6 +8518,7 @@ export type Database = {
         Args: { p_categoria: string; p_nome: string; p_unidade: string };
         Returns: undefined;
       };
+      validar_potencia_material: { Args: { p_potencia_w: number }; Returns: undefined };
       validar_preco_compra: {
         Args: { p_codigo: string; p_data: string; p_fornecedor: string; p_preco: number };
         Returns: undefined;

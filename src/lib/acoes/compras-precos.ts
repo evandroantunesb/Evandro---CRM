@@ -24,6 +24,8 @@ const material = z.object({
   categoria: z.enum(CATEGORIAS_MATERIAL, "Escolha a categoria do material."),
   unidade: z.string().trim().min(1, "Informe a unidade.").max(20, "Unidade muito longa."),
 });
+/** Potência (W) do material; nulo = sem potência. */
+const potencia = z.number({ message: "Potência inválida." }).finite().positive("Potência inválida (em W, maior que zero).").lt(1e6, "Potência inválida.").nullable();
 const preco = z.number({ message: "Informe o preço de custo." }).finite().positive("Informe o preço de custo.").lt(1e10, "Preço muito alto.");
 
 function revalidarPrecos(materialId?: string) {
@@ -31,9 +33,9 @@ function revalidarPrecos(materialId?: string) {
   if (materialId) revalidatePath(`/compras/precos/material/${materialId}`);
 }
 
-export async function criarMaterialCompra(dados: z.input<typeof material>): Promise<ResultadoAcao & { id?: string }> {
+export async function criarMaterialCompra(dados: z.input<typeof material> & { potenciaW: number | null }): Promise<ResultadoAcao & { id?: string }> {
   const { atual } = await exigirPapel(...GERIR_OBRAS);
-  const d = material.safeParse(dados);
+  const d = material.extend({ potenciaW: potencia }).safeParse(dados);
   if (!d.success) return { ok: false, mensagem: d.error.issues[0].message };
   const supabase = await criarClienteServidor();
   const { data: id, error } = await supabase.rpc("criar_material_compra", {
@@ -41,15 +43,16 @@ export async function criarMaterialCompra(dados: z.input<typeof material>): Prom
     p_nome: d.data.nome,
     p_categoria: d.data.categoria,
     p_unidade: d.data.unidade,
+    ...(d.data.potenciaW != null ? { p_potencia_w: d.data.potenciaW } : {}),
   });
   if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível cadastrar o material.") };
   revalidarPrecos();
   return { ok: true, mensagem: "Material cadastrado.", id: id as string };
 }
 
-export async function editarMaterialCompra(dados: z.input<typeof material> & { materialId: string }): Promise<ResultadoAcao> {
+export async function editarMaterialCompra(dados: z.input<typeof material> & { materialId: string; potenciaW: number | null }): Promise<ResultadoAcao> {
   await exigirPapel(...GERIR_OBRAS);
-  const d = material.extend({ materialId: uuid }).safeParse(dados);
+  const d = material.extend({ materialId: uuid, potenciaW: potencia }).safeParse(dados);
   if (!d.success) return { ok: false, mensagem: d.error.issues[0].message };
   const supabase = await criarClienteServidor();
   const { error } = await supabase.rpc("editar_material_compra", {
@@ -57,6 +60,7 @@ export async function editarMaterialCompra(dados: z.input<typeof material> & { m
     p_nome: d.data.nome,
     p_categoria: d.data.categoria,
     p_unidade: d.data.unidade,
+    ...(d.data.potenciaW != null ? { p_potencia_w: d.data.potenciaW } : {}),
   });
   if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível salvar o material.") };
   revalidarPrecos(d.data.materialId);
@@ -136,4 +140,18 @@ export async function importarTabelaPrecos(
   const c = r as { novos: number; subiram: number; baixaram: number; iguais: number };
   const total = c.novos + c.subiram + c.baixaram + c.iguais;
   return { ok: true, mensagem: `${total.toLocaleString("pt-BR")} preços importados.`, contagem: c };
+}
+
+const esquemaMargens = z.record(z.enum(CATEGORIAS_MATERIAL), z.number().finite().min(0, "Margem inválida.").max(5, "Margem inválida: use até 500%."));
+
+/** Margem por categoria (fração: 0,18 = 18%). Só admin e gestor (o banco confere). */
+export async function salvarMargensCompra(margens: z.input<typeof esquemaMargens>): Promise<ResultadoAcao> {
+  const { atual } = await exigirPapel(...GERIR_OBRAS);
+  const d = esquemaMargens.safeParse(margens);
+  if (!d.success) return { ok: false, mensagem: d.error.issues[0].message };
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.rpc("salvar_margens_compra", { p_empresa_id: atual.empresaId, p_margens: d.data });
+  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível salvar as margens.") };
+  revalidarPrecos();
+  return { ok: true, mensagem: "Margens salvas." };
 }

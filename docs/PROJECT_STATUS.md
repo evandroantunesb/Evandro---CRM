@@ -1,5 +1,13 @@
 # Estado do projeto — Raion CRM
 
+## Compras — P4: preço do kit pela tabela de preços (em andamento, 09/11/2026)
+
+Prévia aprovada pelo Evandro em 09/11/2026 no canvas "Raion — Nova interface" (linha "Compras P4: preço do kit pela tabela de preços": `P4Kit`, `P4Desconto`, `P4AprovarDesconto`, `P4Margens`). Dividida em três PRs: **P4a** margens e potência; **P4b** kit montado com os materiais e preço pronto (sai a OpenSolar), retrato do custo e previsto de Equipamentos da obra pelo custo; **P4c** limite de desconto com aprovação do gestor.
+
+Decisões do Evandro (09/11/2026): preço de venda do kit vem pronto e o vendedor pode mudar = custo de cada item (menor preço atual entre fornecedores) + margem da categoria do item + custos internos de hoje (instalação por módulo, material CA por kWp, engenharia) + comissão %; preço velho ou de tabela vencida é usado com aviso; o sugerido preenche o valor do negócio; desconto até X% (admin configura) passa direto, acima disso o gestor da equipe (ou o admin) aprova e, pendente, não sai proposta nem contrato; o vendedor vê só o preço de venda (custo e margem: admin, gestor, Compras, Administrativo); itens do kit só dos materiais da tabela (OpenSolar sai); item sem preço = preço de venda à mão, com aviso; o sugerido fica gravado no cálculo (retrato); previsto de Equipamentos da obra = custo do kit pela tabela (hoje usa o preço de venda inteiro, `kit_preco`).
+
+- **P4a (branch `feat/compras-p4a-margens`, worktree `C:\dev\crm-p4`):** migration `20261130100000_compras_margens.sql`: `compras_margens` (fração por categoria, 0 a 5 = 500%; categoria sem margem = 0%), `salvar_margens_compra` (admin e gestor; tudo ou nada), `compras_materiais.potencia_w` (opcional) e `criar_material_compra`/`editar_material_compra` com `p_potencia_w` (padrão nulo). Na tabela de preços: coluna "Venda sugerida" (melhor custo × (1 + margem)), cartão "Margem por categoria" (edita admin e gestor; os demais consultam) e potência no cadastro do material.
+
 ## Compras — P3: tabela de preços de material (#353; migration aplicada em produção em 09/11/2026 antes do merge, tag `migracao-pr353-32f77e2`, run 42701825090)
 
 Branch `feat/compras-tabela-precos` (worktree `C:\dev\crm-precos`). Migration `20261129100000_compras_tabela_precos.sql`. Desenho aprovado no canvas "Compras · Pedidos de compra" (linha 2: Tabela de preços e Enviar tabela de preços).
