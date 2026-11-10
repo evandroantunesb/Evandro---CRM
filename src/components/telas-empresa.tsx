@@ -1,7 +1,7 @@
 "use client";
 
 import { BarChart3, Inbox, LayoutDashboard, PlugZap, QrCode, Sun, Trophy, Wrench, type LucideIcon } from "lucide-react";
-import { INFO_TELA, TELAS_OPCIONAIS, type TelaOpcional } from "@/lib/telas-empresa";
+import { INFO_TELA, TELAS_OPCIONAIS, avisoTelas, type TelaOpcional } from "@/lib/telas-empresa";
 
 const ICONE: Record<TelaOpcional, LucideIcon> = {
   painel: LayoutDashboard,
@@ -29,6 +29,7 @@ export function CartaoTelasOpcionais({
   onChange: (ligadas: TelaOpcional[]) => void;
 }) {
   const telas = TELAS_OPCIONAIS.filter((t) => t !== "eletroposto" || eletropostoLiberado);
+  const aviso = avisoTelas(ligadas);
   const alternar = (tela: TelaOpcional) =>
     onChange(ligadas.includes(tela) ? ligadas.filter((t) => t !== tela) : TELAS_OPCIONAIS.filter((t) => t === tela || ligadas.includes(t)));
   return (
@@ -66,6 +67,11 @@ export function CartaoTelasOpcionais({
           );
         })}
       </ul>
+      {aviso && (
+        <p role="status" className="mt-3 rounded-xl bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
+          {aviso}
+        </p>
+      )}
     </section>
   );
 }

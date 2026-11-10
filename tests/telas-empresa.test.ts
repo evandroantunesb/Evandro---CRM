@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { TELAS_OPCIONAIS, TELAS_PADRAO, areaLigada, lerDesligadas, telasDaEmpresa } from "@/lib/telas-empresa";
+import { TELAS_OPCIONAIS, TELAS_PADRAO, areaLigada, avisoTelas, lerDesligadas, telasDaEmpresa } from "@/lib/telas-empresa";
 
 const pro = (desligadas: string[] = [], eletropostoLiberado = true) => telasDaEmpresa({ produto: "pro", desligadas, eletropostoLiberado });
 
@@ -34,6 +34,16 @@ describe("telas da empresa", () => {
     expect(TELAS_PADRAO.solo).toBe(false);
     expect(areaLigada(TELAS_PADRAO, "obras")).toBe(true);
     expect(areaLigada(TELAS_PADRAO, "eletroposto")).toBe(false);
+  });
+});
+
+describe("avisoTelas", () => {
+  it("Captura ligada sem Leads a distribuir: os leads ficam na fila sem ninguém para aprovar", () => {
+    expect(avisoTelas(["captura", "obras"])).toBe(
+      "Com a Captura de leads ligada e Leads a distribuir desligada, os leads que chegam pelo formulário ficam na fila sem ninguém para aprovar.",
+    );
+    expect(avisoTelas(["captura", "leads"])).toBeNull();
+    expect(avisoTelas(["obras"])).toBeNull();
   });
 });
 

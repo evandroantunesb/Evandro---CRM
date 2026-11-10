@@ -52,6 +52,16 @@ export const areaLigada = (t: TelasEmpresa, area: Area): boolean => (area === "p
 /** Quando a leitura falha: como sempre foi (PRO, tudo ligado), e o Eletroposto não liga sem a liberação. */
 export const TELAS_PADRAO: TelasEmpresa = telasDaEmpresa({ produto: "pro", desligadas: [], eletropostoLiberado: false });
 
+/**
+ * Combinação que o admin pode escolher, mas deve saber o efeito (decisão do Evandro de 10/11/2026): a Captura ligada
+ * sem Leads a distribuir deixa os leads do formulário na fila de distribuição, sem tela para aprovar.
+ */
+export function avisoTelas(ligadas: readonly TelaOpcional[]): string | null {
+  return ligadas.includes("captura") && !ligadas.includes("leads")
+    ? "Com a Captura de leads ligada e Leads a distribuir desligada, os leads que chegam pelo formulário ficam na fila sem ninguém para aprovar."
+    : null;
+}
+
 /** Lista de telas desligadas enviada pela tela de Configurações (JSON). Nulo = inválida. */
 export function lerDesligadas(texto: string): TelaOpcional[] | null {
   let valor: unknown;
