@@ -7872,6 +7872,15 @@ export type Database = {
         Returns: undefined;
       };
       limite_desconto_membro: { Args: { p_membro_id: string }; Returns: number };
+      marca_da_empresa: {
+        Args: { p_empresa_id: string };
+        Returns: {
+          cor_destaque: string;
+          cor_primaria: string;
+          logo_escuro_url: string;
+          logo_url: string;
+        }[];
+      };
       marcar_parado_fluxo_obra: {
         Args: {
           p_motivo?: string;
