@@ -62,7 +62,7 @@ export function CabecalhoPagina({
 }) {
   const espaco = destaque ? "px-6 py-8 md:px-10 md:py-12" : detalhe ? "px-6 py-6 md:px-8" : "px-6 py-6 md:px-8 md:py-8";
   return (
-    <section className="relative isolate overflow-hidden rounded-3xl bg-carvao text-offwhite">
+    <section className="faixa-marca relative isolate overflow-hidden rounded-3xl bg-carvao text-offwhite">
       <div aria-hidden className={`absolute inset-0 -z-10 bg-[url(/marca/paisagem.jpg)] bg-cover bg-[center_62%] ${detalhe ? "opacity-35" : ""}`} />
       <div
         aria-hidden

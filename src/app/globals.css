@@ -233,6 +233,32 @@ html:has(.tema-app[data-tema="escuro"]) body {
   --color-white: #ffffff;
 }
 
+/*
+ * Marca da empresa (Onboarding, subprojeto 2): o invólucro recebe as variáveis da cor de destaque e `--cor-barra`
+ * (src/lib/marca-cores.ts) e `data-marca`. Sem marca, nada aqui vale e tudo segue o padrão Raion.
+ *  - Na barra lateral, no cabeçalho e nas abas do celular e na faixa do topo, o carvão (fundo e degradê) vira a cor da
+ *    barra; a faixa não sobe para o carvão "elevado" do tema escuro.
+ *  - O texto dos botões de destaque (carvão fixo hoje) segue o preto/branco calculado para a cor.
+ *  - A Gamificação mantém o próprio tema: dourado e carvão do Raion por dentro.
+ */
+.tema-app[data-marca] :is(.barra-lateral, .faixa-marca) {
+  --color-carvao: var(--cor-barra, #0f0f10);
+}
+.tema-app[data-marca] .faixa-marca.bg-carvao {
+  background-color: var(--color-carvao);
+}
+.tema-app[data-marca] :is(.bg-dourado, .bg-acao).text-carvao {
+  color: var(--color-sobre-acao);
+}
+.tema-app .tema-gamificacao {
+  --color-dourado: #d4af37;
+  --color-acao: #d4af37;
+  --color-acao-forte: #b8952a;
+  --color-sobre-acao: #0f0f10;
+  --color-dourado-texto: light-dark(#7a5610, #d4af37);
+  --cor-barra: #0f0f10;
+}
+
 .tema-app .bg-offwhite {
   background-color: var(--tema-offwhite-superficie);
 }
