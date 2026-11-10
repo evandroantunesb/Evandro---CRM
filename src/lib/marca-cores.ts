@@ -48,11 +48,19 @@ function legivelSobre(cor: string, fundo: string, alvo: string): string {
   return alvo === BRANCO ? TEXTO_MENU : CARVAO;
 }
 
+/** Barra: ~7:1 com o texto do menu, para os itens apagados (branco a 60%) continuarem legíveis (decisão de 10/11/2026). */
+const MINIMO_BARRA = 7;
+/** Destaque contra a barra e o fundo escuro: 3:1, o mínimo do WCAG para ícones, filetes e botões (não texto). */
+const MINIMO_ELEMENTO = 3;
+
 export function validarMarca(m: Marca): string[] {
   const problemas: string[] = [];
-  if (contraste(m.barra, TEXTO_MENU) < MINIMO) problemas.push("A cor da barra é clara demais: o texto do menu fica ilegível.");
+  if (contraste(m.barra, TEXTO_MENU) < MINIMO_BARRA) problemas.push("A cor da barra é clara demais: o texto do menu fica ilegível.");
   if (contraste(m.destaque, textoSobre(m.destaque)) < MINIMO) {
     problemas.push("A cor de destaque não deixa o texto dos botões legível, nem em preto nem em branco.");
+  }
+  if (contraste(m.destaque, m.barra) < MINIMO_ELEMENTO || contraste(m.destaque, CARVAO) < MINIMO_ELEMENTO) {
+    problemas.push("A cor de destaque some sobre a barra ou no fundo escuro: escolha uma cor mais clara ou mais viva.");
   }
   return problemas;
 }

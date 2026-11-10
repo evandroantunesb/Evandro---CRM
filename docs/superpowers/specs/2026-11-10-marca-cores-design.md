@@ -11,9 +11,10 @@ O app passa a usar a marca da empresa — a mesma da proposta:
   `logo_escuro_url`, editada em Configurações › Propostas › Identidade). A cor primária vira a cor da barra lateral e da
   faixa do topo; a de destaque substitui o dourado do app (botões, aba ativa, gráficos, marcações). O PDF e a página da
   proposta já usam essas cores: app e proposta seguem sempre o mesmo esquema.
-- **Logo:** a barra lateral e o cabeçalho do celular mostram a logo da empresa (de preferência a versão para fundo
-  escuro, `logo_escuro_url`; senão `logo_url`); sem logo, a do Raion.
-- **Não mudam:** verde (WhatsApp e energia), vermelho (erro), avisos de atenção (escala âmbar), a Gamificação inteira
+- **Logo:** a barra lateral e o cabeçalho do celular mostram só a logo de fundo escuro (`logo_escuro_url`); sem ela, a
+  do Raion (revisão de 10/11/2026: a logo de fundo claro ficaria ilegível na barra).
+- **Não mudam:** verde (WhatsApp e energia), vermelho (erro), avisos de atenção (escala âmbar e o token fixo `atencao`,
+  usado no amarelo do semáforo de Obras e nos atrasos), a Gamificação inteira
   (tema próprio; a barra lateral segue a cor da empresa), a tela de login e as páginas do cliente além do que a proposta
   já faz.
 - **Contraste:** cor ilegível não salva. Combinação antiga ilegível já salva: o app usa o padrão Raion para ela (o PDF
@@ -27,16 +28,20 @@ Migration `supabase/migrations/20261204100000_marca_da_empresa.sql` (prefixo con
   logo_escuro_url text)`: `security definer`, `stable`, `search_path = ''`; devolve a linha de `proposta_identidades`
   só para membro ativo da empresa (`meu_membro_id`); senão nenhuma linha. Sem `EXECUTE` para `public`/`anon`. O resto da
   identidade continua só para quem tem acesso comercial.
-- Nenhuma tabela nova; nenhuma política alterada. A logo é lida pela política existente "marca: ler" (membro ativo).
+- Nenhuma tabela nova; nenhuma política alterada. A política "marca: ler" do Storage é só do comercial (blindagem de
+  07/10): a logo é assinada no servidor com a chave de serviço, só para o caminho que `marca_da_empresa` devolveu.
 
 ## Regra pura (`src/lib/marca-cores.ts`)
 
 - `contraste(a, b)`: razão WCAG 2 entre duas cores `#RRGGBB` (luminância relativa sRGB).
 - `textoSobre(cor)`: `#0F0F10` ou `#FFFFFF`, o de maior contraste.
 - `validarMarca({ barra, destaque })` → lista de problemas em português:
-  - barra: `contraste(barra, "#FAF8F3") >= 4.5` ("A cor da barra é clara demais: o texto do menu fica ilegível.");
+  - barra: `contraste(barra, "#FAF8F3") >= 7` (decisão de 10/11/2026: os itens apagados do menu, branco a 60%,
+    continuam legíveis) ("A cor da barra é clara demais: o texto do menu fica ilegível.");
   - destaque: `contraste(destaque, textoSobre(destaque)) >= 4.5` ("A cor de destaque não deixa o texto dos botões
-    legível, nem em preto nem em branco.").
+    legível, nem em preto nem em branco.");
+  - destaque contra a barra e contra `#0F0F10`: `>= 3` (ícones, filetes e botões) ("A cor de destaque some sobre a barra
+    ou no fundo escuro: escolha uma cor mais clara ou mais viva.").
 - `variaveisMarca({ barra, destaque })` → `Record<string, string>` com `--color-dourado`, `--color-acao` (= destaque),
   `--color-acao-forte` (destaque escurecido ~13%), `--color-sobre-acao` (= `textoSobre`), `--color-dourado-texto`
   (`light-dark(<destaque escurecido até 4,5:1 sobre #FAF8F3>, <destaque clareado até 4,5:1 sobre #0F0F10>)`) e
@@ -46,7 +51,8 @@ Migration `supabase/migrations/20261204100000_marca_da_empresa.sql` (prefixo con
 ## Aplicação no app
 
 - `obterMarcaEmpresa()` (`src/lib/marca-servidor.ts`, `cache` por requisição): `rpc("marca_da_empresa")` +
-  URL assinada da logo (bucket `proposta-marca`, cliente da sessão). Falha = padrão Raion, sem quebrar.
+  URL assinada da logo de fundo escuro (bucket `proposta-marca`, chave de serviço depois do RPC). Falha = padrão Raion,
+  sem quebrar.
 - `src/app/(app)/layout.tsx`: o invólucro `tema-app` recebe `style={variaveisMarca(...)}` e `data-marca` quando há marca;
   a barra lateral e o cabeçalho do celular mostram a logo da empresa (`<img>` com altura igual à do `LogoRaion`) ou o
   `LogoRaion`.

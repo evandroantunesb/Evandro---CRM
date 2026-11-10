@@ -22,7 +22,7 @@ export function classeItemSegmentoCabecalho(atual: boolean) {
 const TOM_SELO_CABECALHO = {
   destaque: "bg-dourado text-carvao",
   neutro: "bg-white/12 text-offwhite",
-  atencao: "bg-dourado/22 text-[#ecd78f]",
+  atencao: "bg-atencao/22 text-[#ecd78f]",
   positivo: "bg-[#1f7a4d]/45 text-[#bfe8d2]",
   negativo: "bg-[#b42318]/45 text-[#fcd4cf]",
 } as const;

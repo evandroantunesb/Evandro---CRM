@@ -5,7 +5,7 @@
 --  * `marca_da_empresa`: as cores e as logos da identidade da proposta (`proposta_identidades`) para qualquer membro
 --    ativo da empresa, inclusive quem não tem acesso comercial, para o app mostrar a marca a todos. O resto da
 --    identidade (WhatsApp, rodapé, capa) continua só para o comercial.
--- Nenhuma tabela, política ou função existente é alterada. A logo é lida pela política existente "marca: ler".
+-- Nenhuma tabela, política ou função existente é alterada. A logo é assinada no servidor (src/lib/marca-servidor.ts) depois desta função confirmar o membro: a política "marca: ler" do Storage é só do comercial.
 
 /** Cores e logos da empresa para quem é membro ativo dela; nenhuma linha para os demais. */
 create or replace function public.marca_da_empresa(p_empresa_id uuid)

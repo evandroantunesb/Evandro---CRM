@@ -152,7 +152,7 @@ export function FormIdentidade({
           corPrimaria={cores.corPrimaria}
           corDestaque={cores.corDestaque}
           onChange={setCores}
-          logoUrl={preview.logoEscuroUrl ?? preview.logoUrl}
+          logoUrl={preview.logoEscuroUrl}
           nomeEmpresa={identidade.nomeExibicao || "Sua empresa"}
         />
         <Campo rotulo="WhatsApp de contato (com DDI/DDD, só números)" name="whatsapp" defaultValue={identidade.whatsapp} placeholder="5545999999999" maxLength={30} />

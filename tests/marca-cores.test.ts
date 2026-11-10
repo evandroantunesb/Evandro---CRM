@@ -20,8 +20,20 @@ describe("validarMarca", () => {
 
   it("barra clara demais é recusada", () => {
     const p = validarMarca({ barra: "#EDDB9F", destaque: "#D4AF37" });
-    expect(p).toHaveLength(1);
     expect(p[0]).toContain("clara demais");
+  });
+
+  it("barra de cor média é recusada: os itens apagados do menu precisam de ~7:1 (decisão de 10/11/2026)", () => {
+    // #6E6E6E passaria nos 4,5:1, mas o texto do menu a 60% fica ilegível.
+    expect(validarMarca({ barra: "#6E6E6E", destaque: "#D4AF37" })[0]).toContain("clara demais");
+    expect(validarMarca({ barra: "#123C45", destaque: "#0E9F8A" })).toEqual([]);
+  });
+
+  it("destaque que some sobre a barra ou no fundo escuro é recusado", () => {
+    // Azul-marinho: texto branco legível no botão, mas o ícone ativo do menu e o botão da faixa somem.
+    const p = validarMarca({ barra: "#0F0F10", destaque: "#1E3A8A" });
+    expect(p).toHaveLength(1);
+    expect(p[0]).toContain("some sobre a barra");
   });
 
   it("destaque em que nem preto nem branco ficam legíveis é recusado", () => {
