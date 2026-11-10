@@ -13,6 +13,7 @@ import { CARTEIRA_CONTATOS, ENGENHARIA, GAMIFICACAO, GESTAO_COMERCIAL, NEGOCIOS,
 import { contarPagamentosAConfirmar } from "@/lib/avisos-pagamento";
 import { filtrarPorTelas } from "@/lib/menu-telas";
 import { obterSessao } from "@/lib/sessao";
+import { areaLigada } from "@/lib/telas-empresa";
 import { obterTelasEmpresa } from "@/lib/telas-empresa-servidor";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { trocarEmpresa } from "@/lib/acoes/empresa-atual";
@@ -106,11 +107,13 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
       verPagamentosAConfirmar = operacional;
     }
   }
+  const telas = await obterTelasEmpresa();
+  // O Financeiro é só do PRO (telas por empresa): no Solo o link não aparece.
   const linkPagamentos =
-    pagamentosAConfirmar > 0
+    pagamentosAConfirmar > 0 && areaLigada(telas, "pro")
       ? [{ href: "/financeiro?aba=confirmar", texto: `${pagamentosAConfirmar} pagamento${pagamentosAConfirmar === 1 ? "" : "s"} a confirmar` }]
       : [];
-  const avisos = { notificacoes, pendencias: [...linkPagamentos, ...linksPendencias(papel, pendencias)] };
+  const avisos = { notificacoes, pendencias: [...linkPagamentos, ...linksPendencias(papel, pendencias, telas)] };
 
   // Foto do próprio usuário (sidebar desktop e menu do celular): uma assinatura com a sessão dele.
   const urlAvatar = sessao.avatarCaminho
@@ -156,7 +159,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
           { href: "/super-admin/cobranca", rotulo: "Cobrança", secao: "Plataforma" },
         ]
       : []),
-  ], await obterTelasEmpresa());
+  ], telas);
 
   const seletorEmpresa =
     sessao.vinculos.length > 1 ? (

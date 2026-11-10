@@ -37,6 +37,8 @@ import { ROTULO_PAPEL, type TipoTarefa } from "@/lib/tipos";
 import { CabecalhoPagina, CLASSE_ACAO_CABECALHO } from "@/components/cabecalho-pagina";
 import { NovoNegocio } from "@/components/novo-negocio";
 import { eletropostoDisponivel } from "@/lib/eletroposto-servidor";
+import { areaLigada } from "@/lib/telas-empresa";
+import { obterTelasEmpresa } from "@/lib/telas-empresa-servidor";
 import { GraficoDesempenho } from "./grafico-desempenho";
 import { InicioBasico } from "./inicio-basico";
 import { ResumoTarefasSetor } from "./resumo-tarefas-setor";
@@ -93,7 +95,9 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
   const pessoal = !(podeVerEquipe && visaoSolicitada === "equipe");
 
   const supabase = await criarClienteServidor();
-  const eletroposto = await eletropostoDisponivel();
+  const [eletroposto, telas] = await Promise.all([eletropostoDisponivel(), obterTelasEmpresa()]);
+  // Telas por empresa: Gamificação e Leads a distribuir desligados (ou plano Solo) não aparecem no Início.
+  const comGamificacao = areaLigada(telas, "gamificacao");
   const agora = new Date();
   const hojeInicio = inicioDoDia();
   const hojeFimExclusivo = hojeInicio + 86_400_000;
@@ -458,7 +462,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
   }));
   // Leads a distribuir entram à frente, sem tomar o lugar das 4 prioridades de sempre.
   const prioridadeDistribuir: Prioridade[] =
-    leadsADistribuir > 0
+    leadsADistribuir > 0 && areaLigada(telas, "leads")
       ? [
           {
             id: "leads-a-distribuir",
@@ -708,6 +712,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
             <MetaComercialConteudo metaComercial={metaComercial} contratos={contratosMes} ticketMedio={ticketMedioMes} vazio="Nenhuma meta configurada." />
           </Cartao>
 
+          {comGamificacao && (
           <Cartao
             titulo="Minha jornada no Raion"
             className="bg-green-50"
@@ -735,8 +740,9 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
               <MiniCartaoJornada valor={String(conquistasCount ?? 0)} legenda="Conquistas" />
             </div>
           </Cartao>
+          )}
         </div>
-      ) : (
+      ) : comGamificacao && (
         <Cartao
           titulo="Ranking da equipe"
           className="bg-green-50"
