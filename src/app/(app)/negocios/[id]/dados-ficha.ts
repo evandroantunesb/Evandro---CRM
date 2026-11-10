@@ -106,7 +106,7 @@ export async function carregarFicha(atual: Vinculo, id: string, abaParam: string
       .neq("id", negocio.id)
       .order("created_at", { ascending: false })
       .limit(10),
-    eletropostoDisponivel(supabase, atual),
+    eletropostoDisponivel(),
   ]);
 
   const { data: proposta } = await supabase

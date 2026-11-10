@@ -57,7 +57,7 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
   const visao = (["kanban", "lista"] as const).find((v) => v === texto("visao")) ?? ((await cookies()).get(COOKIE_VISAO_NEGOCIOS)?.value as "kanban" | "lista" | undefined) ?? "kanban";
 
   const supabase = await criarClienteServidor();
-  const eletroposto = await eletropostoDisponivel(supabase, atual);
+  const eletroposto = await eletropostoDisponivel();
   const consultaBase = supabase
     .from("negocios")
     .select(

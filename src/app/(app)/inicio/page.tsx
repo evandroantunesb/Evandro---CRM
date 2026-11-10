@@ -93,7 +93,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
   const pessoal = !(podeVerEquipe && visaoSolicitada === "equipe");
 
   const supabase = await criarClienteServidor();
-  const eletroposto = await eletropostoDisponivel(supabase, atual);
+  const eletroposto = await eletropostoDisponivel();
   const agora = new Date();
   const hojeInicio = inicioDoDia();
   const hojeFimExclusivo = hojeInicio + 86_400_000;
