@@ -220,10 +220,10 @@ describe("regressões de tela", () => {
     expect(formulario).toContain("Trocar itens ou montar do zero");
   });
 
-  it("cadastro: um botão só para seguir de passo; o valor sugerido é sempre identificado como estimativa", () => {
+  it("cadastro: um botão só para seguir de passo; o valor sugerido diz de onde vem (tabela de preços)", () => {
     expect(formulario.match(/onClick=\{avancar\}/g)).toHaveLength(1);
-    expect(formulario).toContain("estimativa, não é cotação");
-    expect(formulario).toContain("Sem preço de catálogo para estes itens: digite o valor do negócio.");
+    expect(formulario).toContain("Preço pronto pela tabela de preços da empresa. Você pode mudar.");
+    expect(formulario).toContain("Sem preço da tabela para estes itens: digite o valor do negócio.");
   });
 
   it("etapa saiu do formulário de edição e da gravação", () => {
@@ -289,8 +289,8 @@ describe("regressões de tela", () => {
       });
       expect(estado).toEqual({
         linhas: [
-          { tipo: "modulo", descricao: "Módulo 550 W", potenciaW: "550", quantidade: "10" },
-          { tipo: "inversor", descricao: "Inversor 5 kW", potenciaW: (5000).toLocaleString("pt-BR"), quantidade: "1" },
+          { tipo: "modulo", descricao: "Módulo 550 W", potenciaW: "550", quantidade: "10", materialId: null, precoVendaManual: "" },
+          { tipo: "inversor", descricao: "Inversor 5 kW", potenciaW: (5000).toLocaleString("pt-BR"), quantidade: "1", materialId: null, precoVendaManual: "" },
         ],
         estrutura: "gancho",
         tipoLigacao: "bifasico",
@@ -309,7 +309,7 @@ describe("regressões de tela", () => {
         componentesSalvos: [{ tipo: "modulo", descricao: "Módulo 600 W", potenciaW: null, quantidade: 8 }],
         calculo: null,
       });
-      expect(estado.linhas).toEqual([{ tipo: "modulo", descricao: "Módulo 600 W", potenciaW: "", quantidade: "8" }]);
+      expect(estado.linhas).toEqual([{ tipo: "modulo", descricao: "Módulo 600 W", potenciaW: "", quantidade: "8", materialId: null, precoVendaManual: "" }]);
       expect(estado).toMatchObject({ consumoMedioKwh: "450", valorFaturaMedio: "320", tarifaKwh: "" });
     });
 

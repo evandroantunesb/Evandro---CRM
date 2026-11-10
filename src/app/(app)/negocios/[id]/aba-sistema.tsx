@@ -22,7 +22,7 @@ function historicoDaTela(h: { arquivado_em: string; motivo: string; linha: unkno
 
 /** Aba Conta e sistema: conta de luz e local, e o kit com a prévia do cálculo. */
 export function AbaSistema({ ficha }: { ficha: Ficha }) {
-  const { negocio, componentes, parametros, precoDesatualizado, vigenciaDaTela, contextoEstimativa, historicoCalculo, calculo } = ficha;
+  const { negocio, componentes, materiaisKit, precoSugeridoKit, parametros, precoDesatualizado, vigenciaDaTela, contextoEstimativa, historicoCalculo, calculo } = ficha;
   return (
     <div className="flex flex-col gap-4">
     <Cartao titulo="Conta de luz e local"><EdicaoDados ficha={ficha} secao="tecnico" /></Cartao>
@@ -41,7 +41,11 @@ export function AbaSistema({ ficha }: { ficha: Ficha }) {
           descricao: c.descricao,
           potenciaW: c.potencia_w,
           quantidade: c.quantidade,
+          materialId: c.material_id,
+          precoVendaManual: c.preco_venda_manual == null ? null : Number(c.preco_venda_manual),
         }))}
+        materiaisKit={materiaisKit}
+        precoSugeridoKit={precoSugeridoKit}
         parametros={
           parametros
             ? {

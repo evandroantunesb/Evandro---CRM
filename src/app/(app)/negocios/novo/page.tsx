@@ -1,3 +1,5 @@
+import { carregarMateriaisKit } from "@/lib/compras/dados-kit";
+import { hojeEmSaoPaulo } from "@/lib/formatacao";
 import Link from "next/link";
 import { OpcoesTipoNegocio } from "@/components/novo-negocio";
 import { carregarContextoEstimativa } from "@/lib/contexto-estimativa";
@@ -34,6 +36,8 @@ export default async function NovoNegocio({ searchParams }: PageProps<"/negocios
       .maybeSingle(),
     supabase.from("empresas").select("eletroposto_ativo").eq("id", atual.empresaId).maybeSingle(),
   ]);
+  // Materiais da tabela de preços para o kit (sem custo); falhar aqui não impede criar o negócio.
+  const materiaisKit = await carregarMateriaisKit(supabase, atual.empresaId).catch(() => []);
   const funilEscolhido = config.funis.find((f) => f.id === funil && f.ativo) ?? config.funis.find((f) => f.ativo);
   if (!funilEscolhido) return <p className="text-sm text-texto-2">Nenhum funil ativo.</p>;
   const etapaEscolhida = config.etapas.find((e) => e.id === etapa && e.funilId === funilEscolhido.id && e.ativa);
@@ -106,6 +110,8 @@ export default async function NovoNegocio({ searchParams }: PageProps<"/negocios
         meuMembroId={atual.membroId}
         contexto={contexto}
         contatoInicial={contatoInicial}
+        materiais={materiaisKit}
+        hoje={hojeEmSaoPaulo()}
         parametros={
           parametros
             ? {

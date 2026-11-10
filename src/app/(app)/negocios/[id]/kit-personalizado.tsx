@@ -3,9 +3,11 @@
 import { useActionState, useMemo, useState } from "react";
 import { EditorComponentesKit, type LinhaComponente } from "@/components/kit-componentes";
 import { useEnvioSemReset } from "@/components/envio-sem-reset";
+import { usePrecoSugeridoKit } from "@/components/compras/use-preco-sugerido";
+import { textoAvisosPreco, type MaterialKitVM } from "@/lib/compras/precificacao-kit";
 import { Botao, Campo, Mensagem, Selecao } from "@/components/ui";
 import { atualizarPrecoCalculo, salvarKitPersonalizado } from "@/lib/acoes/calculadora";
-import { calcular, custosInternosEstimados, potenciaKitPersonalizadoKwp, sugerirQuantidadeModulos, type ResultadoCalculo } from "@/lib/calculadora";
+import { calcular, potenciaKitPersonalizadoKwp, sugerirQuantidadeModulos, type ResultadoCalculo } from "@/lib/calculadora";
 import { resolverConsumo } from "@/lib/consumo-estimado";
 import {
   mensagemDeRecusa,
@@ -15,7 +17,7 @@ import {
   type MotivoDesatualizacao,
 } from "@/lib/calculo-vigencia";
 import type { Pendencia } from "@/lib/estimativa-financeira";
-import { formatarDataIso, formatarMoeda, formatarNumeroBr, lerNumeroBr } from "@/lib/formatacao";
+import { formatarDataIso, formatarMoeda, formatarNumeroBr, hojeEmSaoPaulo, lerNumeroBr } from "@/lib/formatacao";
 import { estadoSalvoDoKit } from "@/lib/kit-formulario";
 import { analisarLinhas, resumoProblemasKit } from "@/lib/kit-linhas";
 import { MENSAGEM_REMOCAO_COM_CALCULO } from "@/lib/negocio-dados";
@@ -35,6 +37,8 @@ export type ComponenteSalvo = {
   tipo: TipoComponenteKit;
   descricao: string;
   potenciaW: number | null;
+  materialId?: string | null;
+  precoVendaManual?: number | null;
   quantidade: number;
 };
 
@@ -485,6 +489,8 @@ export function KitPersonalizado({
   historico = null,
   precoDesatualizado = false,
   vigencia = null,
+  materiaisKit = [],
+  precoSugeridoKit = null,
 }: {
   negocioId: string;
   negocioValor: number | null;
@@ -506,6 +512,10 @@ export function KitPersonalizado({
   precoDesatualizado?: boolean;
   /** Vigência do cálculo salvo (`carregarVigencia`). Com motivos, o cálculo é histórico: nunca resultado atual. */
   vigencia?: VigenciaDaTela | null;
+  /** Materiais da tabela de preços para o kit (sem custo). */
+  materiaisKit?: MaterialKitVM[];
+  /** Preço sugerido gravado (retrato do kit salvo, P4b); nulo = sem sugerido. */
+  precoSugeridoKit?: number | null;
 }) {
   const motivos = vigencia?.motivos ?? [];
   const calculoDesatualizado = !!calculo && motivos.length > 0;
@@ -602,7 +612,7 @@ export function KitPersonalizado({
   }
 
   // Mesma análise para a potência, o preço sugerido e o envio: a quantidade vista é a quantidade usada.
-  const { componentes, itens, problemas } = useMemo(() => analisarLinhas(linhas), [linhas]);
+  const { componentes, problemas } = useMemo(() => analisarLinhas(linhas), [linhas]);
   const potenciaKwp = potenciaKitPersonalizadoKwp(componentes);
   // Remover o kit é uma ação explícita: tirar TODAS as linhas de um kit salvo (com cálculo, o servidor recusa).
   // Linha sem descrição não conta: ela exige preenchimento ou remoção, nunca vira remoção do kit.
@@ -636,20 +646,9 @@ export function KitPersonalizado({
       sugerirQuantidadeModulos(consumoMedioEstimado, parametros.produtividadeKwhKwpMes, potenciaW);
   }, [parametros, consumoMedioEstimado]);
 
-  // Preço de referência (teste) do catálogo + custos internos configurados —
-  // só informativo aqui, já que o valor do negócio é editado em "Oportunidade".
-  const precoSugerido = useMemo(() => {
-    if (!parametros) return null;
-    // Só linhas válidas, com a mesma quantidade que vai para o servidor ("1.200" = 1200 aqui também).
-    const somaComponentes = itens.reduce((acc, { indice, componente }) => {
-      const textoPreco = linhas[indice].precoEstimadoUnitario;
-      const precoUnitario = textoPreco ? Number(textoPreco) : NaN;
-      return Number.isFinite(precoUnitario) ? acc + precoUnitario * componente.quantidade : acc;
-    }, 0);
-    if (somaComponentes <= 0) return null;
-    const quantidadeModulos = componentes.filter((c) => c.tipo === "modulo").reduce((acc, c) => acc + c.quantidade, 0);
-    return custosInternosEstimados(somaComponentes, quantidadeModulos, potenciaKwp, parametros).total;
-  }, [linhas, itens, componentes, potenciaKwp, parametros]);
+  // Preço pronto pela tabela de preços (P4b), do servidor; o valor do negócio continua editado em "Oportunidade".
+  const { precoSugerido: precoAoVivo, avisosPreco } = usePrecoSugeridoKit(componentes);
+  const precoSugerido = editando ? precoAoVivo : precoSugeridoKit;
 
   // Resultado do motor (união incompleta | completa), com o MESMO contexto que o servidor usa ao salvar. Consumo e
   // tarifa ausentes entram como 0 só para o motor listar as pendências; potência e geração não dependem deles.
@@ -947,13 +946,24 @@ export function KitPersonalizado({
         onChange={setLinhas}
         sugerirQuantidadeModulo={sugerirQuantidadeModulo}
         problemas={mostrarProblemas ? problemas : undefined}
+        materiais={materiaisKit}
+        hoje={hojeEmSaoPaulo()}
       />
       {problemaKit && <Mensagem resultado={{ ok: false, mensagem: problemaKit }} />}
-      {precoSugerido != null && (
-        <p className="-mt-1 text-xs text-zinc-400">
-          Preço sugerido (catálogo + custos internos, estimativa de teste): {formatarMoeda(precoSugerido)} — ajuste em
-          &ldquo;Oportunidade&rdquo; (aba Negócio) se quiser usar.
+      {precoSugerido != null ? (
+        <p className="-mt-1 text-xs text-texto-2">
+          Preço pronto pela tabela de preços: <b className="tabular-nums">{formatarMoeda(precoSugerido)}</b>
+          {negocioValor != null && Math.round(negocioValor * 100) !== Math.round(precoSugerido * 100) && <> (valor do negócio: {formatarMoeda(negocioValor)})</>}.
+          Para usar, ajuste o valor em &ldquo;Oportunidade&rdquo; (aba Negócio).
         </p>
+      ) : (
+        avisosPreco.some((a) => a.tipo === "sem_preco") && (
+          <p className="-mt-1 text-xs text-texto-2">Sem preço pronto: há item sem preço na tabela. Informe o preço de venda dele no kit.</p>
+        )
+      )}
+      {/* Preço velho já aparece em cada linha do editor; aqui só a tabela vencida. */}
+      {avisosPreco.some((a) => a.tipo === "tabela_vencida") && (
+        <p className="-mt-1 text-xs text-texto-2">{textoAvisosPreco(avisosPreco, { incluirAntigo: false })} O preço é usado mesmo assim; peça a tabela nova a Compras.</p>
       )}
       <Selecao
         rotulo="Tipo de ligação"

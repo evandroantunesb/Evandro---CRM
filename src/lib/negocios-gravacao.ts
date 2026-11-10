@@ -18,7 +18,8 @@ import { atualizarPrecoDoCalculo, autorizarGravacaoCalculo, gravarLinhaCalculo, 
 import type { Pendencia } from "@/lib/estimativa-financeira";
 import { cnpjValido, cpfValido, formatarDocumento, soDigitos } from "@/lib/dados-cliente-contrato";
 import { mensagemErro } from "@/lib/erros";
-import { lerNumeroBr, MENSAGEM_NUMERO_BR } from "@/lib/formatacao";
+import { formatarMoeda, lerNumeroBr, MENSAGEM_NUMERO_BR } from "@/lib/formatacao";
+import { gravarPrecificacaoNegocio } from "@/lib/compras/precificacao-gravacao";
 import {
   completarContato,
   montarEndereco,
@@ -191,6 +192,8 @@ async function inserirItensKit(supabase: SupabaseServidor, empresaId: string, ne
         descricao: c.descricao,
         potencia_w: c.potenciaW,
         quantidade: c.quantidade,
+        material_id: c.materialId ?? null,
+        preco_venda_manual: c.precoVendaManual ?? null,
         ordem: i,
       })),
     )
@@ -311,6 +314,8 @@ export async function criarNegocioComCliente(supabase: SupabaseServidor, atual: 
   let estimativa: EstimativaCriacao | undefined;
   if (d.componentes.length) {
     const { error: erroKit } = await inserirItensKit(supabase, atual.empresaId, negocio.id, d.componentes);
+    // Preço sugerido e custo do kit pela tabela de preços (retrato da venda). Falhar aqui não desfaz nada.
+    if (!erroKit) await gravarPrecificacaoNegocio(supabase, negocio.id);
     if (erroKit) {
       avisos.push("kit");
     } else if (d.tipo_ligacao && d.tarifa_kwh != null) {
@@ -458,6 +463,8 @@ type ItemKitSalvo = {
   descricao: string;
   potencia_w: number | null;
   quantidade: number;
+  material_id: string | null;
+  preco_venda_manual: number | null;
   ordem: number;
 };
 
@@ -518,7 +525,7 @@ export async function salvarKitComCliente(
       .maybeSingle(),
     supabase
       .from("kit_componentes")
-      .select("id, empresa_id, negocio_id, tipo, descricao, potencia_w, quantidade, ordem")
+      .select("id, empresa_id, negocio_id, tipo, descricao, potencia_w, quantidade, material_id, preco_venda_manual, ordem")
       .eq("negocio_id", d.negocioId),
   ]);
   if (!negocio) return { ok: false, mensagem: "Negócio não encontrado." };
@@ -639,7 +646,17 @@ export async function salvarKitComCliente(
     };
   }
 
-  if (montado?.ok) return { ok: true, negocioId: d.negocioId, mensagem: "Kit e cálculo salvos." };
+  // Preço sugerido e custo do kit pela tabela de preços (retrato). Falhar aqui não desfaz o kit salvo.
+  const preco = await gravarPrecificacaoNegocio(supabase, d.negocioId);
+  const sobrePreco = !preco?.usaTabela
+    ? ""
+    : preco.sugerido != null
+      ? ` Preço sugerido pela tabela: ${formatarMoeda(preco.sugerido)}.`
+      : preco.avisos.some((a) => a.tipo === "sem_preco")
+        ? " Sem preço sugerido: há item sem preço na tabela; informe o preço de venda dele."
+        : "";
+
+  if (montado?.ok) return { ok: true, negocioId: d.negocioId, mensagem: `Kit e cálculo salvos.${sobrePreco}` };
 
   // Estimativa incompleta: itens salvos. Com linha nova, o resultado técnico (com as novas entradas) foi gravado; sem
   // ela, o cálculo anterior (se houver) continua gravado, mas não vale como resultado atual.
@@ -660,7 +677,7 @@ export async function salvarKitComCliente(
     ok: true,
     negocioId: d.negocioId,
     pendencias,
-    mensagem: `${linhaNova ? "Kit e resultado técnico salvos." : "Itens do kit salvos."} ${mensagemEstimativaIncompleta(pendencias)}${sufixo}`,
+    mensagem: `${linhaNova ? "Kit e resultado técnico salvos." : "Itens do kit salvos."} ${mensagemEstimativaIncompleta(pendencias)}${sufixo}${sobrePreco}`,
   };
 }
 

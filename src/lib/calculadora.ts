@@ -220,8 +220,13 @@ export const componenteKitSchema = z.object({
   descricao: z.string().trim().min(1, "Descreva o componente").max(120, "Descrição muito longa"),
   potenciaW: z.number().positive().nullable(),
   quantidade: z.number().int().positive(),
+  /** Material da tabela de preços (P4b); nulo = item fora da tabela. */
+  materialId: z.string().uuid().nullable().default(null),
+  /** Preço de venda por unidade informado à mão (item fora da tabela ou sem preço nela). */
+  precoVendaManual: z.number().positive().lt(1e10).nullable().default(null),
 });
-export type ComponenteKit = z.infer<typeof componenteKitSchema>;
+/** Material e preço à mão são opcionais: quem só exibe o kit não precisa deles. */
+export type ComponenteKit = z.input<typeof componenteKitSchema>;
 
 /** Os componentes vêm do formulário como JSON (lista dinâmica de tamanho variável). */
 export const componentesJsonSchema = z

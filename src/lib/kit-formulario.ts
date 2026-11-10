@@ -5,7 +5,14 @@ import type { TipoComponenteKit, TipoLigacao } from "@/lib/tipos";
 
 /** O que está gravado do kit do negócio (itens, cálculo e dados do negócio usados no formulário). */
 export type KitSalvo = {
-  componentesSalvos: { tipo: TipoComponenteKit; descricao: string; potenciaW: number | null; quantidade: number }[];
+  componentesSalvos: {
+    tipo: TipoComponenteKit;
+    descricao: string;
+    potenciaW: number | null;
+    quantidade: number;
+    materialId?: string | null;
+    precoVendaManual?: number | null;
+  }[];
   calculo: {
     tipoLigacao: TipoLigacao;
     consumoMedioKwh: number;
@@ -54,6 +61,8 @@ export function estadoSalvoDoKit(k: KitSalvo): EstadoFormularioKit {
       descricao: c.descricao,
       potenciaW: c.potenciaW != null ? numeroBr(c.potenciaW) : "",
       quantidade: String(c.quantidade),
+      materialId: c.materialId ?? null,
+      precoVendaManual: c.precoVendaManual != null ? numeroBr(c.precoVendaManual) : "",
     })),
     estrutura: k.estruturaTelhado ?? "",
     tipoLigacao: k.calculo?.tipoLigacao ?? "trifasico",

@@ -192,8 +192,8 @@ describe("resumoProblemasKit (mensagem do bloqueio)", () => {
 describe("reabrir o kit salvo: o que foi gravado volta igual", () => {
   it("quantidade 1200 e potência 550,5 sobrevivem ao ciclo salvar → reabrir → enviar", () => {
     const salvo = [
-      { tipo: "modulo" as const, descricao: "Módulo A", potenciaW: 550.5, quantidade: 1200 },
-      { tipo: "inversor" as const, descricao: "Inversor B", potenciaW: null, quantidade: 1 },
+      { tipo: "modulo" as const, descricao: "Módulo A", potenciaW: 550.5, quantidade: 1200, materialId: "11111111-1111-4111-8111-111111111111", precoVendaManual: null },
+      { tipo: "inversor" as const, descricao: "Inversor B", potenciaW: null, quantidade: 1, materialId: null, precoVendaManual: 1234.5 },
     ];
     const estado = estadoSalvoDoKit({
       componentesSalvos: salvo,
@@ -227,11 +227,10 @@ describe("o editor e os formulários usam a análise única (nada de conversão 
     expect(editor).not.toMatch(/Math\.max\(\s*1\s*,\s*Math\.round/);
   });
 
-  it("os dois formulários analisam as linhas com `analisarLinhas` e somam o preço só das linhas válidas", () => {
+  it("os dois formulários analisam as linhas com `analisarLinhas` e pedem o preço do kit só das linhas válidas (P4b)", () => {
     for (const fonte of [ficha, cadastro]) {
       expect(fonte).toContain("analisarLinhas(linhas)");
-      expect(fonte).toContain("itens.reduce(");
-      expect(fonte).toContain("componente.quantidade");
+      expect(fonte).toContain("usePrecoSugeridoKit(componentes)");
     }
   });
 
