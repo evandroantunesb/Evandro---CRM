@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MARCA_PADRAO, contraste, marcaDoApp, textoSobre, validarMarca, variaveisMarca } from "@/lib/marca-cores";
+import { MARCA_PADRAO, contraste, marcaDoApp, problemaCoresIdentidade, textoSobre, validarMarca, variaveisMarca } from "@/lib/marca-cores";
 
 describe("contraste e texto sobre a cor", () => {
   it("razão WCAG: preto e branco dão 21; o padrão Raion é legível", () => {
@@ -47,10 +47,20 @@ describe("variaveisMarca", () => {
   });
 });
 
+describe("problemaCoresIdentidade", () => {
+  it("campos vazios = padrão; barra clara recusa; cores legíveis passam", () => {
+    expect(problemaCoresIdentidade("", "")).toBeNull();
+    expect(problemaCoresIdentidade("#EDDB9F", "")).toContain("clara demais");
+    expect(problemaCoresIdentidade("#123C45", "#0E9F8A")).toBeNull();
+  });
+});
+
 describe("marcaDoApp", () => {
   it("sem identidade ou sem cores: padrão Raion (nula)", () => {
     expect(marcaDoApp(null)).toBeNull();
     expect(marcaDoApp({ cor_primaria: null, cor_destaque: null })).toBeNull();
+    // A tela de identidade grava o padrão quando ninguém mexe: continua sem marca própria.
+    expect(marcaDoApp({ cor_primaria: "#0f0f10", cor_destaque: "#D4AF37" })).toBeNull();
   });
 
   it("combinação ilegível já salva: padrão Raion (nula)", () => {

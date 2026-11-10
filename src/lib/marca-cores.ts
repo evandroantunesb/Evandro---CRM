@@ -69,9 +69,16 @@ export function variaveisMarca(m: Marca): Record<string, string> {
   };
 }
 
+/** Cores digitadas na identidade da proposta (vazio = padrão Raion): o primeiro problema de contraste, ou nulo. */
+export function problemaCoresIdentidade(corPrimaria: string, corDestaque: string): string | null {
+  return validarMarca({ barra: corPrimaria || MARCA_PADRAO.barra, destaque: corDestaque || MARCA_PADRAO.destaque })[0] ?? null;
+}
+
 /** Marca do app a partir da identidade da proposta. Nula = padrão Raion (sem cor própria, ou combinação ilegível). */
 export function marcaDoApp(linha: { cor_primaria: string | null; cor_destaque: string | null } | null): Marca | null {
   if (!linha || (!linha.cor_primaria && !linha.cor_destaque)) return null;
-  const m = { barra: linha.cor_primaria || MARCA_PADRAO.barra, destaque: linha.cor_destaque || MARCA_PADRAO.destaque };
+  const m = { barra: (linha.cor_primaria || MARCA_PADRAO.barra).toUpperCase(), destaque: (linha.cor_destaque || MARCA_PADRAO.destaque).toUpperCase() };
+  // As duas no padrão (a tela de identidade grava o padrão quando ninguém mexe) = sem marca própria.
+  if (m.barra === MARCA_PADRAO.barra && m.destaque === MARCA_PADRAO.destaque) return null;
   return validarMarca(m).length ? null : m;
 }
