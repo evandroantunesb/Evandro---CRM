@@ -1949,6 +1949,48 @@ export type Database = {
           },
         ];
       };
+      empresa_telas: {
+        Row: {
+          atualizado_por: string | null;
+          created_at: string;
+          desligadas: string[];
+          empresa_id: string;
+          id: string;
+          updated_at: string;
+        };
+        Insert: {
+          atualizado_por?: string | null;
+          created_at?: string;
+          desligadas?: string[];
+          empresa_id: string;
+          id?: string;
+          updated_at?: string;
+        };
+        Update: {
+          atualizado_por?: string | null;
+          created_at?: string;
+          desligadas?: string[];
+          empresa_id?: string;
+          id?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "empresa_telas_atualizado_por_fkey";
+            columns: ["atualizado_por"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "empresa_telas_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: true;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       empresas: {
         Row: {
           cnpj: string | null;
@@ -8155,6 +8197,7 @@ export type Database = {
         Args: { p_pedido_id: string };
         Returns: Record<string, unknown>;
       };
+      produto_da_empresa: { Args: { p_empresa_id: string }; Returns: string };
       progresso_conquistas_membro: {
         Args: { p_empresa_id: string };
         Returns: {
