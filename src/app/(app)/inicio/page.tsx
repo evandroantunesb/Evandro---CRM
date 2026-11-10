@@ -7,6 +7,7 @@ import {
   Mail,
   MapPin,
   MessageCircle,
+  Percent,
   Phone,
   Plus,
   QrCode,
@@ -24,6 +25,7 @@ import { Cartao, Selo } from "@/components/ui";
 import { carregarConfiguracao, formatarMoeda, inicioDoDia, tempoDesde } from "@/lib/crm";
 import { contarAtribuicoesPendentes } from "@/lib/distribuicao-leads";
 import { calcularNivel, responsavelCongeladoPorNegocio } from "@/lib/gamificacao";
+import { carregarDescontosParaAprovar } from "@/lib/descontos";
 import { carregarLeadsParados } from "@/lib/leads-parados";
 import { carregarLeadsSemContato } from "@/lib/leads-sem-contato";
 import { calcularProgresso, calcularRealizado, type Meta } from "@/lib/metas";
@@ -267,12 +269,14 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
   ]);
 
   const filtroResponsavel = pessoal ? { responsavelId: atual.membroId } : {};
-  const [leadsSemContato, leadsParados, propostasParadas, leadsADistribuir] = await Promise.all([
+  const [leadsSemContato, leadsParados, propostasParadas, leadsADistribuir, descontosParaAprovar] = await Promise.all([
     carregarLeadsSemContato(supabase, atual.empresaId, { ...filtroResponsavel, horasLimite: config.horasConsideradoSemContato }),
     carregarLeadsParados(supabase, atual.empresaId, { ...filtroResponsavel, diasLimite: config.diasConsideradoParado }),
     carregarPropostasParadas(supabase, atual.empresaId, { ...filtroResponsavel, diasLimite: config.diasConsideradoParado }),
     // Fila de distribuição: só admin/gestor decidem (nas duas visões, é tarefa de quem distribui).
     podeVerEquipe ? contarAtribuicoesPendentes(supabase, atual.empresaId) : Promise.resolve(0),
+    // Descontos que quem está logado pode decidir (Compras P4c; o banco decide quem pode).
+    podeVerEquipe ? carregarDescontosParaAprovar(supabase, atual.empresaId) : Promise.resolve([]),
   ]);
 
   // KPIs -------------------------------------------------------------------
@@ -409,7 +413,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
     icone: LucideIcon;
     titulo: string;
     subtitulo: string;
-    badge: "atrasado" | "pendente" | "parado" | "proposta_parada" | "distribuir";
+    badge: "atrasado" | "pendente" | "parado" | "proposta_parada" | "distribuir" | "desconto";
     tempo: string;
     href: string;
   };
@@ -467,7 +471,18 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
           },
         ]
       : [];
+  // Descontos para aprovar também entram à frente: a proposta e o contrato do vendedor esperam a decisão.
+  const prioridadesDesconto: Prioridade[] = descontosParaAprovar.map((d) => ({
+    id: `d-${d.id}`,
+    icone: Percent,
+    titulo: d.titulo,
+    subtitulo: `${d.solicitante} pediu ${d.percentual.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}% de desconto${d.precoSugerido != null ? ` (${formatarMoeda(Math.round(d.precoSugerido * (100 - d.percentual)) / 100)})` : ""}`,
+    badge: "desconto",
+    tempo: tempoDesde(d.criadoEm, agora.getTime()),
+    href: `/negocios/${d.negocioId}?aba=proposta#desconto`,
+  }));
   const prioridades = [
+    ...prioridadesDesconto,
     ...prioridadeDistribuir,
     ...[...prioridadesAtrasadas, ...prioridadesParadas, ...prioridadesPropostasParadas, ...prioridadesLeads].slice(0, 4),
   ];
@@ -611,7 +626,7 @@ export default async function Inicio({ searchParams }: { searchParams: Promise<{
                       <p className="truncate text-xs text-zinc-500">{p.subtitulo}</p>
                     </Link>
                     <Selo tom={p.badge === "atrasado" ? "negativo" : "atencao"}>
-                      {{ atrasado: "Atrasado", pendente: "Pendente", parado: "Parado", proposta_parada: "Proposta parada", distribuir: "Distribuir" }[p.badge]}
+                      {{ atrasado: "Atrasado", pendente: "Pendente", parado: "Parado", proposta_parada: "Proposta parada", distribuir: "Distribuir", desconto: "Aprovar desconto" }[p.badge]}
                     </Selo>
                     <span className="hidden shrink-0 text-xs text-zinc-500 sm:inline">{p.tempo}</span>
                   </li>

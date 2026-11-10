@@ -1746,6 +1746,7 @@ export type Database = {
           motivo_decisao: string | null;
           negocio_id: string;
           percentual: number;
+          preco_sugerido: number | null;
           solicitado_por: string;
           status: string;
         };
@@ -1759,6 +1760,7 @@ export type Database = {
           motivo_decisao?: string | null;
           negocio_id: string;
           percentual: number;
+          preco_sugerido?: number | null;
           solicitado_por: string;
           status?: string;
         };
@@ -1772,6 +1774,7 @@ export type Database = {
           motivo_decisao?: string | null;
           negocio_id?: string;
           percentual?: number;
+          preco_sugerido?: number | null;
           solicitado_por?: string;
           status?: string;
         };
@@ -7088,6 +7091,7 @@ export type Database = {
         };
       };
       cancelar_conta_pagar: { Args: { p_conta_id: string; p_motivo: string }; Returns: undefined };
+      cancelar_desconto: { Args: { p_id: string }; Returns: undefined };
       cancelar_pedido_compra: {
         Args: { p_motivo: string; p_pedido_id: string };
         Returns: undefined;
@@ -7362,6 +7366,18 @@ export type Database = {
       descartar_orcamento_compra: {
         Args: { p_motivo: string; p_orcamento_id: string };
         Returns: undefined;
+      };
+      descontos_para_aprovar: {
+        Args: { p_empresa_id: string };
+        Returns: {
+          created_at: string;
+          id: string;
+          negocio_id: string;
+          percentual: number;
+          preco_sugerido: number;
+          solicitante: string;
+          titulo: string;
+        }[];
       };
       devolver_aviso_pagamento: {
         Args: { p_aviso_id: string; p_motivo: string };

@@ -13,13 +13,16 @@ import {
   descontoDaSoma,
   descontoDoValor,
   descontoPermitido,
+  excessoAVista,
+  passaDoPermitido,
+  pendenciaValorNegocio,
   valorAVista,
   valorParcela,
   type EntradaCondicoes,
   type RegrasCondicoes,
 } from "@/lib/condicoes-pagamento-proposta";
 import { formatarMoeda, lerNumeroBr } from "@/lib/formatacao";
-import { AvisoDesconto, SolicitarAoGestor } from "./solicitar-ao-gestor";
+import { AvisoDesconto, PrecoDoSistema, SolicitarAoGestor } from "./solicitar-ao-gestor";
 
 type Financiamento = NonNullable<EntradaCondicoes["financiamento"]>;
 type Parte = NonNullable<EntradaCondicoes["personalizado"]>["partes"][number];
@@ -83,6 +86,9 @@ export function CondicoesPagamento({
   const descontoValido = Number.isFinite(descontoBruto) && descontoBruto >= 0 && descontoBruto < 100;
   const descontoLido = descontoValido ? Math.round(descontoBruto * 100) / 100 : 0;
   const somaPartes = partes.reduce((s, p) => s + Math.round((lerNumeroBr(p.valor) || 0) * 100), 0) / 100;
+  // Compras P4c: o valor do negócio abaixo do sugerido além do permitido trava a emissão em qualquer condição.
+  const pendenciaValor = temPreco ? pendenciaValorNegocio(preco, regras) : null;
+  const excesso = temPreco && descontoValido ? excessoAVista(preco, descontoLido, regras) : null;
   const nenhuma = !aVista && !parcelado && !financiamento && !personalizado;
 
   const mudarFinanciamento = (i: number, campo: keyof Financiamento["opcoes"][number], valor: string | number) =>
@@ -94,9 +100,7 @@ export function CondicoesPagamento({
       <input type="hidden" name="condicoes" value={JSON.stringify(entrada)} />
       <input type="hidden" name="precoEsperado" value={preco ?? ""} />
       <legend className="px-1 text-sm font-medium text-texto">Condições de pagamento</legend>
-      <p className="-mt-1 text-xs text-texto-2">
-        Preço do sistema: <strong className="text-texto">{temPreco ? formatarMoeda(preco) : "informe o valor do negócio"}</strong>
-      </p>
+      <PrecoDoSistema preco={temPreco ? preco : null} precoSugerido={regras.precoSugerido ?? null} pendencia={pendenciaValor} />
 
       <Modalidade rotulo="À vista" marcada={aVista} aoMarcar={setAVista}>
         {/* Dois campos ligados: digitar um calcula o outro. Vale o último digitado (o valor em R$ vai exato). */}
@@ -132,13 +136,14 @@ export function CondicoesPagamento({
           Seu limite: {percentual(regras.limiteDesconto)}%
           {regras.descontoAprovado > 0 && ` · Aprovado neste negócio: ${percentual(regras.descontoAprovado)}%`}
         </p>
-        {descontoValido && descontoLido > maxDesconto && (
+        {excesso && (
           <SolicitarAoGestor
             negocioId={negocioId}
-            desconto={descontoLido}
+            desconto={excesso.pedir}
             maximo={maxDesconto}
+            maximoAVista={excesso.maximoAVista}
             aoUsarMaximo={() => {
-              setDesconto(percentual(maxDesconto));
+              setDesconto(percentual(excesso.maximoAVista));
               setValorDigitado(null);
             }}
           />
@@ -297,7 +302,7 @@ export function CondicoesPagamento({
               {somaPartes < preco && ` = desconto de ${percentual(descontoDaSoma(preco, somaPartes))}%`}
             </p>
           )}
-          {temPreco && somaPartes > 0 && somaPartes < preco && descontoDaSoma(preco, somaPartes) > maxDesconto && <AvisoDesconto />}
+          {temPreco && somaPartes > 0 && !pendenciaValor && passaDoPermitido(somaPartes, preco, regras) && <AvisoDesconto />}
         </Modalidade>
       )}
 
