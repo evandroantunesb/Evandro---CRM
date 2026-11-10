@@ -98,6 +98,36 @@ export function AbaProposta({ ficha }: { ficha: Ficha }) {
     </div>
   ) : (
     <div id="proposta" className="mx-auto flex w-full max-w-3xl scroll-mt-4 flex-col gap-4 [&>*]:min-w-0">
+      {/* Antes da proposta (Compras P4c): desconto acima do permitido trava a proposta e o contrato. */}
+      {desconto && (
+        <div id="desconto" className="scroll-mt-4">
+          <Cartao titulo="Desconto">
+            <DescontoNegocio
+              negocioId={negocio.id}
+              limite={desconto.limite}
+              souAdmin={souAdmin}
+              possoDecidir={desconto.possoDecidir}
+              podePedir={!arquivado}
+              valor={negocio.valor}
+              regras={regrasCondicoes}
+              resumo={desconto.resumo}
+              pedidos={desconto.pedidos.map((p) => ({
+                id: p.id,
+                percentual: Number(p.percentual),
+                motivo: p.motivo,
+                status: p.status as "pendente" | "aprovado" | "recusado" | "cancelado",
+                solicitante: nomes.membro(p.solicitado_por),
+                meu: p.solicitado_por === atual.membroId,
+                precoSugerido: p.preco_sugerido == null ? null : Number(p.preco_sugerido),
+                decisor: p.decidido_por ? nomes.membro(p.decidido_por) : null,
+                decididoEm: p.decidido_em,
+                motivoDecisao: p.motivo_decisao,
+                criadoEm: p.created_at,
+              }))}
+            />
+          </Cartao>
+        </div>
+      )}
       {pode(atual.papel, PROPOSTA_E_CONTRATO) && (
         <>
           {!emissoesAusente && regrasCondicoes && (
@@ -148,30 +178,6 @@ export function AbaProposta({ ficha }: { ficha: Ficha }) {
           </Cartao>
           )}
         </>
-      )}
-      {desconto && (
-        <div id="desconto" className="scroll-mt-4">
-          <Cartao titulo="Desconto à vista">
-            <DescontoNegocio
-              negocioId={negocio.id}
-              limite={desconto.limite}
-              souAdmin={souAdmin}
-              possoDecidir={desconto.possoDecidir}
-              podePedir={!arquivado}
-              pedidos={desconto.pedidos.map((p) => ({
-                id: p.id,
-                percentual: Number(p.percentual),
-                motivo: p.motivo,
-                status: p.status as "pendente" | "aprovado" | "recusado" | "cancelado",
-                solicitante: nomes.membro(p.solicitado_por),
-                decisor: p.decidido_por ? nomes.membro(p.decidido_por) : null,
-                decididoEm: p.decidido_em,
-                motivoDecisao: p.motivo_decisao,
-                criadoEm: p.created_at,
-              }))}
-            />
-          </Cartao>
-        </div>
       )}
       {pode(atual.papel, PROPOSTA_E_CONTRATO) && (
         <div id="contrato" className="flex scroll-mt-4 flex-col gap-4">

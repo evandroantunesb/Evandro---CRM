@@ -34,6 +34,22 @@ export async function solicitarDesconto(_: ResultadoAcao, formData: FormData): P
   return { ok: true, mensagem: "Pedido enviado. Quem pode aprovar já foi avisado." };
 }
 
+const esquemaCancelamento = z.object({ negocioId: z.string().uuid(), pedidoId: z.string().uuid() });
+
+/** Quem pediu cancela o próprio pedido pendente (Compras P4c). O valor do negócio não muda. */
+export async function cancelarDesconto(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  await exigirPapel(...PROPOSTA_E_CONTRATO);
+  const d = esquemaCancelamento.safeParse(Object.fromEntries(formData));
+  if (!d.success) return { ok: false, mensagem: "Dados inválidos." };
+
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.rpc("cancelar_desconto", { p_id: d.data.pedidoId });
+  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível cancelar o pedido.") };
+
+  revalidatePath(`/negocios/${d.data.negocioId}`);
+  return { ok: true, mensagem: "Pedido cancelado." };
+}
+
 const esquemaDecisao = z.object({
   negocioId: z.string().uuid(),
   pedidoId: z.string().uuid(),

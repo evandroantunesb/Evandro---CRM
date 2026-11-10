@@ -42,7 +42,7 @@ export const LIMITES_CONDICOES = {
 } as const;
 
 export const MENSAGEM_NENHUMA_CONDICAO = "Marque pelo menos uma condição de pagamento.";
-export const ORIENTACAO_APROVACAO = "Peça aprovação no cartão Desconto à vista.";
+export const ORIENTACAO_APROVACAO = "Peça aprovação no cartão Desconto.";
 
 /** O que a tela envia (JSON num campo escondido). Números como digitados ("1.234,56"); o servidor lê e confere tudo. */
 export const esquemaEntradaCondicoes = z.object({
@@ -80,10 +80,59 @@ export type RegrasCondicoes = {
   limiteDesconto: number;
   /** Maior desconto já aprovado neste negócio (0 = nenhum). */
   descontoAprovado: number;
+  /** Preço sugerido pela tabela de preços (Compras P4b), se o negócio tem; ausente = sem sugerido. */
+  precoSugerido?: number | null;
 };
 
-/** Desconto à vista (e do Personalizado abaixo do preço) que quem emite pode dar neste negócio. */
+/** Desconto total que quem emite pode dar neste negócio (o limite dele ou o maior já aprovado). */
 export const descontoPermitido = (r: Pick<RegrasCondicoes, "limiteDesconto" | "descontoAprovado">) => Math.max(r.limiteDesconto, r.descontoAprovado);
+
+/*
+ * Compras P4c (20261202100000_desconto_sobre_sugerido.sql; decisão do Evandro de 10/11/2026): o desconto é o preço
+ * final que o cliente paga contra a referência do negócio, o maior entre o preço sugerido pela tabela e o preço do
+ * negócio. Sem sugerido, a referência é o preço do negócio (como antes da P4c).
+ */
+type RegrasDesconto = Pick<RegrasCondicoes, "limiteDesconto" | "descontoAprovado" | "precoSugerido">;
+
+export const referenciaDesconto = (preco: number, precoSugerido: number | null | undefined) => Math.max(preco, precoSugerido ?? 0);
+
+/** Menor preço final, em centavos, que quem emite pode cobrar neste negócio sem aprovação nova. */
+export const precoMinimoCentavos = (preco: number, r: RegrasDesconto) =>
+  Math.round(referenciaDesconto(preco, r.precoSugerido) * (100 - descontoPermitido(r)));
+
+/** O preço final passa do desconto permitido. */
+export const passaDoPermitido = (precoFinal: number, preco: number, r: RegrasDesconto) => Math.round(precoFinal * 100) < precoMinimoCentavos(preco, r);
+
+/** Desconto total (%) de um preço final, arredondado para cima: é o percentual a pedir para a aprovação cobrir. */
+export const descontoTotal = (precoFinal: number, preco: number, r: Pick<RegrasCondicoes, "precoSugerido">) =>
+  Math.max(0, descontoDoValor(referenciaDesconto(preco, r.precoSugerido), precoFinal));
+
+/** Maior desconto à vista (% sobre o preço do negócio) que ainda cabe no permitido; 0 se o próprio preço já passa. */
+export function descontoAVistaMaximo(preco: number, r: RegrasDesconto): number {
+  if (preco <= 0) return 0;
+  const folga = Math.round(preco * 100) - precoMinimoCentavos(preco, r);
+  // Para baixo em 2 casas (o à vista com esse % ainda cabe), sem erro de ponto flutuante.
+  return folga <= 0 ? 0 : Math.floor(Math.round((folga / (preco * 100)) * 1000000) / 100) / 100;
+}
+
+/**
+ * À vista acima do permitido (a tela oferece pedir aprovação): o desconto total a pedir e o % à vista que ainda cabe.
+ * Nulo = cabe no permitido, ou o próprio valor do negócio já passa (aí vale `pendenciaValorNegocio`).
+ */
+export function excessoAVista(preco: number, descontoAVista: number, r: RegrasDesconto): { pedir: number; maximoAVista: number } | null {
+  if (pendenciaValorNegocio(preco, r)) return null;
+  const final = valorAVista(preco, descontoAVista);
+  if (!passaDoPermitido(final, preco, r) && descontoAVista <= descontoPermitido(r)) return null;
+  return { pedir: descontoTotal(final, preco, r), maximoAVista: descontoAVistaMaximo(preco, r) };
+}
+
+/** Valor do negócio abaixo do sugerido além do permitido (nulo = dentro do permitido ou sem sugerido). */
+export function pendenciaValorNegocio(preco: number, r: RegrasDesconto): string | null {
+  if (!r.precoSugerido || !passaDoPermitido(preco, preco, r)) return null;
+  return `O valor do negócio está ${formatarPercentual(descontoTotal(preco, preco, r))}% abaixo do preço sugerido (${formatarMoedaSimples(r.precoSugerido)}) e passa do permitido neste negócio (${formatarPercentual(descontoPermitido(r))}%). ${ORIENTACAO_APROVACAO}`;
+}
+
+const formatarMoedaSimples = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 const dinheiro = z.number().finite().positive();
 
@@ -185,23 +234,29 @@ export function montarCondicoesPagamento(entrada: EntradaCondicoes, regras: Regr
   const p: string[] = [];
   const L = LIMITES_CONDICOES;
   const maxDesconto = descontoPermitido(regras);
-  const passouDoLimite = (percentual: number) =>
-    `Desconto de ${formatarPercentual(percentual)}% passa do permitido neste negócio (${formatarPercentual(maxDesconto)}%). ${ORIENTACAO_APROVACAO}`;
+  const sobreSugerido = referenciaDesconto(preco, regras.precoSugerido) > preco ? " sobre o preço sugerido" : "";
+  const passouDoLimite = (precoFinal: number) =>
+    `Desconto de ${formatarPercentual(descontoTotal(precoFinal, preco, regras))}%${sobreSugerido} passa do permitido neste negócio (${formatarPercentual(maxDesconto)}%). ${ORIENTACAO_APROVACAO}`;
+  // O próprio valor do negócio já passa do permitido (abaixo do sugerido): uma pendência só, sem repetir por condição.
+  const pendenciaValor = pendenciaValorNegocio(preco, regras);
+  if (pendenciaValor) p.push(pendenciaValor);
+  const passa = (precoFinal: number) => !pendenciaValor && passaDoPermitido(precoFinal, preco, regras);
 
   let aVista: CondicoesEmitidas["aVista"] = null;
   if (entrada.aVista?.valor?.trim()) {
     // Valor à vista digitado em reais: grava o valor exato e o desconto que ele representa (2 casas, só para exibir).
     const v = lerNumeroBr(entrada.aVista.valor);
     if (v == null || !Number.isFinite(v) || centavos(v) <= 0 || centavos(v) > centavos(preco)) p.push("À vista: informe um valor maior que zero e até o preço.");
-    else if (centavos(v) < Math.round(preco * (100 - maxDesconto))) p.push(passouDoLimite(descontoDoValor(preco, v)));
+    else if (passa(v)) p.push(passouDoLimite(v));
     else aVista = { descontoPercentual: Math.round((1 - centavos(v) / centavos(preco)) * 10000) / 100, valor: emReais(centavos(v)) };
   } else if (entrada.aVista) {
     const d = lerNumeroBr(entrada.aVista.desconto) ?? 0;
     if (!Number.isFinite(d) || d < 0 || d >= 100) p.push("À vista: informe um desconto de 0 a 99,99%.");
     else {
       const desconto = Math.round(d * 100) / 100;
-      if (desconto > maxDesconto) p.push(passouDoLimite(desconto));
-      else aVista = { descontoPercentual: desconto, valor: valorAVista(preco, desconto) };
+      const v = valorAVista(preco, desconto);
+      if (passa(v) || (!pendenciaValor && desconto > maxDesconto)) p.push(passouDoLimite(v));
+      else aVista = { descontoPercentual: desconto, valor: v };
     }
   }
 
@@ -274,7 +329,7 @@ export function montarCondicoesPagamento(entrada: EntradaCondicoes, regras: Regr
       });
       const total = lidas.reduce((s, x) => s + centavos(x.valor), 0);
       // Soma abaixo do preço é desconto: vale o mesmo limite do à vista (em centavos).
-      if (p.length === antes && total < Math.round(preco * (100 - maxDesconto))) p.push(passouDoLimite(descontoDaSoma(preco, emReais(total))));
+      if (p.length === antes && passa(emReais(total))) p.push(passouDoLimite(emReais(total)));
       if (p.length === antes) personalizado = { partes: lidas, total: emReais(total) };
     }
   }

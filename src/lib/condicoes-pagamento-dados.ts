@@ -15,7 +15,7 @@ export async function carregarRegrasCondicoes(
   empresaId: string,
   negocioId: string,
 ): Promise<RegrasCondicoes | null> {
-  const [preferenciasR, taxasR, limiteR, aprovadoR] = await Promise.all([
+  const [preferenciasR, taxasR, limiteR, aprovadoR, sugeridoR] = await Promise.all([
     supabase.from("condicoes_pagamento_preferencias").select("desconto_max_vendedor, desconto_max_gestor, personalizado_ativo").eq("empresa_id", empresaId).maybeSingle(),
     supabase.from("taxas_parcelamento").select("meio, parcelas, taxa_percentual").eq("empresa_id", empresaId).order("parcelas"),
     supabase.rpc("meu_limite_desconto", { p_empresa_id: empresaId }),
@@ -27,8 +27,10 @@ export async function carregarRegrasCondicoes(
       .order("percentual", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    // Compras P4c: o desconto é medido contra o preço sugerido pela tabela, se o negócio tem.
+    supabase.from("negocio_precificacao").select("preco_sugerido").eq("negocio_id", negocioId).maybeSingle(),
   ]);
-  if (preferenciasR.error || taxasR.error || limiteR.error || aprovadoR.error) return null;
+  if (preferenciasR.error || taxasR.error || limiteR.error || aprovadoR.error || sugeridoR.error) return null;
   const taxas = Object.fromEntries(
     MEIOS_PARCELAMENTO.map((meio) => [
       meio,
@@ -40,6 +42,7 @@ export async function carregarRegrasCondicoes(
     taxas,
     limiteDesconto: Number(limiteR.data ?? 0),
     descontoAprovado: Number(aprovadoR.data?.percentual ?? 0),
+    precoSugerido: sugeridoR.data?.preco_sugerido == null ? null : Number(sugeridoR.data.preco_sugerido),
   };
 }
 

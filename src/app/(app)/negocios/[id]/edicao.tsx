@@ -8,7 +8,8 @@ import { registrarAnexo } from "@/lib/acoes/anexos";
 import { editarNegocio } from "@/lib/acoes/negocios";
 import { enviarArquivos } from "@/lib/anexos-navegador";
 import { arquivosEscolhidos, metaArquivo, problemaArquivo } from "@/lib/anexos-regras";
-import { formatarMesAno } from "@/lib/formatacao";
+import { descontoTotal, formatarPercentual } from "@/lib/condicoes-pagamento-proposta";
+import { formatarMesAno, formatarMoeda } from "@/lib/formatacao";
 import { criarClienteNavegador } from "@/lib/supabase/navegador";
 import type { ResultadoAcao } from "@/lib/tipos";
 
@@ -27,6 +28,7 @@ export function EdicaoNegocio({
   responsaveis,
   podeEditarValor = true,
   eletroposto = false,
+  precoSugerido = null,
 }: {
   secao: "comercial" | "tecnico";
   /** Empresa do negócio (pasta da fatura no Storage). */
@@ -56,6 +58,8 @@ export function EdicaoNegocio({
   podeEditarValor?: boolean;
   /** Eletroposto: sem os campos de energia solar, e o valor fica opcional até o cliente escolher o modelo. */
   eletroposto?: boolean;
+  /** Preço sugerido pela tabela de preços (Compras P4b/P4c), se o negócio tem. */
+  precoSugerido?: number | null;
 }) {
   const router = useRouter();
   const [resultado, setResultado] = useState<ResultadoAcao>(null);
@@ -117,15 +121,32 @@ export function EdicaoNegocio({
               </option>
             ))}
           </Selecao>
-          <Campo
-            rotulo="Valor (R$)"
-            name="valor"
-            inputMode="decimal"
-            required={!eletroposto}
-            readOnly={!podeEditarValor}
-            placeholder={eletroposto ? "Vazio até o cliente escolher o modelo" : undefined}
-            defaultValue={negocio.valor != null ? String(negocio.valor).replace(".", ",") : ""}
-          />
+          <div className="flex flex-col gap-1">
+            <Campo
+              rotulo="Valor (R$)"
+              name="valor"
+              inputMode="decimal"
+              required={!eletroposto}
+              readOnly={!podeEditarValor}
+              placeholder={eletroposto ? "Vazio até o cliente escolher o modelo" : undefined}
+              defaultValue={negocio.valor != null ? String(negocio.valor).replace(".", ",") : ""}
+            />
+            {precoSugerido != null && (
+              <p className="text-xs text-texto-2">
+                Preço sugerido: <b className="tabular-nums">{formatarMoeda(precoSugerido)}</b>
+                {negocio.valor != null && negocio.valor > 0 && negocio.valor < precoSugerido && (
+                  <>
+                    {" "}
+                    · desconto de {formatarPercentual(descontoTotal(negocio.valor, negocio.valor, { precoSugerido }))}% (aprovação no{" "}
+                    <a href="?aba=proposta#desconto" className="underline">
+                      cartão Desconto
+                    </a>
+                    , se passar do seu limite)
+                  </>
+                )}
+              </p>
+            )}
+          </div>
           <div className="flex flex-col gap-1">
             <Campo rotulo="Data prevista de fechamento" name="fechamento_previsto_em" type="date" defaultValue={negocio.fechamentoPrevistoEm ?? ""} />
             {!negocio.fechamentoPrevistoEm && negocio.fechamentoPrevisto && (

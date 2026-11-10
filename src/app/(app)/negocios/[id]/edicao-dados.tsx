@@ -32,6 +32,7 @@ export function EdicaoDados({ ficha, secao }: { ficha: Ficha; secao: "comercial"
       origens={config.origens.filter((o) => o.ativa || o.id === negocio.origem_id)}
       responsaveis={pode(atual.papel, ESCOLHER_RESPONSAVEL_NEGOCIO) ? config.membros.filter((m) => m.ativo && pode(m.papel, RESPONSAVEL_COMERCIAL)) : []}
       podeEditarValor={pode(atual.papel, EDITAR_VALOR_NEGOCIO)}
+      precoSugerido={ficha.precoSugeridoKit}
       eletroposto={ehEletroposto}
     />
   );
