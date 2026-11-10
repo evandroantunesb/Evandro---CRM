@@ -11,6 +11,15 @@
 - **PRs antigas abertas:** #232 (cartões de Usuários) conflita com a B e foi superada pelo desenho aprovado; as drafts de gamificação (#104–#118), calculadora (#101, #197, #199, #200) e docs antigas (#76, #133, #167, #193) precisam de triagem antes de qualquer retomada; Dependabot (#182, #355, #358, #359) aguarda revisão.
 - **Limpeza local (com OK do Evandro):** vários worktrees em `R:\` e `C:\dev\` já mesclados aparecem como `prunable` em `git worktree list`.
 
+## Onboarding — subprojeto 2: marca e cores da empresa no app (10/11/2026)
+
+Branch `feat/marca-cores` (worktree `C:\dev\crm-p4`); desenho em `docs/superpowers/specs/2026-11-10-marca-cores-design.md`, plano em `docs/superpowers/plans/2026-11-10-marca-cores.md`. Decisões do Evandro (10/11/2026): fonte única = identidade da proposta (a proposta em PDF segue o esquema de cores da empresa); a cor primária pinta a barra lateral e a faixa, a de destaque substitui o dourado do app; a barra mostra a logo da proposta (de preferência a de fundo escuro); a Gamificação mantém o próprio tema (a barra lateral segue a empresa); cor ilegível não salva (contraste 4,5:1; texto dos botões preto ou branco automático).
+
+- Migration `20261204100000_marca_da_empresa.sql`: `marca_da_empresa` (cores e logos para qualquer membro ativo; o resto da identidade continua só para o comercial).
+- App: regra `src/lib/marca-cores.ts` (contraste WCAG, texto sobre o destaque, tons derivados, variáveis; combinação ilegível ou igual ao padrão = sem marca); leitura `src/lib/marca-servidor.ts`; o invólucro `tema-app` recebe as variáveis e `data-marca`; CSS limita a cor da barra à barra lateral, ao cabeçalho do celular e à faixa (`faixa-marca`); `.tema-gamificacao` volta ao dourado; `CamposMarcaCores` (cores, prévia e contraste) na identidade da proposta, que agora grava vazio quando ninguém escolhe cor; atalho "Marca e cores" em Configurações › Empresa.
+- Testes: `tests/marca-cores.test.ts`, `tests/marca-servidor.test.ts`, `tests/marca-da-empresa-db.test.ts`, `e2e/34-marca-cores.spec.ts`.
+- Pendência: mais um `console.error` de falha de leitura (aviso de lint) e o brilho dourado fixo no hover do botão da faixa (`CLASSE_ACAO_CABECALHO`).
+
 ## Onboarding — subprojeto 1: telas por empresa (10/11/2026)
 
 Decisões do Evandro (10/11/2026): no Solo, o menu tem Início, Tarefas, Negócios, Contatos, Propostas e contratos e Configurações (o checklist da obra vem no subprojeto 4); no PRO, o admin liga e desliga Painel, Leads a distribuir, Forecast, Obras, Engenharia, Gamificação, Eletroposto e Captura de leads; tela desligada some do menu e o endereço mostra "Esta tela está desligada na sua empresa", mas nada para de rodar (pontos, rodízio, captura pública, obras) e nada é apagado; o Eletroposto continua liberado pelo super-admin e, liberado, o admin liga ou desliga; chaves de setores ficam para o subprojeto 4.
