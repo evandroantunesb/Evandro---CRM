@@ -6,7 +6,7 @@ import type { criarClienteAdmin } from "@/lib/supabase/admin";
 /**
  * Integração com o Google Agenda: cada membro conecta a própria conta Google
  * (OAuth) e, ao criar uma tarefa, ela também vira um evento na agenda dele.
- * Sem SDK — só fetch nas APIs REST do Google, igual ao resto do projeto (ver src/lib/opensolar.ts).
+ * Sem SDK — só fetch nas APIs REST do Google, igual ao resto do projeto.
  */
 
 const ESCOPO = "https://www.googleapis.com/auth/calendar.events";

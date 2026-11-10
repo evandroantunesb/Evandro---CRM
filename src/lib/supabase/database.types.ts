@@ -2860,9 +2860,11 @@ export type Database = {
           descricao: string;
           empresa_id: string;
           id: string;
+          material_id: string | null;
           negocio_id: string;
           ordem: number;
           potencia_w: number | null;
+          preco_venda_manual: number | null;
           quantidade: number;
           tipo: Database["public"]["Enums"]["tipo_componente_kit"];
         };
@@ -2871,9 +2873,11 @@ export type Database = {
           descricao: string;
           empresa_id: string;
           id?: string;
+          material_id?: string | null;
           negocio_id: string;
           ordem?: number;
           potencia_w?: number | null;
+          preco_venda_manual?: number | null;
           quantidade?: number;
           tipo: Database["public"]["Enums"]["tipo_componente_kit"];
         };
@@ -2882,9 +2886,11 @@ export type Database = {
           descricao?: string;
           empresa_id?: string;
           id?: string;
+          material_id?: string | null;
           negocio_id?: string;
           ordem?: number;
           potencia_w?: number | null;
+          preco_venda_manual?: number | null;
           quantidade?: number;
           tipo?: Database["public"]["Enums"]["tipo_componente_kit"];
         };
@@ -2895,6 +2901,13 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "empresas";
             referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "kit_componentes_material_fk";
+            columns: ["empresa_id", "material_id"];
+            isOneToOne: false;
+            referencedRelation: "compras_materiais";
+            referencedColumns: ["empresa_id", "id"];
           },
           {
             foreignKeyName: "kit_componentes_negocio_id_fkey";
@@ -3225,6 +3238,48 @@ export type Database = {
           },
         ];
       };
+      negocio_custo_kit: {
+        Row: {
+          calculado_em: string;
+          custo_itens: number;
+          empresa_id: string;
+          itens: NonNullable<Json>;
+          negocio_id: string;
+          parcial: boolean;
+        };
+        Insert: {
+          calculado_em?: string;
+          custo_itens: number;
+          empresa_id: string;
+          itens?: NonNullable<Json>;
+          negocio_id: string;
+          parcial?: boolean;
+        };
+        Update: {
+          calculado_em?: string;
+          custo_itens?: number;
+          empresa_id?: string;
+          itens?: NonNullable<Json>;
+          negocio_id?: string;
+          parcial?: boolean;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "negocio_custo_kit_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "negocio_custo_kit_negocio_id_fkey";
+            columns: ["negocio_id"];
+            isOneToOne: true;
+            referencedRelation: "negocios";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       negocio_etiquetas: {
         Row: {
           created_at: string;
@@ -3263,6 +3318,45 @@ export type Database = {
             foreignKeyName: "negocio_etiquetas_negocio_id_fkey";
             columns: ["negocio_id"];
             isOneToOne: false;
+            referencedRelation: "negocios";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      negocio_precificacao: {
+        Row: {
+          avisos: NonNullable<Json>;
+          calculado_em: string;
+          empresa_id: string;
+          negocio_id: string;
+          preco_sugerido: number | null;
+        };
+        Insert: {
+          avisos?: NonNullable<Json>;
+          calculado_em?: string;
+          empresa_id: string;
+          negocio_id: string;
+          preco_sugerido?: number | null;
+        };
+        Update: {
+          avisos?: NonNullable<Json>;
+          calculado_em?: string;
+          empresa_id?: string;
+          negocio_id?: string;
+          preco_sugerido?: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "negocio_precificacao_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "negocio_precificacao_negocio_id_fkey";
+            columns: ["negocio_id"];
+            isOneToOne: true;
             referencedRelation: "negocios";
             referencedColumns: ["id"];
           },
@@ -7730,6 +7824,18 @@ export type Database = {
         Returns: undefined;
       };
       marcar_venda_alterada_obra: { Args: { p_negocio_id: string }; Returns: undefined };
+      materiais_para_kit: {
+        Args: { p_empresa_id: string };
+        Returns: {
+          categoria: string;
+          data_preco: string;
+          id: string;
+          nome: string;
+          potencia_w: number;
+          tem_preco: boolean;
+          unidade: string;
+        }[];
+      };
       membro_ativo: { Args: { p_empresa_id: string }; Returns: boolean };
       membro_atua_no_setor: {
         Args: {

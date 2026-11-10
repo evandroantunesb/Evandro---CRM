@@ -14,8 +14,10 @@ export type LinhaComponente = {
   descricao: string;
   potenciaW: string;
   quantidade: string;
-  /** Preço de referência (teste) vindo do catálogo ao selecionar — nunca é salvo, só usado pra sugerir o valor do negócio. */
-  precoEstimadoUnitario?: string;
+  /** Material da tabela de preços escolhido nesta linha (P4b); ausente = item fora da tabela. */
+  materialId?: string | null;
+  /** Preço de venda por unidade informado à mão (item fora da tabela ou sem preço nela), no padrão brasileiro. */
+  precoVendaManual?: string;
 };
 
 /** Item no formato que o servidor valida e grava (`componenteKitSchema`). */
@@ -24,9 +26,11 @@ export type ComponenteLinha = {
   descricao: string;
   potenciaW: number | null;
   quantidade: number;
+  materialId: string | null;
+  precoVendaManual: number | null;
 };
 
-export type CampoLinha = "descricao" | "potenciaW" | "quantidade";
+export type CampoLinha = "descricao" | "potenciaW" | "quantidade" | "precoVendaManual";
 
 export type ProblemaLinha = {
   /** Posição da linha na lista do editor. */
@@ -96,7 +100,18 @@ export function analisarLinhas(linhas: LinhaComponente[]): AnaliseLinhas {
       quantidade = q;
     }
 
-    if (problemas.length === antes) itens.push({ indice, componente: { tipo: l.tipo, descricao, potenciaW, quantidade } });
+    let precoVendaManual: number | null = null;
+    if ((l.precoVendaManual ?? "").trim() !== "") {
+      const p = lerNumeroBr(l.precoVendaManual);
+      if (p == null || !Number.isFinite(p) || p <= 0 || p >= 1e10) {
+        problemas.push({ indice, campo: "precoVendaManual", mensagem: "Preço de venda inválido: use um valor maior que zero (ex.: 806,00) ou deixe em branco." });
+      } else {
+        precoVendaManual = Math.round(p * 100) / 100;
+      }
+    }
+
+    if (problemas.length === antes)
+      itens.push({ indice, componente: { tipo: l.tipo, descricao, potenciaW, quantidade, materialId: l.materialId ?? null, precoVendaManual } });
   });
 
   return { itens, componentes: itens.map((i) => i.componente), problemas };
