@@ -9,6 +9,7 @@ import {
   FileText,
   Gift,
   Image as ImageIcon,
+  LayoutGrid,
   ListChecks,
   ListTree,
   Medal,
@@ -83,6 +84,7 @@ const GRUPOS: { id: string; titulo: string; itens: Item[] }[] = [
     titulo: "Empresa",
     itens: [
       { href: "/configuracoes/tela-entrada", titulo: "Tela de entrada", descricao: "Imagem, frase e texto que a equipe vê ao entrar.", Icone: ImageIcon },
+      { href: "/configuracoes/telas", titulo: "Telas da empresa", descricao: "Telas que aparecem para a equipe.", Icone: LayoutGrid },
     ],
   },
   {
