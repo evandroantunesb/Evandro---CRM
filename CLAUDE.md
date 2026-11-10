@@ -61,9 +61,9 @@ Este arquivo contém só regras duráveis. Estado atual em `docs/PROJECT_STATUS.
 
 Detalhe e histórico em `docs/PROJECT_STATUS.md` (seção "Ponto de retomada"); aqui só o resumo.
 
-- **Produção:** `main` em `0451966`, todas as migrations até a #356 aplicadas. Backups diários de produção (banco e storage) rodando no GitHub.
-- **Concluídos recentemente:** Perfis e setores (A1 a E, #332–#342), Compras P1, P2, P2b, P2c e P3 (#343–#354) e P4a, margens e potência (#356, #357).
-- **Próximo:** Compras P4b (kit com os materiais da tabela e preço pronto, retrato do custo, previsto da obra pelo custo) e depois P4c (desconto com aprovação), aguardando comando; regras já decididas pelo Evandro em 09/11 (seção da P4 em `docs/PROJECT_STATUS.md`).
+- **Produção:** `main` em `40e36fb`, todas as migrations até a #362 aplicadas. Backups diários de produção (banco e storage) rodando no GitHub. Em 10/11 o environment `producao-banco` estava sem revisor obrigatório (avisado ao Evandro).
+- **Concluídos recentemente:** Perfis e setores (A1 a E, #332–#342) e o módulo Compras inteiro (P1 a P4c, #343–#363: pedidos, orçamentos, tabela de preços, margens, kit pela tabela com preço pronto e desconto sobre o sugerido com aprovação).
+- **Próximo:** aguardando comando do Evandro.
 - **Limpeza pendente (com OK do Evandro):** worktrees já mesclados (`prunable`) em `R:\` e `C:\dev\`; triagem das PRs drafts antigas.
 - **Ambiente neste desktop:** `node_modules` dentro de `R:\` é lento ou quebrado (links para `E:\`); instale e rode a verificação numa cópia em disco local (worktrees em `C:\dev\`; `pnpm install --frozen-lockfile` leva ~25 s lá). Se o Supabase local subir sem o Kong, a stack foi criada de um checkout antigo: `supabase stop` e `start` resolvem. Várias outras stacks Supabase locais estão ativas em portas próprias.
 

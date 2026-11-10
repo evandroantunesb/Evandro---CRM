@@ -2,14 +2,15 @@
 
 ## Ponto de retomada (10/11/2026)
 
-- **Produção:** `main` em `0451966` (CI verde); todas as migrations até a #356 (Compras P4a, margens) aplicadas pelo `banco-producao.yml`.
+- **Produção:** `main` em `40e36fb`; todas as migrations até a #362 (Compras P4c, desconto sobre o sugerido) aplicadas pelo `banco-producao.yml`.
+- **Atenção (10/11/2026):** o environment `producao-banco` está sem revisor obrigatório (só a regra de branch): os runs da P4b e da P4c não pararam para aprovação. Avisado ao Evandro; reativar em Settings → Environments se não for intencional (conferir também `producao-seed`).
 - **Perfis e setores:** concluído (A1 #332, B #334, A2a #335, A2b #337, C #338, A3 #339, D/E #341). Pendências registradas nas seções abaixo (candidatos a participante e tarefas de Compras quando outro setor atende no lugar dele; remover `atua_no_operacional`; "de N do plano" em Usuários).
-- **Compras:** P1, P2, P2b, P2c, P3 (#353/#354) e P4a (margens e potência, #356/#357) concluídas. **Próximo passo: P4b** (kit montado com os materiais da tabela e preço pronto, sai a OpenSolar; retrato do custo; previsto de Equipamentos da obra pelo custo), depois **P4c** (limite de desconto com aprovação do gestor). Regras na seção da P4 abaixo; ainda sem branch. Aguardando comando.
+- **Compras:** concluído (P1 a P4c, #343–#363): P4a margens e potência (#356/#357), P4b kit pela tabela e preço pronto, OpenSolar removida (#360/#361), P4c desconto sobre o sugerido com aprovação (#362/#363). Falta testar no navegador o cartão "Desconto" e "Aprovar desconto" no Início. **Próximo módulo: aguardando comando do Evandro.**
 - **CI:** a cota de armazenamento de artefatos do GitHub Actions estourou em 09/11/2026; o job `navegador` passava nos testes e falhava só ao publicar capturas e relatório até a cota ser recalculada.
 - **PRs antigas abertas:** #232 (cartões de Usuários) conflita com a B e foi superada pelo desenho aprovado; as drafts de gamificação (#104–#118), calculadora (#101, #197, #199, #200) e docs antigas (#76, #133, #167, #193) precisam de triagem antes de qualquer retomada; Dependabot (#182, #355, #358, #359) aguarda revisão.
 - **Limpeza local (com OK do Evandro):** vários worktrees em `R:\` e `C:\dev\` já mesclados aparecem como `prunable` em `git worktree list`.
 
-## Compras — P4: preço do kit pela tabela de preços (em andamento, 09/11/2026)
+## Compras — P4: preço do kit pela tabela de preços (concluída em 10/11/2026)
 
 Prévia aprovada pelo Evandro em 09/11/2026 no canvas "Raion — Nova interface" (linha "Compras P4: preço do kit pela tabela de preços": `P4Kit`, `P4Desconto`, `P4AprovarDesconto`, `P4Margens`). Dividida em três PRs: **P4a** margens e potência; **P4b** kit montado com os materiais e preço pronto (sai a OpenSolar), retrato do custo e previsto de Equipamentos da obra pelo custo; **P4c** limite de desconto com aprovação do gestor.
 
