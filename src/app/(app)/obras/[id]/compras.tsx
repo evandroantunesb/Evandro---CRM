@@ -24,7 +24,7 @@ const dataCurta = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 const TOM: Record<SituacaoPedido, string> = {
   aguardando_nf: "bg-zinc-100 text-zinc-700",
   faturado: "bg-zinc-100 text-zinc-700",
-  recebido_parcial: "bg-dourado/20 text-dourado-texto",
+  recebido_parcial: "bg-atencao/20 text-atencao-texto",
   recebido: "bg-energia/10 text-energia",
   cancelado: "bg-zinc-100 text-zinc-500 line-through decoration-zinc-400/60",
 };
@@ -124,7 +124,7 @@ export function PedidosCompraObra({
                   </div>
                   <span className="font-medium whitespace-nowrap text-texto tabular-nums">{formatarMoeda(p.valorTotal)}</span>
                   <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${TOM[s]}`}>{ROTULO_SITUACAO_PEDIDO[s]}</span>
-                  {atrasada && <span className="rounded-full bg-dourado/20 px-2.5 py-0.5 text-xs font-medium text-dourado-texto">Entrega atrasada</span>}
+                  {atrasada && <span className="rounded-full bg-atencao/20 px-2.5 py-0.5 text-xs font-medium text-atencao-texto">Entrega atrasada</span>}
                 </div>
                 {podeEscrever && ativo && (
                   <div className="flex flex-wrap items-start gap-3">

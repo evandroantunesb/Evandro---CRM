@@ -1,0 +1,86 @@
+import { describe, expect, it } from "vitest";
+import { MARCA_PADRAO, contraste, marcaDoApp, problemaCoresIdentidade, textoSobre, validarMarca, variaveisMarca } from "@/lib/marca-cores";
+
+describe("contraste e texto sobre a cor", () => {
+  it("razão WCAG: preto e branco dão 21; o padrão Raion é legível", () => {
+    expect(Math.round(contraste("#000000", "#FFFFFF") * 100) / 100).toBe(21);
+    expect(contraste("#D4AF37", "#0F0F10")).toBeGreaterThanOrEqual(9);
+  });
+
+  it("texto sobre a cor: o de maior contraste", () => {
+    expect(textoSobre("#D4AF37")).toBe("#0F0F10");
+    expect(textoSobre("#123C45")).toBe("#FFFFFF");
+  });
+});
+
+describe("validarMarca", () => {
+  it("padrão Raion passa", () => {
+    expect(validarMarca(MARCA_PADRAO)).toEqual([]);
+  });
+
+  it("barra clara demais é recusada", () => {
+    const p = validarMarca({ barra: "#EDDB9F", destaque: "#D4AF37" });
+    expect(p[0]).toContain("clara demais");
+  });
+
+  it("barra de cor média é recusada: os itens apagados do menu precisam de ~7:1 (decisão de 10/11/2026)", () => {
+    // #6E6E6E passaria nos 4,5:1, mas o texto do menu a 60% fica ilegível.
+    expect(validarMarca({ barra: "#6E6E6E", destaque: "#D4AF37" })[0]).toContain("clara demais");
+    expect(validarMarca({ barra: "#123C45", destaque: "#0E9F8A" })).toEqual([]);
+  });
+
+  it("destaque que some sobre a barra ou no fundo escuro é recusado", () => {
+    // Azul-marinho: texto branco legível no botão, mas o ícone ativo do menu e o botão da faixa somem.
+    const p = validarMarca({ barra: "#0F0F10", destaque: "#1E3A8A" });
+    expect(p).toHaveLength(1);
+    expect(p[0]).toContain("some sobre a barra");
+  });
+
+  it("destaque em que nem preto nem branco ficam legíveis é recusado", () => {
+    const p = validarMarca({ barra: "#0F0F10", destaque: "#7A7A7A" });
+    expect(p).toHaveLength(1);
+    expect(p[0]).toContain("botões");
+  });
+});
+
+describe("variaveisMarca", () => {
+  it("as variáveis do destaque e da barra, com tons legíveis", () => {
+    const v = variaveisMarca({ barra: "#123C45", destaque: "#0E9F8A" });
+    expect(Object.keys(v).sort()).toEqual(
+      ["--color-acao", "--color-acao-forte", "--color-dourado", "--color-dourado-texto", "--color-sobre-acao", "--cor-barra"].sort(),
+    );
+    expect(v["--color-dourado"]).toBe("#0E9F8A");
+    expect(v["--color-acao"]).toBe("#0E9F8A");
+    expect(v["--color-sobre-acao"]).toBe(textoSobre("#0E9F8A"));
+    expect(v["--cor-barra"]).toBe("#123C45");
+    const [claro, escuro] = v["--color-dourado-texto"].match(/#[0-9A-F]{6}/gi)!;
+    expect(contraste(claro, "#FAF8F3")).toBeGreaterThanOrEqual(4.5);
+    expect(contraste(escuro, "#0F0F10")).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
+describe("problemaCoresIdentidade", () => {
+  it("campos vazios = padrão; barra clara recusa; cores legíveis passam", () => {
+    expect(problemaCoresIdentidade("", "")).toBeNull();
+    expect(problemaCoresIdentidade("#EDDB9F", "")).toContain("clara demais");
+    expect(problemaCoresIdentidade("#123C45", "#0E9F8A")).toBeNull();
+  });
+});
+
+describe("marcaDoApp", () => {
+  it("sem identidade ou sem cores: padrão Raion (nula)", () => {
+    expect(marcaDoApp(null)).toBeNull();
+    expect(marcaDoApp({ cor_primaria: null, cor_destaque: null })).toBeNull();
+    // A tela de identidade grava o padrão quando ninguém mexe: continua sem marca própria.
+    expect(marcaDoApp({ cor_primaria: "#0f0f10", cor_destaque: "#D4AF37" })).toBeNull();
+  });
+
+  it("combinação ilegível já salva: padrão Raion (nula)", () => {
+    expect(marcaDoApp({ cor_primaria: "#EDDB9F", cor_destaque: "#D4AF37" })).toBeNull();
+  });
+
+  it("só uma cor preenchida: a outra fica no padrão", () => {
+    expect(marcaDoApp({ cor_primaria: "#123C45", cor_destaque: null })).toEqual({ barra: "#123C45", destaque: MARCA_PADRAO.destaque });
+    expect(marcaDoApp({ cor_primaria: null, cor_destaque: "#0E9F8A" })).toEqual({ barra: MARCA_PADRAO.barra, destaque: "#0E9F8A" });
+  });
+});

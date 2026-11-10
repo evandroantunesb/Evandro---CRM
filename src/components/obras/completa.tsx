@@ -87,7 +87,7 @@ export function Completa({
             className="mt-3 flex h-2.5 gap-0.5 overflow-hidden rounded-full"
           >
             <span className="h-full bg-erro" style={{ width: `${(kpis.vermelhas / kpis.emExecucao) * 100}%` }} />
-            <span className="h-full bg-dourado" style={{ width: `${(kpis.amarelas / kpis.emExecucao) * 100}%` }} />
+            <span className="h-full bg-atencao" style={{ width: `${(kpis.amarelas / kpis.emExecucao) * 100}%` }} />
             <span className="h-full bg-energia" style={{ width: `${(kpis.verdes / kpis.emExecucao) * 100}%` }} />
           </div>
         )}
@@ -162,7 +162,7 @@ function Numeros({ kpis }: { kpis: KpisCompleta }) {
   const semMargem = kpis.margemProjetadaPct == null;
   const itens: { rotulo: ReactNode; valor: string; classe?: string; rodape?: string; destaque?: boolean }[] = [
     { rotulo: <Rotulo cor="vermelha">Vermelhas</Rotulo>, valor: String(kpis.vermelhas), classe: "text-erro" },
-    { rotulo: <Rotulo cor="amarela">Amarelas</Rotulo>, valor: String(kpis.amarelas), classe: "text-dourado-texto" },
+    { rotulo: <Rotulo cor="amarela">Amarelas</Rotulo>, valor: String(kpis.amarelas), classe: "text-atencao-texto" },
     { rotulo: <Rotulo cor="verde">Verdes</Rotulo>, valor: String(kpis.verdes), classe: "text-energia" },
     { rotulo: "Escalonamentos abertos", valor: String(kpis.escalonamentosAbertos) },
     { rotulo: "Valor em execução", valor: moedaCompacta(kpis.valorEmExecucao) },
@@ -215,7 +215,7 @@ function Entrega({ o }: { o: ObraCompletaVM }) {
   return (
     <span className="tabular-nums">
       {ddmm(o.entregaPrevista)}
-      {o.atrasoEntrega > 0 && <span className={`ml-1 font-semibold ${o.atrasoEntrega > 5 ? "text-erro" : "text-dourado-texto"}`}>+{o.atrasoEntrega} d</span>}
+      {o.atrasoEntrega > 0 && <span className={`ml-1 font-semibold ${o.atrasoEntrega > 5 ? "text-erro" : "text-atencao-texto"}`}>+{o.atrasoEntrega} d</span>}
     </span>
   );
 }

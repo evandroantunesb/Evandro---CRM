@@ -9,8 +9,8 @@ import type { CorSemaforo } from "@/lib/obras/semaforo";
  * Completa (escalonamentos abertos e as regras). Exceção de cores só em Obras (CLAUDE.md).
  */
 
-export const PONTO: Record<CorSemaforo, string> = { vermelha: "bg-erro", amarela: "bg-dourado", verde: "bg-energia" };
-export const TEXTO: Record<CorSemaforo, string> = { vermelha: "text-erro", amarela: "text-dourado-texto", verde: "text-energia" };
+export const PONTO: Record<CorSemaforo, string> = { vermelha: "bg-erro", amarela: "bg-atencao", verde: "bg-energia" };
+export const TEXTO: Record<CorSemaforo, string> = { vermelha: "text-erro", amarela: "text-atencao-texto", verde: "text-energia" };
 
 function tempoAtras(iso: string, hoje: string) {
   const d = Math.max(0, Math.round((Date.parse(hoje) - Date.parse(iso.slice(0, 10))) / 86_400_000));
@@ -68,7 +68,7 @@ export function Escalonamentos({ itens, hoje }: { itens: EscalonamentoAbertoVM[]
 export function Regras() {
   const regras: [string, string, string][] = [
     ["bg-energia", "Verde", "Etapas e entrega no prazo e custo abaixo de 90% do planejado."],
-    ["bg-dourado", "Amarela", "Custo a partir de 90% do planejado; prazo de etapa ou da entrega vencendo em até 3 dias úteis; ou atraso de até 5 dias úteis."],
+    ["bg-atencao", "Amarela", "Custo a partir de 90% do planejado; prazo de etapa ou da entrega vencendo em até 3 dias úteis; ou atraso de até 5 dias úteis."],
     ["bg-erro", "Vermelha", "Entrega prevista mais de 5 dias úteis depois da contratada, ou margem projetada negativa por custos não programados."],
     ["bg-[#c9c4b8]", "Vale a pior cor", "Se a obra se encaixa em mais de uma regra, fica com a mais grave."],
   ];

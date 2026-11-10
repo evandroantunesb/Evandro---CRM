@@ -62,6 +62,9 @@
   --color-dourado-texto: #7a5610;
   --color-energia: #1f7a4d;
   --color-erro: #b42318;
+  /* Atenção (amarelo do semáforo de Obras, atrasos): o dourado do Raion, fixo — não segue a marca da empresa. */
+  --color-atencao: #d4af37;
+  --color-atencao-texto: #7a5610;
 
   /* Movimento: entrada desacelerando; feedback rápido, transições grandes lentas e suaves. */
   --ease-raion: cubic-bezier(0.16, 1, 0.3, 1);
@@ -146,6 +149,7 @@ html:has(.tema-app[data-tema="escuro"]) body {
   --color-texto: light-dark(#0f0f10, #faf8f3);
   --color-texto-2: light-dark(#5f6672, #a3a3aa);
   --color-dourado-texto: light-dark(#7a5610, #d4af37);
+  --color-atencao-texto: light-dark(#7a5610, #d4af37);
   --color-energia: light-dark(#1f7a4d, #5cc796);
   --color-erro: light-dark(#b42318, #f2867d);
 
@@ -231,6 +235,32 @@ html:has(.tema-app[data-tema="escuro"]) body {
  */
 .tema-app .barra-lateral {
   --color-white: #ffffff;
+}
+
+/*
+ * Marca da empresa (Onboarding, subprojeto 2): o invólucro recebe as variáveis da cor de destaque e `--cor-barra`
+ * (src/lib/marca-cores.ts) e `data-marca`. Sem marca, nada aqui vale e tudo segue o padrão Raion.
+ *  - Na barra lateral, no cabeçalho e nas abas do celular e na faixa do topo, o carvão (fundo e degradê) vira a cor da
+ *    barra; a faixa não sobe para o carvão "elevado" do tema escuro.
+ *  - O texto dos botões de destaque (carvão fixo hoje) segue o preto/branco calculado para a cor.
+ *  - A Gamificação mantém o próprio tema: dourado e carvão do Raion por dentro.
+ */
+.tema-app[data-marca] :is(.barra-lateral, .faixa-marca) {
+  --color-carvao: var(--cor-barra, #0f0f10);
+}
+.tema-app[data-marca] .faixa-marca.bg-carvao {
+  background-color: var(--color-carvao);
+}
+.tema-app[data-marca] :is(.bg-dourado, .bg-acao).text-carvao {
+  color: var(--color-sobre-acao);
+}
+.tema-app .tema-gamificacao {
+  --color-dourado: #d4af37;
+  --color-acao: #d4af37;
+  --color-acao-forte: #b8952a;
+  --color-sobre-acao: #0f0f10;
+  --color-dourado-texto: light-dark(#7a5610, #d4af37);
+  --cor-barra: #0f0f10;
 }
 
 .tema-app .bg-offwhite {

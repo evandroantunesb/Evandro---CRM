@@ -15,6 +15,8 @@ import { filtrarPorTelas } from "@/lib/menu-telas";
 import { obterSessao } from "@/lib/sessao";
 import { areaLigada } from "@/lib/telas-empresa";
 import { obterTelasEmpresa } from "@/lib/telas-empresa-servidor";
+import { variaveisMarca } from "@/lib/marca-cores";
+import { obterMarcaEmpresa } from "@/lib/marca-servidor";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { trocarEmpresa } from "@/lib/acoes/empresa-atual";
 import { COOKIE_TEMA, lerTema } from "@/lib/tema";
@@ -107,7 +109,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
       verPagamentosAConfirmar = operacional;
     }
   }
-  const telas = await obterTelasEmpresa();
+  const [telas, { marca, logoUrl }] = await Promise.all([obterTelasEmpresa(), obterMarcaEmpresa()]);
   // O Financeiro é só do PRO (telas por empresa): no Solo o link não aparece.
   const linkPagamentos =
     pagamentosAConfirmar > 0 && areaLigada(telas, "pro")
@@ -207,12 +209,26 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
     </div>
   );
 
+  // Marca da empresa (logo e cores da identidade da proposta); sem marca, o padrão Raion.
+  const logo = (altura: number) =>
+    logoUrl ? (
+      // eslint-disable-next-line @next/next/no-img-element -- URL assinada do Storage, que muda a cada hora
+      <img src={logoUrl} alt={sessao.atual?.empresaNome ?? "Logo"} style={{ height: altura }} className="w-auto max-w-[180px] object-contain" />
+    ) : (
+      <LogoRaion tom="claro" altura={altura} />
+    );
+
   return (
-    <div data-tema={tema} className="tema-app flex min-h-screen flex-col md:flex-row">
+    <div
+      data-tema={tema}
+      data-marca={marca ? "" : undefined}
+      style={marca ? (variaveisMarca(marca) as React.CSSProperties) : undefined}
+      className="tema-app flex min-h-screen flex-col md:flex-row"
+    >
       {/* Celular: cabeçalho enxuto em cima; o menu vai para a barra de abas embaixo. */}
       <header className="barra-lateral sticky top-0 z-30 flex h-14 items-center justify-between bg-carvao/95 px-4 backdrop-blur-md md:hidden">
         <Link href="/inicio" aria-label="Início">
-          <LogoRaion tom="claro" altura={24} />
+          {logo(24)}
         </Link>
         {sessao.atual && <BotaoAvisos {...avisos} total={notificacoes.length + pendencias.leadsADistribuir + pendencias.demais + pagamentosAConfirmar} />}
       </header>
@@ -220,7 +236,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
       <aside className="barra-lateral hidden flex-col gap-5 border-r border-white/5 bg-carvao p-5 text-offwhite md:sticky md:top-0 md:flex md:h-screen md:w-64 md:overflow-y-auto">
         <div>
           <Link href="/inicio" aria-label="Início">
-            <LogoRaion tom="claro" altura={28} />
+            {logo(28)}
           </Link>
           <div className="mt-5">
             {seletorEmpresa ??

@@ -1,0 +1,92 @@
+/*
+ * Marca e cores da empresa no app (Onboarding, subprojeto 2; docs/superpowers/specs/2026-11-10-marca-cores-design.md).
+ * Regra pura: as cores vêm da identidade da proposta (cor primária = barra e faixa; cor de destaque = o dourado do app).
+ * Contraste pela razão do WCAG 2; cor ilegível não salva, e combinação antiga ilegível cai no padrão Raion.
+ */
+
+export const MARCA_PADRAO = { barra: "#0F0F10", destaque: "#D4AF37" } as const;
+export type Marca = { barra: string; destaque: string };
+
+const TEXTO_MENU = "#FAF8F3";
+const CARVAO = "#0F0F10";
+const BRANCO = "#FFFFFF";
+const MINIMO = 4.5;
+
+const canais = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+const hex = (rgb: number[]) => `#${rgb.map((c) => Math.round(Math.min(255, Math.max(0, c))).toString(16).padStart(2, "0")).join("").toUpperCase()}`;
+
+function luminancia(cor: string): number {
+  const [r, g, b] = canais(cor).map((c) => {
+    const s = c / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** Razão de contraste do WCAG 2 entre duas cores `#RRGGBB` (1 a 21). */
+export function contraste(a: string, b: string): number {
+  const [x, y] = [luminancia(a), luminancia(b)].sort((p, q) => q - p);
+  return (x + 0.05) / (y + 0.05);
+}
+
+/** Texto sobre a cor: carvão ou branco, o de maior contraste. */
+export const textoSobre = (cor: string): "#0F0F10" | "#FFFFFF" => (contraste(cor, CARVAO) >= contraste(cor, BRANCO) ? "#0F0F10" : "#FFFFFF");
+
+/** Mistura `cor` com `alvo` na proporção `p` (0 = cor, 1 = alvo). */
+const misturar = (cor: string, alvo: string, p: number) => {
+  const a = canais(cor);
+  const b = canais(alvo);
+  return hex(a.map((c, i) => c + (b[i] - c) * p));
+};
+
+/** Escurece (ou clareia) em passos de 5% até ter contraste mínimo com o fundo. */
+function legivelSobre(cor: string, fundo: string, alvo: string): string {
+  for (let passo = 0; passo <= 20; passo++) {
+    const tom = misturar(cor, alvo, passo * 0.05);
+    if (contraste(tom, fundo) >= MINIMO) return tom;
+  }
+  return alvo === BRANCO ? TEXTO_MENU : CARVAO;
+}
+
+/** Barra: ~7:1 com o texto do menu, para os itens apagados (branco a 60%) continuarem legíveis (decisão de 10/11/2026). */
+const MINIMO_BARRA = 7;
+/** Destaque contra a barra e o fundo escuro: 3:1, o mínimo do WCAG para ícones, filetes e botões (não texto). */
+const MINIMO_ELEMENTO = 3;
+
+export function validarMarca(m: Marca): string[] {
+  const problemas: string[] = [];
+  if (contraste(m.barra, TEXTO_MENU) < MINIMO_BARRA) problemas.push("A cor da barra é clara demais: o texto do menu fica ilegível.");
+  if (contraste(m.destaque, textoSobre(m.destaque)) < MINIMO) {
+    problemas.push("A cor de destaque não deixa o texto dos botões legível, nem em preto nem em branco.");
+  }
+  if (contraste(m.destaque, m.barra) < MINIMO_ELEMENTO || contraste(m.destaque, CARVAO) < MINIMO_ELEMENTO) {
+    problemas.push("A cor de destaque some sobre a barra ou no fundo escuro: escolha uma cor mais clara ou mais viva.");
+  }
+  return problemas;
+}
+
+/** Variáveis de cor que o invólucro do app recebe (só quando a empresa tem marca própria). */
+export function variaveisMarca(m: Marca): Record<string, string> {
+  return {
+    "--color-dourado": m.destaque,
+    "--color-acao": m.destaque,
+    "--color-acao-forte": misturar(m.destaque, CARVAO, 0.13),
+    "--color-sobre-acao": textoSobre(m.destaque),
+    "--color-dourado-texto": `light-dark(${legivelSobre(m.destaque, TEXTO_MENU, CARVAO)}, ${legivelSobre(m.destaque, CARVAO, BRANCO)})`,
+    "--cor-barra": m.barra,
+  };
+}
+
+/** Cores digitadas na identidade da proposta (vazio = padrão Raion): o primeiro problema de contraste, ou nulo. */
+export function problemaCoresIdentidade(corPrimaria: string, corDestaque: string): string | null {
+  return validarMarca({ barra: corPrimaria || MARCA_PADRAO.barra, destaque: corDestaque || MARCA_PADRAO.destaque })[0] ?? null;
+}
+
+/** Marca do app a partir da identidade da proposta. Nula = padrão Raion (sem cor própria, ou combinação ilegível). */
+export function marcaDoApp(linha: { cor_primaria: string | null; cor_destaque: string | null } | null): Marca | null {
+  if (!linha || (!linha.cor_primaria && !linha.cor_destaque)) return null;
+  const m = { barra: (linha.cor_primaria || MARCA_PADRAO.barra).toUpperCase(), destaque: (linha.cor_destaque || MARCA_PADRAO.destaque).toUpperCase() };
+  // As duas no padrão (a tela de identidade grava o padrão quando ninguém mexe) = sem marca própria.
+  if (m.barra === MARCA_PADRAO.barra && m.destaque === MARCA_PADRAO.destaque) return null;
+  return validarMarca(m).length ? null : m;
+}
