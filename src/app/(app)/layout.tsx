@@ -11,7 +11,10 @@ import { carregarNotificacoesNaoLidas, contarPendencias, pendenciasDosSetores, t
 import { linksPendencias, type ContagemPendencias } from "@/lib/pendencias";
 import { CARTEIRA_CONTATOS, ENGENHARIA, GAMIFICACAO, GESTAO_COMERCIAL, NEGOCIOS, OBRAS, PAGAMENTOS_A_CONFIRMAR, PARTICIPANTES_GAMIFICACAO, PEDIDOS_AOS_SETORES, PROPOSTA_E_CONTRATO, TAREFAS, TAREFAS_DO_SETOR, pode } from "@/lib/permissoes";
 import { contarPagamentosAConfirmar } from "@/lib/avisos-pagamento";
+import { filtrarPorTelas } from "@/lib/menu-telas";
 import { obterSessao } from "@/lib/sessao";
+import { areaLigada } from "@/lib/telas-empresa";
+import { obterTelasEmpresa } from "@/lib/telas-empresa-servidor";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { trocarEmpresa } from "@/lib/acoes/empresa-atual";
 import { COOKIE_TEMA, lerTema } from "@/lib/tema";
@@ -54,8 +57,9 @@ function itensGamificacao(papel: Papel | undefined, conquistaNova: boolean): Ite
 }
 
 /** Abas fixas da barra do celular por papel (o resto do menu fica em "Mais"). */
-function abasDoCelular(papel: Papel | undefined) {
-  if (papel === "admin" || papel === "gestor") return ["/inicio", "/negocios", "/painel"];
+function abasDoCelular(papel: Papel | undefined, itens: ItemMenu[]) {
+  // Painel desligado na empresa (ou plano Solo): a terceira aba vira Tarefas.
+  if (papel === "admin" || papel === "gestor") return ["/inicio", "/negocios", itens.some((i) => i.href === "/painel") ? "/painel" : "/tarefas"];
   if (papel === "operacao") return ["/inicio", "/tarefas/setores", "/obras"];
   return ["/inicio", "/negocios", "/tarefas"];
 }
@@ -103,11 +107,13 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
       verPagamentosAConfirmar = operacional;
     }
   }
+  const telas = await obterTelasEmpresa();
+  // O Financeiro é só do PRO (telas por empresa): no Solo o link não aparece.
   const linkPagamentos =
-    pagamentosAConfirmar > 0
+    pagamentosAConfirmar > 0 && areaLigada(telas, "pro")
       ? [{ href: "/financeiro?aba=confirmar", texto: `${pagamentosAConfirmar} pagamento${pagamentosAConfirmar === 1 ? "" : "s"} a confirmar` }]
       : [];
-  const avisos = { notificacoes, pendencias: [...linkPagamentos, ...linksPendencias(papel, pendencias)] };
+  const avisos = { notificacoes, pendencias: [...linkPagamentos, ...linksPendencias(papel, pendencias, telas)] };
 
   // Foto do próprio usuário (sidebar desktop e menu do celular): uma assinatura com a sessão dele.
   const urlAvatar = sessao.avatarCaminho
@@ -117,8 +123,8 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
   // Ordem segue o fluxo do cliente; `secao` dá o título do bloco. Apenas a posição no menu muda:
   // rotas e permissões de cada tela continuam as mesmas (Leads a distribuir: admin/gestor).
   // As configurações do admin (inclusive Captura e a administração da Gamificação) ficam todas
-  // no hub /configuracoes.
-  const itens: ItemMenu[] = [
+  // no hub /configuracoes. A empresa só tira telas (plano Solo e telas desligadas pelo admin): `filtrarPorTelas`.
+  const itens: ItemMenu[] = filtrarPorTelas<ItemMenu>([
     ...(sessao.atual
       ? [
           { href: "/inicio", rotulo: "Início" },
@@ -153,7 +159,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
           { href: "/super-admin/cobranca", rotulo: "Cobrança", secao: "Plataforma" },
         ]
       : []),
-  ];
+  ], telas);
 
   const seletorEmpresa =
     sessao.vinculos.length > 1 ? (
@@ -242,7 +248,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
 
       <main className="min-w-0 flex-1 p-4 pb-28 md:p-10">{children}</main>
 
-      <NavegacaoCelular itens={itens} abas={abasDoCelular(papel)} extras={extrasCelular} />
+      <NavegacaoCelular itens={itens} abas={abasDoCelular(papel, itens)} extras={extrasCelular} />
     </div>
   );
 }

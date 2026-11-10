@@ -1,13 +1,13 @@
 import "server-only";
-import type { Atual } from "@/lib/negocios-gravacao";
-import type { SupabaseServidor } from "@/lib/supabase/server";
+import { areaLigada } from "@/lib/telas-empresa";
+import { obterTelasEmpresa } from "@/lib/telas-empresa-servidor";
 
 /**
- * Eletroposto disponível para quem está usando: módulo ligado na empresa (`empresas.eletroposto_ativo`). Vale para
- * todos os papéis: o SDR também abre negócio de eletroposto (sem modelos nem proposta). Com ele, "Novo negócio"
- * sempre pede a escolha entre solar e eletroposto.
+ * Eletroposto disponível para quem está usando: módulo liberado pelo super-admin (`empresas.eletroposto_ativo`) e tela
+ * ligada pelo admin (telas por empresa, 20261203100000_telas_empresa.sql). Vale para todos os papéis: o SDR também
+ * abre negócio de eletroposto (sem modelos nem proposta). Com ele, "Novo negócio" pede a escolha entre solar e
+ * eletroposto. Negócios de eletroposto que já existem continuam abrindo na ficha.
  */
-export async function eletropostoDisponivel(supabase: SupabaseServidor, atual: Pick<Atual, "empresaId" | "papel">): Promise<boolean> {
-  const { data } = await supabase.from("empresas").select("eletroposto_ativo").eq("id", atual.empresaId).maybeSingle();
-  return !!data?.eletroposto_ativo;
+export async function eletropostoDisponivel(): Promise<boolean> {
+  return areaLigada(await obterTelasEmpresa(), "eletroposto");
 }

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { OpcoesTipoNegocio } from "@/components/novo-negocio";
 import { carregarContextoEstimativa } from "@/lib/contexto-estimativa";
 import { carregarConfiguracao } from "@/lib/crm";
+import { eletropostoDisponivel } from "@/lib/eletroposto-servidor";
 import { exigirPapel } from "@/lib/sessao";
 import { ESCOLHER_RESPONSAVEL_NEGOCIO, NEGOCIOS, PROPOSTA_E_CONTRATO, RESPONSAVEL_COMERCIAL, pode } from "@/lib/permissoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
@@ -21,7 +22,7 @@ export default async function NovoNegocio({ searchParams }: PageProps<"/negocios
     : { data: null };
   // Contexto regulatório sem qualificação: a tela aplica o tipo de cliente e a distribuidora escolhidos (mesmo
   // objeto que o servidor monta ao gravar), para a prévia ao vivo ser o mesmo cálculo que fica salvo.
-  const [config, { data: parametros }, contexto, { data: ultimo }, { data: empresa }] = await Promise.all([
+  const [config, { data: parametros }, contexto, { data: ultimo }, eletroposto] = await Promise.all([
     carregarConfiguracao(atual.empresaId),
     supabase.from("parametros_calculadora").select("*").eq("empresa_id", atual.empresaId).maybeSingle(),
     carregarContextoEstimativa(supabase, { tipoCliente: null, distribuidoraInformada: null }),
@@ -34,7 +35,8 @@ export default async function NovoNegocio({ searchParams }: PageProps<"/negocios
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
-    supabase.from("empresas").select("eletroposto_ativo").eq("id", atual.empresaId).maybeSingle(),
+    // Eletroposto: liberado pelo super-admin e ligado pelo admin (telas por empresa).
+    eletropostoDisponivel(),
   ]);
   // Materiais da tabela de preços para o kit (sem custo); falhar aqui não impede criar o negócio.
   const materiaisKit = await carregarMateriaisKit(supabase, atual.empresaId).catch(() => []);
@@ -45,8 +47,7 @@ export default async function NovoNegocio({ searchParams }: PageProps<"/negocios
   const origemSugerida = origens.some((o) => o.id === ultimo?.origem_id) ? ultimo!.origem_id : null;
   const responsaveis = pode(atual.papel, ESCOLHER_RESPONSAVEL_NEGOCIO) ? config.membros.filter((m) => m.ativo && pode(m.papel, RESPONSAVEL_COMERCIAL)) : [];
 
-  // Eletroposto: só com o módulo ligado na empresa. O SDR também cria, mas sem modelos (quem gera proposta escolhe).
-  const eletroposto = !!empresa?.eletroposto_ativo;
+  // Eletroposto: só com o módulo disponível na empresa. O SDR também cria, mas sem modelos (quem gera proposta escolhe).
   const escolhido = eletroposto ? (tipo === "solar" || tipo === "eletroposto" ? tipo : null) : "solar";
   const parametrosTipo = (t: string) => {
     const p = new URLSearchParams({ tipo: t, funil: funilEscolhido.id });

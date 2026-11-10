@@ -17,6 +17,8 @@ import { criarClienteServidor } from "@/lib/supabase/server";
 import { carregarTemperaturas, type Temperatura, type TemperaturaNegocio } from "@/lib/temperatura";
 import { NovoNegocio } from "@/components/novo-negocio";
 import { eletropostoDisponivel } from "@/lib/eletroposto-servidor";
+import { areaLigada } from "@/lib/telas-empresa";
+import { obterTelasEmpresa } from "@/lib/telas-empresa-servidor";
 import { BotaoFiltros } from "./filtros";
 import { FiltroTemperatura, TEMPERATURAS } from "./filtro-temperatura";
 import { Indicadores, type Indicador } from "./indicadores";
@@ -57,7 +59,7 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
   const visao = (["kanban", "lista"] as const).find((v) => v === texto("visao")) ?? ((await cookies()).get(COOKIE_VISAO_NEGOCIOS)?.value as "kanban" | "lista" | undefined) ?? "kanban";
 
   const supabase = await criarClienteServidor();
-  const eletroposto = await eletropostoDisponivel(supabase, atual);
+  const [eletroposto, telas] = await Promise.all([eletropostoDisponivel(), obterTelasEmpresa()]);
   const consultaBase = supabase
     .from("negocios")
     .select(
@@ -260,10 +262,12 @@ export default async function Negocios({ searchParams }: PageProps<"/negocios">)
         acoes={
           <>
             {status === "aberto" && <VisaoToggle visao={visao} query={queryVisao ? `${queryVisao}&` : ""} />}
-            <Link href="/forecast" className={CLASSE_VIDRO_CABECALHO}>
-              <ChartLine size={16} aria-hidden />
-              Forecast
-            </Link>
+            {areaLigada(telas, "forecast") && (
+              <Link href="/forecast" className={CLASSE_VIDRO_CABECALHO}>
+                <ChartLine size={16} aria-hidden />
+                Forecast
+              </Link>
+            )}
             {pode(atual.papel, FUNIL) && (
               <Link href="/configuracoes/funil" className={`${CLASSE_VIDRO_CABECALHO} max-md:hidden`}>
                 <Settings2 size={16} aria-hidden />
