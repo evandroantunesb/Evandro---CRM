@@ -1,18 +1,6 @@
 import type { criarClienteServidor } from "@/lib/supabase/server";
-import {
-  DIAS_PRECO_ANTIGO,
-  diasDesde,
-  ehCategoriaMaterial,
-  ehMapaColunas,
-  ordenarPrecos,
-  chaveFornecedor,
-  type CategoriaMaterial,
-  type MapaColunas,
-  type MaterialVM,
-  type PrecoAtual,
-  type PrecoHistorico,
-  type VinculoFornecedor,
-} from "./precos";
+import { DIAS_PRECO_ANTIGO, diasDesde, ehCategoriaMaterial, ehMapaColunas, ordenarPrecos, chaveFornecedor, type CategoriaMaterial, type MapaColunas, type MaterialVM, type PrecoAtual, type PrecoHistorico, type VinculoFornecedor } from "./precos";
+import { MARGENS_ZERADAS, type MargensCategoria } from "./margens";
 
 /*
  * Leitura da tabela de preços (20261129100000_compras_tabela_precos.sql). A RLS decide quem vê; `acessoPrecos` só
@@ -32,11 +20,27 @@ export async function acessoPrecos(supabase: SupabaseServidor, empresaId: string
 }
 
 const categoria = (v: string): CategoriaMaterial => (ehCategoriaMaterial(v) ? v : "outros");
+const paraMaterialVM = (m: { id: string; nome: string; categoria: string; unidade: string; potencia_w: number | null }): MaterialVM => ({
+  id: m.id,
+  nome: m.nome,
+  categoria: categoria(m.categoria),
+  unidade: m.unidade,
+  potenciaW: m.potencia_w == null ? null : Number(m.potencia_w),
+});
+
+/** Margens por categoria da empresa (categoria sem margem = 0%). */
+export async function carregarMargens(supabase: SupabaseServidor, empresaId: string): Promise<MargensCategoria> {
+  const { data, error } = await supabase.from("compras_margens").select("categoria, margem").eq("empresa_id", empresaId);
+  if (error) throw error;
+  const margens = { ...MARGENS_ZERADAS };
+  for (const m of data ?? []) if (ehCategoriaMaterial(m.categoria)) margens[m.categoria] = Number(m.margem);
+  return margens;
+}
 
 export async function carregarMateriais(supabase: SupabaseServidor, empresaId: string): Promise<MaterialVM[]> {
-  const { data, error } = await supabase.from("compras_materiais").select("id, nome, categoria, unidade").eq("empresa_id", empresaId).order("nome");
+  const { data, error } = await supabase.from("compras_materiais").select("id, nome, categoria, unidade, potencia_w").eq("empresa_id", empresaId).order("nome");
   if (error) throw error;
-  return (data ?? []).map((m) => ({ ...m, categoria: categoria(m.categoria) }));
+  return (data ?? []).map(paraMaterialVM);
 }
 
 export type PrecoAtualVM = { materialId: string; fornecedor: string; preco: number; dataPreco: string };
@@ -65,6 +69,7 @@ export type TabelaRecebidaVM = {
 
 export type TelaPrecosVM = {
   materiais: LinhaMaterialVM[];
+  margens: MargensCategoria;
   kpis: {
     materiais: number;
     categorias: number;
@@ -78,7 +83,7 @@ export type TelaPrecosVM = {
 };
 
 export async function carregarTelaPrecos(supabase: SupabaseServidor, empresaId: string, hoje: string): Promise<TelaPrecosVM> {
-  const [materiais, atuais, tabelasRes] = await Promise.all([
+  const [materiais, atuais, tabelasRes, margens] = await Promise.all([
     carregarMateriais(supabase, empresaId),
     carregarPrecosAtuais(supabase, empresaId),
     supabase
@@ -87,6 +92,7 @@ export async function carregarTelaPrecos(supabase: SupabaseServidor, empresaId: 
       .eq("empresa_id", empresaId)
       .order("created_at", { ascending: false })
       .limit(500),
+    carregarMargens(supabase, empresaId),
   ]);
   if (tabelasRes.error) throw tabelasRes.error;
 
@@ -109,6 +115,7 @@ export async function carregarTelaPrecos(supabase: SupabaseServidor, empresaId: 
 
   return {
     materiais: linhas,
+    margens,
     kpis: {
       materiais: materiais.length,
       categorias: new Set(materiais.map((m) => m.categoria)).size,
@@ -138,7 +145,7 @@ export type MaterialDetalheVM = {
 
 export async function carregarMaterial(supabase: SupabaseServidor, empresaId: string, materialId: string): Promise<MaterialDetalheVM | null> {
   const [materialRes, historicoRes, membrosRes] = await Promise.all([
-    supabase.from("compras_materiais").select("id, nome, categoria, unidade").eq("empresa_id", empresaId).eq("id", materialId).maybeSingle(),
+    supabase.from("compras_materiais").select("id, nome, categoria, unidade, potencia_w").eq("empresa_id", empresaId).eq("id", materialId).maybeSingle(),
     supabase
       .from("compras_precos")
       .select("fornecedor, preco, data_preco, created_at, tabela_id, lancado_por")
@@ -169,7 +176,7 @@ export async function carregarMaterial(supabase: SupabaseServidor, empresaId: st
     if (!atual.has(chave)) atual.set(chave, { materialId, fornecedor: h.fornecedor, preco: h.preco, dataPreco: h.dataPreco });
   }
   return {
-    material: { ...materialRes.data, categoria: categoria(materialRes.data.categoria) },
+    material: paraMaterialVM(materialRes.data),
     precos: ordenarPrecos([...atual.values()]),
     historico,
   };

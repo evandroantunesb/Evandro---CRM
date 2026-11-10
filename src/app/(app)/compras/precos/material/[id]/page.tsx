@@ -2,9 +2,10 @@ import { notFound, redirect } from "next/navigation";
 import { CabecalhoPagina } from "@/components/cabecalho-pagina";
 import { FormularioMaterial, FormularioPrecoManual } from "@/components/compras/formularios-preco";
 import { CartaoRecolhivel, Selo } from "@/components/ui";
-import { acessoPrecos, carregarMaterial } from "@/lib/compras/dados-precos";
+import { acessoPrecos, carregarMargens, carregarMaterial } from "@/lib/compras/dados-precos";
 import { DIAS_PRECO_ANTIGO, ROTULO_CATEGORIA_MATERIAL, chaveFornecedor, diasDesde, historicoComMudancas, variacao } from "@/lib/compras/precos";
-import { formatarMoeda, hojeEmSaoPaulo } from "@/lib/formatacao";
+import { margemEmTexto, vendaSugerida } from "@/lib/compras/margens";
+import { formatarMoeda, formatarNumeroBr, hojeEmSaoPaulo } from "@/lib/formatacao";
 import { GERIR_OBRAS } from "@/lib/permissoes";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
@@ -20,7 +21,7 @@ export default async function MaterialPrecos({ params }: PageProps<"/compras/pre
   const supabase = await criarClienteServidor();
   const acesso = await acessoPrecos(supabase, atual.empresaId);
   if (!acesso.ver) redirect("/inicio");
-  const dados = await carregarMaterial(supabase, atual.empresaId, id);
+  const [dados, margens] = await Promise.all([carregarMaterial(supabase, atual.empresaId, id), carregarMargens(supabase, atual.empresaId)]);
   if (!dados) notFound();
   const { material, precos } = dados;
   const hoje = hojeEmSaoPaulo();
@@ -43,7 +44,9 @@ export default async function MaterialPrecos({ params }: PageProps<"/compras/pre
         voltar={{ href: "/compras/precos", rotulo: "Tabela de preços" }}
         sobretitulo={`Compras · ${ROTULO_CATEGORIA_MATERIAL[material.categoria]}`}
         titulo={material.nome}
-        descricao={`Preço de custo por ${material.unidade}, em cada fornecedor.`}
+        descricao={`Preço de custo por ${material.unidade}, em cada fornecedor.${material.potenciaW != null ? ` Potência: ${formatarNumeroBr(material.potenciaW)} W.` : ""}${
+          precos[0] ? ` Venda sugerida: ${formatarMoeda(vendaSugerida(precos[0].preco, margens[material.categoria]))} (margem ${margemEmTexto(margens[material.categoria])}%).` : ""
+        }`}
       />
 
       <section className="painel overflow-hidden">

@@ -1,22 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-  adivinharMapa,
-  chaveFornecedor,
-  diasDesde,
-  erroMapa,
-  historicoComMudancas,
-  itensImportacao,
-  letraColuna,
-  lerCsv,
-  lerPrecoCelula,
-  montarPrevia,
-  normalizarUnidade,
-  precoSugerido,
-  resumoPrevia,
-  variacao,
-  type MapaColunas,
-  type MaterialVM,
-} from "@/lib/compras/precos";
+import { adivinharMapa, chaveFornecedor, diasDesde, erroMapa, historicoComMudancas, itensImportacao, letraColuna, lerCsv, lerPrecoCelula, montarPrevia, normalizarUnidade, precoSugerido, resumoPrevia, variacao, type MapaColunas, type MaterialVM } from "@/lib/compras/precos";
+import { lerMargemPercentual, margemEmTexto, vendaSugerida } from "@/lib/compras/margens";
 
 describe("leitura da planilha", () => {
   it("CSV com ponto e vírgula, aspas, BOM e CRLF", () => {
@@ -73,10 +57,10 @@ describe("leitura da planilha", () => {
 describe("prévia da importação", () => {
   const mapa: MapaColunas = { cabecalho: 0, codigo: 0, material: 1, unidade: 2, preco: 3 };
   const materiais: MaterialVM[] = [
-    { id: "mod", nome: "Módulo 550 W", categoria: "modulos", unidade: "un" },
-    { id: "inv", nome: "Inversor 5 kW", categoria: "inversores", unidade: "un" },
-    { id: "sb", nome: "String box", categoria: "cabos_protecao", unidade: "un" },
-    { id: "cabo", nome: "Cabo solar 6 mm²", categoria: "cabos_protecao", unidade: "m" },
+    { id: "mod", nome: "Módulo 550 W", categoria: "modulos", unidade: "un", potenciaW: 550 },
+    { id: "inv", nome: "Inversor 5 kW", categoria: "inversores", unidade: "un", potenciaW: 5000 },
+    { id: "sb", nome: "String box", categoria: "cabos_protecao", unidade: "un", potenciaW: null },
+    { id: "cabo", nome: "Cabo solar 6 mm²", categoria: "cabos_protecao", unidade: "m", potenciaW: null },
   ];
   const vinculos = [
     { materialId: "mod", codigo: "44102", descricao: "MOD 550W MONO" },
@@ -171,5 +155,26 @@ describe("histórico e preço sugerido", () => {
     expect(variacao(5900, 5820)).toBe(-1.4);
     expect(diasDesde("2026-10-06", "2026-11-09")).toBe(34);
     expect(chaveFornecedor("  Solar   SUL ")).toBe("solar sul");
+  });
+});
+
+describe("margem por categoria (P4a)", () => {
+  it("venda sugerida = custo × (1 + margem), em centavos", () => {
+    expect(vendaSugerida(780, 0.18)).toBe(920.4);
+    expect(vendaSugerida(9.8, 0.3)).toBe(12.74);
+    expect(vendaSugerida(5900, 0)).toBe(5900);
+  });
+
+  it("margem digitada em %, com vírgula ou ponto", () => {
+    expect(lerMargemPercentual("18")).toBe(0.18);
+    expect(lerMargemPercentual("18,5")).toBe(0.185);
+    expect(lerMargemPercentual("18.5%")).toBe(0.185);
+    expect(lerMargemPercentual("0")).toBe(0);
+    expect(lerMargemPercentual("")).toBeNull();
+    expect(lerMargemPercentual("-1")).toBeNull();
+    expect(lerMargemPercentual("501")).toBeNull();
+    expect(lerMargemPercentual("abc")).toBeNull();
+    expect(margemEmTexto(0.185)).toBe("18,5");
+    expect(margemEmTexto(0)).toBe("0");
   });
 });

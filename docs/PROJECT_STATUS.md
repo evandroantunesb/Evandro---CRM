@@ -1,13 +1,21 @@
 # Estado do projeto — Raion CRM
 
-## Ponto de retomada (09/11/2026)
+## Ponto de retomada (10/11/2026)
 
-- **Produção:** `main` em `c9aa2f0`; todas as migrations até a #353 (Compras P3) aplicadas pelo `banco-producao.yml`.
+- **Produção:** `main` em `0451966` (CI verde); todas as migrations até a #356 (Compras P4a, margens) aplicadas pelo `banco-producao.yml`.
 - **Perfis e setores:** concluído (A1 #332, B #334, A2a #335, A2b #337, C #338, A3 #339, D/E #341). Pendências registradas nas seções abaixo (candidatos a participante e tarefas de Compras quando outro setor atende no lugar dele; remover `atua_no_operacional`; "de N do plano" em Usuários).
-- **Compras:** P1, P2, P2b, P2c e P3 (tabela de preços, #353 e #354) concluídas. **Próximo passo: P4**, o preço da tabela alimentando a calculadora e o kit da proposta (com margem por categoria e venda sugerida, e ligação automática kit → material). São parâmetros da calculadora: as regras precisam ser perguntadas ao Evandro antes de qualquer código. Aguardando comando.
-- **CI:** a cota de armazenamento de artefatos do GitHub Actions estourou em 09/11/2026; o job `navegador` passa nos testes e falha só ao publicar capturas e relatório até a cota ser recalculada.
-- **PRs antigas abertas:** #232 (cartões de Usuários) conflita com a B e foi superada pelo desenho aprovado; as drafts de gamificação (#104–#118), calculadora (#101, #197, #199, #200) e docs antigas (#68, #76, #133, #167, #193) precisam de triagem antes de qualquer retomada; Dependabot (#182, #183, #202, #293) aguarda revisão.
+- **Compras:** P1, P2, P2b, P2c, P3 (#353/#354) e P4a (margens e potência, #356/#357) concluídas. **Próximo passo: P4b** (kit montado com os materiais da tabela e preço pronto, sai a OpenSolar; retrato do custo; previsto de Equipamentos da obra pelo custo), depois **P4c** (limite de desconto com aprovação do gestor). Regras na seção da P4 abaixo; ainda sem branch. Aguardando comando.
+- **CI:** a cota de armazenamento de artefatos do GitHub Actions estourou em 09/11/2026; o job `navegador` passava nos testes e falhava só ao publicar capturas e relatório até a cota ser recalculada.
+- **PRs antigas abertas:** #232 (cartões de Usuários) conflita com a B e foi superada pelo desenho aprovado; as drafts de gamificação (#104–#118), calculadora (#101, #197, #199, #200) e docs antigas (#76, #133, #167, #193) precisam de triagem antes de qualquer retomada; Dependabot (#182, #355, #358, #359) aguarda revisão.
 - **Limpeza local (com OK do Evandro):** vários worktrees em `R:\` e `C:\dev\` já mesclados aparecem como `prunable` em `git worktree list`.
+
+## Compras — P4: preço do kit pela tabela de preços (em andamento, 09/11/2026)
+
+Prévia aprovada pelo Evandro em 09/11/2026 no canvas "Raion — Nova interface" (linha "Compras P4: preço do kit pela tabela de preços": `P4Kit`, `P4Desconto`, `P4AprovarDesconto`, `P4Margens`). Dividida em três PRs: **P4a** margens e potência; **P4b** kit montado com os materiais e preço pronto (sai a OpenSolar), retrato do custo e previsto de Equipamentos da obra pelo custo; **P4c** limite de desconto com aprovação do gestor.
+
+Decisões do Evandro (09/11/2026): preço de venda do kit vem pronto e o vendedor pode mudar = custo de cada item (menor preço atual entre fornecedores) + margem da categoria do item + custos internos de hoje (instalação por módulo, material CA por kWp, engenharia) + comissão %; preço velho ou de tabela vencida é usado com aviso; o sugerido preenche o valor do negócio; desconto até X% (admin configura) passa direto, acima disso o gestor da equipe (ou o admin) aprova e, pendente, não sai proposta nem contrato; o vendedor vê só o preço de venda (custo e margem: admin, gestor, Compras, Administrativo); itens do kit só dos materiais da tabela (OpenSolar sai); item sem preço = preço de venda à mão, com aviso; o sugerido fica gravado no cálculo (retrato); previsto de Equipamentos da obra = custo do kit pela tabela (hoje usa o preço de venda inteiro, `kit_preco`).
+
+- **P4a (branch `feat/compras-p4a-margens`, worktree `C:\dev\crm-p4`):** migration `20261130100000_compras_margens.sql`: `compras_margens` (fração por categoria, 0 a 5 = 500%; categoria sem margem = 0%), `salvar_margens_compra` (admin e gestor; tudo ou nada), `compras_materiais.potencia_w` (opcional) e `criar_material_compra`/`editar_material_compra` com `p_potencia_w` (padrão nulo). Na tabela de preços: coluna "Venda sugerida" (melhor custo × (1 + margem)), cartão "Margem por categoria" (edita admin e gestor; os demais consultam) e potência no cadastro do material. PR #356; migration aplicada em produção em 09/11/2026 antes do merge pelo `banco-producao.yml` (tag `migracao-pr356-4dca436`; dry-run 42717152047 listou só ela; aplicação 42717397967), aprovada pelo Evandro; autorização na #357.
 
 ## Compras — P3: tabela de preços de material (#353; migration aplicada em produção em 09/11/2026 antes do merge, tag `migracao-pr353-32f77e2`, run 42701825090)
 
