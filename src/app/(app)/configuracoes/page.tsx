@@ -26,7 +26,9 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { filtrarPorTelas } from "@/lib/menu-telas";
 import { exigirPapel } from "@/lib/sessao";
+import { obterTelasEmpresa } from "@/lib/telas-empresa-servidor";
 
 type Item = { href: string; titulo: string; descricao: string; Icone: LucideIcon };
 
@@ -108,6 +110,9 @@ const GRUPOS: { id: string; titulo: string; itens: Item[] }[] = [
 
 export default async function Configuracoes() {
   await exigirPapel("admin");
+  // Telas por empresa: some o que o plano Solo não tem e o que o admin desligou; grupo vazio some junto.
+  const telas = await obterTelasEmpresa();
+  const grupos = GRUPOS.map((g) => ({ ...g, itens: filtrarPorTelas(g.itens, telas) })).filter((g) => g.itens.length > 0);
 
   return (
     <div className="mx-auto flex max-w-3xl animate-entrar flex-col gap-8">
@@ -117,7 +122,7 @@ export default async function Configuracoes() {
         titulo="Configurações"
         descricao="Como a sua empresa funciona no Raion: aquisição, venda, pessoas e gamificação."
       />
-      {GRUPOS.map((grupo) => (
+      {grupos.map((grupo) => (
         <section key={grupo.id} id={grupo.id} aria-labelledby={`grupo-${grupo.id}`} className="flex scroll-mt-20 flex-col gap-3">
           <h2 id={`grupo-${grupo.id}`} className="sobretitulo px-1">
             {grupo.titulo}
