@@ -33,6 +33,15 @@ simples que o cliente acompanha pelo celular; o PRO ganha a escolha dos setores 
 8. As chaves ficam **junto das telas** (passo Telas do assistente PRO e Configurações › Telas da empresa); o assistente
    PRO continua com 7 passos. A chave de Engenharia é uma só: desligar o setor desliga a tela Engenharia.
 
+Acréscimos do Evandro em 11/11/2026 (segunda conversa, só para a 4b):
+
+9. Etapa manual pode ser marcada **"não se aplica"**, com motivo obrigatório; conta como resolvida no andamento e o
+   cliente vê "não se aplica" (sem o motivo).
+10. As obras de empresas Solo que **já existem** quando a migration da 4b roda ganham o checklist (contrato e entrada
+    feitas pelas datas reais, o resto pendente). Os fluxos de setor que essas obras já têm ficam como estão.
+11. A página do cliente lê os dados por uma **função limitada liberada para `anon`**, não pela chave de serviço: o
+    banco garante o que sai mesmo que o código da página erre. A chave de serviço fica só para assinar as fotos.
+
 ## 4a — Setores da obra
 
 ### Banco
@@ -79,8 +88,9 @@ simples que o cliente acompanha pelo celular; o PRO ganha a escolha dos setores 
 
 ### Banco
 
-- `obra_checklist (obra_id, empresa_id, etapa, feita_em date, prevista_para date, anotacao text, marcada_por,
-  marcada_em, primary key (obra_id, etapa))`. Etapas (enum, nesta ordem): `contrato`, `entrada`, `projeto_art`,
+- `obra_checklist (obra_id, empresa_id, etapa, feita_em date, nao_se_aplica_motivo text, prevista_para date,
+  anotacao text, marcada_por, marcada_em, primary key (obra_id, etapa))`, com check: `feita_em` e
+  `nao_se_aplica_motivo` nunca juntos; motivo não vazio. Etapa **resolvida** = feita ou "não se aplica". Etapas (enum, nesta ordem): `contrato`, `entrada`, `projeto_art`,
   `material_comprado`, `protocolo`, `material_entregue`, `instalacao`, `vistoria`, `conexao`, `entrega`.
   Rótulos: Contrato assinado, Entrada recebida, Projeto e ART, Material comprado, Protocolo na distribuidora,
   Material entregue, Instalação, Vistoria, Conexão e medidor, Entrega ao cliente.
@@ -88,13 +98,17 @@ simples que o cliente acompanha pelo celular; o PRO ganha a escolha dos setores 
   data da confirmação do pagamento (datas de Brasília).
 - Escrita só por funções `security definer` que checam o admin da empresa e gravam no histórico da obra:
   `marcar_etapa_obra(obra, etapa, feita boolean, data)`, `prever_etapa_obra(obra, etapa, data|null)`,
-  `anotar_etapa_obra(obra, etapa, texto)`. `contrato` e `entrada` não podem ser desmarcadas.
+  `anotar_etapa_obra(obra, etapa, texto)` e `etapa_nao_se_aplica_obra(obra, etapa, motivo|null)` (nulo desfaz).
+  `contrato` e `entrada` não podem ser desmarcadas. "Não se aplica" vale só para as etapas 3 a 9 (`projeto_art` a
+  `conexao`): `entrega` sempre precisa ser feita. Data de "feita" no futuro é recusada.
+- A migration cria o checklist das obras Solo existentes (decisão 10 acima: datas reais de assinatura e confirmação).
+  Empresa que vira Solo depois (super-admin) não ganha checklist automático nas obras antigas: pendência registrada.
 - `obra_checklist_fotos (id, obra_id, empresa_id, etapa, caminho, enviada_por, created_at)`; bucket privado
   `obra-fotos`, pasta `<empresa>/<obra>/`, só imagem, limite de tamanho; escrita e exclusão só do admin da empresa. Até
   10 fotos por etapa (checado no banco).
 - `obras.link_cliente text unique` (token aleatório), criado na obra do Solo; `gerar_link_cliente_obra(obra)` troca o
   token (o antigo deixa de valer).
-- Obra do Solo concluída = as 10 etapas feitas.
+- Obra do Solo concluída = as 10 etapas resolvidas (a `entrega` sempre feita).
 
 ### Telas (mesmos endereços `/obras` e `/obras/[id]`; o servidor escolhe a versão pelo plano)
 
@@ -102,7 +116,8 @@ simples que o cliente acompanha pelo celular; o PRO ganha a escolha dos setores 
   libera o Solo para a versão checklist.
 - **Lista** (quadro `SoloObras`): cartões com as 10 barrinhas, "X de 10 feitas", etapa atual com a data prevista;
   números Em andamento, Entregues no ano e Próxima data prevista; filtro Em andamento / Entregues.
-- **Checklist** (quadro `SoloChecklist`): marcar/desmarcar (desmarcar pede confirmação), data prevista, foto, anotação
+- **Checklist** (quadro `SoloChecklist`): marcar/desmarcar (desmarcar pede confirmação), "Não se aplica" (pede o
+  motivo; mostra "Não se aplica · <motivo>" e "Desfazer"), data prevista, foto, anotação
   ("Só você vê"); anel de andamento com a etapa atual; cartão do link com Copiar e "Gerar novo link" (confirma: "o link
   antigo para de funcionar"); dados da obra.
 - **"Avisar no WhatsApp"** na faixa e logo depois de marcar uma etapa: `wa.me` com o telefone do cliente e a mensagem
@@ -112,7 +127,10 @@ simples que o cliente acompanha pelo celular; o PRO ganha a escolha dos setores 
 
 ### Página do cliente `/obra/[token]` (quadro `SoloClienteObra`)
 
-- Pública, em `ROTAS_PUBLICAS`; lida no servidor pelo token com o cliente admin (padrão de `/contrato/[token]`).
+- Pública, em `ROTAS_PUBLICAS` (prefixo `/obra`; a regra compara `/obra` ou `/obra/…`, então `/obras` continua
+  exigindo login). Os dados vêm de `acompanhamento_obra(p_token)`, `security definer`, liberada para `anon`, que
+  devolve só os campos abaixo; o servidor assina as fotos (1 hora) com a chave de serviço. Página dinâmica, sem cache
+  entre clientes.
 - Devolve só: primeiro nome do cliente, nome, logo escura e cores da empresa, etapas com datas feitas e previstas,
   fotos por URL assinada de curta duração, WhatsApp da empresa e a hora da última alteração. Nunca anotação, valor,
   NF, fornecedor, telefone ou endereço do cliente.
@@ -130,7 +148,9 @@ link do cliente para o PRO, desligar Compras ou Operacional.
   ficam no cronograma.
 - **Banco:** `garantir_obra` no PRO com Engenharia/Administrativo desligados e no Solo (checklist com contrato e
   entrada feitas); obras antigas intactas; Operacional/Compras não desligam; só o admin grava chaves e marca etapas;
-  contrato/entrada não desmarcam; limite de fotos; RLS entre empresas; token novo invalida o antigo; leitura pública
-  sem dado interno.
+  contrato/entrada não desmarcam; "não se aplica" exige motivo e recusa `contrato`, `entrada` e `entrega`; data de
+  "feita" futura recusada; checklist criado para as obras Solo existentes; limite de fotos; RLS entre empresas; token
+  novo invalida o antigo; `acompanhamento_obra` como `anon` sem dado interno (nem anotação nem motivo) e vazia para
+  token inválido ou obra cancelada.
 - **e2e:** Solo marca uma etapa com foto e a página do cliente mostra etapa e foto, sem a anotação; PRO desliga
   Engenharia, a obra nova nasce sem o setor e `/engenharia` fica travado.
