@@ -3,6 +3,8 @@ import { acessaCompras } from "@/lib/compras/dados";
 import { acessoPrecos } from "@/lib/compras/dados-precos";
 import { cookies } from "next/headers";
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { obterOnboarding, precisaDoAssistente } from "@/lib/assistente-servidor";
 import { Avatar } from "@/components/avatar";
 import { assinarAvatares } from "@/lib/avatares";
 import { LogoRaion } from "@/components/marca";
@@ -69,6 +71,8 @@ function abasDoCelular(papel: Papel | undefined, itens: ItemMenu[]) {
 export default async function LayoutApp({ children }: { children: React.ReactNode }) {
   const sessao = await obterSessao();
   const papel = sessao.atual?.papel;
+  // Empresa nova com o assistente de primeiro acesso pendente: o admin vai para lá (Onboarding, subprojeto 3).
+  if (precisaDoAssistente(papel, await obterOnboarding())) redirect("/primeiro-acesso");
   const tema = lerTema((await cookies()).get(COOKIE_TEMA)?.value);
 
   let pendencias: ContagemPendencias = { leadsADistribuir: 0, demais: 0 };

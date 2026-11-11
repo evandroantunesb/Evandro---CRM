@@ -43,6 +43,9 @@ export async function criarEmpresa(_: ResultadoAcao, formData: FormData): Promis
   if (erroVinculo) {
     return { ok: false, mensagem: "Empresa criada, mas o admin não foi vinculado. Adicione pela página da empresa." };
   }
+  // Empresa nova: o admin vê o assistente de primeiro acesso até concluir. Falhar aqui não impede a empresa.
+  const { error: erroAssistente } = await supabase.from("empresa_onboarding").insert({ empresa_id: empresa.id });
+  if (erroAssistente) console.error("Não foi possível criar o assistente de primeiro acesso.", erroAssistente);
   redirect(`/super-admin/empresas/${empresa.id}`);
 }
 

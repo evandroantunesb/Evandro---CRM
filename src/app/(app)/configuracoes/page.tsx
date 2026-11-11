@@ -18,6 +18,7 @@ import {
   QrCode,
   Radio,
   ShoppingCart,
+  Sparkles,
   Tags,
   Target,
   Thermometer,
@@ -87,6 +88,7 @@ const GRUPOS: { id: string; titulo: string; itens: Item[] }[] = [
       { href: "/configuracoes/tela-entrada", titulo: "Tela de entrada", descricao: "Imagem, frase e texto que a equipe vê ao entrar.", Icone: ImageIcon },
       { href: "/configuracoes/telas", titulo: "Telas da empresa", descricao: "Telas que aparecem para a equipe.", Icone: LayoutGrid },
       { href: "/configuracoes/propostas/identidade", titulo: "Marca e cores", descricao: "Logo e cores do app e das propostas.", Icone: Palette },
+      { href: "/primeiro-acesso?rever=1", titulo: "Abrir o assistente", descricao: "Rever a configuração inicial da empresa, passo a passo.", Icone: Sparkles },
     ],
   },
   {
