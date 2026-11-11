@@ -1901,11 +1901,51 @@ export type Database = {
           },
         ];
       };
+      empresa_onboarding: {
+        Row: {
+          concluido_em: string | null;
+          created_at: string;
+          empresa_id: string;
+          id: string;
+          passo_atual: number;
+          pulados: number[];
+          updated_at: string;
+        };
+        Insert: {
+          concluido_em?: string | null;
+          created_at?: string;
+          empresa_id: string;
+          id?: string;
+          passo_atual?: number;
+          pulados?: number[];
+          updated_at?: string;
+        };
+        Update: {
+          concluido_em?: string | null;
+          created_at?: string;
+          empresa_id?: string;
+          id?: string;
+          passo_atual?: number;
+          pulados?: number[];
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "empresa_onboarding_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: true;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       empresa_tela_entrada: {
         Row: {
           atualizado_por: string | null;
           created_at: string;
           empresa_id: string;
+          faixa_caminho: string | null;
+          faixa_usa_entrada: boolean;
           frase: string | null;
           id: string;
           imagem_caminho: string | null;
@@ -1916,6 +1956,8 @@ export type Database = {
           atualizado_por?: string | null;
           created_at?: string;
           empresa_id: string;
+          faixa_caminho?: string | null;
+          faixa_usa_entrada?: boolean;
           frase?: string | null;
           id?: string;
           imagem_caminho?: string | null;
@@ -1926,6 +1968,8 @@ export type Database = {
           atualizado_por?: string | null;
           created_at?: string;
           empresa_id?: string;
+          faixa_caminho?: string | null;
+          faixa_usa_entrada?: boolean;
           frase?: string | null;
           id?: string;
           imagem_caminho?: string | null;
@@ -8370,6 +8414,7 @@ export type Database = {
         Args: { p_pergunta: string; p_resposta: string };
         Returns: boolean;
       };
+      salvar_cnpj_empresa: { Args: { p_cnpj: string; p_empresa_id: string }; Returns: undefined };
       salvar_configuracoes_empresa: {
         Args: {
           p_dias_considerado_parado?: number;
