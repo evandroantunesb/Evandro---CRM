@@ -1,5 +1,37 @@
 import { describe, expect, it } from "vitest";
-import { PASSOS, estadoDoPasso, passoAnterior, passosDoPlano, proximoPasso } from "@/lib/assistente";
+import { PASSOS, estadoDoPasso, passoAnterior, passosDoPlano, proximoPasso, resumoDoPasso } from "@/lib/assistente";
+
+describe("resumo da revisão (quadro OnboardingRevisar)", () => {
+  const d = {
+    empresa: { nome: "Solar Campinas", cnpj: "12345678000190", whatsapp: "19998765432" },
+    marca: { temLogo: true, temCores: true },
+    imagens: { fotoEntrada: false, faixaPropria: false },
+    telas: { ligadas: 7, eletropostoLiberado: true, eletropostoLigado: false },
+    pagamento: { descontoVendedor: 5, parcelasCartao: 12, personalizado: true },
+    equipe: { pessoas: 2 },
+  };
+  it("feito: o que ficou configurado", () => {
+    expect(resumoDoPasso("empresa", "feito", d)).toBe("Solar Campinas · CNPJ 12.345.678/0001-90 · WhatsApp (19) 99876-5432");
+    expect(resumoDoPasso("marca", "feito", d)).toBe("Logo enviada · cores da empresa");
+    expect(resumoDoPasso("imagens", "feito", d)).toBe("Paisagem do Raion na entrada e na faixa");
+    expect(resumoDoPasso("telas", "feito", d)).toBe("7 ligadas · Eletroposto desligado");
+    expect(resumoDoPasso("pagamento", "feito", d)).toBe("Vendedor dá até 5% · cartão até 12x · Personalizado ligado");
+    expect(resumoDoPasso("equipe", "feito", d)).toBe("2 pessoas cadastradas");
+  });
+
+  it("pulado: fica o padrão", () => {
+    expect(resumoDoPasso("imagens", "pulado", d)).toBe("Pulado: fica a paisagem do Raion.");
+    expect(resumoDoPasso("equipe", "pulado", d)).toBe("Pulado: dá para cadastrar depois em Configurações › Usuários.");
+    expect(resumoDoPasso("marca", "pulado", d)).toBe("Pulado: fica o padrão do Raion.");
+  });
+
+  it("feito sem nada preenchido também diz o padrão", () => {
+    const vazio = { ...d, marca: { temLogo: false, temCores: false }, equipe: { pessoas: 0 }, pagamento: { descontoVendedor: 0, parcelasCartao: 0, personalizado: false } };
+    expect(resumoDoPasso("marca", "feito", vazio)).toBe("Logo e cores do Raion");
+    expect(resumoDoPasso("equipe", "feito", vazio)).toBe("Só você por enquanto");
+    expect(resumoDoPasso("pagamento", "feito", vazio)).toBe("Vendedor sem desconto sem aprovação · sem parcelado no cartão");
+  });
+});
 
 describe("passos do assistente", () => {
   it("Solo tem 5 passos; PRO tem 7 (setores entram no subprojeto 4)", () => {
