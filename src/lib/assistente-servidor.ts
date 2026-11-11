@@ -24,6 +24,6 @@ export const precisaDoAssistente = (papel: string | undefined, o: Onboarding | n
 /** Uma leitura por requisição, para a empresa em uso (só faz sentido para o admin). */
 export const obterOnboarding = cache(async (): Promise<Onboarding | null> => {
   const { atual } = await obterSessao();
-  if (!atual || atual.papel !== "admin") return null;
-  return lerOnboarding(await criarClienteServidor(), atual.empresaId);
+  if (atual?.papel === "admin") return lerOnboarding(await criarClienteServidor(), atual.empresaId);
+  return null;
 });
