@@ -20,6 +20,7 @@ Desenho em `docs/superpowers/specs/2026-11-11-assistente-primeiro-acesso-design.
 - Testes: `tests/assistente*.test.ts`, `tests/dados-empresa.test.ts`, `e2e/35-assistente.spec.ts`.
 - Revisão final (subagente) e decisão do Evandro (11/11/2026): nas empresas que já existem, a faixa continua a paisagem do Raion até o admin escolher (a coluna nasce `false` nas linhas existentes e `true` nas novas); "Voltar ao padrão" da tela de entrada não apaga mais a faixa; "Sair" e "Ir para outra empresa" dentro do assistente; erro ao gravar o progresso aparece em vez de avançar; WhatsApp gravado formatado (a proposta imprime como está); aviso de "salve cada cartão antes de continuar" nos passos com cartões.
 - Pendências (menores da revisão): `?passo=` na URL permite pular passos marcando-os como feitos; `pulados` guarda posições (troca Solo↔PRO no meio embaralha); passo 1 grava identidade e CNPJ em duas chamadas; "Na equipe" pode não atualizar sozinho após cadastrar; botão Continuar sem estado de envio nos formulários de servidor; cores fixas em hex na moldura; mais dois `console.error` (avisos de lint).
+- PR #369; migration aplicada em produção em 11/11/2026 antes do merge pelo `banco-producao.yml` (tag `migracao-pr369-48f254d`; dry-run 42937884689 listou só ela; aplicação 42938020791), autorizada pelo Evandro; autorização na trava pela PR da branch `chore/autorizar-migracao-369`. O environment `producao-banco` seguia sem revisor obrigatório.
 
 ## Onboarding — subprojeto 2: marca e cores da empresa no app (10/11/2026)
 
