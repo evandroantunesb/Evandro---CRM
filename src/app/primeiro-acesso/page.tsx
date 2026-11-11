@@ -45,6 +45,7 @@ export default async function PrimeiroAcesso({ searchParams }: { searchParams: P
       <ConteudoDoPasso
         chave={chave}
         empresaId={atual.empresaId}
+        nomeEmpresa={identidade?.nome_exibicao || atual.empresaNome}
         rever={rever}
         passos={passos}
         estados={estados}

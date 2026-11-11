@@ -82,3 +82,16 @@ export function montarTelaEntrada(
     texto: linha.texto ?? TEXTO_PADRAO_ENTRADA,
   };
 }
+
+/**
+ * Foto da faixa do topo de cada tela (assistente, passo 3): a mesma da tela de entrada (padrão) ou a própria. Nulo = a
+ * paisagem do Raion.
+ */
+export function urlFaixa(
+  linha: { imagem_caminho: string | null; faixa_caminho: string | null; faixa_usa_entrada: boolean } | null | undefined,
+  urlPublica: (caminho: string) => string,
+): string | null {
+  if (!linha) return null;
+  const caminho = linha.faixa_usa_entrada ? linha.imagem_caminho : linha.faixa_caminho;
+  return caminho ? urlPublica(caminho) : null;
+}

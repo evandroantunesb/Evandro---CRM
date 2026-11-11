@@ -86,11 +86,48 @@ export async function voltarTelaEntradaAoPadrao(): Promise<ResultadoAcao> {
     .from("empresa_tela_entrada")
     .delete()
     .eq("empresa_id", atual.empresaId)
-    .select("imagem_caminho")
+    .select("imagem_caminho, faixa_caminho")
     .maybeSingle();
   if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível voltar ao padrão.") };
-  if (apagada?.imagem_caminho) await supabase.storage.from(BUCKET_TELA_ENTRADA).remove([apagada.imagem_caminho]);
+  const fotos = [apagada?.imagem_caminho, apagada?.faixa_caminho].filter((c): c is string => !!c);
+  if (fotos.length) await supabase.storage.from(BUCKET_TELA_ENTRADA).remove(fotos);
 
   revalidar();
+  revalidatePath("/", "layout");
   return { ok: true, mensagem: "A tela de entrada voltou ao padrão do Raion." };
+}
+
+/**
+ * Faixa do topo de cada tela (assistente, passo 3): a mesma foto da tela de entrada (padrão) ou uma própria, já
+ * enviada pelo navegador. Trocar a própria apaga a anterior; se a gravação falhar, apaga a que acabou de subir.
+ */
+export async function salvarFaixa(dados: { usaEntrada: boolean; imagemNova: string | null }): Promise<ResultadoAcao> {
+  const { atual } = await exigirPapel("admin");
+  const supabase = await criarClienteServidor();
+  const descartarNova = async () => {
+    if (dados.imagemNova) await supabase.storage.from(BUCKET_TELA_ENTRADA).remove([dados.imagemNova]);
+  };
+  if (dados.imagemNova && !caminhoImagemEntradaValido(atual.empresaId, dados.imagemNova)) {
+    return { ok: false, mensagem: "Imagem inválida. Escolha a foto de novo." };
+  }
+  const { data: anterior, error: erroLeitura } = await supabase.from("empresa_tela_entrada").select("faixa_caminho").eq("empresa_id", atual.empresaId).maybeSingle();
+  if (erroLeitura) {
+    await descartarNova();
+    return { ok: false, mensagem: mensagemErro(erroLeitura, "Não foi possível salvar.") };
+  }
+  const faixa = dados.imagemNova ?? anterior?.faixa_caminho ?? null;
+  if (!dados.usaEntrada && !faixa) return { ok: false, mensagem: "Escolha a foto da faixa, ou use a mesma da tela de entrada." };
+  const { error } = await supabase
+    .from("empresa_tela_entrada")
+    .upsert({ empresa_id: atual.empresaId, faixa_usa_entrada: dados.usaEntrada, faixa_caminho: faixa }, { onConflict: "empresa_id" });
+  if (error) {
+    await descartarNova();
+    return { ok: false, mensagem: mensagemErro(error, "Não foi possível salvar.") };
+  }
+  if (dados.imagemNova && anterior?.faixa_caminho && anterior.faixa_caminho !== dados.imagemNova) {
+    await supabase.storage.from(BUCKET_TELA_ENTRADA).remove([anterior.faixa_caminho]);
+  }
+  revalidar();
+  revalidatePath("/", "layout");
+  return { ok: true, mensagem: "Faixa salva. Aparece no topo de cada tela." };
 }
