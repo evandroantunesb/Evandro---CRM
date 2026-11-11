@@ -63,7 +63,11 @@ export function CabecalhoPagina({
   const espaco = destaque ? "px-6 py-8 md:px-10 md:py-12" : detalhe ? "px-6 py-6 md:px-8" : "px-6 py-6 md:px-8 md:py-8";
   return (
     <section className="faixa-marca relative isolate overflow-hidden rounded-3xl bg-carvao text-offwhite">
-      <div aria-hidden className={`absolute inset-0 -z-10 bg-[url(/marca/paisagem.jpg)] bg-cover bg-[center_62%] ${detalhe ? "opacity-35" : ""}`} />
+      {/* Foto da faixa: a da empresa (`--faixa-imagem`, posta pelo layout do app) ou a paisagem do Raion. */}
+      <div
+        aria-hidden
+        className={`absolute inset-0 -z-10 bg-[image:var(--faixa-imagem,url(/marca/paisagem.jpg))] bg-cover bg-[center_62%] ${detalhe ? "opacity-35" : ""}`}
+      />
       <div
         aria-hidden
         className={`absolute inset-0 -z-10 bg-gradient-to-r ${detalhe ? "from-carvao/95 via-carvao/80 to-carvao/55" : "from-carvao/90 via-carvao/65 to-carvao/15"}`}

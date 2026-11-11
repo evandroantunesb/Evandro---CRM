@@ -3,6 +3,8 @@ import { acessaCompras } from "@/lib/compras/dados";
 import { acessoPrecos } from "@/lib/compras/dados-precos";
 import { cookies } from "next/headers";
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { obterOnboarding, precisaDoAssistente } from "@/lib/assistente-servidor";
 import { Avatar } from "@/components/avatar";
 import { assinarAvatares } from "@/lib/avatares";
 import { LogoRaion } from "@/components/marca";
@@ -17,6 +19,7 @@ import { areaLigada } from "@/lib/telas-empresa";
 import { obterTelasEmpresa } from "@/lib/telas-empresa-servidor";
 import { variaveisMarca } from "@/lib/marca-cores";
 import { obterMarcaEmpresa } from "@/lib/marca-servidor";
+import { carregarFaixaEmpresa } from "@/lib/tela-entrada-servidor";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { trocarEmpresa } from "@/lib/acoes/empresa-atual";
 import { COOKIE_TEMA, lerTema } from "@/lib/tema";
@@ -69,6 +72,8 @@ function abasDoCelular(papel: Papel | undefined, itens: ItemMenu[]) {
 export default async function LayoutApp({ children }: { children: React.ReactNode }) {
   const sessao = await obterSessao();
   const papel = sessao.atual?.papel;
+  // Empresa nova com o assistente de primeiro acesso pendente: o admin vai para lá (Onboarding, subprojeto 3).
+  if (precisaDoAssistente(papel, await obterOnboarding())) redirect("/primeiro-acesso");
   const tema = lerTema((await cookies()).get(COOKIE_TEMA)?.value);
 
   let pendencias: ContagemPendencias = { leadsADistribuir: 0, demais: 0 };
@@ -109,7 +114,16 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
       verPagamentosAConfirmar = operacional;
     }
   }
-  const [telas, { marca, logoUrl }] = await Promise.all([obterTelasEmpresa(), obterMarcaEmpresa()]);
+  const [telas, { marca, logoUrl }, faixa] = await Promise.all([
+    obterTelasEmpresa(),
+    obterMarcaEmpresa(),
+    sessao.atual ? carregarFaixaEmpresa(sessao.atual.empresaId) : Promise.resolve(null),
+  ]);
+  // Cores da marca e foto da faixa da empresa (sem nenhuma, o padrão Raion).
+  const estiloEmpresa = {
+    ...(marca ? variaveisMarca(marca) : {}),
+    ...(faixa ? { "--faixa-imagem": `url(${JSON.stringify(faixa)})` } : {}),
+  } as React.CSSProperties;
   // O Financeiro é só do PRO (telas por empresa): no Solo o link não aparece.
   const linkPagamentos =
     pagamentosAConfirmar > 0 && areaLigada(telas, "pro")
@@ -222,7 +236,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
     <div
       data-tema={tema}
       data-marca={marca ? "" : undefined}
-      style={marca ? (variaveisMarca(marca) as React.CSSProperties) : undefined}
+      style={marca || faixa ? estiloEmpresa : undefined}
       className="tema-app flex min-h-screen flex-col md:flex-row"
     >
       {/* Celular: cabeçalho enxuto em cima; o menu vai para a barra de abas embaixo. */}

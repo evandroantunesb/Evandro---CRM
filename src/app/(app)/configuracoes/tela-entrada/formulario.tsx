@@ -4,34 +4,11 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { ImageUp } from "lucide-react";
 import { LogoRaion } from "@/components/marca";
 import { Botao, CLASSE_ENTRADA, Cartao, FOCO, Mensagem } from "@/components/ui";
+import { descartarFotoEntrada, enviarFotoEntrada, escolherFotoEntrada, type FotoEscolhida } from "@/lib/imagem-entrada-navegador";
 import { TIPOS_IMAGEM_ACEITOS } from "@/lib/imagem-upload";
-import { recortarImagem } from "@/lib/recortar-imagem";
-import { criarClienteNavegador } from "@/lib/supabase/navegador";
-import {
-  BUCKET_TELA_ENTRADA,
-  DICA_IMAGEM_ENTRADA,
-  FRASE_PADRAO_ENTRADA,
-  LARGURA_MINIMA_IMAGEM_ENTRADA,
-  LIMITE_BYTES_IMAGEM_ENTRADA,
-  LIMITE_FRASE_ENTRADA,
-  LIMITE_TEXTO_ENTRADA,
-  SAIDA_IMAGEM_ENTRADA,
-  TEXTO_PADRAO_ENTRADA,
-  montarCaminhoImagemEntrada,
-} from "@/lib/tela-entrada";
+import { DICA_IMAGEM_ENTRADA, FRASE_PADRAO_ENTRADA, LIMITE_FRASE_ENTRADA, LIMITE_TEXTO_ENTRADA, TEXTO_PADRAO_ENTRADA } from "@/lib/tela-entrada";
 import type { ResultadoAcao } from "@/lib/tipos";
 import { salvarTelaEntrada, voltarTelaEntradaAoPadrao } from "./actions";
-
-type FotoEscolhida = { arquivo: File; url: string; largura: number; altura: number };
-
-function medir(url: string): Promise<{ largura: number; altura: number }> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve({ largura: img.naturalWidth, altura: img.naturalHeight });
-    img.onerror = () => reject(new Error("Não foi possível abrir a imagem."));
-    img.src = url;
-  });
-}
 
 /**
  * Imagem, frase e texto da tela de entrada, com a prévia ao lado (desenho "Configurações · Tela de
@@ -68,30 +45,9 @@ export function FormularioTelaEntrada({
     if (entrada.current) entrada.current.value = "";
     if (!selecionado) return;
     setResultado(null);
-    if (!(TIPOS_IMAGEM_ACEITOS as readonly string[]).includes(selecionado.type)) {
-      setResultado({ ok: false, mensagem: "Use uma imagem JPG, PNG ou WebP." });
-      return;
-    }
-    if (selecionado.size > LIMITE_BYTES_IMAGEM_ENTRADA) {
-      setResultado({ ok: false, mensagem: "A imagem passa de 5 MB. Escolha uma menor." });
-      return;
-    }
-    const url = URL.createObjectURL(selecionado);
-    try {
-      const { largura, altura } = await medir(url);
-      if (largura < LARGURA_MINIMA_IMAGEM_ENTRADA) {
-        URL.revokeObjectURL(url);
-        setResultado({
-          ok: false,
-          mensagem: `A imagem tem ${largura} px de largura. Use uma com pelo menos ${LARGURA_MINIMA_IMAGEM_ENTRADA} px para não ficar borrada.`,
-        });
-        return;
-      }
-      setFoto({ arquivo: selecionado, url, largura, altura });
-    } catch {
-      URL.revokeObjectURL(url);
-      setResultado({ ok: false, mensagem: "Não foi possível abrir a imagem. Tente outra." });
-    }
+    const r = await escolherFotoEntrada(selecionado);
+    if (r.ok) setFoto(r.foto);
+    else setResultado({ ok: false, mensagem: r.mensagem });
   }
 
   async function salvar(evento: React.FormEvent) {
@@ -102,20 +58,11 @@ export function FormularioTelaEntrada({
     let gravou = false;
     try {
       if (foto) {
-        const reduzida = await recortarImagem(
-          foto.url,
-          { x: 0, y: 0, width: foto.largura, height: foto.altura },
-          { saidaMaxima: SAIDA_IMAGEM_ENTRADA },
-        );
-        const caminho = montarCaminhoImagemEntrada(empresaId, reduzida.extensao, crypto.randomUUID());
-        const { error } = await criarClienteNavegador()
-          .storage.from(BUCKET_TELA_ENTRADA)
-          .upload(caminho, reduzida.blob, { contentType: reduzida.tipo, cacheControl: "31536000", upsert: false });
-        if (error) {
+        imagemNova = await enviarFotoEntrada(empresaId, foto);
+        if (!imagemNova) {
           setResultado({ ok: false, mensagem: "Não foi possível enviar a imagem. Tente de novo." });
           return;
         }
-        imagemNova = caminho;
       }
       const salvo = await salvarTelaEntrada({ frase, texto, imagemNova });
       // Respondida, a ação já cuidou da foto enviada (grava ou apaga).
@@ -124,7 +71,7 @@ export function FormularioTelaEntrada({
       if (salvo?.ok) setFoto(null);
     } catch (erro) {
       // Falha de rede depois do envio: tenta não deixar a foto sem uso no bucket.
-      if (imagemNova && !gravou) await criarClienteNavegador().storage.from(BUCKET_TELA_ENTRADA).remove([imagemNova]);
+      if (imagemNova && !gravou) await descartarFotoEntrada(imagemNova);
       setResultado({ ok: false, mensagem: erro instanceof Error ? erro.message : "Não foi possível salvar. Tente de novo." });
     } finally {
       setSalvando(false);

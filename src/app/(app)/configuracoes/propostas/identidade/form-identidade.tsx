@@ -28,7 +28,7 @@ type Identidade = {
   fotoCapaCaminho: string | null;
 };
 
-function CampoImagem({
+export function CampoImagem({
   empresaId,
   rotulo,
   descricao,
