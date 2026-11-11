@@ -64,6 +64,7 @@ test.describe("assistente de primeiro acesso", () => {
     await page.waitForURL("**/primeiro-acesso**", { timeout: 30_000 });
     await expect(page.getByRole("heading", { name: "Como a sua empresa aparece" })).toBeVisible();
     await expect(page.getByText("Passo 1 de 7")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Sair" })).toBeVisible();
 
     await page.getByLabel("Nome de exibição").fill("Solar Assistente");
     await page.getByLabel("CNPJ").fill("12.345.678/0001-90");

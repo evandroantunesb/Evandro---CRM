@@ -22,10 +22,12 @@ export async function avancarAssistente(chave: ChavePasso, pular: boolean, rever
   const o = await lerOnboarding(supabase, atual.empresaId);
   if (o && !o.concluido_em && !rever) {
     const pulados = pular ? [...new Set([...o.pulados, posicao])] : o.pulados.filter((p) => p !== posicao);
-    await supabase
+    const { error } = await supabase
       .from("empresa_onboarding")
       .update({ passo_atual: Math.max(o.passo_atual, posicao + 1), pulados })
       .eq("empresa_id", atual.empresaId);
+    // Sem gravar, não avança: a tela de erro do app mostra a mensagem e o admin tenta de novo.
+    if (error) throw new Error("Não foi possível salvar o progresso do assistente. Tente de novo.");
   }
   redirect(destino(proximoPasso(passos, chave) ?? "revisar", rever));
 }
@@ -35,7 +37,8 @@ export async function concluirAssistente(rever: boolean): Promise<void> {
   const { atual } = await exigirPapel("admin");
   if (!rever) {
     const supabase = await criarClienteServidor();
-    await supabase.from("empresa_onboarding").update({ concluido_em: new Date().toISOString() }).eq("empresa_id", atual.empresaId).is("concluido_em", null);
+    const { error } = await supabase.from("empresa_onboarding").update({ concluido_em: new Date().toISOString() }).eq("empresa_id", atual.empresaId).is("concluido_em", null);
+    if (error) throw new Error("Não foi possível concluir o assistente. Tente de novo.");
   }
   redirect(rever ? "/configuracoes" : "/inicio");
 }

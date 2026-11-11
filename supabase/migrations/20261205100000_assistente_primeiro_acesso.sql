@@ -58,9 +58,12 @@ revoke all on public.empresa_onboarding from anon;
 
 alter table public.empresa_tela_entrada
   add column faixa_caminho text,
-  add column faixa_usa_entrada boolean not null default true,
+  -- As linhas que já existem ficam com false: a faixa delas continua a paisagem do Raion até o admin escolher
+  -- (decisão do Evandro de 11/11/2026). As novas nascem com true ("usar a mesma imagem da tela de entrada").
+  add column faixa_usa_entrada boolean not null default false,
   add constraint empresa_tela_entrada_faixa_da_propria_pasta
     check (faixa_caminho is null or faixa_caminho like empresa_id::text || '/%');
+alter table public.empresa_tela_entrada alter column faixa_usa_entrada set default true;
 
 /** CNPJ da empresa pelo admin dela: 14 dígitos, ou vazio para limpar. */
 create or replace function public.salvar_cnpj_empresa(p_empresa_id uuid, p_cnpj text)

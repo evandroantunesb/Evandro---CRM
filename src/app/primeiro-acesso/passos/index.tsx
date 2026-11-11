@@ -30,6 +30,8 @@ export type PropsPasso = {
 };
 
 const EXPIRA_SEGUNDOS = 3600;
+/** Os cartões destes passos têm "Salvar" próprio; o Continuar só avança. */
+const AVISO_SALVAR = "Salve cada cartão antes de continuar: o que não for salvo fica como estava.";
 
 /** Conteúdo de cada passo: carrega o que o passo mostra e grava pelas mesmas ações de Configurações. */
 export async function ConteudoDoPasso(props: PropsPasso) {
@@ -81,7 +83,7 @@ export async function ConteudoDoPasso(props: PropsPasso) {
           <CartaoFaixa empresaId={props.empresaId} {...imagens.faixa} />
         </div>
         <form action={props.continuar}>
-          <BotaoContinuar />
+          <BotaoContinuar aviso={AVISO_SALVAR} />
         </form>
       </div>
     );
@@ -100,7 +102,7 @@ export async function ConteudoDoPasso(props: PropsPasso) {
         </p>
         <FormularioTelas ligadasIniciais={TELAS_OPCIONAIS.filter((t) => telas.ligadas.has(t))} eletropostoLiberado={!!empresa?.eletroposto_ativo} />
         <form action={props.continuar}>
-          <BotaoContinuar />
+          <BotaoContinuar aviso={AVISO_SALVAR} />
         </form>
       </div>
     );
@@ -128,7 +130,7 @@ export async function ConteudoDoPasso(props: PropsPasso) {
           </Cartao>
         ))}
         <form action={props.continuar}>
-          <BotaoContinuar />
+          <BotaoContinuar aviso={AVISO_SALVAR} />
         </form>
       </div>
     );
@@ -164,7 +166,7 @@ export async function ConteudoDoPasso(props: PropsPasso) {
           </section>
         </div>
         <form action={props.continuar}>
-          <BotaoContinuar />
+          <BotaoContinuar aviso={AVISO_SALVAR} />
         </form>
       </div>
     );

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { LogoRaion } from "@/components/marca";
+import { trocarEmpresa } from "@/lib/acoes/empresa-atual";
 import { PASSOS, type ChavePasso } from "@/lib/assistente";
 
 /**
@@ -16,8 +17,11 @@ export function MolduraAssistente({
   estados,
   anteriorHref,
   pular,
+  outrasEmpresas,
   children,
 }: {
+  /** Outras empresas de quem está no assistente (para parar e ir a outra). */
+  outrasEmpresas: { id: string; nome: string }[];
   solo: boolean;
   nomeEmpresa: string;
   passos: ChavePasso[];
@@ -70,6 +74,31 @@ export function MolduraAssistente({
         <p className="mt-auto text-xs leading-relaxed text-[#faf8f3]/55 max-md:hidden">
           Tudo aqui pode ser mudado depois em Configurações. Dá para parar e continuar de onde parou.
         </p>
+        {/* Parar: sair, ou ir para outra empresa (quem é admin de mais de uma). O assistente volta no próximo acesso. */}
+        <div className="flex flex-wrap items-center gap-3 text-xs text-[#faf8f3]/70">
+          {outrasEmpresas.length > 0 && (
+            <form action={trocarEmpresa} className="flex items-center gap-2">
+              <label className="sr-only" htmlFor="trocar-empresa">
+                Ir para outra empresa
+              </label>
+              <select id="trocar-empresa" name="empresaId" className="rounded-lg bg-[#faf8f3]/10 px-2 py-1.5 text-[#faf8f3]">
+                {outrasEmpresas.map((e) => (
+                  <option key={e.id} value={e.id} className="text-[#0f0f10]">
+                    {e.nome}
+                  </option>
+                ))}
+              </select>
+              <button type="submit" className="underline">
+                Ir para outra empresa
+              </button>
+            </form>
+          )}
+          <form action="/sair" method="post">
+            <button type="submit" className="underline">
+              Sair
+            </button>
+          </form>
+        </div>
       </aside>
       <main className="flex min-w-0 flex-1 flex-col gap-5 px-5 py-8 md:px-10 md:py-9">
         <div className="flex items-center justify-between gap-4">

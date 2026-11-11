@@ -95,3 +95,7 @@ export function urlFaixa(
   const caminho = linha.faixa_usa_entrada ? linha.imagem_caminho : linha.faixa_caminho;
   return caminho ? urlPublica(caminho) : null;
 }
+
+/** A tela de entrada tem algo próprio (foto, frase ou texto do login)? A faixa não conta: tem cartão próprio. */
+export const personalizacaoEntrada = (linha: { frase: string | null; texto: string | null; imagem_caminho: string | null } | null | undefined): boolean =>
+  !!(linha && (linha.frase || linha.texto || linha.imagem_caminho));

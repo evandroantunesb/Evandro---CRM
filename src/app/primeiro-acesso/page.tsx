@@ -13,7 +13,7 @@ import { ConteudoDoPasso } from "./passos";
  * (`?rever=1`, ou já concluído), só navega; o último passo volta a Configurações.
  */
 export default async function PrimeiroAcesso({ searchParams }: { searchParams: Promise<{ passo?: string; rever?: string }> }) {
-  const { atual } = await exigirPapel("admin");
+  const { atual, vinculos } = await exigirPapel("admin");
   const params = await searchParams;
   const supabase = await criarClienteServidor();
   const [onboarding, telas, { data: identidade }] = await Promise.all([
@@ -41,6 +41,7 @@ export default async function PrimeiroAcesso({ searchParams }: { searchParams: P
       estados={estados}
       anteriorHref={anterior ? `/primeiro-acesso?passo=${anterior}${sufixo}` : null}
       pular={chave === "revisar" ? null : avancarAssistente.bind(null, chave, true, rever)}
+      outrasEmpresas={vinculos.filter((v) => v.empresaId !== atual.empresaId).map((v) => ({ id: v.empresaId, nome: v.empresaNome }))}
     >
       <ConteudoDoPasso
         chave={chave}

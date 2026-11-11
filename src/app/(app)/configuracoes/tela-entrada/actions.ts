@@ -75,22 +75,22 @@ export async function salvarTelaEntrada(dados: { frase: string; texto: string; i
   }
 
   revalidar();
+  // A faixa pode usar a mesma foto do login: todas as telas mudam.
+  revalidatePath("/", "layout");
   return { ok: true, mensagem: "Salvo. A equipe vê a nova tela no próximo acesso." };
 }
 
-/** "Voltar ao padrão": apaga a personalização e a foto; a tela volta à do Raion. */
+/** "Voltar ao padrão": limpa a foto, a frase e o texto do login; a faixa (cartão próprio) fica como está. */
 export async function voltarTelaEntradaAoPadrao(): Promise<ResultadoAcao> {
   const { atual } = await exigirPapel("admin");
   const supabase = await criarClienteServidor();
-  const { data: apagada, error } = await supabase
-    .from("empresa_tela_entrada")
-    .delete()
-    .eq("empresa_id", atual.empresaId)
-    .select("imagem_caminho, faixa_caminho")
-    .maybeSingle();
-  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível voltar ao padrão.") };
-  const fotos = [apagada?.imagem_caminho, apagada?.faixa_caminho].filter((c): c is string => !!c);
-  if (fotos.length) await supabase.storage.from(BUCKET_TELA_ENTRADA).remove(fotos);
+  const { data: anterior, error: erroLeitura } = await supabase.from("empresa_tela_entrada").select("imagem_caminho").eq("empresa_id", atual.empresaId).maybeSingle();
+  if (erroLeitura) return { ok: false, mensagem: mensagemErro(erroLeitura, "Não foi possível voltar ao padrão.") };
+  if (anterior) {
+    const { error } = await supabase.from("empresa_tela_entrada").update({ imagem_caminho: null, frase: null, texto: null }).eq("empresa_id", atual.empresaId);
+    if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível voltar ao padrão.") };
+    if (anterior.imagem_caminho) await supabase.storage.from(BUCKET_TELA_ENTRADA).remove([anterior.imagem_caminho]);
+  }
 
   revalidar();
   revalidatePath("/", "layout");

@@ -94,3 +94,12 @@ describe("faixa da tela de entrada", () => {
     expect(ruim.error).not.toBeNull();
   });
 });
+
+describe("padrão da faixa", () => {
+  it("linha nova da tela de entrada nasce usando a mesma imagem na faixa", async () => {
+    const { error } = await adminB.cliente.from("empresa_tela_entrada").insert({ empresa_id: empresaB, frase: "Oi" });
+    expect(error).toBeNull();
+    const { data } = await servico.from("empresa_tela_entrada").select("faixa_usa_entrada").eq("empresa_id", empresaB).single();
+    expect(data!.faixa_usa_entrada).toBe(true);
+  });
+});

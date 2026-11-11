@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { COOKIE_EMPRESA } from "@/lib/sessao";
 import { criarClienteAdmin } from "@/lib/supabase/admin";
 import type { SupabaseServidor } from "@/lib/supabase/server";
-import { BUCKET_TELA_ENTRADA, TELA_ENTRADA_PADRAO, empresaIdValido, montarTelaEntrada, urlFaixa, type TelaEntrada } from "@/lib/tela-entrada";
+import { BUCKET_TELA_ENTRADA, TELA_ENTRADA_PADRAO, empresaIdValido, montarTelaEntrada, personalizacaoEntrada, urlFaixa, type TelaEntrada } from "@/lib/tela-entrada";
 
 /**
  * Tela de entrada da empresa informada ou, sem ela, da empresa lembrada no aparelho (cookie gravado no
@@ -49,7 +49,7 @@ export async function carregarImagensParaEditar(supabase: SupabaseServidor, empr
       texto: linha?.texto ?? "",
       imagem: tela.imagem,
       nomeImagem: tela.imagemPersonalizada ? "Imagem da empresa" : "Paisagem do Raion (padrão)",
-      personalizada: !!linha,
+      personalizada: personalizacaoEntrada(linha),
     },
     faixa: {
       usaEntrada: linha?.faixa_usa_entrada ?? true,
