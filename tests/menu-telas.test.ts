@@ -41,6 +41,7 @@ describe("filtrarPorTelas", () => {
       "/negocios",
       "/contatos",
       "/propostas-contratos",
+      "/obras",
       "/configuracoes",
       "/configuracoes/tela-entrada",
       "/configuracoes/usuarios",
