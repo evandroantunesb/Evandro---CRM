@@ -150,7 +150,8 @@ export function erroMapa(m: MapaColunas): string | null {
   return null;
 }
 
-export type MaterialVM = { id: string; nome: string; categoria: CategoriaMaterial; unidade: string };
+export type MaterialVM = { id: string; nome: string; categoria: CategoriaMaterial; unidade: string; potenciaW: number | null };
+
 /** Como o material já apareceu nas tabelas deste fornecedor (código e descrição). */
 export type VinculoFornecedor = { materialId: string; codigo: string | null; descricao: string | null };
 export type PrecoAtual = { materialId: string; preco: number; dataPreco: string };

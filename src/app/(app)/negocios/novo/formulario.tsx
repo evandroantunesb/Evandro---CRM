@@ -4,6 +4,8 @@ import { AlertTriangle, ChevronLeft, ChevronRight, FileText, X } from "lucide-re
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { EditorComponentesKit, type LinhaComponente } from "@/components/kit-componentes";
+import { usePrecoSugeridoKit } from "@/components/compras/use-preco-sugerido";
+import { textoAvisosPreco, type MaterialKitVM } from "@/lib/compras/precificacao-kit";
 import { analisarLinhas, resumoProblemasKit } from "@/lib/kit-linhas";
 import { Botao, Campo, GrupoOpcoes, Mensagem, Passador, Selecao } from "@/components/ui";
 import { buscarContatos, criarNegocio, verificarDuplicado, type Duplicado } from "@/lib/acoes/negocios";
@@ -12,20 +14,18 @@ import { enviarArquivos } from "@/lib/anexos-navegador";
 import { ANEXOS_CRIACAO, prepararEnvioCriacao } from "@/lib/anexos-regras";
 import {
   calcular,
-  custosInternosEstimados,
   dimensionarSistema,
-  POTENCIA_MODULO_REFERENCIA_W,
   potenciaKitPersonalizadoKwp,
   sugerirQuantidadeModulos,
 } from "@/lib/calculadora";
 import { resolverConsumo } from "@/lib/consumo-estimado";
 import { formatarCep, formatarMascaraMoeda, formatarNumeroBr, formatarTelefoneBr, lerNumeroBr } from "@/lib/formatacao";
 import {
-  DESCRICAO_MODULO_REFERENCIA,
-  descricaoInversorReferencia,
   inversorSugeridoKw,
+  kitSimples,
   linhasKitSugerido,
   opcoesInversorKw,
+  referenciaDoKit,
   relacaoCcCa,
 } from "@/lib/kit-sugerido";
 import { montarEndereco } from "@/lib/negocio-dados";
@@ -97,14 +97,6 @@ function rotuloDistribuidora(nome: string) {
 }
 
 /** Kit no formato simples do cadastro (um módulo de referência + um inversor de referência), ou null se foi editado. */
-function kitSimples(linhas: LinhaComponente[]) {
-  const [modulo, inversor, ...resto] = linhas;
-  if (resto.length || modulo?.tipo !== "modulo" || modulo.descricao !== DESCRICAO_MODULO_REFERENCIA) return null;
-  if (inversor && (inversor.tipo !== "inversor" || !inversor.descricao.startsWith("Inversor de referência"))) return null;
-  const quantidade = lerNumeroBr(modulo.quantidade);
-  if (quantidade == null || !Number.isInteger(quantidade) || quantidade < 1) return null;
-  return { quantidade, inversorKw: inversor ? Number(inversor.potenciaW) / 1000 : null };
-}
 
 /** Seção numerada sem caixa (01/02/03). No celular só a do passo atual aparece; no computador, todas. */
 function Secao({
@@ -163,6 +155,8 @@ export function FormularioNegocio({
   contexto,
   parametros,
   contatoInicial = null,
+  materiais = [],
+  hoje,
 }: {
   funilId: string;
   /** Etapa pré-selecionada (ex.: "Adicionar negócio" numa coluna do Kanban); senão usa a etapa inicial do funil. */
@@ -178,6 +172,9 @@ export function FormularioNegocio({
   parametros: Parametros | null;
   /** Cliente já escolhido ("Novo negócio para este cliente", na ficha de outro negócio). */
   contatoInicial?: ContatoEncontrado | null;
+  /** Materiais da tabela de preços para o kit (sem custo); vazio = empresa sem tabela (kit de referência). */
+  materiais?: MaterialKitVM[];
+  hoje: string;
 }) {
   const router = useRouter();
   const [resultado, setResultado] = useState<ResultadoAcao>(null);
@@ -293,18 +290,21 @@ export function FormularioNegocio({
   const consumoMedioEstimado = consumoResolvido.kwh;
 
   // ── 03 Sistema ──
+  // Kit sugerido pela tabela de preços (P4b): módulo e inversores cadastrados; sem tabela, os itens de referência.
+  const ref = useMemo(() => referenciaDoKit(materiais), [materiais]);
+  const kwsInversor = useMemo(() => ref.inversores.map((i) => i.kw), [ref]);
   // Mesma conta do kit da ficha (`dimensionarSistema`), com o módulo de referência.
   const sistemaRecomendado = useMemo(
     () =>
       consumoMedioEstimado
-        ? dimensionarSistema(consumoMedioEstimado, parametros?.produtividadeKwhKwpMes ?? 120, POTENCIA_MODULO_REFERENCIA_W)
+        ? dimensionarSistema(consumoMedioEstimado, parametros?.produtividadeKwhKwpMes ?? 120, ref.modulo.potenciaW)
         : null,
-    [consumoMedioEstimado, parametros],
+    [consumoMedioEstimado, parametros, ref],
   );
-  const inversorSugerido = sistemaRecomendado ? inversorSugeridoKw(sistemaRecomendado.potenciaInstaladaKwp) : null;
+  const inversorSugerido = sistemaRecomendado ? inversorSugeridoKw(sistemaRecomendado.potenciaInstaladaKwp, kwsInversor) : null;
   const kitRecomendado = useMemo(
-    () => (sistemaRecomendado ? linhasKitSugerido(sistemaRecomendado.quantidadeModulos, inversorSugerido) : []),
-    [sistemaRecomendado, inversorSugerido],
+    () => (sistemaRecomendado ? linhasKitSugerido(sistemaRecomendado.quantidadeModulos, inversorSugerido, ref) : []),
+    [sistemaRecomendado, inversorSugerido, ref],
   );
 
   // O kit segue a sugestão até o vendedor mexer nele; "sem kit" é uma escolha explícita.
@@ -324,49 +324,38 @@ export function FormularioNegocio({
     setEditorAberto(false);
     setMostrarProblemasKit(false);
   }
-  const simples = kitSimples(linhas);
+  const simples = kitSimples(linhas, ref);
   const modoSimples = !editorAberto && (linhas.length === 0 || simples != null);
 
   // O inversor acompanha os módulos (menor potência sugerida) até o vendedor escolher um.
   const [inversorEscolhido, setInversorEscolhido] = useState(false);
   function mudarQuantidadeModulos(quantidade: number) {
     if (!simples) return;
-    const kwp = (quantidade * POTENCIA_MODULO_REFERENCIA_W) / 1000;
-    mudarLinhas(linhasKitSugerido(quantidade, inversorEscolhido ? simples.inversorKw : (inversorSugeridoKw(kwp) ?? simples.inversorKw)));
+    const kwp = (quantidade * ref.modulo.potenciaW) / 1000;
+    mudarLinhas(linhasKitSugerido(quantidade, inversorEscolhido ? simples.inversorKw : (inversorSugeridoKw(kwp, kwsInversor) ?? simples.inversorKw), ref));
   }
   function mudarInversor(kw: number) {
     if (!simples) return;
     setInversorEscolhido(true);
-    mudarLinhas(linhasKitSugerido(simples.quantidade, kw));
+    mudarLinhas(linhasKitSugerido(simples.quantidade, kw, ref));
   }
   const opcoesInversor = simples
     ? [
         ...new Set([
-          ...opcoesInversorKw(inversorSugeridoKw((simples.quantidade * POTENCIA_MODULO_REFERENCIA_W) / 1000)),
+          ...opcoesInversorKw(inversorSugeridoKw((simples.quantidade * ref.modulo.potenciaW) / 1000, kwsInversor), kwsInversor),
           ...(simples.inversorKw != null ? [simples.inversorKw] : []),
         ]),
       ].sort((a, b) => a - b)
     : [];
 
   // Mesma análise para a potência, o preço sugerido e o envio: a quantidade vista é a quantidade usada.
-  const { componentes, itens, problemas: problemasKit } = useMemo(() => analisarLinhas(linhas), [linhas]);
+  const { componentes, problemas: problemasKit } = useMemo(() => analisarLinhas(linhas), [linhas]);
   // Só depois de uma tentativa de seguir/enviar os problemas das linhas aparecem.
   const [mostrarProblemasKit, setMostrarProblemasKit] = useState(false);
   const potenciaKwp = potenciaKitPersonalizadoKwp(componentes);
 
-  const precoSugerido = useMemo(() => {
-    // Só linhas válidas, com a mesma quantidade que vai para o servidor ("1.200" = 1200 aqui também).
-    const somaComponentes = itens.reduce((acc, { indice, componente }) => {
-      const textoPreco = linhas[indice].precoEstimadoUnitario;
-      const precoUnitario = textoPreco ? Number(textoPreco) : NaN;
-      return Number.isFinite(precoUnitario) ? acc + precoUnitario * componente.quantidade : acc;
-    }, 0);
-    if (somaComponentes <= 0) return null;
-    if (!parametros) return Math.round(somaComponentes);
-    const quantidadeModulos = componentes.filter((c) => c.tipo === "modulo").reduce((acc, c) => acc + c.quantidade, 0);
-    const custos = custosInternosEstimados(somaComponentes, quantidadeModulos, potenciaKwp, parametros);
-    return Math.round(custos.total);
-  }, [linhas, itens, componentes, potenciaKwp, parametros]);
+  // Preço pronto pela tabela de preços (P4b), calculado no servidor (o vendedor não vê custo nem margem).
+  const { precoSugerido, avisosPreco } = usePrecoSugeridoKit(componentes);
 
   const [valor, setValor] = useState("");
   const [valorTocado, setValorTocado] = useState(false);
@@ -990,7 +979,7 @@ export function FormularioNegocio({
                 <div className="min-w-0">
                   <p className="text-xs text-texto-2">Módulos</p>
                   <p className="font-medium text-texto">
-                    {POTENCIA_MODULO_REFERENCIA_W} W de referência
+                    {ref.modulo.materialId ? ref.modulo.descricao : `${formatarNumeroBr(ref.modulo.potenciaW)} W de referência`}
                     {sistemaRecomendado && simples.quantidade !== sistemaRecomendado.quantidadeModulos && (
                       <span className="ml-2 text-[11px] tracking-wider text-dourado-texto uppercase">ajustado</span>
                     )}
@@ -1016,7 +1005,7 @@ export function FormularioNegocio({
                   aoEscolher={(v) => mudarInversor(Number(v))}
                 />
                 <p className="mt-2 text-xs text-texto-2">
-                  {simples.inversorKw != null ? descricaoInversorReferencia(simples.inversorKw) : ""}. Inversor maior muda o preço, não a geração.
+                  {simples.inversorKw != null ? ref.inversores.find((x) => x.kw === simples.inversorKw)?.descricao : ""}. Inversor maior muda o preço, não a geração.
                 </p>
               </div>
             </div>
@@ -1026,6 +1015,8 @@ export function FormularioNegocio({
               onChange={mudarLinhas}
               sugerirQuantidadeModulo={sugerirQuantidadeModulo}
               problemas={mostrarProblemasKit ? problemasKit : undefined}
+              materiais={materiais}
+              hoje={hoje}
             />
           )}
 
@@ -1087,9 +1078,31 @@ export function FormularioNegocio({
               </span>
             </label>
             <p className="mt-2 text-xs text-texto-2">
-              {!valorTocado && precoSugerido != null
-                ? "Preço de referência do catálogo + custos internos configurados (estimativa, não é cotação) — ajuste se precisar."
-                : "Sem preço de catálogo para estes itens: digite o valor do negócio."}
+              {precoSugerido != null ? (
+                <>
+                  Preço pronto pela tabela de preços da empresa. Você pode mudar. Preço sugerido:{" "}
+                  <b className="tabular-nums">{precoSugerido.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</b>
+                  {valorTocado && (
+                    <>
+                      {" · "}
+                      <LinkAcao
+                        className="inline"
+                        onClick={() => {
+                          setValor(precoSugerido.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+                          setValorTocado(false);
+                        }}
+                      >
+                        Voltar ao sugerido
+                      </LinkAcao>
+                    </>
+                  )}
+                </>
+              ) : avisosPreco.some((a) => a.tipo === "sem_preco") ? (
+                "Há item sem preço na tabela: informe o preço de venda dele no kit, ou digite o valor do negócio."
+              ) : (
+                "Sem preço da tabela para estes itens: digite o valor do negócio."
+              )}
+              {avisosPreco.length > 0 && ` ${textoAvisosPreco(avisosPreco, { incluirAntigo: true })}`}
             </p>
           </div>
         </Secao>

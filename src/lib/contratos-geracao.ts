@@ -14,7 +14,8 @@ import { MENSAGEM_PRECO_DESATUALIZADO, precoDoCalculoDesatualizado } from "@/lib
 import { mensagemPendenciasContrato, pendenciasDadosContrato, type DadosClienteContrato } from "@/lib/dados-cliente-contrato";
 import { mensagemErro } from "@/lib/erros";
 import type { CondicaoRegistrada } from "@/lib/condicao-escolhida";
-import { carregarEscolhaCondicao } from "@/lib/condicoes-pagamento-dados";
+import { carregarEscolhaCondicao, carregarRegrasCondicoes } from "@/lib/condicoes-pagamento-dados";
+import { pendenciaValorNegocio } from "@/lib/condicoes-pagamento-proposta";
 import { formatarMoeda, hojeEmSaoPaulo } from "@/lib/formatacao";
 import type { SupabaseServidor } from "@/lib/supabase/server";
 import type { ResultadoAcao, StatusContrato } from "@/lib/tipos";
@@ -80,6 +81,14 @@ export async function gerarContratoComCliente(
   const opcao = escolha?.opcoes.find((o) => o.id === condicao) ?? null;
   if (escolha && !condicao) return { ok: false, mensagem: "Marque a condição de pagamento que o cliente escolheu." };
   if (escolha && !opcao) return { ok: false, mensagem: "A condição marcada não está na proposta atual. Atualize a página e marque de novo." };
+  // Sem proposta por modalidade, o contrato usa o valor atual do negócio: o desconto sobre o preço sugerido passa pela
+  // mesma regra da emissão da proposta (Compras P4c). Com proposta, as condições já foram conferidas na emissão.
+  if (!escolha && negocio.valor != null && negocio.valor > 0) {
+    const regras = await carregarRegrasCondicoes(supabase, empresaId, negocioId);
+    if (!regras) return { ok: false, mensagem: "Não foi possível conferir o desconto do negócio. Tente de novo." };
+    const pendenciaDesconto = pendenciaValorNegocio(negocio.valor, regras);
+    if (pendenciaDesconto) return { ok: false, mensagem: pendenciaDesconto };
+  }
   // Com condição, o valor parte sempre do preço da proposta (trocar de condição não acumula desconto).
   const valorContrato = opcao ? opcao.valorNegocio : negocio.valor;
   const precoReferencia = escolha ? escolha.emissao.preco : negocio.valor;

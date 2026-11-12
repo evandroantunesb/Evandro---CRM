@@ -3,6 +3,8 @@ import { acessaCompras } from "@/lib/compras/dados";
 import { acessoPrecos } from "@/lib/compras/dados-precos";
 import { cookies } from "next/headers";
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { obterOnboarding, precisaDoAssistente } from "@/lib/assistente-servidor";
 import { Avatar } from "@/components/avatar";
 import { assinarAvatares } from "@/lib/avatares";
 import { LogoRaion } from "@/components/marca";
@@ -11,7 +13,13 @@ import { carregarNotificacoesNaoLidas, contarPendencias, pendenciasDosSetores, t
 import { linksPendencias, type ContagemPendencias } from "@/lib/pendencias";
 import { CARTEIRA_CONTATOS, ENGENHARIA, GAMIFICACAO, GESTAO_COMERCIAL, NEGOCIOS, OBRAS, PAGAMENTOS_A_CONFIRMAR, PARTICIPANTES_GAMIFICACAO, PEDIDOS_AOS_SETORES, PROPOSTA_E_CONTRATO, TAREFAS, TAREFAS_DO_SETOR, pode } from "@/lib/permissoes";
 import { contarPagamentosAConfirmar } from "@/lib/avisos-pagamento";
+import { filtrarPorTelas } from "@/lib/menu-telas";
 import { obterSessao } from "@/lib/sessao";
+import { areaLigada } from "@/lib/telas-empresa";
+import { obterTelasEmpresa } from "@/lib/telas-empresa-servidor";
+import { variaveisMarca } from "@/lib/marca-cores";
+import { obterMarcaEmpresa } from "@/lib/marca-servidor";
+import { carregarFaixaEmpresa } from "@/lib/tela-entrada-servidor";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { trocarEmpresa } from "@/lib/acoes/empresa-atual";
 import { COOKIE_TEMA, lerTema } from "@/lib/tema";
@@ -54,8 +62,9 @@ function itensGamificacao(papel: Papel | undefined, conquistaNova: boolean): Ite
 }
 
 /** Abas fixas da barra do celular por papel (o resto do menu fica em "Mais"). */
-function abasDoCelular(papel: Papel | undefined) {
-  if (papel === "admin" || papel === "gestor") return ["/inicio", "/negocios", "/painel"];
+function abasDoCelular(papel: Papel | undefined, itens: ItemMenu[]) {
+  // Painel desligado na empresa (ou plano Solo): a terceira aba vira Tarefas.
+  if (papel === "admin" || papel === "gestor") return ["/inicio", "/negocios", itens.some((i) => i.href === "/painel") ? "/painel" : "/tarefas"];
   if (papel === "operacao") return ["/inicio", "/tarefas/setores", "/obras"];
   return ["/inicio", "/negocios", "/tarefas"];
 }
@@ -63,6 +72,8 @@ function abasDoCelular(papel: Papel | undefined) {
 export default async function LayoutApp({ children }: { children: React.ReactNode }) {
   const sessao = await obterSessao();
   const papel = sessao.atual?.papel;
+  // Empresa nova com o assistente de primeiro acesso pendente: o admin vai para lá (Onboarding, subprojeto 3).
+  if (precisaDoAssistente(papel, await obterOnboarding())) redirect("/primeiro-acesso");
   const tema = lerTema((await cookies()).get(COOKIE_TEMA)?.value);
 
   let pendencias: ContagemPendencias = { leadsADistribuir: 0, demais: 0 };
@@ -103,11 +114,22 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
       verPagamentosAConfirmar = operacional;
     }
   }
+  const [telas, { marca, logoUrl }, faixa] = await Promise.all([
+    obterTelasEmpresa(),
+    obterMarcaEmpresa(),
+    sessao.atual ? carregarFaixaEmpresa(sessao.atual.empresaId) : Promise.resolve(null),
+  ]);
+  // Cores da marca e foto da faixa da empresa (sem nenhuma, o padrão Raion).
+  const estiloEmpresa = {
+    ...(marca ? variaveisMarca(marca) : {}),
+    ...(faixa ? { "--faixa-imagem": `url(${JSON.stringify(faixa)})` } : {}),
+  } as React.CSSProperties;
+  // O Financeiro é só do PRO (telas por empresa): no Solo o link não aparece.
   const linkPagamentos =
-    pagamentosAConfirmar > 0
+    pagamentosAConfirmar > 0 && areaLigada(telas, "pro")
       ? [{ href: "/financeiro?aba=confirmar", texto: `${pagamentosAConfirmar} pagamento${pagamentosAConfirmar === 1 ? "" : "s"} a confirmar` }]
       : [];
-  const avisos = { notificacoes, pendencias: [...linkPagamentos, ...linksPendencias(papel, pendencias)] };
+  const avisos = { notificacoes, pendencias: [...linkPagamentos, ...linksPendencias(papel, pendencias, telas)] };
 
   // Foto do próprio usuário (sidebar desktop e menu do celular): uma assinatura com a sessão dele.
   const urlAvatar = sessao.avatarCaminho
@@ -117,8 +139,8 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
   // Ordem segue o fluxo do cliente; `secao` dá o título do bloco. Apenas a posição no menu muda:
   // rotas e permissões de cada tela continuam as mesmas (Leads a distribuir: admin/gestor).
   // As configurações do admin (inclusive Captura e a administração da Gamificação) ficam todas
-  // no hub /configuracoes.
-  const itens: ItemMenu[] = [
+  // no hub /configuracoes. A empresa só tira telas (plano Solo e telas desligadas pelo admin): `filtrarPorTelas`.
+  const itens: ItemMenu[] = filtrarPorTelas<ItemMenu>([
     ...(sessao.atual
       ? [
           { href: "/inicio", rotulo: "Início" },
@@ -153,7 +175,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
           { href: "/super-admin/cobranca", rotulo: "Cobrança", secao: "Plataforma" },
         ]
       : []),
-  ];
+  ], telas);
 
   const seletorEmpresa =
     sessao.vinculos.length > 1 ? (
@@ -201,12 +223,26 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
     </div>
   );
 
+  // Marca da empresa (logo e cores da identidade da proposta); sem marca, o padrão Raion.
+  const logo = (altura: number) =>
+    logoUrl ? (
+      // eslint-disable-next-line @next/next/no-img-element -- URL assinada do Storage, que muda a cada hora
+      <img src={logoUrl} alt={sessao.atual?.empresaNome ?? "Logo"} style={{ height: altura }} className="w-auto max-w-[180px] object-contain" />
+    ) : (
+      <LogoRaion tom="claro" altura={altura} />
+    );
+
   return (
-    <div data-tema={tema} className="tema-app flex min-h-screen flex-col md:flex-row">
+    <div
+      data-tema={tema}
+      data-marca={marca ? "" : undefined}
+      style={marca || faixa ? estiloEmpresa : undefined}
+      className="tema-app flex min-h-screen flex-col md:flex-row"
+    >
       {/* Celular: cabeçalho enxuto em cima; o menu vai para a barra de abas embaixo. */}
       <header className="barra-lateral sticky top-0 z-30 flex h-14 items-center justify-between bg-carvao/95 px-4 backdrop-blur-md md:hidden">
         <Link href="/inicio" aria-label="Início">
-          <LogoRaion tom="claro" altura={24} />
+          {logo(24)}
         </Link>
         {sessao.atual && <BotaoAvisos {...avisos} total={notificacoes.length + pendencias.leadsADistribuir + pendencias.demais + pagamentosAConfirmar} />}
       </header>
@@ -214,7 +250,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
       <aside className="barra-lateral hidden flex-col gap-5 border-r border-white/5 bg-carvao p-5 text-offwhite md:sticky md:top-0 md:flex md:h-screen md:w-64 md:overflow-y-auto">
         <div>
           <Link href="/inicio" aria-label="Início">
-            <LogoRaion tom="claro" altura={28} />
+            {logo(28)}
           </Link>
           <div className="mt-5">
             {seletorEmpresa ??
@@ -242,7 +278,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
 
       <main className="min-w-0 flex-1 p-4 pb-28 md:p-10">{children}</main>
 
-      <NavegacaoCelular itens={itens} abas={abasDoCelular(papel)} extras={extrasCelular} />
+      <NavegacaoCelular itens={itens} abas={abasDoCelular(papel, itens)} extras={extrasCelular} />
     </div>
   );
 }

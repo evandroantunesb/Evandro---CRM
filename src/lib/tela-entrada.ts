@@ -82,3 +82,20 @@ export function montarTelaEntrada(
     texto: linha.texto ?? TEXTO_PADRAO_ENTRADA,
   };
 }
+
+/**
+ * Foto da faixa do topo de cada tela (assistente, passo 3): a mesma da tela de entrada (padrão) ou a própria. Nulo = a
+ * paisagem do Raion.
+ */
+export function urlFaixa(
+  linha: { imagem_caminho: string | null; faixa_caminho: string | null; faixa_usa_entrada: boolean } | null | undefined,
+  urlPublica: (caminho: string) => string,
+): string | null {
+  if (!linha) return null;
+  const caminho = linha.faixa_usa_entrada ? linha.imagem_caminho : linha.faixa_caminho;
+  return caminho ? urlPublica(caminho) : null;
+}
+
+/** A tela de entrada tem algo próprio (foto, frase ou texto do login)? A faixa não conta: tem cartão próprio. */
+export const personalizacaoEntrada = (linha: { frase: string | null; texto: string | null; imagem_caminho: string | null } | null | undefined): boolean =>
+  !!(linha && (linha.frase || linha.texto || linha.imagem_caminho));

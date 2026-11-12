@@ -40,6 +40,9 @@ import { prazosDaLinha, ROTULO_COR, semaforoObra, type CorSemaforo } from "@/lib
 import { COLUNAS_JUSTIFICATIVA, atrasosDaObra, justificativasPorEtapa } from "@/lib/obras/justificativas";
 import { hojeEmSaoPaulo } from "@/lib/formatacao";
 import { exigirPapel } from "@/lib/sessao";
+import { carregarObraSolo } from "@/lib/obras/solo-dados";
+import { obterTelasEmpresa } from "@/lib/telas-empresa-servidor";
+import { ObraSolo } from "./_solo/obra-solo";
 import { carregarSubstituicoes } from "@/lib/substituicoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
 
@@ -60,6 +63,12 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
   const query = queryDosFiltros(filtros);
 
   const supabase = await criarClienteServidor();
+  // Solo: a ficha com o checklist (subprojeto 4b); obra sem checklist ou de outra empresa = 404.
+  if ((await obterTelasEmpresa()).solo) {
+    const obraSolo = await carregarObraSolo(supabase, atual.empresaId, id);
+    if (!obraSolo) notFound();
+    return <ObraSolo obra={obraSolo} empresaId={atual.empresaId} hoje={hojeEmSaoPaulo()} />;
+  }
   // A lista navegável é recalculada aqui, a cada obra: mesma empresa, mesma RLS, mesmos filtros.
   const [obra, lista, tarefasSetor, vistoria, vistorias, cronograma, orcamento, lancamentos, justificativasRes, escalonamentosRes, identidades, prazosRes, substituicoes, pedidosCompra, obraCompras, atuoEmCompras, orcamentosCompra] = await Promise.all([
     carregarDetalheObra(supabase, { empresaId: atual.empresaId, papel: atual.papel, obraId: id, membroId: atual.membroId }),
@@ -144,6 +153,7 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
   // admin; pedidos só depois do "Iniciar compra" e com a obra em andamento (o banco confere de novo).
   const autorizacaoCompras = gestaoDoSetor("compras")?.permissoes.autorizacao ?? null;
   const statusCompras = obra.setores.find((x) => x.setor === "compras")?.status ?? null;
+  const temEngenharia = obra.setores.some((x) => x.setor === "engenharia");
   const emAndamento = resumo.situacao === "em_andamento";
   const podeIniciarCompra = statusCompras === "a_comprar" && emAndamento && (autorizacaoCompras != null || atuoEmCompras);
   const qtdOrcamentos = orcamentosCompra.count ?? 0;
@@ -387,7 +397,9 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
                 {/* key pela obra: ao navegar para outra obra, nenhum estado de formulário da anterior sobrevive. */}
                 {/* Vistoria: quem atua no Operacional registra o agendamento, a vistoria feita em campo e a correção de
                     campo; quem só vê a obra acompanha a situação e as datas. */}
+                {/* Obra sem Engenharia (setor desligado quando ela nasceu): não há vistoria a acompanhar. */}
                 {s.setor === "operacional" &&
+                  temEngenharia &&
                   (g?.permissoes.autorizacao ? (
                     <VistoriaEngenharia
                       key={resumo.id}

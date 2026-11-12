@@ -8,6 +8,7 @@ import { ROTULO_SETOR, SETORES_OBRA } from "@/lib/obras/rotulos";
 import { PERFIL, ROTULO_CAPACIDADE, outrosSetores, perfilDoMembro } from "@/lib/perfis-usuario";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
+import { obterTelasEmpresa } from "@/lib/telas-empresa-servidor";
 import { ROTULO_PERFIL_GAMIFICACAO, type Papel, type PerfilGamificacao, type StatusMembro, type TipoVendedor } from "@/lib/tipos";
 import { PainelPessoa, type MembroLinha } from "./formularios";
 
@@ -48,13 +49,14 @@ export default async function Usuarios({ searchParams }: { searchParams: Promise
   const nova = params.nova === "1";
 
   const supabase = await criarClienteServidor();
-  const [{ data }, { data: setores, error: erroSetores }] = await Promise.all([
+  const [{ data }, { data: setores, error: erroSetores }, telas] = await Promise.all([
     supabase
       .from("empresa_membros")
       .select("id, papel, tipo_vendedor, perfil_gamificacao, recebe_leads, status, perfis(nome, email)")
       .eq("empresa_id", atual.empresaId)
       .order("created_at"),
     supabase.from("membro_setores_obra").select("membro_id, setor, capacidade, principal").eq("empresa_id", atual.empresaId),
+    obterTelasEmpresa(),
   ]);
 
   const membros: MembroLinha[] = (data ?? []).map((m) => {
@@ -219,7 +221,7 @@ export default async function Usuarios({ searchParams }: { searchParams: Promise
         </section>
 
         {painelAberto ? (
-          <PainelPessoa key={selecionado?.id ?? "nova"} membro={nova ? null : selecionado} fecharHref={fechar} />
+          <PainelPessoa key={selecionado?.id ?? "nova"} membro={nova ? null : selecionado} fecharHref={fechar} setoresDesligados={[...telas.setoresDesligados]} />
         ) : (
           <aside className="painel hidden p-6 text-sm text-texto-2 lg:block">Escolha uma pessoa na lista para editar o perfil e os setores.</aside>
         )}

@@ -5,7 +5,7 @@ import { useId, useState, type FormEvent } from "react";
 import { Botao, CLASSE_ENTRADA, Mensagem } from "@/components/ui";
 import { criarMaterialCompra, editarMaterialCompra, lancarPrecoCompra } from "@/lib/acoes/compras-precos";
 import { CATEGORIAS_MATERIAL, ROTULO_CATEGORIA_MATERIAL, type CategoriaMaterial, type MaterialVM } from "@/lib/compras/precos";
-import { lerNumeroBr } from "@/lib/formatacao";
+import { formatarNumeroBr, lerNumeroBr } from "@/lib/formatacao";
 import type { ResultadoAcao } from "@/lib/tipos";
 
 /** Cadastrar ou editar material (nome, categoria e unidade). O banco valida de novo. */
@@ -17,10 +17,17 @@ export function FormularioMaterial({ material }: { material?: MaterialVM }) {
   const enviar = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
+    const textoPotencia = String(f.get("potencia") ?? "").trim();
+    const potenciaW = textoPotencia ? lerNumeroBr(textoPotencia) : null;
+    if (potenciaW != null && (Number.isNaN(potenciaW) || potenciaW <= 0)) {
+      setResultado({ ok: false, mensagem: "Confira a potência em W (ex.: 550)." });
+      return;
+    }
     const dados = {
       nome: String(f.get("nome") ?? ""),
       categoria: String(f.get("categoria") ?? "") as CategoriaMaterial,
       unidade: String(f.get("unidade") ?? ""),
+      potenciaW,
     };
     setEnviando(true);
     setResultado(null);
@@ -38,7 +45,7 @@ export function FormularioMaterial({ material }: { material?: MaterialVM }) {
 
   return (
     <form onSubmit={enviar} className="flex flex-col gap-3">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_12rem_7rem]">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_12rem_7rem_8rem]">
         <label className="flex flex-col gap-1 text-sm">
           <span className="font-medium text-texto-2">Nome</span>
           <input name="nome" required minLength={2} maxLength={120} defaultValue={material?.nome} placeholder="Ex.: Módulo 550 W" className={CLASSE_ENTRADA} />
@@ -57,7 +64,18 @@ export function FormularioMaterial({ material }: { material?: MaterialVM }) {
           <span className="font-medium text-texto-2">Unidade</span>
           <input name="unidade" required maxLength={20} defaultValue={material?.unidade ?? "un"} className={CLASSE_ENTRADA} />
         </label>
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="font-medium text-texto-2">Potência (W)</span>
+          <input
+            name="potencia"
+            inputMode="decimal"
+            defaultValue={material?.potenciaW != null ? formatarNumeroBr(material.potenciaW) : ""}
+            placeholder="Ex.: 550"
+            className={`${CLASSE_ENTRADA} tabular-nums`}
+          />
+        </label>
       </div>
+      <p className="text-xs text-texto-2">Potência obrigatória para Módulos e Inversores: é com ela que o cálculo acha os kWp e a geração. Sem ela, o material não aparece para o vendedor no kit.</p>
       <div className="flex flex-wrap items-center gap-2">
         <Botao type="submit" disabled={enviando}>
           {enviando ? "Salvando..." : material ? "Salvar material" : "Cadastrar material"}

@@ -26,7 +26,7 @@ export function AtrasosObra({ obraId, atrasos, podePedir }: { obraId: string; at
         <li key={a.etapa} className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0">
           <p className="text-sm">
             <span className="font-medium text-texto">{ROTULO_ETAPA[a.etapa]}</span>
-            <span className={`ml-2 text-xs font-semibold ${a.atraso > 5 ? "text-erro" : "text-dourado-texto"}`}>+{dias(a.atraso)}</span>
+            <span className={`ml-2 text-xs font-semibold ${a.atraso > 5 ? "text-erro" : "text-atencao-texto"}`}>+{dias(a.atraso)}</span>
           </p>
           <Justificativa obraId={obraId} atraso={a} podePedir={podePedir} />
         </li>
@@ -51,7 +51,7 @@ function Justificativa({ obraId, atraso: { etapa, justificativa: j }, podePedir 
     return (
       <div className="flex flex-col gap-2 text-sm">
         <p className="text-xs text-texto-2">
-          <span className="font-semibold text-dourado-texto">Justificativa pendente</span> · pedida a {j.pedidoA} em {formatarDataHora(j.pedidoEm)} · prazo para
+          <span className="font-semibold text-atencao-texto">Justificativa pendente</span> · pedida a {j.pedidoA} em {formatarDataHora(j.pedidoEm)} · prazo para
           responder: {dataBr(j.prazo)}
         </p>
         {j.podeResponder && <Responder obraId={obraId} justificativaId={j.id} />}

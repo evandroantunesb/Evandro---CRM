@@ -2,8 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   MENSAGEM_NENHUMA_CONDICAO,
   ORIENTACAO_APROVACAO,
+  descontoAVistaMaximo,
   descontoDoValor,
+  descontoTotal,
+  excessoAVista,
   montarCondicoesPagamento,
+  pendenciaValorNegocio,
+  precoMinimoCentavos,
+  referenciaDesconto,
   valorParcela,
   type EntradaCondicoes,
   type RegrasCondicoes,
@@ -155,14 +161,67 @@ describe("desconto: limite de quem emite ou o maior aprovado no negócio", () =>
 
   it("personalizado abaixo do preço conta como desconto; igual ou acima do preço passa", () => {
     const parte = (valor: string) => ({ valor, forma: "pix", momento: "assinatura", data: "", observacao: "" });
-    // 25.000 de 30.000 = 16,7% de desconto
+    // 25.000 de 30.000 = 16,67% de desconto (para cima: é o % a pedir)
     const r = montar({ personalizado: { partes: [parte("10.000"), parte("15.000")] } });
-    expect(pendencias(r).join(" ")).toContain("16,7%");
+    expect(pendencias(r).join(" ")).toContain("16,67%");
     expect(pendencias(r).join(" ")).toContain(ORIENTACAO_APROVACAO);
     expect(montar({ personalizado: { partes: [parte("28.500")] } }).ok).toBe(true); // exatamente 5%
     expect(montar({ personalizado: { partes: [parte("28.499,99")] } }).ok).toBe(false);
     expect(montar({ personalizado: { partes: [parte("31.000")] } }).ok).toBe(true);
     expect(montar({ personalizado: { partes: [parte("10.000"), parte("15.000")] } }, { descontoAprovado: 17 }).ok).toBe(true);
+  });
+});
+
+describe("desconto sobre o preço sugerido (Compras P4c)", () => {
+  // Sugerido 31.600: o valor do negócio (30.000) já está 5,07% abaixo dele.
+  const SUGERIDO = 31600;
+  const base = (entrada: Partial<EntradaCondicoes>, regras: Partial<RegrasCondicoes> = {}) => montar(entrada, { precoSugerido: SUGERIDO, ...regras });
+  const parcelado = { meio: "cartao" as const, parcelas: [3], repassarTaxas: false };
+
+  it("referência e mínimo: o maior entre o sugerido e o preço do negócio", () => {
+    expect(referenciaDesconto(PRECO, SUGERIDO)).toBe(SUGERIDO);
+    expect(referenciaDesconto(PRECO, 20000)).toBe(PRECO);
+    expect(referenciaDesconto(PRECO, null)).toBe(PRECO);
+    expect(precoMinimoCentavos(PRECO, { limiteDesconto: 5, descontoAprovado: 0, precoSugerido: SUGERIDO })).toBe(3002000);
+  });
+
+  it("valor do negócio abaixo do sugerido além do permitido trava a proposta, em qualquer condição", () => {
+    // 30.000 de 31.600 = 5,07% > 5%
+    const r = base({ parcelado });
+    expect(r.ok).toBe(false);
+    expect(pendencias(r)).toHaveLength(1);
+    expect(pendencias(r)[0]).toContain("5,07% abaixo do preço sugerido");
+    expect(pendencias(r)[0]).toContain(ORIENTACAO_APROVACAO);
+    expect(base({ parcelado }, { descontoAprovado: 5.07 }).ok).toBe(true);
+    expect(base({ parcelado }, { precoSugerido: 31578.95 }).ok).toBe(true); // exatamente 5%
+  });
+
+  it("à vista soma com o que já está abaixo do sugerido: vale o preço final", () => {
+    const regras = { precoSugerido: 31000, limiteDesconto: 10 };
+    // 30.000 × 0,93 = 27.900 de 31.000 = 10% exato: passa; 7,01% passa do limite
+    expect(base({ aVista: { desconto: "7" } }, regras).ok).toBe(true);
+    const r = base({ aVista: { desconto: "7,01" } }, regras);
+    expect(pendencias(r).join(" ")).toContain("sobre o preço sugerido");
+    expect(descontoAVistaMaximo(PRECO, { limiteDesconto: 10, descontoAprovado: 0, precoSugerido: 31000 })).toBe(7);
+    expect(descontoTotal(27900, PRECO, { precoSugerido: 31000 })).toBe(10);
+    const r10 = { limiteDesconto: 10, descontoAprovado: 0, precoSugerido: 31000 };
+    expect(excessoAVista(PRECO, 7, r10)).toBeNull();
+    expect(excessoAVista(PRECO, 8, r10)).toEqual({ pedir: 10.97, maximoAVista: 7 }); // 27.600 de 31.000
+    // O próprio valor já passa: a tela mostra a pendência do valor, não o pedido do à vista.
+    expect(excessoAVista(PRECO, 1, { ...r10, precoSugerido: 40000 })).toBeNull();
+  });
+
+  it("personalizado também é medido contra o sugerido", () => {
+    const parte = (valor: string) => ({ valor, forma: "pix", momento: "assinatura", data: "", observacao: "" });
+    const regras = { precoSugerido: 31000, limiteDesconto: 10 };
+    expect(base({ personalizado: { partes: [parte("27.900")] } }, regras).ok).toBe(true);
+    expect(base({ personalizado: { partes: [parte("27.899,99")] } }, regras).ok).toBe(false);
+  });
+
+  it("sugerido abaixo do valor do negócio não muda nada (referência é o valor)", () => {
+    expect(base({ aVista: { desconto: "5" } }, { precoSugerido: 20000 }).ok).toBe(true);
+    expect(base({ aVista: { desconto: "5,01" } }, { precoSugerido: 20000 }).ok).toBe(false);
+    expect(pendenciaValorNegocio(PRECO, { limiteDesconto: 0, descontoAprovado: 0, precoSugerido: 20000 })).toBeNull();
   });
 });
 

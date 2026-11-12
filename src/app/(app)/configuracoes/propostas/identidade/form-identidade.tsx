@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useRef, useState } from "react";
+import { CamposMarcaCores } from "@/components/marca-cores";
 import { Botao, Campo, Cartao, Mensagem } from "@/components/ui";
 import { salvarIdentidadeProposta } from "@/lib/acoes/proposta-identidade";
 import { criarClienteNavegador } from "@/lib/supabase/navegador";
@@ -27,7 +28,7 @@ type Identidade = {
   fotoCapaCaminho: string | null;
 };
 
-function CampoImagem({
+export function CampoImagem({
   empresaId,
   rotulo,
   descricao,
@@ -107,8 +108,8 @@ export function FormIdentidade({
   const [logoCaminho, setLogoCaminho] = useState(identidade.logoCaminho);
   const [logoEscuroCaminho, setLogoEscuroCaminho] = useState(identidade.logoEscuroCaminho);
   const [fotoCapaCaminho, setFotoCapaCaminho] = useState(identidade.fotoCapaCaminho);
-  const [corPrimaria, setCorPrimaria] = useState(identidade.corPrimaria || "#0F0F10");
-  const [corDestaque, setCorDestaque] = useState(identidade.corDestaque || "#D4AF37");
+  // Vazio = padrão Raion (grava nulo); a prévia e o contraste mostram o padrão.
+  const [cores, setCores] = useState({ corPrimaria: identidade.corPrimaria ?? "", corDestaque: identidade.corDestaque ?? "" });
 
   return (
     <Cartao titulo="Identidade visual da proposta">
@@ -147,50 +148,13 @@ export function FormIdentidade({
             previewUrl={preview.fotoCapaUrl}
           />
         </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-zinc-700">Cor primária</span>
-            <div className="flex items-center gap-2">
-              <input
-                type="color"
-                value={/^#[0-9a-fA-F]{6}$/.test(corPrimaria) ? corPrimaria : "#0F0F10"}
-                onChange={(e) => setCorPrimaria(e.target.value)}
-                className="h-9 w-9 rounded border border-zinc-200"
-                aria-label="Selecionar cor primária"
-              />
-              <input
-                type="text"
-                name="cor_primaria"
-                value={corPrimaria}
-                onChange={(e) => setCorPrimaria(e.target.value)}
-                placeholder="#0F0F10"
-                pattern="^#[0-9a-fA-F]{6}$"
-                className="flex-1 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-carvao outline-none focus:border-dourado focus:ring-2 focus:ring-dourado/20"
-              />
-            </div>
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-zinc-700">Cor de destaque</span>
-            <div className="flex items-center gap-2">
-              <input
-                type="color"
-                value={/^#[0-9a-fA-F]{6}$/.test(corDestaque) ? corDestaque : "#D4AF37"}
-                onChange={(e) => setCorDestaque(e.target.value)}
-                className="h-9 w-9 rounded border border-zinc-200"
-                aria-label="Selecionar cor de destaque"
-              />
-              <input
-                type="text"
-                name="cor_destaque"
-                value={corDestaque}
-                onChange={(e) => setCorDestaque(e.target.value)}
-                placeholder="#D4AF37"
-                pattern="^#[0-9a-fA-F]{6}$"
-                className="flex-1 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-carvao outline-none focus:border-dourado focus:ring-2 focus:ring-dourado/20"
-              />
-            </div>
-          </label>
-        </div>
+        <CamposMarcaCores
+          corPrimaria={cores.corPrimaria}
+          corDestaque={cores.corDestaque}
+          onChange={setCores}
+          logoUrl={preview.logoEscuroUrl}
+          nomeEmpresa={identidade.nomeExibicao || "Sua empresa"}
+        />
         <Campo rotulo="WhatsApp de contato (com DDI/DDD, só números)" name="whatsapp" defaultValue={identidade.whatsapp} placeholder="5545999999999" maxLength={30} />
         <Campo rotulo="Texto de rodapé (opcional)" name="rodape_texto" defaultValue={identidade.rodapeTexto} maxLength={200} />
         <Mensagem resultado={resultado} />

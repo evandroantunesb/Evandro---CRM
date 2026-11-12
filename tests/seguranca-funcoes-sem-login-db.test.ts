@@ -1,6 +1,6 @@
 /**
  * Segurança das funções do banco (20261102120000_seguranca_funcoes_sem_login.sql): sem login, nenhuma função do
- * projeto executa; `decidir_atribuicao_lead` (que pula a checagem de admin/gestor com p_automatico) e
+ * projeto executa (exceto `acompanhamento_obra`, a leitura limitada da página pública do cliente, 11/11/2026); `decidir_atribuicao_lead` (que pula a checagem de admin/gestor com p_automatico) e
  * `expirar_atribuicoes_leads` saíram da API; admin e gestor continuam decidindo por `aprovar_atribuicao_lead`;
  * authenticated e service_role mantêm o que tinham; funções novas já nascem sem EXECUTE para anon.
  * Precisa do Supabase local (roda no CI).
@@ -79,7 +79,10 @@ describe("funções do banco sem login", () => {
         where n.nspname = 'public' and p.prokind = 'f'
           and not exists (select 1 from pg_depend d where d.classid = 'pg_proc'::regclass and d.objid = p.oid and d.deptype = 'e')`);
       expect(rows.length).toBeGreaterThan(100);
-      expect(rows.filter((r) => r.anon || r.publico).map((r) => r.funcao)).toEqual([]);
+      // Única exceção, decisão do Evandro de 11/11/2026 (obra do Solo, 20261207100000_obra_solo.sql): a página pública
+      // do cliente lê por uma função limitada liberada para anon, e nunca para PUBLIC.
+      expect(rows.filter((r) => r.anon).map((r) => r.funcao)).toEqual(["acompanhamento_obra(text)"]);
+      expect(rows.filter((r) => r.publico).map((r) => r.funcao)).toEqual([]);
     } finally {
       await db.end();
     }

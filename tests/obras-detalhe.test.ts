@@ -728,17 +728,21 @@ describe("carregarDetalheObra: view model", () => {
     expect(vm?.resumo.situacao).toBe("em_andamento");
   });
 
-  it("setor sem fluxo gravado: 'Sem informação'", async () => {
+  it("detalhe de obra sem Engenharia não tem o setor", async () => {
+    const tabelas = filhas();
+    tabelas.obra_fluxos = [fluxo("compras", "material_entregue"), fluxo("operacional", "concluido"), fluxo("administrativo", "concluido")];
+    const f = criarFake({ tabelas: { obras: [obraTabela()], ...tabelas }, rpcs: { identidade_membros: identidades } });
+    const vm = await carregarDetalheObra(f.cliente, { empresaId: EMPRESA, papel: "admin", obraId: OBRA });
+    expect(vm?.setores.map((s) => s.setor)).toEqual(["compras", "operacional", "administrativo"]);
+  });
+
+  it("obra sem fluxo gravado: nenhum setor e não fica concluída", async () => {
     const tabelas = filhas();
     tabelas.obra_fluxos = [];
     const f = criarFake({ tabelas: { obras: [obraTabela()], ...tabelas }, rpcs: { identidade_membros: identidades } });
     const vm = await carregarDetalheObra(f.cliente, { empresaId: EMPRESA, papel: "admin", obraId: OBRA });
-    expect(vm?.setores.map((s) => [s.status, s.statusRotulo, s.estado])).toEqual([
-      [null, "Sem informação", "em_andamento"],
-      [null, "Sem informação", "em_andamento"],
-      [null, "Sem informação", "em_andamento"],
-      [null, "Sem informação", "em_andamento"],
-    ]);
+    expect(vm?.setores).toEqual([]);
+    expect(vm?.resumo.situacao).toBe("em_andamento");
   });
 
   it("motivo de pausa só se pausada; de cancelamento só se cancelada", async () => {

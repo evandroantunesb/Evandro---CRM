@@ -24,6 +24,9 @@ import { VISAO_SETORES, filtrosCompletaDeParams, queryCompleta, usaVisaoCompleta
 import { OBRAS, OPR_COMPLETA, pode } from "@/lib/permissoes";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
+import { carregarObrasSolo } from "@/lib/obras/solo-dados";
+import { obterTelasEmpresa } from "@/lib/telas-empresa-servidor";
+import { ListaObrasSolo } from "./_solo/lista-solo";
 
 type Tom = "neutro" | "negativo" | "atencao";
 // Sem verde (reservado ao WhatsApp): "Concluída" fica neutra. Vermelho só para o que é perda/erro.
@@ -40,6 +43,12 @@ export default async function Obras({ searchParams }: PageProps<"/obras">) {
   const { atual } = await exigirPapel(...OBRAS);
   const params = await searchParams;
   const supabase = await criarClienteServidor();
+
+  // Solo: a lista em cartões com o checklist de cada obra (subprojeto 4b).
+  if ((await obterTelasEmpresa()).solo) {
+    const obrasSolo = await carregarObrasSolo(supabase, atual.empresaId);
+    return <ListaObrasSolo obras={obrasSolo} filtro={params.filtro === "entregues" || params.filtro === "canceladas" ? params.filtro : "andamento"} hoje={hojeBrasilia()} />;
+  }
 
   // Admin e gestor: a visão Completa (semáforo de todas as obras), do desenho aprovado. A lista por setor continua
   // ao alcance deles (`?visao=setores`, ou com um filtro dela na URL, como na volta da ficha).
@@ -223,7 +232,17 @@ function ListaObras({ obras, hrefDe }: { obras: ObraListaVM[]; hrefDe: (id: stri
     </Link>,
     <span key="u" className="text-zinc-700">{cidadeUf(o)}</span>,
     <span key="p" className="text-zinc-700">{formatarPotencia(o.potenciaKwp)}</span>,
-    ...o.setores.map((s) => <CelulaSetor key={s.setor} s={s} />),
+    // Colunas fixas por setor: obra sem o setor mostra "—" (não desalinha a tabela).
+    ...SETORES_OBRA.map((setor) => {
+      const s = o.setores.find((x) => x.setor === setor);
+      return s ? (
+        <CelulaSetor key={setor} s={s} />
+      ) : (
+        <span key={setor} className="text-zinc-400" aria-label="Sem este setor">
+          —
+        </span>
+      );
+    }),
     <Situacao key="s" obra={o} />,
   ];
   return (

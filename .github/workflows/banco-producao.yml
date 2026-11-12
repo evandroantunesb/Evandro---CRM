@@ -132,7 +132,7 @@ jobs:
           SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: node .github/scripts/validar-destino-producao.mjs banco "$PROJETO_PRODUCAO"
-      - uses: supabase/setup-cli@45a513f8c64c0bc8e0e3dfe572b5c95be85f6359 # v3.0.1
+      - uses: supabase/setup-cli@689adcfb80d947100a1eab127289b97d1fb07b13 # v3.2.0
         with:
           version: 2.120.0
       - name: Vincular projeto
@@ -198,7 +198,7 @@ jobs:
           SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: node .github/scripts/validar-destino-producao.mjs banco "$PROJETO_PRODUCAO"
-      - uses: supabase/setup-cli@45a513f8c64c0bc8e0e3dfe572b5c95be85f6359 # v3.0.1
+      - uses: supabase/setup-cli@689adcfb80d947100a1eab127289b97d1fb07b13 # v3.2.0
         with:
           version: 2.120.0
       - name: Vincular projeto
@@ -232,12 +232,12 @@ jobs:
       # Trava fail-closed: o conjunto do dry-run acima precisa ser exatamente o autorizado, senão o
       # job termina aqui, antes da aplicação. Sem credenciais. Para autorizar outro conjunto, a lista
       # abaixo muda por commit revisado (e uma nova tag), nunca por entrada do operador.
-      # Compras, P3: tabela de preços de material (#353); conjunto a conferir no dry-run (modo "conferir") antes da
-      # aplicação, com a 20261128100000 (#350) já aplicada.
+      # Obra do Solo, Onboarding subprojeto 4b (#373); conjunto a conferir no dry-run (modo
+      # "conferir") antes da aplicação, com a 20261206100000 (#371) já aplicada.
       - name: Conferir que o conjunto pendente é exatamente o autorizado
         env:
           MIGRATIONS_AUTORIZADAS: |
-                        20261129100000_compras_tabela_precos.sql
+                        20261207100000_obra_solo.sql
         run: bash .github/scripts/validar-conjunto-migrations.sh "$RUNNER_TEMP/dry-run.txt"
       - name: Aplicar (supabase db push --include-all)
         env:

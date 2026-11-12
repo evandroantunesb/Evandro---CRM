@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { problemaCoresIdentidade } from "@/lib/marca-cores";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import type { ResultadoAcao } from "@/lib/tipos";
@@ -34,6 +35,9 @@ export async function salvarIdentidadeProposta(_: ResultadoAcao, formData: FormD
   const dados = esquema.safeParse(Object.fromEntries(formData));
   if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
   const d = dados.data;
+  // As cores também pintam o app (marca da empresa): ilegível não salva (mesma regra da tela).
+  const problemaCores = problemaCoresIdentidade(d.cor_primaria ?? "", d.cor_destaque ?? "");
+  if (problemaCores) return { ok: false, mensagem: problemaCores };
 
   const supabase = await criarClienteServidor();
   const { error } = await supabase.from("proposta_identidades").upsert(
@@ -52,6 +56,8 @@ export async function salvarIdentidadeProposta(_: ResultadoAcao, formData: FormD
     { onConflict: "empresa_id" },
   );
   if (error) return { ok: false, mensagem: "Não foi possível salvar a identidade visual." };
+  // A marca aparece no app inteiro (barra, faixa, botões).
   revalidatePath(CAMINHO);
+  revalidatePath("/", "layout");
   return { ok: true, mensagem: "Identidade visual salva." };
 }

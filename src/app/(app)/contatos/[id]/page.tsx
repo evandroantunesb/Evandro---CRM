@@ -26,7 +26,7 @@ export default async function DetalheContato({ params }: PageProps<"/contatos/[i
       .eq("id", id)
       .maybeSingle(),
     carregarConfiguracao(atual.empresaId),
-    eletropostoDisponivel(supabase, atual),
+    eletropostoDisponivel(),
   ]);
   if (!contato) notFound();
 

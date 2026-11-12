@@ -1,3 +1,4 @@
+import { carregarKitDaFicha } from "@/lib/compras/dados-kit";
 import { lerCondicaoRegistrada } from "@/lib/condicao-escolhida";
 import { hojeEmSaoPaulo } from "@/lib/formatacao";
 import { carregarEscolhaCondicao, carregarRegrasCondicoes } from "@/lib/condicoes-pagamento-dados";
@@ -85,11 +86,7 @@ export async function carregarFicha(atual: Vinculo, id: string, abaParam: string
   const conferencia = await conferirArquivos(supabase, negocio.empresa_id, id, anexos ?? []);
   const semArquivo = conferencia.conferido ? conferencia.semArquivo : new Set<string>();
 
-  const { data: componentes } = await supabase
-    .from("kit_componentes")
-    .select("tipo, descricao, potencia_w, quantidade")
-    .eq("negocio_id", id)
-    .order("ordem");
+  const { componentes, materiaisKit, precoSugeridoKit } = await carregarKitDaFicha(supabase, negocio.empresa_id, id);
 
   // Eletroposto: a ficha troca as abas "Sistema" e "Proposta e contrato" pela aba do eletroposto. O SDR também tem
   // a aba, mas a RLS só lhe mostra o registro sem modelos (sem proposta); a proposta existe quando há modelos.
@@ -109,7 +106,7 @@ export async function carregarFicha(atual: Vinculo, id: string, abaParam: string
       .neq("id", negocio.id)
       .order("created_at", { ascending: false })
       .limit(10),
-    eletropostoDisponivel(supabase, atual),
+    eletropostoDisponivel(),
   ]);
 
   const { data: proposta } = await supabase
@@ -337,7 +334,7 @@ export async function carregarFicha(atual: Vinculo, id: string, abaParam: string
 
   return {
     atual, negocio, config, parametros, temperatura, atividades, notas, tarefas, anexos, calculo, conferencia, semArquivo,
-    componentes, ehEletroposto, eletroposto, propostaEletroposto, outrosNegocios, eletropostoNaEmpresa, proposta, modelosProposta,
+    componentes, materiaisKit, precoSugeridoKit, ehEletroposto, eletroposto, propostaEletroposto, outrosNegocios, eletropostoNaEmpresa, proposta, modelosProposta,
     emissoesAusente, emissoes, conteudoModelo, regrasCondicoes, validadePadraoDias, geracaoConfirmada, aberturas, contrato, statusPagamento,
     registroManualIndisponivel, registrosPagamento, situacaoPagamentoSolo, mostrarPagamentoSolo, mostrarPagamentoPro, ultimoHandoff,
     podeResponderHandoff, obraDoNegocio, arquivado, precoDesatualizado, precoContratoDesatualizado, escolhaCondicao, condicaoRegistrada, vigenciaDaTela, contextoEstimativa, historicoCalculo,
