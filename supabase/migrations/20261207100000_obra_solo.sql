@@ -368,3 +368,172 @@ where public.empresa_e_solo(o.empresa_id)
 
 update public.obras o set link_cliente = gen_random_uuid()::text
 where o.link_cliente is null and exists (select 1 from public.obra_checklist x where x.obra_id = o.id);
+
+-- ---------------------------------------------------------------------------
+-- Fotos das etapas (bucket privado `obra-fotos`, caminho <empresa>/<obra>/<etapa>/<arquivo>)
+-- ---------------------------------------------------------------------------
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('obra-fotos', 'obra-fotos', false, 3145728, array['image/jpeg', 'image/png', 'image/webp'])
+on conflict (id) do update
+  set public = false,
+      file_size_limit = 3145728,
+      allowed_mime_types = array['image/jpeg', 'image/png', 'image/webp'];
+
+-- A obra da pasta (2º nível), se for da empresa da pasta (1º nível) e tiver checklist (Solo).
+create or replace function public.obra_da_pasta_foto(p_nome text)
+returns uuid
+language sql stable security definer set search_path = ''
+as $$
+  select o.id from public.obras o
+  where o.id::text = (storage.foldername(p_nome))[2]
+    and o.empresa_id = public.empresa_da_pasta_marca(p_nome)
+    and exists (select 1 from public.obra_checklist c where c.obra_id = o.id);
+$$;
+revoke all on function public.obra_da_pasta_foto(text) from public, anon, service_role;
+grant execute on function public.obra_da_pasta_foto(text) to authenticated;
+
+create policy "obra-fotos: quem vê a obra lê" on storage.objects for select to authenticated
+  using (bucket_id = 'obra-fotos' and public.pode_ver_obra(public.obra_da_pasta_foto(name)));
+create policy "obra-fotos: admin envia" on storage.objects for insert to authenticated
+  with check (
+    bucket_id = 'obra-fotos'
+    and public.obra_da_pasta_foto(name) is not null
+    and public.tem_papel(public.empresa_da_pasta_marca(name), '{admin}')
+  );
+create policy "obra-fotos: admin remove" on storage.objects for delete to authenticated
+  using (bucket_id = 'obra-fotos' and public.tem_papel(public.empresa_da_pasta_marca(name), '{admin}'));
+
+create table public.obra_checklist_fotos (
+  id uuid primary key default gen_random_uuid(),
+  obra_id uuid not null,
+  empresa_id uuid not null references public.empresas (id) on delete cascade,
+  etapa public.etapa_checklist_obra not null,
+  caminho text not null unique,
+  enviada_por uuid references public.empresa_membros (id) on delete set null,
+  created_at timestamptz not null default now(),
+  foreign key (obra_id, etapa) references public.obra_checklist (obra_id, etapa) on delete cascade
+);
+create index obra_checklist_fotos_etapa_idx on public.obra_checklist_fotos (obra_id, etapa);
+create index obra_checklist_fotos_empresa_idx on public.obra_checklist_fotos (empresa_id);
+
+alter table public.obra_checklist_fotos enable row level security;
+create policy "quem vê a obra lê as fotos" on public.obra_checklist_fotos for select to authenticated
+  using (public.pode_ver_obra(obra_id));
+revoke all on public.obra_checklist_fotos from anon;
+revoke insert, update, delete, truncate, references, trigger on public.obra_checklist_fotos from authenticated;
+
+-- Registra a foto já enviada ao Storage (até 10 por etapa). Desmarcar a etapa não apaga as fotos.
+create or replace function public.registrar_foto_etapa_obra(p_obra_id uuid, p_etapa public.etapa_checklist_obra, p_caminho text)
+returns uuid
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_empresa uuid := public.exigir_admin_obra_solo(p_obra_id);
+  v_id uuid;
+begin
+  if p_caminho is null
+     or p_caminho not like v_empresa::text || '/' || p_obra_id::text || '/' || p_etapa::text || '/%'
+     or (storage.foldername(p_caminho))[4] is not null
+     or not exists (select 1 from storage.objects s where s.bucket_id = 'obra-fotos' and s.name = p_caminho) then
+    raise exception 'Foto inválida.' using errcode = 'check_violation', hint = 'mensagem_usuario';
+  end if;
+  -- Trava a etapa: dois envios ao mesmo tempo não passam do limite.
+  perform 1 from public.obra_checklist where obra_id = p_obra_id and etapa = p_etapa for update;
+  if (select count(*) from public.obra_checklist_fotos f where f.obra_id = p_obra_id and f.etapa = p_etapa) >= 10 then
+    raise exception 'Cada etapa aceita até 10 fotos.' using errcode = 'check_violation', hint = 'mensagem_usuario';
+  end if;
+  insert into public.obra_checklist_fotos (obra_id, empresa_id, etapa, caminho, enviada_por)
+  values (p_obra_id, v_empresa, p_etapa, p_caminho, public.meu_membro_id(v_empresa))
+  returning id into v_id;
+  perform public.registrar_historico_obra(p_obra_id, 'checklist_alterado', null, jsonb_build_object('etapa', p_etapa, 'acao', 'foto_enviada'));
+  return v_id;
+end;
+$$;
+revoke all on function public.registrar_foto_etapa_obra(uuid, public.etapa_checklist_obra, text) from public, anon, authenticated, service_role;
+grant execute on function public.registrar_foto_etapa_obra(uuid, public.etapa_checklist_obra, text) to authenticated;
+
+-- Apaga o registro da foto e devolve o caminho, para o app apagar o arquivo.
+create or replace function public.apagar_foto_etapa_obra(p_foto_id uuid)
+returns text
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_foto public.obra_checklist_fotos;
+begin
+  select * into v_foto from public.obra_checklist_fotos where id = p_foto_id;
+  if not found then
+    raise exception 'Só o admin da empresa altera o checklist da obra.' using errcode = '42501', hint = 'mensagem_usuario';
+  end if;
+  perform public.exigir_admin_obra_solo(v_foto.obra_id);
+  delete from public.obra_checklist_fotos where id = p_foto_id;
+  perform public.registrar_historico_obra(v_foto.obra_id, 'checklist_alterado', null, jsonb_build_object('etapa', v_foto.etapa, 'acao', 'foto_apagada'));
+  return v_foto.caminho;
+end;
+$$;
+revoke all on function public.apagar_foto_etapa_obra(uuid) from public, anon, authenticated, service_role;
+grant execute on function public.apagar_foto_etapa_obra(uuid) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Acompanhamento do cliente (página pública /obra/<token>)
+-- ---------------------------------------------------------------------------
+
+-- Só o que o cliente pode ver: primeiro nome, marca e WhatsApp da empresa, etapas (datas, "não se aplica" sem o
+-- motivo, caminhos das fotos, que o servidor do app assina) e a hora da última alteração. Nunca anotação, motivo,
+-- valor, NF, fornecedor, telefone ou endereço. Token inexistente = nulo; obra cancelada = só "encerrada" e a empresa.
+create or replace function public.acompanhamento_obra(p_token text)
+returns jsonb
+language plpgsql stable security definer set search_path = ''
+as $$
+declare
+  v_obra public.obras;
+  v_empresa jsonb;
+begin
+  if p_token is null or btrim(p_token) = '' then
+    return null;
+  end if;
+  select * into v_obra from public.obras o where o.link_cliente = p_token;
+  if not found then
+    return null;
+  end if;
+
+  select jsonb_build_object(
+    'nome', coalesce(nullif(btrim(pi.nome_exibicao), ''), e.nome),
+    'logo_escura', pi.logo_escuro_url,
+    'cor_primaria', pi.cor_primaria,
+    'cor_destaque', pi.cor_destaque,
+    'whatsapp', pi.whatsapp
+  ) into v_empresa
+  from public.empresas e
+  left join public.proposta_identidades pi on pi.empresa_id = e.id
+  where e.id = v_obra.empresa_id;
+
+  if v_obra.cancelada_em is not null then
+    return jsonb_build_object('situacao', 'encerrada', 'empresa', v_empresa);
+  end if;
+
+  return jsonb_build_object(
+    'situacao', 'ativa',
+    'cliente_primeiro_nome', split_part(btrim(coalesce(v_obra.cliente_nome, '')), ' ', 1),
+    'empresa', v_empresa,
+    'etapas', (
+      select coalesce(jsonb_agg(jsonb_build_object(
+        'etapa', c.etapa,
+        'feita_em', c.feita_em,
+        'prevista_para', c.prevista_para,
+        'nao_se_aplica', c.nao_se_aplica_motivo is not null,
+        'fotos', (select coalesce(jsonb_agg(f.caminho order by f.created_at), '[]'::jsonb)
+                  from public.obra_checklist_fotos f where f.obra_id = c.obra_id and f.etapa = c.etapa)
+      ) order by c.etapa), '[]'::jsonb)
+      from public.obra_checklist c where c.obra_id = v_obra.id
+    ),
+    'atualizado_em', greatest(
+      v_obra.created_at,
+      (select max(c.marcada_em) from public.obra_checklist c where c.obra_id = v_obra.id),
+      (select max(f.created_at) from public.obra_checklist_fotos f where f.obra_id = v_obra.id)
+    )
+  );
+end;
+$$;
+revoke all on function public.acompanhamento_obra(text) from public, service_role;
+grant execute on function public.acompanhamento_obra(text) to anon, authenticated;

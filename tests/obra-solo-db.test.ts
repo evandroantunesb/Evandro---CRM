@@ -5,7 +5,9 @@
  *
  * Cenário próprio ("Obra Solo" + sufixo, usuários "os-*" + sufixo). Os testes seguem em ordem.
  */
+import { createClient } from "@supabase/supabase-js";
 import { Client } from "pg";
+import type { Database } from "@/lib/supabase/database.types";
 import { beforeAll, describe, expect, it } from "vitest";
 import { urlBancoLocal } from "./banco-local";
 import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato } from "./ajuda";
@@ -194,5 +196,98 @@ describe("Obra do Solo: checklist no banco (ordem importa)", { concurrent: false
     expect(data ?? []).toEqual([]);
     const { data: proprio } = await admin.cliente.from("obra_checklist").select("etapa").eq("obra_id", obra);
     expect(proprio).toHaveLength(10);
+  });
+});
+
+// --- Tarefa 2: fotos e leitura pública do cliente ------------------------------------------------
+
+const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+const anonimo = createClient<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { auth: { persistSession: false } });
+
+describe("Obra do Solo: fotos e acompanhamento (ordem importa)", { concurrent: false, shuffle: false }, () => {
+  let obra: string;
+  let token: string;
+  const caminhoDe = (etapa: string, n: number | string, empresa = solo, obraId = obra) => `${empresa}/${obraId}/${etapa}/${n}-${sufixo}.png`;
+  const enviar = async (u: Usuario, caminho: string) => u.cliente.storage.from("obra-fotos").upload(caminho, PNG, { contentType: "image/png" });
+  const registrar = (u: Usuario, etapa: string, caminho: string) =>
+    u.cliente.rpc("registrar_foto_etapa_obra", { p_obra_id: obra, p_etapa: etapa, p_caminho: caminho } as never);
+
+  beforeAll(async () => {
+    obra = (await criarObra(solo, admin, "Solo fotos")).obra;
+    const [o] = await noBanco("select link_cliente from public.obras where id = $1", [obra]);
+    token = o.link_cliente;
+    ok(await admin.cliente.rpc("marcar_etapa_obra", { p_obra_id: obra, p_etapa: "instalacao", p_feita: true, p_data: hoje() }), "instalação");
+    ok(await admin.cliente.rpc("anotar_etapa_obra", { p_obra_id: obra, p_etapa: "instalacao", p_texto: "ANOTACAO-SECRETA" }), "anotação");
+    ok(await admin.cliente.rpc("etapa_nao_se_aplica_obra", { p_obra_id: obra, p_etapa: "vistoria", p_motivo: "MOTIVO-SECRETO" }), "nsa");
+    ok(await admin.cliente.rpc("prever_etapa_obra", { p_obra_id: obra, p_etapa: "conexao", p_data: "2099-03-01" }), "prevista");
+  });
+
+  it("só o admin envia e apaga foto", async () => {
+    const doGestor = caminhoDe("instalacao", "g");
+    expect((await enviar(gestor, doGestor)).error).not.toBeNull();
+    expect((await registrar(gestor, "instalacao", doGestor)).error?.code).toBe("42501");
+
+    const caminho = caminhoDe("instalacao", 1);
+    ok(await enviar(admin, caminho), "upload");
+    const { data: fotoId } = ok(await registrar(admin, "instalacao", caminho), "registrar");
+    expect((await gestor.cliente.rpc("apagar_foto_etapa_obra", { p_foto_id: fotoId as string })).error?.code).toBe("42501");
+    const { data: apagado } = ok(await admin.cliente.rpc("apagar_foto_etapa_obra", { p_foto_id: fotoId as string }), "apagar");
+    expect(apagado).toBe(caminho);
+    expect((await gestor.cliente.storage.from("obra-fotos").remove([caminho])).data ?? []).toEqual([]);
+    ok(await admin.cliente.storage.from("obra-fotos").remove([caminho]), "apagar arquivo");
+  });
+
+  it("caminho fora da pasta da obra é recusado", async () => {
+    expect((await registrar(admin, "instalacao", caminhoDe("vistoria", "x"))).error).not.toBeNull();
+    expect((await registrar(admin, "instalacao", caminhoDe("instalacao", "y", pro))).error).not.toBeNull();
+    expect((await enviar(admin, caminhoDe("instalacao", "z", pro))).error).not.toBeNull();
+  });
+
+  it("até 10 fotos por etapa", async () => {
+    for (let n = 1; n <= 10; n++) {
+      const caminho = caminhoDe("instalacao", `lote${n}`);
+      ok(await enviar(admin, caminho), `upload ${n}`);
+      ok(await registrar(admin, "instalacao", caminho), `registrar ${n}`);
+    }
+    const onze = caminhoDe("instalacao", "lote11");
+    ok(await enviar(admin, onze), "upload 11");
+    expect((await registrar(admin, "instalacao", onze)).error?.message).toContain("10 fotos");
+  });
+
+  it("acompanhamento_obra como anon devolve só os campos públicos", async () => {
+    const { data, error } = await anonimo.rpc("acompanhamento_obra", { p_token: token });
+    expect(error).toBeNull();
+    const r = data as Record<string, unknown>;
+    expect(Object.keys(r).sort()).toEqual(["atualizado_em", "cliente_primeiro_nome", "empresa", "etapas", "situacao"]);
+    expect(r.situacao).toBe("ativa");
+    expect(r.cliente_primeiro_nome).toBe("Cliente");
+    expect(Object.keys(r.empresa as object).sort()).toEqual(["cor_destaque", "cor_primaria", "logo_escura", "nome", "whatsapp"]);
+    const etapas = r.etapas as { etapa: string; feita_em: string | null; prevista_para: string | null; nao_se_aplica: boolean; fotos: string[] }[];
+    expect(etapas.map((e) => e.etapa)).toEqual(ETAPAS);
+    expect(Object.keys(etapas[0]).sort()).toEqual(["etapa", "feita_em", "fotos", "nao_se_aplica", "prevista_para"]);
+    const instalacao = etapas.find((e) => e.etapa === "instalacao")!;
+    expect(instalacao.feita_em).toBe(hoje());
+    expect(instalacao.fotos).toHaveLength(10);
+    expect(etapas.find((e) => e.etapa === "vistoria")!.nao_se_aplica).toBe(true);
+    expect(etapas.find((e) => e.etapa === "conexao")!.prevista_para).toBe("2099-03-01");
+    const json = JSON.stringify(r);
+    for (const proibido of ["ANOTACAO-SECRETA", "MOTIVO-SECRETO", CLIENTE_CONTRATO.telefone, "30000"]) expect(json).not.toContain(proibido);
+  });
+
+  it("token inválido, token antigo e obra do PRO não devolvem nada", async () => {
+    expect((await anonimo.rpc("acompanhamento_obra", { p_token: "nao-existe" })).data).toBeNull();
+    expect((await anonimo.rpc("acompanhamento_obra", { p_token: "" })).data).toBeNull();
+    ok(await admin.cliente.rpc("gerar_link_cliente_obra", { p_obra_id: obra }), "novo link");
+    expect((await anonimo.rpc("acompanhamento_obra", { p_token: token })).data).toBeNull();
+    const [o] = await noBanco("select link_cliente from public.obras where id = $1", [obra]);
+    token = o.link_cliente;
+    expect((await anonimo.rpc("acompanhamento_obra", { p_token: token })).data).not.toBeNull();
+  });
+
+  it("obra cancelada devolve só a situação encerrada e a empresa", async () => {
+    await noBanco("update public.obras set cancelada_em = now(), cancelamento_motivo = 'Cliente desistiu' where id = $1", [obra]);
+    const { data } = await anonimo.rpc("acompanhamento_obra", { p_token: token });
+    expect(Object.keys(data as object).sort()).toEqual(["empresa", "situacao"]);
+    expect((data as { situacao: string }).situacao).toBe("encerrada");
   });
 });

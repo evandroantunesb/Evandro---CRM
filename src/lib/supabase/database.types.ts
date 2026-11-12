@@ -3936,6 +3936,58 @@ export type Database = {
           },
         ];
       };
+      obra_checklist_fotos: {
+        Row: {
+          caminho: string;
+          created_at: string;
+          empresa_id: string;
+          enviada_por: string | null;
+          etapa: Database["public"]["Enums"]["etapa_checklist_obra"];
+          id: string;
+          obra_id: string;
+        };
+        Insert: {
+          caminho: string;
+          created_at?: string;
+          empresa_id: string;
+          enviada_por?: string | null;
+          etapa: Database["public"]["Enums"]["etapa_checklist_obra"];
+          id?: string;
+          obra_id: string;
+        };
+        Update: {
+          caminho?: string;
+          created_at?: string;
+          empresa_id?: string;
+          enviada_por?: string | null;
+          etapa?: Database["public"]["Enums"]["etapa_checklist_obra"];
+          id?: string;
+          obra_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "obra_checklist_fotos_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "obra_checklist_fotos_enviada_por_fkey";
+            columns: ["enviada_por"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "obra_checklist_fotos_obra_id_etapa_fkey";
+            columns: ["obra_id", "etapa"];
+            isOneToOne: false;
+            referencedRelation: "obra_checklist";
+            referencedColumns: ["obra_id", "etapa"];
+          },
+        ];
+      };
       obra_cliente: {
         Row: {
           created_at: string;
@@ -7031,6 +7083,7 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      acompanhamento_obra: { Args: { p_token: string }; Returns: Json };
       ajustar_entrega_contratada_obra: {
         Args: { p_data: string; p_motivo: string; p_obra_id: string };
         Returns: undefined;
@@ -7106,6 +7159,7 @@ export type Database = {
         };
         Returns: undefined;
       };
+      apagar_foto_etapa_obra: { Args: { p_foto_id: string }; Returns: string };
       aplicar_checklist_engenharia: { Args: { p_obra_id: string }; Returns: number };
       aprovar_atribuicao_lead: {
         Args: { p_id: string; p_membro_final_id?: string };
@@ -8074,6 +8128,7 @@ export type Database = {
         Returns: undefined;
       };
       obra_da_pasta_engenharia: { Args: { p_caminho: string }; Returns: string };
+      obra_da_pasta_foto: { Args: { p_nome: string }; Returns: string };
       obra_snapshot_comercial: { Args: { p_negocio_id: string }; Returns: Json };
       obra_snapshot_tecnico: { Args: { p_negocio_id: string }; Returns: Json };
       obra_tem_orcamento_conexao: { Args: { p_obra_id: string }; Returns: boolean };
@@ -8417,6 +8472,14 @@ export type Database = {
       };
       registrar_evento_vistoria_engenharia: {
         Args: { p_data: string; p_descricao?: string; p_tipo: string; p_vistoria_id: string };
+        Returns: string;
+      };
+      registrar_foto_etapa_obra: {
+        Args: {
+          p_caminho: string;
+          p_etapa: Database["public"]["Enums"]["etapa_checklist_obra"];
+          p_obra_id: string;
+        };
         Returns: string;
       };
       registrar_historico_obra: {
