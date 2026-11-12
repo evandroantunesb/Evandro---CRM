@@ -25,6 +25,8 @@ export type ObraSoloListaVM = {
   atualPrevistaPara: string | null;
   /** Data em que a entrega foi feita (obra entregue). */
   entregueEm: string | null;
+  /** Pagamento da entrada estornado sem nova confirmação. */
+  alertaEstornoEm: string | null;
 };
 
 type LinhaBanco = { obra_id: string; etapa: string; feita_em: string | null; nao_se_aplica_motivo: string | null; prevista_para: string | null };
@@ -45,7 +47,7 @@ export async function carregarObrasSolo(supabase: SupabaseServidor, empresaId: s
   const [obrasRes, checklistRes] = await Promise.all([
     supabase
       .from("obras")
-      .select("id, numero, cliente_nome, cidade, uf, potencia_kwp, pausada_em, cancelada_em")
+      .select("id, numero, cliente_nome, cidade, uf, potencia_kwp, pausada_em, cancelada_em, alerta_pagamento_estornado_em")
       .eq("empresa_id", empresaId)
       .order("numero", { ascending: false }),
     supabase.from("obra_checklist").select("obra_id, etapa, feita_em, nao_se_aplica_motivo, prevista_para").eq("empresa_id", empresaId),
@@ -77,12 +79,16 @@ export async function carregarObrasSolo(supabase: SupabaseServidor, empresaId: s
         linhas,
         atualPrevistaPara: atual?.previstaPara ?? null,
         entregueEm: linhas.find((l) => l.etapa === "entrega")?.feitaEm ?? null,
+        alertaEstornoEm: o.alerta_pagamento_estornado_em,
       },
     ];
   });
 }
 
-/** Números do topo da lista: em andamento (e o kWp delas), entregues no ano de `hoje` e a próxima data prevista. */
+/**
+ * Números do topo da lista: em andamento (com as pausadas, como a aba; e o kWp delas), entregues no ano de `hoje` e a
+ * próxima data prevista (só das que não estão pausadas).
+ */
 export function numerosSolo(
   obras: readonly ObraSoloListaVM[],
   hoje: string,
@@ -92,10 +98,10 @@ export function numerosSolo(
   entreguesNoAno: number;
   proximaPrevista: { data: string; etapa: EtapaChecklist; clienteNome: string } | null;
 } {
-  const andamento = obras.filter((o) => o.situacao === "em_andamento");
+  const andamento = obras.filter((o) => o.situacao === "em_andamento" || o.situacao === "pausada");
   const ano = hoje.slice(0, 4);
   let proxima: { data: string; etapa: EtapaChecklist; clienteNome: string } | null = null;
-  for (const o of andamento) {
+  for (const o of andamento.filter((x) => x.situacao === "em_andamento")) {
     if (o.atualPrevistaPara && o.atualPrevistaPara >= hoje && o.andamento.atual && (!proxima || o.atualPrevistaPara < proxima.data)) {
       proxima = { data: o.atualPrevistaPara, etapa: o.andamento.atual, clienteNome: o.clienteNome };
     }
@@ -122,6 +128,8 @@ export type ObraSoloVM = {
   telefoneCliente: string | null;
   linkCliente: string | null;
   criadaEm: string;
+  /** Pagamento da entrada estornado sem nova confirmação. */
+  alertaEstornoEm: string | null;
   situacao: SituacaoObraSolo;
   andamento: ReturnType<typeof andamentoChecklist>;
   etapas: EtapaSoloVM[];
@@ -133,7 +141,7 @@ const EXPIRA_FOTO_SEGUNDOS = 60 * 60;
 export async function carregarObraSolo(supabase: SupabaseServidor, empresaId: string, obraId: string): Promise<ObraSoloVM | null> {
   const { data: o, error } = await supabase
     .from("obras")
-    .select("id, numero, negocio_id, cliente_nome, cidade, uf, potencia_kwp, unidade_consumidora, link_cliente, created_at, pausada_em, cancelada_em")
+    .select("id, numero, negocio_id, cliente_nome, cidade, uf, potencia_kwp, unidade_consumidora, link_cliente, created_at, pausada_em, cancelada_em, alerta_pagamento_estornado_em")
     .eq("id", obraId)
     .eq("empresa_id", empresaId)
     .maybeSingle();
@@ -180,6 +188,7 @@ export async function carregarObraSolo(supabase: SupabaseServidor, empresaId: st
     telefoneCliente: contato?.telefone ?? null,
     linkCliente: o.link_cliente,
     criadaEm: o.created_at,
+    alertaEstornoEm: o.alerta_pagamento_estornado_em,
     situacao: situacaoObraSolo(o, andamento.concluida),
     andamento,
     etapas,

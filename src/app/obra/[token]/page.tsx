@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import { Check } from "lucide-react";
-import { ROTULO_ETAPA, linkWhatsApp } from "@/lib/obras/checklist";
+import { formatarDiaMes } from "@/lib/formatacao";
+import { ROTULO_ETAPA, etapaResolvida, linkWhatsApp } from "@/lib/obras/checklist";
 import { carregarAcompanhamento, type EmpresaAcompanhamento } from "@/lib/obras/acompanhamento";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Acompanhe sua obra", robots: { index: false, follow: false } };
 
-const dataCurta = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 const atualizado = (iso: string) => {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
@@ -54,7 +54,7 @@ export default async function AcompanheSuaObra({ params }: PageProps<"/obra/[tok
           {atual && (
             <p className="mt-2.5 text-[13px] text-offwhite/75">
               Agora: <b className="text-offwhite">{ROTULO_ETAPA[atual.etapa]}</b>
-              {atual.previstaPara && `, prevista para ${dataCurta(atual.previstaPara)}`}
+              {atual.previstaPara && `, prevista para ${formatarDiaMes(atual.previstaPara)}`}
             </p>
           )}
         </>
@@ -62,7 +62,7 @@ export default async function AcompanheSuaObra({ params }: PageProps<"/obra/[tok
     >
       <ol className="flex flex-col px-5 pt-5">
         {a.etapas.map((e, i) => {
-          const resolvida = e.feitaEm != null || e.naoSeAplica;
+          const resolvida = etapaResolvida(e);
           const ehAtual = e.etapa === a.andamento.atual;
           return (
             <li key={e.etapa} className="relative flex gap-3 pb-4 last:pb-2">
@@ -78,11 +78,11 @@ export default async function AcompanheSuaObra({ params }: PageProps<"/obra/[tok
               <div className="min-w-0 flex-1 pt-0.5">
                 <p className={`text-sm ${resolvida || ehAtual ? "font-semibold text-texto" : "text-texto-2"}`}>{ROTULO_ETAPA[e.etapa]}</p>
                 {e.feitaEm ? (
-                  <p className="text-xs text-texto-2">{dataCurta(e.feitaEm)}</p>
+                  <p className="text-xs text-texto-2">{formatarDiaMes(e.feitaEm)}</p>
                 ) : e.naoSeAplica ? (
                   <p className="text-xs text-texto-2">Não se aplica</p>
                 ) : e.previstaPara ? (
-                  <p className="text-xs text-dourado-texto">prevista para {dataCurta(e.previstaPara)}</p>
+                  <p className="text-xs text-dourado-texto">prevista para {formatarDiaMes(e.previstaPara)}</p>
                 ) : null}
                 {e.fotos.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1.5">

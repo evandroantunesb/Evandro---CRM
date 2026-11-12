@@ -47,7 +47,7 @@ export default async function Obras({ searchParams }: PageProps<"/obras">) {
   // Solo: a lista em cartões com o checklist de cada obra (subprojeto 4b).
   if ((await obterTelasEmpresa()).solo) {
     const obrasSolo = await carregarObrasSolo(supabase, atual.empresaId);
-    return <ListaObrasSolo obras={obrasSolo} filtro={params.filtro === "entregues" ? "entregues" : "andamento"} hoje={hojeBrasilia()} />;
+    return <ListaObrasSolo obras={obrasSolo} filtro={params.filtro === "entregues" || params.filtro === "canceladas" ? params.filtro : "andamento"} hoje={hojeBrasilia()} />;
   }
 
   // Admin e gestor: a visão Completa (semáforo de todas as obras), do desenho aprovado. A lista por setor continua

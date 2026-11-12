@@ -6,11 +6,14 @@ import { FOCO } from "@/components/ui";
 import { apagarFotoEtapa, registrarFotoEtapa } from "@/lib/acoes/obra-solo";
 import type { EtapaChecklist } from "@/lib/obras/checklist";
 import type { FotoEtapaVM } from "@/lib/obras/solo-dados";
-import { DICA_IMAGEM, validarArquivoImagem } from "@/lib/imagem-upload";
+import { validarArquivoImagem } from "@/lib/imagem-upload";
 import { recortarImagem } from "@/lib/recortar-imagem";
 import { criarClienteNavegador } from "@/lib/supabase/navegador";
 
 const LIMITE_FOTOS = 10;
+/** Teto do arquivo escolhido (foto do celular); depois de reduzida, a foto precisa caber nos 3 MB do Storage. */
+const LIMITE_ORIGINAL_BYTES = 25 * 1024 * 1024;
+const DICA_FOTO = "JPG, PNG ou WebP até 25 MB";
 
 /** Lê as dimensões da imagem para comprimir sem recortar. */
 function dimensoes(src: string): Promise<{ width: number; height: number }> {
@@ -34,12 +37,14 @@ export function FotosEtapa({ empresaId, obraId, etapa, fotos }: { empresaId: str
 
   async function enviar(arquivo: File) {
     setErro(null);
-    const invalido = validarArquivoImagem(arquivo);
+    const invalido = validarArquivoImagem(arquivo, LIMITE_ORIGINAL_BYTES);
     if (invalido) return setErro(invalido);
     const url = URL.createObjectURL(arquivo);
     try {
       const { width, height } = await dimensoes(url);
       const imagem = await recortarImagem(url, { x: 0, y: 0, width, height });
+      const grande = validarArquivoImagem({ type: imagem.tipo, size: imagem.blob.size });
+      if (grande) return setErro(grande);
       const caminho = `${empresaId}/${obraId}/${etapa}/${crypto.randomUUID()}.${imagem.extensao}`;
       const { error } = await criarClienteNavegador().storage.from("obra-fotos").upload(caminho, imagem.blob, { contentType: imagem.tipo });
       if (error) return setErro("Não foi possível enviar a foto.");
@@ -96,7 +101,7 @@ export function FotosEtapa({ empresaId, obraId, etapa, fotos }: { empresaId: str
           <ImagePlus size={15} aria-hidden />
           {pendente ? "Enviando..." : "Adicionar foto"}
         </button>
-        <span className="text-xs text-texto-2">{cheio ? "Limite de 10 fotos nesta etapa." : DICA_IMAGEM}</span>
+        <span className="text-xs text-texto-2">{cheio ? "Limite de 10 fotos nesta etapa." : DICA_FOTO}</span>
         <input
           ref={entrada}
           type="file"

@@ -63,12 +63,20 @@ export async function carregarAcompanhamento(token: string): Promise<Acompanhame
   const { data, error } = await criarClienteAnonimo().rpc("acompanhamento_obra", { p_token: token });
   if (error || !data) return { tipo: "invalido" };
   const r = data as unknown as RespostaBanco;
-  const empresa = await empresaDe(r.empresa);
-  if (r.situacao === "encerrada") return { tipo: "encerrada", empresa };
+  if (r.situacao === "encerrada") return { tipo: "encerrada", empresa: await empresaDe(r.empresa) };
 
   const etapasBanco = (r.etapas ?? []).filter((e): e is typeof e & { etapa: EtapaChecklist } => ehEtapaChecklist(e.etapa));
   const caminhos = etapasBanco.flatMap((e) => e.fotos);
-  const assinadas = caminhos.length ? ((await criarClienteAdmin().storage.from("obra-fotos").createSignedUrls(caminhos, EXPIRA_SEGUNDOS)).data ?? []) : [];
+  // A logo e as fotos são assinadas ao mesmo tempo.
+  const [empresa, assinadas] = await Promise.all([
+    empresaDe(r.empresa),
+    caminhos.length
+      ? criarClienteAdmin()
+          .storage.from("obra-fotos")
+          .createSignedUrls(caminhos, EXPIRA_SEGUNDOS)
+          .then((res) => res.data ?? [])
+      : Promise.resolve([]),
+  ]);
   const urlDe = new Map(assinadas.map((a) => [a.path, a.signedUrl]));
 
   const etapas: EtapaAcompanhamento[] = etapasBanco.map((e) => ({

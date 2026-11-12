@@ -41,7 +41,6 @@ import { COLUNAS_JUSTIFICATIVA, atrasosDaObra, justificativasPorEtapa } from "@/
 import { hojeEmSaoPaulo } from "@/lib/formatacao";
 import { exigirPapel } from "@/lib/sessao";
 import { carregarObraSolo } from "@/lib/obras/solo-dados";
-import { hojeBrasilia } from "@/lib/obras/apresentacao/dados";
 import { obterTelasEmpresa } from "@/lib/telas-empresa-servidor";
 import { ObraSolo } from "./_solo/obra-solo";
 import { carregarSubstituicoes } from "@/lib/substituicoes";
@@ -68,7 +67,7 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
   if ((await obterTelasEmpresa()).solo) {
     const obraSolo = await carregarObraSolo(supabase, atual.empresaId, id);
     if (!obraSolo) notFound();
-    return <ObraSolo obra={obraSolo} empresaId={atual.empresaId} hoje={hojeBrasilia()} />;
+    return <ObraSolo obra={obraSolo} empresaId={atual.empresaId} hoje={hojeEmSaoPaulo()} />;
   }
   // A lista navegável é recalculada aqui, a cada obra: mesma empresa, mesma RLS, mesmos filtros.
   const [obra, lista, tarefasSetor, vistoria, vistorias, cronograma, orcamento, lancamentos, justificativasRes, escalonamentosRes, identidades, prazosRes, substituicoes, pedidosCompra, obraCompras, atuoEmCompras, orcamentosCompra] = await Promise.all([

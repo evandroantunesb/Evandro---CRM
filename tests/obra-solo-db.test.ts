@@ -100,7 +100,7 @@ describe("Obra do Solo: checklist no banco (ordem importa)", { concurrent: false
     const linhas = await checklist(obra);
     expect(linhas.map((l) => l.etapa)).toEqual(ETAPAS);
     const [datas] = await noBanco(
-      `select (select (min(e.created_at) at time zone 'America/Sao_Paulo')::date::text from public.eventos e
+      `select (select (max(e.created_at) at time zone 'America/Sao_Paulo')::date::text from public.eventos e
                 where e.tipo = 'contrato.assinado' and e.entidade_id = $1) as assinatura,
               (select (c.confirmado_em at time zone 'America/Sao_Paulo')::date::text from public.confirmacoes_pagamento c
                 where c.contrato_id = $2) as entrada`,
@@ -143,6 +143,40 @@ describe("Obra do Solo: checklist no banco (ordem importa)", { concurrent: false
       const { error } = await admin.cliente.rpc("marcar_etapa_obra", { p_obra_id: obra, p_etapa: etapa, p_feita: false, p_data: null } as never);
       expect(error?.message).toContain("não pode ser desmarcada");
     }
+  });
+
+  it("contrato e entrada não se marcam à mão e marcar sem dizer se foi feita é recusado", async () => {
+    const semFeita = await admin.cliente.rpc("marcar_etapa_obra", { p_obra_id: obra, p_etapa: "contrato", p_feita: null, p_data: null } as never);
+    expect(semFeita.error?.message).toContain("Informe se a etapa foi feita");
+    const entrada = await admin.cliente.rpc("marcar_etapa_obra", { p_obra_id: obra, p_etapa: "entrada", p_feita: true, p_data: hoje() });
+    expect(entrada.error?.message).toContain("confirmação do pagamento");
+    expect((await linha(obra, "contrato")).feita_em).not.toBeNull();
+  });
+
+  it("entrega contratada da obra do Solo é o prazo configurado inteiro", async () => {
+    const [l] = await noBanco(
+      `select o.entrega_contratada::text as gravada,
+              public.somar_dias_uteis(o.empresa_id, (o.created_at at time zone 'America/Sao_Paulo')::date, p.dias_uteis)::text as esperada
+       from public.obras o join public.obra_prazos_etapas p on p.empresa_id = o.empresa_id and p.chave = 'entrega_contratada'
+       where o.id = $1`,
+      [obra],
+    );
+    expect(l.gravada).toBe(l.esperada);
+  });
+
+  it("estorno da entrada deixa a etapa pendente; nova confirmação marca de novo", async () => {
+    const estornada = await criarObra(solo, admin, "Solo estorno");
+    ok(await admin.cliente.rpc("estornar_confirmacao_pagamento", { p_contrato_id: estornada.contrato, p_motivo: "Pix devolvido pelo banco" }), "estorno");
+    expect((await linha(estornada.obra, "entrada")).feita_em).toBeNull();
+    const [o] = await noBanco("select alerta_pagamento_estornado_em, link_cliente from public.obras where id = $1", [estornada.obra]);
+    expect(o.alerta_pagamento_estornado_em).not.toBeNull();
+    const { data } = await anonimo.rpc("acompanhamento_obra", { p_token: o.link_cliente });
+    expect((data as { etapas: { etapa: string; feita_em: string | null }[] }).etapas.find((e) => e.etapa === "entrada")!.feita_em).toBeNull();
+
+    ok(await admin.cliente.rpc("confirmar_pagamento", { p_contrato_id: estornada.contrato }), "nova confirmação");
+    expect((await linha(estornada.obra, "entrada")).feita_em).toBe(hoje());
+    const [depois] = await noBanco("select alerta_pagamento_estornado_em from public.obras where id = $1", [estornada.obra]);
+    expect(depois.alerta_pagamento_estornado_em).toBeNull();
   });
 
   it("data de feita no futuro é recusada", async () => {
@@ -254,6 +288,16 @@ describe("Obra do Solo: fotos e acompanhamento (ordem importa)", { concurrent: f
     expect((await registrar(admin, "instalacao", onze)).error?.message).toContain("10 fotos");
   });
 
+  it("etapa que não se aplica não mostra fotos ao cliente", async () => {
+    const caminho = caminhoDe("vistoria", "nsa");
+    ok(await enviar(admin, caminho), "upload");
+    ok(await registrar(admin, "vistoria", caminho), "registrar");
+    const { data } = await anonimo.rpc("acompanhamento_obra", { p_token: token });
+    const vistoria = (data as { etapas: { etapa: string; nao_se_aplica: boolean; fotos: string[] }[] }).etapas.find((e) => e.etapa === "vistoria")!;
+    expect(vistoria.nao_se_aplica).toBe(true);
+    expect(vistoria.fotos).toEqual([]);
+  });
+
   it("acompanhamento_obra como anon devolve só os campos públicos", async () => {
     const { data, error } = await anonimo.rpc("acompanhamento_obra", { p_token: token });
     expect(error).toBeNull();
@@ -272,6 +316,16 @@ describe("Obra do Solo: fotos e acompanhamento (ordem importa)", { concurrent: f
     expect(etapas.find((e) => e.etapa === "conexao")!.prevista_para).toBe("2099-03-01");
     const json = JSON.stringify(r);
     for (const proibido of ["ANOTACAO-SECRETA", "MOTIVO-SECRETO", CLIENTE_CONTRATO.telefone, "30000"]) expect(json).not.toContain(proibido);
+  });
+
+  it("atualizado em acompanha a data prevista, mas não a anotação", async () => {
+    const lerAtualizado = async () =>
+      ((await anonimo.rpc("acompanhamento_obra", { p_token: token })).data as { atualizado_em: string }).atualizado_em;
+    const antes = await lerAtualizado();
+    ok(await admin.cliente.rpc("anotar_etapa_obra", { p_obra_id: obra, p_etapa: "conexao", p_texto: "Só o admin vê" }), "anotação");
+    expect(await lerAtualizado()).toBe(antes);
+    ok(await admin.cliente.rpc("prever_etapa_obra", { p_obra_id: obra, p_etapa: "conexao", p_data: "2099-04-01" }), "nova previsão");
+    expect(Date.parse(await lerAtualizado())).toBeGreaterThan(Date.parse(antes));
   });
 
   it("token inválido, token antigo e obra do PRO não devolvem nada", async () => {

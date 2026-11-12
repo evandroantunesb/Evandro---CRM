@@ -51,6 +51,7 @@ const obra = (id: string, numero: number, extra: Linha = {}): Linha => ({
   uf: "SP",
   potencia_kwp: "8.2",
   pausada_em: null,
+  alerta_pagamento_estornado_em: null,
   cancelada_em: null,
   ...extra,
 });
@@ -93,21 +94,23 @@ describe("numerosSolo", () => {
     linhas: [],
     atualPrevistaPara: null,
     entregueEm: null,
+    alertaEstornoEm: null,
     ...extra,
   });
 
-  it("conta entregues só no ano corrente e soma o kWp em andamento", () => {
+  it("conta entregues só no ano corrente e soma o kWp em andamento (com as pausadas, como a aba)", () => {
     const n = numerosSolo(
       [
         vm({ potenciaKwp: 8.2 }),
-        vm({ potenciaKwp: 30 }),
+        vm({ potenciaKwp: 25, situacao: "pausada" }),
+        vm({ potenciaKwp: 5 }),
         vm({ situacao: "entregue", entregueEm: "2026-03-01" }),
         vm({ situacao: "entregue", entregueEm: "2025-12-30" }),
         vm({ situacao: "cancelada" }),
       ],
       "2026-11-11",
     );
-    expect(n).toMatchObject({ emAndamento: 2, kwpEmAndamento: 38.2, entreguesNoAno: 1 });
+    expect(n).toMatchObject({ emAndamento: 3, kwpEmAndamento: 38.2, entreguesNoAno: 1 });
   });
 
   it("próxima data prevista: a menor de hoje em diante, com a etapa e o cliente", () => {

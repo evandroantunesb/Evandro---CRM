@@ -4,13 +4,11 @@ import { useState, useTransition } from "react";
 import { Check } from "lucide-react";
 import { Botao, CLASSE_ENTRADA, FOCO } from "@/components/ui";
 import { anotarEtapa, etapaNaoSeAplica, marcarEtapa, preverEtapa } from "@/lib/acoes/obra-solo";
-import { ETAPAS_FIXAS, ETAPAS_NAO_SE_APLICA, ROTULO_ETAPA, linkWhatsApp, mensagemWhatsApp, type EtapaChecklist } from "@/lib/obras/checklist";
+import { formatarDiaMes, hojeEmSaoPaulo } from "@/lib/formatacao";
+import { ETAPAS_FIXAS, ETAPAS_NAO_SE_APLICA, ROTULO_ETAPA, etapaResolvida, linkWhatsApp, mensagemWhatsApp, type EtapaChecklist } from "@/lib/obras/checklist";
 import type { EtapaSoloVM } from "@/lib/obras/solo-dados";
 import type { ResultadoAcao } from "@/lib/tipos";
 import { FotosEtapa } from "./fotos";
-
-const hojeIso = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
-const dataCurta = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 
 type Contexto = { obraId: string; empresaId: string; clienteNome: string; link: string | null; telefone: string | null };
 
@@ -30,7 +28,7 @@ export function ChecklistSolo({ etapas, atual, contexto }: { etapas: EtapaSoloVM
       <ol className="flex flex-col">
         {etapas.map((e, i) => {
           const feita = e.feitaEm != null;
-          const resolvida = feita || e.naoSeAplica;
+          const resolvida = etapaResolvida(e);
           const ehAtual = e.etapa === atual;
           return (
             <li key={e.etapa} className="relative flex gap-3.5 pb-4 last:pb-0">
@@ -56,11 +54,11 @@ export function ChecklistSolo({ etapas, atual, contexto }: { etapas: EtapaSoloVM
                 </button>
                 <p className="text-xs text-texto-2">
                   {feita
-                    ? [dataCurta(e.feitaEm!), e.fotos.length ? `${e.fotos.length} ${e.fotos.length === 1 ? "foto" : "fotos"}` : null].filter(Boolean).join(" · ")
+                    ? [formatarDiaMes(e.feitaEm!), e.fotos.length ? `${e.fotos.length} ${e.fotos.length === 1 ? "foto" : "fotos"}` : null].filter(Boolean).join(" · ")
                     : e.naoSeAplica
                       ? `Não se aplica · ${e.motivo}`
                       : e.previstaPara
-                        ? `prevista para ${dataCurta(e.previstaPara)}`
+                        ? `prevista para ${formatarDiaMes(e.previstaPara)}`
                         : "sem data prevista"}
                 </p>
                 {e.anotacao && aberta !== e.etapa && <p className="mt-1 text-xs text-texto-2 italic">Só você vê: {e.anotacao}</p>}
@@ -115,7 +113,7 @@ function AvisoWhatsApp({ etapa, contexto, fechar }: { etapa: EtapaChecklist; con
 function AcoesEtapa({ etapa: e, contexto, aoMarcar }: { etapa: EtapaSoloVM; contexto: Contexto; aoMarcar: () => void }) {
   const [resultado, setResultado] = useState<ResultadoAcao>(null);
   const [pendente, iniciar] = useTransition();
-  const [dataFeita, setDataFeita] = useState(hojeIso());
+  const [dataFeita, setDataFeita] = useState(hojeEmSaoPaulo());
   const [prevista, setPrevista] = useState(e.previstaPara ?? "");
   const [anotacao, setAnotacao] = useState(e.anotacao ?? "");
   const [pedindoMotivo, setPedindoMotivo] = useState(false);
@@ -154,12 +152,18 @@ function AcoesEtapa({ etapa: e, contexto, aoMarcar }: { etapa: EtapaSoloVM; cont
             </Botao>
           </div>
         )
+      ) : ETAPAS_FIXAS.includes(e.etapa) ? (
+        <p className="text-sm text-texto">
+          {e.etapa === "entrada"
+            ? "Pagamento da entrada estornado. A etapa volta a ficar feita quando o pagamento for confirmado de novo."
+            : "Esta etapa é marcada pela assinatura do contrato."}
+        </p>
       ) : (
         <>
           <div className="flex flex-wrap items-end gap-2">
             <label className="flex flex-col gap-1 text-xs text-texto-2">
               Feita em
-              <input type="date" value={dataFeita} max={hojeIso()} onChange={(ev) => setDataFeita(ev.target.value)} className={`${CLASSE_ENTRADA} text-sm`} />
+              <input type="date" value={dataFeita} max={hojeEmSaoPaulo()} onChange={(ev) => setDataFeita(ev.target.value)} className={`${CLASSE_ENTRADA} text-sm`} />
             </label>
             <Botao type="button" disabled={pendente} onClick={() => executar(() => marcarEtapa(contexto.obraId, e.etapa, true, dataFeita || null), aoMarcar)}>
               ✓ Marcar como feita
@@ -198,7 +202,7 @@ function AcoesEtapa({ etapa: e, contexto, aoMarcar }: { etapa: EtapaSoloVM; cont
         </>
       )}
 
-      {!e.naoSeAplica && <FotosEtapa empresaId={contexto.empresaId} obraId={contexto.obraId} etapa={e.etapa} fotos={e.fotos} />}
+      {(!e.naoSeAplica || e.fotos.length > 0) && <FotosEtapa empresaId={contexto.empresaId} obraId={contexto.obraId} etapa={e.etapa} fotos={e.fotos} />}
 
       <div className="flex flex-col gap-1.5">
         <label className="flex flex-col gap-1 text-xs text-texto-2">

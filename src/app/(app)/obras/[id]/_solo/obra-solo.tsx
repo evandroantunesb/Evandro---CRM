@@ -1,5 +1,7 @@
 import { CabecalhoPagina } from "@/components/cabecalho-pagina";
+import { Selo } from "@/components/ui";
 import { env } from "@/lib/env";
+import { formatarDiaMes } from "@/lib/formatacao";
 import { ROTULO_ETAPA } from "@/lib/obras/checklist";
 import type { ObraSoloVM } from "@/lib/obras/solo-dados";
 import { BotaoWhatsApp, ChecklistSolo } from "./checklist";
@@ -39,6 +41,7 @@ export function ObraSolo({ obra: o, empresaId, hoje }: { obra: ObraSoloVM; empre
                     ? "Pausada"
                     : `Etapa ${posicaoAtual} de 10 · ${atual ? ROTULO_ETAPA[atual.etapa] : ""}`}
             </span>
+            {o.alertaEstornoEm && <Selo tom="negativo">Entrada estornada</Selo>}
             {dias != null && <span className="rounded-full bg-white/12 px-2.5 py-1 text-xs text-offwhite">{dias === 1 ? "1 dia" : `${dias} dias`} desde o contrato</span>}
           </div>
         }
@@ -75,7 +78,7 @@ export function ObraSolo({ obra: o, empresaId, hoje }: { obra: ObraSoloVM; empre
                   {atual.previstaPara && (
                     <>
                       <br />
-                      prevista para {atual.previstaPara.slice(8, 10)}/{atual.previstaPara.slice(5, 7)}
+                      prevista para {formatarDiaMes(atual.previstaPara)}
                     </>
                   )}
                 </p>

@@ -13,8 +13,12 @@
 --  * As obras do Solo que já existem ganham o checklist (contrato e entrada pelas datas reais, o resto pendente) e o
 --    link; os fluxos de setor que elas têm ficam como estão. Empresa que vira Solo depois não ganha checklist nas obras
 --    antigas (pendência registrada).
---  * Data da assinatura: o evento `contrato.assinado` do negócio; sem ele (mesma transação), a última alteração do
---    contrato.
+--  * Data da assinatura: o último evento `contrato.assinado` do negócio (o contrato pode ter sido assinado de novo);
+--    sem ele (mesma transação), a última alteração do contrato.
+--  * Entrega contratada da obra do Solo: o prazo configurado inteiro (decisão do Evandro de 12/11/2026); sem setores,
+--    nenhuma etapa é descontada.
+--  * Estorno da entrada (decisão do Evandro de 12/11/2026): a etapa "entrada" volta a pendente e o admin vê o aviso;
+--    uma nova confirmação de pagamento marca a etapa de novo. Contrato e entrada só mudam por esses fatos, nunca à mão.
 
 set lock_timeout = '5s';
 
@@ -78,7 +82,7 @@ returns date
 language sql stable security definer set search_path = ''
 as $$
   select (coalesce(
-    (select min(e.created_at) from public.eventos e where e.tipo = 'contrato.assinado' and e.entidade_id = p_negocio_id),
+    (select max(e.created_at) from public.eventos e where e.tipo = 'contrato.assinado' and e.entidade_id = p_negocio_id),
     p_reserva
   ) at time zone 'America/Sao_Paulo')::date;
 $$;
@@ -99,6 +103,29 @@ as $$
   ) end;
 $$;
 revoke all on function public.setores_da_obra(uuid) from public, anon, authenticated, service_role;
+
+-- Entrega contratada: no PRO, desconta as etapas dos setores que a obra não tem (20261206100000); no Solo, que não tem
+-- setores, vale o prazo configurado inteiro.
+create or replace function public.calcular_entrega_contratada(p_empresa_id uuid, p_chegada timestamptz)
+returns date
+language sql stable security definer set search_path = ''
+as $$
+  select public.somar_dias_uteis(
+    p_empresa_id,
+    (p_chegada at time zone 'America/Sao_Paulo')::date,
+    greatest(1, p.dias_uteis - coalesce((
+      select sum(e.dias_uteis)
+      from public.obra_prazos_etapas e
+      where e.empresa_id = p_empresa_id
+        and e.chave <> 'entrega_contratada'
+        and not public.empresa_e_solo(p_empresa_id)
+        and public.setor_etapa_obra(e.chave) <> all (public.setores_da_obra(p_empresa_id))
+    ), 0)::integer)
+  )
+  from public.obra_prazos_etapas p
+  where p.empresa_id = p_empresa_id and p.chave = 'entrega_contratada';
+$$;
+revoke all on function public.calcular_entrega_contratada(uuid, timestamptz) from public, anon, authenticated, service_role;
 
 create or replace function public.garantir_obra(p_negocio_id uuid)
 returns uuid
@@ -249,7 +276,8 @@ end;
 $$;
 revoke all on function public.exigir_admin_obra_solo(uuid) from public, anon, authenticated, service_role;
 
--- Marca (com a data; vazia = hoje) ou desmarca uma etapa. Marcar tira o "não se aplica".
+-- Marca (com a data; vazia = hoje) ou desmarca uma etapa. Marcar tira o "não se aplica". Contrato e entrada seguem
+-- a assinatura e o pagamento: não mudam à mão.
 create or replace function public.marcar_etapa_obra(p_obra_id uuid, p_etapa public.etapa_checklist_obra, p_feita boolean, p_data date)
 returns void
 language plpgsql security definer set search_path = ''
@@ -258,8 +286,15 @@ declare
   v_empresa uuid := public.exigir_admin_obra_solo(p_obra_id);
   v_data date := coalesce(p_data, public.hoje_brasilia());
 begin
-  if not p_feita and p_etapa in ('contrato', 'entrada') then
-    raise exception 'Esta etapa não pode ser desmarcada.' using errcode = 'check_violation', hint = 'mensagem_usuario';
+  if p_feita is null then
+    raise exception 'Informe se a etapa foi feita.' using errcode = 'check_violation', hint = 'mensagem_usuario';
+  end if;
+  if p_etapa in ('contrato', 'entrada') then
+    if not p_feita then
+      raise exception 'Esta etapa não pode ser desmarcada.' using errcode = 'check_violation', hint = 'mensagem_usuario';
+    end if;
+    raise exception 'Esta etapa é marcada pela assinatura do contrato e pela confirmação do pagamento.'
+      using errcode = 'check_violation', hint = 'mensagem_usuario';
   end if;
   if p_feita and v_data > public.hoje_brasilia() then
     raise exception 'A data da etapa não pode ser no futuro.' using errcode = 'check_violation', hint = 'mensagem_usuario';
@@ -368,6 +403,65 @@ where public.empresa_e_solo(o.empresa_id)
 
 update public.obras o set link_cliente = gen_random_uuid()::text
 where o.link_cliente is null and exists (select 1 from public.obra_checklist x where x.obra_id = o.id);
+
+-- Obra do Solo com a entrada estornada (sem confirmação ativa): a etapa "entrada" fica pendente.
+update public.obra_checklist c set feita_em = null
+from public.obras o
+where c.obra_id = o.id and c.etapa = 'entrada' and c.feita_em is not null and o.alerta_pagamento_estornado_em is not null;
+
+-- Nova confirmação: cria a Obra ou, se ela já existe com aviso de estorno, limpa o aviso (20261006220000). No Solo,
+-- a etapa "entrada" volta a feita na data da nova confirmação.
+create or replace function public.obra_ao_confirmar_pagamento()
+returns trigger
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_obra public.obras;
+begin
+  select * into v_obra from public.obras where negocio_id = new.negocio_id for update;
+  if not found then
+    perform public.garantir_obra(new.negocio_id);
+    return null;
+  end if;
+  if v_obra.alerta_pagamento_estornado_em is not null then
+    update public.obras set alerta_pagamento_estornado_em = null where id = v_obra.id;
+    perform public.registrar_historico_obra(v_obra.id, 'pagamento_reconfirmado', null,
+      jsonb_build_object('confirmacao_pagamento_id', new.id));
+  end if;
+  update public.obra_checklist
+    set feita_em = (new.confirmado_em at time zone 'America/Sao_Paulo')::date, marcada_por = null, marcada_em = now()
+  where obra_id = v_obra.id and etapa = 'entrada' and feita_em is null;
+  return null;
+end;
+$$;
+revoke all on function public.obra_ao_confirmar_pagamento() from public, anon, authenticated, service_role;
+
+-- Estorno: nunca apaga a Obra; liga o aviso e registra no histórico (20261006220000). No Solo, sem outra confirmação
+-- ativa, a etapa "entrada" volta a pendente (o cliente deixa de ver o pagamento como recebido).
+create or replace function public.obra_ao_estornar_pagamento()
+returns trigger
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_obra public.obras;
+begin
+  select * into v_obra from public.obras where negocio_id = new.negocio_id for update;
+  if not found then
+    return null;
+  end if;
+  if not exists (
+    select 1 from public.confirmacoes_pagamento where negocio_id = new.negocio_id and estornado_em is null
+  ) then
+    update public.obras set alerta_pagamento_estornado_em = coalesce(alerta_pagamento_estornado_em, now()) where id = v_obra.id;
+    update public.obra_checklist set feita_em = null, marcada_por = null, marcada_em = now()
+    where obra_id = v_obra.id and etapa = 'entrada' and feita_em is not null;
+  end if;
+  perform public.registrar_historico_obra(v_obra.id, 'pagamento_estornado', null,
+    jsonb_build_object('confirmacao_pagamento_id', new.id, 'motivo', new.motivo_estorno));
+  return null;
+end;
+$$;
+revoke all on function public.obra_ao_estornar_pagamento() from public, anon, authenticated, service_role;
 
 -- ---------------------------------------------------------------------------
 -- Fotos das etapas (bucket privado `obra-fotos`, caminho <empresa>/<obra>/<etapa>/<arquivo>)
@@ -479,7 +573,8 @@ grant execute on function public.apagar_foto_etapa_obra(uuid) to authenticated;
 -- ---------------------------------------------------------------------------
 
 -- Só o que o cliente pode ver: primeiro nome, marca e WhatsApp da empresa, etapas (datas, "não se aplica" sem o
--- motivo, caminhos das fotos, que o servidor do app assina) e a hora da última alteração. Nunca anotação, motivo,
+-- motivo, caminhos das fotos, que o servidor do app assina; a etapa que não se aplica não mostra fotos) e a hora da
+-- última alteração que o cliente vê (pelo histórico da obra, sem anotação nem troca de link). Nunca anotação, motivo,
 -- valor, NF, fornecedor, telefone ou endereço. Token inexistente = nulo; obra cancelada = só "encerrada" e a empresa.
 create or replace function public.acompanhamento_obra(p_token text)
 returns jsonb
@@ -522,15 +617,18 @@ begin
         'feita_em', c.feita_em,
         'prevista_para', c.prevista_para,
         'nao_se_aplica', c.nao_se_aplica_motivo is not null,
-        'fotos', (select coalesce(jsonb_agg(f.caminho order by f.created_at), '[]'::jsonb)
-                  from public.obra_checklist_fotos f where f.obra_id = c.obra_id and f.etapa = c.etapa)
+        'fotos', case when c.nao_se_aplica_motivo is not null then '[]'::jsonb else
+                   (select coalesce(jsonb_agg(f.caminho order by f.created_at), '[]'::jsonb)
+                    from public.obra_checklist_fotos f where f.obra_id = c.obra_id and f.etapa = c.etapa) end
       ) order by c.etapa), '[]'::jsonb)
       from public.obra_checklist c where c.obra_id = v_obra.id
     ),
     'atualizado_em', greatest(
       v_obra.created_at,
-      (select max(c.marcada_em) from public.obra_checklist c where c.obra_id = v_obra.id),
-      (select max(f.created_at) from public.obra_checklist_fotos f where f.obra_id = v_obra.id)
+      (select max(h.created_at) from public.obra_historico h
+       where h.obra_id = v_obra.id
+         and (h.tipo in ('pagamento_estornado', 'pagamento_reconfirmado')
+              or (h.tipo = 'checklist_alterado' and coalesce(h.dados ->> 'acao', '') not in ('anotada', 'link_trocado'))))
     )
   );
 end;

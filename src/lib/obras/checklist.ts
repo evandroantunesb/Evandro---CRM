@@ -42,14 +42,14 @@ export const ehEtapaChecklist = (v: unknown): v is EtapaChecklist => (ETAPAS_CHE
 export type LinhaChecklist = { etapa: EtapaChecklist; feitaEm: string | null; naoSeAplica: boolean; previstaPara: string | null };
 
 /** Resolvida = feita ou "não se aplica"; a entrega só conta feita. */
-const resolvida = (l: LinhaChecklist) => l.feitaEm != null || (l.naoSeAplica && l.etapa !== "entrega");
+export const etapaResolvida = (l: LinhaChecklist) => l.feitaEm != null || (l.naoSeAplica && l.etapa !== "entrega");
 
 /** Andamento: quantas resolvidas, a etapa atual (primeira não resolvida) e se a obra foi concluída (as 10). */
 export function andamentoChecklist(linhas: readonly LinhaChecklist[]): { resolvidas: number; total: 10; atual: EtapaChecklist | null; concluida: boolean } {
   const porEtapa = new Map(linhas.map((l) => [l.etapa, l]));
   const ok = ETAPAS_CHECKLIST.map((e) => {
     const l = porEtapa.get(e);
-    return l != null && resolvida(l);
+    return l != null && etapaResolvida(l);
   });
   const resolvidas = ok.filter(Boolean).length;
   const indiceAtual = ok.indexOf(false);
