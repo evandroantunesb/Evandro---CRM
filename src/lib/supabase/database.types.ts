@@ -2000,6 +2000,7 @@ export type Database = {
           desligadas: string[];
           empresa_id: string;
           id: string;
+          setores_desligados: string[];
           updated_at: string;
         };
         Insert: {
@@ -2008,6 +2009,7 @@ export type Database = {
           desligadas?: string[];
           empresa_id: string;
           id?: string;
+          setores_desligados?: string[];
           updated_at?: string;
         };
         Update: {
@@ -2016,6 +2018,7 @@ export type Database = {
           desligadas?: string[];
           empresa_id?: string;
           id?: string;
+          setores_desligados?: string[];
           updated_at?: string;
         };
         Relationships: [
@@ -8468,6 +8471,10 @@ export type Database = {
       setor_registro_vistoria: {
         Args: { p_obra_id: string; p_tipo: string };
         Returns: Database["public"]["Enums"]["setor_obra"];
+      };
+      setores_da_obra: {
+        Args: { p_empresa_id: string };
+        Returns: Database["public"]["Enums"]["setor_obra"][];
       };
       sincronizar_compras_obra: { Args: { p_aut: string; p_obra_id: string }; Returns: undefined };
       situacao_registro_pagamento: { Args: { p_negocio_id: string }; Returns: string };
