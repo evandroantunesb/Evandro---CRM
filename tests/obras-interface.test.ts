@@ -123,6 +123,17 @@ describe("derivados de Obras", () => {
     expect(situacaoObra({ ...entrada, fluxos: [], marcos: [] })).toBe("em_andamento");
   });
 
+  it("obra sem Engenharia conclui com Compras, Operacional e Administrativo no fim e os 2 marcos resolvidos", () => {
+    const semEngenharia = FLUXOS_FINAIS.filter((f) => f.setor !== "engenharia");
+    expect(situacaoObra({ ...entrada, fluxos: semEngenharia })).toBe("concluida");
+    expect(situacaoObra({ ...entrada, fluxos: [semEngenharia[0], { setor: "operacional", status: "agendada" }, semEngenharia[2]] })).toBe("em_andamento");
+    expect(situacaoObra({ ...entrada, fluxos: semEngenharia, marcos: [marcosOk[0]] })).toBe("em_andamento");
+  });
+
+  it("obra sem nenhum fluxo não fica concluída", () => {
+    expect(situacaoObra({ ...entrada, fluxos: [] })).toBe("em_andamento");
+  });
+
   it("alertas factuais", () => {
     const sem = { alertaPagamentoEstornadoEm: null, vendaAlteradaEm: null, estadosSetores: ["em_andamento", "concluido", "concluido"] as const };
     expect(alertasObra(sem)).toEqual([]);
@@ -358,6 +369,24 @@ describe("carregarObras", () => {
       comSetorParado: 1,
       comSetorAguardando: 1,
     });
+  });
+
+  it("obra sem Engenharia: a lista mostra só os setores dela e o filtro Setor Engenharia + estado não a traz", async () => {
+    const f = criarFake({
+      tabelas: {
+        obras: [obraTabela("o3", 3)],
+        obra_fluxos: [fluxo("o3", "compras", "a_comprar"), fluxo("o3", "operacional", "aguardando_liberacao"), fluxo("o3", "administrativo", "pagando_fornecedores")],
+        obra_marcos: [],
+        obra_participantes: [],
+      },
+      rpcs: { identidade_membros: identidades },
+    });
+    const { obras } = await carregarObras(f.cliente, { empresaId: EMPRESA, papel: "admin" });
+    expect(obras[0].setores.map((s) => s.setor)).toEqual(["compras", "operacional", "administrativo"]);
+    for (const estado of ["em_andamento", "parado", "aguardando", "concluido"] as const) {
+      expect(filtrarObras(obras, { setor: "engenharia", estado })).toEqual([]);
+    }
+    expect(filtrarObras(obras, { setor: "compras", estado: "em_andamento" })).toHaveLength(1);
   });
 
   it("o VM não contém snapshot nem dados pessoais, mesmo que a fonte os devolva (comercial e operacao)", async () => {

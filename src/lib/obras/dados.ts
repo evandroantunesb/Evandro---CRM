@@ -252,7 +252,8 @@ export async function carregarObras(
   const obras = linhas.map((l): ObraListaVM => {
     const fluxosDaObra = fluxos.get(l.id) ?? [];
     const principais = participantes.get(l.id) ?? [];
-    const setores = SETORES_OBRA.map((setor): SetorObraVM => {
+    // Só os setores que a obra recebeu (setor desligado quando ela nasceu não aparece).
+    const setores = SETORES_OBRA.filter((setor) => fluxosDaObra.some((f) => f.setor === setor)).map((setor): SetorObraVM => {
       const fluxo = fluxosDaObra.find((f) => f.setor === setor);
       const principal = principais.find((p) => p.setor === setor);
       const status = fluxo?.status ?? null;
