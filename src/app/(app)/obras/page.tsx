@@ -223,7 +223,17 @@ function ListaObras({ obras, hrefDe }: { obras: ObraListaVM[]; hrefDe: (id: stri
     </Link>,
     <span key="u" className="text-zinc-700">{cidadeUf(o)}</span>,
     <span key="p" className="text-zinc-700">{formatarPotencia(o.potenciaKwp)}</span>,
-    ...o.setores.map((s) => <CelulaSetor key={s.setor} s={s} />),
+    // Colunas fixas por setor: obra sem o setor mostra "—" (não desalinha a tabela).
+    ...SETORES_OBRA.map((setor) => {
+      const s = o.setores.find((x) => x.setor === setor);
+      return s ? (
+        <CelulaSetor key={setor} s={s} />
+      ) : (
+        <span key={setor} className="text-zinc-400" aria-label="Sem este setor">
+          —
+        </span>
+      );
+    }),
     <Situacao key="s" obra={o} />,
   ];
   return (

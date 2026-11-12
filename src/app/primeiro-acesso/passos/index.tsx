@@ -100,7 +100,11 @@ export async function ConteudoDoPasso(props: PropsPasso) {
           Início, Tarefas, Negócios, Contatos e Propostas e contratos ficam sempre ligados. Uma tela desligada some do menu de todo mundo, e os dados dela
           continuam guardados.
         </p>
-        <FormularioTelas ligadasIniciais={TELAS_OPCIONAIS.filter((t) => telas.ligadas.has(t))} eletropostoLiberado={!!empresa?.eletroposto_ativo} />
+        <FormularioTelas
+          ligadasIniciais={TELAS_OPCIONAIS.filter((t) => telas.ligadas.has(t))}
+          setoresDesligadosIniciais={[...telas.setoresDesligados]}
+          eletropostoLiberado={!!empresa?.eletroposto_ativo}
+        />
         <form action={props.continuar}>
           <BotaoContinuar aviso={AVISO_SALVAR} />
         </form>
@@ -137,19 +141,21 @@ export async function ConteudoDoPasso(props: PropsPasso) {
   }
 
   if (props.chave === "equipe") {
-    const { data: membros } = await supabase
-      .from("empresa_membros")
-      .select("id, papel, perfis(nome, email)")
-      .eq("empresa_id", props.empresaId)
-      .eq("ativo", true)
-      .order("created_at");
+    const [{ data: membros }, telas] = await Promise.all([
+      supabase.from("empresa_membros").select("id, papel, perfis(nome, email)").eq("empresa_id", props.empresaId).eq("ativo", true).order("created_at"),
+      obterTelasEmpresa(),
+    ]);
     return (
       <div className="flex flex-col gap-5">
         <p className="max-w-2xl text-sm text-texto-2">
           Cadastre as pessoas agora ou depois, em Configurações › Usuários. Cada uma recebe uma senha temporária para você repassar.
         </p>
         <div className="grid items-start gap-4 lg:grid-cols-[1.3fr_1fr]">
-          <PainelPessoa membro={null} fecharHref={`/primeiro-acesso?passo=equipe${props.rever ? "&rever=1" : ""}`} />
+          <PainelPessoa
+            membro={null}
+            fecharHref={`/primeiro-acesso?passo=equipe${props.rever ? "&rever=1" : ""}`}
+            setoresDesligados={[...telas.setoresDesligados]}
+          />
           <section className="painel flex flex-col gap-2 p-5">
             <h2 className="font-titulo text-[17px] font-semibold">Na equipe</h2>
             <ul className="flex flex-col divide-y divide-linha text-sm">
@@ -191,7 +197,7 @@ async function carregarRevisao(supabase: SupabaseServidor, empresaId: string): P
     empresa: { nome: identidade?.nome_exibicao || empresa?.nome || null, cnpj: empresa?.cnpj ?? null, whatsapp: identidade?.whatsapp ?? null },
     marca: { temLogo: !!identidade?.logo_escuro_url, temCores: !!(identidade?.cor_primaria || identidade?.cor_destaque) },
     imagens: { fotoEntrada: !!tela?.imagem_caminho, faixaPropria: !!tela && !tela.faixa_usa_entrada && !!tela.faixa_caminho },
-    telas: { ligadas: telas.ligadas.size, eletropostoLiberado: !!empresa?.eletroposto_ativo, eletropostoLigado: telas.ligadas.has("eletroposto") },
+    telas: { ligadas: telas.ligadas.size, eletropostoLiberado: !!empresa?.eletroposto_ativo, eletropostoLigado: telas.ligadas.has("eletroposto"), setoresDesligados: [...telas.setoresDesligados] },
     pagamento: { descontoVendedor: pref.descontoMaxVendedor, parcelasCartao: Math.max(0, ...(taxas ?? []).map((t) => t.parcelas)), personalizado: pref.personalizadoAtivo },
     // Quem está fazendo o assistente não conta.
     equipe: { pessoas: Math.max(0, (pessoas ?? 1) - 1) },

@@ -5,12 +5,12 @@ import { criarClienteServidor, type SupabaseServidor } from "@/lib/supabase/serv
 import { TELAS_PADRAO, areaLigada, telasDaEmpresa, type Area, type TelasEmpresa } from "@/lib/telas-empresa";
 
 /**
- * Telas da empresa em uso (20261203100000_telas_empresa.sql): telas desligadas pelo admin, plano (solo/pro) e
+ * Telas da empresa em uso (20261203100000_telas_empresa.sql): telas e setores desligados pelo admin, plano (solo/pro) e
  * Eletroposto liberado pelo super-admin. Falha ao ler = o padrão de sempre (PRO, tudo ligado), sem quebrar o app.
  */
 export async function lerTelasEmpresa(supabase: SupabaseServidor, empresaId: string): Promise<TelasEmpresa> {
   const [telas, empresa, produto] = await Promise.all([
-    supabase.from("empresa_telas").select("desligadas").eq("empresa_id", empresaId).maybeSingle(),
+    supabase.from("empresa_telas").select("desligadas, setores_desligados").eq("empresa_id", empresaId).maybeSingle(),
     supabase.from("empresas").select("eletroposto_ativo").eq("id", empresaId).maybeSingle(),
     supabase.rpc("produto_da_empresa", { p_empresa_id: empresaId }),
   ]);
@@ -22,6 +22,7 @@ export async function lerTelasEmpresa(supabase: SupabaseServidor, empresaId: str
   return telasDaEmpresa({
     produto: produto.data === "solo" ? "solo" : "pro",
     desligadas: telas.data?.desligadas ?? [],
+    setoresDesligados: telas.data?.setores_desligados ?? [],
     eletropostoLiberado: !!empresa.data?.eletroposto_ativo,
   });
 }

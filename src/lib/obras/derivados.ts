@@ -45,9 +45,13 @@ export function situacaoObra(entrada: {
 }): SituacaoObra {
   if (entrada.canceladaEm) return "cancelada";
   if (entrada.pausadaEm) return "pausada";
-  const setoresConcluidos = SETORES_OBRA.every((setor) =>
-    entrada.fluxos.some((f) => f.setor === setor && setorConcluido(setor, f.status)),
-  );
+  // Setores da obra (20261206100000_setores_da_obra.sql): conta só os setores que a obra recebeu. Compras e
+  // Operacional nunca desligam, então sem eles a obra não conclui (nem por falta de fluxo).
+  const setores = SETORES_OBRA.filter((setor) => entrada.fluxos.some((f) => f.setor === setor));
+  const setoresConcluidos =
+    setores.includes("compras") &&
+    setores.includes("operacional") &&
+    setores.every((setor) => entrada.fluxos.some((f) => f.setor === setor && setorConcluido(setor, f.status)));
   const marcosResolvidos = MARCOS_OBRA.every((marco) => entrada.marcos.some((m) => m.marco === marco && marcoResolvido(m.status)));
   if (setoresConcluidos && marcosResolvidos) return "concluida";
   return "em_andamento";

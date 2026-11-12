@@ -144,6 +144,7 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
   // admin; pedidos só depois do "Iniciar compra" e com a obra em andamento (o banco confere de novo).
   const autorizacaoCompras = gestaoDoSetor("compras")?.permissoes.autorizacao ?? null;
   const statusCompras = obra.setores.find((x) => x.setor === "compras")?.status ?? null;
+  const temEngenharia = obra.setores.some((x) => x.setor === "engenharia");
   const emAndamento = resumo.situacao === "em_andamento";
   const podeIniciarCompra = statusCompras === "a_comprar" && emAndamento && (autorizacaoCompras != null || atuoEmCompras);
   const qtdOrcamentos = orcamentosCompra.count ?? 0;
@@ -387,7 +388,9 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
                 {/* key pela obra: ao navegar para outra obra, nenhum estado de formulário da anterior sobrevive. */}
                 {/* Vistoria: quem atua no Operacional registra o agendamento, a vistoria feita em campo e a correção de
                     campo; quem só vê a obra acompanha a situação e as datas. */}
+                {/* Obra sem Engenharia (setor desligado quando ela nasceu): não há vistoria a acompanhar. */}
                 {s.setor === "operacional" &&
+                  temEngenharia &&
                   (g?.permissoes.autorizacao ? (
                     <VistoriaEngenharia
                       key={resumo.id}

@@ -332,7 +332,8 @@ export async function carregarDetalheObra(
     principal: p.principal === true,
   });
 
-  const setores = SETORES_OBRA.map((setor): SetorDetalheVM => {
+  // Só os setores que a obra recebeu (setor desligado quando ela nasceu não aparece).
+  const setores = SETORES_OBRA.filter((setor) => fluxos.some((f) => f.setor === setor)).map((setor): SetorDetalheVM => {
     const fluxo = fluxos.find((f) => f.setor === setor);
     const status = fluxo?.status ?? null;
     const estado = estadoSetor({ setor, status, parado: fluxo?.parado ?? false, aguardando: fluxo?.aguardando ?? null });

@@ -9,7 +9,7 @@ const TELAS_DO_SOLO = ["Início", "Tarefas", "Negócios", "Contatos", "Propostas
 
 /**
  * Telas da empresa (telas por empresa, 20261203100000_telas_empresa.sql): no PRO, o admin liga e desliga as telas
- * opcionais; no Solo, as telas são as do plano. Só o admin; o banco confere de novo.
+ * opcionais e os setores da obra (20261206100000_setores_da_obra.sql); no Solo, as telas são as do plano. Só o admin; o banco confere de novo.
  */
 export default async function TelasDaEmpresa() {
   const { atual } = await exigirPapel("admin");
@@ -19,7 +19,7 @@ export default async function TelasDaEmpresa() {
     : await (await criarClienteServidor()).from("empresas").select("eletroposto_ativo").eq("id", atual.empresaId).maybeSingle();
 
   return (
-    <div className="mx-auto flex max-w-3xl animate-entrar flex-col gap-6">
+    <div className="mx-auto flex max-w-5xl animate-entrar flex-col gap-6">
       <CabecalhoPagina
         detalhe
         voltar={{ href: "/configuracoes", rotulo: "Configurações" }}
@@ -45,7 +45,11 @@ export default async function TelasDaEmpresa() {
           </p>
         </section>
       ) : (
-        <FormularioTelas ligadasIniciais={TELAS_OPCIONAIS.filter((t) => telas.ligadas.has(t))} eletropostoLiberado={!!empresa?.eletroposto_ativo} />
+        <FormularioTelas
+          ligadasIniciais={TELAS_OPCIONAIS.filter((t) => telas.ligadas.has(t))}
+          setoresDesligadosIniciais={[...telas.setoresDesligados]}
+          eletropostoLiberado={!!empresa?.eletroposto_ativo}
+        />
       )}
     </div>
   );

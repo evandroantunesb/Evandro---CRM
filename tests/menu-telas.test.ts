@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { filtrarPorTelas } from "@/lib/menu-telas";
+import { areaDoEndereco, filtrarPorTelas } from "@/lib/menu-telas";
 import { telasDaEmpresa } from "@/lib/telas-empresa";
 
 const hrefs = (...lista: string[]) => lista.map((href) => ({ href }));
@@ -34,7 +34,7 @@ const TODOS = hrefs(
 
 describe("filtrarPorTelas", () => {
   it("Solo: fica só o que o plano tem", () => {
-    const solo = telasDaEmpresa({ produto: "solo", desligadas: [], eletropostoLiberado: true });
+    const solo = telasDaEmpresa({ produto: "solo", desligadas: [], setoresDesligados: [], eletropostoLiberado: true });
     expect(restantes(filtrarPorTelas(TODOS, solo))).toEqual([
       "/inicio",
       "/tarefas",
@@ -48,7 +48,7 @@ describe("filtrarPorTelas", () => {
   });
 
   it("PRO com a Gamificação desligada: some tudo dela, inclusive o atalho de perfis em Usuários", () => {
-    const t = telasDaEmpresa({ produto: "pro", desligadas: ["gamificacao"], eletropostoLiberado: false });
+    const t = telasDaEmpresa({ produto: "pro", desligadas: ["gamificacao"], setoresDesligados: [], eletropostoLiberado: false });
     const r = restantes(filtrarPorTelas(TODOS, t));
     for (const fora of ["/gamificacao/loja", "/gamificacao/administracao/regras", "/configuracoes/metas", "/configuracoes/usuarios#perfil-gamificacao"]) {
       expect(r).not.toContain(fora);
@@ -58,12 +58,22 @@ describe("filtrarPorTelas", () => {
   });
 
   it("PRO sem nada desligado: tudo fica", () => {
-    const t = telasDaEmpresa({ produto: "pro", desligadas: [], eletropostoLiberado: true });
+    const t = telasDaEmpresa({ produto: "pro", desligadas: [], setoresDesligados: [], eletropostoLiberado: true });
     expect(filtrarPorTelas(TODOS, t)).toHaveLength(TODOS.length);
   });
 
+  it("PRO com o setor Engenharia desligado: /engenharia e /configuracoes/engenharia saem; Obras fica", () => {
+    const t = telasDaEmpresa({ produto: "pro", desligadas: [], setoresDesligados: ["engenharia"], eletropostoLiberado: true });
+    const r = restantes(filtrarPorTelas(hrefs("/obras", "/engenharia", "/configuracoes/engenharia", "/configuracoes/prazos-obras"), t));
+    expect(r).toEqual(["/obras", "/configuracoes/prazos-obras"]);
+  });
+
+  it("/configuracoes/engenharia é da área engenharia", () => {
+    expect(areaDoEndereco("/configuracoes/engenharia")).toBe("engenharia");
+  });
+
   it("prefixo exato: /tarefas/setores é do PRO, /tarefas não; ?visao é ignorado", () => {
-    const solo = telasDaEmpresa({ produto: "solo", desligadas: [], eletropostoLiberado: false });
+    const solo = telasDaEmpresa({ produto: "solo", desligadas: [], setoresDesligados: [], eletropostoLiberado: false });
     expect(restantes(filtrarPorTelas(hrefs("/tarefas?aba=hoje", "/tarefas/setores?x=1", "/obrasx"), solo))).toEqual(["/tarefas?aba=hoje", "/obrasx"]);
   });
 });

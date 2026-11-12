@@ -24,7 +24,7 @@ export const AREA_DO_ENDERECO: Readonly<Record<string, Area>> = {
   "/configuracoes/equipes": "pro",
   "/configuracoes/tarefas-automaticas": "pro",
   "/configuracoes/compras": "pro",
-  "/configuracoes/engenharia": "pro",
+  "/configuracoes/engenharia": "engenharia",
   "/configuracoes/prazos-obras": "pro",
   "/configuracoes/deducoes-obras": "pro",
   "/configuracoes/fixacoes": "pro",
