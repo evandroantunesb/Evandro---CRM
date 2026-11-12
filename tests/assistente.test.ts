@@ -6,7 +6,7 @@ describe("resumo da revisão (quadro OnboardingRevisar)", () => {
     empresa: { nome: "Solar Campinas", cnpj: "12345678000190", whatsapp: "19998765432" },
     marca: { temLogo: true, temCores: true },
     imagens: { fotoEntrada: false, faixaPropria: false },
-    telas: { ligadas: 7, eletropostoLiberado: true, eletropostoLigado: false },
+    telas: { ligadas: 7, eletropostoLiberado: true, eletropostoLigado: false, setoresDesligados: [] as ("engenharia" | "administrativo")[] },
     pagamento: { descontoVendedor: 5, parcelasCartao: 12, personalizado: true },
     equipe: { pessoas: 2 },
   };
@@ -17,6 +17,13 @@ describe("resumo da revisão (quadro OnboardingRevisar)", () => {
     expect(resumoDoPasso("telas", "feito", d)).toBe("7 ligadas · Eletroposto desligado");
     expect(resumoDoPasso("pagamento", "feito", d)).toBe("Vendedor dá até 5% · cartão até 12x · Personalizado ligado");
     expect(resumoDoPasso("equipe", "feito", d)).toBe("2 pessoas cadastradas");
+  });
+
+  it("resumo do passo telas cita o setor desligado", () => {
+    const sem = (setoresDesligados: ("engenharia" | "administrativo")[]) => ({ ...d, telas: { ...d.telas, setoresDesligados } });
+    expect(resumoDoPasso("telas", "feito", sem(["engenharia"]))).toBe("7 ligadas · Eletroposto desligado · sem Engenharia");
+    expect(resumoDoPasso("telas", "feito", sem(["engenharia", "administrativo"]))).toBe("7 ligadas · Eletroposto desligado · sem Engenharia · sem Administrativo");
+    expect(resumoDoPasso("telas", "feito", sem([]))).toBe("7 ligadas · Eletroposto desligado");
   });
 
   it("pulado: fica o padrão", () => {

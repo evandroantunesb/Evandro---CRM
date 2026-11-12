@@ -100,7 +100,11 @@ export async function ConteudoDoPasso(props: PropsPasso) {
           Início, Tarefas, Negócios, Contatos e Propostas e contratos ficam sempre ligados. Uma tela desligada some do menu de todo mundo, e os dados dela
           continuam guardados.
         </p>
-        <FormularioTelas ligadasIniciais={TELAS_OPCIONAIS.filter((t) => telas.ligadas.has(t))} eletropostoLiberado={!!empresa?.eletroposto_ativo} />
+        <FormularioTelas
+          ligadasIniciais={TELAS_OPCIONAIS.filter((t) => telas.ligadas.has(t))}
+          setoresDesligadosIniciais={[...telas.setoresDesligados]}
+          eletropostoLiberado={!!empresa?.eletroposto_ativo}
+        />
         <form action={props.continuar}>
           <BotaoContinuar aviso={AVISO_SALVAR} />
         </form>
@@ -191,7 +195,7 @@ async function carregarRevisao(supabase: SupabaseServidor, empresaId: string): P
     empresa: { nome: identidade?.nome_exibicao || empresa?.nome || null, cnpj: empresa?.cnpj ?? null, whatsapp: identidade?.whatsapp ?? null },
     marca: { temLogo: !!identidade?.logo_escuro_url, temCores: !!(identidade?.cor_primaria || identidade?.cor_destaque) },
     imagens: { fotoEntrada: !!tela?.imagem_caminho, faixaPropria: !!tela && !tela.faixa_usa_entrada && !!tela.faixa_caminho },
-    telas: { ligadas: telas.ligadas.size, eletropostoLiberado: !!empresa?.eletroposto_ativo, eletropostoLigado: telas.ligadas.has("eletroposto") },
+    telas: { ligadas: telas.ligadas.size, eletropostoLiberado: !!empresa?.eletroposto_ativo, eletropostoLigado: telas.ligadas.has("eletroposto"), setoresDesligados: [...telas.setoresDesligados] },
     pagamento: { descontoVendedor: pref.descontoMaxVendedor, parcelasCartao: Math.max(0, ...(taxas ?? []).map((t) => t.parcelas)), personalizado: pref.personalizadoAtivo },
     // Quem está fazendo o assistente não conta.
     equipe: { pessoas: Math.max(0, (pessoas ?? 1) - 1) },

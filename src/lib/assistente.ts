@@ -1,8 +1,9 @@
 /*
  * Assistente de primeiro acesso (Onboarding, subprojeto 3; 20261205100000_assistente_primeiro_acesso.sql; desenho em
  * docs/superpowers/specs/2026-11-11-assistente-primeiro-acesso-design.md). Regra pura dos passos: Solo tem 5 e PRO 7
- * (os setores entram como passo 5 do PRO no subprojeto 4). `passo_atual` é 1-based e `pulados` guarda as posições.
+ * (os setores da obra ficam no passo Telas, subprojeto 4a). `passo_atual` é 1-based e `pulados` guarda as posições.
  */
+import { INFO_SETOR, SETORES_DESLIGAVEIS, type SetorDesligavel } from "@/lib/telas-empresa";
 
 export type ChavePasso = "empresa" | "marca" | "imagens" | "telas" | "pagamento" | "equipe" | "revisar";
 
@@ -50,7 +51,7 @@ export type DadosRevisao = {
   empresa: { nome: string | null; cnpj: string | null; whatsapp: string | null };
   marca: { temLogo: boolean; temCores: boolean };
   imagens: { fotoEntrada: boolean; faixaPropria: boolean };
-  telas: { ligadas: number; eletropostoLiberado: boolean; eletropostoLigado: boolean };
+  telas: { ligadas: number; eletropostoLiberado: boolean; eletropostoLigado: boolean; setoresDesligados: SetorDesligavel[] };
   pagamento: { descontoVendedor: number; parcelasCartao: number; personalizado: boolean };
   equipe: { pessoas: number };
 };
@@ -80,7 +81,13 @@ export function resumoDoPasso(chave: ChavePasso, estado: "feito" | "pulado" | "p
       if (!d.imagens.fotoEntrada && !d.imagens.faixaPropria) return "Paisagem do Raion na entrada e na faixa";
       return [d.imagens.fotoEntrada ? "Foto própria na entrada" : "Paisagem na entrada", d.imagens.faixaPropria ? "foto própria na faixa" : "faixa igual à entrada"].join(" · ");
     case "telas":
-      return [`${d.telas.ligadas} ligadas`, d.telas.eletropostoLiberado && !d.telas.eletropostoLigado ? "Eletroposto desligado" : null].filter(Boolean).join(" · ");
+      return [
+        `${d.telas.ligadas} ligadas`,
+        d.telas.eletropostoLiberado && !d.telas.eletropostoLigado ? "Eletroposto desligado" : null,
+        ...SETORES_DESLIGAVEIS.filter((s) => d.telas.setoresDesligados.includes(s)).map((s) => `sem ${INFO_SETOR[s].rotulo}`),
+      ]
+        .filter(Boolean)
+        .join(" · ");
     case "pagamento":
       return [
         d.pagamento.descontoVendedor > 0 ? `Vendedor dá até ${d.pagamento.descontoVendedor.toLocaleString("pt-BR")}%` : "Vendedor sem desconto sem aprovação",
