@@ -1,4 +1,6 @@
-import { andamentoChecklist, ehEtapaChecklist, type EtapaChecklist, type LinhaChecklist } from "@/lib/obras/checklist";
+import { ETAPAS_CHECKLIST, andamentoChecklist, ehEtapaChecklist, type EtapaChecklist, type LinhaChecklist } from "@/lib/obras/checklist";
+
+const ETAPAS_ORDEM: readonly string[] = ETAPAS_CHECKLIST;
 import type { SupabaseServidor } from "@/lib/supabase/server";
 
 /*
@@ -103,5 +105,83 @@ export function numerosSolo(
     kwpEmAndamento: Math.round(andamento.reduce((soma, o) => soma + (o.potenciaKwp ?? 0), 0) * 100) / 100,
     entreguesNoAno: obras.filter((o) => o.situacao === "entregue" && o.entregueEm?.startsWith(ano)).length,
     proximaPrevista: proxima,
+  };
+}
+
+export type FotoEtapaVM = { id: string; url: string | null };
+export type EtapaSoloVM = LinhaChecklist & { motivo: string | null; anotacao: string | null; fotos: FotoEtapaVM[] };
+export type ObraSoloVM = {
+  id: string;
+  numero: number;
+  clienteNome: string;
+  cidade: string | null;
+  uf: string | null;
+  potenciaKwp: number | null;
+  unidadeConsumidora: string | null;
+  valorVendido: number | null;
+  telefoneCliente: string | null;
+  linkCliente: string | null;
+  criadaEm: string;
+  situacao: SituacaoObraSolo;
+  andamento: ReturnType<typeof andamentoChecklist>;
+  etapas: EtapaSoloVM[];
+};
+
+const EXPIRA_FOTO_SEGUNDOS = 60 * 60;
+
+/** Uma obra do Solo com o checklist completo, as fotos (URL assinada de 1 hora) e os dados internos do admin. */
+export async function carregarObraSolo(supabase: SupabaseServidor, empresaId: string, obraId: string): Promise<ObraSoloVM | null> {
+  const { data: o, error } = await supabase
+    .from("obras")
+    .select("id, numero, negocio_id, cliente_nome, cidade, uf, potencia_kwp, unidade_consumidora, link_cliente, created_at, pausada_em, cancelada_em")
+    .eq("id", obraId)
+    .eq("empresa_id", empresaId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!o) return null;
+
+  const [checklistRes, fotosRes, comercialRes, negocioRes] = await Promise.all([
+    supabase.from("obra_checklist").select("obra_id, etapa, feita_em, nao_se_aplica_motivo, prevista_para, anotacao").eq("obra_id", obraId),
+    supabase.from("obra_checklist_fotos").select("id, etapa, caminho").eq("obra_id", obraId).order("created_at"),
+    supabase.from("obra_dados_comerciais").select("valor_vendido").eq("obra_id", obraId).maybeSingle(),
+    o.negocio_id ? supabase.from("negocios").select("contatos(telefone)").eq("id", o.negocio_id).maybeSingle() : Promise.resolve({ data: null, error: null }),
+  ]);
+  if (checklistRes.error) throw checklistRes.error;
+  if (fotosRes.error) throw fotosRes.error;
+  const checklist = (checklistRes.data ?? []) as (LinhaBanco & { anotacao: string | null })[];
+  if (!checklist.length) return null;
+
+  const fotos = fotosRes.data ?? [];
+  const assinadas = fotos.length
+    ? ((await supabase.storage.from("obra-fotos").createSignedUrls(fotos.map((f) => f.caminho), EXPIRA_FOTO_SEGUNDOS)).data ?? [])
+    : [];
+  const urlDe = new Map(assinadas.map((a) => [a.path, a.signedUrl]));
+
+  const etapas = checklist
+    .flatMap((l): EtapaSoloVM[] => {
+      const linha = linhaDoBanco(l);
+      if (!linha) return [];
+      const daEtapa = fotos.filter((f) => f.etapa === l.etapa).map((f) => ({ id: f.id, url: urlDe.get(f.caminho) ?? null }));
+      return [{ ...linha, motivo: l.nao_se_aplica_motivo, anotacao: l.anotacao, fotos: daEtapa }];
+    })
+    .sort((a, b) => ETAPAS_ORDEM.indexOf(a.etapa) - ETAPAS_ORDEM.indexOf(b.etapa));
+  const andamento = andamentoChecklist(etapas);
+  const contato = (negocioRes.data as { contatos: { telefone: string | null } | null } | null)?.contatos;
+
+  return {
+    id: o.id,
+    numero: o.numero,
+    clienteNome: o.cliente_nome ?? "",
+    cidade: o.cidade,
+    uf: o.uf,
+    potenciaKwp: o.potencia_kwp == null ? null : Number(o.potencia_kwp),
+    unidadeConsumidora: o.unidade_consumidora,
+    valorVendido: comercialRes.data?.valor_vendido == null ? null : Number(comercialRes.data.valor_vendido),
+    telefoneCliente: contato?.telefone ?? null,
+    linkCliente: o.link_cliente,
+    criadaEm: o.created_at,
+    situacao: situacaoObraSolo(o, andamento.concluida),
+    andamento,
+    etapas,
   };
 }
