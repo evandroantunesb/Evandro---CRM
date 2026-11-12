@@ -5,7 +5,7 @@
  *
  *  - PRO: todas as telas opcionais, menos as que o admin desligou; o Eletroposto só com a liberação do super-admin.
  *  - Solo: nenhuma tela opcional e nenhuma área só do PRO (operação e equipe). Fica Início, Tarefas, Negócios,
- *    Contatos, Propostas e contratos e Configurações.
+ *    Contatos, Propostas e contratos e Configurações, e Obras na versão checklist (subprojeto 4b).
  *  - Setores da obra (subprojeto 4a, 20261206100000_setores_da_obra.sql): o PRO desliga Engenharia e/ou Administrativo.
  *    A tela Engenharia segue a chave do setor (área `"engenharia"`), não é mais tela opcional.
  */
@@ -67,6 +67,8 @@ export function telasDaEmpresa({
 
 export function areaLigada(t: TelasEmpresa, area: Area): boolean {
   if (area === "pro") return !t.solo;
+  // Solo: Obras sempre ligada, na versão checklist (obra do Solo, 20261207100000_obra_solo.sql).
+  if (area === "obras" && t.solo) return true;
   if (area === "engenharia") return !t.solo && !t.setoresDesligados.has("engenharia");
   return t.ligadas.has(area);
 }

@@ -26,7 +26,7 @@ Regras de trabalho (autorização, merges, produção, gamificação) estão no 
 - Papéis por empresa em `empresa_membros.papel`: `admin`, `gestor`, `vendedor`, `sdr`. Perfil de gamificação: `sdr`, `closer`, `cs_farmer`. Status: `ativo`, `inativo`, `desligado`.
 - Visibilidade de negócio: `pode_ver_responsavel()` (admin da empresa, o responsável ou o gestor da equipe dele).
 - Super-admin (`plataforma_admins`) **não fura RLS**: só libera `/super-admin/*`. Um 404 em negócio costuma ser permissão.
-- Rotas públicas sem login ficam em `ROTAS_PUBLICAS` (`src/lib/supabase/proxy.ts`).
+- Rotas públicas sem login ficam em `ROTAS_PUBLICAS` (`src/lib/rotas-publicas.ts`, usada por `src/lib/supabase/proxy.ts`).
 
 ## Banco e migrations
 

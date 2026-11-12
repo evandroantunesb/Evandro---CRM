@@ -3878,6 +3878,116 @@ export type Database = {
           },
         ];
       };
+      obra_checklist: {
+        Row: {
+          anotacao: string | null;
+          empresa_id: string;
+          etapa: Database["public"]["Enums"]["etapa_checklist_obra"];
+          feita_em: string | null;
+          marcada_em: string | null;
+          marcada_por: string | null;
+          nao_se_aplica_motivo: string | null;
+          obra_id: string;
+          prevista_para: string | null;
+        };
+        Insert: {
+          anotacao?: string | null;
+          empresa_id: string;
+          etapa: Database["public"]["Enums"]["etapa_checklist_obra"];
+          feita_em?: string | null;
+          marcada_em?: string | null;
+          marcada_por?: string | null;
+          nao_se_aplica_motivo?: string | null;
+          obra_id: string;
+          prevista_para?: string | null;
+        };
+        Update: {
+          anotacao?: string | null;
+          empresa_id?: string;
+          etapa?: Database["public"]["Enums"]["etapa_checklist_obra"];
+          feita_em?: string | null;
+          marcada_em?: string | null;
+          marcada_por?: string | null;
+          nao_se_aplica_motivo?: string | null;
+          obra_id?: string;
+          prevista_para?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "obra_checklist_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "obra_checklist_marcada_por_fkey";
+            columns: ["marcada_por"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "obra_checklist_obra_id_fkey";
+            columns: ["obra_id"];
+            isOneToOne: false;
+            referencedRelation: "obras";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      obra_checklist_fotos: {
+        Row: {
+          caminho: string;
+          created_at: string;
+          empresa_id: string;
+          enviada_por: string | null;
+          etapa: Database["public"]["Enums"]["etapa_checklist_obra"];
+          id: string;
+          obra_id: string;
+        };
+        Insert: {
+          caminho: string;
+          created_at?: string;
+          empresa_id: string;
+          enviada_por?: string | null;
+          etapa: Database["public"]["Enums"]["etapa_checklist_obra"];
+          id?: string;
+          obra_id: string;
+        };
+        Update: {
+          caminho?: string;
+          created_at?: string;
+          empresa_id?: string;
+          enviada_por?: string | null;
+          etapa?: Database["public"]["Enums"]["etapa_checklist_obra"];
+          id?: string;
+          obra_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "obra_checklist_fotos_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "obra_checklist_fotos_enviada_por_fkey";
+            columns: ["enviada_por"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "obra_checklist_fotos_obra_id_etapa_fkey";
+            columns: ["obra_id", "etapa"];
+            isOneToOne: false;
+            referencedRelation: "obra_checklist";
+            referencedColumns: ["obra_id", "etapa"];
+          },
+        ];
+      };
       obra_cliente: {
         Row: {
           created_at: string;
@@ -5323,6 +5433,7 @@ export type Database = {
           entrega_contratada: string;
           entrega_material_prevista: string | null;
           id: string;
+          link_cliente: string | null;
           negocio_id: string;
           numero: number;
           pausa_motivo: string | null;
@@ -5351,6 +5462,7 @@ export type Database = {
           entrega_contratada: string;
           entrega_material_prevista?: string | null;
           id?: string;
+          link_cliente?: string | null;
           negocio_id: string;
           numero: number;
           pausa_motivo?: string | null;
@@ -5379,6 +5491,7 @@ export type Database = {
           entrega_contratada?: string;
           entrega_material_prevista?: string | null;
           id?: string;
+          link_cliente?: string | null;
           negocio_id?: string;
           numero?: number;
           pausa_motivo?: string | null;
@@ -6970,6 +7083,7 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      acompanhamento_obra: { Args: { p_token: string }; Returns: Json };
       ajustar_entrega_contratada_obra: {
         Args: { p_data: string; p_motivo: string; p_obra_id: string };
         Returns: undefined;
@@ -7037,6 +7151,15 @@ export type Database = {
         };
         Returns: string;
       };
+      anotar_etapa_obra: {
+        Args: {
+          p_etapa: Database["public"]["Enums"]["etapa_checklist_obra"];
+          p_obra_id: string;
+          p_texto: string;
+        };
+        Returns: undefined;
+      };
+      apagar_foto_etapa_obra: { Args: { p_foto_id: string }; Returns: string };
       aplicar_checklist_engenharia: { Args: { p_obra_id: string }; Returns: number };
       aprovar_atribuicao_lead: {
         Args: { p_id: string; p_membro_final_id?: string };
@@ -7415,6 +7538,10 @@ export type Database = {
           uf: string;
         }[];
       };
+      data_assinatura_contrato: {
+        Args: { p_negocio_id: string; p_reserva: string };
+        Returns: string;
+      };
       data_pascoa: { Args: { p_ano: number }; Returns: string };
       decidir_atribuicao_lead: {
         Args: { p_automatico: boolean; p_id: string; p_membro_final_id: string };
@@ -7622,6 +7749,7 @@ export type Database = {
       };
       eletroposto_ativo: { Args: { p_empresa_id: string }; Returns: boolean };
       empresa_da_pasta_marca: { Args: { p_caminho: string }; Returns: string };
+      empresa_e_solo: { Args: { p_empresa_id: string }; Returns: boolean };
       empresa_solo_autonoma: { Args: { p_empresa_id: string }; Returns: boolean };
       encerrar_participacoes_operacionais: {
         Args: {
@@ -7733,6 +7861,15 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      etapa_nao_se_aplica_obra: {
+        Args: {
+          p_etapa: Database["public"]["Enums"]["etapa_checklist_obra"];
+          p_motivo: string;
+          p_obra_id: string;
+        };
+        Returns: undefined;
+      };
+      exigir_admin_obra_solo: { Args: { p_obra_id: string }; Returns: string };
       exigir_editar_precos_compra: { Args: { p_empresa_id: string }; Returns: undefined };
       expirar_atribuicoes_leads: { Args: Record<PropertyKey, never>; Returns: undefined };
       fechar_comissao: { Args: { p_comissao_id: string }; Returns: undefined };
@@ -7752,6 +7889,7 @@ export type Database = {
         };
         Returns: undefined;
       };
+      gerar_link_cliente_obra: { Args: { p_obra_id: string }; Returns: string };
       gravar_arquivo_compra: {
         Args: {
           p_caminho: string;
@@ -7928,6 +8066,15 @@ export type Database = {
           logo_url: string;
         }[];
       };
+      marcar_etapa_obra: {
+        Args: {
+          p_data: string;
+          p_etapa: Database["public"]["Enums"]["etapa_checklist_obra"];
+          p_feita: boolean;
+          p_obra_id: string;
+        };
+        Returns: undefined;
+      };
       marcar_parado_fluxo_obra: {
         Args: {
           p_motivo?: string;
@@ -7981,6 +8128,7 @@ export type Database = {
         Returns: undefined;
       };
       obra_da_pasta_engenharia: { Args: { p_caminho: string }; Returns: string };
+      obra_da_pasta_foto: { Args: { p_nome: string }; Returns: string };
       obra_snapshot_comercial: { Args: { p_negocio_id: string }; Returns: Json };
       obra_snapshot_tecnico: { Args: { p_negocio_id: string }; Returns: Json };
       obra_tem_orcamento_conexao: { Args: { p_obra_id: string }; Returns: boolean };
@@ -8253,6 +8401,14 @@ export type Database = {
         Args: { p_pedido_id: string };
         Returns: Record<string, unknown>;
       };
+      prever_etapa_obra: {
+        Args: {
+          p_data: string;
+          p_etapa: Database["public"]["Enums"]["etapa_checklist_obra"];
+          p_obra_id: string;
+        };
+        Returns: undefined;
+      };
       produto_da_empresa: { Args: { p_empresa_id: string }; Returns: string };
       progresso_conquistas_membro: {
         Args: { p_empresa_id: string };
@@ -8316,6 +8472,14 @@ export type Database = {
       };
       registrar_evento_vistoria_engenharia: {
         Args: { p_data: string; p_descricao?: string; p_tipo: string; p_vistoria_id: string };
+        Returns: string;
+      };
+      registrar_foto_etapa_obra: {
+        Args: {
+          p_caminho: string;
+          p_etapa: Database["public"]["Enums"]["etapa_checklist_obra"];
+          p_obra_id: string;
+        };
         Returns: string;
       };
       registrar_historico_obra: {
@@ -8758,6 +8922,17 @@ export type Database = {
         | "transportadora"
         | "equipe_campo";
       capacidade_obra: "executar" | "coordenar";
+      etapa_checklist_obra:
+        | "contrato"
+        | "entrada"
+        | "projeto_art"
+        | "material_comprado"
+        | "protocolo"
+        | "material_entregue"
+        | "instalacao"
+        | "vistoria"
+        | "conexao"
+        | "entrega";
       funcao_participante_obra: "vendedor" | "sdr" | "responsavel" | "apoio" | "substituto";
       marco_obra: "nf_cliente" | "garantia";
       metrica_meta: "receita" | "negocios_ganhos" | "reunioes" | "conversao" | "tarefas_concluidas";
@@ -8924,6 +9099,18 @@ export const Constants = {
         "equipe_campo",
       ],
       capacidade_obra: ["executar", "coordenar"],
+      etapa_checklist_obra: [
+        "contrato",
+        "entrada",
+        "projeto_art",
+        "material_comprado",
+        "protocolo",
+        "material_entregue",
+        "instalacao",
+        "vistoria",
+        "conexao",
+        "entrega",
+      ],
       funcao_participante_obra: ["vendedor", "sdr", "responsavel", "apoio", "substituto"],
       marco_obra: ["nf_cliente", "garantia"],
       metrica_meta: ["receita", "negocios_ganhos", "reunioes", "conversao", "tarefas_concluidas"],

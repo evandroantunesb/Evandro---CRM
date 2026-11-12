@@ -77,6 +77,11 @@ export function hojeEmSaoPaulo(agora = Date.now()) {
   return new Date(agora).toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
 }
 
+/** Data sem hora do banco ("2026-10-01") para "01/10", sem passar por fuso horário. */
+export function formatarDiaMes(data: string) {
+  return `${data.slice(8, 10)}/${data.slice(5, 7)}`;
+}
+
 /** Data sem hora do banco ("2026-10-01") para "01/10/2026", sem passar por fuso horário. */
 export function formatarDataIso(data: string) {
   const [ano, mes, dia] = data.split("-");

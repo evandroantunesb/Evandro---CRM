@@ -1,8 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { env } from "@/lib/env";
-
-const ROTAS_PUBLICAS = ["/login", "/recuperar-senha", "/auth", "/proposta", "/captura", "/contrato"];
+import { ehRotaPublica } from "@/lib/rotas-publicas";
 
 export async function atualizarSessao(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -28,7 +27,7 @@ export async function atualizarSessao(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const caminho = request.nextUrl.pathname;
-  const publica = ROTAS_PUBLICAS.some((r) => caminho === r || caminho.startsWith(`${r}/`));
+  const publica = ehRotaPublica(caminho);
 
   if (!user && !publica) {
     const url = request.nextUrl.clone();

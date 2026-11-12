@@ -16,12 +16,15 @@ export const DICA_IMAGEM = "JPG, PNG ou WebP até 3 MB";
 const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 const UUID_EXATO = new RegExp(`^${UUID}$`, "i");
 
-/** Mensagem de erro (em português) se o arquivo escolhido não for aceito; null se estiver ok. */
-export function validarArquivoImagem(arquivo: { type: string; size: number }): string | null {
+/**
+ * Mensagem de erro (em português) se o arquivo escolhido não for aceito; null se estiver ok. `limiteBytes` (padrão
+ * 3 MB, o limite do Storage) vale para quem comprime antes de enviar e confere o original com um teto maior.
+ */
+export function validarArquivoImagem(arquivo: { type: string; size: number }, limiteBytes = LIMITE_BYTES_IMAGEM): string | null {
   if (!(TIPOS_IMAGEM_ACEITOS as readonly string[]).includes(arquivo.type)) {
     return "Formato não aceito. Use JPG, PNG ou WebP.";
   }
-  if (arquivo.size > LIMITE_BYTES_IMAGEM) return "A imagem passa de 3 MB. Escolha um arquivo menor.";
+  if (arquivo.size > limiteBytes) return `A imagem passa de ${Math.round(limiteBytes / (1024 * 1024))} MB. Escolha um arquivo menor.`;
   if (arquivo.size === 0) return "O arquivo está vazio.";
   return null;
 }

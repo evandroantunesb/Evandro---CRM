@@ -34,6 +34,12 @@ describe("telas da empresa", () => {
     expect(t.setoresDesligados.size).toBe(0);
   });
 
+  it("Solo: Obras ligada (versão checklist), as outras opcionais não", () => {
+    const t = telasDaEmpresa({ produto: "solo", desligadas: ["obras"], setoresDesligados: [], eletropostoLiberado: true });
+    expect(areaLigada(t, "obras")).toBe(true);
+    for (const tela of TELAS_OPCIONAIS.filter((x) => x !== "obras")) expect(areaLigada(t, tela)).toBe(false);
+  });
+
   it("Engenharia não é tela opcional", () => {
     expect((TELAS_OPCIONAIS as readonly string[]).includes("engenharia")).toBe(false);
   });
