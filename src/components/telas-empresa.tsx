@@ -1,6 +1,6 @@
 "use client";
 
-import { BarChart3, Inbox, LayoutDashboard, PlugZap, QrCode, Sun, Trophy, Wrench, type LucideIcon } from "lucide-react";
+import { BarChart3, Inbox, LayoutDashboard, PlugZap, QrCode, Sun, Trophy, type LucideIcon } from "lucide-react";
 import { INFO_TELA, TELAS_OPCIONAIS, avisoTelas, type TelaOpcional } from "@/lib/telas-empresa";
 
 const ICONE: Record<TelaOpcional, LucideIcon> = {
@@ -8,7 +8,6 @@ const ICONE: Record<TelaOpcional, LucideIcon> = {
   leads: Inbox,
   forecast: BarChart3,
   obras: Sun,
-  engenharia: Wrench,
   gamificacao: Trophy,
   eletroposto: PlugZap,
   captura: QrCode,

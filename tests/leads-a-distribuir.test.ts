@@ -88,10 +88,10 @@ describe("linksPendencias (sininho)", () => {
   });
 
   it("telas por empresa: sem Painel (Solo ou desligado) as pendências vão para o Início; sem Leads, a fila não aparece", () => {
-    const solo = telasDaEmpresa({ produto: "solo", desligadas: [], eletropostoLiberado: false });
+    const solo = telasDaEmpresa({ produto: "solo", desligadas: [], setoresDesligados: [], eletropostoLiberado: false });
     expect(linksPendencias("admin", { leadsADistribuir: 2, demais: 3 }, solo)).toEqual([{ href: "/inicio", texto: "3 pendências" }]);
     expect(linksPendencias("admin", { leadsADistribuir: 0, demais: 0 }, solo)).toEqual([{ href: "/inicio", texto: "Nenhuma pendência" }]);
-    const semPainel = telasDaEmpresa({ produto: "pro", desligadas: ["painel"], eletropostoLiberado: false });
+    const semPainel = telasDaEmpresa({ produto: "pro", desligadas: ["painel"], setoresDesligados: [], eletropostoLiberado: false });
     expect(linksPendencias("gestor", { leadsADistribuir: 1, demais: 1 }, semPainel)).toEqual([
       { href: "/leads-a-distribuir", texto: "1 lead a distribuir" },
       { href: "/inicio", texto: "1 pendência" },

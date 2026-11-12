@@ -26,6 +26,16 @@ describe("lerTelasEmpresa", () => {
     expect(areaLigada(t, "forecast")).toBe(true);
   });
 
+  it("lê os setores desligados da mesma linha", async () => {
+    const t = await lerTelasEmpresa(
+      cliente({ telas: ok({ desligadas: [], setores_desligados: ["engenharia"] }), empresa: ok({ eletroposto_ativo: false }), produto: ok("pro") }),
+      "e1",
+    );
+    expect([...t.setoresDesligados]).toEqual(["engenharia"]);
+    expect(areaLigada(t, "engenharia")).toBe(false);
+    expect(areaLigada(t, "obras")).toBe(true);
+  });
+
   it("sem linha de telas: nada desligado; plano Solo vale", async () => {
     const t = await lerTelasEmpresa(cliente({ telas: ok(null), empresa: ok({ eletroposto_ativo: false }), produto: ok("solo") }), "e1");
     expect(t.solo).toBe(true);

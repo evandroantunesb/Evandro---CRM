@@ -6,9 +6,11 @@
  *  - PRO: todas as telas opcionais, menos as que o admin desligou; o Eletroposto só com a liberação do super-admin.
  *  - Solo: nenhuma tela opcional e nenhuma área só do PRO (operação e equipe). Fica Início, Tarefas, Negócios,
  *    Contatos, Propostas e contratos e Configurações.
+ *  - Setores da obra (subprojeto 4a, 20261206100000_setores_da_obra.sql): o PRO desliga Engenharia e/ou Administrativo.
+ *    A tela Engenharia segue a chave do setor (área `"engenharia"`), não é mais tela opcional.
  */
 
-export const TELAS_OPCIONAIS = ["painel", "leads", "forecast", "obras", "engenharia", "gamificacao", "eletroposto", "captura"] as const;
+export const TELAS_OPCIONAIS = ["painel", "leads", "forecast", "obras", "gamificacao", "eletroposto", "captura"] as const;
 export type TelaOpcional = (typeof TELAS_OPCIONAIS)[number];
 
 /** Textos do quadro aprovado "Onboarding PRO · passos 4 e 5". */
@@ -17,40 +19,60 @@ export const INFO_TELA: Record<TelaOpcional, { rotulo: string; descricao: string
   leads: { rotulo: "Leads a distribuir", descricao: "Rodízio de leads entre vendedores e SDR" },
   forecast: { rotulo: "Forecast", descricao: "Negócios com chance real de fechar" },
   obras: { rotulo: "Obras", descricao: "Acompanhamento das obras e semáforo" },
-  engenharia: { rotulo: "Engenharia", descricao: "Projeto, protocolo e vistoria" },
   gamificacao: { rotulo: "Gamificação", descricao: "Ranking, metas, loja e comissões" },
   eletroposto: { rotulo: "Eletroposto", descricao: "Negócios e propostas de eletroposto" },
   captura: { rotulo: "Captura de leads", descricao: "Formulário público para o site" },
 };
 
-/** Uma tela opcional, ou `"pro"`: as áreas que só existem no plano PRO (operação, equipe). */
-export type Area = TelaOpcional | "pro";
+/** Setores que a empresa PRO pode não ter (Compras e Operacional nunca desligam). */
+export const SETORES_DESLIGAVEIS = ["engenharia", "administrativo"] as const;
+export type SetorDesligavel = (typeof SETORES_DESLIGAVEIS)[number];
 
-export type TelasEmpresa = { solo: boolean; ligadas: ReadonlySet<TelaOpcional> };
+/** Textos do quadro aprovado "OnboardingProTelas". */
+export const INFO_SETOR: Record<SetorDesligavel, { rotulo: string; descricao: string }> = {
+  engenharia: { rotulo: "Engenharia", descricao: "Projeto, ART, protocolo, vistoria e conexão" },
+  administrativo: { rotulo: "Administrativo", descricao: "Paga fornecedores e cuida da NF do cliente" },
+};
+
+/**
+ * Uma tela opcional; `"pro"`: as áreas que só existem no plano PRO (operação, equipe); `"engenharia"`: as telas do
+ * setor Engenharia (só no PRO e com o setor ligado).
+ */
+export type Area = TelaOpcional | "pro" | "engenharia";
+
+export type TelasEmpresa = { solo: boolean; ligadas: ReadonlySet<TelaOpcional>; setoresDesligados: ReadonlySet<SetorDesligavel> };
 
 const ehTelaOpcional = (v: unknown): v is TelaOpcional => (TELAS_OPCIONAIS as readonly unknown[]).includes(v);
+const ehSetorDesligavel = (v: unknown): v is SetorDesligavel => (SETORES_DESLIGAVEIS as readonly unknown[]).includes(v);
 
 export function telasDaEmpresa({
   produto,
   desligadas,
+  setoresDesligados,
   eletropostoLiberado,
 }: {
   produto: "solo" | "pro";
   desligadas: readonly string[];
+  setoresDesligados: readonly string[];
   eletropostoLiberado: boolean;
 }): TelasEmpresa {
-  if (produto === "solo") return { solo: true, ligadas: new Set() };
+  if (produto === "solo") return { solo: true, ligadas: new Set(), setoresDesligados: new Set() };
   const fora = new Set(desligadas.filter(ehTelaOpcional));
   return {
     solo: false,
     ligadas: new Set(TELAS_OPCIONAIS.filter((t) => !fora.has(t) && (t !== "eletroposto" || eletropostoLiberado))),
+    setoresDesligados: new Set(setoresDesligados.filter(ehSetorDesligavel)),
   };
 }
 
-export const areaLigada = (t: TelasEmpresa, area: Area): boolean => (area === "pro" ? !t.solo : t.ligadas.has(area));
+export function areaLigada(t: TelasEmpresa, area: Area): boolean {
+  if (area === "pro") return !t.solo;
+  if (area === "engenharia") return !t.solo && !t.setoresDesligados.has("engenharia");
+  return t.ligadas.has(area);
+}
 
 /** Quando a leitura falha: como sempre foi (PRO, tudo ligado), e o Eletroposto não liga sem a liberação. */
-export const TELAS_PADRAO: TelasEmpresa = telasDaEmpresa({ produto: "pro", desligadas: [], eletropostoLiberado: false });
+export const TELAS_PADRAO: TelasEmpresa = telasDaEmpresa({ produto: "pro", desligadas: [], setoresDesligados: [], eletropostoLiberado: false });
 
 /**
  * Combinação que o admin pode escolher, mas deve saber o efeito (decisão do Evandro de 10/11/2026): a Captura ligada
@@ -71,5 +93,17 @@ export function lerDesligadas(texto: string): TelaOpcional[] | null {
     return null;
   }
   if (!Array.isArray(valor) || !valor.every(ehTelaOpcional)) return null;
+  return [...new Set(valor)];
+}
+
+/** Lista de setores desligados enviada pela tela de Configurações (JSON). Nulo = inválida. */
+export function lerSetoresDesligados(texto: string): SetorDesligavel[] | null {
+  let valor: unknown;
+  try {
+    valor = JSON.parse(texto);
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(valor) || !valor.every(ehSetorDesligavel)) return null;
   return [...new Set(valor)];
 }
