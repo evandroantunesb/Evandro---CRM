@@ -11,6 +11,7 @@ import {
   PERFIL,
   ehPerfilSetor,
   papelDoPerfil,
+  setoresOferecidos,
   type Atuacao,
   type Capacidade,
   type PerfilUsuario,
@@ -68,7 +69,16 @@ function Pilulas<T extends string>({ name, opcoes, valor, onChange, rotulo }: { 
  * Painel à direita da lista (no celular, a tela toda): cria (`membro` nulo) ou edita uma pessoa, pelo desenho
  * "Usuários com perfil único". O perfil define papel e setores; o banco confere tudo de novo.
  */
-export function PainelPessoa({ membro, fecharHref }: { membro: MembroLinha | null; fecharHref: string }) {
+export function PainelPessoa({
+  membro,
+  fecharHref,
+  setoresDesligados,
+}: {
+  membro: MembroLinha | null;
+  fecharHref: string;
+  /** Setores da obra que a empresa desligou: não são oferecidos, salvo os que a pessoa já tem. */
+  setoresDesligados: readonly string[];
+}) {
   const novo = membro === null;
   const [resultado, acao, pendente] = useActionState(novo ? convidarMembro : atualizarMembro, null);
   // Sem o reset do React 19: os campos voltariam ao valor inicial com o estado em outro.
@@ -96,6 +106,7 @@ export function PainelPessoa({ membro, fecharHref }: { membro: MembroLinha | nul
   const setorDoPerfil = perfil && ehPerfilSetor(perfil) ? perfil : null;
   // Comercial e Gestão: ranking (e, no comercial, tipo e leads). Só ajusta campos do cadastro, não dá acesso.
   const camposComerciais = papel === "vendedor" || papel === "sdr" || papel === "gestor" || papel === "admin";
+  const oferecidos = setoresOferecidos(new Set(setoresDesligados), [...(membro?.setores ?? []).map((s) => s.setor), ...(membro?.perfil ? [membro.perfil] : [])]);
   const outrosAtivos = SETORES_OBRA.filter((s) => s !== setorDoPerfil && outros[s] !== "sem_acesso").length;
   const eraOperacao = membro?.papel === "operacao";
   const nomeExibido = membro ? membro.nome || membro.email : "Nova pessoa";
@@ -131,7 +142,7 @@ export function PainelPessoa({ membro, fecharHref }: { membro: MembroLinha | nul
           {GRUPOS_PERFIL.map((g) => (
             <div key={g.titulo}>
               <p className="mt-3.5 mb-1.5 text-[10px] font-semibold tracking-[0.2em] text-texto-2 uppercase">{g.titulo}</p>
-              {g.perfis.map((p) => (
+              {g.perfis.filter((p) => !ehPerfilSetor(p) || oferecidos.includes(p)).map((p) => (
                 <label
                   key={p}
                   className={`mt-1.5 flex cursor-pointer items-start gap-2.5 rounded-xl px-2.5 py-2 ring-1 ring-linha transition-colors duration-200 ease-raion has-[:focus-visible]:ring-dourado/60 ${
@@ -161,7 +172,7 @@ export function PainelPessoa({ membro, fecharHref }: { membro: MembroLinha | nul
             <details className="border-t border-linha pt-3.5" open={outrosAtivos > 0}>
               <summary className={`cursor-pointer rounded-lg text-sm font-semibold text-texto ${FOCO}`}>Também atua em outros setores ({outrosAtivos})</summary>
               <div className="mt-2">
-                {SETORES_OBRA.filter((s) => s !== setorDoPerfil).map((s) => (
+                {oferecidos.filter((s) => s !== setorDoPerfil).map((s) => (
                   <fieldset key={s} className="grid gap-1.5 md:grid-cols-[100px_minmax(0,1fr)] md:items-center md:gap-2 border-t border-linha py-2 first:border-0">
                     <legend className="sr-only">{ROTULO_SETOR[s]}</legend>
                     <span aria-hidden className="text-sm font-semibold text-texto">

@@ -141,19 +141,21 @@ export async function ConteudoDoPasso(props: PropsPasso) {
   }
 
   if (props.chave === "equipe") {
-    const { data: membros } = await supabase
-      .from("empresa_membros")
-      .select("id, papel, perfis(nome, email)")
-      .eq("empresa_id", props.empresaId)
-      .eq("ativo", true)
-      .order("created_at");
+    const [{ data: membros }, telas] = await Promise.all([
+      supabase.from("empresa_membros").select("id, papel, perfis(nome, email)").eq("empresa_id", props.empresaId).eq("ativo", true).order("created_at"),
+      obterTelasEmpresa(),
+    ]);
     return (
       <div className="flex flex-col gap-5">
         <p className="max-w-2xl text-sm text-texto-2">
           Cadastre as pessoas agora ou depois, em Configurações › Usuários. Cada uma recebe uma senha temporária para você repassar.
         </p>
         <div className="grid items-start gap-4 lg:grid-cols-[1.3fr_1fr]">
-          <PainelPessoa membro={null} fecharHref={`/primeiro-acesso?passo=equipe${props.rever ? "&rever=1" : ""}`} />
+          <PainelPessoa
+            membro={null}
+            fecharHref={`/primeiro-acesso?passo=equipe${props.rever ? "&rever=1" : ""}`}
+            setoresDesligados={[...telas.setoresDesligados]}
+          />
           <section className="painel flex flex-col gap-2 p-5">
             <h2 className="font-titulo text-[17px] font-semibold">Na equipe</h2>
             <ul className="flex flex-col divide-y divide-linha text-sm">

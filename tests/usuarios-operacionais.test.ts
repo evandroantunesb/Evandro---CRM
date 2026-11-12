@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { outrosSetores, perfilDoMembro, setoresParaSalvar } from "@/lib/perfis-usuario";
+import { outrosSetores, perfilDoMembro, setoresOferecidos, setoresParaSalvar } from "@/lib/perfis-usuario";
 
 const mocks = vi.hoisted(() => ({
   exigirPapel: vi.fn(),
@@ -84,6 +84,18 @@ describe("perfil único (puro)", () => {
       { setor: "compras", capacidade: "executar" },
       { setor: "administrativo", capacidade: "coordenar", principal: true },
     ]);
+  });
+});
+
+describe("setoresOferecidos (setores da obra)", () => {
+  it("setor desligado some das opções", () => {
+    expect(setoresOferecidos(new Set(["engenharia"]), [])).toEqual(["compras", "operacional", "administrativo"]);
+    expect(setoresOferecidos(new Set(["engenharia", "administrativo"]), [])).toEqual(["compras", "operacional"]);
+    expect(setoresOferecidos(new Set(), [])).toEqual(["compras", "engenharia", "operacional", "administrativo"]);
+  });
+
+  it("setor desligado que a pessoa já tem continua", () => {
+    expect(setoresOferecidos(new Set(["engenharia"]), ["engenharia"])).toEqual(["compras", "engenharia", "operacional", "administrativo"]);
   });
 });
 

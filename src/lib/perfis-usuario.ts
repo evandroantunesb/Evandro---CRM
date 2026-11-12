@@ -42,6 +42,14 @@ export type SetorDoMembro = { setor: string; capacidade: string; principal: bool
 const ehSetor = (s: string): s is SetorObra => (SETORES_OBRA as readonly string[]).includes(s);
 
 /**
+ * Setores que o cadastro oferece (setores da obra, 20261206100000_setores_da_obra.sql): sem os que a empresa desligou,
+ * mas mantendo os que a pessoa já tem (o banco continua aceitando o setor; a tela só não oferece um setor novo).
+ */
+export function setoresOferecidos(desligados: ReadonlySet<string>, atuais: readonly string[]): SetorObra[] {
+  return SETORES_OBRA.filter((setor) => !desligados.has(setor) || atuais.includes(setor));
+}
+
+/**
  * Perfil exibido: o papel, ou, para a Operação, o setor principal (sem marca, o mesmo critério do banco: o que coordena
  * e depois a ordem dos setores). Operação sem nenhum setor devolve null ("sem setor").
  */
