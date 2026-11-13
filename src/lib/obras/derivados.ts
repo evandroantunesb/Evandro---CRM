@@ -115,3 +115,14 @@ export function filtrarObras<T extends ObraFiltravel>(obras: readonly T[], filtr
     return true;
   });
 }
+
+/**
+ * Setores que o filtro "Setor" da lista oferece: os que alguma obra da lista tem (status gravado) e o já escolhido.
+ * Setor desligado na empresa (4a) some do filtro, mas continua enquanto houver obra aberta que ainda o tenha.
+ */
+export function setoresDoFiltro(
+  obras: readonly { setores: readonly { setor: SetorObra; status: string | null }[] }[],
+  escolhido?: SetorObra,
+): SetorObra[] {
+  return SETORES_OBRA.filter((s) => s === escolhido || obras.some((o) => o.setores.some((x) => x.setor === s && x.status !== null)));
+}
