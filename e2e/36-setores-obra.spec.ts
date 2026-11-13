@@ -3,7 +3,7 @@ import { entrarComo, lerBase } from "./ajuda";
 
 // Setores da obra (Onboarding, subprojeto 4a; 20261206100000_setores_da_obra.sql): o admin desliga o setor Engenharia
 // em Configurações › Telas da empresa, no cartão "Setores da obra"; a tela Engenharia some do menu e os endereços dela
-// mostram o aviso. O teste religa no fim (os arquivos rodam em sequência na mesma base).
+// mostram o aviso. Desligar o Administrativo tira o perfil dele do cadastro de pessoas. O teste religa no fim (os arquivos rodam em sequência na mesma base).
 
 const menu = (page: Page) => page.getByRole("navigation", { name: "Menu principal" }).first();
 const chaveSetor = (page: Page, nome: string) => page.getByRole("switch", { name: `Setor ${nome}`, exact: true });
@@ -44,5 +44,22 @@ test.describe("setores da obra", () => {
       await page.goto(endereco);
       await expect(page.getByText("Esta tela está desligada na sua empresa")).toHaveCount(0);
     }
+  });
+
+  test("Administrativo desligado some do cadastro de pessoas; religado, volta", async ({ page }) => {
+    const { usuarios, senha } = lerBase();
+    await entrarComo(page, usuarios.admin, senha);
+    const perfilAdministrativo = async () => {
+      await page.goto("/configuracoes/usuarios");
+      await page.getByRole("link", { name: "Convidar pessoa" }).click();
+      return page.getByRole("complementary", { name: "Convidar pessoa" }).getByRole("radio", { name: /^Administrativo/ });
+    };
+
+    await salvarSetores(page, { Administrativo: false });
+    await expect(chaveSetor(page, "Administrativo")).toHaveAttribute("aria-checked", "false");
+    await expect(await perfilAdministrativo()).toHaveCount(0);
+
+    await salvarSetores(page, { Administrativo: true });
+    await expect(await perfilAdministrativo()).toBeVisible();
   });
 });

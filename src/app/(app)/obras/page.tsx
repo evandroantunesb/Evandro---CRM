@@ -6,7 +6,7 @@ import { Botao, Selecao, Selo } from "@/components/ui";
 import { hojeBrasilia } from "@/lib/obras/apresentacao/dados";
 import { carregarCompleta } from "@/lib/obras/completa";
 import { carregarObras, type KpisObras, type ObraListaVM, type SetorObraVM } from "@/lib/obras/dados";
-import { filtrarObras } from "@/lib/obras/derivados";
+import { filtrarObras, setoresDoFiltro } from "@/lib/obras/derivados";
 import { filtrosDeParams, hrefObra, queryDosFiltros, temFiltroAtivo } from "@/lib/obras/navegacao";
 import {
   ALERTAS_OBRA,
@@ -131,7 +131,7 @@ export default async function Obras({ searchParams }: PageProps<"/obras">) {
         </Selecao>
         <Selecao name="setor" defaultValue={setor ?? ""} aria-label="Setor">
           <option value="">Setor: todos</option>
-          {SETORES_OBRA.map((s) => (
+          {setoresDoFiltro(obras, setor).map((s) => (
             <option key={s} value={s}>
               {ROTULO_SETOR[s]}
             </option>

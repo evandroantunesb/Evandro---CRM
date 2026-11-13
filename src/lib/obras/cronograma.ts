@@ -2,8 +2,8 @@ import type { Database } from "@/lib/supabase/database.types";
 import type { SetorObra } from "./rotulos";
 
 /**
- * Cronograma da obra (OPR): as sete etapas que o banco calcula em `cronograma_obra` (previsto, real, previsão em
- * cascata e atraso em dias úteis) viram as linhas do Gantt do desenho aprovado "Obras — Apresentação". Só
+ * Cronograma da obra (OPR): as etapas que o banco calcula em `cronograma_obra` (até sete; a obra sem um setor não tem as
+ * etapas dele, 4a), com previsto, real, previsão em cascata e atraso em dias úteis, viram as linhas do Gantt do desenho aprovado "Obras — Apresentação". Só
  * apresentação: nenhuma data ou atraso é recalculado aqui.
  */
 
@@ -108,7 +108,7 @@ function desvio(l: LinhaCronograma, ultima: boolean): EtapaGanttVM["desvio"] {
 
 /**
  * Linhas do Gantt e escala do desenho: meses inteiros do primeiro ao último dia que aparece (previsto, real, previsão e
- * entrega contratada); posições em % dessa faixa. Linhas fora das sete etapas conhecidas são ignoradas.
+ * entrega contratada); posições em % dessa faixa. Linhas fora das etapas conhecidas (`ETAPAS_OBRA`) são ignoradas.
  */
 export function montarCronograma(
   linhas: readonly LinhaCronograma[],
