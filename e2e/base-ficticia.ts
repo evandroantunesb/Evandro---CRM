@@ -37,7 +37,7 @@ function ambiente() {
 }
 
 /** Postgres local (para pausa/cancelamento). Recusa qualquer host que não seja local. */
-async function noBancoLocal(sql: string, params: unknown[]) {
+export async function noBancoLocal(sql: string, params: unknown[]) {
   // Definida só por e2e/global-setup.ts, depois de comprovar que o banco é o da mesma stack da API.
   const urlBanco = process.env.SUPABASE_DB_URL;
   if (!urlBanco) throw new Error("Banco não verificado: e2e/global-setup.ts não definiu a URL. Recusado.");
