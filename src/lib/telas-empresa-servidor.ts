@@ -6,7 +6,8 @@ import { TELAS_PADRAO, areaLigada, telasDaEmpresa, type Area, type TelasEmpresa 
 
 /**
  * Telas da empresa em uso (20261203100000_telas_empresa.sql): telas e setores desligados pelo admin, plano (solo/pro) e
- * Eletroposto liberado pelo super-admin. Falha ao ler = o padrão de sempre (PRO, tudo ligado), sem quebrar o app.
+ * Eletroposto liberado pelo super-admin. Falha ao ler = o padrão de sempre (PRO, tudo ligado), sem quebrar o app, marcado
+ * com `leituraFalhou` para as telas de configuração não salvarem esse padrão por cima do que está gravado.
  */
 export async function lerTelasEmpresa(supabase: SupabaseServidor, empresaId: string): Promise<TelasEmpresa> {
   const [telas, empresa, produto] = await Promise.all([
@@ -17,7 +18,7 @@ export async function lerTelasEmpresa(supabase: SupabaseServidor, empresaId: str
   const erro = telas.error ?? empresa.error ?? produto.error;
   if (erro) {
     console.error("Não foi possível ler as telas da empresa; seguindo com o padrão.", erro);
-    return TELAS_PADRAO;
+    return { ...TELAS_PADRAO, leituraFalhou: true };
   }
   return telasDaEmpresa({
     produto: produto.data === "solo" ? "solo" : "pro",

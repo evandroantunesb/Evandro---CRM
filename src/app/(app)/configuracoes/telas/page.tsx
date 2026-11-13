@@ -1,4 +1,5 @@
 import { CabecalhoPagina } from "@/components/cabecalho-pagina";
+import { Mensagem } from "@/components/ui";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { TELAS_OPCIONAIS } from "@/lib/telas-empresa";
@@ -44,6 +45,8 @@ export default async function TelasDaEmpresa() {
             Cresceu e contratou alguém? Passe para o PRO e libere equipe, setores, gestão e Gamificação.
           </p>
         </section>
+      ) : telas.leituraFalhou ? (
+        <Mensagem resultado={{ ok: false, mensagem: "Não foi possível ler as telas da empresa agora. Recarregue a página antes de mudar alguma coisa." }} />
       ) : (
         <FormularioTelas
           ligadasIniciais={TELAS_OPCIONAIS.filter((t) => telas.ligadas.has(t))}
