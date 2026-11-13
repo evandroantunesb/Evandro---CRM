@@ -71,7 +71,21 @@ test.describe("assistente de primeiro acesso", () => {
     await page.getByRole("button", { name: "Continuar" }).click();
     await expect(page.getByText("Passo 2 de 7")).toBeVisible();
 
+    // Um passo à frente pela URL não abre (nem marcaria os do meio como feitos): fica no passo onde parou.
+    await page.goto("/primeiro-acesso?passo=equipe");
+    await expect(page.getByText("Passo 2 de 7")).toBeVisible();
+
     for (let passo = 2; passo <= 6; passo++) {
+      if (passo === 6) {
+        // Passo Equipe: a pessoa cadastrada aparece em "Na equipe" sem recarregar.
+        const painel = page.getByRole("complementary", { name: "Convidar pessoa" });
+        await painel.getByRole("textbox", { name: "Nome" }).fill("Vera Equipe");
+        await painel.getByRole("textbox", { name: "E-mail" }).fill(`e2e-ass-equipe-${sufixo}@teste.raion`);
+        await painel.getByRole("radio", { name: /^Vendedor/ }).check();
+        await painel.getByRole("button", { name: "Criar usuário" }).click();
+        await expect(painel.getByText("Usuário criado.", { exact: false })).toBeVisible();
+        await expect(page.locator("section").filter({ has: page.getByRole("heading", { name: "Na equipe" }) })).toContainText("Vera Equipe");
+      }
       await page.getByRole("button", { name: "Pular por agora" }).click();
       await expect(page.getByText(`Passo ${passo + 1} de 7`)).toBeVisible();
     }

@@ -21,6 +21,8 @@ export async function avancarAssistente(chave: ChavePasso, pular: boolean, rever
   const supabase = await criarClienteServidor();
   const o = await lerOnboarding(supabase, atual.empresaId);
   if (o && !o.concluido_em && !rever) {
+    // Só avança a partir do passo onde parou ou de um anterior: um passo à frente (URL antiga ou outra aba) volta para lá.
+    if (posicao > o.passo_atual) redirect("/primeiro-acesso");
     const pulados = pular ? [...new Set([...o.pulados, posicao])] : o.pulados.filter((p) => p !== posicao);
     const { error } = await supabase
       .from("empresa_onboarding")

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PASSOS, estadoDoPasso, passoAnterior, passosDoPlano, proximoPasso, resumoDoPasso } from "@/lib/assistente";
+import { PASSOS, estadoDoPasso, passoAnterior, passoPedido, passosDoPlano, proximoPasso, resumoDoPasso } from "@/lib/assistente";
 
 describe("resumo da revisão (quadro OnboardingRevisar)", () => {
   const d = {
@@ -64,5 +64,29 @@ describe("passos do assistente", () => {
     expect(estadoDoPasso(o, solo, "imagens")).toBe("feito");
     expect(estadoDoPasso(o, solo, "pagamento")).toBe("pendente");
     expect(estadoDoPasso(o, solo, "revisar")).toBe("pendente");
+  });
+});
+
+describe("passoPedido (?passo= na URL não pula passos)", () => {
+  const pro = passosDoPlano(false);
+  const noPasso2 = { passo_atual: 2, pulados: [] };
+
+  it("em andamento: passo à frente de onde parou volta para lá", () => {
+    expect(passoPedido(noPasso2, pro, "equipe", false)).toBe("marca");
+  });
+
+  it("em andamento: o passo onde parou e os anteriores abrem", () => {
+    expect(passoPedido(noPasso2, pro, "marca", false)).toBe("marca");
+    expect(passoPedido(noPasso2, pro, "empresa", false)).toBe("empresa");
+  });
+
+  it("revendo: qualquer passo abre", () => {
+    expect(passoPedido(noPasso2, pro, "equipe", true)).toBe("equipe");
+  });
+
+  it("passo inválido ou fora do plano: onde parou", () => {
+    expect(passoPedido(noPasso2, pro, "xyz", false)).toBe("marca");
+    expect(passoPedido(noPasso2, passosDoPlano(true), "equipe", true)).toBe("marca");
+    expect(passoPedido(noPasso2, pro, undefined, false)).toBe("marca");
   });
 });
