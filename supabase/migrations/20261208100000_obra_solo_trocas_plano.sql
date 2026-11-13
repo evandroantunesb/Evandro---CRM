@@ -4,10 +4,13 @@
 --  * Obra cancelada: o checklist não muda mais (marcar, prever, anotar, "não se aplica", enviar foto e gerar link são
 --    recusados); apagar foto continua, para o admin limpar o que não deveria estar lá. O cliente já vê "encerrada".
 --  * Foto: o caminho é conferido por prefixo exato (`starts_with`); com `like`, o `_` das etapas era coringa.
---  * Empresa que vira Solo (o super-admin troca o plano): cada obra aberta (nem cancelada nem concluída pela regra do
---    PRO) que não tem checklist ganha o checklist (contrato e entrada pelos fatos; entrada estornada fica pendente),
---    como a migration da 4b fez com as obras do Solo que já existiam; obra aberta com checklist ganha o link do
---    cliente, se não tem. Os fluxos de setor que as obras têm ficam como estão.
+--  * Empresa que vira Solo (o super-admin troca o plano): toda obra sem checklist ganha o checklist, para continuar
+--    aparecendo nas telas do Solo (decisão do Evandro de 13/11/2026: as concluídas em "Entregues", as canceladas em
+--    "Canceladas"). Contrato e entrada pelos fatos, como a migration da 4b fez (entrada estornada fica pendente). Obra
+--    concluída pela regra do PRO (e não cancelada): entrega feita na data da conclusão (a maior conclusão dos setores
+--    e marcos, como na migration do Administrativo) e as etapas do meio "não se aplica", sem inventar data. Obra aberta
+--    (com etapa pendente e não cancelada) ganha o link do cliente, se não tem; concluída e cancelada não. Os fluxos de
+--    setor que as obras têm ficam como estão.
 --  * Empresa que sai do Solo para o PRO: cada obra aberta (não cancelada, com alguma etapa do checklist pendente, ou
 --    sem checklist) ganha os setores que a empresa tem, como uma obra nova do PRO, e segue pelo fluxo do PRO; o link
 --    do cliente dela é desligado (link do cliente só no Solo). As obras concluídas no Solo ficam como estão.
@@ -117,28 +120,42 @@ declare
   v_e_solo boolean := tg_op <> 'DELETE' and new.produto = 'solo';
 begin
   if v_e_solo and not v_era_solo then
-    -- Obras abertas sem checklist: checklist como na 4b (contrato e entrada pelos fatos; entrada estornada pendente).
-    insert into public.obra_checklist (obra_id, empresa_id, etapa, feita_em)
+    -- Toda obra sem checklist ganha o checklist (aberta, concluída ou cancelada).
+    insert into public.obra_checklist (obra_id, empresa_id, etapa, feita_em, nao_se_aplica_motivo)
     select o.id, o.empresa_id, e.etapa,
-           case e.etapa
-             when 'contrato' then public.data_assinatura_contrato(o.negocio_id, c.updated_at)
-             when 'entrada' then case when o.alerta_pagamento_estornado_em is null
-                                      then (cp.confirmado_em at time zone 'America/Sao_Paulo')::date end
-           end
+           case
+             when e.etapa = 'contrato' then public.data_assinatura_contrato(o.negocio_id, c.updated_at)
+             when e.etapa = 'entrada' then case when o.alerta_pagamento_estornado_em is null
+                                                then (cp.confirmado_em at time zone 'America/Sao_Paulo')::date end
+             when e.etapa = 'entrega' and fim.concluida then fim.data
+           end,
+           case when fim.concluida and e.etapa not in ('contrato', 'entrada', 'entrega')
+                then 'Obra concluída antes do Solo, pelo fluxo dos setores.' end
     from public.obras o
     join public.contratos c on c.id = o.contrato_id
     left join public.confirmacoes_pagamento cp on cp.id = o.confirmacao_pagamento_id
+    cross join lateral (
+      select o.cancelada_em is null and public.obra_concluida_pro(o.id) as concluida,
+             (coalesce(
+                greatest(
+                  (select max(x.concluido_em) from public.obra_fluxos x where x.obra_id = o.id),
+                  (select max(m.concluido_em) from public.obra_marcos m where m.obra_id = o.id)
+                ),
+                o.updated_at) at time zone 'America/Sao_Paulo')::date as data
+    ) fim
     cross join unnest(enum_range(null::public.etapa_checklist_obra)) as e(etapa)
     where o.empresa_id = v_empresa
-      and o.cancelada_em is null
-      and not exists (select 1 from public.obra_checklist x where x.obra_id = o.id)
-      and not public.obra_concluida_pro(o.id);
+      and not exists (select 1 from public.obra_checklist x where x.obra_id = o.id);
 
+    -- Link do cliente só para a obra aberta (não cancelada, com etapa pendente).
     update public.obras o set link_cliente = gen_random_uuid()::text
     where o.empresa_id = v_empresa
       and o.link_cliente is null
       and o.cancelada_em is null
-      and exists (select 1 from public.obra_checklist x where x.obra_id = o.id);
+      and exists (
+        select 1 from public.obra_checklist x
+        where x.obra_id = o.id and x.feita_em is null and x.nao_se_aplica_motivo is null
+      );
 
   elsif v_era_solo and not v_e_solo then
     -- Obras abertas do Solo: os setores que a empresa tem agora (como uma obra nova do PRO) e sem o link do cliente.

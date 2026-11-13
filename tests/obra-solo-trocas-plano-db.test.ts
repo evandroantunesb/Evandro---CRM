@@ -131,7 +131,7 @@ describe("Obra do Solo: cancelada, prefixo da foto e troca de plano (ordem impor
     expect(apagado).toBe(caminho);
   });
 
-  it("empresa que vira Solo: obras abertas ganham checklist e link; cancelada e concluída ficam como estão", async () => {
+  it("empresa que vira Solo: todas ganham checklist (concluída entregue, cancelada cancelada); só a aberta ganha link", async () => {
     const aberta = await criarObra(pro, adminPro, "Pro aberta");
     const estornada = await criarObra(pro, adminPro, "Pro estornada");
     const cancelada = await criarObra(pro, adminPro, "Pro cancelada");
@@ -142,7 +142,11 @@ describe("Obra do Solo: cancelada, prefixo da foto e troca de plano (ordem impor
       "update public.obra_fluxos set status = case when setor = 'compras' then 'material_entregue' else 'concluido' end where obra_id = $1",
       [concluida],
     );
-    await noBanco("update public.obra_marcos set status = 'concluido' where obra_id = $1", [concluida]);
+    await noBanco(
+      "update public.obra_fluxos set concluido_em = now() - interval '3 days' where obra_id = $1 and concluido_em is null",
+      [concluida],
+    );
+    await noBanco("update public.obra_marcos set status = 'concluido', concluido_em = now() - interval '2 days' where obra_id = $1", [concluida]);
     const setoresAntes = await setoresDa(aberta);
 
     await trocarPlano(pro, "solo");
@@ -156,10 +160,30 @@ describe("Obra do Solo: cancelada, prefixo da foto e troca de plano (ordem impor
     expect(await setoresDa(aberta)).toEqual(setoresAntes); // os fluxos que já tinha ficam
 
     expect((await etapasDa(estornada)).find((e) => e.etapa === "entrada")!.feita_em).toBeNull();
-    for (const obra of [cancelada, concluida]) {
-      expect(await etapasDa(obra)).toEqual([]);
-      expect(await linkDa(obra)).toBeNull();
-    }
+
+    // Cancelada: checklist pelos fatos (aparece em "Canceladas"), sem link.
+    const etapasCancelada = await etapasDa(cancelada);
+    expect(etapasCancelada).toHaveLength(10);
+    expect(etapasCancelada.filter((e) => e.feita_em !== null).map((e) => e.etapa)).toEqual(["contrato", "entrada"]);
+    expect(await linkDa(cancelada)).toBeNull();
+
+    // Concluída: entrega na data da conclusão dos setores e marcos, etapas do meio "não se aplica" (aparece em "Entregues"), sem link.
+    const fimConcluida = (
+      await noBanco(
+        `select (greatest((select max(concluido_em) from public.obra_fluxos where obra_id = $1),
+                          (select max(concluido_em) from public.obra_marcos where obra_id = $1)) at time zone 'America/Sao_Paulo')::date::text as d`,
+        [concluida],
+      )
+    )[0].d as string;
+    const etapasConcluida = await noBanco(
+      "select etapa::text as etapa, feita_em::text as feita_em, nao_se_aplica_motivo from public.obra_checklist where obra_id = $1 order by etapa",
+      [concluida],
+    );
+    expect(etapasConcluida).toHaveLength(10);
+    expect(etapasConcluida.find((e) => e.etapa === "entrega")!.feita_em).toBe(fimConcluida);
+    expect(etapasConcluida.filter((e) => e.nao_se_aplica_motivo !== null)).toHaveLength(7);
+    expect(etapasConcluida.every((e) => e.feita_em !== null || e.nao_se_aplica_motivo !== null)).toBe(true);
+    expect(await linkDa(concluida)).toBeNull();
 
     // O admin da empresa (agora Solo) já marca no checklist da obra que veio do PRO.
     ok(await adminPro.cliente.rpc("marcar_etapa_obra", { p_obra_id: aberta, p_etapa: "instalacao", p_feita: true, p_data: hoje() }), "marcar");
