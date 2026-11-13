@@ -130,7 +130,14 @@ export function CorEtapa({ etapaId, cor }: { etapaId: string; cor: string | null
         defaultValue={cor ?? "#a1a1aa"}
         aria-label="Cor da etapa"
         className="h-6 w-6 cursor-pointer rounded border border-zinc-300 p-0"
-        onChange={(e) => e.currentTarget.form?.requestSubmit()}
+        // O onChange do React num <input type="color"> dispara a cada movimento dentro do seletor (evento "input")
+        // e inundava o servidor de envios, travando a tela. O "change" nativo só dispara quando a cor é confirmada.
+        ref={(input) => {
+          if (!input) return;
+          const enviar = () => input.form?.requestSubmit();
+          input.addEventListener("change", enviar);
+          return () => input.removeEventListener("change", enviar);
+        }}
       />
     </form>
   );
