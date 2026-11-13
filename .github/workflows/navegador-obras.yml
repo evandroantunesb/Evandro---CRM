@@ -7,43 +7,32 @@ name: Navegador (Obras)
 # (webServer do playwright.config.ts). Este arquivo não sobe o app diretamente.
 # Capturas de tela e relatório ficam como artefatos (retenção curta). Em falha, as linhas de
 # erro viram anotações do job (só dados fictícios e do Supabase local).
+#
+# Sob demanda (decisão do Evandro, 13/11/2026: o job era quase metade dos minutos do Actions):
+# roda numa PR com a etiqueta "navegador" (ao pôr a etiqueta e a cada push enquanto ela estiver lá)
+# ou pelo disparo manual (Run workflow / `gh workflow run navegador-obras.yml --ref <branch>`).
+# Ponha a etiqueta quando a PR mexer em Obras, Engenharia, e2e, na trava ou no servidor do e2e
+# (scripts/lib, scripts/e2e-servidor.mjs, playwright.config.ts), em next.config.ts, nas dependências
+# ou em supabase/**. Sem a etiqueta o job fica "pulado" e não gasta minutos.
 on:
   pull_request:
-    paths:
-      - "src/app/(app)/obras/**"
-      - "src/components/obras/**"
-      - "src/lib/obras/**"
-      - "src/lib/acoes/obras.ts"
-      - "src/lib/acoes/obras-opr.ts"
-      # Engenharia (telas, componentes, regras e ações): os e2e 18 a 24 e 26 cobrem o módulo.
-      - "src/app/(app)/engenharia/**"
-      - "src/components/engenharia/**"
-      - "src/lib/engenharia*.ts"
-      - "src/lib/acoes/engenharia*.ts"
-      - "e2e/**"
-      - "playwright.config.ts"
-      - ".github/workflows/navegador-obras.yml"
-      # A trava e o servidor do e2e decidem em que stack o teste grava: mudar qualquer um deles precisa rodar os
-      # testes de navegador. Também entram o que o servidor constrói/inicia (next.config.ts, dependências) e o
-      # banco local que eles usam (supabase/**: migrations, seed e config.toml).
-      - "scripts/e2e-servidor.mjs"
-      - "scripts/checar-ambiente-local.mjs"
-      - "scripts/lib/**"
-      - "next.config.ts"
-      - "package.json"
-      - "pnpm-lock.yaml"
-      - "supabase/**"
+    types: [opened, synchronize, reopened, labeled]
   workflow_dispatch:
 
 permissions:
   contents: read
 
-concurrency:
-  group: navegador-obras-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   navegador:
+    # Pôr outra etiqueta numa PR que já tem "navegador" não roda de novo.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.action == 'labeled' && github.event.label.name == 'navegador') ||
+      (github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'navegador'))
+    # No job, e não no workflow: uma execução pulada (outra etiqueta) não cancela a que está rodando.
+    concurrency:
+      group: navegador-obras-${{ github.ref }}
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:

@@ -17,7 +17,7 @@ Regras de trabalho (autorização, merges, produção, gamificação) estão no 
 - **Next.js 16** (App Router — ver aviso acima) · **React 19** · **TypeScript** · **Tailwind 4**
 - **Supabase:** Postgres, Auth, RLS e Storage (região São Paulo)
 - Zod 4 · `@react-pdf/renderer` · `@dnd-kit/core` · `lucide-react` · Vitest · pnpm · Node 22
-- **Vercel** (deploy da `main` + preview por PR) · GitHub Actions (`ci.yml`, `banco-producao.yml`)
+- **Vercel** (deploy da `main` + preview por PR) · GitHub Actions (`ci.yml`, `banco-producao.yml`; `navegador-obras.yml`, os testes de navegador, só sob demanda: etiqueta `navegador` na PR ou disparo manual)
 - Produção: `raion-crm-roan.vercel.app` (`raion-crm.vercel.app`, sem "-roan", é de terceiros)
 
 ## Multiempresa
