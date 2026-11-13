@@ -41,9 +41,9 @@ describe("lerTelasEmpresa", () => {
     expect(t.solo).toBe(true);
   });
 
-  it("erro na leitura: o padrão de sempre (PRO, tudo ligado)", async () => {
+  it("erro na leitura: o padrão de sempre (PRO, tudo ligado), marcado para as configurações não salvarem por cima", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const t = await lerTelasEmpresa(cliente({ telas: { data: null, error: { message: "falhou" } }, empresa: ok(null), produto: ok("pro") }), "e1");
-    expect(t).toBe(TELAS_PADRAO);
+    expect(t).toEqual({ ...TELAS_PADRAO, leituraFalhou: true });
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { TELAS_OPCIONAIS, TELAS_PADRAO, areaLigada, avisoTelas, lerDesligadas, lerSetoresDesligados, telasDaEmpresa } from "@/lib/telas-empresa";
+import { TELAS_OPCIONAIS, TELAS_PADRAO, areaLigada, avisoTelas, desligadasParaGravar, lerDesligadas, lerSetoresDesligados, telasDaEmpresa } from "@/lib/telas-empresa";
 
 const pro = (desligadas: string[] = [], eletropostoLiberado = true, setoresDesligados: string[] = []) =>
   telasDaEmpresa({ produto: "pro", desligadas, setoresDesligados, eletropostoLiberado });
@@ -101,5 +101,20 @@ describe("lerSetoresDesligados", () => {
     expect(lerSetoresDesligados('["operacional"]')).toBeNull();
     expect(lerSetoresDesligados("nada")).toBeNull();
     expect(lerSetoresDesligados('{"a":1}')).toBeNull();
+  });
+});
+
+describe("desligadasParaGravar (Eletroposto sem liberação fica como está gravado)", () => {
+  it("liberado: grava o que o formulário pediu", () => {
+    expect(desligadasParaGravar(["painel"], ["eletroposto"], true)).toEqual(["painel"]);
+    expect(desligadasParaGravar(["painel", "eletroposto"], [], true)).toEqual(["painel", "eletroposto"]);
+  });
+
+  it("sem liberação: o desligamento gravado do Eletroposto não se perde", () => {
+    expect(desligadasParaGravar(["painel"], ["painel", "eletroposto"], false)).toEqual(["painel", "eletroposto"]);
+  });
+
+  it("sem liberação: o formulário não desliga o Eletroposto que estava ligado", () => {
+    expect(desligadasParaGravar(["eletroposto"], [], false)).toEqual([]);
   });
 });
