@@ -46,6 +46,17 @@ export function passoDoEstado(o: EstadoAssistente, passos: readonly ChavePasso[]
   return passos[Math.min(Math.max(o.passo_atual, 1), passos.length) - 1];
 }
 
+/**
+ * Passo pedido na URL (`?passo=`), limitado ao alcance: no assistente em andamento, só o passo onde parou ou um anterior
+ * (pular passos pela URL os marcaria como feitos); revendo, qualquer um. Pedido inválido = o passo onde parou.
+ */
+export function passoPedido(o: EstadoAssistente, passos: readonly ChavePasso[], pedido: string | undefined, rever: boolean): ChavePasso {
+  const ondeParou = passoDoEstado(o, passos);
+  const i = passos.indexOf(pedido as ChavePasso);
+  if (i < 0) return ondeParou;
+  return rever || i <= passos.indexOf(ondeParou) ? passos[i] : ondeParou;
+}
+
 /** O que a revisão (último passo) resume de cada passo. */
 export type DadosRevisao = {
   empresa: { nome: string | null; cnpj: string | null; whatsapp: string | null };
