@@ -342,70 +342,29 @@ describe("A1: workflows de teste preparam o Docker para publicar em loopback", (
     expect(passo).not.toMatch(/echo[^\n]*\$\{?(API_URL|DB_URL)\b/);
   });
 
-  describe("M3: o workflow do navegador roda quando a trava ou o servidor do e2e mudam", () => {
-    /** Entradas de `on.pull_request.paths` (leitura textual: o arquivo não tem outro bloco `paths:`). */
-    function caminhosDoGatilho(): string[] {
-      const linhas = ler(".github/workflows/navegador-obras.yml").split(/\r?\n/);
-      const inicio = linhas.findIndex((l) => /^\s{4}paths:\s*$/.test(l));
-      expect(inicio).toBeGreaterThan(-1);
-      const caminhos: string[] = [];
-      for (const linha of linhas.slice(inicio + 1)) {
-        const m = /^\s{6}-\s+"([^"]+)"\s*$/.exec(linha);
-        if (m) caminhos.push(m[1]);
-        else if (!/^\s*(#.*)?$/.test(linha)) break;
-      }
-      return caminhos;
-    }
+  describe("M3: o workflow do navegador roda sob demanda (etiqueta \"navegador\" na PR ou disparo manual)", () => {
+    const texto = () => ler(".github/workflows/navegador-obras.yml");
 
-    it("mantém os gatilhos originais", () => {
-      expect(caminhosDoGatilho()).toEqual(
-        expect.arrayContaining([
-          "src/app/(app)/obras/**",
-          "src/components/obras/**",
-          "src/lib/obras/**",
-          "src/lib/acoes/obras.ts",
-          "e2e/**",
-          "playwright.config.ts",
-          ".github/workflows/navegador-obras.yml",
-        ]),
+    it("dispara na PR (inclusive ao pôr etiqueta) e à mão, sem filtro de caminhos", () => {
+      const t = texto();
+      expect(t).toMatch(/^ {2}pull_request:\s*\n {4}types: \[opened, synchronize, reopened, labeled\]\s*$/m);
+      expect(t).toMatch(/^ {2}workflow_dispatch:\s*$/m);
+      expect(t).not.toMatch(/^\s+paths:/m);
+    });
+
+    it("o job só roda com a etiqueta navegador ou no disparo manual", () => {
+      const t = texto();
+      expect(t).toContain("github.event_name == 'workflow_dispatch'");
+      expect(t).toContain("(github.event.action == 'labeled' && github.event.label.name == 'navegador')");
+      expect(t).toContain(
+        "(github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'navegador'))",
       );
     });
 
-    it("roda também quando muda a Engenharia (e2e 18 a 24 e 26) e as ações da OPR", () => {
-      expect(caminhosDoGatilho()).toEqual(
-        expect.arrayContaining([
-          "src/app/(app)/engenharia/**",
-          "src/components/engenharia/**",
-          "src/lib/engenharia*.ts",
-          "src/lib/acoes/engenharia*.ts",
-          "src/lib/acoes/obras-opr.ts",
-        ]),
-      );
-    });
-
-    it("inclui os arquivos que decidem em que stack o e2e grava e como o app é construído", () => {
-      expect(caminhosDoGatilho()).toEqual(
-        expect.arrayContaining([
-          "scripts/e2e-servidor.mjs",
-          "scripts/checar-ambiente-local.mjs",
-          "scripts/lib/**",
-          "next.config.ts",
-          "package.json",
-          "pnpm-lock.yaml",
-          "supabase/**",
-        ]),
-      );
-    });
-
-    it("todo módulo local que o servidor do e2e importa está coberto pelos gatilhos", () => {
-      const caminhos = caminhosDoGatilho();
-      const cobre = (arquivo: string) =>
-        caminhos.some((c) => (c.endsWith("/**") ? arquivo.startsWith(c.slice(0, -2)) : c === arquivo));
-      const importados = [...ler("scripts/e2e-servidor.mjs").matchAll(/from "(\.\/[^"]+)"/g)].map((m) => `scripts/${m[1].slice(2)}`);
-      expect(importados.length).toBeGreaterThan(0);
-      for (const arquivo of [...importados, "scripts/checar-ambiente-local.mjs", "scripts/e2e-servidor.mjs"]) {
-        expect(cobre(arquivo), `${arquivo} não está nos gatilhos`).toBe(true);
-      }
+    it("a concorrência fica no job: uma execução pulada não cancela a que está rodando", () => {
+      const t = texto();
+      expect(t).not.toMatch(/^concurrency:/m);
+      expect(t).toMatch(/^ {4}concurrency:\s*\n {6}group: navegador-obras-\$\{\{ github\.ref \}\}\s*\n {6}cancel-in-progress: true/m);
     });
 
     it("princípio de mínimos privilégios preservado: só leitura, sem secrets, sem pull_request_target", () => {

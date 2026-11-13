@@ -63,7 +63,7 @@ Detalhe e histórico em `docs/PROJECT_STATUS.md` (seção "Ponto de retomada"); 
 
 - **Produção:** `main` em `cf579e5`, todas as migrations até a #373 (obra do Solo) aplicadas. Backups diários de produção (banco e storage) rodando no GitHub. Repositório público de novo desde 12/11/2026 (privado, os minutos do Actions acabaram); com isso `producao-banco` e `producao-seed` voltaram a exigir a aprovação do Evandro.
 - **Concluídos recentemente:** Compras inteiro (P1 a P4c, #343–#363) e Onboarding Solo e PRO, subprojetos 1 a 4 (#365–#374: telas por empresa, marca e cores, assistente de primeiro acesso, setores da obra e obra do Solo).
-- **Próximo:** aguardando comando do Evandro. Sugestão registrada: o job `navegador` rodar só sob demanda (era quase metade do consumo do Actions).
+- **Próximo:** aguardando comando do Evandro. Testes de navegador passam a rodar só sob demanda (etiqueta `navegador` na PR ou disparo manual), decisão de 13/11/2026.
 - **Limpeza pendente (com OK do Evandro):** worktrees já mesclados (`prunable`) em `R:\` e `C:\dev\`; triagem das PRs drafts antigas.
 - **Ambiente neste desktop:** `node_modules` dentro de `R:\` é lento ou quebrado (links para `E:\`); instale e rode a verificação numa cópia em disco local (worktrees em `C:\dev\`; `pnpm install --frozen-lockfile` leva ~25 s lá). Se o Supabase local subir sem o Kong, a stack foi criada de um checkout antigo: `supabase stop` e `start` resolvem. Várias outras stacks Supabase locais estão ativas em portas próprias.
 
