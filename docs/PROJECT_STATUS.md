@@ -1,15 +1,15 @@
 # Estado do projeto — Raion CRM
 
-## Ponto de retomada (10/11/2026)
+## Ponto de retomada (13/11/2026)
 
-- **Produção:** `main` em `40e36fb`; todas as migrations até a #362 (Compras P4c, desconto sobre o sugerido) aplicadas pelo `banco-producao.yml`. Depois: #365, #367, #369, a #371 (setores da obra, 11/11/2026, antes do merge), a #373 (obra do Solo, 12/11) e a #377 (obra do Solo: cancelada, foto e troca de plano, 13/11/2026, depois do merge).
-- **Repositório (12/11/2026):** estava privado (a documentação dizia público) e os minutos do GitHub Actions do mês acabaram (CI e workflows de produção parados por cobrança). Com autorização do Evandro, o repositório voltou a ser **público** em 12/11/2026 depois de uma varredura do histórico (1.233 commits, nenhum segredo real) e dos gatilhos dos workflows (sem `pull_request_target` nem runner próprio). Com isso o revisor obrigatório do `producao-banco` voltou a valer (o run da #373 parou para a aprovação do Evandro); de 10/11 a 11/11 os runs não pararam. Conferir também o `producao-seed`. A tag antiga `migracao-pr373-19bb586` e a branch `chore/autorizar-migracao-373` (migration sem as correções da revisão) ainda existem: não usar; apagar com OK do Evandro.
+- **Produção:** `main` em `be73857`; todas as migrations até a #377 (obra do Solo: cancelada, foto e troca de plano, 13/11/2026) aplicadas pelo `banco-producao.yml`.
+- **Repositório (12/11/2026):** estava privado (a documentação dizia público) e os minutos do GitHub Actions do mês acabaram (CI e workflows de produção parados por cobrança). Com autorização do Evandro, o repositório voltou a ser **público** em 12/11/2026 depois de uma varredura do histórico (1.233 commits, nenhum segredo real) e dos gatilhos dos workflows (sem `pull_request_target` nem runner próprio). Com isso o revisor obrigatório do `producao-banco` voltou a valer (o run da #373 parou para a aprovação do Evandro); de 10/11 a 11/11 os runs não pararam. Conferir também o `producao-seed`. A tag antiga `migracao-pr373-19bb586` (migration sem as correções da revisão) fica: o ruleset "Tags de migracao imutaveis" não deixa apagá-la (13/11/2026); não usar. A branch `chore/autorizar-migracao-373` já não existe.
 - **Perfis e setores:** concluído (A1 #332, B #334, A2a #335, A2b #337, C #338, A3 #339, D/E #341). Pendências registradas nas seções abaixo (candidatos a participante e tarefas de Compras quando outro setor atende no lugar dele; remover `atua_no_operacional`; "de N do plano" em Usuários).
 - **Compras:** concluído (P1 a P4c, #343–#363): P4a margens e potência (#356/#357), P4b kit pela tabela e preço pronto, OpenSolar removida (#360/#361), P4c desconto sobre o sugerido com aprovação (#362/#363). Cartão "Desconto" e "Aprovar desconto" no Início cobertos no navegador pelo e2e `38-desconto-sugerido` (13/11/2026).
-- **Onboarding Solo e PRO (em andamento, 10/11/2026):** dividido em 4 subprojetos, nesta ordem: (1) telas por empresa, (2) cores por empresa, (3) assistente de primeiro acesso, (4) obra do Solo com as chaves de setores (quadros `SoloObras`, `SoloChecklist` e `SoloClienteObra` aprovados na versão enxuta em 11/11/2026). **Subprojeto 1** concluído (#365/#366, em produção). **Subprojeto 2** (marca e cores) concluído (#367/#368, em produção). **Subprojeto 3** (assistente de primeiro acesso) concluído (#369/#370, em produção). **Subprojeto 4** dividido em 4a (setores da obra) e 4b (obra do Solo); a **4a** concluída (#371/#372, em produção); a **4b** na PR #373 (branch `feat/obra-solo`, worktree `C:\dev\crm-p4`), revisada e corrigida em 12/11/2026, migration aplicada em produção em 12/11/2026, seção abaixo.
+- **Onboarding Solo e PRO: concluído (13/11/2026).** Quatro subprojetos, todos mesclados e em produção: (1) telas por empresa (#365/#366), (2) marca e cores (#367/#368), (3) assistente de primeiro acesso (#369/#370), (4a) setores da obra (#371/#372) e (4b) obra do Solo (#373/#374, ajustes na #377/#378). Pendências pequenas nas seções de cada subprojeto (ficha do Solo sem modo só leitura, filtro "Setor" com setor desligado, e2e só da chave de Engenharia, backfill da 4b sem teste, 8 menores da revisão do subprojeto 1, contraste do dourado).
 - **CI:** desde 13/11/2026 (decisão do Evandro) o workflow `navegador-obras.yml` roda só sob demanda: numa PR com a etiqueta `navegador` (ao pô-la e a cada push enquanto ela estiver lá) ou pelo disparo manual; sem a etiqueta o job fica pulado. Ponha a etiqueta em PR que mexa em Obras, Engenharia, `e2e/`, na trava ou no servidor do e2e, em `next.config.ts`, nas dependências ou em `supabase/**`. Antes, a cota de armazenamento de artefatos do GitHub Actions estourou em 09/11/2026; o job `navegador` passava nos testes e falhava só ao publicar capturas e relatório até a cota ser recalculada.
-- **PRs antigas abertas:** #232 (cartões de Usuários) conflita com a B e foi superada pelo desenho aprovado; as drafts de gamificação (#104–#118), calculadora (#101, #197, #199, #200) e docs antigas (#76, #133, #167, #193) precisam de triagem antes de qualquer retomada; Dependabot (#182, #355, #358, #359) aguarda revisão.
-- **Limpeza local (com OK do Evandro):** vários worktrees em `R:\` e `C:\dev\` já mesclados aparecem como `prunable` em `git worktree list`.
+- **PRs (triagem de 13/11/2026):** nenhuma PR aberta. Fechadas a pedido do Evandro: #70 (substituída pela #380, com e2e na #381), #193 (docs antigas), #197 (parser ANEEL) e #132 (script da Base Demo; dá para reabrir se a demo voltar a importar). As demais citadas em seções antigas (#62, #68, #71, #76, #101, #116, #118, #133, #135 e as drafts de gamificação) já estavam fechadas.
+- **Limpeza local (13/11/2026, com OK do Evandro):** 9 worktrees mesclados e limpos removidos (`C:\dev\crm-copel`, `crm-p4-chore`, `crm-precos`; `R:\wt-main`, `wt-p0-jay`, `wt-p0-kara`, `wt-p0-kevin`, `wt-pr190`, `wt-m2b`). Falta apagar à mão as pastas `R:\wt-190`, `R:\wt-e0` e `R:\wt-m2b`, que ficaram pela metade e sem vínculo com o git (o sistema de permissões não deixa o agente apagá-las): `cmd /c rmdir /s /q` em cada uma e `git worktree prune`. Os demais worktrees têm mudança não commitada ou trabalho fora da `main` e ficaram.
 
 ## Onboarding — subprojeto 4b: obra do Solo (11/11/2026)
 
@@ -587,6 +587,8 @@ Membros fictícios: Lucas Martins, Mariana Costa, Rafael Almeida e Bruno Ferreir
 
 ## Outras PRs (estados verificados em 2026-10-06)
 
+Em 13/11/2026 todas as PRs desta tabela estavam fechadas ou mescladas.
+
 | PR | Estado | Observação |
 | --- | --- | --- |
 | #139 Imagem nas recompensas | mesclada | merge `3b8de5c` |
@@ -624,9 +626,9 @@ Membros fictícios: Lucas Martins, Mariana Costa, Rafael Almeida e Bruno Ferreir
 
 ## Próximas prioridades
 
-1. Base Demo (PR #132): revisar e mesclar o script com autorização (a demo já está em produção). Qualquer nova execução exige dry-run antes e autorização específica.
-2. Confirmar o primeiro ciclo de backups agendados e, em etapa separada, reavaliar a aplicação das 13 migrations da PR #101 (somente com autorização específica, revisão técnica e backup recente verificado).
-3. Fechar/decidir as PRs remanescentes (#116, #118, #133, #135, #62, #68, #70, #71, #76).
-4. Consolidar Calculadora + Propostas (CSV real e teste de referência).
-5. Validação visual em navegador real e melhorias de UX.
-6. Iniciar o roadmap operacional (Pedido → Compras), conforme `docs/ROADMAP.md`, quando o Evandro decidir.
+Atualizado em 13/11/2026. A ordem entre as frentes é do Evandro.
+
+1. Pendências pequenas do Onboarding (lista no "Ponto de retomada").
+2. Frentes não iniciadas do `docs/ROADMAP.md`: tipos de solução, documentos configuráveis, concessionárias (além da Copel), agenda operacional e integrações (Meta Ads, assinatura eletrônica real, avisos por e-mail/WhatsApp, leitura de documentos por IA).
+3. Calculadora e catálogo técnico: o trabalho da PR #101 (fechada, 13 migrations nunca aplicadas) precisa de revisão própria antes de qualquer retomada.
+4. Base Demo: o script (#132) foi fechado sem merge; a demo em produção continua. Qualquer nova execução exige dry-run antes e autorização específica.
