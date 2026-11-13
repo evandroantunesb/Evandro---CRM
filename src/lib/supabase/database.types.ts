@@ -8127,6 +8127,7 @@ export type Database = {
         Args: { p_aviso: Database["public"]["Tables"]["avisos_pagamento"]["Row"]; p_tipo: string };
         Returns: undefined;
       };
+      obra_concluida_pro: { Args: { p_obra_id: string }; Returns: boolean };
       obra_da_pasta_engenharia: { Args: { p_caminho: string }; Returns: string };
       obra_da_pasta_foto: { Args: { p_nome: string }; Returns: string };
       obra_snapshot_comercial: { Args: { p_negocio_id: string }; Returns: Json };
