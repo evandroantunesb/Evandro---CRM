@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { avancarAssistente, concluirAssistente } from "@/lib/acoes/assistente";
-import { estadoDoPasso, passoAnterior, passoDoEstado, passosDoPlano, type ChavePasso } from "@/lib/assistente";
+import { estadoDoPasso, passoAnterior, passoPedido, passosDoPlano, type ChavePasso } from "@/lib/assistente";
 import { lerOnboarding } from "@/lib/assistente-servidor";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
@@ -27,7 +27,7 @@ export default async function PrimeiroAcesso({ searchParams }: { searchParams: P
 
   const passos = passosDoPlano(telas.solo);
   const estado = onboarding ?? { passo_atual: passos.length, pulados: [] };
-  const chave: ChavePasso = passos.includes(params.passo as ChavePasso) ? (params.passo as ChavePasso) : passoDoEstado(estado, passos);
+  const chave: ChavePasso = passoPedido(estado, passos, params.passo, rever);
   const anterior = passoAnterior(passos, chave);
   const sufixo = rever ? "&rever=1" : "";
   const estados = Object.fromEntries(passos.map((p) => [p, estadoDoPasso(estado, passos, p)])) as Record<ChavePasso, "feito" | "pulado" | "pendente">;
