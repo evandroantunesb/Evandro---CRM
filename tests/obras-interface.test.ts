@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { carregarObras, type ObraListaVM } from "@/lib/obras/dados";
-import { alertasObra, estadoSetor, filtrarObras, normalizarBusca, setorConcluido, situacaoObra } from "@/lib/obras/derivados";
+import { alertasObra, estadoSetor, filtrarObras, normalizarBusca, setorConcluido, setoresDoFiltro, situacaoObra } from "@/lib/obras/derivados";
 import { fonteDadosObras, podeVerObras } from "@/lib/obras/permissoes-ui";
 import {
   AGUARDANDO_OBRA,
@@ -482,5 +482,27 @@ describe("filtrarObras", () => {
   it("combina filtros (E)", () => {
     expect(nums({ situacao: "concluida", alerta: "parado", busca: "ana" })).toEqual([7]);
     expect(nums({ situacao: "concluida", busca: "maria" })).toEqual([]);
+  });
+});
+
+describe("setoresDoFiltro (setor desligado some do filtro de Obras)", () => {
+  const obra = (eng: string | null) => ({
+    setores: [
+      { setor: "compras" as const, status: "a_comprar" },
+      { setor: "engenharia" as const, status: eng },
+      { setor: "operacional" as const, status: "aguardando_liberacao" },
+    ],
+  });
+
+  it("oferece só os setores que alguma obra tem", () => {
+    expect(setoresDoFiltro([obra(null), obra(null)])).toEqual(["compras", "operacional"]);
+  });
+
+  it("mantém o setor enquanto houver obra que ainda o tenha", () => {
+    expect(setoresDoFiltro([obra(null), obra("a_iniciar")])).toEqual(["compras", "engenharia", "operacional"]);
+  });
+
+  it("mantém o setor já escolhido na URL", () => {
+    expect(setoresDoFiltro([obra(null)], "engenharia")).toEqual(["compras", "engenharia", "operacional"]);
   });
 });
