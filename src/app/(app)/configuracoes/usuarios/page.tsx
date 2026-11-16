@@ -49,7 +49,7 @@ export default async function Usuarios({ searchParams }: { searchParams: Promise
   const nova = params.nova === "1";
 
   const supabase = await criarClienteServidor();
-  const [{ data }, { data: setores, error: erroSetores }, telas] = await Promise.all([
+  const [{ data }, { data: setores, error: erroSetores }, telas, { data: limitePlano }] = await Promise.all([
     supabase
       .from("empresa_membros")
       .select("id, papel, tipo_vendedor, perfil_gamificacao, recebe_leads, status, perfis(nome, email)")
@@ -57,6 +57,7 @@ export default async function Usuarios({ searchParams }: { searchParams: Promise
       .order("created_at"),
     supabase.from("membro_setores_obra").select("membro_id, setor, capacidade, principal").eq("empresa_id", atual.empresaId),
     obterTelasEmpresa(),
+    supabase.rpc("limite_usuarios_empresa", { p_empresa_id: atual.empresaId }),
   ]);
 
   const membros: MembroLinha[] = (data ?? []).map((m) => {
@@ -81,7 +82,7 @@ export default async function Usuarios({ searchParams }: { searchParams: Promise
   const setoresOperacao = SETORES_OBRA.filter((s) => ativos.some((m) => m.perfil === s)).map((s) => ROTULO_SETOR[s]);
   const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
   const indicadores = [
-    { Icone: Users, valor: String(ativos.length), legenda: "Ativos" },
+    { Icone: Users, valor: String(ativos.length), legenda: limitePlano ? `Ativos · de ${limitePlano} do plano` : "Ativos" },
     {
       Icone: BriefcaseBusiness,
       valor: String(contar("vendedor") + contar("sdr")),
