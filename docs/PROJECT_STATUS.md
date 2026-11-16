@@ -187,7 +187,7 @@ Decisões do Evandro (05/11/2026):
 - Pagamento do cliente: o Operacional **ou** o Administrativo confirma ou devolve (`confirma_pagamento_cliente`).
 - Conta a pagar (A2) fica separada e só vira custo real quando paga; o Operacional continua lançando custo real. Na A1, custos da obra seguem só com o Operacional.
 
-Pendências: `atua_no_operacional` ficou no banco para o app anterior ao deploy (removida em 16/11/2026 pela migration `20261209100000_remover_atua_no_operacional.sql`, sem `cascade`; nenhuma função atual a chamava); a inscrição estadual do cliente (NF de PJ) não foi liberada ao Administrativo (decidir na A2).
+Pendências: `atua_no_operacional` ficou no banco para o app anterior ao deploy (removida em 16/11/2026 pela migration `20261209100000_remover_atua_no_operacional.sql`, sem `cascade`; nenhuma função atual a chamava; aplicada em produção em 16/11/2026 antes do merge da #392 pelo `banco-producao.yml`, tag `migracao-pr392-97de29f`, dry-run 43955661850 listou só ela, aplicação 43960935933, aprovada pelo Evandro; autorização na trava pela PR da branch `chore/autorizar-migracao-392`); a inscrição estadual do cliente (NF de PJ) não foi liberada ao Administrativo (decidir na A2).
 
 ## Tela de entrada configurável — concluída (04/11/2026)
 
