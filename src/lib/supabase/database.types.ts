@@ -7186,7 +7186,6 @@ export type Database = {
         Args: { p_membro_id?: string; p_tarefa_id: string };
         Returns: undefined;
       };
-      atua_no_operacional: { Args: { p_empresa_id: string }; Returns: boolean };
       atualizar_marco_obra: {
         Args: {
           p_marco: Database["public"]["Enums"]["marco_obra"];
