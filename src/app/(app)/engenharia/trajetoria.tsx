@@ -218,7 +218,7 @@ function Grafico({
             <b className="text-[10.5px] font-semibold whitespace-nowrap text-offwhite/75 tabular-nums">{mostra(k) ? inteiro(b.valor) : ""}</b>
             <span
               className="block w-full max-w-9 origin-bottom animate-crescer rounded-t-md"
-              style={{ height: Math.max(6, Math.round((b.valor / maximo) * ALTURA)), background: k === ultimo ? "#d4af37" : "#eddb9f" }}
+              style={{ height: Math.max(6, Math.round((b.valor / maximo) * ALTURA)), background: k === ultimo ? "var(--color-dourado)" : "color-mix(in srgb, var(--color-dourado) 50%, white)" }}
             />
           </div>
         ))}
