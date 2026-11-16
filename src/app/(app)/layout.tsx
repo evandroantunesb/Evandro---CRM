@@ -8,6 +8,7 @@ import { obterOnboarding, precisaDoAssistente } from "@/lib/assistente-servidor"
 import { Avatar } from "@/components/avatar";
 import { assinarAvatares } from "@/lib/avatares";
 import { LogoRaion } from "@/components/marca";
+import { LogoEmpresa } from "@/components/logo-empresa";
 import { carregarDiasConsideradoParado, carregarHorasConsideradoSemContato } from "@/lib/crm";
 import { carregarNotificacoesNaoLidas, contarPendencias, pendenciasDosSetores, temConquistaNaoVisualizada } from "@/lib/notificacoes";
 import { linksPendencias, type ContagemPendencias } from "@/lib/pendencias";
@@ -226,8 +227,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
   // Marca da empresa (logo e cores da identidade da proposta); sem marca, o padrão Raion.
   const logo = (altura: number) =>
     logoUrl ? (
-      // eslint-disable-next-line @next/next/no-img-element -- URL assinada do Storage, que muda a cada hora
-      <img src={logoUrl} alt={sessao.atual?.empresaNome ?? "Logo"} style={{ height: altura }} className="w-auto max-w-[180px] object-contain" />
+      <LogoEmpresa url={logoUrl} nome={sessao.atual?.empresaNome ?? "Logo"} altura={altura} />
     ) : (
       <LogoRaion tom="claro" altura={altura} />
     );
