@@ -22,6 +22,7 @@ export function ObraSolo({ obra: o, empresaId, hoje }: { obra: ObraSoloVM; empre
   const pct = Math.round((o.andamento.resolvidas / 10) * 100);
   const circunferencia = 2 * Math.PI * 42;
   const local = [o.cidade, o.uf].filter(Boolean).join(" / ");
+  const cancelada = o.situacao === "cancelada";
 
   return (
     <div className="mx-auto flex max-w-6xl animate-entrar flex-col gap-4">
@@ -45,11 +46,11 @@ export function ObraSolo({ obra: o, empresaId, hoje }: { obra: ObraSoloVM; empre
             {dias != null && <span className="rounded-full bg-white/12 px-2.5 py-1 text-xs text-offwhite">{dias === 1 ? "1 dia" : `${dias} dias`} desde o contrato</span>}
           </div>
         }
-        acoes={ultimaFeita && <BotaoWhatsApp etapa={ultimaFeita.etapa} contexto={contexto} className="text-offwhite" />}
+        acoes={!cancelada && ultimaFeita && <BotaoWhatsApp etapa={ultimaFeita.etapa} contexto={contexto} className="text-offwhite" />}
       />
 
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-        <ChecklistSolo etapas={o.etapas} atual={o.andamento.atual} contexto={contexto} />
+        <ChecklistSolo etapas={o.etapas} atual={o.andamento.atual} contexto={contexto} somenteLeitura={cancelada} />
         <div className="flex flex-col gap-4">
           <section className="flex items-center gap-5 rounded-3xl bg-carvao p-5 text-offwhite">
             <div className="relative h-28 w-28 shrink-0">
@@ -85,7 +86,7 @@ export function ObraSolo({ obra: o, empresaId, hoje }: { obra: ObraSoloVM; empre
               )}
             </div>
           </section>
-          <LinkCliente obraId={o.id} link={link} primeiroNome={o.clienteNome.trim().split(/\s+/)[0] ?? ""} />
+          <LinkCliente obraId={o.id} link={link} primeiroNome={o.clienteNome.trim().split(/\s+/)[0] ?? ""} somenteLeitura={cancelada} />
           <section className="painel p-5">
             <p className="text-[10px] font-semibold tracking-[0.2em] text-texto-2 uppercase">Só você vê</p>
             <h2 className="mb-3 font-titulo text-[17px] font-semibold text-texto">Dados da obra</h2>

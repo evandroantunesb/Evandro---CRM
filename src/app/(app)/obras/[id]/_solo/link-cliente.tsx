@@ -5,7 +5,17 @@ import { Botao, CLASSE_ENTRADA, FOCO } from "@/components/ui";
 import { gerarNovoLink } from "@/lib/acoes/obra-solo";
 
 /** Cartão "Link de acompanhamento" do quadro "SoloChecklist": copiar e gerar um novo (o antigo para de funcionar). */
-export function LinkCliente({ obraId, link, primeiroNome }: { obraId: string; link: string | null; primeiroNome: string }) {
+export function LinkCliente({
+  obraId,
+  link,
+  primeiroNome,
+  somenteLeitura = false,
+}: {
+  obraId: string;
+  link: string | null;
+  primeiroNome: string;
+  somenteLeitura?: boolean;
+}) {
   const [atual, setAtual] = useState(link);
   const [aviso, setAviso] = useState<string | null>(null);
   const [pendente, iniciar] = useTransition();
@@ -17,21 +27,23 @@ export function LinkCliente({ obraId, link, primeiroNome }: { obraId: string; li
           <p className="text-[10px] font-semibold tracking-[0.2em] text-texto-2 uppercase">O que o cliente vê</p>
           <h2 className="font-titulo text-[17px] font-semibold text-texto">Link de acompanhamento</h2>
         </div>
-        <button
-          type="button"
-          disabled={pendente}
-          onClick={() => {
-            if (!confirm("Gerar um novo link? O link antigo para de funcionar.")) return;
-            iniciar(async () => {
-              const r = await gerarNovoLink(obraId);
-              setAviso(r.mensagem);
-              if (r.ok) setAtual(r.link);
-            });
-          }}
-          className={`rounded text-sm font-medium text-dourado-texto underline-offset-2 hover:underline disabled:opacity-50 ${FOCO}`}
-        >
-          Gerar novo link
-        </button>
+        {!somenteLeitura && (
+          <button
+            type="button"
+            disabled={pendente}
+            onClick={() => {
+              if (!confirm("Gerar um novo link? O link antigo para de funcionar.")) return;
+              iniciar(async () => {
+                const r = await gerarNovoLink(obraId);
+                setAviso(r.mensagem);
+                if (r.ok) setAtual(r.link);
+              });
+            }}
+            className={`rounded text-sm font-medium text-dourado-texto underline-offset-2 hover:underline disabled:opacity-50 ${FOCO}`}
+          >
+            Gerar novo link
+          </button>
+        )}
       </div>
       <p className="text-sm text-texto-2">
         {primeiroNome ? `${primeiroNome} acompanha` : "O cliente acompanha"} as etapas, as datas e as fotos pelo celular, sem precisar ligar para perguntar. Suas
@@ -56,7 +68,7 @@ export function LinkCliente({ obraId, link, primeiroNome }: { obraId: string; li
           </Botao>
         </div>
       ) : (
-        <p className="text-sm text-texto-2">Esta obra ainda não tem link. Use “Gerar novo link”.</p>
+        <p className="text-sm text-texto-2">{somenteLeitura ? "Esta obra não tem link." : "Esta obra ainda não tem link. Use “Gerar novo link”."}</p>
       )}
       {aviso && (
         <p role="status" className="text-xs text-texto-2">

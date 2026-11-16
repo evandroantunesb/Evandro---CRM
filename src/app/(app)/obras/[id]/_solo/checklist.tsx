@@ -15,9 +15,20 @@ type Contexto = { obraId: string; empresaId: string; clienteNome: string; link: 
 /**
  * Checklist da obra do Solo (quadro aprovado "SoloChecklist"): as 10 etapas em linha do tempo; a etapa atual abre com
  * as ações. Marcação em qualquer ordem; desmarcar pede confirmação; "Não se aplica" pede o motivo. A página do cliente
- * atualiza na hora; o aviso é pelo botão do WhatsApp.
+ * atualiza na hora; o aviso é pelo botão do WhatsApp. Obra cancelada (`somenteLeitura`): o banco só deixa apagar foto,
+ * então a etapa aberta mostra as fotos (só apagar) e a anotação, sem as demais ações.
  */
-export function ChecklistSolo({ etapas, atual, contexto }: { etapas: EtapaSoloVM[]; atual: EtapaChecklist | null; contexto: Contexto }) {
+export function ChecklistSolo({
+  etapas,
+  atual,
+  contexto,
+  somenteLeitura = false,
+}: {
+  etapas: EtapaSoloVM[];
+  atual: EtapaChecklist | null;
+  contexto: Contexto;
+  somenteLeitura?: boolean;
+}) {
   const [aberta, setAberta] = useState<EtapaChecklist | null>(atual);
   const [recemFeita, setRecemFeita] = useState<EtapaChecklist | null>(null);
 
@@ -63,7 +74,7 @@ export function ChecklistSolo({ etapas, atual, contexto }: { etapas: EtapaSoloVM
                 </p>
                 {e.anotacao && aberta !== e.etapa && <p className="mt-1 text-xs text-texto-2 italic">Só você vê: {e.anotacao}</p>}
                 {recemFeita === e.etapa && <AvisoWhatsApp etapa={e.etapa} contexto={contexto} fechar={() => setRecemFeita(null)} />}
-                {aberta === e.etapa && <AcoesEtapa etapa={e} contexto={contexto} aoMarcar={() => setRecemFeita(e.etapa)} />}
+                {aberta === e.etapa && <AcoesEtapa etapa={e} contexto={contexto} aoMarcar={() => setRecemFeita(e.etapa)} somenteLeitura={somenteLeitura} />}
               </div>
             </li>
           );
@@ -110,7 +121,7 @@ function AvisoWhatsApp({ etapa, contexto, fechar }: { etapa: EtapaChecklist; con
   );
 }
 
-function AcoesEtapa({ etapa: e, contexto, aoMarcar }: { etapa: EtapaSoloVM; contexto: Contexto; aoMarcar: () => void }) {
+function AcoesEtapa({ etapa: e, contexto, aoMarcar, somenteLeitura }: { etapa: EtapaSoloVM; contexto: Contexto; aoMarcar: () => void; somenteLeitura: boolean }) {
   const [resultado, setResultado] = useState<ResultadoAcao>(null);
   const [pendente, iniciar] = useTransition();
   const [dataFeita, setDataFeita] = useState(hojeEmSaoPaulo());
@@ -125,6 +136,16 @@ function AcoesEtapa({ etapa: e, contexto, aoMarcar }: { etapa: EtapaSoloVM; cont
       setResultado(r);
       if (r?.ok) depois?.();
     });
+
+  if (somenteLeitura) {
+    return (
+      <div className="mt-2.5 flex flex-col gap-3 rounded-2xl bg-superficie-2 p-3">
+        {e.fotos.length > 0 && <FotosEtapa empresaId={contexto.empresaId} obraId={contexto.obraId} etapa={e.etapa} fotos={e.fotos} somenteApagar />}
+        {e.anotacao && <p className="text-xs text-texto-2 italic">Só você vê: {e.anotacao}</p>}
+        <p className="text-xs text-texto-2">Obra cancelada: o checklist não muda mais. Só dá para apagar fotos.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="mt-2.5 flex flex-col gap-3 rounded-2xl bg-superficie-2 p-3">
