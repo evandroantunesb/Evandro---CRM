@@ -1,8 +1,9 @@
 # Estado do projeto — Raion CRM
 
-## Ponto de retomada (13/11/2026)
+## Ponto de retomada (16/11/2026)
 
-- **Produção:** `main` em `be73857`; todas as migrations até a #377 (obra do Solo: cancelada, foto e troca de plano, 13/11/2026) aplicadas pelo `banco-producao.yml`.
+- **Produção:** `main` em `c1a4b85`; todas as migrations até a `20261210100000_limite_usuarios_plano.sql` (#394) aplicadas pelo `banco-producao.yml`.
+- **Sessão de 16/11/2026 (PRs #390 a #396, todas mescladas):** Onboarding (cores antigas ilegíveis não travam a identidade, `registrarErro`, dourado derivado da marca), remoção de `atua_no_operacional`, "de N do plano" em Usuários e o caso de referência da calculadora. Em aberto: Perfis e setores 2c (decisão do Evandro pendente), CSV real de equipamentos e preços, `pulados` por posição e passo 1 do assistente em duas chamadas (adiados, pedem migration/RPC).
 - **Repositório (12/11/2026):** estava privado (a documentação dizia público) e os minutos do GitHub Actions do mês acabaram (CI e workflows de produção parados por cobrança). Com autorização do Evandro, o repositório voltou a ser **público** em 12/11/2026 depois de uma varredura do histórico (1.233 commits, nenhum segredo real) e dos gatilhos dos workflows (sem `pull_request_target` nem runner próprio). Com isso o revisor obrigatório do `producao-banco` voltou a valer (o run da #373 parou para a aprovação do Evandro); de 10/11 a 11/11 os runs não pararam. Conferir também o `producao-seed`. A tag antiga `migracao-pr373-19bb586` (migration sem as correções da revisão) fica: o ruleset "Tags de migracao imutaveis" não deixa apagá-la (13/11/2026); não usar. A branch `chore/autorizar-migracao-373` já não existe.
 - **Perfis e setores:** concluído (A1 #332, B #334, A2a #335, A2b #337, C #338, A3 #339, D/E #341). Pendências registradas nas seções abaixo (candidatos a participante e tarefas de Compras quando outro setor atende no lugar dele).
 - **Compras:** concluído (P1 a P4c, #343–#363): P4a margens e potência (#356/#357), P4b kit pela tabela e preço pronto, OpenSolar removida (#360/#361), P4c desconto sobre o sugerido com aprovação (#362/#363). Cartão "Desconto" e "Aprovar desconto" no Início cobertos no navegador pelo e2e `38-desconto-sugerido` (13/11/2026).
