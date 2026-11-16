@@ -8,7 +8,7 @@ const ESTILO = {
 } as const;
 
 /** Sobre a faixa escura do cabeçalho: vidro claro; o quente mantém o dourado. */
-const ESTILO_FAIXA = { quente: "bg-dourado/22 text-[#ecd78f]", morno: "bg-white/12 text-offwhite", frio: "bg-white/12 text-offwhite" } as const;
+const ESTILO_FAIXA = { quente: "bg-dourado/22 text-[color-mix(in_srgb,var(--color-dourado)_55%,white)]", morno: "bg-white/12 text-offwhite", frio: "bg-white/12 text-offwhite" } as const;
 
 /**
  * Selo de temperatura com o "porquê" (nome da regra que decidiu). Ícone + texto: não depende só de cor

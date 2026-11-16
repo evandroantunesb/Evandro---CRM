@@ -17,8 +17,8 @@ export function queryForecast(f: FiltrosForecast, mesAtual: string) {
   return `/forecast${q ? `?${q}` : ""}`;
 }
 
-/** Cor de cada categoria (dourado cheio, médio e claro), igual no gráfico, na legenda e na lista. */
-export const COR: Record<Categoria, string> = { compromisso: "bg-dourado", provavel: "bg-[#e6cc7a]", possivel: "bg-[#f2e4b8]" };
+/** Cor de cada categoria (dourado da marca cheio, médio e claro: acompanha o destaque da empresa), igual no gráfico, na legenda e na lista. */
+export const COR: Record<Categoria, string> = { compromisso: "bg-dourado", provavel: "bg-[color-mix(in_srgb,var(--color-dourado)_60%,white)]", possivel: "bg-[color-mix(in_srgb,var(--color-dourado)_35%,white)]" };
 
 export function MarcaCategoria({ categoria, children }: { categoria: Categoria; children?: ReactNode }) {
   return (
