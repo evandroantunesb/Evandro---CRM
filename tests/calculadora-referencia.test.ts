@@ -1,8 +1,8 @@
 /**
  * Caso de referência da calculadora: 1.500 kWh/mês em Cascavel/PR (Copel, B1 residencial, GD II, 2026).
  *
- * ATENÇÃO: os parâmetros abaixo (potências, produtividade de 125 kWh/kWp/mês, tipos de ligação) são ILUSTRATIVOS,
- * definidos pelo Evandro em 16/11/2026 só para este teste; NÃO foram validados pelo engenheiro. Os valores esperados
+ * Os parâmetros abaixo (potências, produtividade de 125 kWh/kWp/mês, tipos de ligação) e os resultados foram definidos
+ * e APROVADOS pelo Evandro em 16/11/2026 como referência do projeto; não houve validação do engenheiro. Os valores esperados
  * foram calculados à parte do motor (aritmética decimal, fórmula do contrato m2-p0-decisao-fio-b-copel.md) e conferem
  * o motor número a número. Trocar pelos números do engenheiro quando houver: só mudar as constantes e a tabela.
  *
