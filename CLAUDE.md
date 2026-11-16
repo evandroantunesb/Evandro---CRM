@@ -61,10 +61,10 @@ Este arquivo contém só regras duráveis. Estado atual em `docs/PROJECT_STATUS.
 
 Detalhe e histórico em `docs/PROJECT_STATUS.md` (seção "Ponto de retomada"); aqui só o resumo.
 
-- **Produção:** `main` em `863b429`, todas as migrations até a #377 (obra do Solo: cancelada, foto e troca de plano) aplicadas. Backups diários de produção (banco e storage) rodando no GitHub. Repositório público desde 12/11/2026; `producao-banco` e `producao-seed` exigem a aprovação do Evandro.
-- **Concluídos recentemente:** Compras inteiro (P1 a P4c, #343–#363) e Onboarding Solo e PRO inteiro (subprojetos 1 a 4, #365–#378). Testes de navegador só sob demanda (etiqueta `navegador` na PR ou disparo manual), decisão de 13/11/2026.
-- **Próximo:** aguardando o Evandro escolher a frente (lista em "Próximas prioridades" do `docs/PROJECT_STATUS.md`).
-- **Limpeza (13/11/2026):** nenhuma PR aberta; worktrees mesclados removidos, faltam três pastas no `R:\` para o Evandro apagar à mão (comando no `docs/PROJECT_STATUS.md`).
+- **Produção:** `main` em `c1a4b85`, todas as migrations até a `20261210100000` (#394, limite de usuários do plano) aplicadas. Backups diários de produção (banco e storage) rodando no GitHub. Repositório público desde 12/11/2026; `producao-banco` e `producao-seed` exigem a aprovação do Evandro.
+- **Concluídos recentemente:** Compras inteiro (P1 a P4c, #343–#363) e Onboarding Solo e PRO inteiro (subprojetos 1 a 4, #365–#378). Em 16/11/2026: pendências do Onboarding (#390, #391: cores da identidade e dourado que segue a marca), `atua_no_operacional` removida (#392/#393), "de N do plano" em Usuários (#394/#395) e teste de referência da calculadora de 1.500 kWh/mês aprovado por você (#396). Testes de navegador só sob demanda (etiqueta `navegador` na PR ou disparo manual), decisão de 13/11/2026.
+- **Próximo:** aguardando o Evandro escolher a frente. Em aberto: Perfis e setores 2c (setor que atende no lugar de Compras: decidir se a autorização nas obras se mantém e se o substituto vira candidato e recebe as tarefas), importar o CSV real de equipamentos e preços e as frentes do `docs/ROADMAP.md` (lista em "Próximas prioridades" do `docs/PROJECT_STATUS.md`).
+- **Limpeza (16/11/2026):** nenhuma PR aberta; faltam três pastas no `R:\` para o Evandro apagar à mão (comando no `docs/PROJECT_STATUS.md`).
 - **Ambiente neste desktop:** `node_modules` dentro de `R:\` é lento ou quebrado (links para `E:\`); instale e rode a verificação numa cópia em disco local (worktrees em `C:\dev\`; `pnpm install --frozen-lockfile` leva ~25 s lá). Se o Supabase local subir sem o Kong, a stack foi criada de um checkout antigo: `supabase stop` e `start` resolvem. Várias outras stacks Supabase locais estão ativas em portas próprias.
 
 ## Segurança
