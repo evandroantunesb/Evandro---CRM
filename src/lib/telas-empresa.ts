@@ -40,7 +40,13 @@ export const INFO_SETOR: Record<SetorDesligavel, { rotulo: string; descricao: st
  */
 export type Area = TelaOpcional | "pro" | "engenharia";
 
-export type TelasEmpresa = { solo: boolean; ligadas: ReadonlySet<TelaOpcional>; setoresDesligados: ReadonlySet<SetorDesligavel> };
+export type TelasEmpresa = {
+  solo: boolean;
+  ligadas: ReadonlySet<TelaOpcional>;
+  setoresDesligados: ReadonlySet<SetorDesligavel>;
+  /** A leitura falhou e estes são os valores padrão: a configuração não pode ser salva por cima. */
+  leituraFalhou?: boolean;
+};
 
 const ehTelaOpcional = (v: unknown): v is TelaOpcional => (TELAS_OPCIONAIS as readonly unknown[]).includes(v);
 const ehSetorDesligavel = (v: unknown): v is SetorDesligavel => (SETORES_DESLIGAVEIS as readonly unknown[]).includes(v);
@@ -84,6 +90,16 @@ export function avisoTelas(ligadas: readonly TelaOpcional[]): string | null {
   return ligadas.includes("captura") && !ligadas.includes("leads")
     ? "Com a Captura de leads ligada e Leads a distribuir desligada, os leads que chegam pelo formulário ficam na fila sem ninguém para aprovar."
     : null;
+}
+
+/**
+ * Telas desligadas a gravar. Sem a liberação do super-admin o Eletroposto não aparece no formulário: fica como está
+ * gravado, para o desligamento do admin não se perder quando a liberação voltar.
+ */
+export function desligadasParaGravar(pedidas: readonly TelaOpcional[], gravadas: readonly string[], eletropostoLiberado: boolean): TelaOpcional[] {
+  if (eletropostoLiberado) return [...pedidas];
+  const semEletroposto = pedidas.filter((t) => t !== "eletroposto");
+  return gravadas.includes("eletroposto") ? [...semEletroposto, "eletroposto"] : semEletroposto;
 }
 
 /** Lista de telas desligadas enviada pela tela de Configurações (JSON). Nulo = inválida. */

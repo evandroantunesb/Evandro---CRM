@@ -3,7 +3,7 @@ import { FormularioTelaEntrada } from "@/app/(app)/configuracoes/tela-entrada/fo
 import { FormularioPreferencias, FormularioTaxas } from "@/app/(app)/configuracoes/condicoes-pagamento/formularios";
 import { FormularioTelas } from "@/app/(app)/configuracoes/telas/formulario";
 import { PainelPessoa } from "@/app/(app)/configuracoes/usuarios/formularios";
-import { Cartao } from "@/components/ui";
+import { Cartao, Mensagem } from "@/components/ui";
 import type { ChavePasso, DadosRevisao } from "@/lib/assistente";
 import { MEIOS_PARCELAMENTO, ROTULO_MEIO_PARCELAMENTO, preferenciasDaEmpresa } from "@/lib/condicoes-pagamento";
 import { criarClienteServidor, type SupabaseServidor } from "@/lib/supabase/server";
@@ -100,11 +100,15 @@ export async function ConteudoDoPasso(props: PropsPasso) {
           Início, Tarefas, Negócios, Contatos e Propostas e contratos ficam sempre ligados. Uma tela desligada some do menu de todo mundo, e os dados dela
           continuam guardados.
         </p>
-        <FormularioTelas
-          ligadasIniciais={TELAS_OPCIONAIS.filter((t) => telas.ligadas.has(t))}
-          setoresDesligadosIniciais={[...telas.setoresDesligados]}
-          eletropostoLiberado={!!empresa?.eletroposto_ativo}
-        />
+        {telas.leituraFalhou ? (
+          <Mensagem resultado={{ ok: false, mensagem: "Não foi possível ler as telas da empresa agora. Recarregue a página antes de mudar alguma coisa." }} />
+        ) : (
+          <FormularioTelas
+            ligadasIniciais={TELAS_OPCIONAIS.filter((t) => telas.ligadas.has(t))}
+            setoresDesligadosIniciais={[...telas.setoresDesligados]}
+            eletropostoLiberado={!!empresa?.eletroposto_ativo}
+          />
+        )}
         <form action={props.continuar}>
           <BotaoContinuar aviso={AVISO_SALVAR} />
         </form>
