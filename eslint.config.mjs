@@ -22,7 +22,15 @@ const eslintConfig = defineConfig([
     plugins: { quality },
     rules: {
       "quality/max-lines": ["warn", { max: 350 }],
-      "quality/no-direct-console": ["warn", { logger: "um helper de log do projeto (ainda não existe)" }],
+    },
+  },
+  // Console direto: use `registrarErro` (src/lib/log.ts), o único arquivo liberado.
+  {
+    files: ["src/**/*.{ts,tsx}"],
+    ignores: ["src/lib/supabase/database.types.ts", "src/lib/log.ts"],
+    plugins: { quality },
+    rules: {
+      "quality/no-direct-console": ["warn", { logger: "registrarErro, de @/lib/log" }],
     },
   },
   // Acesso a dados. Cada arquivo recebe uma só configuração da regra: a do último bloco que o casa, então os blocos

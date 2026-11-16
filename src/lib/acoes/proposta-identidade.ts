@@ -35,11 +35,17 @@ export async function salvarIdentidadeProposta(_: ResultadoAcao, formData: FormD
   const dados = esquema.safeParse(Object.fromEntries(formData));
   if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
   const d = dados.data;
-  // As cores também pintam o app (marca da empresa): ilegível não salva (mesma regra da tela).
-  const problemaCores = problemaCoresIdentidade(d.cor_primaria ?? "", d.cor_destaque ?? "");
-  if (problemaCores) return { ok: false, mensagem: problemaCores };
-
   const supabase = await criarClienteServidor();
+  // As cores também pintam o app (marca da empresa): ilegível não salva (mesma regra da tela). Só vale para cor que
+  // mudou: uma combinação antiga ilegível, deixada como está, não impede salvar nome, logo, WhatsApp etc. (o app já
+  // a ignora e usa o padrão Raion).
+  const { data: gravadas } = await supabase.from("proposta_identidades").select("cor_primaria, cor_destaque").eq("empresa_id", atual.empresaId).maybeSingle();
+  const igual = (a: string | null | undefined, b: string | null | undefined) => (a ?? "").toUpperCase() === (b ?? "").toUpperCase();
+  const coresMudaram = !igual(d.cor_primaria, gravadas?.cor_primaria) || !igual(d.cor_destaque, gravadas?.cor_destaque);
+  if (coresMudaram) {
+    const problemaCores = problemaCoresIdentidade(d.cor_primaria ?? "", d.cor_destaque ?? "");
+    if (problemaCores) return { ok: false, mensagem: problemaCores };
+  }
   const { error } = await supabase.from("proposta_identidades").upsert(
     {
       empresa_id: atual.empresaId,
