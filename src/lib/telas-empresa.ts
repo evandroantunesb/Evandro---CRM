@@ -92,7 +92,6 @@ export function avisoTelas(ligadas: readonly TelaOpcional[]): string | null {
     : null;
 }
 
-/** Lista de telas desligadas enviada pela tela de Configurações (JSON). Nulo = inválida. */
 /**
  * Telas desligadas a gravar. Sem a liberação do super-admin o Eletroposto não aparece no formulário: fica como está
  * gravado, para o desligamento do admin não se perder quando a liberação voltar.
@@ -103,6 +102,7 @@ export function desligadasParaGravar(pedidas: readonly TelaOpcional[], gravadas:
   return gravadas.includes("eletroposto") ? [...semEletroposto, "eletroposto"] : semEletroposto;
 }
 
+/** Lista de telas desligadas enviada pela tela de Configurações (JSON). Nulo = inválida. */
 export function lerDesligadas(texto: string): TelaOpcional[] | null {
   let valor: unknown;
   try {
