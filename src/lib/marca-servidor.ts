@@ -1,6 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { marcaDoApp, type Marca } from "@/lib/marca-cores";
+import { registrarErro } from "@/lib/log";
 import { obterSessao } from "@/lib/sessao";
 import { criarClienteAdmin } from "@/lib/supabase/admin";
 import { criarClienteServidor, type SupabaseServidor } from "@/lib/supabase/server";
@@ -36,7 +37,7 @@ export async function lerMarcaEmpresa(
 ): Promise<MarcaEmpresa> {
   const { data, error } = await supabase.rpc("marca_da_empresa", { p_empresa_id: empresaId });
   if (error) {
-    console.error("Não foi possível ler a marca da empresa; seguindo com o padrão Raion.", error);
+    registrarErro("Não foi possível ler a marca da empresa; seguindo com o padrão Raion.", error);
     return SEM_MARCA;
   }
   const linha = data?.[0];
