@@ -1,5 +1,6 @@
 import "server-only";
 import { cache } from "react";
+import { registrarErro } from "@/lib/log";
 import { obterSessao } from "@/lib/sessao";
 import { criarClienteServidor, type SupabaseServidor } from "@/lib/supabase/server";
 import { TELAS_PADRAO, areaLigada, telasDaEmpresa, type Area, type TelasEmpresa } from "@/lib/telas-empresa";
@@ -17,7 +18,7 @@ export async function lerTelasEmpresa(supabase: SupabaseServidor, empresaId: str
   ]);
   const erro = telas.error ?? empresa.error ?? produto.error;
   if (erro) {
-    console.error("Não foi possível ler as telas da empresa; seguindo com o padrão.", erro);
+    registrarErro("Não foi possível ler as telas da empresa; seguindo com o padrão.", erro);
     return { ...TELAS_PADRAO, leituraFalhou: true };
   }
   return telasDaEmpresa({

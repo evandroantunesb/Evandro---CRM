@@ -57,11 +57,11 @@ Este arquivo contém só regras duráveis. Estado atual em `docs/PROJECT_STATUS.
 - **Identidade visual (não alterar):** Carvão `#0F0F10`, Dourado Solar `#D4AF37`, Off-white `#FAF8F3`, Cinza `#6B7280`, Cinza claro `#E5E7EB` (`src/app/globals.css`); Manrope nos títulos, Inter nos textos; logo em `src/components/marca.tsx` + `public/marca/`. Verde só no WhatsApp, vermelho só para perda e erro. **Exceção (só no módulo de gamificação — `/gamificacao` e `/configuracoes/{metas,comissoes,resgates}`):** tema escuro, verde como cor contextual principal, dourado reservado a prestígio/conquistas, vermelho limitado a alertas. **Exceção em Obras (prazo e semáforo, decisão de 02/11/2026):** verde `energia` (`#1f7a4d`) para no prazo, dourado para atenção e vermelho `erro` (`#b42318`) para atraso ou margem negativa.
 - Respostas objetivas: o que mudou, arquivos, testes feitos e pendências.
 
-## Andamento atual (13/11/2026)
+## Andamento atual (16/11/2026)
 
 Detalhe e histórico em `docs/PROJECT_STATUS.md` (seção "Ponto de retomada"); aqui só o resumo.
 
-- **Produção:** `main` em `be73857`, todas as migrations até a #377 (obra do Solo: cancelada, foto e troca de plano) aplicadas. Backups diários de produção (banco e storage) rodando no GitHub. Repositório público desde 12/11/2026; `producao-banco` e `producao-seed` exigem a aprovação do Evandro.
+- **Produção:** `main` em `863b429`, todas as migrations até a #377 (obra do Solo: cancelada, foto e troca de plano) aplicadas. Backups diários de produção (banco e storage) rodando no GitHub. Repositório público desde 12/11/2026; `producao-banco` e `producao-seed` exigem a aprovação do Evandro.
 - **Concluídos recentemente:** Compras inteiro (P1 a P4c, #343–#363) e Onboarding Solo e PRO inteiro (subprojetos 1 a 4, #365–#378). Testes de navegador só sob demanda (etiqueta `navegador` na PR ou disparo manual), decisão de 13/11/2026.
 - **Próximo:** aguardando o Evandro escolher a frente (lista em "Próximas prioridades" do `docs/PROJECT_STATUS.md`).
 - **Limpeza (13/11/2026):** nenhuma PR aberta; worktrees mesclados removidos, faltam três pastas no `R:\` para o Evandro apagar à mão (comando no `docs/PROJECT_STATUS.md`).

@@ -1,5 +1,6 @@
 import "server-only";
 import { cache } from "react";
+import { registrarErro } from "@/lib/log";
 import { obterSessao } from "@/lib/sessao";
 import { criarClienteServidor, type SupabaseServidor } from "@/lib/supabase/server";
 
@@ -12,7 +13,7 @@ export type Onboarding = { passo_atual: number; pulados: number[]; concluido_em:
 export async function lerOnboarding(supabase: SupabaseServidor, empresaId: string): Promise<Onboarding | null> {
   const { data, error } = await supabase.from("empresa_onboarding").select("passo_atual, pulados, concluido_em").eq("empresa_id", empresaId).maybeSingle();
   if (error) {
-    console.error("Não foi possível ler o assistente de primeiro acesso.", error);
+    registrarErro("Não foi possível ler o assistente de primeiro acesso.", error);
     return null;
   }
   return data ?? null;
