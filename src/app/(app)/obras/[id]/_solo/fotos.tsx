@@ -27,9 +27,22 @@ function dimensoes(src: string): Promise<{ width: number; height: number }> {
 
 /**
  * Fotos de uma etapa (até 10): comprimidas no navegador como as imagens de hoje, enviadas para o bucket privado
- * `obra-fotos` na pasta da obra e registradas no banco. Apagar pede confirmação.
+ * `obra-fotos` na pasta da obra e registradas no banco. Apagar pede confirmação. `somenteApagar` (obra cancelada) tira o
+ * envio.
  */
-export function FotosEtapa({ empresaId, obraId, etapa, fotos }: { empresaId: string; obraId: string; etapa: EtapaChecklist; fotos: FotoEtapaVM[] }) {
+export function FotosEtapa({
+  empresaId,
+  obraId,
+  etapa,
+  fotos,
+  somenteApagar = false,
+}: {
+  empresaId: string;
+  obraId: string;
+  etapa: EtapaChecklist;
+  fotos: FotoEtapaVM[];
+  somenteApagar?: boolean;
+}) {
   const entrada = useRef<HTMLInputElement>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [pendente, iniciar] = useTransition();
@@ -91,31 +104,33 @@ export function FotosEtapa({ empresaId, obraId, etapa, fotos }: { empresaId: str
           ))}
         </ul>
       )}
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          disabled={pendente || cheio}
-          onClick={() => entrada.current?.click()}
-          className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-linha bg-superficie px-3 text-sm font-medium text-texto hover:border-dourado disabled:opacity-50 ${FOCO}`}
-        >
-          <ImagePlus size={15} aria-hidden />
-          {pendente ? "Enviando..." : "Adicionar foto"}
-        </button>
-        <span className="text-xs text-texto-2">{cheio ? "Limite de 10 fotos nesta etapa." : DICA_FOTO}</span>
-        <input
-          ref={entrada}
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          className="sr-only"
-          tabIndex={-1}
-          aria-label="Escolher foto"
-          onChange={(e) => {
-            const arquivo = e.target.files?.[0];
-            e.target.value = "";
-            if (arquivo) iniciar(() => enviar(arquivo));
-          }}
-        />
-      </div>
+      {!somenteApagar && (
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            disabled={pendente || cheio}
+            onClick={() => entrada.current?.click()}
+            className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-linha bg-superficie px-3 text-sm font-medium text-texto hover:border-dourado disabled:opacity-50 ${FOCO}`}
+          >
+            <ImagePlus size={15} aria-hidden />
+            {pendente ? "Enviando..." : "Adicionar foto"}
+          </button>
+          <span className="text-xs text-texto-2">{cheio ? "Limite de 10 fotos nesta etapa." : DICA_FOTO}</span>
+          <input
+            ref={entrada}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="sr-only"
+            tabIndex={-1}
+            aria-label="Escolher foto"
+            onChange={(e) => {
+              const arquivo = e.target.files?.[0];
+              e.target.value = "";
+              if (arquivo) iniciar(() => enviar(arquivo));
+            }}
+          />
+        </div>
+      )}
       {erro && (
         <p role="alert" className="text-xs text-erro">
           {erro}
