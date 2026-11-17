@@ -21,7 +21,8 @@ export async function lerMarcaPdf(empresaId: string, admin = criarClienteAdmin()
   ]);
   const nome = identidade?.nome_exibicao?.trim() || empresa?.nome || null;
   const caminho = identidade?.logo_url ?? null;
-  if (!caminho || !LOGO_DESENHAVEL.test(caminho)) return { logoUrl: null, nome };
+  // O logo legítimo fica na pasta da própria empresa (`<empresa>/…`): um caminho de outra nunca é assinado aqui.
+  if (!caminho || !caminho.startsWith(`${empresaId}/`) || !LOGO_DESENHAVEL.test(caminho)) return { logoUrl: null, nome };
   try {
     const { data, error } = await admin.storage.from("proposta-marca").createSignedUrl(caminho, EXPIRA_SEGUNDOS);
     if (error || !data?.signedUrl) {

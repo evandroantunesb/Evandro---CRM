@@ -53,6 +53,12 @@ describe("lerMarcaPdf", () => {
     expect((await lerMarcaPdf("e1", cliente)).logoUrl).toBe("https://assinada/e1/logo.JPEG");
   });
 
+  it("logo na pasta de outra empresa: só o nome, sem assinar (isolamento multiempresa)", async () => {
+    const { cliente, assinadas } = adminFalso({ identidade: { logo_url: "empresa-b/logo.png", nome_exibicao: null } });
+    expect(await lerMarcaPdf("e1", cliente)).toEqual({ logoUrl: null, nome: "Solar Exemplo Ltda." });
+    expect(assinadas).toEqual([]);
+  });
+
   it("logo .webp: só o nome, sem assinar", async () => {
     const { cliente, assinadas } = adminFalso({ identidade: { logo_url: "e1/logo.webp", nome_exibicao: null } });
     expect(await lerMarcaPdf("e1", cliente)).toEqual({ logoUrl: null, nome: "Solar Exemplo Ltda." });
