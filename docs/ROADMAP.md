@@ -26,7 +26,7 @@ Legenda da coluna Situação: **produção** = mesclado na `main` e em produçã
 | Pós-venda/Obras | 8% | produção: Obras (OPR, Apresentação, cronograma, financeiro da obra), Compras P1 a P4 e obra do Solo com link do cliente |
 | Engenharia | 5% | produção: Engenharia em Obras (P1 a P6), enquadramento e prazos da Copel, obra de rede |
 | Administrativo/Pós-vendas | 5% | produção: setor Administrativo, contas a pagar e tela Financeiro |
-| Documentos configuráveis | 5% | produção: modelos de proposta e contrato configuráveis · procuração — |
+| Documentos configuráveis | 5% | produção: modelos de proposta e contrato configuráveis · **branch** `feat/procuracao`: modelo de procuração, PDF pelo negócio e pela obra (Engenharia) e logo da empresa nos PDFs de contrato e procuração |
 | Concessionárias | 10% | produção: só a Copel, dentro da Engenharia |
 | Agenda Operacional | 15% | — (status "agendada" e cronograma da obra existem; sem tela de agenda; há trabalho inacabado na branch `backup/wt-calendario-operacional-20261103-wip`) |
 | Integrações/Automações | 15% | — (WhatsApp só por link pronto; sem e-mail, assinatura eletrônica, Meta Ads ou IA) |
@@ -48,8 +48,8 @@ Situação em 17/11/2026:
 ## Próximas frentes (ordem aprovada pelo Evandro em 17/11/2026)
 
 0. **Segurança:** tirar os secrets de produção do nível do repositório (só o Evandro altera secrets).
-1. **Documentos configuráveis:** contrato, proposta e **procuração** (hoje a procuração só existe como opção de titularidade no enquadramento da Engenharia).
-2. **Assinatura eletrônica real** (ZapSign ou gov.br), para contrato e procuração; serviço a escolher.
+1. **Documentos configuráveis:** contrato, proposta e **procuração** (em andamento: branch `feat/procuracao`, 17/11/2026).
+2. **Assinatura eletrônica real** para contrato e procuração. A orientação do engenheiro no checklist da Copel aceita gov.br ouro ou prata no lugar da firma reconhecida: o serviço precisa cobrir gov.br.
 3. **Avisos externos:** e-mail primeiro; WhatsApp pela API oficial depois (custo e aprovação da Meta).
 4. **Agenda operacional:** avaliar antes o trabalho inacabado da branch de backup.
 5. **Calculadora e catálogo técnico:** CSV real de equipamentos e preços, com o engenheiro.
