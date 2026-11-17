@@ -5,6 +5,7 @@ import {
   Calculator,
   ChevronRight,
   CreditCard,
+  FileKey,
   FileSignature,
   FileText,
   Gift,
@@ -67,6 +68,7 @@ const GRUPOS: { id: string; titulo: string; itens: Item[] }[] = [
       { href: "/configuracoes/validade-proposta", titulo: "Validade da proposta", descricao: "Prazo padrão da proposta (o gestor também edita).", Icone: CalendarClock },
       { href: "/configuracoes/condicoes-pagamento", titulo: "Condições de pagamento", descricao: "Descontos, parcelas e taxas do cartão e do boleto (o gestor também edita).", Icone: CreditCard },
       { href: "/configuracoes/contrato", titulo: "Modelo de contrato", descricao: "Texto do contrato, com campos preenchidos sozinhos.", Icone: FileSignature },
+      { href: "/configuracoes/procuracao", titulo: "Modelo de procuração", descricao: "Texto da procuração, com campos preenchidos sozinhos.", Icone: FileKey },
     ],
   },
   {

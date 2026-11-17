@@ -2,10 +2,19 @@
 
 import { useActionState, useState } from "react";
 import { Botao, Mensagem } from "@/components/ui";
-import { salvarModeloContrato } from "@/lib/acoes/contratos";
+import type { ResultadoAcao } from "@/lib/tipos";
 
-export function FormularioModeloContrato({ conteudoInicial }: { conteudoInicial: string }) {
-  const [resultado, acao, pendente] = useActionState(salvarModeloContrato, null);
+/** Texto de um modelo com `{{campos}}` (contrato, procuração); a ação de salvar vem da página. */
+export function FormularioModelo({
+  conteudoInicial,
+  salvar,
+  exemplo,
+}: {
+  conteudoInicial: string;
+  salvar: (anterior: ResultadoAcao, formData: FormData) => Promise<ResultadoAcao>;
+  exemplo: string;
+}) {
+  const [resultado, acao, pendente] = useActionState(salvar, null);
   // Controlado: se o salvamento for recusado (campo desconhecido), o texto digitado não se perde.
   const [conteudo, setConteudo] = useState(conteudoInicial);
   return (
@@ -15,7 +24,7 @@ export function FormularioModeloContrato({ conteudoInicial }: { conteudoInicial:
         value={conteudo}
         onChange={(e) => setConteudo(e.target.value)}
         rows={16}
-        placeholder={"Ex.: Pelo presente instrumento, {{empresa_nome}}, CNPJ {{empresa_cnpj}}, e {{cliente_nome}}..."}
+        placeholder={exemplo}
         className="rounded-lg border border-zinc-200 bg-white px-3 py-2 font-mono text-sm text-carvao outline-none placeholder:text-zinc-400 focus:border-dourado focus:ring-2 focus:ring-dourado/20"
       />
       <div className="flex items-center gap-2">

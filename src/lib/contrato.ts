@@ -75,6 +75,18 @@ export function validarModeloContrato(modelo: string): { desconhecidos: string[]
   return { desconhecidos: [...desconhecidos], chavesSoltas: restante.includes("{{") || restante.includes("}}") };
 }
 
+/** Texto de modelo (contrato, procuração) enviado pelo formulário: até 20.000 caracteres e só campos da lista. */
+export function conferirTextoModelo(valor: unknown): { ok: true; conteudo: string } | { ok: false; mensagem: string } {
+  if (typeof valor !== "string" || valor.length > 20000) return { ok: false, mensagem: "Modelo inválido." };
+  // Marcador desconhecido apareceria cru no documento do cliente: recusa ao salvar.
+  const validacao = validarModeloContrato(valor);
+  if (validacao.desconhecidos.length) {
+    return { ok: false, mensagem: `Campos desconhecidos no modelo: ${validacao.desconhecidos.join(", ")}. Use só os campos da lista.` };
+  }
+  if (validacao.chavesSoltas) return { ok: false, mensagem: "Há chaves {{ ou }} sem par no modelo. Confira os campos." };
+  return { ok: true, conteudo: valor };
+}
+
 /** Marcadores que sobraram num texto (contrato já preenchido): se houver, não vai para o cliente. */
 export function marcadoresPendentes(texto: string): string[] {
   return [...new Set([...texto.matchAll(MARCADOR)].map((m) => m[0]))];

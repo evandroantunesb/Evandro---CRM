@@ -4,7 +4,8 @@ import { PLACEHOLDERS_CONTRATO } from "@/lib/contrato";
 import { EDITAR_MODELO_CONTRATO } from "@/lib/permissoes";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteServidor } from "@/lib/supabase/server";
-import { FormularioModeloContrato } from "./formularios";
+import { salvarModeloContrato } from "@/lib/acoes/contratos";
+import { FormularioModelo } from "./formularios";
 
 export default async function ConfigContrato() {
   const { atual } = await exigirPapel(...EDITAR_MODELO_CONTRATO);
@@ -39,7 +40,11 @@ export default async function ConfigContrato() {
         </div>
       </Cartao>
       <Cartao titulo="Texto do modelo">
-        <FormularioModeloContrato conteudoInicial={modelo?.conteudo ?? ""} />
+        <FormularioModelo
+          conteudoInicial={modelo?.conteudo ?? ""}
+          salvar={salvarModeloContrato}
+          exemplo="Ex.: Pelo presente instrumento, {{empresa_nome}}, CNPJ {{empresa_cnpj}}, e {{cliente_nome}}..."
+        />
       </Cartao>
     </div>
   );
