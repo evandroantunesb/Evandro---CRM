@@ -1,6 +1,6 @@
 import "server-only";
 import { registrarErro } from "@/lib/log";
-import type { criarClienteAdmin } from "@/lib/supabase/admin";
+import { criarClienteAdmin } from "@/lib/supabase/admin";
 
 /** Marca da empresa no cabeçalho dos PDFs de contrato e procuração. */
 export type MarcaPdf = { logoUrl: string | null; nome: string | null };
@@ -14,7 +14,7 @@ const LOGO_DESENHAVEL = /\.(png|jpe?g)$/i;
  * (sem ele, o nome da empresa). Quem chama já conferiu o acesso: o contrato pelo token, a procuração pela sessão ou
  * pela RPC da obra. Qualquer falha vira "sem logo"; nunca a marca Raion e nunca um erro no PDF.
  */
-export async function lerMarcaPdf(admin: ReturnType<typeof criarClienteAdmin>, empresaId: string): Promise<MarcaPdf> {
+export async function lerMarcaPdf(empresaId: string, admin = criarClienteAdmin()): Promise<MarcaPdf> {
   const [{ data: identidade }, { data: empresa }] = await Promise.all([
     admin.from("proposta_identidades").select("logo_url, nome_exibicao").eq("empresa_id", empresaId).maybeSingle(),
     admin.from("empresas").select("nome").eq("id", empresaId).maybeSingle(),

@@ -10,7 +10,6 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/sessao", () => ({ exigirPapel: mocks.exigirPapel }));
 vi.mock("@/lib/supabase/server", () => ({ criarClienteServidor: mocks.criarClienteServidor }));
-vi.mock("@/lib/supabase/admin", () => ({ criarClienteAdmin: () => ({}) }));
 vi.mock("@/lib/procuracao", () => ({ montarProcuracaoNegocio: mocks.montarProcuracaoNegocio, MENSAGEM_SEM_MODELO_PROCURACAO: "A empresa ainda não tem modelo de procuração." }));
 vi.mock("@/lib/marca-pdf", () => ({ lerMarcaPdf: mocks.lerMarcaPdf }));
 
@@ -57,7 +56,7 @@ describe("PDF da procuração pelo negócio", () => {
     expect(r.status).toBe(200);
     expect(r.headers.get("content-type")).toBe("application/pdf");
     expect(r.headers.get("content-disposition")).toBe('inline; filename="procuracao-Sistema-8-kWp.pdf"');
-    expect(mocks.lerMarcaPdf).toHaveBeenCalledWith({}, "e1");
+    expect(mocks.lerMarcaPdf).toHaveBeenCalledWith("e1");
     expect(Buffer.from(await r.arrayBuffer()).subarray(0, 5).toString()).toBe("%PDF-");
   });
 });

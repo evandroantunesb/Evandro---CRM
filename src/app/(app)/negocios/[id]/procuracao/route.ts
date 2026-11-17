@@ -5,7 +5,6 @@ import { renderizarDocumentoPdf } from "@/lib/pdf-contrato";
 import { PROPOSTA_E_CONTRATO } from "@/lib/permissoes";
 import { MENSAGEM_SEM_MODELO_PROCURACAO, montarProcuracaoNegocio } from "@/lib/procuracao";
 import { exigirPapel } from "@/lib/sessao";
-import { criarClienteAdmin } from "@/lib/supabase/admin";
 import { criarClienteServidor } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -25,7 +24,7 @@ export async function GET(_: Request, { params }: RouteContext<"/negocios/[id]/p
     rotulo: "Procuração",
     titulo: procuracao.titulo,
     conteudo: procuracao.conteudo,
-    marca: await lerMarcaPdf(criarClienteAdmin(), atual.empresaId),
+    marca: await lerMarcaPdf(atual.empresaId),
   });
   return new NextResponse(pdf, {
     headers: { "Content-Type": "application/pdf", "Content-Disposition": `inline; filename="${procuracao.arquivo}"` },

@@ -26,7 +26,7 @@ export async function GET(_: Request, { params }: RouteContext<"/contrato/[token
     rotulo: "Contrato",
     titulo,
     conteudo: contrato.conteudo,
-    marca: await lerMarcaPdf(admin, contrato.empresa_id),
+    marca: await lerMarcaPdf(contrato.empresa_id, admin),
   });
   const arquivo = `contrato-${(titulo ?? "raion").replace(/[^a-zA-Z0-9]+/g, "-")}.pdf`;
   return new NextResponse(pdf, {

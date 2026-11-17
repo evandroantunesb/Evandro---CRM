@@ -332,14 +332,8 @@ export async function carregarFicha(atual: Vinculo, id: string, abaParam: string
     aba === "atividades" && pode(atual.papel, PEDIDOS_AOS_SETORES)
       ? await carregarTarefasSetor(supabase, { empresaId: atual.empresaId, membroId: atual.membroId, papel: atual.papel, negocioId: negocio.id, filtro: "todas" })
       : null;
-  // Procuração (17/11/2026): só na aba Proposta e contrato, fora do eletroposto.
-  const procuracao =
-    aba === "proposta" && !ehEletroposto
-      ? {
-          ...(await carregarProcuracaoNegocio(supabase, atual.empresaId, negocio.id)),
-          podeCadastrarModelo: pode(atual.papel, EDITAR_MODELO_CONTRATO),
-        }
-      : null;
+  const procuracao = aba === "proposta" && !ehEletroposto // procuração: só na aba Proposta e contrato
+    ? { ...(await carregarProcuracaoNegocio(supabase, atual.empresaId, negocio.id)), podeCadastrarModelo: pode(atual.papel, EDITAR_MODELO_CONTRATO) } : null;
 
   return {
     atual, negocio, config, parametros, temperatura, atividades, notas, tarefas, anexos, calculo, conferencia, semArquivo,
