@@ -13,7 +13,8 @@ import { precoDoCalculoDesatualizado } from "@/lib/calculo-preco";
 import { calculoEhIncompleto, calculoEhLegado, carregarVigencia, ENTRADAS_NAO_VERIFICAVEIS, MENSAGEM_PROPOSTA_ECONOMIA_INDISPONIVEL, mensagemDeRecusa, motivosDaAcao, type MotivoDesatualizacao } from "@/lib/calculo-vigencia";
 import { carregarContextoEstimativa } from "@/lib/contexto-estimativa";
 import { mensagemPropostaIncompleta, pendenciasSemDados } from "@/lib/estimativa-financeira";
-import { PEDIDOS_AOS_SETORES, PROPOSTA_E_CONTRATO, pode } from "@/lib/permissoes";
+import { EDITAR_MODELO_CONTRATO, PEDIDOS_AOS_SETORES, PROPOSTA_E_CONTRATO, pode } from "@/lib/permissoes";
+import { carregarProcuracaoNegocio } from "@/lib/procuracao";
 import { listarEmissoesDoNegocio } from "@/lib/propostas/emissoes-dados";
 import { extrairConteudoDoModelo, validadePadraoDaEmpresa, produtividadeConfirmada } from "@/lib/propostas/proposta-simples";
 import { avisarSchemaAusente, funcaoAusente, tabelaAusente } from "@/lib/schema-ausente";
@@ -331,6 +332,14 @@ export async function carregarFicha(atual: Vinculo, id: string, abaParam: string
     aba === "atividades" && pode(atual.papel, PEDIDOS_AOS_SETORES)
       ? await carregarTarefasSetor(supabase, { empresaId: atual.empresaId, membroId: atual.membroId, papel: atual.papel, negocioId: negocio.id, filtro: "todas" })
       : null;
+  // Procuração (17/11/2026): só na aba Proposta e contrato, fora do eletroposto.
+  const procuracao =
+    aba === "proposta" && !ehEletroposto
+      ? {
+          ...(await carregarProcuracaoNegocio(supabase, atual.empresaId, negocio.id)),
+          podeCadastrarModelo: pode(atual.papel, EDITAR_MODELO_CONTRATO),
+        }
+      : null;
 
   return {
     atual, negocio, config, parametros, temperatura, atividades, notas, tarefas, anexos, calculo, conferencia, semArquivo,
@@ -339,7 +348,7 @@ export async function carregarFicha(atual: Vinculo, id: string, abaParam: string
     registroManualIndisponivel, registrosPagamento, situacaoPagamentoSolo, mostrarPagamentoSolo, mostrarPagamentoPro, ultimoHandoff,
     podeResponderHandoff, obraDoNegocio, arquivado, precoDesatualizado, precoContratoDesatualizado, escolhaCondicao, condicaoRegistrada, vigenciaDaTela, contextoEstimativa, historicoCalculo,
     bloqueioProposta, bloqueioEmissao, bloqueioContrato, responsavelInativo, cartao, contato, pendenciasCliente, nomes, souAdmin,
-    etiquetasMarcadas, etiquetasVisiveis, abas, aba, pedidosSetor, desconto, recusasDocumentos: aba === "proposta" && obraDoNegocio ? await carregarRecusasDocumentos(supabase, negocio.id, nomes.membro) : [],
+    etiquetasMarcadas, etiquetasVisiveis, abas, aba, pedidosSetor, desconto, procuracao, recusasDocumentos: aba === "proposta" && obraDoNegocio ? await carregarRecusasDocumentos(supabase, negocio.id, nomes.membro) : [],
   };
 }
 
