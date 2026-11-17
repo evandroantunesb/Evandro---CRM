@@ -2103,6 +2103,7 @@ export type Database = {
           descricao: string | null;
           documento_cliente: string | null;
           empresa_id: string;
+          gera_procuracao: boolean;
           grupo: string;
           id: string;
           obrigatorio: boolean;
@@ -2117,6 +2118,7 @@ export type Database = {
           descricao?: string | null;
           documento_cliente?: string | null;
           empresa_id: string;
+          gera_procuracao?: boolean;
           grupo: string;
           id?: string;
           obrigatorio?: boolean;
@@ -2131,6 +2133,7 @@ export type Database = {
           descricao?: string | null;
           documento_cliente?: string | null;
           empresa_id?: string;
+          gera_procuracao?: boolean;
           grupo?: string;
           id?: string;
           obrigatorio?: boolean;
@@ -3288,6 +3291,45 @@ export type Database = {
           },
           {
             foreignKeyName: "modelos_contrato_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: true;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      modelos_procuracao: {
+        Row: {
+          atualizado_por: string | null;
+          conteudo: string;
+          created_at: string;
+          empresa_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          atualizado_por?: string | null;
+          conteudo?: string;
+          created_at?: string;
+          empresa_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          atualizado_por?: string | null;
+          conteudo?: string;
+          created_at?: string;
+          empresa_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "modelos_procuracao_atualizado_por_fkey";
+            columns: ["atualizado_por"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "modelos_procuracao_empresa_id_fkey";
             columns: ["empresa_id"];
             isOneToOne: true;
             referencedRelation: "empresas";
@@ -7537,6 +7579,7 @@ export type Database = {
           uf: string;
         }[];
       };
+      dados_procuracao_obra: { Args: { p_obra_id: string }; Returns: Json };
       data_assinatura_contrato: {
         Args: { p_negocio_id: string; p_reserva: string };
         Returns: string;
@@ -7878,6 +7921,7 @@ export type Database = {
       };
       feriado_nacional: { Args: { p_data: string }; Returns: boolean };
       garantir_obra: { Args: { p_negocio_id: string }; Returns: string };
+      gera_procuracao_pelo_titulo: { Args: { p_titulo: string }; Returns: boolean };
       gerar_contrato_com_condicao: {
         Args: {
           p_condicao: Json;
@@ -8709,6 +8753,7 @@ export type Database = {
       tarefa_da_pasta_anexo: { Args: { p_caminho: string }; Returns: string };
       tem_acesso_comercial: { Args: { p_empresa_id: string }; Returns: boolean };
       tem_acesso_financeiro: { Args: { p_empresa_id: string }; Returns: boolean };
+      tem_modelo_procuracao: { Args: { p_empresa_id: string }; Returns: boolean };
       tem_papel: {
         Args: { p_empresa_id: string; p_papeis: Database["public"]["Enums"]["papel_membro"][] };
         Returns: boolean;
