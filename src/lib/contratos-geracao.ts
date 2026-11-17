@@ -27,6 +27,34 @@ import type { ResultadoAcao, StatusContrato } from "@/lib/tipos";
  */
 
 /**
+ * O que os documentos do negócio (contrato, procuração) preenchem, lido sob a RLS de quem chama: o negócio com o
+ * cliente, o cálculo, os itens do kit, a empresa e o nome do vendedor responsável (só o nome). `negocio` nulo = a
+ * pessoa não vê o negócio.
+ */
+export async function lerFontesNegocio(supabase: SupabaseServidor, empresaId: string, negocioId: string) {
+  const [{ data: negocio }, { data: calculo }, { data: itensKit }, { data: empresa }, { data: identidades }] = await Promise.all([
+    supabase
+      .from("negocios")
+      .select(
+        "titulo, numero, valor, unidade_consumidora, qualif_distribuidora, consumo_medio_kwh, responsavel_id, contatos(tipo, nome, documento, rg, data_nascimento, inscricao_estadual, endereco, cep, logradouro, numero, bairro, cidade, uf, email, telefone, telefone2)",
+      )
+      .eq("id", negocioId)
+      .maybeSingle(),
+    supabase
+      .from("calculos_solares")
+      .select("kit_nome, kit_potencia_kwp, kit_preco, tipo_ligacao, consumo_medio_kwh, geracao_estimada_kwh_mes, estado_financeiro")
+      .eq("negocio_id", negocioId)
+      .maybeSingle(),
+    supabase.from("kit_componentes").select("tipo, descricao, quantidade, potencia_w").eq("negocio_id", negocioId).order("ordem"),
+    supabase.from("empresas").select("nome, cnpj").eq("id", empresaId).maybeSingle(),
+    // Nome do vendedor responsável (só nome; nunca e-mail ou telefone).
+    supabase.rpc("identidade_membros", { p_empresa_id: empresaId }),
+  ]);
+  const vendedorNome = negocio ? ((identidades ?? []).find((m) => m.membro_id === negocio.responsavel_id)?.nome ?? null) : null;
+  return { negocio, calculo, itensKit: itensKit ?? [], empresa, vendedorNome };
+}
+
+/**
  * Gera (ou regera, enquanto ainda for rascunho) o contrato do negócio a partir do modelo da empresa. Com a última
  * proposta por modalidade dentro da validade, exige a condição que o cliente escolheu (`condicao`, id da opção): o
  * contrato cita a condição e o valor do negócio passa ao que a regra da empresa define, na mesma transação
@@ -48,29 +76,13 @@ export async function gerarContratoComCliente(
     agora?: Date;
   },
 ): Promise<NonNullable<ResultadoAcao>> {
-  const [{ data: modelo }, { data: negocio }, { data: calculo }, { data: itensKit }, { data: empresa }, { data: existente }, { data: identidades }, { data: anexos }] =
-    await Promise.all([
-      supabase.from("modelos_contrato").select("conteudo").eq("empresa_id", empresaId).maybeSingle(),
-      supabase
-        .from("negocios")
-        .select(
-          "titulo, numero, valor, unidade_consumidora, qualif_distribuidora, consumo_medio_kwh, responsavel_id, contatos(tipo, nome, documento, rg, data_nascimento, inscricao_estadual, endereco, cep, logradouro, numero, bairro, cidade, uf, email, telefone, telefone2)",
-        )
-        .eq("id", negocioId)
-        .maybeSingle(),
-      supabase
-        .from("calculos_solares")
-        .select("kit_nome, kit_potencia_kwp, kit_preco, tipo_ligacao, consumo_medio_kwh, geracao_estimada_kwh_mes, estado_financeiro")
-        .eq("negocio_id", negocioId)
-        .maybeSingle(),
-      supabase.from("kit_componentes").select("tipo, descricao, quantidade, potencia_w").eq("negocio_id", negocioId).order("ordem"),
-      supabase.from("empresas").select("nome, cnpj").eq("id", empresaId).maybeSingle(),
-      supabase.from("contratos").select("id, status").eq("negocio_id", negocioId).maybeSingle(),
-      // Nome do vendedor responsável (só nome; nunca e-mail ou telefone).
-      supabase.rpc("identidade_membros", { p_empresa_id: empresaId }),
-      // Documentos do cliente anexados no negócio (só as categorias).
-      supabase.from("anexos").select("categoria").eq("negocio_id", negocioId),
-    ]);
+  const [{ data: modelo }, { negocio, calculo, itensKit, empresa, vendedorNome }, { data: existente }, { data: anexos }] = await Promise.all([
+    supabase.from("modelos_contrato").select("conteudo").eq("empresa_id", empresaId).maybeSingle(),
+    lerFontesNegocio(supabase, empresaId, negocioId),
+    supabase.from("contratos").select("id, status").eq("negocio_id", negocioId).maybeSingle(),
+    // Documentos do cliente anexados no negócio (só as categorias).
+    supabase.from("anexos").select("categoria").eq("negocio_id", negocioId),
+  ]);
   if (!modelo?.conteudo.trim()) return { ok: false, mensagem: "Cadastre o modelo de contrato em Configurações antes." };
   if (!negocio) return { ok: false, mensagem: "Negócio não encontrado." };
   if (existente && existente.status !== "rascunho") {
@@ -120,8 +132,8 @@ export async function gerarContratoComCliente(
     negocio: { ...negocio, valor: valorContrato },
     contato: negocio.contatos as unknown as FontesContrato["contato"],
     calculo,
-    itensKit: itensKit ?? [],
-    vendedorNome: (identidades ?? []).find((m) => m.membro_id === negocio.responsavel_id)?.nome ?? null,
+    itensKit,
+    vendedorNome,
     condicaoPagamento: opcao?.descricao ?? null,
     agora,
     formatarMoeda: (v) => formatarMoeda(v),

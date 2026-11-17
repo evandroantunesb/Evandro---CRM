@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { mensagemErro } from "@/lib/erros";
-import { validarModeloContrato } from "@/lib/contrato";
+import { conferirTextoModelo } from "@/lib/contrato";
 import { atualizarStatusContratoComCliente, gerarContratoComCliente } from "@/lib/contratos-geracao";
 import { exigirPapel } from "@/lib/sessao";
 import { CONFIRMAR_PAGAMENTO, EDITAR_MODELO_CONTRATO, NEGOCIOS, PROPOSTA_E_CONTRATO, pode } from "@/lib/permissoes";
@@ -12,19 +12,13 @@ import { STATUS_CONTRATO, type ResultadoAcao } from "@/lib/tipos";
 
 export async function salvarModeloContrato(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
   const { atual } = await exigirPapel(...EDITAR_MODELO_CONTRATO);
-  const conteudo = z.string().max(20000, "Modelo muito longo").safeParse(formData.get("conteudo"));
-  if (!conteudo.success) return { ok: false, mensagem: "Modelo inválido." };
-  // Marcador desconhecido apareceria cru no contrato do cliente: recusa ao salvar.
-  const validacao = validarModeloContrato(conteudo.data);
-  if (validacao.desconhecidos.length) {
-    return { ok: false, mensagem: `Campos desconhecidos no modelo: ${validacao.desconhecidos.join(", ")}. Use só os campos da lista.` };
-  }
-  if (validacao.chavesSoltas) return { ok: false, mensagem: "Há chaves {{ ou }} sem par no modelo. Confira os campos." };
+  const conteudo = conferirTextoModelo(formData.get("conteudo"));
+  if (!conteudo.ok) return conteudo;
 
   const supabase = await criarClienteServidor();
   const { error } = await supabase
     .from("modelos_contrato")
-    .upsert({ empresa_id: atual.empresaId, conteudo: conteudo.data, atualizado_por: atual.membroId });
+    .upsert({ empresa_id: atual.empresaId, conteudo: conteudo.conteudo, atualizado_por: atual.membroId });
   if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível salvar o modelo.") };
 
   revalidatePath("/configuracoes/contrato");

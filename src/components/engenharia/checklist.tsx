@@ -3,7 +3,7 @@
 import { Paperclip } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useState, useTransition } from "react";
-import { Botao, CLASSE_ENTRADA, Mensagem, Selo } from "@/components/ui";
+import { Botao, CLASSE_ENTRADA, classeBotao, Mensagem, Selo } from "@/components/ui";
 import { alterarItemEngenharia, aplicarChecklistEngenharia, registrarDocumentoEngenharia } from "@/lib/acoes/engenharia";
 import { usarArquivoNegocioEngenharia } from "@/lib/acoes/engenharia-arquivo-negocio";
 import { metaArquivo, nomeSeguro, problemaArquivo } from "@/lib/anexos-regras";
@@ -169,6 +169,8 @@ function Item({ obraId, pasta, item, acoes }: { obraId: string; pasta: string; i
         </ul>
       )}
 
+      {item.procuracao && acoes.anexar && !comMotivo && <BaixarProcuracao obraId={obraId} situacao={item.procuracao} />}
+
       {oferta && acoes.anexar && !comMotivo && <ArquivoNegocio obraId={obraId} itemId={item.id} arquivo={item.arquivoNegocio!} novo={oferta === "nova_versao"} />}
 
       {comMotivo ? (
@@ -219,6 +221,16 @@ function MudarStatus({ obraId, itemId, status, rotulo }: { obraId: string; itemI
       </Botao>
       {resultado && !resultado.ok && <Mensagem resultado={resultado} />}
     </form>
+  );
+}
+
+/** Item da procuração (checklist da Copel): baixa o PDF preenchido pelo modelo da empresa, ou avisa que não há modelo. */
+function BaixarProcuracao({ obraId, situacao }: { obraId: string; situacao: "baixar" | "sem_modelo" }) {
+  if (situacao === "sem_modelo") return <p className="text-xs text-texto-2">A empresa ainda não tem modelo de procuração.</p>;
+  return (
+    <a href={`/engenharia/${obraId}/procuracao`} target="_blank" rel="noopener noreferrer" className={`${classeBotao()} self-start`}>
+      Baixar procuração preenchida
+    </a>
   );
 }
 

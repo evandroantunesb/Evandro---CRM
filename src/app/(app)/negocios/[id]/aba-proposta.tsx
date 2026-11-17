@@ -24,6 +24,7 @@ import { DocumentosCliente } from "./documentos-cliente";
 import { EletropostoNegocio } from "./eletroposto";
 import { normalizarModelos, type ModeloEletroposto } from "@/lib/eletroposto";
 import { Pagamento } from "./pagamento";
+import { Procuracao } from "./procuracao";
 import { PagamentoSolo } from "./pagamento-solo";
 import { EmitirProposta } from "./emitir-proposta";
 import { Proposta } from "./proposta";
@@ -67,6 +68,7 @@ export function AbaProposta({ ficha }: { ficha: Ficha }) {
     registrosPagamento,
     desconto,
     recusasDocumentos,
+    procuracao,
   } = ficha;
   // Documentos do cliente que faltam nos anexos do negócio (o banco confere de novo ao gerar o contrato).
   const pendenciasDocumentos = pendenciasDocumentosContrato((anexos ?? []).map((a) => a.categoria), contato?.tipo);
@@ -226,6 +228,18 @@ export function AbaProposta({ ficha }: { ficha: Ficha }) {
               ganhoSemPermissao={negocio.status === "ganho" && !pode(atual.papel, CORRIGIR_VALOR_GANHO)}
             />
           </Cartao>
+          {procuracao && (
+            <div id="procuracao" className="scroll-mt-4">
+              <Cartao titulo="Procuração">
+                <Procuracao
+                  negocioId={negocio.id}
+                  temModelo={procuracao.temModelo}
+                  faltando={procuracao.faltando}
+                  podeCadastrarModelo={procuracao.podeCadastrarModelo}
+                />
+              </Cartao>
+            </div>
+          )}
         </div>
       )}
       {(mostrarPagamentoSolo || mostrarPagamentoPro) && (
