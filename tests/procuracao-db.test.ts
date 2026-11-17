@@ -4,6 +4,7 @@
  * procuração usa (sem valor, e-mail nem telefones). Precisa do Supabase local. Os testes seguem em ordem.
  */
 import { beforeAll, describe, expect, it } from "vitest";
+import { carregarChecklistEngenharia } from "@/lib/engenharia-checklist";
 import { anexarDocumentosContrato, CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
 
 let admin: Usuario;
@@ -172,5 +173,22 @@ describe("dados da procuração para a Engenharia", () => {
   it("admin de outra empresa é recusado", async () => {
     const { error } = await adminB.cliente.rpc("dados_procuracao_obra", { p_obra_id: obra });
     expect(error?.code).toBe("42501");
+  });
+});
+
+describe("checklist da obra com o item da procuração", () => {
+  it("o item marcado traz \"baixar\" (há modelo); os outros, nulo", async () => {
+    const ap = await admin.cliente.rpc("aplicar_checklist_engenharia", { p_obra_id: obra });
+    expect(ap.error).toBeNull();
+    const itens = await carregarChecklistEngenharia(engenheiro.cliente as never, { empresaId: empresa, obraId: obra });
+    const comProcuracao = itens.filter((i) => i.procuracao);
+    expect(comProcuracao.map((i) => [i.titulo, i.procuracao])).toEqual([["Procuração do titular", "baixar"]]);
+  });
+
+  it("sem modelo, o item marcado traz \"sem_modelo\"", async () => {
+    const { error } = await admin.cliente.from("modelos_procuracao").update({ conteudo: "" }).eq("empresa_id", empresa);
+    expect(error).toBeNull();
+    const itens = await carregarChecklistEngenharia(engenheiro.cliente as never, { empresaId: empresa, obraId: obra });
+    expect(itens.filter((i) => i.procuracao).map((i) => i.procuracao)).toEqual(["sem_modelo"]);
   });
 });

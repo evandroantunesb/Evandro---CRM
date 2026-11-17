@@ -9,22 +9,24 @@ import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAt
 
 export const FOCO = "outline-none focus-visible:ring-2 focus-visible:ring-dourado/60 focus-visible:ring-offset-2 focus-visible:ring-offset-fundo";
 
-export function Botao({
-  variante = "primario",
-  className = "",
-  ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { variante?: "primario" | "secundario" | "perigo" }) {
+type VarianteBotao = "primario" | "secundario" | "perigo";
+
+/** Classes do botão, também para um link que abre um arquivo (ex.: PDF numa aba nova) com a mesma aparência. */
+export function classeBotao(variante: VarianteBotao = "primario"): string {
   const estilos = {
     primario: "bg-acao text-sobre-acao hover:bg-acao-forte",
     secundario: "border border-linha bg-superficie text-texto hover:border-dourado",
     perigo: "border border-red-200 bg-superficie text-red-700 hover:bg-red-50",
   }[variante];
-  return (
-    <button
-      className={`inline-flex min-h-11 items-center justify-center rounded-lg px-4 py-2 text-sm font-medium transition-[background-color,border-color,transform] duration-200 ease-raion active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100 md:min-h-9 ${FOCO} ${estilos} ${className}`}
-      {...props}
-    />
-  );
+  return `inline-flex min-h-11 items-center justify-center rounded-lg px-4 py-2 text-sm font-medium transition-[background-color,border-color,transform] duration-200 ease-raion active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100 md:min-h-9 ${FOCO} ${estilos}`;
+}
+
+export function Botao({
+  variante = "primario",
+  className = "",
+  ...props
+}: ButtonHTMLAttributes<HTMLButtonElement> & { variante?: VarianteBotao }) {
+  return <button className={`${classeBotao(variante)} ${className}`} {...props} />;
 }
 
 /** Aparência de campo de entrada (input, select, textarea) nas cores do tema. */

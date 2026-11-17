@@ -13,10 +13,10 @@ export async function carregarChecklistEngenharia(
   supabase: SupabaseServidor,
   { empresaId, obraId }: { empresaId: string; obraId: string },
 ): Promise<ItemEngenhariaVM[]> {
-  const [{ data: itens, error }, { data: documentos }, { data: identidades }, { data: doNegocio }] = await Promise.all([
+  const [{ data: itens, error }, { data: documentos }, { data: identidades }, { data: doNegocio }, { data: temModeloProcuracao }] = await Promise.all([
     supabase
       .from("obra_engenharia_itens")
-      .select("id, grupo, titulo, descricao, obrigatorio, status, motivo, atualizado_por, atualizado_em, engenharia_checklist_modelo(documento_cliente)")
+      .select("id, grupo, titulo, descricao, obrigatorio, status, motivo, atualizado_por, atualizado_em, engenharia_checklist_modelo(documento_cliente, gera_procuracao)")
       .eq("empresa_id", empresaId)
       .eq("obra_id", obraId)
       .order("ordem")
@@ -29,6 +29,7 @@ export async function carregarChecklistEngenharia(
       .order("versao", { ascending: false }),
     supabase.rpc("identidade_membros", { p_empresa_id: empresaId }),
     supabase.rpc("documentos_negocio_engenharia", { p_obra_id: obraId }),
+    supabase.rpc("tem_modelo_procuracao", { p_empresa_id: empresaId }),
   ]);
   if (error) throw error;
   const nomes = new Map((identidades ?? []).map((m) => [m.membro_id, m.nome]));
@@ -63,6 +64,7 @@ export async function carregarChecklistEngenharia(
         anexoOrigemId: d.anexo_origem_id,
       })),
     arquivoNegocio: arquivosNegocio.get(i.engenharia_checklist_modelo?.documento_cliente ?? "") ?? null,
+    procuracao: i.engenharia_checklist_modelo?.gera_procuracao ? (temModeloProcuracao ? "baixar" : "sem_modelo") : null,
   }));
 }
 

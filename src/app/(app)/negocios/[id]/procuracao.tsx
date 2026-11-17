@@ -1,9 +1,6 @@
 import Link from "next/link";
-import { FOCO } from "@/components/ui";
+import { classeBotao, FOCO } from "@/components/ui";
 import { MENSAGEM_SEM_MODELO_PROCURACAO } from "@/lib/procuracao";
-
-/** Mesma aparência do botão principal (`Botao`), num link: o PDF abre numa aba nova. */
-const CLASSE_LINK_BOTAO = `inline-flex min-h-11 items-center justify-center self-start rounded-lg bg-acao px-4 py-2 text-sm font-medium text-sobre-acao transition-[background-color,transform] duration-200 ease-raion hover:bg-acao-forte active:scale-[0.98] md:min-h-9 ${FOCO}`;
 
 /**
  * Cartão "Procuração" da aba Proposta e contrato (desenho aprovado em 17/11/2026): sem modelo, o aviso (e o atalho
@@ -52,7 +49,7 @@ export function Procuracao({
               <p className="mt-1 text-xs text-texto-2">Dá para baixar assim mesmo: o campo sem dado sai como &quot;—&quot;, como no contrato.</p>
             </div>
           )}
-          <a href={`/negocios/${negocioId}/procuracao`} target="_blank" rel="noopener noreferrer" className={CLASSE_LINK_BOTAO}>
+          <a href={`/negocios/${negocioId}/procuracao`} target="_blank" rel="noopener noreferrer" className={`${classeBotao()} self-start`}>
             Baixar procuração (PDF)
           </a>
           <p className="text-xs text-texto-2">

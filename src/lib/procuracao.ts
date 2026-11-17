@@ -80,3 +80,43 @@ export async function carregarProcuracaoNegocio(
   const fontes = await fontesDoNegocio(supabase, empresaId, negocioId, agora);
   return { temModelo: true, faltando: fontes ? camposSemDado(modelo, montarDadosContrato(fontes)) : [] };
 }
+
+/** O que `dados_procuracao_obra` devolve à Engenharia: sem valor, condição de pagamento, e-mail, telefones nem nascimento. */
+export type DadosProcuracaoObra = {
+  modelo: string;
+  empresa_id: string;
+  empresa: { nome: string | null; cnpj: string | null };
+  negocio: {
+    titulo: string;
+    numero: number | null;
+    unidade_consumidora: string | null;
+    qualif_distribuidora: string | null;
+    consumo_medio_kwh: number | null;
+  };
+  contato: {
+    nome: string | null;
+    documento: string | null;
+    rg: string | null;
+    endereco: string | null;
+    cidade: string | null;
+    uf: string | null;
+    inscricao_estadual: string | null;
+  } | null;
+};
+
+/** Procuração da obra: o que a Engenharia não recebe sai "—" no texto. */
+export function montarProcuracaoObra(dados: DadosProcuracaoObra, agora = new Date()): ProcuracaoMontada {
+  if (!modeloComTexto(dados.modelo)) return { situacao: "sem_modelo" };
+  const fontes: FontesContrato = {
+    empresa: dados.empresa,
+    negocio: { ...dados.negocio, valor: null },
+    contato: dados.contato ? { ...dados.contato, email: null, telefone: null, telefone2: null, data_nascimento: null } : null,
+    calculo: null,
+    itensKit: [],
+    vendedorNome: null,
+    condicaoPagamento: null,
+    agora,
+    formatarMoeda: (v) => formatarMoeda(v),
+  };
+  return { situacao: "ok", ...preencherProcuracao(dados.modelo, fontes), arquivo: arquivoProcuracao(dados.negocio.titulo) };
+}

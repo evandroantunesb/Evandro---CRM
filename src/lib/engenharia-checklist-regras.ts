@@ -49,6 +49,8 @@ export type ItemEngenhariaVM = {
   documentos: DocumentoEngenhariaVM[];
   /** Item marcado como documento do cliente no modelo: o arquivo dele no negócio, se houver. */
   arquivoNegocio: ArquivoNegocioVM | null;
+  /** Item que gera a procuração (`gera_procuracao` no modelo): "baixar" com modelo cadastrado, "sem_modelo" sem ele. */
+  procuracao: "baixar" | "sem_modelo" | null;
 };
 
 /**

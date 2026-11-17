@@ -23,6 +23,7 @@ const item = (extra: Partial<ItemEngenhariaVM> = {}): ItemEngenhariaVM => ({
   atualizadoEm: null,
   documentos: [],
   arquivoNegocio: null,
+  procuracao: null,
   ...extra,
 });
 
