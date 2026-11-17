@@ -8625,6 +8625,10 @@ export type Database = {
         Args: { p_obra_id: string };
         Returns: Database["public"]["Enums"]["setor_obra"];
       };
+      setor_efetivo_obra: {
+        Args: { p_empresa_id: string; p_setor: Database["public"]["Enums"]["setor_obra"] };
+        Returns: Database["public"]["Enums"]["setor_obra"];
+      };
       setor_etapa_obra: {
         Args: { p_etapa: string };
         Returns: Database["public"]["Enums"]["setor_obra"];
