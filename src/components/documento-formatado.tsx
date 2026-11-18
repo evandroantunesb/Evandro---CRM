@@ -44,5 +44,6 @@ export function DocumentoFormatado({ texto, className }: { texto: string; classN
       saida.push(<div key={i} className="h-3" aria-hidden="true" />);
     }
   }
-  return <div className={className}>{saida}</div>;
+  // Espaços e recuos do modelo aparecem como antes (cada bloco é uma linha).
+  return <div className={className ? `whitespace-pre-wrap ${className}` : "whitespace-pre-wrap"}>{saida}</div>;
 }

@@ -75,8 +75,12 @@ test.describe("contrato: conferir, editar e enviar", () => {
     await expect(whatsapp).toHaveAttribute("href", /^https:\/\/wa\.me\/5545900000000\?text=/);
     await expect(page.getByText("Abre a conversa com Marcos Contrato (fictício)")).toBeVisible();
 
-    // Edição à mão.
+    // Edição à mão. Texto recusado pelo banco ({{ }}) não pode apagar o que foi digitado.
     await page.getByRole("button", { name: "Editar texto" }).click();
+    await page.getByLabel("Texto do contrato").fill("Texto com {{chave}} esquecida.");
+    await page.getByRole("button", { name: "Salvar texto" }).click();
+    await expect(page.getByText("Tire as chaves {{ ou }} do texto antes de salvar.")).toBeVisible();
+    await expect(page.getByLabel("Texto do contrato")).toHaveValue("Texto com {{chave}} esquecida.");
     await page.getByLabel("Texto do contrato").fill("# CONTRATO AJUSTADO\nEntrada via Pix em 25/11/2026.");
     await page.getByRole("button", { name: "Salvar texto" }).click();
     await expect(page.getByTestId("contrato-editado")).toContainText("Texto editado à mão · Vera Vendedora (fictícia)");

@@ -44,3 +44,14 @@ describe("blocosDocumento", () => {
     expect(blocosDocumento(texto).map(textoDoBloco).join("\n")).toBe(texto);
   });
 });
+
+describe("DocumentoFormatado (HTML)", () => {
+  it("preserva espaços e recuos do modelo (whitespace-pre-wrap), como antes", async () => {
+    const { createElement } = await import("react");
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const { DocumentoFormatado } = await import("@/components/documento-formatado");
+    const html = renderToStaticMarkup(createElement(DocumentoFormatado, { texto: "   a) cláusula\nAssinatura: ____      Data: __" }));
+    expect(html).toMatch(/^<div class="[^"]*whitespace-pre-wrap/);
+    expect(html).toContain("   a) cláusula");
+  });
+});

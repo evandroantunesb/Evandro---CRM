@@ -58,6 +58,8 @@ export function Contrato({
   const [resultadoGerar, acaoGerar, gerando] = useActionState(gerarContrato, null);
   const [resultadoStatus, acaoStatus] = useActionState(atualizarStatusContrato, null);
   const [editando, setEditando] = useState(false);
+  // Campo controlado: o React limpa o formulário depois da ação, e um texto recusado pelo banco não pode se perder.
+  const [textoEmEdicao, setTextoEmEdicao] = useState("");
   const [confirmarGerar, setConfirmarGerar] = useState(false);
   const [resultadoTexto, acaoTexto, salvandoTexto] = useActionState(async (anterior: ResultadoAcao, dados: FormData) => {
     const r = await editarTextoContrato(anterior, dados);
@@ -89,15 +91,16 @@ export function Contrato({
               <span className="font-medium text-texto-2">Texto do contrato</span>
               <textarea
                 name="conteudo"
-                defaultValue={contrato.conteudo}
+                value={textoEmEdicao}
+                onChange={(e) => setTextoEmEdicao(e.target.value)}
                 rows={16}
                 maxLength={60000}
                 className="rounded-md border border-dourado bg-superficie px-3 py-2 font-mono text-xs leading-relaxed text-texto"
               />
             </label>
             <p className="text-xs text-texto-2">
-              Use <b>## </b> para título, <b>**negrito**</b> e <b>- </b> para lista. O link, o PDF e o WhatsApp passam a usar este
-              texto.
+              Use <b>## </b> para título, <b>**negrito**</b> e <b>- </b> para lista. Não deixe chaves <b>{"{{ }}"}</b> no texto. O
+              link, o PDF e o WhatsApp passam a usar este texto.
             </p>
             <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900">
               Valor, pontos e comissão continuam vindo do negócio, não do texto. A edição fica no histórico com seu nome.
@@ -152,7 +155,14 @@ export function Contrato({
             ) : (
               <div className="flex flex-wrap gap-2">
                 {contrato && podeEditar && (
-                  <Botao type="button" variante="secundario" onClick={() => setEditando(true)}>
+                  <Botao
+                    type="button"
+                    variante="secundario"
+                    onClick={() => {
+                      setTextoEmEdicao(contrato.conteudo);
+                      setEditando(true);
+                    }}
+                  >
                     Editar texto
                   </Botao>
                 )}
