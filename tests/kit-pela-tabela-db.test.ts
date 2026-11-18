@@ -6,7 +6,7 @@
  * Cenário próprio ("Kit tabela A/B" + sufixo, usuários "ktb-*" + sufixo).
  */
 import { beforeAll, describe, expect, it } from "vitest";
-import { CLIENTE_CONTRATO, anexarDocumentosContrato, criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
+import { CLIENTE_CONTRATO, anexarDocumentosContrato, criarUsuario, servico, sufixo, type Usuario, gerarContratoTeste } from "./ajuda";
 
 let admin: Usuario;
 let vendedor: Usuario;
@@ -117,7 +117,7 @@ describe("Compras: kit pela tabela de preços", { concurrent: false, shuffle: fa
       ok(await vendedor.cliente.from("negocios").update({ status: "ganho" }).eq("id", negocio), "ganho");
       await anexarDocumentosContrato(negocio);
       const { data: contrato } = ok(
-        await vendedor.cliente.from("contratos").insert({ empresa_id: empresa, negocio_id: negocio, conteudo: "Contrato de teste" }).select("id").single(),
+        await gerarContratoTeste(vendedor.cliente, { empresa_id: empresa, negocio_id: negocio, conteudo: "Contrato de teste" }),
         "contrato",
       );
       ok(await vendedor.cliente.from("contratos").update({ status: "assinado" }).eq("id", contrato!.id), "assinatura");

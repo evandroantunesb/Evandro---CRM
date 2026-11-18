@@ -8020,18 +8020,10 @@ export type Database = {
       feriado_nacional: { Args: { p_data: string }; Returns: boolean };
       garantir_obra: { Args: { p_negocio_id: string }; Returns: string };
       gera_procuracao_pelo_titulo: { Args: { p_titulo: string }; Returns: boolean };
-      gerar_contrato_com_condicao:
-        | {
-            Args: {
-              p_condicao: Json;
-              p_conteudo: string;
-              p_motivo: string;
-              p_negocio_id: string;
-              p_valor: number;
-            };
-            Returns: undefined;
-          }
-        | { Args: { p_geracao_id: string; p_negocio_id: string }; Returns: undefined };
+      gerar_contrato_com_condicao: {
+        Args: { p_geracao_id: string; p_negocio_id: string };
+        Returns: undefined;
+      };
       gerar_link_cliente_obra: { Args: { p_obra_id: string }; Returns: string };
       gravar_arquivo_compra: {
         Args: {

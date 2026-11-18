@@ -17,7 +17,7 @@
  * aqui só se acrescenta a cobertura de que `unica_por_negocio` também funciona nesse evento.
  */
 import { beforeAll, describe, expect, it } from "vitest";
-import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato, gerarContratoTeste } from "./ajuda";
 
 let sdr1: Usuario;
 let closer: Usuario;
@@ -100,11 +100,7 @@ async function marcarStatus(negocioId: string, status: "ganho" | "perdido" | "ab
 
 async function criarEAssinarContrato(negocioId: string, cliente: Usuario["cliente"]) {
   await anexarDocumentosContrato(negocioId);
-  const { data: contrato, error } = await cliente
-    .from("contratos")
-    .insert({ empresa_id: empresa, negocio_id: negocioId, conteudo: "Contrato de teste" })
-    .select("id")
-    .single();
+  const { data: contrato, error } = await gerarContratoTeste(cliente, { empresa_id: empresa, negocio_id: negocioId, conteudo: "Contrato de teste" });
   if (error) throw error;
   const { error: erroAssinar } = await cliente.from("contratos").update({ status: "assinado" }).eq("id", contrato!.id);
   if (erroAssinar) throw erroAssinar;

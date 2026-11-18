@@ -8,7 +8,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { beforeAll, describe, expect, it } from "vitest";
-import { anexarDocumentosContrato, CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
+import { anexarDocumentosContrato, CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, gerarContratoTeste } from "./ajuda";
 
 let admin: Usuario;
 let vendedor: Usuario;
@@ -114,7 +114,7 @@ describe("Compras P2c: documentos do cliente na Engenharia e no Administrativo (
     ok(await vendedor.cliente.from("negocios").update({ status: "ganho" }).eq("id", negocioObra), "ganho");
     await anexarDocumentosContrato(negocioObra);
     const { data: contrato } = ok(
-      await vendedor.cliente.from("contratos").insert({ empresa_id: empresa, negocio_id: negocioObra, conteudo: "Contrato" }).select("id").single(),
+      await gerarContratoTeste(vendedor.cliente, { empresa_id: empresa, negocio_id: negocioObra, conteudo: "Contrato" }),
       "contrato",
     );
     ok(await vendedor.cliente.from("contratos").update({ status: "assinado" }).eq("id", contrato!.id), "assinatura");

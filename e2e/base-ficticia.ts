@@ -218,10 +218,17 @@ export async function criarBaseFicticia(): Promise<BaseFicticia> {
       ),
       "documentos do cliente",
     );
-    const contrato = ok(
-      await clientes[vendedor].from("contratos").insert({ empresa_id: emp, negocio_id: negocio.id, conteudo: "Contrato fictício (E2E)" }).select("id").single(),
-      "contrato",
+    // O texto do contrato vem do servidor (service role) e quem gera é o vendedor (20261215100000_contrato_texto_trava.sql).
+    const geracao = ok(
+      await servico
+        .from("contratos_geracoes")
+        .insert({ empresa_id: emp, negocio_id: negocio.id, membro_id: usuarios[vendedor].membroId, conteudo: "Contrato fictício (E2E)" })
+        .select("id")
+        .single(),
+      "texto do contrato",
     );
+    feito(await clientes[vendedor].rpc("gerar_contrato_com_condicao", { p_negocio_id: negocio.id, p_geracao_id: geracao.id }), "contrato");
+    const contrato = ok(await servico.from("contratos").select("id").eq("negocio_id", negocio.id).single(), "contrato");
     feito(await clientes[vendedor].from("contratos").update({ status: "assinado" }).eq("id", contrato.id), "assinado");
     feito(await clientes[confirmador].rpc("confirmar_pagamento", { p_contrato_id: contrato.id }), "pagamento");
     const obra = ok(await servico.from("obras").select("id").eq("negocio_id", negocio.id).single(), "obra");

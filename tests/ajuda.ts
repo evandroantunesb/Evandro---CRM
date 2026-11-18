@@ -63,3 +63,47 @@ export async function criarUsuario(nome: string) {
 }
 
 export type Usuario = Awaited<ReturnType<typeof criarUsuario>>;
+
+type ClienteBanco = ReturnType<typeof createClient<Database>>;
+type ContratoGerado = Database["public"]["Tables"]["contratos"]["Row"];
+
+/**
+ * Cria (ou regera, em rascunho) o contrato como o app faz desde 20261215100000_contrato_texto_trava.sql: o texto vai
+ * para `contratos_geracoes` pela service role e quem está logado chama `gerar_contrato_com_condicao`. Usuário do app
+ * não grava `contratos` direto. Devolve a linha gravada ou o erro, sem lançar, para os testes de recusa.
+ */
+export async function gerarContratoTeste(
+  cliente: ClienteBanco,
+  campos: { empresa_id: string; negocio_id: string; conteudo: string; condicao_pagamento?: Record<string, unknown> | null },
+): Promise<{ data: ContratoGerado | null; error: { message: string; code?: string } | null }> {
+  const { data: sessao } = await cliente.auth.getUser();
+  if (!sessao.user) return { data: null, error: { message: "Sem sessão." } };
+  const { data: membro } = await servico
+    .from("empresa_membros")
+    .select("id")
+    .eq("empresa_id", campos.empresa_id)
+    .eq("user_id", sessao.user.id)
+    .maybeSingle();
+  if (!membro) return { data: null, error: { message: "Usuário não é membro da empresa.", code: "42501" } };
+
+  const { data: geracao, error: erroGeracao } = await servico
+    .from("contratos_geracoes")
+    .insert({
+      empresa_id: campos.empresa_id,
+      negocio_id: campos.negocio_id,
+      membro_id: membro.id,
+      conteudo: campos.conteudo,
+      condicao: (campos.condicao_pagamento ?? null) as Database["public"]["Tables"]["contratos_geracoes"]["Insert"]["condicao"],
+    })
+    .select("id")
+    .single();
+  if (erroGeracao) return { data: null, error: erroGeracao };
+
+  const { error } = await cliente.rpc("gerar_contrato_com_condicao", { p_negocio_id: campos.negocio_id, p_geracao_id: geracao.id });
+  if (error) {
+    await servico.from("contratos_geracoes").delete().eq("id", geracao.id);
+    return { data: null, error };
+  }
+  const { data, error: erroLeitura } = await servico.from("contratos").select("*").eq("negocio_id", campos.negocio_id).single();
+  return { data, error: erroLeitura };
+}

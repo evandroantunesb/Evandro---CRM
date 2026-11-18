@@ -5,7 +5,7 @@
  * eventos causais (`contrato.assinado`, `pagamento.confirmado`) e o beneficiário congelado.
  */
 import { beforeAll, describe, expect, it } from "vitest";
-import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato, gerarContratoTeste } from "./ajuda";
 
 type Empresa = { id: string; funil: string; etapa: string; contato: string };
 
@@ -51,11 +51,7 @@ async function criarNegocio(e: Empresa, titulo: string, responsavel: Usuario) {
 
 async function gerarContrato(e: Empresa, negocioId: string, u: Usuario) {
   await anexarDocumentosContrato(negocioId);
-  const { data, error } = await u.cliente
-    .from("contratos")
-    .insert({ empresa_id: e.id, negocio_id: negocioId, conteudo: "Contrato de teste", criado_por: m(e, u) })
-    .select("id")
-    .single();
+  const { data, error } = await gerarContratoTeste(u.cliente, { empresa_id: e.id, negocio_id: negocioId, conteudo: "Contrato de teste" });
   if (error) throw error;
   return data!.id as string;
 }
@@ -105,6 +101,8 @@ describe("SDR não escreve em contratos pela API", () => {
     await anexarDocumentosContrato(outroNegocio);
     const { error } = await sdr.cliente.from("contratos").insert({ empresa_id: emp.id, negocio_id: outroNegocio, conteudo: "Contrato do SDR" });
     expect(error?.code).toBe("42501");
+    // Nem pelo caminho da geração (texto montado pelo servidor).
+    expect((await gerarContratoTeste(sdr.cliente, { empresa_id: emp.id, negocio_id: outroNegocio, conteudo: "Contrato do SDR" })).error).not.toBeNull();
     expect((await servico.from("contratos").select("id").eq("negocio_id", outroNegocio)).data).toEqual([]);
   });
 
@@ -159,7 +157,7 @@ describe("papéis autorizados mantêm os fluxos", () => {
   it("vendedor gera, edita, assina; o banco congela o responsável e emite contrato.assinado", async () => {
     const negocioId = await criarNegocio(emp, "Fluxo do vendedor", vendedor);
     const contratoId = await gerarContrato(emp, negocioId, vendedor);
-    sem(await vendedor.cliente.from("contratos").update({ conteudo: "Revisado" }).eq("id", contratoId).select("id"));
+    sem(await vendedor.cliente.rpc("editar_texto_contrato", { p_negocio_id: negocioId, p_conteudo: "Revisado" }));
     expect(sem(await vendedor.cliente.from("contratos").update({ status: "assinado" }).eq("id", contratoId).select("id"))).toHaveLength(1);
     expect(await contratoNoBanco(contratoId)).toMatchObject({ status: "assinado", conteudo: "Revisado", responsavel_assinatura_id: m(emp, vendedor) });
     expect((await eventosDo(negocioId)).map((e) => e.tipo)).toContain("contrato.assinado");

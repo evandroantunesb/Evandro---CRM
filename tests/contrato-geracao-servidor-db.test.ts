@@ -1,5 +1,5 @@
 /**
- * Texto do contrato só pelo servidor (etapa 1, 18/11/2026) com Supabase local e RLS real: o servidor guarda o texto
+ * Texto do contrato só pelo servidor (etapas 1 e 2, 18/11/2026) com Supabase local e RLS real: o servidor guarda o texto
  * montado em `contratos_geracoes` (service role) e `gerar_contrato_com_condicao(negócio, geração)` consome a linha na
  * sessão de quem pediu. O usuário não lê nem escreve na tabela; a linha vale uma vez, só para quem pediu, só para o
  * negócio dela e por até 10 minutos.
@@ -140,5 +140,71 @@ describe("o usuário não fura a geração", () => {
     expect((await gerar(vendedor, n, nova)).error).toBeNull();
     expect(await textoDoContrato(n)).toBe("Texto novo.");
     expect(await linhaExiste(velha)).toBe(false);
+  });
+});
+
+/*
+ * Etapa 2 (20261215100000_contrato_texto_trava.sql): fora da geração e do "Editar texto", usuário do app não cria
+ * contrato nem muda texto ou condição pela API. Status e o resto seguem; a service role (manutenção) também.
+ */
+describe("o usuário não grava texto nem condição pela API", () => {
+  it("a assinatura antiga, com texto vindo de quem chama, não existe mais", async () => {
+    const n = await negocio("Assinatura antiga");
+    const { error } = await vendedor.cliente.rpc(
+      "gerar_contrato_com_condicao" as never,
+      { p_negocio_id: n, p_conteudo: "Texto do usuário", p_condicao: null, p_valor: null, p_motivo: "" } as never,
+    );
+    expect(error).not.toBeNull();
+    expect(await textoDoContrato(n)).toBeNull();
+  });
+
+  it("insert direto é recusado, para vendedor e admin", async () => {
+    const n = await negocio("Insert direto");
+    for (const u of [vendedor, admin]) {
+      const { error } = await u.cliente.from("contratos").insert({ empresa_id: empresa, negocio_id: n, conteudo: "Texto do usuário" });
+      expect(error?.code).toBe("42501");
+    }
+    expect(await textoDoContrato(n)).toBeNull();
+  });
+
+  it("texto e condição não mudam por update direto, nem no rascunho; o status muda", async () => {
+    const n = await negocio("Update direto");
+    expect((await gerar(vendedor, n, await geracao(n, membro[vendedor.id], "Texto do servidor"))).error).toBeNull();
+
+    for (const u of [vendedor, admin]) {
+      const texto = await u.cliente.from("contratos").update({ conteudo: "Texto do usuário" }).eq("negocio_id", n);
+      expect(texto.error?.code).toBe("42501");
+      const condicao = await u.cliente.from("contratos").update({ condicao_pagamento: { forma: "avista" } }).eq("negocio_id", n);
+      expect(condicao.error?.code).toBe("42501");
+    }
+    const { data } = await servico.from("contratos").select("conteudo, condicao_pagamento, texto_editado_em").eq("negocio_id", n).single();
+    expect(data).toEqual({ conteudo: "Texto do servidor", condicao_pagamento: null, texto_editado_em: null });
+
+    expect((await vendedor.cliente.from("contratos").update({ status: "aguardando_assinatura" }).eq("negocio_id", n)).error).toBeNull();
+  });
+
+  it("o \"Editar texto\" continua mudando o texto, com a marca de editado", async () => {
+    const n = await negocio("Editar texto");
+    expect((await gerar(vendedor, n, await geracao(n, membro[vendedor.id], "Texto do servidor"))).error).toBeNull();
+    expect((await vendedor.cliente.rpc("editar_texto_contrato", { p_negocio_id: n, p_conteudo: "Texto ajustado" })).error).toBeNull();
+    const { data } = await servico.from("contratos").select("conteudo, texto_editado_por").eq("negocio_id", n).single();
+    expect(data).toEqual({ conteudo: "Texto ajustado", texto_editado_por: membro[vendedor.id] });
+  });
+
+  it("a marca da geração não sobra para o resto da transação", async () => {
+    // Gerar de novo depois de editar apaga a marca de editado: o texto volta a ser o do servidor.
+    const n = await negocio("Marca local");
+    expect((await gerar(vendedor, n, await geracao(n, membro[vendedor.id], "Primeiro"))).error).toBeNull();
+    expect((await vendedor.cliente.rpc("editar_texto_contrato", { p_negocio_id: n, p_conteudo: "Editado" })).error).toBeNull();
+    expect((await gerar(vendedor, n, await geracao(n, membro[vendedor.id], "Segundo"))).error).toBeNull();
+    const { data } = await servico.from("contratos").select("conteudo, texto_editado_em").eq("negocio_id", n).single();
+    expect(data).toEqual({ conteudo: "Segundo", texto_editado_em: null });
+  });
+
+  it("a service role (manutenção) continua podendo corrigir o texto", async () => {
+    const n = await negocio("Manutenção");
+    expect((await gerar(vendedor, n, await geracao(n, membro[vendedor.id], "Texto do servidor"))).error).toBeNull();
+    expect((await servico.from("contratos").update({ conteudo: "Corrigido" }).eq("negocio_id", n)).error).toBeNull();
+    expect(await textoDoContrato(n)).toBe("Corrigido");
   });
 });

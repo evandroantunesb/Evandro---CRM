@@ -8,7 +8,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { beforeAll, describe, expect, it } from "vitest";
-import { anexarDocumentosContrato, CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
+import { anexarDocumentosContrato, CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, gerarContratoTeste } from "./ajuda";
 
 let admin: Usuario;
 let vendedor: Usuario;
@@ -55,7 +55,7 @@ const anexo = (negocioId: string, categoria: string) =>
     tipo_mime: "application/pdf",
   });
 const gerarContrato = (negocioId: string) =>
-  vendedor.cliente.from("contratos").insert({ empresa_id: empresa, negocio_id: negocioId, conteudo: "Contrato" }).select("id").single();
+  gerarContratoTeste(vendedor.cliente, { empresa_id: empresa, negocio_id: negocioId, conteudo: "Contrato" });
 
 const ITENS = [{ kit_indice: null, descricao: "Kit fotovoltaico", unidade: "un", quantidade: 1, valor_unitario: 10000 }];
 const criarPedido = (quem: Usuario, extra: Partial<Record<string, unknown>> = {}) =>

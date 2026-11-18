@@ -7,7 +7,7 @@
  * Cenário próprio ("Custos A/B" + sufixo, usuários "cu-*" + sufixo). Os testes seguem em ordem.
  */
 import { beforeAll, describe, expect, it } from "vitest";
-import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato, gerarContratoTeste } from "./ajuda";
 
 let admin: Usuario;
 let gestor: Usuario;
@@ -39,7 +39,7 @@ async function criarObra(titulo: string): Promise<string> {
   ok(await vendedor.cliente.from("negocios").update({ status: "ganho" }).eq("id", neg!.id), "ganho");
   await anexarDocumentosContrato(neg!.id);
   const { data: contrato } = ok(
-    await vendedor.cliente.from("contratos").insert({ empresa_id: empresa, negocio_id: neg!.id, conteudo: "Contrato de teste" }).select("id").single(),
+    await gerarContratoTeste(vendedor.cliente, { empresa_id: empresa, negocio_id: neg!.id, conteudo: "Contrato de teste" }),
     "contrato",
   );
   ok(await vendedor.cliente.from("contratos").update({ status: "assinado" }).eq("id", contrato!.id), "assinatura");
