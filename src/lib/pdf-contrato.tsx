@@ -1,5 +1,6 @@
 import "server-only";
 import { Document, Image, Page, StyleSheet, Text, View, renderToBuffer } from "@react-pdf/renderer";
+import { blocosDocumento, type Trecho } from "@/lib/documento-formatado";
 import { registrarErro } from "@/lib/log";
 import type { MarcaPdf } from "@/lib/marca-pdf";
 
@@ -16,10 +17,26 @@ const estilos = StyleSheet.create({
   rotulo: { fontSize: 8, letterSpacing: 2, color: CINZA, textTransform: "uppercase" },
   titulo: { marginTop: 4, marginBottom: 18, fontSize: 16, fontFamily: "Helvetica-Bold" },
   linha: { lineHeight: 1.5, marginBottom: 2 },
+  titulo1: { fontSize: 13, fontFamily: "Helvetica-Bold", lineHeight: 1.3, marginTop: 4, marginBottom: 8 },
+  titulo2: { fontSize: 10.5, fontFamily: "Helvetica-Bold", lineHeight: 1.4, marginTop: 10, marginBottom: 3 },
+  item: { lineHeight: 1.5, marginBottom: 2, paddingLeft: 10 },
+  negrito: { fontFamily: "Helvetica-Bold" },
   rodape: { position: "absolute", bottom: "10mm", left: "18mm", right: "18mm", fontSize: 8, color: CINZA, textAlign: "right" },
 });
 
-type PropsDocumento = { rotulo: string; titulo: string | null; conteudo: string; marca: MarcaPdf };
+function TrechosPdf({ trechos }: { trechos: Trecho[] }) {
+  return trechos.map((t, i) =>
+    t.negrito ? (
+      <Text key={i} style={estilos.negrito}>
+        {t.texto}
+      </Text>
+    ) : (
+      t.texto
+    ),
+  );
+}
+
+type PropsDocumento ={ rotulo: string; titulo: string | null; conteudo: string; marca: MarcaPdf };
 
 /**
  * PDF de um documento da empresa (contrato, procuração): cabeçalho discreto com o logo e o nome da própria empresa
@@ -42,12 +59,24 @@ export function DocumentoPdf({ rotulo, titulo, conteudo, marca }: PropsDocumento
         </View>
         <Text style={estilos.rotulo}>{rotulo}</Text>
         {titulo && <Text style={estilos.titulo}>{titulo}</Text>}
-        {/* Uma linha do texto por <Text>: o react-pdf quebra a página entre linhas, e linha vazia vira espaço. */}
-        {conteudo.split(/\r?\n/).map((linha, i) => (
-          <Text key={i} style={estilos.linha}>
-            {linha || " "}
-          </Text>
-        ))}
+        {/* Um bloco (linha do texto) por <Text>: o react-pdf quebra a página entre linhas, e linha vazia vira espaço. */}
+        {blocosDocumento(conteudo).map((bloco, i) => {
+          if (bloco.tipo === "vazio") {
+            return (
+              <Text key={i} style={estilos.linha}>
+                {" "}
+              </Text>
+            );
+          }
+          const estilo =
+            bloco.tipo === "titulo" ? (bloco.nivel === 1 ? estilos.titulo1 : estilos.titulo2) : bloco.tipo === "item" ? estilos.item : estilos.linha;
+          return (
+            <Text key={i} style={estilo}>
+              {bloco.tipo === "item" ? "• " : null}
+              <TrechosPdf trechos={bloco.trechos} />
+            </Text>
+          );
+        })}
         <Text style={estilos.rodape} fixed render={({ pageNumber, totalPages }) => `Página ${pageNumber} de ${totalPages}`} />
       </Page>
     </Document>

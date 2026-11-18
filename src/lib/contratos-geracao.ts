@@ -36,7 +36,7 @@ export async function lerFontesNegocio(supabase: SupabaseServidor, empresaId: st
     supabase
       .from("negocios")
       .select(
-        "titulo, numero, valor, unidade_consumidora, qualif_distribuidora, consumo_medio_kwh, responsavel_id, contatos(tipo, nome, documento, rg, data_nascimento, inscricao_estadual, endereco, cep, logradouro, numero, bairro, cidade, uf, email, telefone, telefone2)",
+        "titulo, numero, valor, unidade_consumidora, qualif_distribuidora, consumo_medio_kwh, tipo_telhado, endereco_instalacao, responsavel_id, contatos(tipo, nome, documento, rg, data_nascimento, inscricao_estadual, endereco, cep, logradouro, numero, bairro, cidade, uf, email, telefone, telefone2)",
       )
       .eq("id", negocioId)
       .maybeSingle(),

@@ -1646,6 +1646,8 @@ export type Database = {
           perfil_assinatura: Database["public"]["Enums"]["perfil_gamificacao"] | null;
           responsavel_assinatura_id: string | null;
           status: Database["public"]["Enums"]["status_contrato"];
+          texto_editado_em: string | null;
+          texto_editado_por: string | null;
           token: string;
           updated_at: string;
         };
@@ -1663,6 +1665,8 @@ export type Database = {
           perfil_assinatura?: Database["public"]["Enums"]["perfil_gamificacao"] | null;
           responsavel_assinatura_id?: string | null;
           status?: Database["public"]["Enums"]["status_contrato"];
+          texto_editado_em?: string | null;
+          texto_editado_por?: string | null;
           token?: string;
           updated_at?: string;
         };
@@ -1680,6 +1684,8 @@ export type Database = {
           perfil_assinatura?: Database["public"]["Enums"]["perfil_gamificacao"] | null;
           responsavel_assinatura_id?: string | null;
           status?: Database["public"]["Enums"]["status_contrato"];
+          texto_editado_em?: string | null;
+          texto_editado_por?: string | null;
           token?: string;
           updated_at?: string;
         };
@@ -1729,6 +1735,13 @@ export type Database = {
           {
             foreignKeyName: "contratos_responsavel_assinatura_id_fkey";
             columns: ["responsavel_assinatura_id"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "contratos_texto_editado_por_fkey";
+            columns: ["texto_editado_por"];
             isOneToOne: false;
             referencedRelation: "empresa_membros";
             referencedColumns: ["id"];
@@ -3507,6 +3520,7 @@ export type Database = {
           criado_por: string | null;
           descricao: string | null;
           empresa_id: string;
+          endereco_instalacao: string | null;
           estrutura_telhado: string | null;
           etapa_desde: string;
           etapa_id: string;
@@ -3555,6 +3569,7 @@ export type Database = {
           criado_por?: string | null;
           descricao?: string | null;
           empresa_id: string;
+          endereco_instalacao?: string | null;
           estrutura_telhado?: string | null;
           etapa_desde?: string;
           etapa_id: string;
@@ -3603,6 +3618,7 @@ export type Database = {
           criado_por?: string | null;
           descricao?: string | null;
           empresa_id?: string;
+          endereco_instalacao?: string | null;
           estrutura_telhado?: string | null;
           etapa_desde?: string;
           etapa_id?: string;
@@ -7789,6 +7805,10 @@ export type Database = {
         };
         Returns: undefined;
       };
+      editar_texto_contrato: {
+        Args: { p_conteudo: string; p_negocio_id: string };
+        Returns: undefined;
+      };
       eletroposto_ativo: { Args: { p_empresa_id: string }; Returns: boolean };
       empresa_da_pasta_marca: { Args: { p_caminho: string }; Returns: string };
       empresa_e_solo: { Args: { p_empresa_id: string }; Returns: boolean };
@@ -8780,6 +8800,7 @@ export type Database = {
           criado_por: string | null;
           descricao: string | null;
           empresa_id: string;
+          endereco_instalacao: string | null;
           estrutura_telhado: string | null;
           etapa_desde: string;
           etapa_id: string;
@@ -8837,6 +8858,7 @@ export type Database = {
           criado_por: string | null;
           descricao: string | null;
           empresa_id: string;
+          endereco_instalacao: string | null;
           estrutura_telhado: string | null;
           etapa_desde: string;
           etapa_id: string;

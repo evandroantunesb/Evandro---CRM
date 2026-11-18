@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
+import { DocumentoFormatado } from "@/components/documento-formatado";
 import { LogoRaion } from "@/components/marca";
 import { Selo } from "@/components/ui";
 import { contratoProntoParaCliente } from "@/lib/contrato";
+import { SELECAO_CONTRATO_PUBLICO } from "@/lib/contrato-publico";
 import { criarClienteAdmin } from "@/lib/supabase/admin";
 import { ROTULO_STATUS_CONTRATO, type StatusContrato } from "@/lib/tipos";
 
@@ -14,7 +16,7 @@ export default async function ContratoPublico({ params }: PageProps<"/contrato/[
 
   const { data: contrato } = await admin
     .from("contratos")
-    .select("conteudo, status, negocios(titulo)")
+    .select(SELECAO_CONTRATO_PUBLICO)
     .eq("token", token)
     .maybeSingle();
   if (!contrato) notFound();
@@ -38,8 +40,8 @@ export default async function ContratoPublico({ params }: PageProps<"/contrato/[
       {/* Contrato com campo sem resolver (gerado antes da validação) não é mostrado ao cliente. */}
       {contratoProntoParaCliente(contrato.conteudo) ? (
         <>
-          <article className="rounded-xl border border-zinc-200/80 bg-white p-6 whitespace-pre-wrap text-sm text-zinc-800 shadow-[0_1px_2px_rgba(15,15,16,0.04)]">
-            {contrato.conteudo}
+          <article className="rounded-xl border border-zinc-200/80 bg-white p-6 text-sm text-zinc-800 shadow-[0_1px_2px_rgba(15,15,16,0.04)]">
+            <DocumentoFormatado texto={contrato.conteudo} />
           </article>
           <a
             href={`/contrato/${token}/pdf`}

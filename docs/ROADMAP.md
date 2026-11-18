@@ -49,7 +49,7 @@ Situação em 17/11/2026:
 
 0. **Segurança:** tirar os secrets de produção do nível do repositório (só o Evandro altera secrets).
 1. **Documentos configuráveis:** contrato, proposta e **procuração** (em andamento: branch `feat/procuracao`, 17/11/2026).
-2. **Assinatura eletrônica real** para contrato e procuração. A orientação do engenheiro no checklist da Copel aceita gov.br ouro ou prata no lugar da firma reconhecida: o serviço precisa cobrir gov.br.
+2. **Contrato: conferir, editar e enviar** (redefinido pelo Evandro em 18/11/2026). A assinatura eletrônica saiu: nenhum serviço privado assina "gov.br" (a API de assinatura do gov.br não é aberta ao setor privado), e o cliente assina como conseguir (gov.br, cartório). No lugar: o vendedor confere e ajusta o texto no CRM e envia pelo WhatsApp.
 3. **Avisos externos:** e-mail primeiro; WhatsApp pela API oficial depois (custo e aprovação da Meta).
 4. **Agenda operacional:** avaliar antes o trabalho inacabado da branch de backup.
 5. **Calculadora e catálogo técnico:** CSV real de equipamentos e preços, com o engenheiro.

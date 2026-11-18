@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { contratoProntoParaCliente } from "@/lib/contrato";
+import { SELECAO_CONTRATO_PDF } from "@/lib/contrato-publico";
 import { lerMarcaPdf } from "@/lib/marca-pdf";
 import { renderizarDocumentoPdf } from "@/lib/pdf-contrato";
 import { criarClienteAdmin } from "@/lib/supabase/admin";
@@ -12,7 +13,7 @@ export async function GET(_: Request, { params }: RouteContext<"/contrato/[token
   const admin = criarClienteAdmin();
   const { data: contrato } = await admin
     .from("contratos")
-    .select("conteudo, empresa_id, negocios(titulo)")
+    .select(SELECAO_CONTRATO_PDF)
     .eq("token", token)
     .maybeSingle();
   if (!contrato) return new NextResponse("Contrato não encontrado.", { status: 404 });

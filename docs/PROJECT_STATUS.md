@@ -1,6 +1,25 @@
 # Estado do projeto — Raion CRM
 
-## Ponto de retomada (17/11/2026)
+## Ponto de retomada (18/11/2026)
+
+- **Produção:** `main` em `fde50ec` (#403 e #404 mescladas; migration da procuração aplicada antes do merge).
+- **Sessão de 18/11/2026:** item 2 do roadmap redefinido pelo Evandro: **sem assinatura eletrônica** (nenhum serviço privado assina "gov.br"; o cliente assina como conseguir). No lugar, **contrato: conferir, editar e enviar** (seção própria abaixo), na branch `feat/contrato-editar` (worktree `C:\dev\crm-contrato-editar`). Modelo de contrato genérico adaptado para o Evandro em `C:\dev\modelos\contrato-modelo.md` (fora do repositório; só vale depois desta entrega).
+- Pendências do item 1 (procuração): o Evandro cola o texto do modelo e confere um PDF real com o logo.
+
+## Contrato: conferir, editar e enviar (18/11/2026)
+
+Desenho em `docs/superpowers/specs/2026-11-18-contrato-conferir-editar-design.md`, plano em `docs/superpowers/plans/2026-11-18-contrato-conferir-editar.md`; prévia aprovada no canvas "Raion — Nova interface" (linha "Contrato: conferir, editar e enviar": `ContratoNegocio`, `ContratoEnderecoInstalacao`, `ContratoPdfFormatado`). Decisões do Evandro: edição dentro do CRM (sem Word); editam o responsável atual pelo negócio (vendedor), o gestor e o admin, só em rascunho; cada edição no histórico; valor por extenso; logo do PDF como está.
+
+- Migration `20261213100000_contrato_texto_editado.sql`: `contratos.texto_editado_em/por` (marca "editado à mão", mantida só pelo gatilho `contratos_texto_editado`: liga pela RPC, some ao gerar de novo, nunca muda por update direto), texto do contrato travado fora do rascunho para usuários do app, RPC `editar_texto_contrato` (permissão, rascunho, texto não vazio, sem `{{ }}`, até 60.000 caracteres; atividade `contrato_texto_editado`) e `negocios.endereco_instalacao` (até 300).
+- Modelo: formatação simples (`#`/`##` título, `**negrito**`, `- ` lista) na conferência, no link do cliente e no PDF (a procuração também ganha); campos `{{negocio_valor_extenso}}`, `{{tipo_telhado}}` e `{{endereco_instalacao}}` (vazio = endereço do cliente com cidade/UF).
+- Cartão do contrato: texto para conferir, "Editar texto", confirmação antes de "Gerar novamente" quando há edição, "Enviar no WhatsApp" direto ao número do cliente (sem número válido, sem destinatário).
+- Endereço da instalação só na edição do negócio (cartão "Conta de luz e local"), não no assistente de criação.
+- **Produção:** PR #405; migration aplicada em 18/11/2026 antes do merge pelo `banco-producao.yml` (tag `migracao-pr405-ce84615`; dry-run 44299027230 listou só ela; aplicação 44299244263), autorizada e aprovada pelo Evandro no `producao-banco`; autorização na trava na própria branch da #405.
+- **Defeito antigo corrigido:** desde a migration `20261015100000_integridade_contratos.sql` (chave composta `contratos_negocio_empresa_fk`), o link público do contrato e o PDF caíam em 404 para todo contrato: o embed `negocios(titulo)` ficou ambíguo (PGRST201). Agora nomeiam a relação (`src/lib/contrato-publico.ts`), com teste de banco (`tests/contrato-publico-db.test.ts`) e e2e `40-contrato-editar`. Os testes do PDF simulavam o banco e não pegavam.
+- **Decidido pelo Evandro em 18/11/2026: etapa própria para fechar (aguardando comando).** Contexto (revisão final, I2): a permissão e o histórico da edição valem pela RPC `editar_texto_contrato`, mas quem tem a RLS "editar contrato" (`pode_ver_financeiro_negocio`) ainda consegue gravar o texto do rascunho chamando a API direto (update em `contratos` ou `gerar_contrato_com_condicao`, que recebe o texto do app), sem marca nem atividade. Fechar de vez exige montar o contrato dentro do banco. Próxima etapa (não iniciada): só funções do banco gravam `contratos.conteudo` (geração e edição), com a mesma permissão e histórico; update direto do texto recusado para usuários do app.
+- Pendências menores da revisão: mensagem "Para gerar o contrato..." ao editar com dado do cliente apagado; telefone com zero na frente no WhatsApp (helper de obras); marca que fica se o texto gerado de novo for idêntico; acessibilidade do cartão (role da área de conferência, foco na confirmação, `<a><button>` antigo); negrito desligado por `****` no começo da linha.
+
+## Ponto de retomada anterior (17/11/2026)
 
 - **Produção:** `main` em `1485d6d`; todas as migrations até a `20261211100000_compras_substituto_candidatos.sql` (#400, autorização na #401) aplicadas pelo `banco-producao.yml`.
 - **Sessão de 17/11/2026:** revisão e correção da #400 (substituto de Compras como participante e coordenador nas tarefas), aplicada e mesclada; análise do roadmap com o Evandro e **ordem das próximas frentes aprovada** (seção "Próximas prioridades" e `docs/ROADMAP.md`). Próximo: item 0 (secrets, feito pelo Evandro) e item 1 (documentos configuráveis com procuração), aguardando o modelo da procuração.
@@ -641,7 +660,7 @@ Ordem aprovada pelo Evandro em 17/11/2026 (detalhe em `docs/ROADMAP.md`, seção
 
 0. **Segurança:** tirar os secrets de produção do nível do repositório (público desde 12/11/2026). Todos os que a `main` usa já estão nos environments (`producao-banco`, `producao-seed`, `backup-producao`); os 8 do nível do repositório não são lidos por nenhum workflow da `main` (`BACKUP_ENCRYPTION_KEY` e `BACKUP_REPO_TOKEN` eram da PR #62, fechada). Só o Evandro altera secrets.
 1. **Documentos configuráveis:** contrato, proposta e procuração.
-2. **Assinatura eletrônica real** (ZapSign ou gov.br).
+2. **Contrato: conferir, editar e enviar** (18/11/2026: a assinatura eletrônica saiu; o cliente assina como conseguir).
 3. **Avisos externos:** e-mail primeiro, WhatsApp pela API oficial depois.
 4. **Agenda operacional** (avaliar a branch `backup/wt-calendario-operacional-20261103-wip`).
 5. **Calculadora e catálogo técnico:** CSV real de equipamentos; o trabalho da PR #101 (fechada, 13 migrations nunca aplicadas) precisa de revisão própria antes de qualquer retomada.

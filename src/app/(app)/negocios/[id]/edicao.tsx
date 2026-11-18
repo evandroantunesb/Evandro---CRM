@@ -41,6 +41,7 @@ export function EdicaoNegocio({
     valor: number | null;
     descricao: string | null;
     tipoTelhado: string | null;
+    enderecoInstalacao: string | null;
     unidadeConsumidora: string | null;
     padraoCliente: string | null;
     consumoMedioKwh: number | null;
@@ -200,6 +201,16 @@ export function EdicaoNegocio({
             placeholder="Ex.: cerâmico, metálico, laje, solo"
             defaultValue={negocio.tipoTelhado ?? ""}
           />
+          <div className="flex flex-col gap-1 md:col-span-2">
+            <Campo
+              rotulo="Endereço da instalação"
+              name="endereco_instalacao"
+              maxLength={300}
+              placeholder="Deixe vazio se for o endereço do cliente"
+              defaultValue={negocio.enderecoInstalacao ?? ""}
+            />
+            <p className="text-xs text-texto-2">Vazio, o contrato usa o endereço do cliente. Preencha só quando a usina for em outro lugar.</p>
+          </div>
           <div className="md:col-span-2">
             <CampoArquivo key={versaoArquivo} rotulo="Fatura de energia (opcional)" name="anexo_fatura_energia" accept="image/*,.pdf" />
           </div>

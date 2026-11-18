@@ -1,22 +1,33 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { DocumentoFormatado } from "@/components/documento-formatado";
+import { EnvioContrato, type ClienteContrato } from "./envio-contrato";
 import { Botao, Mensagem, Selecao } from "@/components/ui";
-import { atualizarStatusContrato, gerarContrato } from "@/lib/acoes/contratos";
+import { atualizarStatusContrato, editarTextoContrato, gerarContrato } from "@/lib/acoes/contratos";
 import { MENSAGEM_PRECO_DESATUALIZADO } from "@/lib/calculo-preco";
 import type { CondicaoRegistrada, OpcaoEscolha } from "@/lib/condicao-escolhida";
 import { formatarDataIso, formatarMoeda } from "@/lib/formatacao";
-import { ROTULO_STATUS_CONTRATO, STATUS_CONTRATO, type StatusContrato } from "@/lib/tipos";
+import { ROTULO_STATUS_CONTRATO, STATUS_CONTRATO, type ResultadoAcao, type StatusContrato } from "@/lib/tipos";
 
 export type ContratoSalvo = {
   token: string;
   status: StatusContrato;
+  /** Texto atual do contrato (o que o link, o PDF e o WhatsApp mostram). */
+  conteudo: string;
+  /** Marca "texto editado à mão" (o banco a mantém; some ao gerar de novo). */
+  editadoEm: string | null;
+  editadoPorNome: string | null;
 };
+
+const AVISO_PERDER_EDICOES = "O texto volta ao modelo e você perde as edições feitas à mão. Gerar de novo?";
 
 export function Contrato({
   negocioId,
   contrato,
   siteUrl,
+  cliente,
+  podeEditar = false,
   precoDesatualizado = false,
   bloqueio = null,
   escolha = null,
@@ -27,6 +38,10 @@ export function Contrato({
   negocioId: string;
   contrato: ContratoSalvo | null;
   siteUrl: string;
+  /** Contato do negócio: o WhatsApp abre a conversa dele. */
+  cliente: ClienteContrato;
+  /** Admin, gestor ou o vendedor responsável (a barreira real é `editar_texto_contrato`). */
+  podeEditar?: boolean;
   /** Valor do negócio diferente do preço do cálculo: o servidor não gera o contrato nesse estado. */
   precoDesatualizado?: boolean;
   /** Mensagem do servidor quando o cálculo salvo impede o contrato (nunca por `legado`); nulo = liberado. */
@@ -40,39 +55,135 @@ export function Contrato({
 }) {
   const [resultadoGerar, acaoGerar, gerando] = useActionState(gerarContrato, null);
   const [resultadoStatus, acaoStatus] = useActionState(atualizarStatusContrato, null);
-  const [copiado, setCopiado] = useState(false);
+  const [editando, setEditando] = useState(false);
+  // Campo controlado: o React limpa o formulário depois da ação, e um texto recusado pelo banco não pode se perder.
+  const [textoEmEdicao, setTextoEmEdicao] = useState("");
+  const [confirmarGerar, setConfirmarGerar] = useState(false);
+  const [resultadoTexto, acaoTexto, salvandoTexto] = useActionState(async (anterior: ResultadoAcao, dados: FormData) => {
+    const r = await editarTextoContrato(anterior, dados);
+    if (r?.ok) setEditando(false);
+    return r;
+  }, null);
 
   if (!contrato || contrato.status === "rascunho") {
+    const editado = !!contrato?.editadoEm;
+    const gerarDesabilitado = gerando || precoDesatualizado || !!bloqueio || (!!escolha && ganhoSemPermissao);
+    const rotuloGerar = gerando ? "Gerando..." : escolha ? "Registrar e gerar contrato" : contrato ? "Gerar novamente" : "Gerar contrato";
     return (
       <div className="flex flex-col gap-3">
-        {contrato && (
-          <p className="text-sm text-zinc-600">
-            Contrato gerado como rascunho. Gerar de novo substitui o texto pelo modelo atual.
-          </p>
+        {contrato?.editadoEm && <MarcaEditado editadoEm={contrato.editadoEm} nome={contrato.editadoPorNome} />}
+        {contrato && !editando && (
+          <div
+            tabIndex={0}
+            aria-label="Texto do contrato"
+            data-testid="texto-contrato"
+            className="max-h-80 overflow-y-auto rounded-lg border border-linha bg-superficie px-4 py-3 text-sm text-texto"
+          >
+            <DocumentoFormatado texto={contrato.conteudo} />
+          </div>
         )}
-        <form action={acaoGerar} className="flex flex-col gap-2">
-          <input type="hidden" name="negocioId" value={negocioId} />
-          {escolha && (
-            <EscolhaCondicao escolha={escolha} registrada={condicaoRegistrada} valorNegocio={valorNegocio} ganhoSemPermissao={ganhoSemPermissao} />
-          )}
-          {bloqueio ? (
-            <p role="alert" className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900">
-              {bloqueio}
+        {contrato && editando && (
+          <form action={acaoTexto} className="flex flex-col gap-2">
+            <input type="hidden" name="negocioId" value={negocioId} />
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="font-medium text-texto-2">Texto do contrato</span>
+              <textarea
+                name="conteudo"
+                value={textoEmEdicao}
+                onChange={(e) => setTextoEmEdicao(e.target.value)}
+                rows={16}
+                maxLength={60000}
+                className="rounded-md border border-dourado bg-superficie px-3 py-2 font-mono text-xs leading-relaxed text-texto"
+              />
+            </label>
+            <p className="text-xs text-texto-2">
+              Use <b>## </b> para título, <b>**negrito**</b> e <b>- </b> para lista. Não deixe chaves <b>{"{{ }}"}</b> no texto. O
+              link, o PDF e o WhatsApp passam a usar este texto.
             </p>
-          ) : (
-            precoDesatualizado && (
+            <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              Valor, pontos e comissão continuam vindo do negócio, não do texto. A edição fica no histórico com seu nome.
+            </p>
+            <Mensagem resultado={resultadoTexto} />
+            <div className="flex flex-wrap gap-2">
+              <Botao type="submit" disabled={salvandoTexto}>
+                {salvandoTexto ? "Salvando..." : "Salvar texto"}
+              </Botao>
+              <Botao type="button" variante="secundario" onClick={() => setEditando(false)}>
+                Cancelar
+              </Botao>
+            </div>
+          </form>
+        )}
+        {contrato && !editando && (
+          <>
+            <Mensagem resultado={resultadoTexto} />
+            <p className="text-xs text-texto-2">Algo errado nos dados? Corrija no negócio e gere de novo. Para ajustar o texto, use “Editar texto”.</p>
+          </>
+        )}
+        {!editando && (
+          <form action={acaoGerar} className="flex flex-col gap-2">
+            <input type="hidden" name="negocioId" value={negocioId} />
+            {escolha && (
+              <EscolhaCondicao escolha={escolha} registrada={condicaoRegistrada} valorNegocio={valorNegocio} ganhoSemPermissao={ganhoSemPermissao} />
+            )}
+            {bloqueio ? (
               <p role="alert" className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                {MENSAGEM_PRECO_DESATUALIZADO}
+                {bloqueio}
               </p>
-            )
-          )}
-          <Mensagem resultado={resultadoGerar} />
-          <Botao type="submit" disabled={gerando || precoDesatualizado || !!bloqueio || (!!escolha && ganhoSemPermissao)} className="self-start">
-            {gerando ? "Gerando..." : escolha ? "Registrar e gerar contrato" : contrato ? "Gerar novamente" : "Gerar contrato"}
-          </Botao>
-        </form>
-        {contrato && <FormularioStatus negocioId={negocioId} status={contrato.status} acao={acaoStatus} resultado={resultadoStatus} />}
-        {contrato && <LinkContrato token={contrato.token} siteUrl={siteUrl} copiado={copiado} setCopiado={setCopiado} />}
+            ) : (
+              precoDesatualizado && (
+                <p role="alert" className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  {MENSAGEM_PRECO_DESATUALIZADO}
+                </p>
+              )
+            )}
+            <Mensagem resultado={resultadoGerar} />
+            {editado && confirmarGerar ? (
+              <div role="alert" className="flex flex-col gap-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                <p className="font-medium">{AVISO_PERDER_EDICOES}</p>
+                <div className="flex flex-wrap gap-2">
+                  <Botao type="submit" disabled={gerarDesabilitado}>
+                    Gerar e perder edições
+                  </Botao>
+                  <Botao type="button" variante="secundario" onClick={() => setConfirmarGerar(false)}>
+                    Manter
+                  </Botao>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {contrato && podeEditar && (
+                  <Botao
+                    type="button"
+                    variante="secundario"
+                    onClick={() => {
+                      setTextoEmEdicao(contrato.conteudo);
+                      setEditando(true);
+                    }}
+                  >
+                    Editar texto
+                  </Botao>
+                )}
+                {editado ? (
+                  <Botao type="button" variante="secundario" disabled={gerarDesabilitado} onClick={() => setConfirmarGerar(true)}>
+                    {rotuloGerar}
+                  </Botao>
+                ) : (
+                  <Botao type="submit" variante={contrato ? "secundario" : "primario"} disabled={gerarDesabilitado}>
+                    {rotuloGerar}
+                  </Botao>
+                )}
+              </div>
+            )}
+          </form>
+        )}
+        {contrato && (
+          <>
+            <hr className="border-linha" />
+            <EnvioContrato token={contrato.token} siteUrl={siteUrl} cliente={cliente} />
+            <FormularioStatus negocioId={negocioId} status={contrato.status} acao={acaoStatus} resultado={resultadoStatus} />
+          </>
+        )}
       </div>
     );
   }
@@ -80,56 +191,24 @@ export function Contrato({
   return (
     <div className="flex flex-col gap-3">
       {condicaoRegistrada && <CondicaoDoContrato condicao={condicaoRegistrada} />}
-      <LinkContrato token={contrato.token} siteUrl={siteUrl} copiado={copiado} setCopiado={setCopiado} />
+      <EnvioContrato token={contrato.token} siteUrl={siteUrl} cliente={cliente} />
       <FormularioStatus negocioId={negocioId} status={contrato.status} acao={acaoStatus} resultado={resultadoStatus} />
     </div>
   );
 }
 
-function LinkContrato({
-  token,
-  siteUrl,
-  copiado,
-  setCopiado,
-}: {
-  token: string;
-  siteUrl: string;
-  copiado: boolean;
-  setCopiado: (v: boolean) => void;
-}) {
-  const link = `${siteUrl}/contrato/${token}`;
-  const linkWhatsapp = `https://wa.me/?text=${encodeURIComponent(`Segue o contrato: ${link}`)}`;
+function MarcaEditado({ editadoEm, nome }: { editadoEm: string; nome: string | null }) {
+  const quando = new Date(editadoEm).toLocaleString("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
   return (
-    <div className="flex flex-col gap-1">
-      <span className="text-sm font-medium text-zinc-700">Link do contrato</span>
-      <div className="flex flex-wrap gap-2">
-        <input
-          readOnly
-          value={link}
-          onFocus={(e) => e.currentTarget.select()}
-          className="min-w-0 flex-1 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-700 outline-none"
-        />
-        <Botao
-          type="button"
-          variante="secundario"
-          onClick={() => {
-            navigator.clipboard.writeText(link);
-            setCopiado(true);
-            setTimeout(() => setCopiado(false), 2000);
-          }}
-        >
-          {copiado ? "Copiado!" : "Copiar"}
-        </Botao>
-        <a href={linkWhatsapp} target="_blank" rel="noopener noreferrer">
-          <Botao type="button">Enviar no WhatsApp</Botao>
-        </a>
-        <a href={`/contrato/${token}/pdf`} target="_blank" rel="noopener noreferrer">
-          <Botao type="button" variante="secundario">
-            Baixar PDF
-          </Botao>
-        </a>
-      </div>
-    </div>
+    <p className="self-start rounded-full bg-zinc-100 px-3 py-0.5 text-xs text-zinc-700" data-testid="contrato-editado">
+      Texto editado à mão{nome ? ` · ${nome}` : ""}, {quando}
+    </p>
   );
 }
 

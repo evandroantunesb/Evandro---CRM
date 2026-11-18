@@ -38,7 +38,7 @@ export async function carregarFicha(atual: Vinculo, id: string, abaParam: string
     supabase
       .from("negocios")
       .select(
-        "id, empresa_id, tipo, numero, titulo, valor, descricao, status, arquivado_em, arquivado_por, motivo_arquivamento, funil_id, etapa_id, origem_id, responsavel_id, motivo_perda_id, motivo_perda_detalhe, fechado_em, created_at, updated_at, tipo_telhado, unidade_consumidora, padrao_cliente, estrutura_telhado, consumo_medio_kwh, consumo_estimado_kwh, tarifa_efetiva_kwh, valor_conta_energia, fechamento_previsto, fechamento_previsto_em, qualif_tipo_cliente, qualif_possui_conta_energia, qualif_distribuidora, qualif_imovel_proprio, qualif_objetivo, qualif_prazo_instalacao, qualif_busca_financiamento, qualif_orcamento_outra_empresa, qualif_e_decisor, qualif_outro_decisor, qualif_participantes_decisao, qualif_observacoes, contatos(id, nome, tipo, telefone, email, endereco, cidade, uf, documento, rg, data_nascimento, inscricao_estadual, cep, logradouro, numero, bairro, complemento)",
+        "id, empresa_id, tipo, numero, titulo, valor, descricao, status, arquivado_em, arquivado_por, motivo_arquivamento, funil_id, etapa_id, origem_id, responsavel_id, motivo_perda_id, motivo_perda_detalhe, fechado_em, created_at, updated_at, tipo_telhado, endereco_instalacao, unidade_consumidora, padrao_cliente, estrutura_telhado, consumo_medio_kwh, consumo_estimado_kwh, tarifa_efetiva_kwh, valor_conta_energia, fechamento_previsto, fechamento_previsto_em, qualif_tipo_cliente, qualif_possui_conta_energia, qualif_distribuidora, qualif_imovel_proprio, qualif_objetivo, qualif_prazo_instalacao, qualif_busca_financiamento, qualif_orcamento_outra_empresa, qualif_e_decisor, qualif_outro_decisor, qualif_participantes_decisao, qualif_observacoes, contatos(id, nome, tipo, telefone, email, endereco, cidade, uf, documento, rg, data_nascimento, inscricao_estadual, cep, logradouro, numero, bairro, complemento)",
       )
       .eq("id", id)
       .maybeSingle(),
@@ -162,7 +162,7 @@ export async function carregarFicha(atual: Vinculo, id: string, abaParam: string
 
   const { data: contrato } = await supabase
     .from("contratos")
-    .select("id, token, status, responsavel_assinatura_id, condicao_pagamento")
+    .select("id, token, status, responsavel_assinatura_id, condicao_pagamento, conteudo, texto_editado_em, texto_editado_por")
     .eq("negocio_id", id)
     .maybeSingle();
   const { data: statusPagamento } = contrato

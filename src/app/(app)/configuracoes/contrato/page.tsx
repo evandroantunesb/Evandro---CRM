@@ -30,6 +30,10 @@ export default async function ConfigContrato() {
         são preenchidos automaticamente. Condições fixas (garantias, prazos, foro, dados da empresa) ficam escritas no
         próprio texto. Só são aceitos os campos da lista abaixo.
       </p>
+      <p className="text-sm text-zinc-600">
+        Formatação: comece a linha com <code>## </code> para título, use <code>**negrito**</code> e comece a linha com{" "}
+        <code>- </code> para item de lista.
+      </p>
       <Cartao titulo="Campos disponíveis">
         <div className="flex flex-wrap gap-2">
           {PLACEHOLDERS_CONTRATO.map((p) => (
