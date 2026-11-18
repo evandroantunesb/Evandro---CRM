@@ -6,6 +6,15 @@
 - **Sessão de 18/11/2026:** item 2 do roadmap redefinido pelo Evandro: **sem assinatura eletrônica** (nenhum serviço privado assina "gov.br"; o cliente assina como conseguir). No lugar, **contrato: conferir, editar e enviar** (seção própria abaixo), na branch `feat/contrato-editar` (worktree `C:\dev\crm-contrato-editar`). Modelo de contrato genérico adaptado para o Evandro em `C:\dev\modelos\contrato-modelo.md` (fora do repositório; só vale depois desta entrega).
 - Pendências do item 1 (procuração): o Evandro cola o texto do modelo e confere um PDF real com o logo.
 
+## Avisos externos: resumo diário por e-mail (18/11/2026, item 3 do roadmap)
+
+Plano em `docs/superpowers/plans/2026-11-18-resumo-diario-email.md`; prévia aprovada pelo Evandro (https://claude.ai/artifact/FHzSsGsk4EyewgNXBD12eC). Decisões de 18/11/2026: só a equipe; só os avisos que pedem ação (lead atribuído, handoff recebido/devolvido, desconto solicitado/decidido, pagamento confirmado/devolvido, justificativa de atraso pedida/cobrada); um resumo por dia às 7h30 de Brasília, só com o que ainda não foi visto no sininho; cada pessoa desliga em "Meu perfil" (ligado por padrão); envio pelo Resend com domínio próprio.
+
+- Migration `20261216100000_resumo_diario_email.sql`: `preferencias_resumo_email` (sem linha = ligado; `definir_resumo_email` só a própria), `resumos_email_envios` (um por membro e dia; só service role) e as funções do agendador `resumo_email_pendentes`, `reservar_resumo_email` e `concluir_resumo_email` (só service role).
+- Rota `/api/cron/resumo-diario` (Cron da Vercel em `vercel.json`, `30 10 * * *` UTC; no plano gratuito pode atrasar até ~1 h), protegida por `CRON_SECRET`; `/api/cron` entrou nas rotas públicas. Envio pela API HTTP do Resend, sem dependência nova. Sem `RESEND_API_KEY`, `EMAIL_REMETENTE` ou `CRON_SECRET` na Vercel, nada é enviado.
+- **Pendente do Evandro:** verificar o domínio de envio no Resend e criar, na Vercel (Production), `RESEND_API_KEY`, `EMAIL_REMETENTE` e `CRON_SECRET`.
+- Testes: `tests/resumo-email.test.ts` (montagem e autorização) e `tests/resumo-email-db.test.ts` (banco e envio com remetente falso).
+
 ## Contrato: conferir, editar e enviar (18/11/2026)
 
 Desenho em `docs/superpowers/specs/2026-11-18-contrato-conferir-editar-design.md`, plano em `docs/superpowers/plans/2026-11-18-contrato-conferir-editar.md`; prévia aprovada no canvas "Raion — Nova interface" (linha "Contrato: conferir, editar e enviar": `ContratoNegocio`, `ContratoEnderecoInstalacao`, `ContratoPdfFormatado`). Decisões do Evandro: edição dentro do CRM (sem Word); editam o responsável atual pelo negócio (vendedor), o gestor e o admin, só em rascunho; cada edição no histórico; valor por extenso; logo do PDF como está.

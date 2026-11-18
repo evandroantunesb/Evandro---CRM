@@ -11,6 +11,7 @@ import { criarClienteAdmin } from "@/lib/supabase/admin";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { FormularioPerfil } from "./formulario";
 import { FotoPerfil } from "./foto-perfil";
+import { ResumoEmail } from "./resumo-email";
 
 const MENSAGENS_GOOGLE: Record<string, { texto: string; erro: boolean }> = {
   conectado: { texto: "Conta do Google conectada.", erro: false },
@@ -39,6 +40,17 @@ export default async function Perfil({ searchParams }: PageProps<"/perfil">) {
     emailGoogleConectado = data?.email_google ?? null;
   }
 
+  // Resumo diário por e-mail: sem linha na preferência, fica ligado.
+  let resumoEmailLigado = true;
+  if (sessao.atual) {
+    const { data } = await (await criarClienteServidor())
+      .from("preferencias_resumo_email")
+      .select("ligado")
+      .eq("membro_id", sessao.atual.membroId)
+      .maybeSingle();
+    resumoEmailLigado = data?.ligado ?? true;
+  }
+
   return (
     <div className="mx-auto flex max-w-xl flex-col gap-4">
       <CabecalhoPagina
@@ -63,6 +75,13 @@ export default async function Perfil({ searchParams }: PageProps<"/perfil">) {
           Trocar minha senha →
         </Link>
       </Cartao>
+      {sessao.atual && (
+        <div id="resumo-email" className="scroll-mt-24">
+          <Cartao titulo="Avisos por e-mail">
+            <ResumoEmail ligadoInicial={resumoEmailLigado} />
+          </Cartao>
+        </div>
+      )}
       {sessao.atual && integracaoConfigurada() && (
         <Cartao titulo="Google Agenda">
           <div className="flex flex-col gap-3">
