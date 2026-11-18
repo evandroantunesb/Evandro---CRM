@@ -3,6 +3,7 @@ import { DocumentoFormatado } from "@/components/documento-formatado";
 import { LogoRaion } from "@/components/marca";
 import { Selo } from "@/components/ui";
 import { contratoProntoParaCliente } from "@/lib/contrato";
+import { SELECAO_CONTRATO_PUBLICO } from "@/lib/contrato-publico";
 import { criarClienteAdmin } from "@/lib/supabase/admin";
 import { ROTULO_STATUS_CONTRATO, type StatusContrato } from "@/lib/tipos";
 
@@ -15,7 +16,7 @@ export default async function ContratoPublico({ params }: PageProps<"/contrato/[
 
   const { data: contrato } = await admin
     .from("contratos")
-    .select("conteudo, status, negocios(titulo)")
+    .select(SELECAO_CONTRATO_PUBLICO)
     .eq("token", token)
     .maybeSingle();
   if (!contrato) notFound();
