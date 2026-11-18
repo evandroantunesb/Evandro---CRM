@@ -162,7 +162,7 @@ export async function carregarFicha(atual: Vinculo, id: string, abaParam: string
 
   const { data: contrato } = await supabase
     .from("contratos")
-    .select("id, token, status, responsavel_assinatura_id, condicao_pagamento")
+    .select("id, token, status, responsavel_assinatura_id, condicao_pagamento, conteudo, texto_editado_em, texto_editado_por")
     .eq("negocio_id", id)
     .maybeSingle();
   const { data: statusPagamento } = contrato

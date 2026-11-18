@@ -217,7 +217,19 @@ export function AbaProposta({ ficha }: { ficha: Ficha }) {
                       ? mensagemPendenciasDocumentos(pendenciasDocumentos)
                       : null)
               }
-              contrato={contrato ? { token: contrato.token, status: contrato.status as StatusContrato } : null}
+              contrato={
+                contrato
+                  ? {
+                      token: contrato.token,
+                      status: contrato.status as StatusContrato,
+                      conteudo: contrato.conteudo,
+                      editadoEm: contrato.texto_editado_em,
+                      editadoPorNome: contrato.texto_editado_por ? nomes.membro(contrato.texto_editado_por) : null,
+                    }
+                  : null
+              }
+              cliente={{ nome: contato?.nome ?? null, telefone: contato?.telefone ?? null }}
+              podeEditar={atual.papel === "admin" || atual.papel === "gestor" || (atual.papel === "vendedor" && negocio.responsavel_id === atual.membroId)}
               escolha={
                 escolhaCondicao
                   ? { versao: escolhaCondicao.emissao.versao, validadeAte: escolhaCondicao.emissao.validadeAte, opcoes: escolhaCondicao.opcoes }

@@ -57,6 +57,9 @@ export function descreverAtividade(tipo: string, dadosJson: Json, nomes: Nomes):
     case "pagamento_estornado":
       return `Confirmação de pagamento estornada${d.motivo ? `: ${d.motivo}` : ""}`;
     // Pagamento informado pelo vendedor, com comprovante (20261113100000_aviso_pagamento_vendedor.sql).
+    // Texto do contrato ajustado à mão no rascunho (20261213100000_contrato_texto_editado.sql).
+    case "contrato_texto_editado":
+      return "Editou o texto do contrato";
     case "pagamento_informado":
       return `Pagamento informado${typeof d.data_pagamento === "string" ? ` (pago em ${formatarDataIso(d.data_pagamento)})` : ""}, aguardando confirmação`;
     case "pagamento_aviso_devolvido":

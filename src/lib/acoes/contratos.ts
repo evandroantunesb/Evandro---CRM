@@ -25,6 +25,29 @@ export async function salvarModeloContrato(_: ResultadoAcao, formData: FormData)
   return { ok: true, mensagem: "Modelo salvo." };
 }
 
+const esquemaTextoContrato = z.object({
+  negocioId: z.string().uuid(),
+  conteudo: z.string().max(60000, "O texto do contrato passou do limite de 60.000 caracteres."),
+});
+
+/**
+ * Ajusta à mão o texto do contrato em rascunho. Quem pode (admin, gestor que vê o negócio, vendedor responsável),
+ * o rascunho, o texto válido, a marca "editado à mão" e o histórico ficam no banco (`editar_texto_contrato`).
+ */
+export async function editarTextoContrato(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  const { atual } = await exigirPapel(...NEGOCIOS);
+  if (!pode(atual.papel, PROPOSTA_E_CONTRATO)) return { ok: false, mensagem: "SDR não pode editar o contrato." };
+  const dados = esquemaTextoContrato.safeParse({ negocioId: formData.get("negocioId"), conteudo: formData.get("conteudo") });
+  if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
+
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.rpc("editar_texto_contrato", { p_negocio_id: dados.data.negocioId, p_conteudo: dados.data.conteudo });
+  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível salvar o texto do contrato.") };
+
+  revalidatePath(`/negocios/${dados.data.negocioId}`);
+  return { ok: true, mensagem: "Texto do contrato salvo." };
+}
+
 /** Gera (ou regera, enquanto ainda for rascunho) o contrato do negócio a partir do modelo da empresa. */
 export async function gerarContrato(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
   const { atual } = await exigirPapel(...NEGOCIOS);
