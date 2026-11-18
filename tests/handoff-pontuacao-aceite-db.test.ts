@@ -17,7 +17,7 @@ import { join } from "node:path";
 import { Client } from "pg";
 import { urlBancoLocal } from "./banco-local";
 import { beforeAll, describe, expect, it } from "vitest";
-import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato, gerarContratoTeste } from "./ajuda";
 
 const NOMES = [
   "admin",
@@ -389,11 +389,7 @@ describe("pontuação do repasse", () => {
     };
     await status("ganho");
     await anexarDocumentosContrato(n.negocioId);
-    const { data: contrato, error: erroContrato } = await u.closer.cliente
-      .from("contratos")
-      .insert({ empresa_id: empresa, negocio_id: n.negocioId, conteudo: "Contrato B1a" })
-      .select("id")
-      .single();
+    const { data: contrato, error: erroContrato } = await gerarContratoTeste(u.closer.cliente, { empresa_id: empresa, negocio_id: n.negocioId, conteudo: "Contrato B1a" });
     if (erroContrato) throw erroContrato;
     const assinar = async (s: "assinado" | "aguardando_assinatura") => {
       const { error } = await u.closer.cliente.from("contratos").update({ status: s }).eq("id", contrato!.id);

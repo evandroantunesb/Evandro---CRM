@@ -18,7 +18,7 @@ import { randomUUID } from "node:crypto";
 import { Client } from "pg";
 import { urlBancoLocal } from "./banco-local";
 import { beforeAll, describe, expect, it } from "vitest";
-import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato, gerarContratoTeste } from "./ajuda";
 
 
 async function noBanco(sql: string, params: unknown[] = []) {
@@ -118,11 +118,7 @@ async function criarVenda(
     .eq("id", neg!.id);
   if (ganho.error) throw ganho.error;
   await anexarDocumentosContrato(neg!.id);
-  const { data: contrato, error: erroContrato } = await responsavel.cliente
-    .from("contratos")
-    .insert({ empresa_id: emp, negocio_id: neg!.id, conteudo: "Contrato de teste" })
-    .select("id")
-    .single();
+  const { data: contrato, error: erroContrato } = await gerarContratoTeste(responsavel.cliente, { empresa_id: emp, negocio_id: neg!.id, conteudo: "Contrato de teste" });
   if (erroContrato) throw erroContrato;
   const assinado = await responsavel.cliente
     .from("contratos")

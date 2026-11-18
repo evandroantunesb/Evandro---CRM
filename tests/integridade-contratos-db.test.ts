@@ -2,12 +2,13 @@
  * Integridade de contratos na escrita direta pela API (20261015100000_integridade_contratos.sql).
  * Quem tem acesso financeiro (admin, gestor, vendedor) não grava contrato de uma empresa em outra,
  * não troca empresa/negócio, não cria contrato já assinado e não escolhe o beneficiário da assinatura;
- * o fluxo legítimo (rascunho -> upsert do texto -> assinatura por UPDATE -> confirmação) segue igual.
+ * o fluxo legítimo (gerar -> gerar de novo -> assinatura por UPDATE -> confirmação) segue igual. Desde
+ * 20261215100000 o contrato nasce pela geração (`gerarContratoTeste`); `insert` direto é recusado de qualquer jeito.
  */
 import { Client } from "pg";
 import { urlBancoLocal } from "./banco-local";
 import { beforeAll, describe, expect, it } from "vitest";
-import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato, gerarContratoTeste } from "./ajuda";
 
 
 type Empresa = { id: string; funil: string; etapa: string; contato: string };
@@ -53,12 +54,9 @@ const eventosDo = async (negocioId: string) =>
 
 async function rascunho(u: Usuario, e: Empresa, negocioId: string) {
   await anexarDocumentosContrato(negocioId);
-  const r = await u.cliente
-    .from("contratos")
-    .insert({ empresa_id: e.id, negocio_id: negocioId, conteudo: "Contrato de teste", criado_por: m(e, u) })
-    .select("id")
-    .single();
+  const r = await gerarContratoTeste(u.cliente, { empresa_id: e.id, negocio_id: negocioId, conteudo: "Contrato de teste" });
   expect(r.error).toBeNull();
+  expect(r.data!.criado_por).toBe(m(e, u));
   return r.data!.id as string;
 }
 
@@ -157,12 +155,8 @@ describe("fluxo legítimo continua igual", () => {
     const n = await criarNegocio(A, "ic-fluxo", vendedorA);
     const id = await rascunho(vendedorA, A, n);
 
-    // A geração da interface usa upsert por negocio_id: no rascunho regrava o texto sem trocar a chave.
-    const up = await vendedorA.cliente
-      .from("contratos")
-      .upsert({ empresa_id: A.id, negocio_id: n, conteudo: "Texto regerado", criado_por: m(A, vendedorA), atualizado_por: m(A, vendedorA) }, { onConflict: "negocio_id" })
-      .select("id, conteudo")
-      .single();
+    // Gerar de novo no rascunho regrava o texto sem trocar a chave.
+    const up = await gerarContratoTeste(vendedorA.cliente, { empresa_id: A.id, negocio_id: n, conteudo: "Texto regerado" });
     expect(up.error).toBeNull();
     expect(up.data).toMatchObject({ id, conteudo: "Texto regerado" });
 
@@ -180,7 +174,9 @@ describe("fluxo legítimo continua igual", () => {
   it("admin cria e edita o contrato de um vendedor da própria empresa", async () => {
     const n = await criarNegocio(A, "ic-gestor-cria", vendedorA);
     const id = await rascunho(adminA, A, n);
-    expect((await adminA.cliente.from("contratos").update({ conteudo: "Editado pelo admin" }).eq("id", id)).error).toBeNull();
+    // Desde 20261215100000 o texto muda pelo "Editar texto" (com marca e histórico), não por UPDATE direto.
+    expect((await adminA.cliente.from("contratos").update({ conteudo: "Direto" }).eq("id", id)).error).not.toBeNull();
+    expect((await adminA.cliente.rpc("editar_texto_contrato", { p_negocio_id: n, p_conteudo: "Editado pelo admin" })).error).toBeNull();
     expect((await contratoNoBanco(id)).conteudo).toBe("Editado pelo admin");
   });
 });

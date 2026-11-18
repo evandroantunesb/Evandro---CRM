@@ -12,7 +12,7 @@ import { randomUUID } from "node:crypto";
 import { Client } from "pg";
 import { urlBancoLocal } from "./banco-local";
 import { beforeAll, describe, expect, it } from "vitest";
-import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato, gerarContratoTeste } from "./ajuda";
 
 
 let admin: Usuario;
@@ -135,11 +135,7 @@ async function criarVenda(
   const ganho = await ator.cliente.from("negocios").update({ status: "ganho" }).eq("id", negocioId);
   if (ganho.error) throw ganho.error;
   await anexarDocumentosContrato(negocioId);
-  const { data: contrato, error: erroContrato } = await ator.cliente
-    .from("contratos")
-    .insert({ empresa_id: emp, negocio_id: negocioId, conteudo: "Contrato de teste" })
-    .select("id")
-    .single();
+  const { data: contrato, error: erroContrato } = await gerarContratoTeste(ator.cliente, { empresa_id: emp, negocio_id: negocioId, conteudo: "Contrato de teste" });
   if (erroContrato) throw erroContrato;
   const assinado = await ator.cliente
     .from("contratos")

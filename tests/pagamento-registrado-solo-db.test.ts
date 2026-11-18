@@ -5,7 +5,7 @@
  * os dois caminhos nunca deixam dois pagamentos ativos no mesmo negócio.
  */
 import { beforeAll, describe, expect, it } from "vitest";
-import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato, gerarContratoTeste } from "./ajuda";
 
 type Empresa = { id: string; funil: string; etapa: string; contato: string; motivoPerda: string };
 
@@ -57,7 +57,7 @@ async function criarNegocio(e: Empresa, titulo: string, responsavel: Usuario) {
 
 async function gerarContrato(e: Empresa, negocioId: string, u: Usuario) {
   await anexarDocumentosContrato(negocioId);
-  const { data, error } = await u.cliente.from("contratos").insert({ empresa_id: e.id, negocio_id: negocioId, conteudo: "Contrato de teste" }).select("id").single();
+  const { data, error } = await gerarContratoTeste(u.cliente, { empresa_id: e.id, negocio_id: negocioId, conteudo: "Contrato de teste" });
   if (error) throw error;
   return data!.id as string;
 }

@@ -5,7 +5,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { beforeAll, describe, expect, it } from "vitest";
-import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato, gerarContratoTeste } from "./ajuda";
 
 const BUCKET = "comprovantes-pagamento";
 
@@ -93,11 +93,7 @@ async function criarContrato(assinar = true, responsavel: Usuario = vendedor) {
     .single();
   if (error) throw error;
   await anexarDocumentosContrato(negocio!.id);
-  const { data: contrato, error: e2 } = await responsavel.cliente
-    .from("contratos")
-    .insert({ empresa_id: empresa, negocio_id: negocio!.id, conteudo: "Contrato de teste" })
-    .select("id")
-    .single();
+  const { data: contrato, error: e2 } = await gerarContratoTeste(responsavel.cliente, { empresa_id: empresa, negocio_id: negocio!.id, conteudo: "Contrato de teste" });
   if (e2) throw e2;
   if (assinar) {
     const { error: e3 } = await responsavel.cliente.from("contratos").update({ status: "assinado" }).eq("id", contrato!.id);

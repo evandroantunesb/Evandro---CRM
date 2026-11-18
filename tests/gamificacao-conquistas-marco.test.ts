@@ -9,7 +9,7 @@
  * ausência de dependência de `gamification_rules`/`point_ledger`.
  */
 import { beforeAll, describe, expect, it } from "vitest";
-import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato, gerarContratoTeste } from "./ajuda";
 
 let sdr1: Usuario;
 let closer: Usuario;
@@ -80,11 +80,7 @@ async function marcarStatus(negocioId: string, status: "ganho" | "perdido" | "ab
 
 async function criarEAssinarContrato(negocioId: string, cliente: Usuario["cliente"]) {
   await anexarDocumentosContrato(negocioId);
-  const { data: contrato, error } = await cliente
-    .from("contratos")
-    .insert({ empresa_id: empresa, negocio_id: negocioId, conteudo: "Contrato de teste" })
-    .select("id")
-    .single();
+  const { data: contrato, error } = await gerarContratoTeste(cliente, { empresa_id: empresa, negocio_id: negocioId, conteudo: "Contrato de teste" });
   if (error) throw error;
   const { error: erroAssinar } = await cliente.from("contratos").update({ status: "assinado" }).eq("id", contrato!.id);
   if (erroAssinar) throw erroAssinar;
@@ -467,9 +463,9 @@ describe("marco_contagem: concorrência", () => {
     const negocioA = await criarNegocio("Concorrência A", membro[closer2.id]);
     const negocioB = await criarNegocio("Concorrência B", membro[closer2.id]);
     await anexarDocumentosContrato(negocioA);
-    const { data: contratoA } = await closer2.cliente.from("contratos").insert({ empresa_id: empresa, negocio_id: negocioA, conteudo: "x" }).select("id").single();
+    const { data: contratoA } = await gerarContratoTeste(closer2.cliente, { empresa_id: empresa, negocio_id: negocioA, conteudo: "x" });
     await anexarDocumentosContrato(negocioB);
-    const { data: contratoB } = await closer2.cliente.from("contratos").insert({ empresa_id: empresa, negocio_id: negocioB, conteudo: "x" }).select("id").single();
+    const { data: contratoB } = await gerarContratoTeste(closer2.cliente, { empresa_id: empresa, negocio_id: negocioB, conteudo: "x" });
 
     const resultados = await Promise.all([
       closer2.cliente.from("contratos").update({ status: "assinado" }).eq("id", contratoA!.id),

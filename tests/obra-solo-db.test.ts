@@ -10,7 +10,7 @@ import { Client } from "pg";
 import type { Database } from "@/lib/supabase/database.types";
 import { beforeAll, describe, expect, it } from "vitest";
 import { urlBancoLocal } from "./banco-local";
-import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato, gerarContratoTeste } from "./ajuda";
 
 async function noBanco(sql: string, params: unknown[] = []) {
   const banco = new Client({ connectionString: urlBancoLocal() });
@@ -52,7 +52,7 @@ async function criarObra(empresa: string, dono: Usuario, titulo: string): Promis
   ok(await dono.cliente.from("negocios").update({ status: "ganho" }).eq("id", neg!.id), "ganho");
   await anexarDocumentosContrato(neg!.id);
   const { data: contrato } = ok(
-    await dono.cliente.from("contratos").insert({ empresa_id: empresa, negocio_id: neg!.id, conteudo: "Contrato de teste" }).select("id").single(),
+    await gerarContratoTeste(dono.cliente, { empresa_id: empresa, negocio_id: neg!.id, conteudo: "Contrato de teste" }),
     "contrato",
   );
   ok(await dono.cliente.from("contratos").update({ status: "assinado" }).eq("id", contrato!.id), "assinatura");

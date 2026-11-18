@@ -5,7 +5,7 @@
  * Só autorização de leitura: os fluxos de escrita são cobertos pelas suítes de pagamento.
  */
 import { beforeAll, describe, expect, it } from "vitest";
-import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato, gerarContratoTeste } from "./ajuda";
 
 type Empresa = { id: string; funil: string; etapa: string; contato: string };
 
@@ -115,11 +115,7 @@ beforeAll(async () => {
   await equipe(pro, proGestor, [proVendedor, proSdr]);
   negocioProSdr = await criarNegocio(pro, "Venda Pro que vai para o SDR", proVendedor);
   await anexarDocumentosContrato(negocioProSdr);
-  const { data: contrato } = await proVendedor.cliente
-    .from("contratos")
-    .insert({ empresa_id: pro.id, negocio_id: negocioProSdr, conteudo: "Contrato de teste" })
-    .select("id")
-    .single();
+  const { data: contrato } = await gerarContratoTeste(proVendedor.cliente, { empresa_id: pro.id, negocio_id: negocioProSdr, conteudo: "Contrato de teste" });
   sem(await proVendedor.cliente.from("contratos").update({ status: "assinado" }).eq("id", contrato!.id).select("id"));
   sem(await proGestor.cliente.rpc("confirmar_pagamento", { p_contrato_id: contrato!.id }));
   sem(await proGestor.cliente.rpc("estornar_confirmacao_pagamento", { p_contrato_id: contrato!.id, p_motivo: MOTIVO_PRO }));

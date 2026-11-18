@@ -5,7 +5,7 @@
  * Precisa do Supabase local (roda no CI). Os testes seguem em ordem (cada um parte do estado do anterior).
  */
 import { beforeAll, describe, expect, it } from "vitest";
-import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato, gerarContratoTeste } from "./ajuda";
 
 let admin: Usuario;
 let vendedor: Usuario;
@@ -51,11 +51,7 @@ async function venderAteObra(negocioId: string): Promise<string> {
   const ganho = await vendedor.cliente.from("negocios").update({ status: "ganho" }).eq("id", negocioId);
   if (ganho.error) throw ganho.error;
   await anexarDocumentosContrato(negocioId);
-  const { data: contrato, error } = await vendedor.cliente
-    .from("contratos")
-    .insert({ empresa_id: empresa, negocio_id: negocioId, conteudo: "Contrato de teste" })
-    .select("id")
-    .single();
+  const { data: contrato, error } = await gerarContratoTeste(vendedor.cliente, { empresa_id: empresa, negocio_id: negocioId, conteudo: "Contrato de teste" });
   if (error) throw error;
   const assinado = await vendedor.cliente.from("contratos").update({ status: "assinado" }).eq("id", contrato!.id);
   if (assinado.error) throw assinado.error;

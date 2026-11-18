@@ -6,7 +6,7 @@
  */
 import { Client } from "pg";
 import { beforeAll, describe, expect, it } from "vitest";
-import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato, gerarContratoTeste } from "./ajuda";
 import { urlBancoLocal } from "./banco-local";
 
 async function noBanco(sql: string, params: unknown[] = []) {
@@ -52,11 +52,7 @@ async function criarObra(titulo: string): Promise<string> {
   const ganho = await vendedor.cliente.from("negocios").update({ status: "ganho" }).eq("id", neg!.id);
   if (ganho.error) throw ganho.error;
   await anexarDocumentosContrato(neg!.id);
-  const { data: contrato, error: e2 } = await vendedor.cliente
-    .from("contratos")
-    .insert({ empresa_id: empresa, negocio_id: neg!.id, conteudo: "Contrato de teste" })
-    .select("id")
-    .single();
+  const { data: contrato, error: e2 } = await gerarContratoTeste(vendedor.cliente, { empresa_id: empresa, negocio_id: neg!.id, conteudo: "Contrato de teste" });
   if (e2) throw e2;
   const assinado = await vendedor.cliente.from("contratos").update({ status: "assinado" }).eq("id", contrato!.id);
   if (assinado.error) throw assinado.error;

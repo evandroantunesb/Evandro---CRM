@@ -42,7 +42,15 @@ test.beforeAll(async () => {
   };
   passo(await admin.from("negocios").update({ status: "ganho" }).eq("id", neg.id), "ganho");
   await anexarDocumentosContrato(empresa.id, neg.id);
-  const { data: contrato, error: ec } = await admin.from("contratos").insert({ empresa_id: empresa.id, negocio_id: neg.id, conteudo: "Contrato E2E" }).select("id").single();
+  // O texto do contrato vem do servidor (service role) e quem gera é o admin (20261215100000_contrato_texto_trava.sql).
+  const { data: geracao, error: eg } = await s
+    .from("contratos_geracoes")
+    .insert({ empresa_id: empresa.id, negocio_id: neg.id, membro_id: membro.id, conteudo: "Contrato E2E" })
+    .select("id")
+    .single();
+  if (eg || !geracao) throw eg ?? new Error("texto do contrato");
+  passo(await admin.rpc("gerar_contrato_com_condicao", { p_negocio_id: neg.id, p_geracao_id: geracao.id }), "contrato gerado");
+  const { data: contrato, error: ec } = await s.from("contratos").select("id").eq("negocio_id", neg.id).single();
   if (ec || !contrato) throw ec ?? new Error("contrato");
   passo(await admin.from("contratos").update({ status: "assinado" }).eq("id", contrato.id), "assinatura");
   passo(await admin.rpc("confirmar_pagamento", { p_contrato_id: contrato.id }), "pagamento");

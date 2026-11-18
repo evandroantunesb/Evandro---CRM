@@ -10,7 +10,7 @@
 import { Client } from "pg";
 import { urlBancoLocal } from "./banco-local";
 import { beforeAll, describe, expect, it } from "vitest";
-import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato, gerarContratoTeste } from "./ajuda";
 
 let admin: Usuario;
 let gestor: Usuario;
@@ -89,11 +89,7 @@ async function ganhar(negocioId: string, cliente: Usuario["cliente"]) {
 
 async function assinar(negocioId: string, cliente: Usuario["cliente"]) {
   await anexarDocumentosContrato(negocioId);
-  const { data: contrato, error } = await cliente
-    .from("contratos")
-    .insert({ empresa_id: empresa, negocio_id: negocioId, conteudo: "Contrato de teste" })
-    .select("id")
-    .single();
+  const { data: contrato, error } = await gerarContratoTeste(cliente, { empresa_id: empresa, negocio_id: negocioId, conteudo: "Contrato de teste" });
   if (error) throw error;
   const { error: erroAssinar } = await cliente.from("contratos").update({ status: "assinado" }).eq("id", contrato!.id);
   if (erroAssinar) throw erroAssinar;

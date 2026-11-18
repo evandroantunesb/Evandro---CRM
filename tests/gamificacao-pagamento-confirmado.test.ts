@@ -7,7 +7,7 @@
  * (20261001250000_gamificacao_pagamento_confirmado.sql).
  */
 import { beforeAll, describe, expect, it } from "vitest";
-import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato } from "./ajuda";
+import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato, gerarContratoTeste } from "./ajuda";
 
 let closer: Usuario;
 let closer2: Usuario;
@@ -74,11 +74,7 @@ async function criarNegocio(titulo: string, responsavelId: string) {
 
 async function criarEAssinarContrato(negocioId: string, cliente: Usuario["cliente"]) {
   await anexarDocumentosContrato(negocioId);
-  const { data: contrato, error } = await cliente
-    .from("contratos")
-    .insert({ empresa_id: empresa, negocio_id: negocioId, conteudo: "Contrato de teste" })
-    .select("id")
-    .single();
+  const { data: contrato, error } = await gerarContratoTeste(cliente, { empresa_id: empresa, negocio_id: negocioId, conteudo: "Contrato de teste" });
   if (error) throw error;
   const { error: erroAssinar } = await cliente.from("contratos").update({ status: "assinado" }).eq("id", contrato!.id);
   if (erroAssinar) throw erroAssinar;
@@ -89,11 +85,7 @@ describe("confirmar_pagamento", () => {
   it("contrato não assinado: erro", async () => {
     const negocioId = await criarNegocio("Sem contrato", membro[closer.id]);
     await anexarDocumentosContrato(negocioId);
-    const { data: contrato } = await closer.cliente
-      .from("contratos")
-      .insert({ empresa_id: empresa, negocio_id: negocioId, conteudo: "Rascunho" })
-      .select("id")
-      .single();
+    const { data: contrato } = await gerarContratoTeste(closer.cliente, { empresa_id: empresa, negocio_id: negocioId, conteudo: "Rascunho" });
 
     const { error } = await gestor.cliente.rpc("confirmar_pagamento", { p_contrato_id: contrato!.id });
     expect(error?.message).toContain("assinado");

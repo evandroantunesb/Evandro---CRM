@@ -7,7 +7,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { salvarDadosClienteComCliente } from "@/lib/negocios-gravacao";
 import type { SupabaseServidor } from "@/lib/supabase/server";
-import { CLIENTE_CONTRATO, anexarDocumentosContrato, criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
+import { CLIENTE_CONTRATO, anexarDocumentosContrato, criarUsuario, servico, sufixo, type Usuario, gerarContratoTeste } from "./ajuda";
 
 let vendedor: Usuario;
 let empresa: string;
@@ -51,7 +51,7 @@ async function negocioCom(contato: Record<string, unknown>) {
 
 const inserirComoVendedor = async (negocioId: string) => {
   await anexarDocumentosContrato(negocioId);
-  return vendedor.cliente.from("contratos").insert({ empresa_id: empresa, negocio_id: negocioId, conteudo: "Contrato" }).select("id, status").single();
+  return gerarContratoTeste(vendedor.cliente, { empresa_id: empresa, negocio_id: negocioId, conteudo: "Contrato" });
 };
 
 describe("trava no banco: contrato só com os dados do cliente", () => {
