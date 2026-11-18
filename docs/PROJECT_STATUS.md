@@ -14,6 +14,7 @@ Plano em `docs/superpowers/plans/2026-11-18-resumo-diario-email.md`; prévia apr
 - Rota `/api/cron/resumo-diario` (Cron da Vercel em `vercel.json`, `30 10 * * *` UTC; no plano gratuito pode atrasar até ~1 h), protegida por `CRON_SECRET`; `/api/cron` entrou nas rotas públicas. Envio pela API HTTP do Resend, sem dependência nova. Sem `RESEND_API_KEY`, `EMAIL_REMETENTE` ou `CRON_SECRET` na Vercel, nada é enviado.
 - **Pendente do Evandro:** verificar o domínio de envio no Resend e criar, na Vercel (Production), `RESEND_API_KEY`, `EMAIL_REMETENTE` e `CRON_SECRET`.
 - Testes: `tests/resumo-email.test.ts` (montagem e autorização) e `tests/resumo-email-db.test.ts` (banco e envio com remetente falso).
+- **Produção:** PR #410; migration aplicada em 18/11/2026 antes do merge pelo `banco-producao.yml` (tag `migracao-pr410-aed658f`; dry-run 44423487644 listou só ela; aplicação 44423884361), autorizada e aprovada pelo Evandro no `producao-banco`.
 
 ## Contrato: conferir, editar e enviar (18/11/2026)
 
