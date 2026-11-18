@@ -2,11 +2,11 @@
 
 import { useActionState, useState } from "react";
 import { DocumentoFormatado } from "@/components/documento-formatado";
+import { EnvioContrato, type ClienteContrato } from "./envio-contrato";
 import { Botao, Mensagem, Selecao } from "@/components/ui";
 import { atualizarStatusContrato, editarTextoContrato, gerarContrato } from "@/lib/acoes/contratos";
 import { MENSAGEM_PRECO_DESATUALIZADO } from "@/lib/calculo-preco";
 import type { CondicaoRegistrada, OpcaoEscolha } from "@/lib/condicao-escolhida";
-import { linkWhatsAppContrato } from "@/lib/contrato-envio";
 import { formatarDataIso, formatarMoeda } from "@/lib/formatacao";
 import { ROTULO_STATUS_CONTRATO, STATUS_CONTRATO, type ResultadoAcao, type StatusContrato } from "@/lib/tipos";
 
@@ -19,8 +19,6 @@ export type ContratoSalvo = {
   editadoEm: string | null;
   editadoPorNome: string | null;
 };
-
-type Cliente = { nome: string | null; telefone: string | null };
 
 const AVISO_PERDER_EDICOES = "O texto volta ao modelo e você perde as edições feitas à mão. Gerar de novo?";
 
@@ -41,7 +39,7 @@ export function Contrato({
   contrato: ContratoSalvo | null;
   siteUrl: string;
   /** Contato do negócio: o WhatsApp abre a conversa dele. */
-  cliente: Cliente;
+  cliente: ClienteContrato;
   /** Admin, gestor ou o vendedor responsável (a barreira real é `editar_texto_contrato`). */
   podeEditar?: boolean;
   /** Valor do negócio diferente do preço do cálculo: o servidor não gera o contrato nesse estado. */
@@ -211,44 +209,6 @@ function MarcaEditado({ editadoEm, nome }: { editadoEm: string; nome: string | n
     <p className="self-start rounded-full bg-zinc-100 px-3 py-0.5 text-xs text-zinc-700" data-testid="contrato-editado">
       Texto editado à mão{nome ? ` · ${nome}` : ""}, {quando}
     </p>
-  );
-}
-
-/** Telefone com pelo menos 10 dígitos: o mesmo critério de `linkWhatsApp`. */
-const telefoneValido = (telefone: string | null) => (telefone ?? "").replace(/\D/g, "").length >= 10;
-
-function EnvioContrato({ token, siteUrl, cliente }: { token: string; siteUrl: string; cliente: Cliente }) {
-  const [copiado, setCopiado] = useState(false);
-  const link = `${siteUrl}/contrato/${token}`;
-  return (
-    <div className="flex flex-col gap-1">
-      <div className="flex flex-wrap gap-2">
-        <a href={linkWhatsAppContrato(cliente, link)} target="_blank" rel="noopener noreferrer">
-          <Botao type="button">Enviar no WhatsApp</Botao>
-        </a>
-        <a href={`/contrato/${token}/pdf`} target="_blank" rel="noopener noreferrer">
-          <Botao type="button" variante="secundario">
-            Baixar PDF
-          </Botao>
-        </a>
-        <Botao
-          type="button"
-          variante="secundario"
-          onClick={() => {
-            navigator.clipboard.writeText(link);
-            setCopiado(true);
-            setTimeout(() => setCopiado(false), 2000);
-          }}
-        >
-          {copiado ? "Copiado!" : "Copiar link"}
-        </Botao>
-      </div>
-      {telefoneValido(cliente.telefone) && (
-        <p className="text-xs text-texto-2">
-          Abre a conversa com {cliente.nome ?? "o cliente"} · {cliente.telefone}
-        </p>
-      )}
-    </div>
   );
 }
 
