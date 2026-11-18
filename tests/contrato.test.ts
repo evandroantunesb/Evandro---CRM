@@ -215,3 +215,30 @@ describe("permissões", () => {
     expect(fonte("src", "app", "contrato", "[token]", "page.tsx")).toContain("contratoProntoParaCliente(contrato.conteudo)");
   });
 });
+
+describe("campos novos (18/11/2026)", () => {
+  const negocio = (extra: Partial<FontesContrato["negocio"]>) => ({ ...fontes().negocio, ...extra });
+
+  it("valor por extenso; sem valor fica vazio", () => {
+    expect(montarDadosContrato(fontes({ negocio: negocio({ valor: 42500 }) })).negocio_valor_extenso).toBe("quarenta e dois mil e quinhentos reais");
+    expect(montarDadosContrato(fontes({ negocio: negocio({ valor: null }) })).negocio_valor_extenso).toBe("");
+  });
+
+  it("tipo do telhado vem do negócio", () => {
+    expect(montarDadosContrato(fontes({ negocio: negocio({ tipo_telhado: "metálico" }) })).tipo_telhado).toBe("metálico");
+    expect(montarDadosContrato(fontes({ negocio: negocio({ tipo_telhado: null }) })).tipo_telhado).toBe("");
+  });
+
+  it("endereço da instalação: o do negócio; vazio, o do cliente com cidade/UF; sem nenhum, vazio", () => {
+    expect(montarDadosContrato(fontes({ negocio: negocio({ endereco_instalacao: "Sítio Boa Vista, km 3" }) })).endereco_instalacao).toBe(
+      "Sítio Boa Vista, km 3",
+    );
+    expect(montarDadosContrato(fontes({ negocio: negocio({ endereco_instalacao: "  " }) })).endereco_instalacao).toBe("Rua A, 10, Cascavel/PR");
+    const semEndereco = fontes({ contato: { ...fontes().contato!, endereco: null } });
+    expect(montarDadosContrato(semEndereco).endereco_instalacao).toBe("");
+  });
+
+  it("os três campos são aceitos no modelo", () => {
+    expect(validarModeloContrato("{{tipo_telhado}} {{endereco_instalacao}} {{negocio_valor_extenso}}").desconhecidos).toEqual([]);
+  });
+});

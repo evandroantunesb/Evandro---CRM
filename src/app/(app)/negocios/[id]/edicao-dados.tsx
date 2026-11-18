@@ -20,6 +20,7 @@ export function EdicaoDados({ ficha, secao }: { ficha: Ficha; secao: "comercial"
         valor: negocio.valor,
         descricao: negocio.descricao,
         tipoTelhado: negocio.tipo_telhado,
+        enderecoInstalacao: negocio.endereco_instalacao,
         unidadeConsumidora: negocio.unidade_consumidora,
         padraoCliente: negocio.padrao_cliente,
         consumoMedioKwh: negocio.consumo_medio_kwh,

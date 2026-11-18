@@ -354,6 +354,7 @@ describe("ficha pela tela", () => {
       unidade_consumidora: "UC-9",
       padrao_cliente: "",
       tipo_telhado: "metálico",
+      endereco_instalacao: "Sítio Boa Vista, Estrada X, km 3",
       descricao: "",
     }))
       edicao.append(k, v);
@@ -388,10 +389,10 @@ describe("ficha pela tela", () => {
 
     const { data: n } = await vendedor.cliente
       .from("negocios")
-      .select("titulo, valor, valor_conta_energia, unidade_consumidora, tipo_telhado, estrutura_telhado, contato_id")
+      .select("titulo, valor, valor_conta_energia, unidade_consumidora, tipo_telhado, endereco_instalacao, estrutura_telhado, contato_id")
       .eq("id", r.negocioId)
       .single();
-    expect(n).toMatchObject({ titulo: "Editado pela tela", valor: 31000, valor_conta_energia: 320, unidade_consumidora: "UC-9", tipo_telhado: "metálico", estrutura_telhado: "trilho" });
+    expect(n).toMatchObject({ titulo: "Editado pela tela", valor: 31000, valor_conta_energia: 320, unidade_consumidora: "UC-9", tipo_telhado: "metálico", endereco_instalacao: "Sítio Boa Vista, Estrada X, km 3", estrutura_telhado: "trilho" });
 
     const contato = new FormData();
     for (const [k, v] of Object.entries({

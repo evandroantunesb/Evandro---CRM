@@ -1,3 +1,4 @@
+import { valorPorExtenso } from "@/lib/extenso";
 import { ROTULO_TIPO_LIGACAO } from "@/lib/tipos";
 
 /** Campos disponíveis no modelo de contrato, preenchidos automaticamente ao gerar. */
@@ -18,6 +19,7 @@ export const PLACEHOLDERS_CONTRATO = [
   { chave: "negocio_titulo", rotulo: "Título do negócio" },
   { chave: "negocio_numero", rotulo: "Número do negócio" },
   { chave: "negocio_valor", rotulo: "Valor do negócio (R$)" },
+  { chave: "negocio_valor_extenso", rotulo: "Valor do negócio por extenso" },
   { chave: "condicao_pagamento", rotulo: "Condição de pagamento escolhida" },
   { chave: "negocio_uc", rotulo: "Unidade consumidora" },
   { chave: "distribuidora", rotulo: "Distribuidora de energia" },
@@ -26,6 +28,8 @@ export const PLACEHOLDERS_CONTRATO = [
   { chave: "kit_potencia_kwp", rotulo: "Potência do kit (kWp)" },
   { chave: "kit_itens", rotulo: "Itens do kit (um por linha)" },
   { chave: "tipo_ligacao", rotulo: "Tipo de ligação" },
+  { chave: "tipo_telhado", rotulo: "Tipo do telhado" },
+  { chave: "endereco_instalacao", rotulo: "Endereço da instalação (ou do cliente)" },
   { chave: "consumo_medio_kwh", rotulo: "Consumo médio (kWh/mês)" },
   { chave: "geracao_estimada_kwh_mes", rotulo: "Geração estimada (kWh/mês)" },
   { chave: "data_hoje", rotulo: "Data de hoje" },
@@ -120,6 +124,9 @@ export type FontesContrato = {
     unidade_consumidora: string | null;
     qualif_distribuidora: string | null;
     consumo_medio_kwh: number | null;
+    tipo_telhado?: string | null;
+    /** Vazio = o endereço do cliente, com cidade/UF. */
+    endereco_instalacao?: string | null;
   };
   contato: {
     nome: string | null;
@@ -163,6 +170,17 @@ export function formatarItensKit(itens: FontesContrato["itensKit"]): string {
     .join("\n");
 }
 
+/** Endereço da instalação do negócio; vazio, o do cliente com cidade/UF ("Rua A, 10, Cascavel/PR"). */
+function enderecoInstalacao(f: FontesContrato): string {
+  const proprio = f.negocio.endereco_instalacao?.trim();
+  if (proprio) return proprio;
+  const c = f.contato;
+  const endereco = c?.endereco?.trim();
+  if (!endereco) return "";
+  const local = [c?.cidade?.trim(), c?.uf?.trim()].filter(Boolean).join("/");
+  return local ? `${endereco}, ${local}` : endereco;
+}
+
 /** Monta os valores de cada campo a partir dos dados já existentes (sem campo novo no banco). */
 export function montarDadosContrato(f: FontesContrato): DadosContrato {
   const c = f.contato;
@@ -185,6 +203,7 @@ export function montarDadosContrato(f: FontesContrato): DadosContrato {
     negocio_titulo: f.negocio.titulo,
     negocio_numero: f.negocio.numero != null ? String(f.negocio.numero) : "",
     negocio_valor: f.negocio.valor != null ? f.formatarMoeda(f.negocio.valor) : "",
+    negocio_valor_extenso: f.negocio.valor != null && f.negocio.valor >= 0 ? valorPorExtenso(f.negocio.valor) : "",
     condicao_pagamento: f.condicaoPagamento ?? "",
     negocio_uc: f.negocio.unidade_consumidora ?? "",
     distribuidora: f.negocio.qualif_distribuidora ?? "",
@@ -193,6 +212,8 @@ export function montarDadosContrato(f: FontesContrato): DadosContrato {
     // Mesmo formato de antes (toLocaleString padrão), para não mudar contratos gerados.
     kit_potencia_kwp: f.calculo?.kit_potencia_kwp != null ? `${f.calculo.kit_potencia_kwp.toLocaleString("pt-BR")} kWp` : "",
     kit_itens: formatarItensKit(f.itensKit),
+    tipo_telhado: f.negocio.tipo_telhado?.trim() ?? "",
+    endereco_instalacao: enderecoInstalacao(f),
     tipo_ligacao: ligacao && Object.hasOwn(ROTULO_TIPO_LIGACAO, ligacao) ? ROTULO_TIPO_LIGACAO[ligacao as keyof typeof ROTULO_TIPO_LIGACAO] : "",
     consumo_medio_kwh: consumo != null ? `${numeroBr(consumo)} kWh/mês` : "",
     geracao_estimada_kwh_mes: f.calculo?.geracao_estimada_kwh_mes != null ? `${numeroBr(f.calculo.geracao_estimada_kwh_mes)} kWh/mês` : "",
