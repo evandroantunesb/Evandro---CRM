@@ -1748,6 +1748,64 @@ export type Database = {
           },
         ];
       };
+      contratos_geracoes: {
+        Row: {
+          condicao: Json | null;
+          conteudo: string;
+          created_at: string;
+          empresa_id: string;
+          id: string;
+          membro_id: string;
+          motivo: string;
+          negocio_id: string;
+          valor: number | null;
+        };
+        Insert: {
+          condicao?: Json | null;
+          conteudo: string;
+          created_at?: string;
+          empresa_id: string;
+          id?: string;
+          membro_id: string;
+          motivo?: string;
+          negocio_id: string;
+          valor?: number | null;
+        };
+        Update: {
+          condicao?: Json | null;
+          conteudo?: string;
+          created_at?: string;
+          empresa_id?: string;
+          id?: string;
+          membro_id?: string;
+          motivo?: string;
+          negocio_id?: string;
+          valor?: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "contratos_geracoes_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "contratos_geracoes_membro_id_fkey";
+            columns: ["membro_id"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "contratos_geracoes_negocio_empresa_fk";
+            columns: ["negocio_id", "empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "negocios";
+            referencedColumns: ["id", "empresa_id"];
+          },
+        ];
+      };
       descontos_solicitacoes: {
         Row: {
           created_at: string;
@@ -7417,6 +7475,26 @@ export type Database = {
         Args: { p_empresa_id: string; p_fonte: string; p_responsavel: string; p_valor: number };
         Returns: undefined;
       };
+      consumir_geracao_contrato: {
+        Args: { p_geracao_id: string; p_negocio_id: string };
+        Returns: {
+          condicao: Json | null;
+          conteudo: string;
+          created_at: string;
+          empresa_id: string;
+          id: string;
+          membro_id: string;
+          motivo: string;
+          negocio_id: string;
+          valor: number | null;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "contratos_geracoes";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       contar_marco_membro: {
         Args: {
           p_ativa_desde: string;
@@ -7942,16 +8020,18 @@ export type Database = {
       feriado_nacional: { Args: { p_data: string }; Returns: boolean };
       garantir_obra: { Args: { p_negocio_id: string }; Returns: string };
       gera_procuracao_pelo_titulo: { Args: { p_titulo: string }; Returns: boolean };
-      gerar_contrato_com_condicao: {
-        Args: {
-          p_condicao: Json;
-          p_conteudo: string;
-          p_motivo: string;
-          p_negocio_id: string;
-          p_valor: number;
-        };
-        Returns: undefined;
-      };
+      gerar_contrato_com_condicao:
+        | {
+            Args: {
+              p_condicao: Json;
+              p_conteudo: string;
+              p_motivo: string;
+              p_negocio_id: string;
+              p_valor: number;
+            };
+            Returns: undefined;
+          }
+        | { Args: { p_geracao_id: string; p_negocio_id: string }; Returns: undefined };
       gerar_link_cliente_obra: { Args: { p_obra_id: string }; Returns: string };
       gravar_arquivo_compra: {
         Args: {

@@ -17,6 +17,7 @@ import type { CondicaoRegistrada } from "@/lib/condicao-escolhida";
 import { carregarEscolhaCondicao, carregarRegrasCondicoes } from "@/lib/condicoes-pagamento-dados";
 import { pendenciaValorNegocio } from "@/lib/condicoes-pagamento-proposta";
 import { formatarMoeda, hojeEmSaoPaulo } from "@/lib/formatacao";
+import { criarClienteAdmin } from "@/lib/supabase/admin";
 import type { SupabaseServidor } from "@/lib/supabase/server";
 import type { ResultadoAcao, StatusContrato } from "@/lib/tipos";
 
@@ -25,6 +26,17 @@ import type { ResultadoAcao, StatusContrato } from "@/lib/tipos";
  * em `@/lib/acoes/contratos` cuidam de sessão, papel e revalidação; os testes de banco chamam
  * direto com o cliente de cada usuário). Tudo sob a RLS de quem chama.
  */
+
+export const MENSAGEM_GERACAO_INDISPONIVEL = "Não foi possível gerar o contrato agora: o servidor não está configurado para isso.";
+
+/** Cliente privilegiado, ou null se a chave do servidor falta (nunca lança). */
+function clienteGravacao() {
+  try {
+    return criarClienteAdmin();
+  } catch {
+    return null;
+  }
+}
 
 /**
  * O que os documentos do negócio (contrato, procuração) preenchem, lido sob a RLS de quem chama: o negócio com o
@@ -64,12 +76,13 @@ export async function gerarContratoComCliente(
   supabase: SupabaseServidor,
   {
     empresaId,
+    membroId,
     negocioId,
     condicao = null,
     agora = new Date(),
   }: {
     empresaId: string;
-    /** Mantido por compatibilidade; o autor do contrato vem do banco (`meu_membro_id`). */
+    /** Quem pede (da sessão). O banco só aceita o texto se for o membro de quem chama; a autoria vem de `meu_membro_id`. */
     membroId: string;
     negocioId: string;
     condicao?: string | null;
@@ -168,16 +181,33 @@ export async function gerarContratoComCliente(
           base: opcao.base,
         }
       : null;
-  // Texto, condição e valor do negócio na mesma transação (o banco confere rascunho, RLS e negócio ganho).
-  const { error } = await supabase.rpc("gerar_contrato_com_condicao", {
-    p_negocio_id: negocioId,
-    p_conteudo: conteudoPreenchido,
-    p_condicao: registrada,
-    // Sem condição o banco ignora o valor (o negócio fica como está).
-    p_valor: registrada ? registrada.valorNegocio : 0,
-    p_motivo: registrada ? `Condição escolhida pelo cliente: ${registrada.descricao}` : "",
-  });
-  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível gerar o contrato.") };
+  // O texto só chega ao banco pelo servidor: guardado com a service role (o usuário não escreve em
+  // `contratos_geracoes`) e consumido pela geração na sessão de quem pediu, que grava texto, condição e valor do
+  // negócio na mesma transação (o banco confere quem pediu, rascunho, RLS e negócio ganho).
+  const admin = clienteGravacao();
+  if (!admin) return { ok: false, mensagem: MENSAGEM_GERACAO_INDISPONIVEL };
+  const { data: geracao, error: erroGeracao } = await admin
+    .from("contratos_geracoes")
+    .insert({
+      empresa_id: empresaId,
+      negocio_id: negocioId,
+      membro_id: membroId,
+      conteudo: conteudoPreenchido,
+      condicao: registrada,
+      // Sem condição o banco ignora o valor (o negócio fica como está).
+      valor: registrada ? registrada.valorNegocio : null,
+      motivo: registrada ? `Condição escolhida pelo cliente: ${registrada.descricao}` : "",
+    })
+    .select("id")
+    .single();
+  if (erroGeracao || !geracao) return { ok: false, mensagem: "Não foi possível gerar o contrato. Tente de novo." };
+
+  const { error } = await supabase.rpc("gerar_contrato_com_condicao", { p_negocio_id: negocioId, p_geracao_id: geracao.id });
+  if (error) {
+    // A transação desfeita deixa a linha: apaga já (o banco também limpa as vencidas de quem chama).
+    await admin.from("contratos_geracoes").delete().eq("id", geracao.id);
+    return { ok: false, mensagem: mensagemErro(error, "Não foi possível gerar o contrato.") };
+  }
   return { ok: true, mensagem: "Contrato pronto." };
 }
 
