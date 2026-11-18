@@ -86,3 +86,14 @@ export async function removerAvatar(): Promise<NonNullable<ResultadoAcao>> {
   revalidatePath("/", "layout");
   return { ok: true, mensagem: "Foto removida." };
 }
+
+/** Liga ou desliga o resumo diário por e-mail de quem está logado, na empresa em uso (só a própria preferência). */
+export async function definirResumoEmail(ligado: boolean): Promise<NonNullable<ResultadoAcao>> {
+  const sessao = await obterSessao();
+  if (!sessao.atual) return { ok: false, mensagem: "Escolha uma empresa para mudar este aviso." };
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.rpc("definir_resumo_email", { p_empresa_id: sessao.atual.empresaId, p_ligado: ligado === true });
+  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível salvar.") };
+  revalidatePath("/perfil");
+  return { ok: true, mensagem: ligado ? "Resumo diário ligado." : "Resumo diário desligado." };
+}

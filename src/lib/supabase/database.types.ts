@@ -6022,6 +6022,42 @@ export type Database = {
           },
         ];
       };
+      preferencias_resumo_email: {
+        Row: {
+          empresa_id: string;
+          ligado: boolean;
+          membro_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          empresa_id: string;
+          ligado?: boolean;
+          membro_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          empresa_id?: string;
+          ligado?: boolean;
+          membro_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "preferencias_resumo_email_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "preferencias_resumo_email_empresa_id_membro_id_fkey";
+            columns: ["empresa_id", "membro_id"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["empresa_id", "id"];
+          },
+        ];
+      };
       proposta_identidades: {
         Row: {
           atualizado_por: string | null;
@@ -6686,6 +6722,63 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "recompensas";
             referencedColumns: ["id"];
+          },
+        ];
+      };
+      resumos_email_envios: {
+        Row: {
+          created_at: string;
+          dia: string;
+          empresa_id: string;
+          erro: string | null;
+          id: string;
+          itens: number;
+          janela_fim: string | null;
+          janela_inicio: string | null;
+          membro_id: string;
+          situacao: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          dia: string;
+          empresa_id: string;
+          erro?: string | null;
+          id?: string;
+          itens?: number;
+          janela_fim?: string | null;
+          janela_inicio?: string | null;
+          membro_id: string;
+          situacao?: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          dia?: string;
+          empresa_id?: string;
+          erro?: string | null;
+          id?: string;
+          itens?: number;
+          janela_fim?: string | null;
+          janela_inicio?: string | null;
+          membro_id?: string;
+          situacao?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "resumos_email_envios_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "resumos_email_envios_empresa_id_membro_id_fkey";
+            columns: ["empresa_id", "membro_id"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["empresa_id", "id"];
           },
         ];
       };
@@ -7439,6 +7532,10 @@ export type Database = {
         Args: { p_motivo: string; p_obra_id: string };
         Returns: undefined;
       };
+      concluir_resumo_email: {
+        Args: { p_enviado: boolean; p_erro?: string; p_id: string };
+        Returns: undefined;
+      };
       concluir_tarefa_setor: {
         Args: { p_resposta?: string; p_tarefa_id: string };
         Returns: undefined;
@@ -7705,6 +7802,10 @@ export type Database = {
       };
       definir_fixacao_obra: {
         Args: { p_fixacao_id?: string; p_obra_id: string };
+        Returns: undefined;
+      };
+      definir_resumo_email: {
+        Args: { p_empresa_id: string; p_ligado: boolean };
         Returns: undefined;
       };
       definir_setores_membro: {
@@ -8710,6 +8811,17 @@ export type Database = {
         Returns: undefined;
       };
       remover_anexo_tarefa_setor: { Args: { p_anexo_id: string }; Returns: string };
+      reservar_resumo_email: {
+        Args: {
+          p_dia: string;
+          p_empresa_id: string;
+          p_itens: number;
+          p_janela_fim: string;
+          p_janela_inicio: string;
+          p_membro_id: string;
+        };
+        Returns: string;
+      };
       responder_justificativa_atraso: {
         Args: { p_justificativa_id: string; p_texto: string };
         Returns: undefined;
@@ -8717,6 +8829,22 @@ export type Database = {
       resposta_enquadramento_valida: {
         Args: { p_pergunta: string; p_resposta: string };
         Returns: boolean;
+      };
+      resumo_email_pendentes: {
+        Args: { p_ate: string; p_dia: string };
+        Returns: {
+          criada_em: string;
+          email: string;
+          empresa_id: string;
+          empresa_nome: string;
+          janela_inicio: string;
+          link: string;
+          membro_id: string;
+          mensagem: string;
+          nome: string;
+          notificacao_id: string;
+          tipo: string;
+        }[];
       };
       salvar_cnpj_empresa: { Args: { p_cnpj: string; p_empresa_id: string }; Returns: undefined };
       salvar_configuracoes_empresa: {
