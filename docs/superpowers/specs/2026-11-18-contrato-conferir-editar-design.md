@@ -13,6 +13,13 @@ Nenhuma integração de assinatura cobre gov.br para empresa privada (a API de a
 1. **Conferir:** depois de gerar, o texto completo do contrato aparece no cartão "Contrato" do negócio (aba "Proposta e contrato"), sem abrir o link.
 2. **Editar:** enquanto o contrato é rascunho, "Editar texto" transforma o texto num campo editável; salvar grava o texto, e link, PDF e WhatsApp passam a usar o texto editado.
 3. **Enviar:** "Enviar no WhatsApp" abre a conversa com o número do cliente (contato do negócio); sem número válido, abre sem destinatário, como hoje.
+4. **Formatação simples no modelo:** título (`#`, `##`), negrito (`**texto**`) e lista (`- item`) saem formatados no PDF, no link público e na conferência, em vez de os símbolos aparecerem no texto. Nada além disso (sem tabela, imagem, cor). Modelos sem esses símbolos saem como hoje.
+5. **Campos novos no modelo:**
+   - `{{negocio_valor_extenso}}`: valor do negócio por extenso ("quarenta e dois mil e quinhentos reais"), com centavos quando houver. Pedido do Evandro em 18/11/2026.
+   - `{{tipo_telhado}}`: o tipo de telhado já guardado no negócio.
+   - `{{endereco_instalacao}}`: endereço onde o sistema será instalado (ver "Decisões minhas").
+
+Entrada e parcelas não ganham campos próprios: `{{condicao_pagamento}}` já muda conforme a condição escolhida (à vista, cartão, financiamento). Datas de vencimento e forma de pagamento ("via Pix") o vendedor completa com a edição do texto.
 
 ## Fora do escopo (não-objetivos)
 
@@ -29,7 +36,7 @@ Nenhuma integração de assinatura cobre gov.br para empresa privada (a API de a
 
 ## Regras (decididas pelo Evandro)
 
-- **Quem edita:** o vendedor que gerou o contrato, o gestor e o admin. O SDR não (já não gera contrato).
+- **Quem edita:** o responsável atual pelo negócio, o gestor e o admin. O SDR não (já não gera contrato). Quem assume o card vira responsável e passa a poder editar e gerar novamente (Evandro, 18/11/2026).
 - **Quando:** só com o contrato em rascunho. Em "aguardando assinatura" ou "assinado" o texto trava, como hoje.
 - **Histórico:** cada edição registra quem e quando na linha do tempo do negócio; o cartão mostra a marca "texto editado à mão".
 
@@ -41,10 +48,11 @@ Nenhuma integração de assinatura cobre gov.br para empresa privada (a API de a
 
 ## Decisões minhas (para o Evandro conferir)
 
-- **"Vendedor que gerou"** = quem gerou o contrato pela primeira vez (`contratos.criado_por`). "Gerar novamente" por outra pessoa não muda isso. Ele também precisa continuar vendo o negócio (RLS atual).
 - **"Gerar novamente" apaga a edição:** refaz o texto a partir do modelo; com texto editado, o botão pede confirmação ("Você perde as edições feitas à mão") e a marca "editado à mão" sai.
 - **Validação do texto editado:** não pode ficar vazio, nem com `{{`/`}}` (mesma regra `contratoProntoParaCliente` de hoje), com limite de tamanho. A trava acontece no banco, não só na tela.
 - **Gravação:** RPC `security definer` que confere empresa, papel/autor, status rascunho e o texto, grava `conteudo`, quem e quando editou, e registra a atividade na mesma transação. Nunca grava em `eventos` nem `point_ledger`.
+- **Endereço da instalação:** o CRM não guarda hoje. Proposta: campo opcional novo no negócio ("Endereço da instalação, se diferente do cliente"); vazio, o campo do contrato usa o endereço do cliente com cidade/UF. Exige coluna nova e um campo no formulário do negócio.
+- **Logo:** fica como está (pequeno, em cima, com o nome da empresa ao lado). Opção "sem logo" só se o PDF impresso em preto e branco ficar ruim.
 - **Conferência:** texto exibido com as quebras de linha do modelo, numa área com rolagem, no próprio cartão (mobile primeiro).
 
 ## Riscos
