@@ -14,6 +14,7 @@ import {
   lerCsv,
   montarPrevia,
   normalizarUnidade,
+  
   resumoPrevia,
   textoCelula,
   type Celula,
@@ -22,6 +23,7 @@ import {
   type MapaColunas,
   type MaterialVM,
 } from "@/lib/compras/precos";
+import { palpiteCategoria } from "@/lib/compras/potencia";
 import { criarClienteNavegador } from "@/lib/supabase/navegador";
 import type { ResultadoAcao } from "@/lib/tipos";
 import { TabelaPrevia } from "./tabela-previa-precos";
@@ -41,7 +43,7 @@ async function lerPlanilha(arquivo: File): Promise<Celula[][]> {
 function decisaoPadrao(l: LinhaPrevia): DecisaoNovo {
   return l.materialId
     ? { tipo: "ligar", materialId: l.materialId }
-    : { tipo: "criar", nome: l.descricao.slice(0, 120), categoria: "outros", unidade: normalizarUnidade(l.unidade) };
+    : { tipo: "criar", nome: l.descricao.slice(0, 120), categoria: palpiteCategoria(l.descricao), unidade: normalizarUnidade(l.unidade) };
 }
 
 export function EnviarTabelaPrecos({ empresaId, materiais, fornecedores, hoje }: { empresaId: string; materiais: MaterialVM[]; fornecedores: string[]; hoje: string }) {
@@ -73,8 +75,15 @@ export function EnviarTabelaPrecos({ empresaId, materiais, fornecedores, hoje }:
     setDados({ chave, vm });
     if (!linhasLidas) return;
     const colunas = Math.max(0, ...linhasLidas.slice(0, 50).map((l) => l.length));
-    const lembrado = vm.mapa && Math.max(vm.mapa.material, vm.mapa.preco, vm.mapa.codigo ?? 0, vm.mapa.unidade ?? 0) < colunas ? vm.mapa : null;
-    setMapa(lembrado ?? adivinharMapa(linhasLidas) ?? { cabecalho: 0, material: 0, preco: Math.min(1, Math.max(colunas - 1, 0)), codigo: null, unidade: null });
+    const lembrado =
+      vm.mapa && Math.max(vm.mapa.material, vm.mapa.preco, vm.mapa.codigo ?? 0, vm.mapa.unidade ?? 0, vm.mapa.potencia ?? 0) < colunas ? vm.mapa : null;
+    const palpite = adivinharMapa(linhasLidas);
+    // Mapa lembrado antes da coluna de potência (18/11/2026): a potência vem do palpite pelo cabeçalho.
+    setMapa(
+      lembrado
+        ? { ...lembrado, potencia: lembrado.potencia !== undefined ? lembrado.potencia : (palpite?.potencia ?? null) }
+        : (palpite ?? { cabecalho: 0, material: 0, preco: Math.min(1, Math.max(colunas - 1, 0)), codigo: null, unidade: null, potencia: null }),
+    );
     setMapaLembrado(lembrado != null);
     setDecisoes({});
   };
@@ -240,7 +249,7 @@ export function EnviarTabelaPrecos({ empresaId, materiais, fornecedores, hoje }:
             </div>
             <span className="text-xs text-texto-2">{mapaLembrado ? "Lembrado para este fornecedor" : "Fica lembrado para este fornecedor"}</span>
           </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
             <label className="flex flex-col gap-1 text-sm">
               <span className="font-medium text-texto-2">Linha do cabeçalho</span>
               <input
@@ -258,6 +267,7 @@ export function EnviarTabelaPrecos({ empresaId, materiais, fornecedores, hoje }:
                 ["codigo", "Código do fornecedor", true],
                 ["unidade", "Unidade", true],
                 ["preco", "Preço de custo", false],
+                ["potencia", "Potência (W)", true],
               ] as const
             ).map(([campo, rotulo, opcional]) => (
               <label key={campo} className="flex flex-col gap-1 text-sm">
@@ -324,7 +334,7 @@ export function EnviarTabelaPrecos({ empresaId, materiais, fornecedores, hoje }:
               ))}
             </nav>
           </div>
-          <TabelaPrevia linhas={daAba} materiais={materiais} decisaoDe={decisaoDe} aoMudar={mudar} />
+          <TabelaPrevia linhas={daAba} materiais={materiais} decisaoDe={decisaoDe} aoMudar={mudar} comPotencia={mapa?.potencia != null} />
           <div className="flex flex-col gap-3 border-t border-linha p-4 md:flex-row md:items-center md:justify-between md:px-6">
             <p className="text-sm text-texto">
               Importa {validos.toLocaleString("pt-BR")} preços ({resumo.subiram + resumo.baixaram} mudanças, {resumo.novos} novos e {resumo.iguais} iguais, que

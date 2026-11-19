@@ -5,12 +5,15 @@ import {
   CATEGORIAS_MATERIAL,
   ROTULO_CATEGORIA_MATERIAL,
   normalizarUnidade,
+  
+  
   variacao,
   type CategoriaMaterial,
   type DecisaoNovo,
   type LinhaPrevia,
   type MaterialVM,
 } from "@/lib/compras/precos";
+import { palpiteCategoria, situacaoPotencia } from "@/lib/compras/potencia";
 import { formatarMoeda } from "@/lib/formatacao";
 
 /** Linhas mostradas por aba da prévia (a importação leva todas). */
@@ -23,13 +26,26 @@ export function TabelaPrevia({
   materiais,
   decisaoDe,
   aoMudar: mudar,
+  comPotencia = false,
 }: {
   linhas: LinhaPrevia[];
   materiais: MaterialVM[];
   decisaoDe: (l: LinhaPrevia) => DecisaoNovo;
   aoMudar: (l: LinhaPrevia, d: DecisaoNovo) => void;
+  /** Mostra a coluna Potência (quando a planilha tem a coluna mapeada). */
+  comPotencia?: boolean;
 }) {
   const nomeMaterial = new Map(materiais.map((m) => [m.id, m.nome]));
+  const porId = new Map(materiais.map((m) => [m.id, m]));
+  // Material de destino da linha: o escolhido na prévia (linha nova) ou o reconhecido.
+  const destino = (l: LinhaPrevia) => {
+    if (l.situacao === "problema") return undefined;
+    if (l.situacao === "novo") {
+      const d = decisaoDe(l);
+      return d.tipo === "ligar" ? porId.get(d.materialId) : undefined;
+    }
+    return l.materialId ? porId.get(l.materialId) : undefined;
+  };
   return (
     <>
           {daAba.length === 0 ? (
@@ -43,6 +59,7 @@ export function TabelaPrevia({
                     <th className="px-2 py-2 font-medium">Material na planilha</th>
                     <th className="px-2 py-2 font-medium">No Raion</th>
                     <th className="px-2 py-2 text-right font-medium">Preço</th>
+                    {comPotencia && <th className="px-2 py-2 font-medium">Potência</th>}
                     <th className="px-4 py-2 font-medium md:px-6">Situação</th>
                   </tr>
                 </thead>
@@ -71,6 +88,11 @@ export function TabelaPrevia({
                         )}
                         {l.preco != null ? formatarMoeda(l.preco) : "—"}
                       </td>
+                      {comPotencia && (
+                        <td className="px-2 py-2">
+                          <PotenciaPrevia lida={l.potencia} material={destino(l)} />
+                        </td>
+                      )}
                       <td className="px-4 py-2 whitespace-nowrap md:px-6">
                         {l.situacao === "subiu" && <Selo tom="atencao">Subiu {pct(variacao(l.precoAnterior!, l.preco!))}</Selo>}
                         {l.situacao === "baixou" && <Selo>Baixou {pct(-variacao(l.precoAnterior!, l.preco!))}</Selo>}
@@ -93,8 +115,20 @@ export function TabelaPrevia({
   );
 }
 
-function DecisaoLinha({ linha, decisao, materiais, aoMudar }: { linha: LinhaPrevia; decisao: DecisaoNovo; materiais: MaterialVM[]; aoMudar: (d: DecisaoNovo) => void }) {
-  const criar = () => aoMudar({ tipo: "criar", nome: linha.descricao.slice(0, 120), categoria: "outros", unidade: normalizarUnidade(linha.unidade) });
+/** Linha nova: criar material (nome e categoria) ou ligar a um já cadastrado. Também usada na lista de equipamentos. */
+export function DecisaoLinha({
+  linha,
+  decisao,
+  materiais,
+  aoMudar,
+}: {
+  linha: Pick<LinhaPrevia, "numero" | "descricao" | "unidade">;
+  decisao: DecisaoNovo;
+  materiais: MaterialVM[];
+  aoMudar: (d: DecisaoNovo) => void;
+}) {
+  const criar = () =>
+    aoMudar({ tipo: "criar", nome: linha.descricao.slice(0, 120), categoria: palpiteCategoria(linha.descricao), unidade: normalizarUnidade(linha.unidade) });
   return (
     <div className="flex min-w-56 flex-col gap-1.5">
       <select
@@ -134,5 +168,26 @@ function DecisaoLinha({ linha, decisao, materiais, aoMudar }: { linha: LinhaPrev
         </div>
       )}
     </div>
+  );
+}
+
+const formatarW = (w: number) => `${w.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} W`;
+
+/**
+ * Potência da linha e o que acontece com ela (decisão de 18/11/2026: a potência cadastrada nunca é trocada pela
+ * planilha; só material sem potência é completado).
+ */
+export function PotenciaPrevia({ lida, material }: { lida: number | null; material: { potenciaW: number | null } | undefined }) {
+  const s = situacaoPotencia(lida, material);
+  if (s === "sem") return <span className="text-texto-2">—</span>;
+  if (s === "ilegivel") return <Selo tom="negativo">Não lida, segue sem potência</Selo>;
+  return (
+    <span className="flex flex-col items-start gap-1 whitespace-nowrap">
+      <span className="tabular-nums">{formatarW(lida!)}</span>
+      {s === "nova" && <Selo tom="atencao">Entra no cadastro</Selo>}
+      {s === "preenche" && <Selo tom="atencao">Completa o cadastro</Selo>}
+      {s === "ja" && <span className="text-xs text-texto-2">Já cadastrada</span>}
+      {s === "diferente" && <Selo>Diferente: fica {formatarW(material!.potenciaW!)}</Selo>}
+    </span>
   );
 }

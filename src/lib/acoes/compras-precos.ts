@@ -101,7 +101,8 @@ export async function dadosFornecedorTabela(nome: string): Promise<DadosForneced
 }
 
 const texto = (max: number) => z.string().trim().min(1).max(max);
-const base = { codigo: z.string().trim().max(60).nullable(), descricao: texto(200), preco };
+const potenciaW = z.number().positive("Potência inválida.").lt(1_000_000, "Potência inválida.").optional();
+const base = { codigo: z.string().trim().max(60).nullable(), descricao: texto(200), preco, potencia_w: potenciaW };
 const esquemaImportacao = z.object({
   fornecedor,
   dataTabela: data,
@@ -118,7 +119,7 @@ const esquemaImportacao = z.object({
 
 export async function importarTabelaPrecos(
   dados: z.input<typeof esquemaImportacao>,
-): Promise<ResultadoAcao & { contagem?: { novos: number; subiram: number; baixaram: number; iguais: number } }> {
+): Promise<ResultadoAcao & { contagem?: { novos: number; subiram: number; baixaram: number; iguais: number; potencias?: number } }> {
   const { atual } = await exigirPapel(...GERIR_OBRAS);
   const d = esquemaImportacao.safeParse(dados);
   if (!d.success) return { ok: false, mensagem: d.error.issues[0].message };
@@ -137,9 +138,10 @@ export async function importarTabelaPrecos(
   });
   if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível importar a tabela.") };
   revalidarPrecos();
-  const c = r as { novos: number; subiram: number; baixaram: number; iguais: number };
+  const c = r as { novos: number; subiram: number; baixaram: number; iguais: number; potencias?: number };
   const total = c.novos + c.subiram + c.baixaram + c.iguais;
-  return { ok: true, mensagem: `${total.toLocaleString("pt-BR")} preços importados.`, contagem: c };
+  const potencias = c.potencias ? ` Potência registrada em ${c.potencias.toLocaleString("pt-BR")} ${c.potencias === 1 ? "material" : "materiais"}.` : "";
+  return { ok: true, mensagem: `${total.toLocaleString("pt-BR")} preços importados.${potencias}`, contagem: c };
 }
 
 const esquemaMargens = z.record(z.enum(CATEGORIAS_MATERIAL), z.number().finite().min(0, "Margem inválida.").max(5, "Margem inválida: use até 500%."));
@@ -154,4 +156,30 @@ export async function salvarMargensCompra(margens: z.input<typeof esquemaMargens
   if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível salvar as margens.") };
   revalidarPrecos();
   return { ok: true, mensagem: "Margens salvas." };
+}
+
+const baseEquipamento = { descricao: texto(200), potencia_w: potenciaW };
+const esquemaLista = z
+  .array(z.union([z.object({ material_id: uuid, ...baseEquipamento }), z.object({ novo: material, ...baseEquipamento })]))
+  .min(1, "Nenhum equipamento para importar.")
+  .max(MAX_PRECOS_POR_TABELA, "A lista tem equipamentos demais. Divida a planilha.");
+
+/**
+ * Lista de equipamentos sem preço (item 5 do roadmap, 18/11/2026): cria os novos e completa a potência de quem está
+ * sem. A potência cadastrada não muda; nenhum preço muda. Mesmas pessoas da tabela de preços (o banco confere).
+ */
+export async function importarListaEquipamentos(itens: z.input<typeof esquemaLista>): Promise<ResultadoAcao> {
+  const { atual } = await exigirPapel(...GERIR_OBRAS);
+  const d = esquemaLista.safeParse(itens);
+  if (!d.success) return { ok: false, mensagem: d.error.issues[0].message };
+  const supabase = await criarClienteServidor();
+  const { data: r, error } = await supabase.rpc("importar_lista_equipamentos", { p_empresa_id: atual.empresaId, p_itens: d.data });
+  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível importar a lista.") };
+  revalidarPrecos();
+  const c = r as { criados: number; completados: number };
+  const partes = [
+    c.criados ? `${c.criados.toLocaleString("pt-BR")} ${c.criados === 1 ? "equipamento cadastrado" : "equipamentos cadastrados"}` : null,
+    c.completados ? `potência completada em ${c.completados.toLocaleString("pt-BR")}` : null,
+  ].filter(Boolean);
+  return { ok: true, mensagem: partes.length ? `${partes.join(", ")}.`.replace(/^./, (x) => x.toUpperCase()) : "Nada mudou: os equipamentos já estavam cadastrados." };
 }

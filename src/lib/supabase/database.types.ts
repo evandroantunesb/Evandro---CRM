@@ -8308,6 +8308,7 @@ export type Database = {
           nome: string;
         }[];
       };
+      importar_lista_equipamentos: { Args: { p_empresa_id: string; p_itens: Json }; Returns: Json };
       importar_tabela_precos: {
         Args: {
           p_caminho: string;
@@ -8680,6 +8681,7 @@ export type Database = {
       pode_ver_valor_vendido_obra: { Args: { p_obra_id: string }; Returns: boolean };
       pode_ver_vistoria_obra: { Args: { p_obra_id: string }; Returns: boolean };
       posso_decidir_desconto: { Args: { p_id: string }; Returns: boolean };
+      potencia_item_importacao: { Args: { p_descricao: string; p_item: Json }; Returns: number };
       prazo_dias_restantes: {
         Args: { p_empresa_id: string; p_hoje: string; p_limite: string };
         Returns: number;
