@@ -45,6 +45,8 @@ import { obterTelasEmpresa } from "@/lib/telas-empresa-servidor";
 import { ObraSolo } from "./_solo/obra-solo";
 import { carregarSubstituicoes } from "@/lib/substituicoes";
 import { criarClienteServidor } from "@/lib/supabase/server";
+import { InstalacaoObraCartao } from "@/components/obras/instalacao";
+import { carregarEquipesInstalacao, carregarInstalacaoObra } from "@/lib/obras/agenda";
 
 type Tom = "neutro" | "positivo" | "negativo" | "atencao";
 // Sem verde (reservado ao WhatsApp): "Concluída" fica neutra. Vermelho só para o que é perda/erro.
@@ -135,6 +137,14 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
   });
   const cancelada = resumo.situacao === "cancelada";
   const hoje = hojeEmSaoPaulo();
+  // Agenda da instalação (20261217100000): quem escreve no Operacional agenda; quem vê a obra acompanha.
+  const autorizacaoOperacional = gestaoDoSetor("operacional")?.permissoes.autorizacao ?? null;
+  const podeAgendarInstalacao = autorizacaoOperacional != null && !cancelada;
+  const [agendaInstalacao, equipesInstalacao] = await Promise.all([
+    carregarInstalacaoObra(supabase, id, nomes),
+    podeAgendarInstalacao ? carregarEquipesInstalacao(supabase, atual.empresaId) : Promise.resolve([]),
+  ]);
+  const etapaInstalacao = etapas.find((e) => e.etapa === "instalacao");
   // Financeiro (contas a fornecedor, pagamento e NF do cliente): mesma visibilidade dos custos; a NF do cliente, sem o
   // Operacional. Escreve quem atua no Administrativo da obra (ou admin); a obra pausada também aceita.
   const autorizacaoAdministrativo = gestaoDoSetor("administrativo")?.permissoes.autorizacao ?? null;
@@ -398,6 +408,18 @@ export default async function DetalheObra({ params, searchParams }: PageProps<"/
                 {/* Vistoria: quem atua no Operacional registra o agendamento, a vistoria feita em campo e a correção de
                     campo; quem só vê a obra acompanha a situação e as datas. */}
                 {/* Obra sem Engenharia (setor desligado quando ela nasceu): não há vistoria a acompanhar. */}
+                {s.setor === "operacional" && (
+                  <InstalacaoObraCartao
+                    key={`instalacao-${resumo.id}`}
+                    obraId={resumo.id}
+                    status={s.status}
+                    podeAgendar={podeAgendarInstalacao}
+                    instalacao={agendaInstalacao.instalacao}
+                    equipes={equipesInstalacao}
+                    real={{ inicio: etapaInstalacao?.real_inicio ?? null, fim: etapaInstalacao?.real_fim ?? null }}
+                    historico={agendaInstalacao.historico}
+                  />
+                )}
                 {s.setor === "operacional" &&
                   temEngenharia &&
                   (g?.permissoes.autorizacao ? (

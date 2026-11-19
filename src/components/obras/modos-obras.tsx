@@ -2,19 +2,21 @@ import Link from "next/link";
 
 /**
  * Alternância entre os modos de Obras: Gestão (operacional: lista e detalhe com ações) — para admin e gestor, a visão
- * Completa — e Apresentação (executivo, somente leitura, navegação como slides). Os dois levam os mesmos filtros na URL.
- * `escuro`: sobre a faixa escura da Completa.
+ * Completa —, Apresentação (executivo, somente leitura, navegação como slides) e, nas listas do PRO, Agenda (semana e
+ * mês da operação). Gestão e Apresentação levam os mesmos filtros na URL. `escuro`: sobre a faixa escura da Completa.
  */
 export function ModosObras({
   modo,
   hrefGestao,
   hrefApresentacao,
+  hrefAgenda,
   rotuloGestao = "Gestão",
   escuro = false,
 }: {
-  modo: "gestao" | "apresentacao";
+  modo: "gestao" | "apresentacao" | "agenda";
   hrefGestao: string;
   hrefApresentacao: string;
+  hrefAgenda?: string;
   rotuloGestao?: string;
   escuro?: boolean;
 }) {
@@ -39,6 +41,11 @@ export function ModosObras({
       <Link href={hrefApresentacao} aria-current={modo === "apresentacao" ? "page" : undefined} className={item(modo === "apresentacao")}>
         Apresentação
       </Link>
+      {hrefAgenda && (
+        <Link href={hrefAgenda} aria-current={modo === "agenda" ? "page" : undefined} className={item(modo === "agenda")}>
+          Agenda
+        </Link>
+      )}
     </nav>
   );
 }
