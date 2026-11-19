@@ -63,7 +63,7 @@ export default async function Obras({ searchParams }: PageProps<"/obras">) {
         completa={completa}
         filtros={filtrosCompleta}
         hoje={hoje}
-        modos={<ModosObras modo="gestao" rotuloGestao="Completa" escuro hrefGestao={`/obras${q ? `?${q}` : ""}`} hrefApresentacao={`/obras/apresentacao${q ? `?${q}` : ""}`} />}
+        modos={<ModosObras modo="gestao" rotuloGestao="Completa" escuro hrefGestao={`/obras${q ? `?${q}` : ""}`} hrefApresentacao={`/obras/apresentacao${q ? `?${q}` : ""}`} hrefAgenda="/obras/agenda" />}
       />
     );
   }
@@ -91,7 +91,7 @@ export default async function Obras({ searchParams }: PageProps<"/obras">) {
               ‹ Visão Completa
             </Link>
           )}
-          <ModosObras modo="gestao" hrefGestao={`/obras${query ? `?${query}` : ""}`} hrefApresentacao={`/obras/apresentacao${query ? `?${query}` : ""}`} />
+          <ModosObras modo="gestao" hrefGestao={`/obras${query ? `?${query}` : ""}`} hrefApresentacao={`/obras/apresentacao${query ? `?${query}` : ""}`} hrefAgenda="/obras/agenda" />
           {visiveis.length > 0 && (
             <Link
               href={hrefGestao(visiveis[0].id)}

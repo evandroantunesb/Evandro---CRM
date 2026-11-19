@@ -6,6 +6,15 @@
 - **Sessão de 18/11/2026:** item 2 do roadmap redefinido pelo Evandro: **sem assinatura eletrônica** (nenhum serviço privado assina "gov.br"; o cliente assina como conseguir). No lugar, **contrato: conferir, editar e enviar** (seção própria abaixo), na branch `feat/contrato-editar` (worktree `C:\dev\crm-contrato-editar`). Modelo de contrato genérico adaptado para o Evandro em `C:\dev\modelos\contrato-modelo.md` (fora do repositório; só vale depois desta entrega).
 - Pendências do item 1 (procuração): o Evandro cola o texto do modelo e confere um PDF real com o logo.
 
+## Agenda operacional (18/11/2026, item 4 do roadmap)
+
+Plano em `docs/superpowers/plans/2026-11-18-agenda-operacional.md`; prévia aprovada pelo Evandro (https://claude.ai/artifact/AqMCMkaNj5JB3wnAmP9ucs), com a observação para a equipe e o "Trocar equipe". Decisões de 18/11/2026: agendar a instalação na obra e tela "Agenda" (semana e mês); quem agenda é o Operacional, admin e gestor; equipe do cadastro ou digitada só na obra; a Agenda é vista pelos setores da obra, admin e gestor, e o vendedor vê só as obras dos próprios clientes; prazos seguem em dias úteis; só no PRO. A branch `backup/wt-calendario-operacional-20261103-wip` só tinha documentos de 26/10, já superados pelo código (apagar depois, com OK do Evandro).
+
+- Migration `20261217100000_agenda_operacional.sql`: `equipes_instalacao` (cadastro; inativa em vez de apagar), `obra_instalacoes` (agendamento por obra; só `agendar_instalacao_obra` escreve: Operacional em "Liberada para agendamento" ou "Agendada", motivo ao mudar datas, histórico `instalacao_agendamento`, primeiro agendamento passa o Operacional a "Agendada", Solo recusado), `sugerir_termino_instalacao` (3 dias úteis contando o início), `cronograma_obra` (previsão da Instalação pela agenda), `agenda_operacional` e `feriados_periodo`.
+- Telas: `/obras/agenda` (aba "Agenda" ao lado de Gestão e Apresentação; semana, mês, lista por dia no celular, filtros por tipo e equipe), `/obras/agenda/equipes` e o cartão "Instalação" no setor Operacional da obra.
+- Testes: `tests/agenda-operacional-db.test.ts` e `tests/agenda-regras.test.ts`.
+- **Produção:** PR #411; migration aplicada em 18/11/2026 antes do merge pelo `banco-producao.yml` (tag `migracao-pr411-f27c6c2`; dry-run 44432331034 listou só ela; aplicação 44432480227), autorizada e aprovada pelo Evandro no `producao-banco`.
+
 ## Avisos externos: resumo diário por e-mail (18/11/2026, item 3 do roadmap)
 
 Plano em `docs/superpowers/plans/2026-11-18-resumo-diario-email.md`; prévia aprovada pelo Evandro (https://claude.ai/artifact/FHzSsGsk4EyewgNXBD12eC). Decisões de 18/11/2026: só a equipe; só os avisos que pedem ação (lead atribuído, handoff recebido/devolvido, desconto solicitado/decidido, pagamento confirmado/devolvido, justificativa de atraso pedida/cobrada); um resumo por dia às 7h30 de Brasília, só com o que ainda não foi visto no sininho; cada pessoa desliga em "Meu perfil" (ligado por padrão); envio pelo Resend com domínio próprio.

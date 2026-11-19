@@ -2364,6 +2364,44 @@ export type Database = {
           },
         ];
       };
+      equipes_instalacao: {
+        Row: {
+          ativa: boolean;
+          created_at: string;
+          empresa_id: string;
+          id: string;
+          nome: string;
+          telefone: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          ativa?: boolean;
+          created_at?: string;
+          empresa_id: string;
+          id?: string;
+          nome: string;
+          telefone?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          ativa?: boolean;
+          created_at?: string;
+          empresa_id?: string;
+          id?: string;
+          nome?: string;
+          telefone?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "equipes_instalacao_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       etapas: {
         Row: {
           ativa: boolean;
@@ -5272,6 +5310,77 @@ export type Database = {
           },
         ];
       };
+      obra_instalacoes: {
+        Row: {
+          agendado_por: string | null;
+          created_at: string;
+          empresa_id: string;
+          equipe_id: string | null;
+          equipe_nome: string;
+          equipe_telefone: string | null;
+          inicio: string;
+          obra_id: string;
+          observacao: string | null;
+          termino: string;
+          updated_at: string;
+        };
+        Insert: {
+          agendado_por?: string | null;
+          created_at?: string;
+          empresa_id: string;
+          equipe_id?: string | null;
+          equipe_nome: string;
+          equipe_telefone?: string | null;
+          inicio: string;
+          obra_id: string;
+          observacao?: string | null;
+          termino: string;
+          updated_at?: string;
+        };
+        Update: {
+          agendado_por?: string | null;
+          created_at?: string;
+          empresa_id?: string;
+          equipe_id?: string | null;
+          equipe_nome?: string;
+          equipe_telefone?: string | null;
+          inicio?: string;
+          obra_id?: string;
+          observacao?: string | null;
+          termino?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "obra_instalacoes_agendado_por_fkey";
+            columns: ["agendado_por"];
+            isOneToOne: false;
+            referencedRelation: "empresa_membros";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "obra_instalacoes_empresa_id_equipe_id_fkey";
+            columns: ["empresa_id", "equipe_id"];
+            isOneToOne: false;
+            referencedRelation: "equipes_instalacao";
+            referencedColumns: ["empresa_id", "id"];
+          },
+          {
+            foreignKeyName: "obra_instalacoes_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "obra_instalacoes_empresa_id_obra_id_fkey";
+            columns: ["empresa_id", "obra_id"];
+            isOneToOne: false;
+            referencedRelation: "obras";
+            referencedColumns: ["empresa_id", "id"];
+          },
+        ];
+      };
       obra_justificativas_atraso: {
         Row: {
           cobrado_em: string | null;
@@ -7293,6 +7402,34 @@ export type Database = {
         };
       };
       acompanhamento_obra: { Args: { p_token: string }; Returns: Json };
+      agenda_operacional: {
+        Args: { p_ate: string; p_de: string; p_empresa_id: string };
+        Returns: {
+          alerta: boolean;
+          cliente_nome: string;
+          detalhe: string;
+          equipe_id: string;
+          fim: string;
+          inicio: string;
+          obra_id: string;
+          obra_numero: number;
+          situacao: string;
+          tipo: string;
+        }[];
+      };
+      agendar_instalacao_obra: {
+        Args: {
+          p_equipe_id: string;
+          p_equipe_nome: string;
+          p_equipe_telefone: string;
+          p_inicio: string;
+          p_motivo: string;
+          p_obra_id: string;
+          p_observacao: string;
+          p_termino: string;
+        };
+        Returns: undefined;
+      };
       ajustar_entrega_contratada_obra: {
         Args: { p_data: string; p_motivo: string; p_obra_id: string };
         Returns: undefined;
@@ -8119,6 +8256,13 @@ export type Database = {
         Returns: undefined;
       };
       feriado_nacional: { Args: { p_data: string }; Returns: boolean };
+      feriados_periodo: {
+        Args: { p_ate: string; p_de: string; p_empresa_id: string };
+        Returns: {
+          data: string;
+          nome: string;
+        }[];
+      };
       garantir_obra: { Args: { p_negocio_id: string }; Returns: string };
       gera_procuracao_pelo_titulo: { Args: { p_titulo: string }; Returns: boolean };
       gerar_contrato_com_condicao: {
@@ -8493,6 +8637,7 @@ export type Database = {
       pode_enviar_pasta_tarefa_setor: { Args: { p_caminho: string }; Returns: boolean };
       pode_enviar_pasta_vistoria: { Args: { p_caminho: string }; Returns: boolean };
       pode_escalonar_obra: { Args: { p_obra_id: string }; Returns: boolean };
+      pode_gerir_equipes_instalacao: { Args: { p_empresa_id: string }; Returns: boolean };
       pode_informar_pagamento: { Args: { p_contrato_id: string }; Returns: boolean };
       pode_ler_documento_cliente_anexo: { Args: { p_caminho: string }; Returns: boolean };
       pode_ler_documento_cliente_compras: { Args: { p_caminho: string }; Returns: boolean };
@@ -8968,6 +9113,10 @@ export type Database = {
       };
       substituto_ativo_obra: {
         Args: { p_obra_id: string; p_setor: Database["public"]["Enums"]["setor_obra"] };
+        Returns: string;
+      };
+      sugerir_termino_instalacao: {
+        Args: { p_empresa_id: string; p_inicio: string };
         Returns: string;
       };
       tarefa_da_pasta_anexo: { Args: { p_caminho: string }; Returns: string };
