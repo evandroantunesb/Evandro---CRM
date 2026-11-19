@@ -77,6 +77,13 @@ export default async function PrecosMaterial({ searchParams }: PageProps<"/compr
                 Enviar tabela de preços
               </Link>
               <Link
+                href="/compras/precos/equipamentos"
+                className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-offwhite/30 px-5 text-sm font-semibold text-offwhite transition-colors hover:border-dourado ${FOCO}`}
+              >
+                <FileSpreadsheet size={16} aria-hidden />
+                Enviar lista de equipamentos
+              </Link>
+              <Link
                 href="/compras/precos/material/novo"
                 className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-offwhite/30 px-5 text-sm font-semibold text-offwhite transition-colors hover:border-dourado ${FOCO}`}
               >

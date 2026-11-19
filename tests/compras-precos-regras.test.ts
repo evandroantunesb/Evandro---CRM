@@ -35,7 +35,7 @@ describe("leitura da planilha", () => {
 
   it("palpite das colunas acha o cabeçalho depois das linhas de título", () => {
     const linhas = [["Tabela Solar Sul — novembro"], [], ["Cód.", "Descrição", "Un", "NCM", "Preço c/ IPI"], ["44102", "MOD 550W", "un", "x", 780]];
-    expect(adivinharMapa(linhas)).toEqual({ cabecalho: 2, codigo: 0, material: 1, unidade: 2, preco: 4 });
+    expect(adivinharMapa(linhas)).toEqual({ cabecalho: 2, codigo: 0, material: 1, unidade: 2, preco: 4, potencia: null });
     expect(adivinharMapa([["a", "b"]])).toBeNull();
   });
 

@@ -1,4 +1,5 @@
 import { lerNumeroBr } from "@/lib/formatacao";
+import { lerPotenciaCelula, situacaoPotencia, potenciaDoItem, type SituacaoPotencia } from "@/lib/compras/potencia";
 
 /*
  * Compras P3, tabela de preços de material (20261129100000_compras_tabela_precos.sql). Regras puras: leitura da
@@ -110,17 +111,30 @@ export type MapaColunas = {
   codigo: number | null;
   unidade: number | null;
   preco: number;
+  /** Potência em W (item 5 do roadmap, 18/11/2026). Opcional: mapas lembrados antes dela não têm o campo. */
+  potencia?: number | null;
 };
 
 export function ehMapaColunas(v: unknown): v is MapaColunas {
   if (!v || typeof v !== "object") return false;
   const m = v as Record<string, unknown>;
   const idx = (x: unknown) => Number.isInteger(x) && (x as number) >= 0 && (x as number) < 200;
-  return idx(m.cabecalho) && idx(m.material) && idx(m.preco) && (m.codigo === null || idx(m.codigo)) && (m.unidade === null || idx(m.unidade));
+  return (
+    idx(m.cabecalho) &&
+    idx(m.material) &&
+    idx(m.preco) &&
+    (m.codigo === null || idx(m.codigo)) &&
+    (m.unidade === null || idx(m.unidade)) &&
+    (m.potencia === undefined || m.potencia === null || idx(m.potencia))
+  );
 }
 
-const PALPITES: { campo: "material" | "codigo" | "unidade" | "preco"; padrao: RegExp }[] = [
+/** Cabeçalho de potência: "Potência", "Pot.", "W", "Wp", "Watts". */
+const PADRAO_POTENCIA = /^pot\b|^pot\.|potencia|^w$|^wp$|^k?wp?$|^watts?$/;
+
+const PALPITES: { campo: "material" | "codigo" | "unidade" | "preco" | "potencia"; padrao: RegExp }[] = [
   { campo: "preco", padrao: /preco|valor|custo/ },
+  { campo: "potencia", padrao: PADRAO_POTENCIA },
   { campo: "codigo", padrao: /^cod|codigo|sku|^ref/ },
   { campo: "unidade", padrao: /^un\b|^un\.|^und|unidade|medida/ },
   { campo: "material", padrao: /descri|produto|material|^item|^nome/ },
@@ -129,7 +143,7 @@ const PALPITES: { campo: "material" | "codigo" | "unidade" | "preco"; padrao: Re
 /** Palpite das colunas pelo cabeçalho (nas 20 primeiras linhas). Nulo = não achou material e preço. */
 export function adivinharMapa(linhas: Celula[][]): MapaColunas | null {
   for (let l = 0; l < Math.min(linhas.length, 20); l++) {
-    const achado: Partial<Record<"material" | "codigo" | "unidade" | "preco", number>> = {};
+    const achado: Partial<Record<"material" | "codigo" | "unidade" | "preco" | "potencia", number>> = {};
     linhas[l].forEach((c, i) => {
       const t = normalizar(textoCelula(c));
       if (!t) return;
@@ -137,7 +151,14 @@ export function adivinharMapa(linhas: Celula[][]): MapaColunas | null {
       if (p) achado[p.campo] = i;
     });
     if (achado.material != null && achado.preco != null) {
-      return { cabecalho: l, material: achado.material, preco: achado.preco, codigo: achado.codigo ?? null, unidade: achado.unidade ?? null };
+      return {
+        cabecalho: l,
+        material: achado.material,
+        preco: achado.preco,
+        codigo: achado.codigo ?? null,
+        unidade: achado.unidade ?? null,
+        potencia: achado.potencia ?? null,
+      };
     }
   }
   return null;
@@ -145,7 +166,7 @@ export function adivinharMapa(linhas: Celula[][]): MapaColunas | null {
 
 export function erroMapa(m: MapaColunas): string | null {
   if (m.material === m.preco) return "Material e preço de custo precisam ser colunas diferentes.";
-  const usadas = [m.material, m.preco, m.codigo, m.unidade].filter((x) => x != null);
+  const usadas = [m.material, m.preco, m.codigo, m.unidade, m.potencia].filter((x) => x != null);
   if (new Set(usadas).size !== usadas.length) return "Cada coluna só pode ter um significado.";
   return null;
 }
@@ -170,6 +191,9 @@ export type LinhaPrevia = {
   materialId: string | null;
   precoAnterior: number | null;
   problema: string | null;
+  /** Potência lida (W): nula sem coluna ou vazia, NaN ilegível. */
+  potencia: number | null;
+  potenciaSituacao: SituacaoPotencia;
 };
 
 /** Unidade da planilha no padrão do Raion ("UN" → "un", "Metro" → "m"). */
@@ -202,6 +226,7 @@ export function montarPrevia({
     if (v.descricao && !porDescricao.has(normalizar(v.descricao))) porDescricao.set(normalizar(v.descricao), v.materialId);
   }
   const porNome = new Map(materiais.map((m) => [normalizar(m.nome), m.id]));
+  const porId = new Map(materiais.map((m) => [m.id, m]));
   const atual = new Map(precosAtuais.map((p) => [p.materialId, p.preco]));
   const vistos = new Map<string, number>();
 
@@ -213,7 +238,8 @@ export function montarPrevia({
     const codigo = mapa.codigo != null ? textoCelula(linha[mapa.codigo]).slice(0, 60) || null : null;
     const unidade = mapa.unidade != null ? textoCelula(linha[mapa.unidade]) || null : null;
     const preco = lerPrecoCelula(linha[mapa.preco]);
-    const base = { numero: l + 1, descricao, codigo, unidade, preco: preco != null && !Number.isNaN(preco) ? preco : null };
+    const potencia = mapa.potencia != null ? lerPotenciaCelula(linha[mapa.potencia]) : null;
+    const base = { numero: l + 1, descricao, codigo, unidade, preco: preco != null && !Number.isNaN(preco) ? preco : null, potencia };
 
     let problema: string | null = null;
     if (!descricao) problema = "Sem material";
@@ -228,13 +254,13 @@ export function montarPrevia({
       else vistos.set(materialId, l + 1);
     }
     if (problema) {
-      resultado.push({ ...base, situacao: "problema", materialId: null, precoAnterior: null, problema });
+      resultado.push({ ...base, situacao: "problema", materialId: null, precoAnterior: null, problema, potenciaSituacao: situacaoPotencia(potencia, undefined) });
       continue;
     }
     const anterior = reconhecido ? (atual.get(reconhecido) ?? null) : null;
     const situacao: SituacaoLinha =
       !reconhecido || anterior == null ? "novo" : base.preco! > anterior ? "subiu" : base.preco! < anterior ? "baixou" : "igual";
-    resultado.push({ ...base, situacao, materialId, precoAnterior: anterior, problema: null });
+    resultado.push({ ...base, situacao, materialId, precoAnterior: anterior, problema: null, potenciaSituacao: situacaoPotencia(potencia, materialId ? porId.get(materialId) : undefined) });
   }
   return resultado;
 }
@@ -252,9 +278,10 @@ export function variacao(anterior: number, novo: number) {
 /** Escolha para uma linha "novo": criar material ou ligar a um existente. */
 export type DecisaoNovo = { tipo: "criar"; nome: string; categoria: CategoriaMaterial; unidade: string } | { tipo: "ligar"; materialId: string };
 
-export type ItemImportacao =
+export type ItemImportacao = (
   | { material_id: string; codigo: string | null; descricao: string; preco: number }
-  | { novo: { nome: string; categoria: CategoriaMaterial; unidade: string }; codigo: string | null; descricao: string; preco: number };
+  | { novo: { nome: string; categoria: CategoriaMaterial; unidade: string }; codigo: string | null; descricao: string; preco: number }
+) & { potencia_w?: number };
 
 /**
  * Itens que vão ao banco: todas as linhas sem problema (as iguais confirmam a data do preço). Erro se uma linha nova não
@@ -265,7 +292,7 @@ export function itensImportacao(linhas: LinhaPrevia[], decisoes: Record<number, 
   const usados = new Map<string, number>();
   for (const l of linhas) {
     if (l.situacao === "problema") continue;
-    const base = { codigo: l.codigo, descricao: l.descricao, preco: l.preco! };
+    const base = { codigo: l.codigo, descricao: l.descricao, preco: l.preco!, ...potenciaDoItem(l.potencia) };
     let chave: string;
     if (l.situacao === "novo") {
       const d = decisoes[l.numero];
