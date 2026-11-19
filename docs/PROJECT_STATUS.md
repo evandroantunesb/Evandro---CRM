@@ -13,6 +13,7 @@ Diagnóstico de 18/11/2026: a importação de preços por CSV já existia (Compr
 - Migration `20261218100000_potencia_equipamentos.sql`: `importar_tabela_precos` aceita `potencia_w` por item (novo nasce com ela; existente só é completado se estiver sem; retorna `potencias`) e `importar_lista_equipamentos` (lista sem preço: cria os novos e completa a potência; não mexe em preço).
 - Telas: coluna opcional "Potência (W)" no passo das colunas e na prévia de "Enviar tabela de preços" (reconhecida pelo cabeçalho e lembrada por fornecedor) e a tela nova "Enviar lista de equipamentos" (`/compras/precos/equipamentos`), com categoria deduzida do texto.
 - Código: `src/lib/compras/potencia.ts`, `src/lib/compras/equipamentos.ts`. Testes: `tests/potencia-equipamentos.test.ts` e `tests/potencia-equipamentos-db.test.ts`.
+- **Produção:** PR #412; migration aplicada em 18/11/2026 antes do merge pelo `banco-producao.yml` (tag `migracao-pr412-6a8d926`; dry-run 44437129372 listou só ela; aplicação 44437483110), autorizada e aprovada pelo Evandro no `producao-banco`.
 - Pendente do Evandro: mandar o CSV real (colunas e uma linha de exemplo) para conferir o reconhecimento das colunas.
 
 ## Agenda operacional (18/11/2026, item 4 do roadmap)
