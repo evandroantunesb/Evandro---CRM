@@ -13,6 +13,7 @@ Plano em `docs/superpowers/plans/2026-11-18-agenda-operacional.md`; prévia apro
 - Migration `20261217100000_agenda_operacional.sql`: `equipes_instalacao` (cadastro; inativa em vez de apagar), `obra_instalacoes` (agendamento por obra; só `agendar_instalacao_obra` escreve: Operacional em "Liberada para agendamento" ou "Agendada", motivo ao mudar datas, histórico `instalacao_agendamento`, primeiro agendamento passa o Operacional a "Agendada", Solo recusado), `sugerir_termino_instalacao` (3 dias úteis contando o início), `cronograma_obra` (previsão da Instalação pela agenda), `agenda_operacional` e `feriados_periodo`.
 - Telas: `/obras/agenda` (aba "Agenda" ao lado de Gestão e Apresentação; semana, mês, lista por dia no celular, filtros por tipo e equipe), `/obras/agenda/equipes` e o cartão "Instalação" no setor Operacional da obra.
 - Testes: `tests/agenda-operacional-db.test.ts` e `tests/agenda-regras.test.ts`.
+- **Produção:** PR #411; migration aplicada em 18/11/2026 antes do merge pelo `banco-producao.yml` (tag `migracao-pr411-f27c6c2`; dry-run 44432331034 listou só ela; aplicação 44432480227), autorizada e aprovada pelo Evandro no `producao-banco`.
 
 ## Avisos externos: resumo diário por e-mail (18/11/2026, item 3 do roadmap)
 
