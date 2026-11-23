@@ -156,7 +156,7 @@ test.describe("estados do cálculo", () => {
 
   test("(a) dados do vendedor completos: prévia com potência e geração, quadro só com pendências da empresa; salvar grava só o resultado técnico", async ({ page }) => {
     // Distribuidora sem tarifa oficial cadastrada: o que falta não depende do vendedor.
-    const n = await novoNegocio("Cliente dados completos (fictício)", { distribuidora: "Cemig" });
+    const n = await novoNegocio("Cliente dados completos (fictício)", { distribuidora: "Distribuidora Fictícia" });
     await abrir(page, n.id);
     await adicionarModulo(page, "550", "10");
     await page.getByLabel("Consumo médio (kWh/mês)").fill("700");
@@ -177,7 +177,7 @@ test.describe("estados do cálculo", () => {
     await expect(porId(page, "pendencias-vendedor")).toHaveCount(0);
     const empresa = porId(page, "pendencias-empresa");
     await expect(empresa).toContainText("O que não depende de você");
-    await expect(empresa.getByRole("listitem")).toHaveText(["Não há tarifa oficial cadastrada para a distribuidora informada (“Cemig”)."]);
+    await expect(empresa.getByRole("listitem")).toHaveText(["Não há tarifa oficial cadastrada para a distribuidora informada (“Distribuidora Fictícia”)."]);
 
     await page.getByRole("button", { name: /^Salvar kit/ }).click();
 
@@ -185,7 +185,7 @@ test.describe("estados do cálculo", () => {
     const salvo = porId(page, "kit-salvo");
     await expect(salvo).toBeVisible();
     await expect(salvo).toContainText("Kit e resultado técnico salvos. A conta e a economia ainda não foram calculadas.");
-    await expect(salvo).toContainText("Não depende de você: não há tarifa oficial cadastrada para a distribuidora informada (“Cemig”).");
+    await expect(salvo).toContainText("Não depende de você: não há tarifa oficial cadastrada para a distribuidora informada (“Distribuidora Fictícia”).");
     await expect(salvo).not.toContainText("Falta você informar");
     await expect(salvo).not.toContainText("fórmula antiga");
     await page.waitForTimeout(2000);

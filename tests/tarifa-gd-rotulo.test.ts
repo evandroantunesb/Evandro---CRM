@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { rotulosDistribuidoras } from "@/lib/tarifa-gd";
+import { distribuidoraDoTexto, rotulosDistribuidoras } from "@/lib/tarifa-gd";
 
 describe("rotulosDistribuidoras", () => {
   it("rótulo curto quando único; sigla como publicada quando o curto se repete", () => {
@@ -26,5 +26,23 @@ describe("rotulosDistribuidoras", () => {
     const rotulos = [...rotulosDistribuidoras(siglas).values()];
     expect(rotulos).toHaveLength(siglas.length);
     expect(new Set(rotulos.map((x) => x.toLowerCase())).size).toBe(siglas.length);
+  });
+});
+
+describe("distribuidoraDoTexto", () => {
+  const rotulos = new Map([
+    ["COPEL-DIS", "Copel"],
+    ["ENEL CE", "ENEL CE"],
+    ["CEMIG-D", "Cemig"],
+  ]);
+  it("rótulo ou sigla escolhidos viram a sigla oficial, sem diferença de caixa, acento ou espaço", () => {
+    expect(distribuidoraDoTexto("Copel", rotulos)).toBe("COPEL-DIS");
+    expect(distribuidoraDoTexto("  cemig ", rotulos)).toBe("CEMIG-D");
+    expect(distribuidoraDoTexto("enel ce", rotulos)).toBe("ENEL CE");
+    expect(distribuidoraDoTexto("cemig-d", rotulos)).toBe("CEMIG-D");
+  });
+  it("texto que não está na lista segue como digitado (distribuidora 'outra'); vazio vira vazio", () => {
+    expect(distribuidoraDoTexto("  Cooperativa Nova  ", rotulos)).toBe("Cooperativa Nova");
+    expect(distribuidoraDoTexto("   ", rotulos)).toBe("");
   });
 });

@@ -194,10 +194,10 @@ describe("regressões de tela", () => {
     const problema = formulario.slice(formulario.indexOf("function problemaDaEtapa("), formulario.indexOf("function mostrarProblema("));
     expect(problema).toContain("campoInvalido(etapa)");
     expect(formulario).toContain("etapasRef.current[etapa]");
-    // Campos com `required`: nome, WhatsApp, cidade, UF e valor. Origem, tipo de cliente, distribuidora e ligação são
-    // botões: conferidos em `problemaDaEtapa`, com mensagem própria.
+    // Campos com `required`: nome, WhatsApp, cidade, UF e valor. Origem, tipo de cliente e ligação são botões e a
+    // distribuidora é lista com busca: conferidos em `problemaDaEtapa`, com mensagem própria.
     expect(formulario.match(/\brequired\b/g)?.length).toBe(5);
-    for (const mensagem of ["Escolha a origem do cliente.", "Escolha o tipo de cliente.", "Escolha a distribuidora", "Escolha a ligação: ela muda o cálculo."]) {
+    for (const mensagem of ["Escolha a origem do cliente.", "Escolha o tipo de cliente.", "Escolha ou digite a distribuidora.", "Escolha a ligação: ela muda o cálculo."]) {
       expect(problema).toContain(mensagem);
     }
   });

@@ -33,6 +33,7 @@ import { criarClienteNavegador } from "@/lib/supabase/navegador";
 import {
   enquadramentoDoTipoCliente,
   resolverTarifa,
+  distribuidoraDoTexto,
   rotulosDistribuidoras,
   tarifaOficialRsKwh,
   type BaseTributaria,
@@ -83,7 +84,6 @@ const ETAPAS: { numero: Etapa; titulo: string; descricao: string }[] = [
   { numero: 3, titulo: "Sistema", descricao: "Sugerido pelo consumo. Ajuste se o cliente pedir." },
 ];
 
-const OUTRA = "__outra__";
 
 /** Mesmo conversor do servidor ("450", "1.200", "1.234,56"); vazio, inválido ou ambíguo vira null. */
 function numero(v: string): number | null {
@@ -247,16 +247,13 @@ export function FormularioNegocio({
   const [tarifaEfetivaKwh, setTarifaEfetivaKwh] = useState("");
   const [tipoCliente, setTipoCliente] = useState<TipoClienteQualif | null>(null);
   const [tipoLigacao, setTipoLigacao] = useState<TipoLigacao | null>(null);
-  // Só rótulo: o valor enviado é a sigla oficial, aceita pela tabela de tarifas.
+  // Lista suspensa que também se digita: o rótulo aparece na lista; o valor enviado é a sigla oficial, aceita pela tabela de
+  // tarifas. Texto fora da lista segue como digitado (distribuidora sem tarifa oficial).
   const rotulosDistribuidora = useMemo(() => rotulosDistribuidoras((contexto?.tarifas ?? []).map((t) => t.distribuidora)), [contexto]);
-  const distribuidorasConhecidas = useMemo(
-    () => [...rotulosDistribuidora.keys()].sort((a, b) => rotulosDistribuidora.get(a)!.localeCompare(rotulosDistribuidora.get(b)!, "pt-BR")),
-    [rotulosDistribuidora],
-  );
+  const opcoesDistribuidora = useMemo(() => [...rotulosDistribuidora.values()].sort((a, b) => a.localeCompare(b, "pt-BR")), [rotulosDistribuidora]);
   const rotuloDistribuidora = (sigla: string) => rotulosDistribuidora.get(sigla) ?? sigla;
-  const [distribuidoraEscolha, setDistribuidoraEscolha] = useState<string | null>(null);
-  const [distribuidoraOutra, setDistribuidoraOutra] = useState("");
-  const distribuidora = distribuidoraEscolha === OUTRA ? distribuidoraOutra.trim() : (distribuidoraEscolha ?? "");
+  const [distribuidoraTexto, setDistribuidoraTexto] = useState("");
+  const distribuidora = distribuidoraDoTexto(distribuidoraTexto, rotulosDistribuidora);
   const [faturaSelecionada, setFaturaSelecionada] = useState<File | null>(null);
   const inputFatura = useRef<HTMLInputElement>(null);
 
@@ -504,7 +501,7 @@ export function FormularioNegocio({
       if (formaConsumo === "kwh" && numero(consumoMedioKwh) == null) return { mensagem: "Informe o consumo médio mensal em kWh." };
       if (formaConsumo === "conta" && numero(valorFaturaMedio) == null) return { mensagem: "Informe o valor médio da conta." };
       if (!tipoCliente) return { mensagem: "Escolha o tipo de cliente." };
-      if (!distribuidora) return { mensagem: "Escolha a distribuidora (ou informe outra)." };
+      if (!distribuidora) return { mensagem: "Escolha ou digite a distribuidora." };
       if (!tipoLigacao) return { mensagem: "Escolha a ligação: ela muda o cálculo." };
       if (!usandoOficial && numero(tarifaManual) != null && !baseManual) return { mensagem: "Diga se a tarifa digitada tem ou não tributos." };
     }
@@ -864,19 +861,25 @@ export function FormularioNegocio({
             />
           </div>
 
-          <div>
-            <RotuloGrupo>Distribuidora</RotuloGrupo>
-            <GrupoOpcoes
+          <div className="md:max-w-sm">
+            <Campo
               rotulo="Distribuidora"
-              opcoes={[...distribuidorasConhecidas.map((d) => ({ valor: d, rotulo: rotuloDistribuidora(d) })), { valor: OUTRA, rotulo: "Outra" }]}
-              valor={distribuidoraEscolha}
-              aoEscolher={setDistribuidoraEscolha}
+              list="distribuidoras-conhecidas"
+              autoComplete="off"
+              placeholder="Escolha ou digite para buscar"
+              aria-describedby="distribuidora-ajuda"
+              value={distribuidoraTexto}
+              onChange={(e) => setDistribuidoraTexto(e.target.value)}
+              maxLength={80}
             />
-            {distribuidoraEscolha === OUTRA && (
-              <div className="mt-3 md:max-w-sm">
-                <Campo rotulo="Nome da distribuidora" value={distribuidoraOutra} onChange={(e) => setDistribuidoraOutra(e.target.value)} maxLength={80} />
-              </div>
-            )}
+            <datalist id="distribuidoras-conhecidas">
+              {opcoesDistribuidora.map((r) => (
+                <option key={r} value={r} />
+              ))}
+            </datalist>
+            <p id="distribuidora-ajuda" className="mt-1 text-xs text-texto-2">
+              {opcoesDistribuidora.length} distribuidoras com tarifa oficial. Se não estiver na lista, digite o nome.
+            </p>
           </div>
 
           <div>

@@ -108,6 +108,18 @@ export function rotulosDistribuidoras(siglas: readonly string[]): Map<string, st
   return new Map([...new Set(siglas)].map((s) => [s, contagem.get(curto(s).toLowerCase()) === 1 ? curto(s) : s]));
 }
 
+/**
+ * Texto do campo de distribuidora (escolhido na lista ou digitado) → valor gravado: a sigla oficial quando o texto é o
+ * rótulo ou a sigla de uma distribuidora da lista; senão, o texto como digitado (distribuidora fora da lista).
+ */
+export function distribuidoraDoTexto(texto: string, rotulos: ReadonlyMap<string, string>): string {
+  const digitado = texto.trim().replace(/\s+/g, " ");
+  const alvo = normalizarNome(digitado);
+  if (!alvo) return "";
+  for (const [sigla, rotulo] of rotulos) if (normalizarNome(rotulo) === alvo || normalizarNome(sigla) === alvo) return sigla;
+  return digitado;
+}
+
 /** Minúsculas, sem acento e com espaços simples: forma comparada com `nomes_aceitos`. */
 export function normalizarNome(v: string): string {
   return v
