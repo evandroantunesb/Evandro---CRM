@@ -1,11 +1,19 @@
 # Estado do projeto — Raion CRM
 
+## Ponto de retomada (23/11/2026)
+
+- **Produção:** `main` em `62db3f6`; migration `20261219100000_tarifas_gd_todas_distribuidoras.sql` aplicada em 23/11/2026 depois do merge pelo `banco-producao.yml` (dry-run 45251875236 listou só ela; aplicação 45267743393), autorizada e aprovada pelo Evandro no `producao-banco`. Um primeiro `aplicar` (45262084496) parou na trava sem aplicar nada: a #414 não tinha atualizado `MIGRATIONS_AUTORIZADAS`; corrigido pela #416.
+- **Mescladas em 23/11/2026:** #414 (item 6, entrega 1), #415 (teste da agenda sem depender da data) e #416 (autorização da migration).
+- **Lembrete para toda PR com migration:** atualizar junto `MIGRATIONS_AUTORIZADAS` em `.github/workflows/banco-producao.yml` e `AUTORIZADAS` em `tests/validar-conjunto-migrations.test.ts`.
+- **Próximo:** aguardando comando. Item 6, entrega 2 (cadastro de concessionárias + obra com concessionária) e depois a 3 (com prévia).
+- **Limpeza pendente (com OK do Evandro):** worktrees mesclados `C:\dev\crm-concessionarias` e `C:\dev\crm-agenda-teste`.
+
 ## Concessionárias além da Copel (23/11/2026, item 6 do roadmap)
 
 Desenho em `docs/superpowers/specs/2026-11-23-concessionarias-design.md` (aprovado): preparar para revenda, cada empresa cadastra as próprias concessionárias (checklist, prazos da distribuidora e canais por concessionária); a obra herda a concessionária do negócio; a Copel vira modelo pronto e é migrada para as empresas e obras atuais. Três entregas: (1) tarifas ANEEL de todas as distribuidoras; (2) cadastro de concessionárias + obra com concessionária; (3) checklist, prazos e canais por concessionária, com a tela (prévia antes).
 
-- **Entrega 1** (plano `docs/superpowers/plans/2026-11-23-tarifas-todas-distribuidoras.md`, branch `feat/concessionarias-tarifas`, worktree `C:\dev\crm-concessionarias`): gerador `scripts/aneel/gerar-tarifas.mjs` (mesma regra da Copel; fonte em `.aurora/fontes/aneel-componentes-2026-b1-todas.json`), migration `20261219100000_tarifas_gd_todas_distribuidoras.sql` (85 distribuidoras, 88 vigências; CERGAPA e CERSAD com Fio B zero e o agente "Não Informado", CNPJ 89.435.598/0001-55, ficaram de fora por decisão do Evandro em 23/11) e o campo "Distribuidora" do novo negócio virou lista com busca (`<input list>`; prévia aprovada com a observação "digitável para pesquisa": https://claude.ai/artifact/1EZe7YdVxQ1JBTDw66hSzs). A migration não pode ir a produção antes do código do campo (senão o seletor antigo mostraria 86 botões).
-- **Pendência encontrada (não é desta entrega):** `tests/agenda-operacional-db.test.ts` falha também na `main` desde ~23/11/2026 ("término sugerido" e "Agenda do período"): o teste parte da próxima segunda a partir de hoje e a semana cai perto do Natal (feriado nacional). Corrigir o teste para não depender da data.
+- **Entrega 1** (plano `docs/superpowers/plans/2026-11-23-tarifas-todas-distribuidoras.md`, branch `feat/concessionarias-tarifas`, worktree `C:\dev\crm-concessionarias`): gerador `scripts/aneel/gerar-tarifas.mjs` (mesma regra da Copel; fonte em `.aurora/fontes/aneel-componentes-2026-b1-todas.json`), migration `20261219100000_tarifas_gd_todas_distribuidoras.sql` (85 distribuidoras, 88 vigências; CERGAPA e CERSAD com Fio B zero e o agente "Não Informado", CNPJ 89.435.598/0001-55, ficaram de fora por decisão do Evandro em 23/11) e o campo "Distribuidora" do novo negócio virou lista com busca (`<input list>`; prévia aprovada com a observação "digitável para pesquisa": https://claude.ai/artifact/1EZe7YdVxQ1JBTDw66hSzs). **Concluída:** PR #414 mesclada; migration aplicada em produção em 23/11/2026 (run 45267743393), depois do código no ar.
+- **Teste da agenda corrigido (#415):** `tests/agenda-operacional-db.test.ts` falhava na `main` desde 23/11/2026 porque a semana escolhida caía no Natal; agora `segundaSemFeriado` escolhe uma semana sem feriado nacional pela própria `feriado_nacional` do banco.
 
 ## Ponto de retomada (18/11/2026)
 
