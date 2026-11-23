@@ -33,6 +33,7 @@ import { criarClienteNavegador } from "@/lib/supabase/navegador";
 import {
   enquadramentoDoTipoCliente,
   resolverTarifa,
+  rotulosDistribuidoras,
   tarifaOficialRsKwh,
   type BaseTributaria,
   type ContextoEstimativa,
@@ -88,12 +89,6 @@ const OUTRA = "__outra__";
 function numero(v: string): number | null {
   const n = lerNumeroBr(v);
   return n != null && Number.isFinite(n) && n > 0 ? n : null;
-}
-
-/** "COPEL-DIS" → "Copel" (só rótulo; o valor enviado é o nome oficial, aceito pela tabela de tarifas). */
-function rotuloDistribuidora(nome: string) {
-  const base = nome.split(/[-\s]/)[0];
-  return base.charAt(0) + base.slice(1).toLowerCase();
 }
 
 /** Kit no formato simples do cadastro (um módulo de referência + um inversor de referência), ou null se foi editado. */
@@ -252,10 +247,13 @@ export function FormularioNegocio({
   const [tarifaEfetivaKwh, setTarifaEfetivaKwh] = useState("");
   const [tipoCliente, setTipoCliente] = useState<TipoClienteQualif | null>(null);
   const [tipoLigacao, setTipoLigacao] = useState<TipoLigacao | null>(null);
+  // Só rótulo: o valor enviado é a sigla oficial, aceita pela tabela de tarifas.
+  const rotulosDistribuidora = useMemo(() => rotulosDistribuidoras((contexto?.tarifas ?? []).map((t) => t.distribuidora)), [contexto]);
   const distribuidorasConhecidas = useMemo(
-    () => [...new Set((contexto?.tarifas ?? []).map((t) => t.distribuidora))].sort(),
-    [contexto],
+    () => [...rotulosDistribuidora.keys()].sort((a, b) => rotulosDistribuidora.get(a)!.localeCompare(rotulosDistribuidora.get(b)!, "pt-BR")),
+    [rotulosDistribuidora],
   );
+  const rotuloDistribuidora = (sigla: string) => rotulosDistribuidora.get(sigla) ?? sigla;
   const [distribuidoraEscolha, setDistribuidoraEscolha] = useState<string | null>(null);
   const [distribuidoraOutra, setDistribuidoraOutra] = useState("");
   const distribuidora = distribuidoraEscolha === OUTRA ? distribuidoraOutra.trim() : (distribuidoraEscolha ?? "");

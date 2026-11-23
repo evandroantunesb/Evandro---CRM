@@ -148,6 +148,9 @@ export function extrairTarifas(linhas) {
  * Nomes aceitos por distribuidora (forma de `normalizarNome`): a sigla, com hífen e com espaço; o apelido curto (antes do
  * primeiro hífen ou espaço) só quando nenhuma outra distribuidora tem o mesmo. Nenhum nome fica em duas distribuidoras
  * nem repete um reservado (os da Copel já carregados).
+ * @param {string[]} distribuidoras
+ * @param {{ reservados?: string[] }} [opcoes]
+ * @returns {Map<string, string[]>}
  */
 export function nomesAceitos(distribuidoras, { reservados = [] } = {}) {
   const curto = (d) => normalizarNome(d).split(/[-\s]/)[0];
