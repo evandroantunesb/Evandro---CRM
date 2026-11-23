@@ -21,12 +21,27 @@ const somarDias = (d: string, n: number) => {
   x.setUTCDate(x.getUTCDate() + n);
   return x.toISOString().slice(0, 10);
 };
-/** Próxima segunda-feira a partir de daqui a `semanas` semanas (dia útil, longe de feriado fixo do teste). */
+/** Próxima segunda-feira a partir de daqui a `semanas` semanas. */
 const segunda = (semanas: number) => {
   const x = new Date(`${hoje()}T12:00:00Z`);
   x.setUTCDate(x.getUTCDate() + 7 * semanas + ((8 - x.getUTCDay()) % 7 || 7));
   return x.toISOString().slice(0, 10);
 };
+/**
+ * Primeira segunda-feira, a partir de daqui a `semanas` semanas, sem feriado nacional da semana anterior até o fim da
+ * seguinte (pela própria `feriado_nacional` do banco): os testes contam dias úteis à mão e consultam a Agenda de 7 dias
+ * antes a 7 depois, onde feriado vira evento; não podem depender da data em que rodam (em 23/11/2026 a semana caía no
+ * Natal e o teste quebrava).
+ */
+async function segundaSemFeriado(semanas: number): Promise<string> {
+  for (let s = semanas; s < semanas + 12; s++) {
+    const seg = segunda(s);
+    const dias = Array.from({ length: 21 }, (_, i) => somarDias(seg, i - 7));
+    const feriados = await Promise.all(dias.map((d) => admin.cliente.rpc("feriado_nacional", { p_data: d })));
+    if (feriados.every((r) => !r.error && r.data === false)) return seg;
+  }
+  throw new Error(`Nenhuma semana sem feriado nacional a partir de ${semanas} semanas`);
+}
 
 async function vincular(empresaId: string, u: Usuario, papel: "admin" | "gestor" | "vendedor" | "operacao") {
   const { data, error } = await servico.from("empresa_membros").insert({ empresa_id: empresaId, user_id: u.id, papel }).select("id").single();
@@ -121,7 +136,7 @@ describe("equipes de instalação", () => {
 
 describe("término sugerido", () => {
   it("3 dias úteis contando o início, pulando fim de semana e feriado da empresa", async () => {
-    const seg = segunda(3);
+    const seg = await segundaSemFeriado(3);
     const sugerir = async (inicio: string) => (await admin.cliente.rpc("sugerir_termino_instalacao", { p_empresa_id: empresa, p_inicio: inicio })).data;
     expect(await sugerir(seg)).toBe(somarDias(seg, 2)); // seg → qua
     expect(await sugerir(somarDias(seg, 4))).toBe(somarDias(seg, 8)); // sex → ter
@@ -132,11 +147,11 @@ describe("término sugerido", () => {
 });
 
 describe("agendar a instalação", () => {
-  let obra: string;
-  const inicio = segunda(5);
-  const termino = somarDias(inicio, 2);
+  let obra: string, inicio: string, termino: string;
 
   beforeAll(async () => {
+    inicio = await segundaSemFeriado(5);
+    termino = somarDias(inicio, 2);
     obra = await criarObra("Fazenda Santa Luzia", vendedor);
   });
 
@@ -196,10 +211,10 @@ describe("agendar a instalação", () => {
 });
 
 describe("Agenda do período", () => {
-  let obraVendedor: string, obraOutro: string;
-  const inicio = segunda(9);
+  let obraVendedor: string, obraOutro: string, inicio: string;
 
   beforeAll(async () => {
+    inicio = await segundaSemFeriado(9);
     obraVendedor = await criarObra("Usina Marcos", vendedor);
     obraOutro = await criarObra("Mercado Bom Preço", outroVendedor);
     for (const o of [obraVendedor, obraOutro]) await liberar(o);
