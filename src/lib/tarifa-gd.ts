@@ -93,6 +93,33 @@ export function disponibilidadeArt291(tipoLigacao: string): number | null {
   return (DISPONIBILIDADE_ART_291 as Record<string, number | undefined>)[tipoLigacao] ?? null;
 }
 
+/**
+ * Rótulo de cada distribuidora (sigla da ANEEL) para a tela: o nome curto capitalizado ("COPEL-DIS" → "Copel") quando
+ * nenhuma outra da lista tem o mesmo; senão, a sigla como a ANEEL publica ("ENEL CE", "CPFL-PAULISTA"), para não haver
+ * dois rótulos iguais.
+ */
+export function rotulosDistribuidoras(siglas: readonly string[]): Map<string, string> {
+  const curto = (s: string) => {
+    const base = s.split(/[-\s]/)[0];
+    return base.charAt(0).toUpperCase() + base.slice(1).toLowerCase();
+  };
+  const contagem = new Map<string, number>();
+  for (const s of new Set(siglas)) contagem.set(curto(s).toLowerCase(), (contagem.get(curto(s).toLowerCase()) ?? 0) + 1);
+  return new Map([...new Set(siglas)].map((s) => [s, contagem.get(curto(s).toLowerCase()) === 1 ? curto(s) : s]));
+}
+
+/**
+ * Texto do campo de distribuidora (escolhido na lista ou digitado) → valor gravado: a sigla oficial quando o texto é o
+ * rótulo ou a sigla de uma distribuidora da lista; senão, o texto como digitado (distribuidora fora da lista).
+ */
+export function distribuidoraDoTexto(texto: string, rotulos: ReadonlyMap<string, string>): string {
+  const digitado = texto.trim().replace(/\s+/g, " ");
+  const alvo = normalizarNome(digitado);
+  if (!alvo) return "";
+  for (const [sigla, rotulo] of rotulos) if (normalizarNome(rotulo) === alvo || normalizarNome(sigla) === alvo) return sigla;
+  return digitado;
+}
+
 /** Minúsculas, sem acento e com espaços simples: forma comparada com `nomes_aceitos`. */
 export function normalizarNome(v: string): string {
   return v

@@ -22,7 +22,7 @@ test.describe("Novo negócio — computador", () => {
     await entrarComo(page, base.usuarios.vendedor, base.senha);
     await preencherNovoNegocio(page, "Cliente Horizonte (fictício)", "45900000020", "1.200");
     await escolher(page, "Tipo de cliente", "Residencial");
-    await escolher(page, "Distribuidora", "Copel");
+    await page.getByRole("combobox", { name: "Distribuidora" }).fill("Copel");
 
     // 1.200 kWh → 17 módulos (1.264,8 kWh/mês) = 100%. Dois a menos: 15 × 620 W × 120 = 1.116 kWh = 93%.
     await expect(autonomia(page)).toHaveText("100%");
@@ -57,7 +57,7 @@ test.describe("Novo negócio — computador", () => {
     await entrarComo(page, base.usuarios.vendedor, base.senha);
     await preencherNovoNegocio(page, "Cliente Horizonte comercial (fictício)", "45900000021", "800");
     await escolher(page, "Tipo de cliente", "Comercial");
-    await escolher(page, "Distribuidora", "Copel");
+    await page.getByRole("combobox", { name: "Distribuidora" }).fill("Copel");
     await escolher(page, "Ligação", /Trif/);
     const resultado = page.getByRole("region", { name: "Resultado" });
     await expect(resultado.getByText("Para calcular conta e economia, falta:")).toBeVisible();
@@ -89,7 +89,7 @@ test.describe("Novo negócio — celular, tema escuro", () => {
 
     await page.getByRole("textbox", { name: "Consumo médio mensal (kWh)" }).fill("500");
     await escolher(page, "Tipo de cliente", "Residencial");
-    await escolher(page, "Distribuidora", "Copel");
+    await page.getByRole("combobox", { name: "Distribuidora" }).fill("Copel");
     await escolher(page, "Ligação", /Mono/);
     await semRolagemHorizontal(page, "passo 2");
     await page.getByRole("button", { name: /^Avançar/ }).click();

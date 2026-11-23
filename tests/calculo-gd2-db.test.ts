@@ -301,12 +301,12 @@ describe("banco: CHECK do estado completo, referência só de leitura, históric
   });
 
   it("tarifas_gd_aneel: qualquer usuário lê; ninguém grava pelo app", async () => {
-    const { data } = await fora.cliente.from("tarifas_gd_aneel").select("distribuidora, tusd_fio_b_rs_mwh, pendencias_fonte");
+    const { data } = await fora.cliente.from("tarifas_gd_aneel").select("distribuidora, tusd_fio_b_rs_mwh, pendencias_fonte").eq("distribuidora", "COPEL-DIS");
     expect(data).toEqual([{ distribuidora: "COPEL-DIS", tusd_fio_b_rs_mwh: 214.535600374, pendencias_fonte: ["tabela4_nao_conferida"] }]);
     const ins = await fora.cliente.from("tarifas_gd_aneel").update({ tusd_fio_b_rs_mwh: 1 }).eq("distribuidora", "COPEL-DIS").select("id");
     expect(ins.error ?? ins.data).toBeTruthy();
     expect(ins.data ?? []).toEqual([]);
-    const { data: depois } = await servico.from("tarifas_gd_aneel").select("tusd_fio_b_rs_mwh").single();
+    const { data: depois } = await servico.from("tarifas_gd_aneel").select("tusd_fio_b_rs_mwh").eq("distribuidora", "COPEL-DIS").single();
     expect(depois!.tusd_fio_b_rs_mwh).toBe(214.535600374);
   });
 
@@ -351,8 +351,8 @@ describe("banco: CHECK do estado completo, referência só de leitura, históric
     const comercial = await novoNegocio({ tipo: "comercial" });
     expect((await salvar(comercial)).mensagem).toContain("Enquadramento sem regra validada");
     expect((await linha(comercial)).estado_financeiro).toBe("incompleto");
-    const cemig = await novoNegocio({ distribuidora: "Cemig" });
-    expect((await salvar(cemig)).mensagem).toContain("Não há tarifa oficial cadastrada para a distribuidora informada");
-    expect((await linha(cemig)).estado_financeiro).toBe("incompleto");
+    const semTarifa = await novoNegocio({ distribuidora: "Distribuidora Fictícia" });
+    expect((await salvar(semTarifa)).mensagem).toContain("Não há tarifa oficial cadastrada para a distribuidora informada");
+    expect((await linha(semTarifa)).estado_financeiro).toBe("incompleto");
   });
 });
