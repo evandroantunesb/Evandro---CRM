@@ -99,12 +99,17 @@ export function EmitirProposta({
               ["Não incluso", conteudoModelo.exclusos?.length],
               ["Garantias", conteudoModelo.garantias?.length],
               ["Etapas", conteudoModelo.etapas?.length],
+              ["Depois da instalação", conteudoModelo.posVenda?.length],
             ] as const
           ).map(([nome, n]) => (
             <li key={nome}>
               {nome}: {n ? `${n} item(ns) do modelo da empresa` : "fora da proposta (o modelo não tem conteúdo confirmado)"}
             </li>
           ))}
+          <li>
+            Sobre a empresa:{" "}
+            {conteudoModelo.institucional ? "entra na proposta (blocos institucionais do modelo)" : "fora da proposta (o modelo não tem conteúdo institucional)"}
+          </li>
         </ul>
         <p className="rounded-md bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
           Detalhe interno (não aparece para o cliente): GD II e Fio B de 60% em 2026 ficam fora da proposta até o enquadramento do negócio e

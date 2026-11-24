@@ -79,7 +79,7 @@ export async function carregarEscolhaCondicao(
   if (emissaoR.error || preferenciasR.error) return { escolha: null, erro: true };
   if (!emissaoR.data) return { escolha: null, erro: false };
   const lida = lerDadosDaEmissao(emissaoR.data.dados, emissaoR.data.dados_sha256);
-  if (!lida.ok || lida.dados.esquema !== 5 || lida.dados.comercial.validadeAte < hoje) return { escolha: null, erro: false };
+  if (!lida.ok || lida.dados.esquema === 4 || lida.dados.comercial.validadeAte < hoje) return { escolha: null, erro: false };
   const preco = lida.dados.preco.valor;
   return {
     escolha: {

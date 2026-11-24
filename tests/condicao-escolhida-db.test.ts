@@ -92,7 +92,7 @@ async function negocioComProposta(titulo: string) {
       },
       regras: { personalizadoAtivo: true, taxas: { cartao: [{ parcelas: 10, taxa: 8 }], boleto: [] }, limiteDesconto: 10, descontoAprovado: 0 },
     },
-    conteudo: { incluso: null, exclusos: null, garantias: null, etapas: null },
+    conteudo: { incluso: null, exclusos: null, garantias: null, etapas: null, posVenda: null, institucional: null },
     identidade: { nomeExibicao: "Solar Teste", corPrimaria: "#0F0F10", corDestaque: "#D4AF37", whatsapp: "45999990000" },
     versao: 1,
     emitidaEm: new Date().toISOString(),

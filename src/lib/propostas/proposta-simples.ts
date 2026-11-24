@@ -1,6 +1,7 @@
 /**
- * Proposta simples provisória (M2 P0): até 3 páginas A4 (capa, sistema, oferta), no layout aprovado em
- * `docs/referencias/proposta-solar-ibs.html`, SEM economia, payback, Fio B nem tipo de ligação. Puro (sem I/O, sem
+ * Proposta simples (M2 P0; esquema 6 em 24/11/2026): capa, "Sobre a empresa" (só com conteúdo institucional escrito
+ * pela empresa), sistema e oferta com próximos passos, no layout aprovado pelo Evandro (artefato "Proposta comercial:
+ * antes e depois"), SEM economia, payback, Fio B nem tipo de ligação. Puro (sem I/O, sem
  * "server-only").
  *
  * A emissão nunca altera os modelos publicados da empresa. Só LÊ deles o conteúdo que a empresa escreveu (condições,
@@ -30,7 +31,7 @@ import { valorComoPersistido } from "@/lib/consumo-persistido";
 import { TIPOS_COMPONENTE_KIT } from "@/lib/tipos";
 
 /** Identificação do layout que gera o PDF; muda quando o conteúdo/estrutura do modelo simples mudar. */
-export const RENDERIZADOR_SIMPLES = "simples-v5";
+export const RENDERIZADOR_SIMPLES = "simples-v6";
 
 /** Rodapé aprovado (proposta COM a geração estimada). */
 export const RODAPE_SIMPLES =
@@ -45,14 +46,29 @@ export const rodapeDaProposta = (temGeracao: boolean) => (temGeracao ? RODAPE_SI
 export const LIMITES_CONFIRMACAO = { fonteMin: 10, fonteMax: 120, responsavelMin: 3, responsavelMax: 60 } as const;
 
 /**
- * Limites que mantêm a proposta em 3 páginas A4 sem cortar nada: passou do limite, a emissão é recusada com a
- * orientação, em vez de truncar o texto que a empresa confirmou.
+ * Limites que mantêm cada página A4 sem cortar nada: passou do limite, a emissão é recusada com a orientação, em vez
+ * de truncar o texto que a empresa confirmou.
  */
 export const LIMITES_SIMPLES = {
   incluso: 5,
   exclusos: 4,
   garantias: 3,
-  etapas: 4,
+  etapas: 5,
+  posVenda: 3,
+  sobreTexto: 600,
+  numeros: 4,
+  numeroRotulo: 30,
+  numeroValor: 20,
+  projetos: 3,
+  projetoTitulo: 40,
+  projetoDescricao: 90,
+  depoimentos: 2,
+  depoimentoNome: 40,
+  depoimentoTexto: 240,
+  equipe: 2,
+  equipeNome: 50,
+  equipeRegistro: 50,
+  equipeTexto: 90,
   textoItem: 70,
   etapaTitulo: 28,
   etapaPrazo: 20,
@@ -81,6 +97,18 @@ export type ConteudoDoModelo = {
   garantias: string[] | null;
   /** Etapas ("título | prazo | descrição") escritas pela empresa; nulo = sem conteúdo. */
   etapas: Etapa[] | null;
+  /** Suporte e manutenção depois da instalação (bloco "Suporte e manutenção"); nulo = sem conteúdo. */
+  posVenda: string[] | null;
+  /** Página "Sobre a empresa" (blocos institucionais ativos e escritos); nulo = página omitida. */
+  institucional: Institucional | null;
+};
+
+export type Institucional = {
+  sobre: string | null;
+  numeros: { rotulo: string; valor: string }[] | null;
+  projetos: { titulo: string; descricao: string | null }[] | null;
+  depoimentos: { nome: string; texto: string }[] | null;
+  equipe: { nome: string; registro: string | null; texto: string | null }[] | null;
 };
 
 function listaEscrita(valor: unknown): string[] | null {
@@ -111,7 +139,40 @@ export function extrairConteudoDoModelo(blocos: { tipo: string; ativo: boolean; 
     exclusos: listaEscrita(escopo?.excluido),
     garantias: itensDe(ativo("warranties")),
     etapas: etapas.length ? etapas : null,
+    posVenda: itensDe(ativo("support_maintenance")),
+    institucional: institucionalDoModelo(ativo),
   };
+}
+
+/** Linhas "a | b | c" de um bloco de lista, com as partes aparadas; linha sem a primeira parte é descartada. */
+function linhasComPartes(config: unknown): string[][] {
+  return (itensDe(config) ?? []).map((linha) => linha.split("|").map((p) => p.trim())).filter((partes) => partes[0]);
+}
+
+function ouNulo<T>(lista: T[]): T[] | null {
+  return lista.length ? lista : null;
+}
+
+/** Conteúdo institucional dos blocos ATIVOS, só o que a empresa escreveu; tudo vazio = nulo (sem a página). */
+function institucionalDoModelo(ativo: (tipo: string) => unknown): Institucional | null {
+  const sobreBruto = (ativo("about_company") as { texto?: unknown } | null | undefined)?.texto;
+  const sobre = typeof sobreBruto === "string" && sobreBruto.trim() ? sobreBruto.trim() : null;
+  const numeros = ouNulo(
+    linhasComPartes(ativo("company_numbers"))
+      .filter((p) => p[1])
+      .map(([rotulo, valor]) => ({ rotulo: rotulo!, valor: valor! })),
+  );
+  const projetos = ouNulo(linhasComPartes(ativo("portfolio")).map(([titulo, descricao]) => ({ titulo: titulo!, descricao: descricao || null })));
+  const depoimentos = ouNulo(
+    linhasComPartes(ativo("testimonials"))
+      .filter((p) => p[1])
+      .map(([nome, texto]) => ({ nome: nome!, texto: texto! })),
+  );
+  const equipe = ouNulo(
+    linhasComPartes(ativo("team_and_certifications")).map(([nome, registro, texto]) => ({ nome: nome!, registro: registro || null, texto: texto || null })),
+  );
+  if (!sobre && !numeros && !projetos && !depoimentos && !equipe) return null;
+  return { sobre, numeros, projetos, depoimentos, equipe };
 }
 
 /** Validade padrão da proposta quando o modelo não define uma (decisão do Evandro, 29/10/2026). */
@@ -215,22 +276,41 @@ const esquemaV4 = z.object({
   comercial: z.object({ ...comercialComum, condicoesPagamento: z.string().trim().min(1).max(LIMITES_SIMPLES.condicoes) }),
 });
 
-/** Esquema 5: condições escolhidas por modalidade e conferidas no servidor (ver `montarCondicoesPagamento`). */
+/** Esquema 5: condições escolhidas por modalidade e conferidas no servidor (ver `montarCondicoesPagamento`). Só leitura. */
 const esquemaV5 = z.object({
   esquema: z.literal(5),
   ...comum,
   comercial: z.object({ ...comercialComum, condicoesPagamento: esquemaCondicoesEmitidas }),
 });
 
+const textoInst = z.string().trim().min(1).max(600);
+const textoInstNulo = textoInst.nullable();
+
+/** Esquema 6 (24/11/2026): o 5 com o pós-venda e o conteúdo institucional da empresa ("Sobre a empresa"). */
+const esquemaV6 = z.object({
+  esquema: z.literal(6),
+  ...comum,
+  comercial: z.object({ ...comercialComum, condicoesPagamento: esquemaCondicoesEmitidas, posVenda: listaDeItens }),
+  institucional: z
+    .object({
+      sobre: textoInstNulo,
+      numeros: z.array(z.object({ rotulo: textoInst, valor: textoInst })).min(1).max(8).nullable(),
+      projetos: z.array(z.object({ titulo: textoInst, descricao: textoInstNulo })).min(1).max(8).nullable(),
+      depoimentos: z.array(z.object({ nome: textoInst, texto: textoInst })).min(1).max(8).nullable(),
+      equipe: z.array(z.object({ nome: textoInst, registro: textoInstNulo, texto: textoInstNulo })).min(1).max(8).nullable(),
+    })
+    .nullable(),
+});
+
 export const esquemaDadosEmissaoSimples = z
-  .discriminatedUnion("esquema", [esquemaV4, esquemaV5])
+  .discriminatedUnion("esquema", [esquemaV4, esquemaV5, esquemaV6])
   // O rodapé acompanha a geração: com o número, o aprovado; sem ele, a variante que não o promete.
   .refine((d) => d.rodape === rodapeDaProposta(d.sistema.geracao != null), { path: ["rodape"], message: "Rodapé não confere com a proposta." });
 
 /** Qualquer versão já emitida (leitura). */
 export type DadosEmissaoSimples = z.infer<typeof esquemaDadosEmissaoSimples>;
 /** O que uma emissão nova grava. */
-export type DadosEmissaoAtual = z.infer<typeof esquemaV5>;
+export type DadosEmissaoAtual = z.infer<typeof esquemaV6>;
 
 /** JSON canônico (chaves ordenadas): o mesmo conteúdo gera sempre os mesmos bytes, não importa a ordem do jsonb. */
 export function jsonCanonico(valor: unknown): string {
@@ -312,7 +392,7 @@ export type EntradaEmissaoSimples = {
   validadeAte: string | null;
   /** O que o vendedor escolheu (nulo = não veio) e o que a empresa permite a quem emite, lido no servidor. */
   condicoes: { entrada: EntradaCondicoes | null; regras: RegrasCondicoes };
-  conteudo: Pick<ConteudoDoModelo, "incluso" | "exclusos" | "garantias" | "etapas">;
+  conteudo: Pick<ConteudoDoModelo, "incluso" | "exclusos" | "garantias" | "etapas" | "posVenda" | "institucional">;
   identidade: { nomeExibicao: string; corPrimaria: string; corDestaque: string; whatsapp: string };
   versao: number;
   emitidaEm: string;
@@ -382,6 +462,7 @@ export function montarDadosEmissaoSimples(e: EntradaEmissaoSimples): ResultadoMo
     ["Incluso", e.conteudo.incluso, L.incluso],
     ["Não incluso", e.conteudo.exclusos, L.exclusos],
     ["Garantias", e.conteudo.garantias, L.garantias],
+    ["Suporte e manutenção", e.conteudo.posVenda, L.posVenda],
   ] as const) {
     if (!itens) continue;
     if (itens.length > max) pendencias.push(`O modelo da empresa tem ${itens.length} itens em "${nome}": a proposta simples comporta até ${max}. Reduza no modelo.`);
@@ -393,6 +474,7 @@ export function montarDadosEmissaoSimples(e: EntradaEmissaoSimples): ResultadoMo
       pendencias.push(`Há etapa com texto acima do limite (título ${L.etapaTitulo}, prazo ${L.etapaPrazo}, descrição ${L.etapaDescricao} caracteres). Encurte no modelo.`);
     }
   }
+  pendencias.push(...pendenciasInstitucional(e.conteudo.institucional));
   const temPreco = typeof e.valorNegocio === "number" && e.valorNegocio > 0;
   if (!temPreco) pendencias.push("Informe o valor do negócio (preço da proposta).");
   // As condições dependem do preço (desconto, parcelas): sem preço, só a pendência dele.
@@ -415,7 +497,7 @@ export function montarDadosEmissaoSimples(e: EntradaEmissaoSimples): ResultadoMo
     potenciaW: c.potencia_w != null && c.potencia_w > 0 ? c.potencia_w : null,
   }));
   const candidato = {
-    esquema: 5 as const,
+    esquema: 6 as const,
     cliente: { nome: e.contatoNome!.trim(), endereco: e.contatoEndereco?.trim() || null },
     sistema: {
       kitNome: nomeKitPersonalizado(
@@ -435,14 +517,65 @@ export function montarDadosEmissaoSimples(e: EntradaEmissaoSimples): ResultadoMo
       exclusos: e.conteudo.exclusos,
       garantias: e.conteudo.garantias,
       etapas: e.conteudo.etapas,
+      posVenda: e.conteudo.posVenda,
     },
+    institucional: e.conteudo.institucional,
     identidade: e.identidade,
     emissao: { versao: e.versao, emitidaEm: e.emitidaEm },
     rodape: rodapeDaProposta(sistema.geracao != null),
   };
-  const analisado = esquemaV5.safeParse(candidato);
+  const analisado = esquemaV6.safeParse(candidato);
   if (!analisado.success || analisado.data.rodape !== rodapeDaProposta(analisado.data.sistema.geracao != null)) return { ok: false, pendencias: ["Os dados do negócio não passaram na conferência da proposta. Revise o kit e o cliente."] };
   return { ok: true, dados: analisado.data };
+}
+
+/** Limites da página "Sobre a empresa": acima deles a emissão é recusada com a orientação (nada é cortado). */
+function pendenciasInstitucional(inst: Institucional | null): string[] {
+  if (!inst) return [];
+  const L = LIMITES_SIMPLES;
+  const p: string[] = [];
+  const n = (t: string | null) => t?.length ?? 0;
+  const conferir = (bloco: string, quantidade: number, max: number, regra: string, longo: boolean) => {
+    if (quantidade > max) p.push(`O modelo da empresa tem ${quantidade} itens em "${bloco}": a proposta comporta até ${max}. Reduza no modelo.`);
+    if (longo) p.push(`Há item de "${bloco}" com texto acima do limite (${regra}). Encurte no modelo.`);
+  };
+  if (n(inst.sobre) > L.sobreTexto) p.push(`O texto de "Quem somos" passa de ${L.sobreTexto} caracteres. Encurte no modelo.`);
+  if (inst.numeros) {
+    const longo = inst.numeros.some((x) => n(x.rotulo) > L.numeroRotulo || n(x.valor) > L.numeroValor);
+    conferir("Nossos números", inst.numeros.length, L.numeros, `rótulo ${L.numeroRotulo}, valor ${L.numeroValor} caracteres`, longo);
+  }
+  if (inst.projetos) {
+    const longo = inst.projetos.some((x) => n(x.titulo) > L.projetoTitulo || n(x.descricao) > L.projetoDescricao);
+    conferir("Nossos projetos", inst.projetos.length, L.projetos, `título ${L.projetoTitulo}, descrição ${L.projetoDescricao} caracteres`, longo);
+  }
+  if (inst.depoimentos) {
+    const longo = inst.depoimentos.some((x) => n(x.nome) > L.depoimentoNome || n(x.texto) > L.depoimentoTexto);
+    conferir("Depoimentos", inst.depoimentos.length, L.depoimentos, `nome ${L.depoimentoNome}, depoimento ${L.depoimentoTexto} caracteres`, longo);
+  }
+  if (inst.equipe) {
+    const longo = inst.equipe.some((x) => n(x.nome) > L.equipeNome || n(x.registro) > L.equipeRegistro || n(x.texto) > L.equipeTexto);
+    conferir("Equipe e qualificações", inst.equipe.length, L.equipe, `nome ${L.equipeNome}, registro ${L.equipeRegistro}, texto ${L.equipeTexto} caracteres`, longo);
+  }
+  return p;
+}
+
+/** Quanto do consumo informado a geração estimada cobre (%, inteiro); nulo sem geração confirmada. */
+export function coberturaDoConsumo(dados: DadosEmissaoSimples): number | null {
+  const s = dados.sistema;
+  return s.geracao ? Math.round((s.geracao.kwhMes / s.consumoMedioKwh) * 100) : null;
+}
+
+/**
+ * Link do WhatsApp da empresa com a mensagem pronta, para o QR code do fechamento (decisão do Evandro em 24/11/2026):
+ * o link da proposta on-line só existe depois da gravação (o token é sorteado no banco), então o QR leva ao consultor.
+ * Número brasileiro sem o 55 ganha o código do país; número que não parece celular ou fixo com DDD (ex.: 0800) = sem QR.
+ */
+export function linkWhatsappDaProposta(dados: DadosEmissaoSimples): string | null {
+  const digitos = dados.identidade.whatsapp.replace(/\D/g, "");
+  const numero = digitos.length === 10 || digitos.length === 11 ? `55${digitos}` : digitos;
+  if (!/^55[1-9]\d{9,10}$/.test(numero)) return null;
+  const mensagem = `Olá! Quero falar sobre a proposta nº ${dados.emissao.versao} de ${dados.cliente.nome}.`;
+  return `https://wa.me/${numero}?text=${encodeURIComponent(mensagem)}`;
 }
 
 // ---------------------------------------------------------------------------

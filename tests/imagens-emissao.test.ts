@@ -66,7 +66,7 @@ describe("foto da capa: fallback definido", () => {
     }
   });
 
-  it("o PDF com logo e SEM foto (fallback) tem 3 páginas, e o PDF com logo e foto também", async () => {
+  it("o PDF com logo e SEM foto (fallback) tem as mesmas 2 páginas do PDF com logo e foto (modelo sem conteúdo)", async () => {
     const entrada: EntradaEmissaoSimples = {
       contatoNome: "Maria Souza",
       contatoEndereco: "Rua A, 10",
@@ -82,7 +82,7 @@ describe("foto da capa: fallback definido", () => {
         entrada: { aVista: { desconto: "0" }, parcelado: null, financiamento: null, personalizado: null, observacao: "" },
         regras: { personalizadoAtivo: true, taxas: { cartao: [], boleto: [] }, limiteDesconto: 0, descontoAprovado: 0 },
       },
-      conteudo: { incluso: null, exclusos: null, garantias: null, etapas: null },
+      conteudo: { incluso: null, exclusos: null, garantias: null, etapas: null, posVenda: null, institucional: null },
       identidade: { nomeExibicao: "Solar Teste", corPrimaria: "#0E2A47", corDestaque: "#F2A900", whatsapp: "45999990000" },
       versao: 1,
       emitidaEm: "2026-10-22T12:00:00.000Z",
@@ -92,8 +92,8 @@ describe("foto da capa: fallback definido", () => {
     if (!m.ok) throw new Error(m.pendencias.join(" "));
     const logoUrl = `data:image/png;base64,${Buffer.from(PNG).toString("base64")}`;
     const paginas = (pdf: Uint8Array) => Buffer.from(pdf).toString("latin1").match(/\/Type \/Page(?!s)/g)?.length ?? 0;
-    expect(paginas(await gerarPdfPropostaSimples(m.dados, { logoUrl, fotoCapaUrl: null }))).toBe(3);
-    expect(paginas(await gerarPdfPropostaSimples(m.dados, { logoUrl, fotoCapaUrl: logoUrl }))).toBe(3);
+    expect(paginas(await gerarPdfPropostaSimples(m.dados, { logoUrl, fotoCapaUrl: null }))).toBe(2);
+    expect(paginas(await gerarPdfPropostaSimples(m.dados, { logoUrl, fotoCapaUrl: logoUrl }))).toBe(2);
   });
 });
 

@@ -3,12 +3,24 @@ import { Cartao } from "@/components/ui";
 import { formatarDataHora, formatarMoeda, hojeEmSaoPaulo } from "@/lib/formatacao";
 import { secoesCondicoesEmitidas } from "@/lib/condicoes-pagamento-exibicao";
 import type { CondicoesEmitidas } from "@/lib/condicoes-pagamento-proposta";
-import { dataBr, textoCondicoesComerciais, textoPremissaGeracao, type DadosEmissaoSimples } from "@/lib/propostas/proposta-simples";
+import {
+  coberturaDoConsumo,
+  dataBr,
+  linkWhatsappDaProposta,
+  textoCondicoesComerciais,
+  textoPremissaGeracao,
+  type DadosEmissaoSimples,
+  type Institucional,
+} from "@/lib/propostas/proposta-simples";
 import { ROTULO_TIPO_COMPONENTE_KIT } from "@/lib/tipos";
 
 /** Proposta emitida (simples): renderizada SÓ a partir dos dados congelados na emissão. */
 export function PropostaEmitida({ token, dados }: { token: string; dados: DadosEmissaoSimples }) {
   const vencida = dados.comercial.validadeAte < hojeEmSaoPaulo();
+  const cobertura = coberturaDoConsumo(dados);
+  const institucional = dados.esquema === 6 ? dados.institucional : null;
+  const posVenda = dados.esquema === 6 ? dados.comercial.posVenda : null;
+  const whatsapp = dados.esquema === 6 ? linkWhatsappDaProposta(dados) : null;
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-6 px-6 py-10">
       <LogoRaion altura={32} />
@@ -37,6 +49,8 @@ export function PropostaEmitida({ token, dados }: { token: string; dados: DadosE
         </div>
       )}
 
+      {institucional && <SobreAEmpresa inst={institucional} />}
+
       <Cartao titulo="O sistema">
         <dl className="grid grid-cols-2 gap-4 text-sm">
           <div>
@@ -60,6 +74,12 @@ export function PropostaEmitida({ token, dados }: { token: string; dados: DadosE
             <div>
               <dt className="text-zinc-500">Geração estimada</dt>
               <dd className="font-medium text-zinc-900">{dados.sistema.geracao.kwhMes.toLocaleString("pt-BR")} kWh/mês</dd>
+            </div>
+          )}
+          {cobertura != null && (
+            <div>
+              <dt className="text-zinc-500">Cobertura do consumo</dt>
+              <dd className="font-medium text-zinc-900">{cobertura.toLocaleString("pt-BR")}%</dd>
             </div>
           )}
         </dl>
@@ -116,15 +136,113 @@ export function PropostaEmitida({ token, dados }: { token: string; dados: DadosE
 
       <Cartao titulo="Investimento">
         <p data-testid="preco-proposta" className="text-2xl font-semibold text-carvao tabular-nums">{formatarMoeda(dados.preco.valor)}</p>
-        {dados.esquema === 5 ? (
+        {dados.esquema !== 4 ? (
           <CondicoesPagamento condicoes={dados.comercial.condicoesPagamento} validadeAte={dados.comercial.validadeAte} />
         ) : (
           <p className="mt-3 text-sm whitespace-pre-wrap text-zinc-700">{textoCondicoesComerciais(dados)}</p>
         )}
       </Cartao>
 
+      {dados.comercial.etapas && (
+        <Cartao titulo="Do contrato à energia ligada">
+          <ol className="flex flex-col gap-3 text-sm">
+            {dados.comercial.etapas.map((et, i) => (
+              <li key={i} className="flex gap-3">
+                <span className="flex size-6 shrink-0 items-center justify-center rounded-full border border-dourado text-xs font-semibold text-dourado-texto">{i + 1}</span>
+                <div>
+                  <p className="font-medium text-zinc-900">
+                    {et.titulo}
+                    {et.prazo && <span className="font-normal text-dourado-texto"> · {et.prazo}</span>}
+                  </p>
+                  {et.descricao && <p className="text-zinc-600">{et.descricao}</p>}
+                </div>
+              </li>
+            ))}
+          </ol>
+        </Cartao>
+      )}
+
+      {posVenda && (
+        <Cartao titulo="Depois da instalação">
+          <ul className="list-disc pl-5 text-sm text-zinc-800">
+            {posVenda.map((i, k) => (
+              <li key={k}>{i}</li>
+            ))}
+          </ul>
+        </Cartao>
+      )}
+
+      {whatsapp && (
+        <a
+          href={whatsapp}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex min-h-11 w-full items-center justify-center rounded-md bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
+        >
+          Falar com o consultor no WhatsApp
+        </a>
+      )}
+
       <p className="text-xs text-zinc-500">{dados.rodape}</p>
     </main>
+  );
+}
+
+/** "Sobre a empresa": só o que a empresa escreveu nos blocos institucionais, como no PDF. */
+function SobreAEmpresa({ inst }: { inst: Institucional }) {
+  return (
+    <Cartao titulo="Sobre a empresa">
+      <div className="flex flex-col gap-4 text-sm text-zinc-800">
+        {inst.sobre && <p className="whitespace-pre-line">{inst.sobre}</p>}
+        {inst.numeros && (
+          <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {inst.numeros.map((n, i) => (
+              <div key={i} className="rounded-lg border border-zinc-200 p-3">
+                <dd className="text-lg font-semibold text-carvao">{n.valor}</dd>
+                <dt className="text-xs text-zinc-500">{n.rotulo}</dt>
+              </div>
+            ))}
+          </dl>
+        )}
+        {inst.projetos && (
+          <div>
+            <p className="mb-1 text-xs font-medium tracking-wide text-dourado-texto uppercase">Projetos que já entregamos</p>
+            <ul className="flex flex-col gap-1">
+              {inst.projetos.map((pr, i) => (
+                <li key={i}>
+                  <span className="font-medium text-zinc-900">{pr.titulo}</span>
+                  {pr.descricao && <span className="text-zinc-600"> · {pr.descricao}</span>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {inst.depoimentos && (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {inst.depoimentos.map((d, i) => (
+              <figure key={i} className="rounded-lg border border-zinc-200 p-3">
+                <blockquote className="text-zinc-800">“{d.texto}”</blockquote>
+                <figcaption className="mt-2 text-xs font-medium text-dourado-texto">{d.nome}</figcaption>
+              </figure>
+            ))}
+          </div>
+        )}
+        {inst.equipe && (
+          <div>
+            <p className="mb-1 text-xs font-medium tracking-wide text-dourado-texto uppercase">Nossa equipe</p>
+            <ul className="flex flex-col gap-1">
+              {inst.equipe.map((m, i) => (
+                <li key={i}>
+                  <span className="font-medium text-zinc-900">{m.nome}</span>
+                  {m.registro && <span className="text-zinc-600"> · {m.registro}</span>}
+                  {m.texto && <span className="block text-zinc-600">{m.texto}</span>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </Cartao>
   );
 }
 
