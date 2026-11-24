@@ -30,6 +30,7 @@ export function AbaSistema({ ficha }: { ficha: Ficha }) {
       <KitPersonalizado
         negocioId={negocio.id}
         negocioValor={negocio.valor}
+        autoconsumoFracao={negocio.autoconsumo_percentual == null ? null : Number(negocio.autoconsumo_percentual)}
         estruturaTelhado={negocio.estrutura_telhado}
         padraoCliente={negocio.padrao_cliente}
         consumoMedioKwhPadrao={negocio.consumo_medio_kwh}
@@ -58,6 +59,8 @@ export function AbaSistema({ ficha }: { ficha: Ficha }) {
                 custoMaterialCaPorKwp: parametros.custo_material_ca_por_kwp,
                 custoEngenharia: parametros.custo_engenharia,
                 comissaoPercentual: parametros.comissao_percentual,
+                icms: Number(parametros.icms),
+                pisCofins: Number(parametros.pis_cofins),
               }
             : null
         }

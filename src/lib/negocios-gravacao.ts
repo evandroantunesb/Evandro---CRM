@@ -14,6 +14,7 @@ import {
 } from "@/lib/calculo-reproduzivel";
 import { carregarVigencia, mensagemDeRecusa, motivosDaAcao } from "@/lib/calculo-vigencia";
 import { montarLinhaCalculo } from "@/lib/calculo-servidor";
+import { precoInversorParaCalculo } from "@/lib/compras/precificacao-gravacao";
 import { atualizarPrecoDoCalculo, autorizarGravacaoCalculo, gravarLinhaCalculo, marcarCalculoDesatualizado } from "@/lib/calculo-gravacao";
 import type { Pendencia } from "@/lib/estimativa-financeira";
 import { cnpjValido, cpfValido, formatarDocumento, soDigitos } from "@/lib/dados-cliente-contrato";
@@ -181,6 +182,24 @@ export type ResultadoCriacao =
   | { ok: true; negocioId: string; empresaId: string; avisos: AvisoCriacao[]; estimativa?: EstimativaCriacao }
   | { ok: false; mensagem: string; contatoId?: string };
 
+/**
+ * Preço atual dos inversores do kit para a troca no ano 12 do cálculo (método v2). Só depois da autorização da sessão no
+ * negócio: lê custos com a chave de serviço (ver `precoInversorParaCalculo`).
+ */
+function precoInversor(empresaId: string, componentes: ComponenteKit[]) {
+  return precoInversorParaCalculo(
+    empresaId,
+    componentes.map((c) => ({
+      tipo: c.tipo,
+      descricao: c.descricao,
+      quantidade: c.quantidade,
+      potenciaW: c.potenciaW,
+      materialId: c.materialId ?? null,
+      precoVendaManual: c.precoVendaManual ?? null,
+    })),
+  );
+}
+
 async function inserirItensKit(supabase: SupabaseServidor, empresaId: string, negocioId: string, componentes: ComponenteKit[]) {
   return supabase
     .from("kit_componentes")
@@ -330,6 +349,9 @@ export async function criarNegocioComCliente(supabase: SupabaseServidor, atual: 
         valorFaturaMedio: d.valor_fatura_medio,
         tarifaKwh: d.tarifa_kwh,
         tarifaBaseTributaria: d.tarifa_base_tributaria,
+        // Negócio novo: autoconsumo padrão (30% no residencial).
+        autoconsumoFracao: null,
+        precoInversor: autorizado.ok ? await precoInversor(autorizado.autorizacao.empresaId, d.componentes) : null,
       }, { tipoCliente: d.qualif_tipo_cliente, distribuidoraInformada: d.qualif_distribuidora });
       if (montado.ok) {
         const { error: erroCalculo } = autorizado.ok
@@ -517,7 +539,7 @@ export async function salvarKitComCliente(
   const [{ data: negocio }, { data: calculoAtual, error: erroCalculo }, { data: itensAntigos, error: erroAntigos }] = await Promise.all([
     supabase
       .from("negocios")
-      .select("valor, consumo_medio_kwh, consumo_estimado_kwh, tarifa_efetiva_kwh, valor_conta_energia, qualif_tipo_cliente, qualif_distribuidora")
+      .select("valor, consumo_medio_kwh, consumo_estimado_kwh, tarifa_efetiva_kwh, valor_conta_energia, qualif_tipo_cliente, qualif_distribuidora, autoconsumo_percentual")
       .eq("id", d.negocioId)
       .maybeSingle(),
     supabase
@@ -561,6 +583,8 @@ export async function salvarKitComCliente(
       valorFaturaMedio,
       tarifaKwh: d.tarifaKwh,
       tarifaBaseTributaria: d.tarifaBaseTributaria,
+      autoconsumoFracao: negocio.autoconsumo_percentual == null ? null : Number(negocio.autoconsumo_percentual),
+      precoInversor: await precoInversor(autorizacao.empresaId, d.componentes),
     }, { tipoCliente: negocio.qualif_tipo_cliente, distribuidoraInformada: negocio.qualif_distribuidora });
     if (!montado.ok && !montado.incompleta) return { ok: false, mensagem: `${montado.mensagem} Nada foi alterado.` };
   }

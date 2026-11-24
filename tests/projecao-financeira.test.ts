@@ -100,6 +100,14 @@ describe("projeção de conta fácil", () => {
     expect(r.motivoSemPayback).toBe("inversor_sem_preco");
   });
 
+  it("sem o valor do negócio, sai a economia mas não o payback nem o saldo", () => {
+    for (const investimento of [null, 0]) {
+      const r = ok({ ...SIMPLES, investimento });
+      expect(r.economiaTotal).toBe(105000);
+      expect([r.paybackMeses, r.saldoFinal, r.motivoSemPayback]).toEqual([null, null, "sem_investimento"]);
+    }
+  });
+
   it("investimento que não se paga em 25 anos fica sem payback, com o motivo", () => {
     const r = ok({ ...SIMPLES, investimento: 10_000_000 });
     expect(r.paybackMeses).toBeNull();
@@ -160,7 +168,7 @@ describe("entradas inválidas nunca viram número", () => {
     ["antes de 2026 (sem percentual do Fio B)", { mesInicio: "2025-06" }],
     ["autoconsumo acima de 100%", { autoconsumoFracao: 1.2 }],
     ["consumo zero", { consumoMensalKwh: 0 }],
-    ["investimento zero", { investimento: 0 }],
+    ["investimento negativo", { investimento: -1 }],
     ["preço do inversor negativo", { precoInversor: -1 }],
     ["tributos absurdos", { icms: 0.5, pisCofins: 0.2 }],
     ["número não finito", { geracaoMensalKwh: Number.NaN }],

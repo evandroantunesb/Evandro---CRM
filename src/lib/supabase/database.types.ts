@@ -326,6 +326,7 @@ export type Database = {
       calculos_solares: {
         Row: {
           atualizado_por: string | null;
+          autoconsumo_fracao: number | null;
           autoconsumo_kwh: number | null;
           consumo_medio_kwh: number;
           conta_com_solar: number | null;
@@ -336,7 +337,9 @@ export type Database = {
           data_referencia: string | null;
           disponibilidade_kwh: number;
           distribuidora: string | null;
+          economia_25_anos: number | null;
           economia_mensal: number | null;
+          economia_primeiro_ano: number | null;
           empresa_id: string;
           enquadramento: string | null;
           estado_financeiro: string;
@@ -347,6 +350,7 @@ export type Database = {
           fio_b_vigencia_fim: string | null;
           fio_b_vigencia_inicio: string | null;
           geracao_estimada_kwh_mes: number;
+          icms: number | null;
           id: string;
           kit_id: string | null;
           kit_nome: string;
@@ -359,11 +363,16 @@ export type Database = {
           negocio_id: string;
           observacoes: string | null;
           payback_meses: number | null;
+          payback_motivo: string | null;
           pendencias: Json | null;
           percentual_fio_b: number;
           percentual_legal_fio_b: number | null;
+          pis_cofins: number | null;
+          preco_inversor: number | null;
           produtividade_kwh_kwp_mes: number;
+          projecao: Json | null;
           ressalvas: string[] | null;
+          saldo_25_anos: number | null;
           tarifa_base_tributaria: string | null;
           tarifa_gd_id: string | null;
           tarifa_kwh: number;
@@ -374,6 +383,7 @@ export type Database = {
         };
         Insert: {
           atualizado_por?: string | null;
+          autoconsumo_fracao?: number | null;
           autoconsumo_kwh?: number | null;
           consumo_medio_kwh: number;
           conta_com_solar?: number | null;
@@ -384,7 +394,9 @@ export type Database = {
           data_referencia?: string | null;
           disponibilidade_kwh: number;
           distribuidora?: string | null;
+          economia_25_anos?: number | null;
           economia_mensal?: number | null;
+          economia_primeiro_ano?: number | null;
           empresa_id: string;
           enquadramento?: string | null;
           estado_financeiro?: string;
@@ -395,6 +407,7 @@ export type Database = {
           fio_b_vigencia_fim?: string | null;
           fio_b_vigencia_inicio?: string | null;
           geracao_estimada_kwh_mes: number;
+          icms?: number | null;
           id?: string;
           kit_id?: string | null;
           kit_nome: string;
@@ -407,11 +420,16 @@ export type Database = {
           negocio_id: string;
           observacoes?: string | null;
           payback_meses?: number | null;
+          payback_motivo?: string | null;
           pendencias?: Json | null;
           percentual_fio_b: number;
           percentual_legal_fio_b?: number | null;
+          pis_cofins?: number | null;
+          preco_inversor?: number | null;
           produtividade_kwh_kwp_mes: number;
+          projecao?: Json | null;
           ressalvas?: string[] | null;
+          saldo_25_anos?: number | null;
           tarifa_base_tributaria?: string | null;
           tarifa_gd_id?: string | null;
           tarifa_kwh: number;
@@ -422,6 +440,7 @@ export type Database = {
         };
         Update: {
           atualizado_por?: string | null;
+          autoconsumo_fracao?: number | null;
           autoconsumo_kwh?: number | null;
           consumo_medio_kwh?: number;
           conta_com_solar?: number | null;
@@ -432,7 +451,9 @@ export type Database = {
           data_referencia?: string | null;
           disponibilidade_kwh?: number;
           distribuidora?: string | null;
+          economia_25_anos?: number | null;
           economia_mensal?: number | null;
+          economia_primeiro_ano?: number | null;
           empresa_id?: string;
           enquadramento?: string | null;
           estado_financeiro?: string;
@@ -443,6 +464,7 @@ export type Database = {
           fio_b_vigencia_fim?: string | null;
           fio_b_vigencia_inicio?: string | null;
           geracao_estimada_kwh_mes?: number;
+          icms?: number | null;
           id?: string;
           kit_id?: string | null;
           kit_nome?: string;
@@ -455,11 +477,16 @@ export type Database = {
           negocio_id?: string;
           observacoes?: string | null;
           payback_meses?: number | null;
+          payback_motivo?: string | null;
           pendencias?: Json | null;
           percentual_fio_b?: number;
           percentual_legal_fio_b?: number | null;
+          pis_cofins?: number | null;
+          preco_inversor?: number | null;
           produtividade_kwh_kwp_mes?: number;
+          projecao?: Json | null;
           ressalvas?: string[] | null;
+          saldo_25_anos?: number | null;
           tarifa_base_tributaria?: string | null;
           tarifa_gd_id?: string | null;
           tarifa_kwh?: number;
@@ -3609,6 +3636,7 @@ export type Database = {
         Row: {
           arquivado_em: string | null;
           arquivado_por: string | null;
+          autoconsumo_percentual: number | null;
           consumo_estimado_kwh: number | null;
           consumo_medio_kwh: number | null;
           contato_id: string;
@@ -3658,6 +3686,7 @@ export type Database = {
         Insert: {
           arquivado_em?: string | null;
           arquivado_por?: string | null;
+          autoconsumo_percentual?: number | null;
           consumo_estimado_kwh?: number | null;
           consumo_medio_kwh?: number | null;
           contato_id: string;
@@ -3707,6 +3736,7 @@ export type Database = {
         Update: {
           arquivado_em?: string | null;
           arquivado_por?: string | null;
+          autoconsumo_percentual?: number | null;
           consumo_estimado_kwh?: number | null;
           consumo_medio_kwh?: number | null;
           contato_id?: string;
@@ -5815,7 +5845,9 @@ export type Database = {
           disponibilidade_mono_kwh: number;
           disponibilidade_tri_kwh: number;
           empresa_id: string;
+          icms: number;
           percentual_fio_b: number;
+          pis_cofins: number;
           produtividade_confirmada_em: string | null;
           produtividade_confirmada_fonte: string | null;
           produtividade_confirmada_por: string | null;
@@ -5834,7 +5866,9 @@ export type Database = {
           disponibilidade_mono_kwh?: number;
           disponibilidade_tri_kwh?: number;
           empresa_id: string;
+          icms?: number;
           percentual_fio_b?: number;
+          pis_cofins?: number;
           produtividade_confirmada_em?: string | null;
           produtividade_confirmada_fonte?: string | null;
           produtividade_confirmada_por?: string | null;
@@ -5853,7 +5887,9 @@ export type Database = {
           disponibilidade_mono_kwh?: number;
           disponibilidade_tri_kwh?: number;
           empresa_id?: string;
+          icms?: number;
           percentual_fio_b?: number;
+          pis_cofins?: number;
           produtividade_confirmada_em?: string | null;
           produtividade_confirmada_fonte?: string | null;
           produtividade_confirmada_por?: string | null;
@@ -9144,6 +9180,7 @@ export type Database = {
         Returns: {
           arquivado_em: string | null;
           arquivado_por: string | null;
+          autoconsumo_percentual: number | null;
           consumo_estimado_kwh: number | null;
           consumo_medio_kwh: number | null;
           contato_id: string;
@@ -9202,6 +9239,7 @@ export type Database = {
         Returns: {
           arquivado_em: string | null;
           arquivado_por: string | null;
+          autoconsumo_percentual: number | null;
           consumo_estimado_kwh: number | null;
           consumo_medio_kwh: number | null;
           contato_id: string;
