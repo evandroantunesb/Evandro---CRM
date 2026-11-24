@@ -53,7 +53,7 @@ const esquemaCriar = z.object({
 });
 
 export async function criarModeloProposta(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  const { atual } = await exigirPapel("admin");
+  const { atual } = await exigirPapel("admin", "gestor");
   const dados = esquemaCriar.safeParse(Object.fromEntries(formData));
   if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
   const d = dados.data;
@@ -88,7 +88,7 @@ async function carregarModeloDaEmpresa(id: string, empresaId: string) {
 }
 
 export async function duplicarModeloProposta(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  const { atual } = await exigirPapel("admin");
+  const { atual } = await exigirPapel("admin", "gestor");
   const id = z.string().uuid().safeParse(formData.get("id"));
   if (!id.success) return { ok: false, mensagem: "Dados inválidos." };
 
@@ -141,7 +141,7 @@ export async function duplicarModeloProposta(_: ResultadoAcao, formData: FormDat
 }
 
 export async function definirModeloPadrao(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  const { atual } = await exigirPapel("admin");
+  const { atual } = await exigirPapel("admin", "gestor");
   const id = z.string().uuid().safeParse(formData.get("id"));
   if (!id.success) return { ok: false, mensagem: "Dados inválidos." };
   if (!(await carregarModeloDaEmpresa(id.data, atual.empresaId))) return { ok: false, mensagem: "Modelo não encontrado." };
@@ -157,7 +157,7 @@ export async function definirModeloPadrao(_: ResultadoAcao, formData: FormData):
 }
 
 export async function alternarPublicacaoModelo(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  const { atual } = await exigirPapel("admin");
+  const { atual } = await exigirPapel("admin", "gestor");
   const id = z.string().uuid().safeParse(formData.get("id"));
   if (!id.success) return { ok: false, mensagem: "Dados inválidos." };
   const publicar = formData.get("publicar") === "1";
@@ -197,7 +197,7 @@ export async function alternarPublicacaoModelo(_: ResultadoAcao, formData: FormD
 }
 
 export async function arquivarModeloProposta(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  const { atual } = await exigirPapel("admin");
+  const { atual } = await exigirPapel("admin", "gestor");
   const id = z.string().uuid().safeParse(formData.get("id"));
   if (!id.success) return { ok: false, mensagem: "Dados inválidos." };
 
@@ -213,7 +213,7 @@ export async function arquivarModeloProposta(_: ResultadoAcao, formData: FormDat
 }
 
 export async function renomearModeloProposta(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  const { atual } = await exigirPapel("admin");
+  const { atual } = await exigirPapel("admin", "gestor");
   const id = z.string().uuid().safeParse(formData.get("id"));
   const esquema = z.object({
     nome: z.string().trim().min(2, "Nome muito curto").max(80, "Nome muito longo"),
@@ -246,7 +246,7 @@ async function empresaDoModelo(modeloId: string, empresaId: string) {
 }
 
 export async function adicionarBlocoModelo(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  const { atual } = await exigirPapel("admin");
+  const { atual } = await exigirPapel("admin", "gestor");
   const modeloId = z.string().uuid().safeParse(formData.get("modeloId"));
   const tipo = z.enum(TIPOS_BLOCO_PROPOSTA as [string, ...string[]]).safeParse(formData.get("tipo"));
   if (!modeloId.success || !tipo.success) return { ok: false, mensagem: "Dados inválidos." };
@@ -269,7 +269,7 @@ export async function adicionarBlocoModelo(_: ResultadoAcao, formData: FormData)
 }
 
 export async function removerBlocoModelo(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  const { atual } = await exigirPapel("admin");
+  const { atual } = await exigirPapel("admin", "gestor");
   const id = z.string().uuid().safeParse(formData.get("id"));
   const modeloId = z.string().uuid().safeParse(formData.get("modeloId"));
   if (!id.success || !modeloId.success) return { ok: false, mensagem: "Dados inválidos." };
@@ -283,7 +283,7 @@ export async function removerBlocoModelo(_: ResultadoAcao, formData: FormData): 
 }
 
 export async function alternarBlocoModelo(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  const { atual } = await exigirPapel("admin");
+  const { atual } = await exigirPapel("admin", "gestor");
   const id = z.string().uuid().safeParse(formData.get("id"));
   const modeloId = z.string().uuid().safeParse(formData.get("modeloId"));
   if (!id.success || !modeloId.success) return { ok: false, mensagem: "Dados inválidos." };
@@ -301,7 +301,7 @@ export async function alternarBlocoModelo(_: ResultadoAcao, formData: FormData):
 }
 
 export async function moverBlocoModelo(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  const { atual } = await exigirPapel("admin");
+  const { atual } = await exigirPapel("admin", "gestor");
   const modeloId = z.string().uuid().safeParse(formData.get("modeloId"));
   const id = z.string().uuid().safeParse(formData.get("id"));
   const direcao = z.enum(["cima", "baixo"]).safeParse(formData.get("direcao"));
@@ -334,7 +334,7 @@ export async function moverBlocoModelo(_: ResultadoAcao, formData: FormData): Pr
 const esquemaQuebra = z.enum(["auto", "nova_pagina", "pagina_exclusiva"]);
 
 export async function definirQuebraBlocoModelo(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  const { atual } = await exigirPapel("admin");
+  const { atual } = await exigirPapel("admin", "gestor");
   const id = z.string().uuid().safeParse(formData.get("id"));
   const modeloId = z.string().uuid().safeParse(formData.get("modeloId"));
   const quebra = esquemaQuebra.safeParse(formData.get("quebra_pagina"));
@@ -354,7 +354,7 @@ export async function definirQuebraBlocoModelo(_: ResultadoAcao, formData: FormD
 
 /** Salva o `config` (JSON) de um bloco — os campos variam por tipo, resolvidos no formulário de cada bloco. */
 export async function salvarConfigBlocoModelo(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
-  const { atual } = await exigirPapel("admin");
+  const { atual } = await exigirPapel("admin", "gestor");
   const id = z.string().uuid().safeParse(formData.get("id"));
   const modeloId = z.string().uuid().safeParse(formData.get("modeloId"));
   const configBruto = z.string().safeParse(formData.get("config"));

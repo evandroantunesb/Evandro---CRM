@@ -4,7 +4,7 @@ import { CardModelo } from "./card-modelo";
 import { NovoModeloColapsavel } from "./novo-modelo";
 
 export default async function ConfigPropostas() {
-  const { atual } = await exigirPapel("admin");
+  const { atual } = await exigirPapel("admin", "gestor");
   const supabase = await criarClienteServidor();
   const { data: modelos } = await supabase
     .from("proposta_modelos")

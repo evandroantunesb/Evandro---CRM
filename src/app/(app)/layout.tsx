@@ -164,6 +164,8 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
           // Administrativo (`confirma_pagamento_cliente`); a tela escolhe as abas de cada um.
           ...(verPagamentosAConfirmar ? [{ href: "/financeiro", rotulo: "Financeiro", secao: "Operação", ativoEm: ["/pagamentos"] }] : []),
           ...(pode(papel, GESTAO_COMERCIAL) ? [{ href: "/painel", rotulo: "Painel", secao: "Gestão" }] : []),
+          // O gestor escolhe o que aparece nas propostas (o admin chega pelo hub de Configurações).
+          ...(papel === "gestor" ? [{ href: "/configuracoes/propostas", rotulo: "Modelos de proposta", secao: "Gestão" }] : []),
           ...itensGamificacao(papel, conquistaNova),
         ]
       : []),
