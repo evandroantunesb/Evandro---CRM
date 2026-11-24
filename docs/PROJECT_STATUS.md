@@ -5,8 +5,17 @@
 - **Produção:** `main` em `62db3f6`; migration `20261219100000_tarifas_gd_todas_distribuidoras.sql` aplicada em 23/11/2026 depois do merge pelo `banco-producao.yml` (dry-run 45251875236 listou só ela; aplicação 45267743393), autorizada e aprovada pelo Evandro no `producao-banco`. Um primeiro `aplicar` (45262084496) parou na trava sem aplicar nada: a #414 não tinha atualizado `MIGRATIONS_AUTORIZADAS`; corrigido pela #416.
 - **Mescladas em 23/11/2026:** #414 (item 6, entrega 1), #415 (teste da agenda sem depender da data) e #416 (autorização da migration).
 - **Lembrete para toda PR com migration:** atualizar junto `MIGRATIONS_AUTORIZADAS` em `.github/workflows/banco-producao.yml` e `AUTORIZADAS` em `tests/validar-conjunto-migrations.test.ts`.
-- **Próximo:** aguardando comando. Item 6, entrega 2 (cadastro de concessionárias + obra com concessionária) e depois a 3 (com prévia).
+- **Próximo:** proposta comercial completa, PR 1 em revisão e depois o modelo da proposta liberado para o gestor (seção abaixo). Item 6, entregas 2 e 3, aguardando comando.
 - **Limpeza pendente (com OK do Evandro):** worktrees mesclados `C:\dev\crm-concessionarias` e `C:\dev\crm-agenda-teste`.
+
+## Proposta comercial completa (24/11/2026)
+
+O Evandro aprovou o "depois" da proposta (https://claude.ai/artifact/GF3sEXXvGsThZePPpVsNZQ) e o levantamento de dados (https://claude.ai/artifact/KUFt76o6SBpNRAEyVDPtd5). Quatro PRs, nesta ordem: (1) proposta com dado que já existe; (2) motor da calculadora (economia, payback, 25 anos; recomendado Opus); (3) economia na proposta; (4) geração mês a mês e CO₂.
+
+- **Premissas da calculadora aprovadas em 24/11/2026** (valem para as PRs 2 a 4): autoconsumo padrão de 30% (residencial) e 50% (comercial), editável no negócio; ICMS de 19% (PR) e PIS/Cofins do mês, isentos só sobre a energia compensada (Lei PR 19.595/2018; Lei 13.169/2015, art. 8º); reajuste projetado de 5% ao ano (histórico Copel 2022–2026 ≈ 7,3%); perda dos módulos pela ficha (padrão 1% no 1º ano e 0,4% ao ano); horizonte de 25 anos; uma troca do inversor no ano 12, pelo preço atual do inversor do kit; Fio B a 100% a partir de 2029; bandeiras fora da projeção e iluminação pública só se o vendedor informar; CO₂ só em toneladas, com o último fator anual do MCTI, sem árvores.
+- **Em aberto para a PR 2:** faturas reais da Copel de clientes com solar depois de 2023 (para conferir a tributação do Fio B); fim do PIS/Cofins zero em 2027 com a reforma tributária (contador); curva de irradiação mês a mês (SunData por cidade); fichas oficiais dos equipamentos no catálogo (item 5).
+- **PR 1** (branch `feat/proposta-completa-p1`, worktree `C:\dev\crm-proposta-p1`): esquema 6 da emissão (pós-venda e conteúdo institucional dos blocos do modelo, só o que a empresa escreveu; esquemas 4 e 5 seguem legíveis), PDF com cobertura do consumo, "Sobre a empresa", linha do tempo de até 5 etapas, "Depois da instalação" e QR do WhatsApp da empresa (decisão do Evandro: o link da proposta on-line só existe depois da gravação), miolo em fluxo contínuo (pedido do Evandro: seção desligada só encurta a proposta, sem espaço vazio), as mesmas seções na página on-line e no resumo da emissão. Sem migration. Área e peso no telhado e ficha técnica dos equipamentos ficam para o catálogo (o kit não tem dimensões nem marca); fotos de projetos ficam para outra PR.
+- **Depois da PR 1:** liberar o modelo da proposta (Configurações › Propostas) também para o gestor, pedido do Evandro em 24/11/2026, em PR separada.
 
 ## Concessionárias além da Copel (23/11/2026, item 6 do roadmap)
 

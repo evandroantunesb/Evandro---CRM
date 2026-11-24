@@ -1,9 +1,18 @@
-import { Document, Font, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
+import { Document, Font, Image, Page, Rect, StyleSheet, Svg, Text, View } from "@react-pdf/renderer";
+import QRCode from "qrcode";
 import { formatarMoeda } from "@/lib/formatacao";
 import { ROTULO_TIPO_COMPONENTE_KIT } from "@/lib/tipos";
 import { FONTES_PDF } from "./fontes-pdf";
 import { CondicoesPagamentoPdf } from "./pdf-condicoes";
-import { dataBr, linhasCondicoesPagamento, textoPremissaGeracao, type DadosEmissaoSimples } from "./proposta-simples";
+import {
+  coberturaDoConsumo,
+  dataBr,
+  linhasCondicoesPagamento,
+  linkWhatsappDaProposta,
+  textoPremissaGeracao,
+  type DadosEmissaoSimples,
+  type Institucional,
+} from "./proposta-simples";
 
 // Manrope nos títulos e Inter nos textos (identidade do Raion), embutidas: nada é buscado na rede na hora de gerar.
 for (const fonte of FONTES_PDF) Font.register({ family: fonte.family, src: fonte.src, fontWeight: fonte.fontWeight });
@@ -13,9 +22,12 @@ const NEGRITO = { fontFamily: "Inter", fontWeight: 600 } as const;
 
 /**
  * PDF da proposta simples, seguindo a estrutura aprovada em `docs/referencias/proposta-solar-ibs.html` (spec
- * PROPOSTA_PDF_LAYOUT_IBS.md): capa fotográfica com três indicadores, página do sistema e página de oferta e
- * fechamento, com o investimento no fim. Sem economia, retorno, conta futura nem tipo de ligação: os mesmos espaços
- * mostram potência, geração (só se a produtividade estiver confirmada) e a descrição verificável da solução.
+ * PROPOSTA_PDF_LAYOUT_IBS.md) e o "depois" aprovado pelo Evandro em 24/11/2026: capa fotográfica com três
+ * indicadores, "Sobre a empresa" (só quando a empresa escreveu conteúdo institucional), página do sistema e página de
+ * oferta e fechamento (investimento, linha do tempo, pós-venda e QR do WhatsApp). Sem economia, retorno, conta futura
+ * nem tipo de ligação: os mesmos espaços mostram potência, geração e cobertura do consumo (só se a produtividade
+ * estiver confirmada) e a descrição verificável da solução. Depois da capa, as seções correm em fluxo contínuo: a
+ * folha vira quando enche, com o mesmo cabeçalho e a numeração total no rodapé, e seção ausente não deixa espaço.
  * Identidade (cores, logo, foto de capa) vem da empresa emissora; nada da marca de exemplo é reproduzido.
  */
 
@@ -91,7 +103,7 @@ const numero = (n: number) => n.toLocaleString("pt-BR");
 function Cabecalho({ dados, imagens, e }: { dados: DadosEmissaoSimples; imagens: ImagensDoPdf; e: ReturnType<typeof criarEstilos> }) {
   const nome = dados.identidade.nomeExibicao;
   return (
-    <>
+    <View fixed>
       <View style={e.barraTopo} />
       <View style={[e.miolo, { paddingTop: 10 }]}>
         <View style={e.cabecalho}>
@@ -105,21 +117,24 @@ function Cabecalho({ dados, imagens, e }: { dados: DadosEmissaoSimples; imagens:
           <Text style={e.etiqueta}>{`ENERGIA SOLAR · ${dados.cliente.nome.toUpperCase()}`.slice(0, 38)}</Text>
         </View>
       </View>
-    </>
+    </View>
   );
 }
 
-function Rodape({ dados, pagina, e, texto }: { dados: DadosEmissaoSimples; pagina: number; e: ReturnType<typeof criarEstilos>; texto?: string }) {
+/** Rodapé de toda página do miolo: o nome da empresa; na última, o aviso aprovado (sem economia nem retorno). */
+function Rodape({ dados, e }: { dados: DadosEmissaoSimples; e: ReturnType<typeof criarEstilos> }) {
+  const nome = dados.identidade.nomeExibicao || "Proposta de energia solar";
   return (
-    <View style={e.rodape}>
-      <Text style={{ flex: 1 }}>{texto ?? (dados.identidade.nomeExibicao || "Proposta de energia solar")}</Text>
-      <Text>{`${pagina} / 3`}</Text>
+    <View style={e.rodape} fixed>
+      <Text style={{ flex: 1 }} render={({ pageNumber, totalPages }) => (pageNumber === totalPages ? dados.rodape : nome)} />
+      <Text render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`} />
     </View>
   );
 }
 
 function Capa({ dados, imagens, p }: { dados: DadosEmissaoSimples; imagens: ImagensDoPdf; p: ReturnType<typeof paletaDaEmpresa> }) {
   const s = dados.sistema;
+  const cobertura = coberturaDoConsumo(dados);
   const emitida = new Date(dados.emissao.emitidaEm).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
   const inversor = s.componentes.find((c) => c.tipo === "inversor");
   const cartaoBase = { flex: 1, backgroundColor: mix(p.fundo, "#FFFFFF", 0.09), borderWidth: 1, borderColor: p.borda, borderRadius: 10, padding: 12 } as const;
@@ -174,7 +189,7 @@ function Capa({ dados, imagens, p }: { dados: DadosEmissaoSimples; imagens: Imag
               <>
                 <Text style={{ fontSize: 7.5, ...NEGRITO, letterSpacing: 0.8, color: p.suave }}>GERAÇÃO ESTIMADA</Text>
                 <Text style={{ fontSize: 19, ...TITULO, marginTop: 6 }}>{`${numero(Math.round(s.geracao.kwhMes))} kWh/mês`}</Text>
-                <Text style={{ fontSize: 8.5, color: p.suave, marginTop: 4 }}>Estimativa comercial</Text>
+                <Text style={{ fontSize: 8.5, color: p.suave, marginTop: 4 }}>{cobertura != null ? `cobre ${numero(cobertura)}% do seu consumo` : "Estimativa comercial"}</Text>
               </>
             ) : (
               <>
@@ -200,12 +215,12 @@ function Capa({ dados, imagens, p }: { dados: DadosEmissaoSimples; imagens: Imag
   );
 }
 
-function PaginaSistema({ dados, imagens, e, p }: { dados: DadosEmissaoSimples; imagens: ImagensDoPdf; e: ReturnType<typeof criarEstilos>; p: ReturnType<typeof paletaDaEmpresa> }) {
+/** Números do sistema, equipamentos e garantias. */
+function SecoesSistema({ dados, e, p }: { dados: DadosEmissaoSimples; e: ReturnType<typeof criarEstilos>; p: ReturnType<typeof paletaDaEmpresa> }) {
   const s = dados.sistema;
+  const cobertura = coberturaDoConsumo(dados);
   return (
-    <Page size="A4" style={e.pagina}>
-      <Cabecalho dados={dados} imagens={imagens} e={e} />
-      <View style={e.miolo}>
+    <>
         <View style={e.cartao} wrap={false}>
           <Text style={e.tituloCartao}>Seu sistema solar em números simples</Text>
           <View style={{ flexDirection: "row", gap: 9 }}>
@@ -226,11 +241,19 @@ function PaginaSistema({ dados, imagens, e, p }: { dados: DadosEmissaoSimples; i
                 <Text style={e.miniSub}>{`cerca de ${numero(Math.round(s.geracao.kwhMes * 12))} kWh/ano`}</Text>
               </View>
             ) : null}
-            <View style={e.mini}>
-              <Text style={e.miniRotulo}>CONSUMO</Text>
-              <Text style={e.miniValor}>{`${numero(s.consumoMedioKwh)} kWh`}</Text>
-              <Text style={e.miniSub}>por mês, informado</Text>
-            </View>
+            {cobertura != null ? (
+              <View style={e.mini}>
+                <Text style={e.miniRotulo}>COBERTURA</Text>
+                <Text style={e.miniValor}>{`${numero(cobertura)}%`}</Text>
+                <Text style={e.miniSub}>{`do consumo de ${numero(s.consumoMedioKwh)} kWh`}</Text>
+              </View>
+            ) : (
+              <View style={e.mini}>
+                <Text style={e.miniRotulo}>CONSUMO</Text>
+                <Text style={e.miniValor}>{`${numero(s.consumoMedioKwh)} kWh`}</Text>
+                <Text style={e.miniSub}>por mês, informado</Text>
+              </View>
+            )}
           </View>
           {s.geracao ? <Text style={{ fontSize: 7.5, color: p.suave, marginTop: 9, lineHeight: 1.4 }}>{textoPremissaGeracao(dados)}</Text> : null}
         </View>
@@ -265,9 +288,7 @@ function PaginaSistema({ dados, imagens, e, p }: { dados: DadosEmissaoSimples; i
             </View>
           </View>
         ) : null}
-      </View>
-      <Rodape dados={dados} pagina={2} e={e} />
-    </Page>
+    </>
   );
 }
 
@@ -298,12 +319,11 @@ function Colunas({ dados, e, p }: { dados: DadosEmissaoSimples; e: ReturnType<ty
   );
 }
 
-function PaginaOferta({ dados, imagens, e, p }: { dados: DadosEmissaoSimples; imagens: ImagensDoPdf; e: ReturnType<typeof criarEstilos>; p: ReturnType<typeof paletaDaEmpresa> }) {
+/** Incluso, investimento, linha do tempo, pós-venda e fechamento. */
+function SecoesOferta({ dados, e, p }: { dados: DadosEmissaoSimples; e: ReturnType<typeof criarEstilos>; p: ReturnType<typeof paletaDaEmpresa> }) {
   const c = dados.comercial;
   return (
-    <Page size="A4" style={e.pagina}>
-      <Cabecalho dados={dados} imagens={imagens} e={e} />
-      <View style={e.miolo}>
+    <>
         <Colunas dados={dados} e={e} p={p} />
 
         <View style={e.cartao} wrap={false}>
@@ -315,7 +335,7 @@ function PaginaOferta({ dados, imagens, e, p }: { dados: DadosEmissaoSimples; im
             </View>
             <Text style={{ fontSize: 22, ...TITULO }}>{formatarMoeda(dados.preco.valor)}</Text>
           </View>
-          {dados.esquema === 5 ? (
+          {dados.esquema !== 4 ? (
             <CondicoesPagamentoPdf condicoes={dados.comercial.condicoesPagamento} p={p} />
           ) : linhasCondicoesPagamento(dados).length > 0 ? (
             // Esquema 4 (texto livre): uma opção por linha.
@@ -333,47 +353,197 @@ function PaginaOferta({ dados, imagens, e, p }: { dados: DadosEmissaoSimples; im
           ) : null}
         </View>
 
-        {c.etapas ? (
-          <View style={{ flexDirection: "row", gap: 8, marginBottom: 8 }} wrap={false}>
-            {c.etapas.map((et, i) => (
-              <View key={i} style={{ flex: 1, backgroundColor: p.cartao, borderWidth: 1, borderColor: p.borda, borderRadius: 8, padding: 8 }}>
-                <Text style={{ fontSize: 7, ...NEGRITO, letterSpacing: 0.8, color: p.acento }}>{`PASSO ${i + 1}`}</Text>
-                <Text style={{ fontSize: 9.5, ...NEGRITO, marginTop: 4 }}>{et.titulo}</Text>
-                {et.prazo ? <Text style={{ fontSize: 8, color: p.suave, marginTop: 2 }}>{et.prazo}</Text> : null}
-                {et.descricao ? <Text style={{ fontSize: 8, color: p.suave, marginTop: 3, lineHeight: 1.35 }}>{et.descricao}</Text> : null}
+        {c.etapas ? <LinhaDoTempo etapas={c.etapas} e={e} p={p} /> : null}
+
+        {dados.esquema === 6 && dados.comercial.posVenda ? (
+          <View style={e.cartao} wrap={false}>
+            <Text style={e.tituloCartao}>Depois da instalação</Text>
+            <View style={{ flexDirection: "row", gap: 9 }}>
+              {dados.comercial.posVenda.map((item, i) => (
+                <View key={i} style={[e.mini, e.itemLista, { padding: 8 }]}>
+                  <View style={[e.ponto, { backgroundColor: p.acento }]} />
+                  <Text style={{ flex: 1, fontSize: 9, lineHeight: 1.35 }}>{item}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : null}
+
+        <Fechamento dados={dados} p={p} />
+    </>
+  );
+}
+
+/** Etapas da empresa em linha do tempo: círculos numerados ligados por uma linha, com prazo e descrição embaixo. */
+function LinhaDoTempo({ etapas, e, p }: { etapas: NonNullable<DadosEmissaoSimples["comercial"]["etapas"]>; e: ReturnType<typeof criarEstilos>; p: ReturnType<typeof paletaDaEmpresa> }) {
+  const meia = 50 / etapas.length;
+  return (
+    <View style={e.cartao} wrap={false}>
+      <Text style={e.tituloCartao}>Do contrato à energia ligada</Text>
+      <View style={{ position: "relative", flexDirection: "row" }}>
+        {etapas.length > 1 ? <View style={{ position: "absolute", top: 9, left: `${meia}%`, right: `${meia}%`, height: 1.5, backgroundColor: p.borda }} /> : null}
+        {etapas.map((et, i) => (
+          <View key={i} style={{ flex: 1, alignItems: "center", paddingHorizontal: 4 }}>
+            <View style={{ width: 19, height: 19, borderRadius: 10, borderWidth: 1.5, borderColor: p.acento, backgroundColor: p.acentoSuave, alignItems: "center", justifyContent: "center" }}>
+              <Text style={{ fontSize: 8, ...TITULO, color: p.acento }}>{i + 1}</Text>
+            </View>
+            <Text style={{ fontSize: 9, ...NEGRITO, marginTop: 5, textAlign: "center" }}>{et.titulo}</Text>
+            {et.prazo ? <Text style={{ fontSize: 7.5, ...NEGRITO, color: p.acento, marginTop: 2, textAlign: "center" }}>{et.prazo}</Text> : null}
+            {et.descricao ? <Text style={{ fontSize: 7.5, color: p.suave, marginTop: 2, lineHeight: 1.35, textAlign: "center" }}>{et.descricao}</Text> : null}
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+/** QR code desenhado em vetor (nítido em qualquer zoom), uma faixa por sequência de módulos escuros na linha. */
+function QrCodePdf({ texto, tamanho }: { texto: string; tamanho: number }) {
+  const { modules } = QRCode.create(texto, { errorCorrectionLevel: "M" });
+  const n = modules.size;
+  const faixas: { x: number; y: number; w: number }[] = [];
+  for (let y = 0; y < n; y++) {
+    let inicio = -1;
+    for (let x = 0; x <= n; x++) {
+      const escuro = x < n && modules.get(y, x);
+      if (escuro && inicio < 0) inicio = x;
+      if (!escuro && inicio >= 0) {
+        faixas.push({ x: inicio, y, w: x - inicio });
+        inicio = -1;
+      }
+    }
+  }
+  const borda = 2;
+  return (
+    <Svg width={tamanho} height={tamanho} viewBox={`0 0 ${n + borda * 2} ${n + borda * 2}`}>
+      <Rect x={0} y={0} width={n + borda * 2} height={n + borda * 2} fill="#FFFFFF" />
+      {faixas.map((f, i) => (
+        <Rect key={i} x={f.x + borda} y={f.y + borda} width={f.w} height={1} fill="#000000" />
+      ))}
+    </Svg>
+  );
+}
+
+/** Faixa final: próximos passos, WhatsApp e validade; com QR do WhatsApp quando o número é um telefone válido. */
+function Fechamento({ dados, p }: { dados: DadosEmissaoSimples; p: ReturnType<typeof paletaDaEmpresa> }) {
+  const link = dados.esquema === 6 ? linkWhatsappDaProposta(dados) : null;
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 10, borderLeftWidth: 3, borderLeftColor: p.acento, backgroundColor: p.cartao, borderRadius: 9, padding: 9 }} wrap={false}>
+      {link ? <QrCodePdf texto={link} tamanho={62} /> : null}
+      <View style={{ flex: 1 }}>
+        {/* Duas linhas: título e WhatsApp; convite e validade. */}
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+          <Text style={{ fontSize: 11.5, ...TITULO, flexShrink: 1 }}>{dados.identidade.nomeExibicao ? `${dados.identidade.nomeExibicao}: próximos passos` : "Próximos passos"}</Text>
+          {dados.identidade.whatsapp ? <Text style={{ fontSize: 11, ...NEGRITO, color: p.verde }}>{`WhatsApp: ${dados.identidade.whatsapp}`}</Text> : null}
+        </View>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8, marginTop: 4 }}>
+          <Text style={{ fontSize: 9, color: p.suave, flexShrink: 1 }}>
+            {link ? "Aponte a câmera para o QR code e fale com o seu consultor pelo WhatsApp." : "Fale com seu consultor para tirar dúvidas e avançar com a sua proposta."}
+          </Text>
+          <Text style={{ fontSize: 9, color: p.suave }}>
+            {"Válida até "}
+            <Text style={{ ...NEGRITO, color: p.texto }}>{dataBr(dados.comercial.validadeAte)}</Text>
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+/** "Sobre a empresa": só o que a empresa escreveu nos blocos institucionais do modelo; seção vazia não aparece. */
+function SecoesSobre({ inst, e, p }: { inst: Institucional; e: ReturnType<typeof criarEstilos>; p: ReturnType<typeof paletaDaEmpresa> }) {
+  const iniciais = (nome: string) =>
+    nome
+      .split(/\s+/)
+      .filter((parte) => /^[A-Za-zÀ-ÿ]/.test(parte))
+      .slice(0, 2)
+      .map((parte) => parte[0]!.toUpperCase())
+      .join("");
+  return (
+    <>
+        {inst.sobre ? (
+          <View style={e.cartao} wrap={false}>
+            <Text style={e.tituloCartao}>Quem somos</Text>
+            <Text style={{ fontSize: 9.5, lineHeight: 1.5 }}>{inst.sobre}</Text>
+          </View>
+        ) : null}
+        {inst.numeros ? (
+          <View style={e.cartao} wrap={false}>
+            <Text style={e.tituloCartao}>Nossos números</Text>
+            <View style={{ flexDirection: "row", gap: 9 }}>
+              {inst.numeros.map((n, i) => (
+                <View key={i} style={e.mini}>
+                  <Text style={[e.miniValor, { color: p.acento }]}>{n.valor}</Text>
+                  <Text style={e.miniSub}>{n.rotulo}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : null}
+        {inst.projetos ? (
+          <View style={e.cartao} wrap={false}>
+            <Text style={e.tituloCartao}>Projetos que já entregamos</Text>
+            <View style={{ flexDirection: "row", gap: 9 }}>
+              {inst.projetos.map((pr, i) => (
+                <View key={i} style={e.mini}>
+                  <Text style={e.itemTitulo}>{pr.titulo}</Text>
+                  {pr.descricao ? <Text style={e.miniSub}>{pr.descricao}</Text> : null}
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : null}
+        {inst.depoimentos ? (
+          <View style={e.cartao} wrap={false}>
+            <Text style={e.tituloCartao}>O que nossos clientes dizem</Text>
+            <View style={{ flexDirection: "row", gap: 9 }}>
+              {inst.depoimentos.map((d, i) => (
+                <View key={i} style={e.mini}>
+                  <Text style={{ fontSize: 9, lineHeight: 1.45 }}>{`“${d.texto}”`}</Text>
+                  <Text style={[e.miniSub, { ...NEGRITO, color: p.acento, marginTop: 6 }]}>{d.nome}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : null}
+        {inst.equipe ? (
+          <View style={e.cartao} wrap={false}>
+            <Text style={e.tituloCartao}>Nossa equipe</Text>
+            {inst.equipe.map((m, i) => (
+              <View key={i} style={e.linhaItem}>
+                <View style={[e.qtd, { width: 26, borderRadius: 13 }]}>
+                  <Text style={e.qtdTexto}>{iniciais(m.nome) || "•"}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={e.itemTitulo}>{m.registro ? `${m.nome} · ${m.registro}` : m.nome}</Text>
+                  {m.texto ? <Text style={e.itemSub}>{m.texto}</Text> : null}
+                </View>
               </View>
             ))}
           </View>
         ) : null}
-
-        <View style={{ borderLeftWidth: 3, borderLeftColor: p.acento, backgroundColor: p.cartao, borderRadius: 9, padding: 9 }} wrap={false}>
-          {/* Duas linhas: título e WhatsApp; convite e validade. */}
-          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-            <Text style={{ fontSize: 11.5, ...TITULO, flexShrink: 1 }}>{dados.identidade.nomeExibicao ? `${dados.identidade.nomeExibicao}: próximos passos` : "Próximos passos"}</Text>
-            {dados.identidade.whatsapp ? <Text style={{ fontSize: 11, ...NEGRITO, color: p.verde }}>{`WhatsApp: ${dados.identidade.whatsapp}`}</Text> : null}
-          </View>
-          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8, marginTop: 4 }}>
-            <Text style={{ fontSize: 9, color: p.suave, flexShrink: 1 }}>Fale com seu consultor para tirar dúvidas e avançar com a sua proposta.</Text>
-            <Text style={{ fontSize: 9, color: p.suave }}>
-              {"Válida até "}
-              <Text style={{ ...NEGRITO, color: p.texto }}>{dataBr(c.validadeAte)}</Text>
-            </Text>
-          </View>
-        </View>
-      </View>
-      <Rodape dados={dados} pagina={3} e={e} texto={dados.rodape} />
-    </Page>
+    </>
   );
 }
 
 export function PropostaSimplesPdfDocument({ dados, imagens }: { dados: DadosEmissaoSimples; imagens: ImagensDoPdf }) {
   const p = paletaDaEmpresa(dados.identidade.corPrimaria, dados.identidade.corDestaque);
   const e = criarEstilos(p);
+  const institucional = dados.esquema === 6 ? dados.institucional : null;
   return (
     <Document title={`Proposta - ${dados.cliente.nome}`}>
       <Capa dados={dados} imagens={imagens} p={p} />
-      <PaginaSistema dados={dados} imagens={imagens} e={e} p={p} />
-      <PaginaOferta dados={dados} imagens={imagens} e={e} p={p} />
+      {/* Miolo em fluxo contínuo (pedido do Evandro, 24/11/2026): as seções seguem uma atrás da outra e a folha vira
+          quando enche, sem cartão cortado ao meio; seção desligada no modelo só encurta a proposta, sem deixar vazio. */}
+      <Page size="A4" style={e.pagina}>
+        <Cabecalho dados={dados} imagens={imagens} e={e} />
+        <View style={e.miolo}>
+          {institucional ? <SecoesSobre inst={institucional} e={e} p={p} /> : null}
+          <SecoesSistema dados={dados} e={e} p={p} />
+          <SecoesOferta dados={dados} e={e} p={p} />
+        </View>
+        <Rodape dados={dados} e={e} />
+      </Page>
     </Document>
   );
 }
