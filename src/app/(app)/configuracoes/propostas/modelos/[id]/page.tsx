@@ -8,7 +8,7 @@ import { BlocoLinha } from "./bloco-linha";
 import { DetalhesModelo } from "./detalhes-modelo";
 
 export default async function ConstrutorModelo({ params }: PageProps<"/configuracoes/propostas/modelos/[id]">) {
-  const { atual } = await exigirPapel("admin");
+  const { atual } = await exigirPapel("admin", "gestor");
   const { id } = await params;
   const supabase = await criarClienteServidor();
   const { data: modelo } = await supabase
