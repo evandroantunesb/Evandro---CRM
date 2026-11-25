@@ -117,6 +117,17 @@ export function PainelResultado({
               <Metrica rotulo="Conta com solar" valor={completo ? moeda(completo.contaComSolar) : null} />
               <Metrica rotulo="Geração" valor={geracao != null ? `${inteiro(geracao)} kWh/mês` : null} />
               <Metrica rotulo="Carbono evitado" valor={carbono != null ? `${inteiro(carbono)} kg/ano` : null} />
+              {completo?.financeiro && (
+                <>
+                  <Metrica rotulo={`Economia em ${completo.financeiro.projecao.anos.length} anos`} valor={moeda(completo.financeiro.economia25Anos)} />
+                  <div>
+                    <dt className="mb-1 text-xs text-texto-2">Payback</dt>
+                    <dd data-testid="cadastro-payback" className="text-sm text-texto-2">
+                      aparece ao salvar o kit
+                    </dd>
+                  </div>
+                </>
+              )}
             </dl>
             {!completo && pendencias.length > 0 && (
               <div className="mt-5 rounded-xl bg-superficie-2 px-4 py-3 text-sm">

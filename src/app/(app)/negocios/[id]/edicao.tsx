@@ -10,6 +10,7 @@ import { enviarArquivos } from "@/lib/anexos-navegador";
 import { arquivosEscolhidos, metaArquivo, problemaArquivo } from "@/lib/anexos-regras";
 import { descontoTotal, formatarPercentual } from "@/lib/condicoes-pagamento-proposta";
 import { formatarMesAno, formatarMoeda } from "@/lib/formatacao";
+import { percentualParaCampo } from "@/lib/percentual-exibicao";
 import { criarClienteNavegador } from "@/lib/supabase/navegador";
 import type { ResultadoAcao } from "@/lib/tipos";
 
@@ -48,6 +49,8 @@ export function EdicaoNegocio({
     consumoEstimadoKwh: number | null;
     tarifaEfetivaKwh: number | null;
     valorContaEnergia: number | null;
+    /** Autoconsumo (fração da geração); nulo = padrão residencial de 30%. */
+    autoconsumoFracao: number | null;
     /** Data prevista (AAAA-MM-DD) ou nula. */
     fechamentoPrevistoEm: string | null;
     /** Legado: mês previsto (AAAA-MM-01), de antes da data com dia. */
@@ -187,6 +190,19 @@ export function EdicaoNegocio({
             placeholder="ex.: 0,9500"
             defaultValue={negocio.tarifaEfetivaKwh != null ? String(negocio.tarifaEfetivaKwh).replace(".", ",") : ""}
           />
+          <div className="flex flex-col gap-1">
+            <Campo
+              rotulo="Autoconsumo (% da geração)"
+              name="autoconsumo_percentual"
+              inputMode="decimal"
+              placeholder="30"
+              defaultValue={negocio.autoconsumoFracao != null ? percentualParaCampo(negocio.autoconsumoFracao) : ""}
+            />
+            <p className="text-xs text-texto-2">
+              Parte da energia gerada que o cliente usa na hora, sem passar pela rede (chuveiro, ar ou geladeira durante o
+              dia). Vazio vale 30%, o padrão residencial. Ao mudar, o cálculo do kit fica desatualizado até recalcular.
+            </p>
+          </div>
           <Campo rotulo="Unidade consumidora" name="unidade_consumidora" defaultValue={negocio.unidadeConsumidora ?? ""} />
           {negocio.consumoEstimadoKwh != null && (
             <p role="status" className="text-xs text-amber-800 md:col-span-2">
