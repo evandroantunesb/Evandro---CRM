@@ -29,9 +29,13 @@ import {
 import { linhasCondicoesEmitidas } from "@/lib/condicoes-pagamento-exibicao";
 import { valorComoPersistido } from "@/lib/consumo-persistido";
 import { TIPOS_COMPONENTE_KIT } from "@/lib/tipos";
+import { esquemaEconomiaEmitida, type EconomiaEmitida } from "./economia-emissao";
+
+/** A tela de emissão usa a mesma regra da economia (ver `economia-emissao.ts`). */
+export { avisoDaEconomia } from "./economia-emissao";
 
 /** Identificação do layout que gera o PDF; muda quando o conteúdo/estrutura do modelo simples mudar. */
-export const RENDERIZADOR_SIMPLES = "simples-v6";
+export const RENDERIZADOR_SIMPLES = "simples-v7";
 
 /** Rodapé aprovado (proposta COM a geração estimada). */
 export const RODAPE_SIMPLES =
@@ -40,7 +44,11 @@ export const RODAPE_SIMPLES =
 /** Variante para a proposta SEM geração (produtividade não confirmada): não promete um número que não está nela. */
 export const RODAPE_SIMPLES_SEM_GERACAO = "Esta proposta apresenta o sistema. Não inclui estimativa de geração, economia ou prazo de retorno.";
 
-export const rodapeDaProposta = (temGeracao: boolean) => (temGeracao ? RODAPE_SIMPLES : RODAPE_SIMPLES_SEM_GERACAO);
+/** Rodapé aprovado da proposta COM economia (esquema 7, decisão do Evandro em 25/11/2026). */
+export const RODAPE_COM_ECONOMIA = "Estimativas comerciais; a geração e a economia reais variam com clima, consumo e tarifas.";
+
+export const rodapeDaProposta = (temGeracao: boolean, temEconomia = false) =>
+  temEconomia ? RODAPE_COM_ECONOMIA : temGeracao ? RODAPE_SIMPLES : RODAPE_SIMPLES_SEM_GERACAO;
 
 /** Limites da identificação da confirmação da produtividade (cabem na linha de premissa da página 2). */
 export const LIMITES_CONFIRMACAO = { fonteMin: 10, fonteMax: 120, responsavelMin: 3, responsavelMax: 60 } as const;
@@ -302,15 +310,28 @@ const esquemaV6 = z.object({
     .nullable(),
 });
 
+/**
+ * Esquema 7 (25/11/2026, proposta completa PR 3): o 6 com a economia do cálculo v2 vigente (conta, economia, retorno e
+ * os anos escolhidos no modelo). Nula = a proposta sai sem economia (modelo sem blocos ou cálculo não vigente).
+ */
+const esquemaV7 = esquemaV6.extend({ esquema: z.literal(7), economia: esquemaEconomiaEmitida.nullable() });
+
+/** Economia da versão emitida (só o esquema 7 pode tê-la). */
+export const economiaDaEmissao = (d: { esquema: number; economia?: EconomiaEmitida | null }): EconomiaEmitida | null =>
+  d.esquema === 7 ? (d.economia ?? null) : null;
+
 export const esquemaDadosEmissaoSimples = z
-  .discriminatedUnion("esquema", [esquemaV4, esquemaV5, esquemaV6])
-  // O rodapé acompanha a geração: com o número, o aprovado; sem ele, a variante que não o promete.
-  .refine((d) => d.rodape === rodapeDaProposta(d.sistema.geracao != null), { path: ["rodape"], message: "Rodapé não confere com a proposta." });
+  .discriminatedUnion("esquema", [esquemaV4, esquemaV5, esquemaV6, esquemaV7])
+  // O rodapé acompanha o que a proposta promete: com economia, o aviso das estimativas; sem ela, o da geração.
+  .refine((d) => d.rodape === rodapeDaProposta(d.sistema.geracao != null, economiaDaEmissao(d) != null), {
+    path: ["rodape"],
+    message: "Rodapé não confere com a proposta.",
+  });
 
 /** Qualquer versão já emitida (leitura). */
 export type DadosEmissaoSimples = z.infer<typeof esquemaDadosEmissaoSimples>;
 /** O que uma emissão nova grava. */
-export type DadosEmissaoAtual = z.infer<typeof esquemaV6>;
+export type DadosEmissaoAtual = z.infer<typeof esquemaV7>;
 
 /** JSON canônico (chaves ordenadas): o mesmo conteúdo gera sempre os mesmos bytes, não importa a ordem do jsonb. */
 export function jsonCanonico(valor: unknown): string {
@@ -398,6 +419,8 @@ export type EntradaEmissaoSimples = {
   emitidaEm: string;
   /** AAAA-MM-DD de hoje em São Paulo. */
   hoje: string;
+  /** Economia do cálculo v2 vigente (`situacaoDaEconomia`); nulo = a proposta sai sem economia. */
+  economia?: EconomiaEmitida | null;
 };
 
 export const MENSAGEM_VALIDADE_OBRIGATORIA = "Informe até quando a proposta é válida.";
@@ -497,7 +520,7 @@ export function montarDadosEmissaoSimples(e: EntradaEmissaoSimples): ResultadoMo
     potenciaW: c.potencia_w != null && c.potencia_w > 0 ? c.potencia_w : null,
   }));
   const candidato = {
-    esquema: 6 as const,
+    esquema: 7 as const,
     cliente: { nome: e.contatoNome!.trim(), endereco: e.contatoEndereco?.trim() || null },
     sistema: {
       kitNome: nomeKitPersonalizado(
@@ -522,10 +545,11 @@ export function montarDadosEmissaoSimples(e: EntradaEmissaoSimples): ResultadoMo
     institucional: e.conteudo.institucional,
     identidade: e.identidade,
     emissao: { versao: e.versao, emitidaEm: e.emitidaEm },
-    rodape: rodapeDaProposta(sistema.geracao != null),
+    economia: e.economia ?? null,
+    rodape: rodapeDaProposta(sistema.geracao != null, e.economia != null),
   };
-  const analisado = esquemaV6.safeParse(candidato);
-  if (!analisado.success || analisado.data.rodape !== rodapeDaProposta(analisado.data.sistema.geracao != null)) return { ok: false, pendencias: ["Os dados do negócio não passaram na conferência da proposta. Revise o kit e o cliente."] };
+  const analisado = esquemaV7.safeParse(candidato);
+  if (!analisado.success || analisado.data.rodape !== rodapeDaProposta(analisado.data.sistema.geracao != null, analisado.data.economia != null)) return { ok: false, pendencias: ["Os dados do negócio não passaram na conferência da proposta. Revise o kit e o cliente."] };
   return { ok: true, dados: analisado.data };
 }
 

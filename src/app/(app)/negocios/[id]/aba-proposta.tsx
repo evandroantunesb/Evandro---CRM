@@ -47,6 +47,7 @@ export function AbaProposta({ ficha }: { ficha: Ficha }) {
     conteudoModelo,
     regrasCondicoes,
     geracaoConfirmada,
+    economiaEmissao,
     bloqueioEmissao,
     proposta,
     precoDesatualizado,
@@ -143,6 +144,7 @@ export function AbaProposta({ ficha }: { ficha: Ficha }) {
               preco={negocio.valor}
               regrasCondicoes={regrasCondicoes}
               geracaoConfirmada={geracaoConfirmada}
+              economia={economiaEmissao}
               bloqueio={arquivado ? "Negócio arquivado: não é possível emitir proposta." : bloqueioEmissao}
               avisoValor={
                 condicaoRegistrada && negocio.valor !== condicaoRegistrada.precoProposta

@@ -16,7 +16,7 @@ import { mensagemPropostaIncompleta, pendenciasSemDados } from "@/lib/estimativa
 import { EDITAR_MODELO_CONTRATO, PEDIDOS_AOS_SETORES, PROPOSTA_E_CONTRATO, pode } from "@/lib/permissoes";
 import { carregarProcuracaoNegocio } from "@/lib/procuracao";
 import { listarEmissoesDoNegocio } from "@/lib/propostas/emissoes-dados";
-import { extrairConteudoDoModelo, validadePadraoDaEmpresa, produtividadeConfirmada } from "@/lib/propostas/proposta-simples";
+import { avisoDaEconomia, extrairConteudoDoModelo, validadePadraoDaEmpresa, produtividadeConfirmada } from "@/lib/propostas/proposta-simples";
 import { avisarSchemaAusente, funcaoAusente, tabelaAusente } from "@/lib/schema-ausente";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { cartaoFechamento } from "@/lib/venda";
@@ -339,7 +339,7 @@ export async function carregarFicha(atual: Vinculo, id: string, abaParam: string
     atual, negocio, config, parametros, temperatura, atividades, notas, tarefas, anexos, calculo, conferencia, semArquivo,
     componentes, materiaisKit, precoSugeridoKit, ehEletroposto, eletroposto, propostaEletroposto, outrosNegocios, eletropostoNaEmpresa, proposta, modelosProposta,
     emissoesAusente, emissoes, conteudoModelo, regrasCondicoes, validadePadraoDias, geracaoConfirmada, aberturas, contrato, statusPagamento,
-    registroManualIndisponivel, registrosPagamento, situacaoPagamentoSolo, mostrarPagamentoSolo, mostrarPagamentoPro, ultimoHandoff,
+    economiaEmissao: avisoDaEconomia(modeloPadrao?.proposta_modelo_blocos, carregamento), registroManualIndisponivel, registrosPagamento, situacaoPagamentoSolo, mostrarPagamentoSolo, mostrarPagamentoPro, ultimoHandoff,
     podeResponderHandoff, obraDoNegocio, arquivado, precoDesatualizado, precoContratoDesatualizado, escolhaCondicao, condicaoRegistrada, vigenciaDaTela, contextoEstimativa, historicoCalculo,
     bloqueioProposta, bloqueioEmissao, bloqueioContrato, responsavelInativo, cartao, contato, pendenciasCliente, nomes, souAdmin,
     etiquetasMarcadas, etiquetasVisiveis, abas, aba, pedidosSetor, desconto, procuracao, recusasDocumentos: aba === "proposta" && obraDoNegocio ? await carregarRecusasDocumentos(supabase, negocio.id, nomes.membro) : [],

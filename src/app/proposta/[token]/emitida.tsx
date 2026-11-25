@@ -6,6 +6,7 @@ import type { CondicoesEmitidas } from "@/lib/condicoes-pagamento-proposta";
 import {
   coberturaDoConsumo,
   dataBr,
+  economiaDaEmissao,
   linkWhatsappDaProposta,
   textoCondicoesComerciais,
   textoPremissaGeracao,
@@ -13,14 +14,16 @@ import {
   type Institucional,
 } from "@/lib/propostas/proposta-simples";
 import { ROTULO_TIPO_COMPONENTE_KIT } from "@/lib/tipos";
+import { EconomiaDaProposta } from "./economia";
 
 /** Proposta emitida (simples): renderizada SÓ a partir dos dados congelados na emissão. */
 export function PropostaEmitida({ token, dados }: { token: string; dados: DadosEmissaoSimples }) {
   const vencida = dados.comercial.validadeAte < hojeEmSaoPaulo();
   const cobertura = coberturaDoConsumo(dados);
-  const institucional = dados.esquema === 6 ? dados.institucional : null;
-  const posVenda = dados.esquema === 6 ? dados.comercial.posVenda : null;
-  const whatsapp = dados.esquema === 6 ? linkWhatsappDaProposta(dados) : null;
+  const institucional = (dados.esquema === 6 || dados.esquema === 7) ? dados.institucional : null;
+  const posVenda = (dados.esquema === 6 || dados.esquema === 7) ? dados.comercial.posVenda : null;
+  const whatsapp = (dados.esquema === 6 || dados.esquema === 7) ? linkWhatsappDaProposta(dados) : null;
+  const economia = economiaDaEmissao(dados);
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-6 px-6 py-10">
       <LogoRaion altura={32} />
@@ -96,6 +99,8 @@ export function PropostaEmitida({ token, dados }: { token: string; dados: DadosE
           ))}
         </ul>
       </Cartao>
+
+      {economia && <EconomiaDaProposta economia={economia} />}
 
       {(dados.comercial.incluso || dados.comercial.exclusos) && (
         <Cartao titulo="O que está incluso">
