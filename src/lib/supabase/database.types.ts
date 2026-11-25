@@ -3639,6 +3639,7 @@ export type Database = {
           autoconsumo_percentual: number | null;
           consumo_estimado_kwh: number | null;
           consumo_medio_kwh: number | null;
+          consumo_mensal_kwh: number[] | null;
           contato_id: string;
           created_at: string;
           criado_por: string | null;
@@ -3689,6 +3690,7 @@ export type Database = {
           autoconsumo_percentual?: number | null;
           consumo_estimado_kwh?: number | null;
           consumo_medio_kwh?: number | null;
+          consumo_mensal_kwh?: number[] | null;
           contato_id: string;
           created_at?: string;
           criado_por?: string | null;
@@ -3739,6 +3741,7 @@ export type Database = {
           autoconsumo_percentual?: number | null;
           consumo_estimado_kwh?: number | null;
           consumo_medio_kwh?: number | null;
+          consumo_mensal_kwh?: number[] | null;
           contato_id?: string;
           created_at?: string;
           criado_por?: string | null;
@@ -5837,6 +5840,7 @@ export type Database = {
       parametros_calculadora: {
         Row: {
           comissao_percentual: number;
+          curva_geracao_mensal: number[] | null;
           custo_engenharia: number;
           custo_frete: number;
           custo_instalacao_por_modulo: number;
@@ -5858,6 +5862,7 @@ export type Database = {
         };
         Insert: {
           comissao_percentual?: number;
+          curva_geracao_mensal?: number[] | null;
           custo_engenharia?: number;
           custo_frete?: number;
           custo_instalacao_por_modulo?: number;
@@ -5879,6 +5884,7 @@ export type Database = {
         };
         Update: {
           comissao_percentual?: number;
+          curva_geracao_mensal?: number[] | null;
           custo_engenharia?: number;
           custo_frete?: number;
           custo_instalacao_por_modulo?: number;
@@ -9183,6 +9189,7 @@ export type Database = {
           autoconsumo_percentual: number | null;
           consumo_estimado_kwh: number | null;
           consumo_medio_kwh: number | null;
+          consumo_mensal_kwh: number[] | null;
           contato_id: string;
           created_at: string;
           criado_por: string | null;
@@ -9242,6 +9249,7 @@ export type Database = {
           autoconsumo_percentual: number | null;
           consumo_estimado_kwh: number | null;
           consumo_medio_kwh: number | null;
+          consumo_mensal_kwh: number[] | null;
           contato_id: string;
           created_at: string;
           criado_por: string | null;
