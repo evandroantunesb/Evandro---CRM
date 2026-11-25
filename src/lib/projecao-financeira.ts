@@ -64,13 +64,15 @@ export type EntradaProjecao = {
   custoDisponibilidadeKwh: number;
   /** Mês em que a projeção começa (AAAA-MM). */
   mesInicio: string;
-  /** Valor da proposta (R$). */
-  investimento: number;
+  /** Valor da proposta (R$); nulo ou zero = sem valor do negócio (sem payback nem saldo). */
+  investimento: number | null;
   /** Preço atual do inversor do kit (R$); nulo = desconhecido (sem payback). */
   precoInversor: number | null;
   /** Só o que tiver dado melhor que o padrão aprovado. */
   premissas?: Partial<Record<"horizonteAnos" | "reajusteAnual" | "perdaPrimeiroAno" | "perdaAnual" | "anoTrocaInversor", number>>;
 };
+
+export type MotivoSemPayback = "sem_investimento" | "inversor_sem_preco" | "nao_se_paga_no_horizonte";
 
 export type AnoProjecao = {
   ano: number;
@@ -101,7 +103,7 @@ export type ResultadoProjecao =
       paybackMeses: number | null;
       /** Economia total − investimento − trocas; nulo sem o preço do inversor. */
       saldoFinal: number | null;
-      motivoSemPayback: "inversor_sem_preco" | "nao_se_paga_no_horizonte" | null;
+      motivoSemPayback: MotivoSemPayback | null;
       premissas: {
         horizonteAnos: number;
         reajusteAnual: number;
@@ -131,7 +133,7 @@ export function projetarEconomia(e: EntradaProjecao): ResultadoProjecao {
   const p = { ...PREMISSAS_PROJECAO, ...e.premissas };
   const inicio = lerMes(e.mesInicio);
   if (!inicio) return falha("Mês de início inválido (use AAAA-MM).");
-  const numeros = [e.consumoMensalKwh, e.geracaoMensalKwh, e.autoconsumoFracao, e.tarifaSemTributosRsKwh, e.fioBSemTributosRsKwh, e.icms, e.pisCofins, e.custoDisponibilidadeKwh, e.investimento];
+  const numeros = [e.consumoMensalKwh, e.geracaoMensalKwh, e.autoconsumoFracao, e.tarifaSemTributosRsKwh, e.fioBSemTributosRsKwh, e.icms, e.pisCofins, e.custoDisponibilidadeKwh];
   if (!numeros.every(finito)) return falha("Todos os valores precisam ser números finitos.");
   if (e.precoInversor != null && !(finito(e.precoInversor) && e.precoInversor > 0)) return falha("O preço do inversor precisa ser positivo.");
   if (!(e.consumoMensalKwh > 0)) return falha("O consumo precisa ser maior que zero.");
@@ -139,18 +141,20 @@ export function projetarEconomia(e: EntradaProjecao): ResultadoProjecao {
   if (e.autoconsumoFracao < 0 || e.autoconsumoFracao > 1) return falha("O autoconsumo precisa estar entre 0% e 100%.");
   if (e.icms < 0 || e.pisCofins < 0 || e.icms + e.pisCofins >= 0.6) return falha("ICMS e PIS/Cofins fora da faixa esperada.");
   if (!(e.tarifaSemTributosRsKwh > 0) || e.fioBSemTributosRsKwh < 0) return falha("Tarifa e Fio B inválidos.");
-  if (!(e.investimento > 0)) return falha("O investimento precisa ser maior que zero.");
+  if (e.investimento != null && !(finito(e.investimento) && e.investimento >= 0)) return falha("O investimento não pode ser negativo.");
   if (!(Number.isInteger(p.horizonteAnos) && p.horizonteAnos >= 1 && p.horizonteAnos <= 40)) return falha("Horizonte inválido.");
   if (!(Number.isInteger(p.anoTrocaInversor) && p.anoTrocaInversor >= 2)) return falha("Ano da troca do inversor inválido.");
   if (fatorGeracao(p.horizonteAnos, p.perdaPrimeiroAno, p.perdaAnual) <= 0) return falha("A perda do módulo zera a geração no horizonte.");
 
   const T0 = comTributos(e.tarifaSemTributosRsKwh, e.icms, e.pisCofins);
   const fioB0 = comTributos(e.fioBSemTributosRsKwh, e.icms, e.pisCofins);
-  const temPreco = e.precoInversor != null;
+  // Sem valor do negócio ou sem o preço do inversor não há saldo nem payback (nunca inventar o valor).
+  const investimento = e.investimento != null && e.investimento > 0 ? e.investimento : null;
+  const temPreco = investimento != null && e.precoInversor != null;
 
   const anos: AnoProjecao[] = [];
   let primeiroMes: { contaSemSolar: number; contaComSolar: number; economia: number } | null = null;
-  let acumulado = -e.investimento;
+  let acumulado = -(investimento ?? 0);
   let payback: number | null = null;
   let economiaTotal = 0;
 
@@ -204,7 +208,7 @@ export function projetarEconomia(e: EntradaProjecao): ResultadoProjecao {
     economiaTotal: arredondar2(economiaTotal),
     paybackMeses: temPreco ? payback : null,
     saldoFinal: temPreco ? arredondar2(acumulado) : null,
-    motivoSemPayback: !temPreco ? "inversor_sem_preco" : payback == null ? "nao_se_paga_no_horizonte" : null,
+    motivoSemPayback: investimento == null ? "sem_investimento" : !temPreco ? "inversor_sem_preco" : payback == null ? "nao_se_paga_no_horizonte" : null,
     premissas: {
       horizonteAnos: p.horizonteAnos,
       reajusteAnual: p.reajusteAnual,

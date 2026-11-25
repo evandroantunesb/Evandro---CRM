@@ -49,6 +49,7 @@ import {
   type TipoLigacao,
 } from "@/lib/tipos";
 import { PainelResultado } from "./painel-resultado";
+import { PREMISSAS_PROJECAO } from "@/lib/projecao-financeira";
 
 type Opcao = { id: string; nome: string };
 type ContatoEncontrado = {
@@ -70,6 +71,9 @@ type Parametros = {
   custoMaterialCaPorKwp: number;
   custoEngenharia: number;
   comissaoPercentual: number;
+  /** Tributos da empresa (método v2 do cálculo). */
+  icms: number;
+  pisCofins: number;
 };
 type Etapa = 1 | 2 | 3;
 
@@ -381,6 +385,8 @@ export function FormularioNegocio({
         contexto: contexto ? { ...contexto, tipoCliente, distribuidoraInformada: distribuidora || null } : null,
         tarifaBaseTributaria: tarifaBase,
       },
+      // Mesmo método que o servidor grava; o preço do inversor (custo da tabela) só o servidor lê: sem payback aqui.
+      financeiro: { icms: parametros.icms, pisCofins: parametros.pisCofins, autoconsumoFracao: PREMISSAS_PROJECAO.autoconsumoResidencial, precoInversor: null },
     });
   }, [parametros, potenciaKwp, valor, tipoLigacao, consumoMedioEstimado, tarifaKwh, contexto, tipoCliente, distribuidora, tarifaBase]);
   // Sem ligação o motor não fecha a conta: a prévia nunca mostra resultado completo com ligação presumida.

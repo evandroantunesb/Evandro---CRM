@@ -5,7 +5,7 @@ import { criarClienteAdmin } from "@/lib/supabase/admin";
 import type { SupabaseServidor } from "@/lib/supabase/server";
 import type { TipoComponenteKit } from "@/lib/tipos";
 import { MARGENS_ZERADAS, type MargensCategoria } from "./margens";
-import { melhoresCustos, precificarKit, type AvisoPreco, type ItemPrecificacao, type PrecificacaoKit } from "./precificacao-kit";
+import { melhoresCustos, precificarKit, precoInversorDoKit, type AvisoPreco, type ItemPrecificacao, type PrecificacaoKit } from "./precificacao-kit";
 import { ehCategoriaMaterial } from "./precos";
 
 /*
@@ -90,6 +90,25 @@ async function calcular(admin: Admin, empresaId: string, itens: ItemPrecificacao
   const base = await carregarBase(admin, empresaId, ids);
   if (!base) return null;
   return precificarKit({ itens, ...base, hoje: hojeEmSaoPaulo() });
+}
+
+/**
+ * Preço atual dos inversores do kit para o cálculo (troca no ano 12). Lê custos e margens com a chave de serviço, então
+ * SÓ pode ser chamado depois de a sessão provar acesso ao negócio (`autorizar_gravacao_calculo`, como o retrato).
+ * Sai só o preço de venda dos inversores, nunca custo nem margem. Falha de leitura = nulo (cálculo sem payback).
+ */
+export async function precoInversorParaCalculo(empresaId: string, itens: ItemPrecificacao[]): Promise<number | null> {
+  if (!itens.some((i) => i.tipo === "inversor")) return null;
+  const admin = clienteAdmin();
+  if (!admin) return null;
+  try {
+    const ids = [...new Set(itens.filter((i) => i.tipo === "inversor").map((i) => i.materialId).filter((x): x is string => x != null))];
+    const base = await carregarBase(admin, empresaId, ids);
+    if (!base) return precoInversorDoKit({ itens, custos: new Map(), margens: MARGENS_ZERADAS });
+    return precoInversorDoKit({ itens, custos: base.custos, margens: base.margens });
+  } catch {
+    return null;
+  }
 }
 
 export type PreviaPrecoKit = {

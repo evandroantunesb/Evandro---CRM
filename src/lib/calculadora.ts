@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { consumoComoPersistido } from "@/lib/consumo-persistido";
 import { avaliarEstimativa, type Pendencia } from "@/lib/estimativa-financeira";
-import { calcularFioBGd2, METODO_GD2_PISO_V1 } from "@/lib/fio-b-gd2";
+import { arredondar2, calcularFioBGd2, METODO_GD2_PISO_V1 } from "@/lib/fio-b-gd2";
+import { comTributos, fatorGeracao, projetarEconomia, type AnoProjecao, type MotivoSemPayback } from "@/lib/projecao-financeira";
 import {
   disponibilidadeArt291,
   rotuloEnquadramento,
@@ -26,11 +27,41 @@ export type EntradaCalculo = {
   disponibilidadeKwh?: number;
   /** Contexto regulatório do negócio (data, enquadramento, tarifa oficial) e base declarada da tarifa. Ausente = pendências. */
   dadosEstimativa?: { contexto: ContextoEstimativa | null; tarifaBaseTributaria: BaseTributaria | null };
+  /**
+   * Método v2 (proposta completa, premissas de 24/11/2026): tributos da empresa, autoconsumo do negócio e preço do
+   * inversor para a projeção de 25 anos. Ausente = método v1 (sem tributos, autoconsumo zero, payback nulo).
+   */
+  financeiro?: EntradaFinanceira;
+};
+
+export type EntradaFinanceira = {
+  icms: number;
+  pisCofins: number;
+  /** Fração da geração consumida na hora (0 a 1). */
+  autoconsumoFracao: number;
+  /** Preço atual do inversor do kit (R$); nulo = desconhecido (sem payback). */
+  precoInversor: number | null;
+};
+
+/** Método v2: conta GD II com tributos e autoconsumo, e projeção de 25 anos com payback. */
+export const METODO_GD2_PISO_V2 = "gd2_piso_655i_v2" as const;
+
+/** Resultado financeiro do método v2: o que foi usado e a projeção (gravado em `calculos_solares`). */
+export type FinanceiroV2 = {
+  icms: number;
+  pisCofins: number;
+  autoconsumoFracao: number;
+  precoInversor: number | null;
+  economiaPrimeiroAno: number;
+  economia25Anos: number;
+  saldo25Anos: number | null;
+  paybackMotivo: MotivoSemPayback | null;
+  projecao: { premissas: Record<string, number>; anos: AnoProjecao[] };
 };
 
 /** O que o cálculo completo usou: gravado com a linha para reproduzir e auditar (contrato, seções 1, 2, 4 e 5). */
 export type RetratoEstimativa = {
-  metodo: typeof METODO_GD2_PISO_V1;
+  metodo: typeof METODO_GD2_PISO_V1 | typeof METODO_GD2_PISO_V2;
   dataReferencia: string;
   enquadramento: string;
   tarifaGdId: string;
@@ -51,7 +82,7 @@ export type RetratoEstimativa = {
   ressalvas: CodigoRessalva[];
 };
 
-/** Campos do resultado financeiro (ramo "completa"). Payback é sempre nulo no P0 (contrato, seção 4). */
+/** Campos do resultado financeiro (ramo "completa"). Payback: nulo no v1 (P0); no v2, quando há dados para ele. */
 export type CamposCalculoCompleto = {
   geracaoEstimadaKwhMes: number;
   kwhFaturado: number;
@@ -61,7 +92,9 @@ export type CamposCalculoCompleto = {
   contaSemSolar: number;
   contaComSolar: number;
   economiaMensal: number;
-  paybackMeses: null;
+  paybackMeses: number | null;
+  /** Só no método v2. */
+  financeiro: FinanceiroV2 | null;
 };
 
 /** Resultado do motor: `completa` só sem nenhuma pendência; dado ou regra pendente nunca vira número. */
@@ -133,6 +166,10 @@ export function calcular(entrada: EntradaCalculo): ResultadoCalculo {
   if (avaliacao.pendencias.length || !dados || D == null || !d?.tarifaBaseTributaria) return incompleta(avaliacao.pendencias);
 
   const N = (dados.percentualLegal * dados.tarifa.fioBRsMwh) / 1000;
+  // Método v2 só com a tarifa sem tributos: os tributos da empresa entram por dentro (nunca duas vezes).
+  if (entrada.financeiro && d.tarifaBaseTributaria === "sem_tributos") {
+    return calcularV2(entrada, entrada.financeiro, dados, D, geracaoKwh, N, incompleta);
+  }
   const r = calcularFioBGd2({
     consumoTotalKwh: entrada.consumoMedioKwh,
     geracaoTotalKwh: geracaoKwh,
@@ -161,6 +198,7 @@ export function calcular(entrada: EntradaCalculo): ResultadoCalculo {
     contaComSolar: r.contaComSolar,
     economiaMensal: r.economiaMensal,
     paybackMeses: null,
+    financeiro: null,
     retrato: {
       metodo: r.metodo,
       dataReferencia: dados.dataReferencia,
@@ -179,6 +217,102 @@ export function calcular(entrada: EntradaCalculo): ResultadoCalculo {
       vigenciaFim: dados.tarifa.vigenciaFim,
       disponibilidadeKwh: D,
       autoconsumoKwh: 0,
+      ressalvas,
+    },
+  };
+}
+
+/**
+ * Ramo v2 do `calcular`: a conta do 1º mês (motor aprovado com tributos, autoconsumo e a perda do 1º ano) e a projeção
+ * de 25 anos (`projetarEconomia`). Mesma referência regulatória do v1 (o banco confere); muda só o método e o que entra.
+ */
+function calcularV2(
+  entrada: EntradaCalculo,
+  f: EntradaFinanceira,
+  dados: NonNullable<ReturnType<typeof avaliarEstimativa>["dados"]>,
+  D: number,
+  geracaoKwh: number,
+  N: number,
+  incompleta: (pendencias: Pendencia[]) => ResultadoCalculo,
+): ResultadoCalculo {
+  const fioBRsKwh = dados.tarifa.fioBRsMwh / 1000;
+  const projecao = projetarEconomia({
+    consumoMensalKwh: entrada.consumoMedioKwh,
+    geracaoMensalKwh: geracaoKwh,
+    autoconsumoFracao: f.autoconsumoFracao,
+    tarifaSemTributosRsKwh: entrada.tarifaKwh,
+    fioBSemTributosRsKwh: fioBRsKwh,
+    icms: f.icms,
+    pisCofins: f.pisCofins,
+    custoDisponibilidadeKwh: D,
+    mesInicio: dados.dataReferencia.slice(0, 7),
+    investimento: entrada.precoKit > 0 ? entrada.precoKit : null,
+    precoInversor: f.precoInversor,
+  });
+  if (!projecao.ok) return incompleta([{ codigo: "tarifa_abaixo_do_fio_b", mensagem: projecao.motivo }]);
+
+  // O 1º mês da projeção, com o detalhe de energia (mesmas entradas que `projetarEconomia` usa no primeiro mês).
+  const geracaoAno1 = geracaoKwh * fatorGeracao(1);
+  const autoconsumo = Math.min(geracaoAno1 * f.autoconsumoFracao, entrada.consumoMedioKwh);
+  const r = calcularFioBGd2({
+    consumoTotalKwh: entrada.consumoMedioKwh,
+    geracaoTotalKwh: geracaoAno1,
+    autoconsumoInstantaneoKwh: autoconsumo,
+    tarifaCheiaRsKwh: comTributos(entrada.tarifaKwh, f.icms, f.pisCofins),
+    custoDisponibilidadeKwh: D,
+    custoEnergiaCompensadaRsKwh: comTributos(N, f.icms, f.pisCofins),
+  });
+  if (!r.ok) return incompleta([{ codigo: "tarifa_abaixo_do_fio_b", mensagem: r.motivo }]);
+
+  const tarifaOficial = tarifaOficialRsKwh(dados.tarifa);
+  const ressalvas: CodigoRessalva[] = ["media_mensal", "modalidade_convencional", "gd2_sistema_novo", "autoconsumo_informado", "tributos_empresa", "projecao_premissas"];
+  if (entrada.tipoLigacao === "bifasico") ressalvas.push("bifasico_tres_condutores");
+  if (r.energiaDisponivelNaoCompensadaKwh > 0) ressalvas.push("creditos_nao_valorados");
+  if (dados.tarifa.pendenciasFonte.includes("tabela4_nao_conferida")) ressalvas.push("tabela4_nao_conferida");
+  if (projecao.motivoSemPayback === "sem_investimento") ressalvas.push("payback_sem_investimento");
+  if (projecao.motivoSemPayback === "inversor_sem_preco") ressalvas.push("payback_sem_preco_inversor");
+  if (projecao.motivoSemPayback === "nao_se_paga_no_horizonte") ressalvas.push("payback_fora_do_horizonte");
+
+  return {
+    estado: "completa",
+    geracaoEstimadaKwhMes: arredondar(geracaoKwh, 2),
+    kwhFaturado: r.energiaFaturadaTarifaCheiaKwh,
+    kwhCompensado: r.energiaCompensadaKwh,
+    kwhNaoCompensado: r.energiaDisponivelNaoCompensadaKwh,
+    custoFioB: r.custoEnergiaCompensada,
+    contaSemSolar: r.contaSemSolar,
+    contaComSolar: r.contaComSolar,
+    economiaMensal: r.economiaMensal,
+    paybackMeses: projecao.paybackMeses,
+    financeiro: {
+      icms: f.icms,
+      pisCofins: f.pisCofins,
+      autoconsumoFracao: f.autoconsumoFracao,
+      precoInversor: f.precoInversor,
+      economiaPrimeiroAno: projecao.economiaPrimeiroAno,
+      economia25Anos: projecao.economiaTotal,
+      saldo25Anos: projecao.saldoFinal,
+      paybackMotivo: projecao.motivoSemPayback,
+      projecao: { premissas: { ...projecao.premissas }, anos: projecao.anos },
+    },
+    retrato: {
+      metodo: METODO_GD2_PISO_V2,
+      dataReferencia: dados.dataReferencia,
+      enquadramento: rotuloEnquadramento(dados.enquadramento),
+      tarifaGdId: dados.tarifa.id,
+      distribuidora: dados.tarifa.distribuidora,
+      ato: dados.tarifa.ato,
+      tarifaOficialRsKwh: tarifaOficial,
+      tarifaOrigem: arredondar(entrada.tarifaKwh, 5) === tarifaOficial ? "oficial_aneel" : "informada_vendedor",
+      tarifaBaseTributaria: "sem_tributos",
+      fioBRsMwh: dados.tarifa.fioBRsMwh,
+      fioBBaseTributaria: dados.tarifa.baseTributaria,
+      percentualLegalFioB: dados.percentualLegal,
+      custoEnergiaCompensadaRsKwh: N,
+      vigenciaInicio: dados.tarifa.vigenciaInicio,
+      vigenciaFim: dados.tarifa.vigenciaFim,
+      disponibilidadeKwh: D,
+      autoconsumoKwh: arredondar2(autoconsumo),
       ressalvas,
     },
   };

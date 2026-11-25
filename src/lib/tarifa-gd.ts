@@ -209,7 +209,14 @@ export type CodigoRessalva =
   | "creditos_nao_valorados"
   | "sem_tributos"
   | "tabela4_nao_conferida"
-  | "payback_indisponivel";
+  | "payback_indisponivel"
+  // Método v2 (premissas aprovadas em 24/11/2026).
+  | "autoconsumo_informado"
+  | "tributos_empresa"
+  | "projecao_premissas"
+  | "payback_sem_investimento"
+  | "payback_sem_preco_inversor"
+  | "payback_fora_do_horizonte";
 
 export function textoRessalva(codigo: string, r: { ato?: string | null; kwhNaoCompensado?: number | null } = {}): string {
   switch (codigo) {
@@ -231,6 +238,18 @@ export function textoRessalva(codigo: string, r: { ato?: string | null; kwhNaoCo
       return `Desconto da Tabela 4 da ${r.ato ?? "REH"} ainda não conferido na fonte: a energia compensada usa percentual legal × Fio B.`;
     case "payback_indisponivel":
       return "Payback indisponível: depende de projeção de tarifas e da transição da Lei 14.300 (75% em 2027, 90% em 2028).";
+    case "autoconsumo_informado":
+      return "Parte da geração é consumida na hora (autoconsumo do negócio; padrão de 30% no residencial) e não paga Fio B.";
+    case "tributos_empresa":
+      return "ICMS e PIS/Cofins pelas alíquotas da empresa; a energia compensada é isenta e o Fio B pago é tratado como tributado. Sem iluminação pública e bandeiras.";
+    case "projecao_premissas":
+      return "Projeção de 25 anos: tarifa +5% ao ano, perda dos módulos de 1% no 1º ano e 0,4% ao ano, Fio B a 90% em 2028 e 100% a partir de 2029, troca do inversor no ano 12. Sem correção do dinheiro no tempo.";
+    case "payback_sem_investimento":
+      return "Payback indisponível: informe o valor do negócio.";
+    case "payback_sem_preco_inversor":
+      return "Payback indisponível: o kit não tem o preço do inversor (monte o kit pela tabela de preços ou informe o preço do item).";
+    case "payback_fora_do_horizonte":
+      return "O investimento não se paga em 25 anos com estas premissas.";
     default:
       return codigo;
   }

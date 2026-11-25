@@ -32,6 +32,7 @@ import {
   type TarifaGd,
 } from "@/lib/tarifa-gd";
 import { ROTULO_TIPO_COMPONENTE_KIT, ROTULO_TIPO_LIGACAO, TIPOS_LIGACAO, type TipoComponenteKit, type TipoLigacao } from "@/lib/tipos";
+import { PREMISSAS_PROJECAO } from "@/lib/projecao-financeira";
 
 export type ComponenteSalvo = {
   tipo: TipoComponenteKit;
@@ -99,6 +100,9 @@ type Parametros = {
   custoMaterialCaPorKwp: number;
   custoEngenharia: number;
   comissaoPercentual: number;
+  /** Tributos da empresa (método v2 do cálculo). */
+  icms: number;
+  pisCofins: number;
 };
 
 function numeroBr(v: number) {
@@ -476,6 +480,7 @@ function tarifaOficialDoContexto(contexto: ContextoEstimativa | null): TarifaGd 
 export function KitPersonalizado({
   negocioId,
   negocioValor,
+  autoconsumoFracao,
   estruturaTelhado,
   padraoCliente,
   consumoMedioKwhPadrao,
@@ -494,6 +499,8 @@ export function KitPersonalizado({
 }: {
   negocioId: string;
   negocioValor: number | null;
+  /** Autoconsumo do negócio (fração); nulo = padrão residencial de 30%. */
+  autoconsumoFracao: number | null;
   estruturaTelhado: string | null;
   padraoCliente: string | null;
   consumoMedioKwhPadrao: number | null;
@@ -664,8 +671,15 @@ export function KitPersonalizado({
       tarifaKwh: tarifa != null ? Math.round(tarifa * 1e5) / 1e5 : 0,
       produtividadeKwhKwpMes: parametros.produtividadeKwhKwpMes,
       dadosEstimativa: { contexto, tarifaBaseTributaria: tarifaBase || null },
+      // Mesmo método que o servidor grava; o preço do inversor (custo da tabela) só o servidor lê: sem payback aqui.
+      financeiro: {
+        icms: parametros.icms,
+        pisCofins: parametros.pisCofins,
+        autoconsumoFracao: autoconsumoFracao ?? PREMISSAS_PROJECAO.autoconsumoResidencial,
+        precoInversor: null,
+      },
     });
-  }, [parametros, tarifaKwh, tarifaBase, consumoEfetivo, potenciaKwp, negocioValor, tipoLigacao, contexto]);
+  }, [parametros, tarifaKwh, tarifaBase, consumoEfetivo, potenciaKwp, negocioValor, tipoLigacao, contexto, autoconsumoFracao]);
   const pendenciasPrevia = previa?.estado === "incompleta" ? previa.pendencias : [];
   const avisoSalvo =
     avisoKitSalvo &&
