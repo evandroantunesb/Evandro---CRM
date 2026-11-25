@@ -9,6 +9,7 @@ import {
   coberturaDoConsumo,
   dataBr,
   economiaDaEmissao,
+  temConteudoV6,
   linhasCondicoesPagamento,
   linkWhatsappDaProposta,
   textoPremissaGeracao,
@@ -367,7 +368,7 @@ function SecoesOferta({ dados, e, p }: { dados: DadosEmissaoSimples; e: ReturnTy
 
         {c.etapas ? <LinhaDoTempo etapas={c.etapas} e={e} p={p} /> : null}
 
-        {(dados.esquema === 6 || dados.esquema === 7) && dados.comercial.posVenda ? (
+        {temConteudoV6(dados) && dados.comercial.posVenda ? (
           <View style={e.cartao} wrap={false}>
             <Text style={e.tituloCartao}>Depois da instalação</Text>
             <View style={{ flexDirection: "row", gap: 9 }}>
@@ -438,7 +439,7 @@ function QrCodePdf({ texto, tamanho }: { texto: string; tamanho: number }) {
 
 /** Faixa final: próximos passos, WhatsApp e validade; com QR do WhatsApp quando o número é um telefone válido. */
 function Fechamento({ dados, p }: { dados: DadosEmissaoSimples; p: ReturnType<typeof paletaDaEmpresa> }) {
-  const link = (dados.esquema === 6 || dados.esquema === 7) ? linkWhatsappDaProposta(dados) : null;
+  const link = temConteudoV6(dados) ? linkWhatsappDaProposta(dados) : null;
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 10, borderLeftWidth: 3, borderLeftColor: p.acento, backgroundColor: p.cartao, borderRadius: 9, padding: 9 }} wrap={false}>
       {link ? <QrCodePdf texto={link} tamanho={62} /> : null}
@@ -541,7 +542,7 @@ function SecoesSobre({ inst, e, p }: { inst: Institucional; e: ReturnType<typeof
 export function PropostaSimplesPdfDocument({ dados, imagens }: { dados: DadosEmissaoSimples; imagens: ImagensDoPdf }) {
   const p = paletaDaEmpresa(dados.identidade.corPrimaria, dados.identidade.corDestaque);
   const e = criarEstilos(p);
-  const institucional = (dados.esquema === 6 || dados.esquema === 7) ? dados.institucional : null;
+  const institucional = temConteudoV6(dados) ? dados.institucional : null;
   const economia = economiaDaEmissao(dados);
   return (
     <Document title={`Proposta - ${dados.cliente.nome}`}>

@@ -69,13 +69,13 @@ export async function emitirPropostaSimples(_: ResultadoAcao, formData: FormData
   const [negocioR, componentesR, parametrosR, identidadeR, modeloR, ultima, regrasCondicoes] = await Promise.all([
     supabase
       .from("negocios")
-      .select("empresa_id, valor, consumo_medio_kwh, arquivado_em, contatos(nome, endereco, cidade, uf)")
+      .select("empresa_id, valor, consumo_medio_kwh, consumo_mensal_kwh, arquivado_em, contatos(nome, endereco, cidade, uf)")
       .eq("id", negocioId)
       .maybeSingle(),
     supabase.from("kit_componentes").select("tipo, descricao, potencia_w, quantidade").eq("negocio_id", negocioId).order("ordem"),
     supabase
       .from("parametros_calculadora")
-      .select("produtividade_kwh_kwp_mes, produtividade_confirmada_valor, produtividade_confirmada_em, produtividade_confirmada_fonte, produtividade_confirmada_responsavel")
+      .select("produtividade_kwh_kwp_mes, produtividade_confirmada_valor, produtividade_confirmada_em, produtividade_confirmada_fonte, produtividade_confirmada_responsavel, curva_geracao_mensal")
       .eq("empresa_id", atual.empresaId)
       .maybeSingle(),
     supabase.from("proposta_identidades").select("nome_exibicao, cor_primaria, cor_destaque, whatsapp, logo_url, logo_escuro_url, foto_capa_url").eq("empresa_id", atual.empresaId).maybeSingle(),
@@ -125,6 +125,9 @@ export async function emitirPropostaSimples(_: ResultadoAcao, formData: FormData
     contatoEndereco: contato ? [contato.endereco, contato.cidade, contato.uf].filter(Boolean).join(" · ") : null,
     valorNegocio: negocio.valor,
     consumoMedioKwhNegocio: negocio.consumo_medio_kwh,
+    // Gráfico mês a mês (proposta completa, PR 4): curva da empresa e consumo dos 12 meses do negócio, congelados aqui.
+    curvaGeracao: parametrosR.data?.curva_geracao_mensal?.map(Number) ?? null,
+    consumoMensalKwhNegocio: negocio.consumo_mensal_kwh?.map(Number) ?? null,
     componentes: componentesR.data ?? [],
     // Sem confirmação do admin para o valor ATUAL da produtividade, a proposta sai sem o número de geração.
     produtividadeConfirmada: produtividadeConfirmada(parametrosR.data),

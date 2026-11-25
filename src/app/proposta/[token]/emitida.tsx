@@ -7,6 +7,7 @@ import {
   coberturaDoConsumo,
   dataBr,
   economiaDaEmissao,
+  temConteudoV6,
   linkWhatsappDaProposta,
   textoCondicoesComerciais,
   textoPremissaGeracao,
@@ -20,9 +21,9 @@ import { EconomiaDaProposta } from "./economia";
 export function PropostaEmitida({ token, dados }: { token: string; dados: DadosEmissaoSimples }) {
   const vencida = dados.comercial.validadeAte < hojeEmSaoPaulo();
   const cobertura = coberturaDoConsumo(dados);
-  const institucional = (dados.esquema === 6 || dados.esquema === 7) ? dados.institucional : null;
-  const posVenda = (dados.esquema === 6 || dados.esquema === 7) ? dados.comercial.posVenda : null;
-  const whatsapp = (dados.esquema === 6 || dados.esquema === 7) ? linkWhatsappDaProposta(dados) : null;
+  const institucional = temConteudoV6(dados) ? dados.institucional : null;
+  const posVenda = temConteudoV6(dados) ? dados.comercial.posVenda : null;
+  const whatsapp = temConteudoV6(dados) ? linkWhatsappDaProposta(dados) : null;
   const economia = economiaDaEmissao(dados);
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-6 px-6 py-10">
