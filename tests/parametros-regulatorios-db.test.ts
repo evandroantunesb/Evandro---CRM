@@ -47,6 +47,8 @@ describe("editarParametros", () => {
       disponibilidade_tri_kwh: "3",
       custo_engenharia: "1.500",
       comissao_percentual: "5",
+      icms: "19",
+      pis_cofins: "7,63",
     }))
       f.append(k, v);
     expect(await editarParametros(null, f)).toEqual({ ok: true, mensagem: "Parâmetros salvos." });
@@ -56,5 +58,34 @@ describe("editarParametros", () => {
       produtividade_kwh_kwp_mes: 118.5,
       custo_engenharia: 1500,
     });
+  });
+
+  // Tributos da conta de luz (método v2, PR 2b-2): o admin informa em %; gravados como fração, nos limites do banco.
+  const formulario = (tributos: Record<string, string>) => {
+    const f = new FormData();
+    for (const [k, v] of Object.entries({ produtividade_kwh_kwp_mes: "118,5", comissao_percentual: "5", ...tributos })) f.append(k, v);
+    return f;
+  };
+  const tributosGravados = async () =>
+    (await servico.from("parametros_calculadora").select("icms, pis_cofins").eq("empresa_id", empresa).single()).data;
+
+  it("grava ICMS e PIS/Cofins informados em % como fração", async () => {
+    expect(await editarParametros(null, formulario({ icms: "18", pis_cofins: "8,12" }))).toEqual({ ok: true, mensagem: "Parâmetros salvos." });
+    expect(await tributosGravados()).toEqual({ icms: 0.18, pis_cofins: 0.0812 });
+  });
+
+  it("recusa tributo vazio, fora do limite do banco ou com soma de 60% ou mais, sem gravar nada", async () => {
+    const antes = await tributosGravados();
+    for (const [tributos, mensagem] of [
+      [{ icms: "", pis_cofins: "7,63" }, "Informe o ICMS."],
+      [{ icms: "19" }, "Informe o PIS/Cofins."],
+      [{ icms: "50", pis_cofins: "7,63" }, "O ICMS precisa ficar abaixo de 50%."],
+      [{ icms: "19", pis_cofins: "30" }, "O PIS/Cofins precisa ficar abaixo de 30%."],
+      [{ icms: "-1", pis_cofins: "7,63" }, "ICMS inválido."],
+      [{ icms: "45", pis_cofins: "20" }, "ICMS e PIS/Cofins somados precisam ficar abaixo de 60%."],
+    ] as const) {
+      expect(await editarParametros(null, formulario(tributos))).toEqual({ ok: false, mensagem });
+    }
+    expect(await tributosGravados()).toEqual(antes);
   });
 });

@@ -76,7 +76,7 @@ export async function carregarFicha(atual: Vinculo, id: string, abaParam: string
       supabase
         .from("calculos_solares")
         .select(
-          "id, kit_nome, kit_potencia_kwp, kit_preco, tipo_ligacao, consumo_medio_kwh, valor_fatura_medio, tarifa_kwh, geracao_estimada_kwh_mes, economia_mensal, payback_meses, observacoes, estado_financeiro, conta_sem_solar, conta_com_solar, kwh_compensado, kwh_nao_compensado, custo_fio_b, tarifa_base_tributaria, tarifa_origem, distribuidora, fio_b_rs_mwh, percentual_legal_fio_b, fio_b_vigencia_inicio, fio_b_vigencia_fim, disponibilidade_kwh, data_referencia, ressalvas",
+          "id, kit_nome, kit_potencia_kwp, kit_preco, tipo_ligacao, consumo_medio_kwh, valor_fatura_medio, tarifa_kwh, geracao_estimada_kwh_mes, economia_mensal, payback_meses, observacoes, estado_financeiro, conta_sem_solar, conta_com_solar, kwh_compensado, kwh_nao_compensado, custo_fio_b, tarifa_base_tributaria, tarifa_origem, distribuidora, fio_b_rs_mwh, percentual_legal_fio_b, fio_b_vigencia_inicio, fio_b_vigencia_fim, disponibilidade_kwh, data_referencia, ressalvas, metodo_calculo, economia_primeiro_ano, economia_25_anos, saldo_25_anos, payback_motivo, autoconsumo_fracao, icms, pis_cofins, projecao",
         )
         .eq("negocio_id", id)
         .maybeSingle(),

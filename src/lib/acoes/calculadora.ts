@@ -123,6 +123,22 @@ export async function editarParametros(_: ResultadoAcao, formData: FormData): Pr
     .optional()
     .transform((v) => lerNumeroBr(v) ?? 0)
     .pipe(z.number({ message: `Custo inválido. ${MENSAGEM_NUMERO_BR}` }).nonnegative("Custo inválido"));
+  // Tributos da conta de luz (método v2): obrigatórios e nos limites do banco (`parametros_calculadora`).
+  const tributo = (nome: string, limite: number) =>
+    z
+      .string({ message: `Informe o ${nome}.` })
+      .trim()
+      .min(1, `Informe o ${nome}.`)
+      .transform((v) => {
+        const n = lerNumeroBr(v);
+        return n == null ? null : Math.round(n * 100) / 10000;
+      })
+      .pipe(
+        z
+          .number({ message: `${nome} inválido. ${MENSAGEM_NUMERO_BR}` })
+          .min(0, `${nome} inválido.`)
+          .lt(limite, `O ${nome} precisa ficar abaixo de ${limite * 100}%.`),
+      );
   const dados = z
     .object({
       // Fio B e disponibilidade não são mais editáveis: a estimativa usa a regra legal (Lei 14.300, art. 27; REN 1.000,
@@ -133,7 +149,10 @@ export async function editarParametros(_: ResultadoAcao, formData: FormData): Pr
       custo_engenharia: custoOpcional,
       comissao_percentual: percentual,
       custo_frete: custoOpcional,
+      icms: tributo("ICMS", 0.5),
+      pis_cofins: tributo("PIS/Cofins", 0.3),
     })
+    .refine((d) => d.icms + d.pis_cofins < 0.6, { message: "ICMS e PIS/Cofins somados precisam ficar abaixo de 60%." })
     .safeParse(Object.fromEntries(formData));
   if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
   const supabase = await criarClienteServidor();

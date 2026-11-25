@@ -393,6 +393,21 @@ const esquemaEdicao = z.object({
   consumo_medio_kwh: numeroBrOpcional,
   tarifa_efetiva_kwh: numeroBrOpcional,
   valor_conta_energia: numeroBrOpcional,
+  // Autoconsumo em % da geração (0 a 100); vazio = padrão residencial de 30% (gravado nulo).
+  autoconsumo_percentual: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v, ctx) => {
+      if (v === undefined) return undefined;
+      if (v === "") return null;
+      const n = lerNumeroBr(v);
+      if (n == null || !Number.isFinite(n) || n < 0 || n > 100) {
+        ctx.addIssue({ code: "custom", message: "Autoconsumo: informe de 0 a 100%." });
+        return z.NEVER;
+      }
+      return Math.round(n * 100) / 10000;
+    }),
   // Data prevista (AAAA-MM-DD); vazio limpa a previsão. Salvar a data limpa o mês legado (`fechamento_previsto`).
   fechamento_previsto_em: z
     .union([z.string().regex(/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/, "Data prevista inválida"), z.literal("")])
@@ -435,6 +450,7 @@ export async function editarNegocioComCliente(
         consumo_estimado_kwh: consumoEdicao.origem === "estimado" ? consumoEdicao.kwh : null,
         tarifa_efetiva_kwh: consumoEdicao.tarifaEfetiva,
         valor_conta_energia: d.valor_conta_energia,
+        ...(d.autoconsumo_percentual !== undefined ? { autoconsumo_percentual: d.autoconsumo_percentual } : {}),
       };
 
   const { data, error } = await supabase

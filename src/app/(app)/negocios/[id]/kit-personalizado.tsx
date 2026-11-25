@@ -33,6 +33,8 @@ import {
 } from "@/lib/tarifa-gd";
 import { ROTULO_TIPO_COMPONENTE_KIT, ROTULO_TIPO_LIGACAO, TIPOS_LIGACAO, type TipoComponenteKit, type TipoLigacao } from "@/lib/tipos";
 import { PREMISSAS_PROJECAO } from "@/lib/projecao-financeira";
+import { METODO_GD2_PISO_V2 } from "@/lib/calculadora";
+import { ResultadoKitV2, type ResultadoV2Salvo } from "./projecao-kit";
 
 export type ComponenteSalvo = {
   tipo: TipoComponenteKit;
@@ -74,6 +76,10 @@ export type CalculoSalvo = {
   disponibilidadeKwh?: number | null;
   dataReferencia?: string | null;
   ressalvas?: string[] | null;
+  /** Método do cálculo completo (`gd2_piso_655i_v1` ou `gd2_piso_655i_v2`). */
+  metodo?: string | null;
+  /** Só no método v2 (nulos nos demais). */
+  v2?: Omit<ResultadoV2Salvo, "contaSemSolar" | "contaComSolar" | "economiaMensal" | "paybackMeses" | "investimento"> | null;
 };
 
 /** Linha mais recente de `calculos_solares_historico` (cálculo anterior substituído). */
@@ -261,9 +267,12 @@ function HipotesesELimitacoes({
   const presumidas = ressalvas.filter((r) => RESSALVAS_PRESUMIDAS.includes(r));
   return (
     <div className="flex flex-col gap-2">
-      <p data-testid="hipotese-autoconsumo" className="text-xs text-zinc-600">
-        Hipótese: autoconsumo simultâneo considerado zero (toda a geração é tratada como injetada na rede e compensada).
-      </p>
+      {/* Só no método anterior (ressalva `autoconsumo_zero`); no v2 o autoconsumo usado está nas premissas. */}
+      {ressalvas.includes("autoconsumo_zero") && (
+        <p data-testid="hipotese-autoconsumo" className="text-xs text-zinc-600">
+          Hipótese: autoconsumo simultâneo considerado zero (toda a geração é tratada como injetada na rede e compensada).
+        </p>
+      )}
       {presumidas.length > 0 && (
         <p data-testid="premissas-presumidas" className="text-xs text-amber-800">
           Presumido (confira na conta do cliente): {presumidas.map((r) => textoRessalva(r).replace(/\.$/, "").replace(/^./, (c) => c.toLowerCase())).join("; ")}.
@@ -340,10 +349,18 @@ export function PreviaEstimativa({
                 {previa.economiaMensal > 0 ? `${formatarMoeda(previa.economiaMensal)}/mês` : TEXTO_SEM_ECONOMIA}
               </dd>
             </div>
+            {previa.financeiro && (
+              <div>
+                <dt className="text-zinc-500">Economia em {previa.financeiro.projecao.anos.length} anos</dt>
+                <dd data-testid="previa-economia-25" className="font-medium text-zinc-900">
+                  {formatarMoeda(previa.financeiro.economia25Anos)}
+                </dd>
+              </div>
+            )}
             <div>
               <dt className="text-zinc-500">Payback estimado</dt>
-              <dd data-testid="previa-payback" className="font-medium text-zinc-900" title={MOTIVO_PAYBACK}>
-                indisponível
+              <dd data-testid="previa-payback" className="font-medium text-zinc-900" title={previa.financeiro ? undefined : MOTIVO_PAYBACK}>
+                {previa.financeiro ? "aparece ao salvar o kit" : "indisponível"}
               </dd>
             </div>
           </>
@@ -351,7 +368,11 @@ export function PreviaEstimativa({
       </dl>
       {previa.estado === "completa" && (
         <>
-          <p className="-mt-2 text-xs text-zinc-500">Payback indisponível: {MOTIVO_PAYBACK}.</p>
+          <p className="-mt-2 text-xs text-zinc-500">
+            {previa.financeiro
+              ? "Conta e economia já com tributos e autoconsumo. O payback aparece depois de salvar: o preço do inversor vem do custo da tabela de preços, que só o servidor lê."
+              : `Payback indisponível: ${MOTIVO_PAYBACK}.`}
+          </p>
           <HipotesesELimitacoes ressalvas={previa.retrato.ressalvas} kwhNaoCompensado={previa.kwhNaoCompensado} tarifaOrigem={previa.retrato.tarifaOrigem} />
         </>
       )}
@@ -735,6 +756,19 @@ export function KitPersonalizado({
 
   if (calculo && !editando) {
     const tecnicosSalvos = dadosTecnicosDoSalvo(calculo);
+    // Método v2 com a projeção gravada: números, payback e 25 anos. Completo de antes do v2: aviso para recalcular.
+    const resultadoV2: ResultadoV2Salvo | null =
+      calculo.metodo === METODO_GD2_PISO_V2 && calculo.v2 && calculo.contaSemSolar != null && calculo.contaComSolar != null && calculo.economiaMensal != null
+        ? {
+            ...calculo.v2,
+            contaSemSolar: calculo.contaSemSolar,
+            contaComSolar: calculo.contaComSolar,
+            economiaMensal: calculo.economiaMensal,
+            paybackMeses: calculo.paybackMeses,
+            investimento: calculo.kitPreco,
+          }
+        : null;
+    const metodoAnterior = calculo.estadoFinanceiro === "completo" && calculo.metodo !== METODO_GD2_PISO_V2;
     return (
       <div className="flex flex-col gap-3">
         {!padraoCliente && (
@@ -861,6 +895,35 @@ export function KitPersonalizado({
             )}
             {calculo.estadoFinanceiro === "incompleto" && blocoHistorico}
           </>
+        ) : resultadoV2 ? (
+          <>
+            <dl data-testid="resultado-atual" className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
+              <div>
+                <dt className="text-zinc-500">Kit</dt>
+                <dd className="font-medium text-zinc-900">{calculo.kitNome}</dd>
+              </div>
+              <div>
+                <dt className="text-zinc-500">Ligação</dt>
+                <dd>{ROTULO_TIPO_LIGACAO[calculo.tipoLigacao]}</dd>
+              </div>
+              <div>
+                <dt className="text-zinc-500">Geração estimada</dt>
+                <dd>{numeroBr(calculo.geracaoEstimadaKwhMes)} kWh/mês</dd>
+              </div>
+              <div>
+                <dt className="text-zinc-500">
+                  Consumo médio{consumoEstimadoKwhPadrao === calculo.consumoMedioKwh && consumoMedioKwhPadrao == null ? " (estimado pela conta)" : ""}
+                </dt>
+                <dd>{numeroBr(calculo.consumoMedioKwh)} kWh/mês</dd>
+              </div>
+            </dl>
+            <ResultadoKitV2 r={resultadoV2} />
+            <HipotesesELimitacoes
+              ressalvas={calculo.ressalvas ?? []}
+              kwhNaoCompensado={calculo.kwhNaoCompensado ?? null}
+              tarifaOrigem={calculo.tarifaOrigem ?? null}
+            />
+          </>
         ) : (
           <>
             <dl data-testid="resultado-atual" className="grid grid-cols-2 gap-3 text-sm">
@@ -902,12 +965,18 @@ export function KitPersonalizado({
               </div>
               <div>
                 <dt className="text-zinc-500">Payback estimado</dt>
-                <dd data-testid="payback-salvo" title={MOTIVO_PAYBACK}>
-                  {textoPayback(calculo.economiaMensal, calculo.paybackMeses)}
+                <dd data-testid="payback-salvo" title={metodoAnterior ? undefined : MOTIVO_PAYBACK}>
+                  {metodoAnterior ? "recalcule o kit" : textoPayback(calculo.economiaMensal, calculo.paybackMeses)}
                 </dd>
               </div>
             </dl>
-            <p className="-mt-1 text-xs text-zinc-500">Payback indisponível: {MOTIVO_PAYBACK}.</p>
+            {metodoAnterior ? (
+              <p data-testid="metodo-anterior" role="status" className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                Este cálculo é do método anterior, sem tributos, autoconsumo e payback. Recalcule o kit para ver a projeção de 25 anos.
+              </p>
+            ) : (
+              <p className="-mt-1 text-xs text-zinc-500">Payback indisponível: {MOTIVO_PAYBACK}.</p>
+            )}
             <HipotesesELimitacoes
               ressalvas={calculo.ressalvas ?? []}
               kwhNaoCompensado={calculo.kwhNaoCompensado ?? null}

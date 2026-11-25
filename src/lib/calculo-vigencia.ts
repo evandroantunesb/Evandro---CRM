@@ -22,9 +22,12 @@
  *    e `negocios.valor_conta_energia`.
  *  - regra tarifária (só `completo`): enquadramento pela qualificação de HOJE, linha oficial vigente HOJE e percentual
  *    legal do ANO de hoje x o retrato gravado. Virada de ano (60% → 75%) ou fim da vigência = `regra_tarifaria`.
+ *  - premissas do método v2 (`gd2_piso_655i_v2`): `autoconsumo_fracao` x `negocios.autoconsumo_percentual` (nulo = 30%)
+ *    e `icms`/`pis_cofins` x `parametros_calculadora`. Linha v1 não tem essas entradas e não é comparada.
  *  - marca R6.2 (`financeiro_desatualizado_em`): `desatualizado_por_entradas`.
  */
-import { potenciaKitPersonalizadoKwp, nomeKitPersonalizado, DISPONIBILIDADE_PADRAO, type ComponenteKit } from "@/lib/calculadora";
+import { potenciaKitPersonalizadoKwp, nomeKitPersonalizado, DISPONIBILIDADE_PADRAO, METODO_GD2_PISO_V2, type ComponenteKit } from "@/lib/calculadora";
+import { PREMISSAS_PROJECAO } from "@/lib/projecao-financeira";
 import { precoDoCalculoDesatualizado } from "@/lib/calculo-preco";
 import { valorComoPersistido } from "@/lib/consumo-persistido";
 import { carregarContextoEstimativa } from "@/lib/contexto-estimativa";
@@ -75,6 +78,7 @@ export type MotivoDesatualizacao =
   | "parametros" // produtividade (afeta a geração, logo o contrato)
   | "regra_tarifaria" // tarifa oficial vigente, percentual legal do ano ou enquadramento mudaram (só `completo`)
   | "parametros_financeiros" // linha legada: percentual do Fio B e disponibilidade da empresa; nova: piso do art. 291
+  | "premissas" // método v2: autoconsumo do negócio ou tributos da empresa mudaram
   | "preco"
   | "nao_comprovado";
 
@@ -88,6 +92,7 @@ const PRIORIDADE: MotivoDesatualizacao[] = [
   "parametros",
   "regra_tarifaria",
   "parametros_financeiros",
+  "premissas",
   "preco",
   "nao_comprovado",
 ];
@@ -99,6 +104,7 @@ const SO_FINANCEIROS: readonly MotivoDesatualizacao[] = [
   "desatualizado_por_entradas",
   "regra_tarifaria",
   "parametros_financeiros",
+  "premissas",
 ];
 
 /** Entradas do cálculo SEM fonte independente atual: registradas, nunca comparadas nem rotuladas como atuais. */
@@ -152,6 +158,12 @@ export type CalculoParaVigencia = {
   enquadramento?: string | null;
   tarifa_gd_id?: string | null;
   percentual_legal_fio_b?: number | null;
+  /** Método do cálculo completo (ausente = não é v2: premissas não comparadas). */
+  metodo_calculo?: string | null;
+  /** Premissas usadas pelo método v2. */
+  autoconsumo_fracao?: number | null;
+  icms?: number | null;
+  pis_cofins?: number | null;
 };
 
 export type ParametrosAtuais = {
@@ -160,6 +172,9 @@ export type ParametrosAtuais = {
   disponibilidade_mono_kwh: number;
   disponibilidade_bi_kwh: number;
   disponibilidade_tri_kwh: number;
+  /** Tributos da empresa (método v2); ausentes = não comprovado na linha v2. */
+  icms?: number | null;
+  pis_cofins?: number | null;
 };
 
 export type EstadoAtualParaVigencia = {
@@ -175,6 +190,8 @@ export type EstadoAtualParaVigencia = {
   consumoEstimadoKwhNegocio?: number | null;
   /** `negocios.valor_conta_energia`. */
   valorContaEnergiaNegocio: number | null;
+  /** `negocios.autoconsumo_percentual` (nulo = padrão de 30%); ausente = não lido (não comprovado na linha v2). */
+  autoconsumoNegocio?: number | null;
   /** `parametros_calculadora` atual da empresa; nulo = não lido/inexistente (não comprovado). */
   parametros: ParametrosAtuais | null;
   /** Contexto regulatório de HOJE (data, qualificação, tarifas oficiais); só usado na linha `completo`. */
@@ -241,7 +258,7 @@ export function avaliarVigencia(calculo: CalculoParaVigencia, atual: EstadoAtual
   if (precoDoCalculoDesatualizado(calculo.kit_preco, atual.valorNegocio)) achados.add("preco");
 
   // Parâmetros, na escala do banco (numeric(4,3) e numeric(6,2)).
-  const chaveDisponibilidade = (DISPONIBILIDADE_PADRAO as Record<string, keyof ParametrosAtuais | undefined>)[calculo.tipo_ligacao];
+  const chaveDisponibilidade = (DISPONIBILIDADE_PADRAO as Record<string, (typeof DISPONIBILIDADE_PADRAO)[keyof typeof DISPONIBILIDADE_PADRAO] | undefined>)[calculo.tipo_ligacao];
   if (!atual.parametros || !chaveDisponibilidade) {
     achados.add("nao_comprovado");
   } else {
@@ -258,6 +275,20 @@ export function avaliarVigencia(calculo: CalculoParaVigencia, atual: EstadoAtual
       }
     } else if (disponibilidadeArt291(calculo.tipo_ligacao) !== valorComoPersistido(calculo.disponibilidade_kwh, 2)) {
       achados.add("parametros_financeiros");
+    }
+  }
+
+  // Premissas do método v2: autoconsumo do negócio e tributos da empresa, na escala do banco (numeric(5,4)).
+  if (completo && calculo.metodo_calculo === METODO_GD2_PISO_V2) {
+    const p = atual.parametros;
+    if (atual.autoconsumoNegocio === undefined || p?.icms == null || p.pis_cofins == null) {
+      achados.add("nao_comprovado");
+    } else {
+      const igual = (a: number | null | undefined, b: number) => a != null && valorComoPersistido(Number(a), 4) === valorComoPersistido(Number(b), 4);
+      const autoconsumo = atual.autoconsumoNegocio ?? PREMISSAS_PROJECAO.autoconsumoResidencial;
+      if (!igual(calculo.autoconsumo_fracao, autoconsumo) || !igual(calculo.icms, p.icms) || !igual(calculo.pis_cofins, p.pis_cofins)) {
+        achados.add("premissas");
+      }
     }
   }
 
@@ -334,6 +365,8 @@ export function textoDoMotivo(motivo: MotivoDesatualizacao): string {
       return "a tarifa oficial vigente, o percentual legal do Fio B ou o enquadramento mudaram depois do último cálculo";
     case "parametros_financeiros":
       return "os parâmetros financeiros da calculadora mudaram depois do último cálculo";
+    case "premissas":
+      return "o autoconsumo do negócio ou os tributos da empresa mudaram depois do último cálculo";
     case "kit":
       return "o kit mudou depois do último cálculo";
     case "consumo":
@@ -386,7 +419,7 @@ export async function carregarVigencia(supabase: SupabaseClient<Database>, negoc
   const [negocioR, calculoR, itensR] = await Promise.all([
     supabase
       .from("negocios")
-      .select("empresa_id, valor, consumo_medio_kwh, consumo_estimado_kwh, valor_conta_energia, qualif_tipo_cliente, qualif_distribuidora")
+      .select("empresa_id, valor, consumo_medio_kwh, consumo_estimado_kwh, valor_conta_energia, qualif_tipo_cliente, qualif_distribuidora, autoconsumo_percentual")
       .eq("id", negocioId)
       .maybeSingle(),
     supabase.from("calculos_solares").select("*").eq("negocio_id", negocioId).maybeSingle(),
@@ -401,7 +434,7 @@ export async function carregarVigencia(supabase: SupabaseClient<Database>, negoc
   const [paramsR, catalogoR, contexto] = await Promise.all([
     supabase
       .from("parametros_calculadora")
-      .select("produtividade_kwh_kwp_mes, percentual_fio_b, disponibilidade_mono_kwh, disponibilidade_bi_kwh, disponibilidade_tri_kwh")
+      .select("produtividade_kwh_kwp_mes, percentual_fio_b, disponibilidade_mono_kwh, disponibilidade_bi_kwh, disponibilidade_tri_kwh, icms, pis_cofins")
       .eq("empresa_id", negocio.empresa_id)
       .maybeSingle(),
     calculo.kit_id
@@ -420,6 +453,7 @@ export async function carregarVigencia(supabase: SupabaseClient<Database>, negoc
     consumoMedioKwhNegocio: negocio.consumo_medio_kwh,
     consumoEstimadoKwhNegocio: negocio.consumo_estimado_kwh,
     valorContaEnergiaNegocio: negocio.valor_conta_energia,
+    autoconsumoNegocio: negocio.autoconsumo_percentual,
     parametros: paramsR.data,
     contexto,
   });

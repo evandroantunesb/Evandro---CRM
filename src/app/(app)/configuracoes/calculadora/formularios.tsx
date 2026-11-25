@@ -77,6 +77,8 @@ export function FormularioParametros({
     custoEngenharia: number;
     comissaoPercentual: number;
     custoFrete: number;
+    icms: number;
+    pisCofins: number;
   };
 }) {
   const [resultado, acao, pendente] = useActionState(editarParametros, null);
@@ -106,6 +108,28 @@ export function FormularioParametros({
           kWh.
         </p>
       </div>
+      <p className="mt-2 text-sm font-medium text-zinc-700">Tributos da conta de luz</p>
+      <div className="grid grid-cols-2 gap-2">
+        <Campo
+          rotulo="ICMS (%)"
+          name="icms"
+          inputMode="decimal"
+          defaultValue={percentualParaCampo(parametros.icms)}
+          required
+        />
+        <Campo
+          rotulo="PIS/Cofins (%)"
+          name="pis_cofins"
+          inputMode="decimal"
+          defaultValue={percentualParaCampo(parametros.pisCofins)}
+          required
+        />
+      </div>
+      <p data-testid="tributos-ajuda" className="-mt-1 text-xs text-zinc-500">
+        Entram &quot;por dentro&quot; na tarifa e no Fio B pago, como na fatura. A energia compensada pelo sistema é isenta
+        (Lei PR 19.595/2018 e Lei 13.169/2015). O PIS/Cofins muda todo mês: use o da última fatura da distribuidora. Ao
+        mudar, os cálculos já feitos ficam desatualizados até o vendedor recalcular o kit.
+      </p>
       <p className="mt-2 text-sm font-medium text-zinc-700">Custos internos (opcional)</p>
       <p className="-mt-2 text-xs text-zinc-500">
         Somados automaticamente ao preço sugerido do negócio junto com o preço estimado dos componentes do catálogo —

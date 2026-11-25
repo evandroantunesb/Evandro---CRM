@@ -277,7 +277,7 @@ describe("datas: percentual pelo ano e componente pela vigência", () => {
     await salvar(negocioId);
     const l = await linha(negocioId);
     const n = { tipoCliente: "residencial", distribuidoraInformada: "Copel" };
-    const base = { componentes: [{ tipo: "modulo", descricao: "Módulo 600 W", potencia_w: 600, quantidade: 5, ordem: 0 }], valorNegocio: 20000, consumoMedioKwhNegocio: 500, valorContaEnergiaNegocio: null, parametros: { produtividade_kwh_kwp_mes: 100, percentual_fio_b: l.percentual_fio_b, disponibilidade_mono_kwh: 30, disponibilidade_bi_kwh: 50, disponibilidade_tri_kwh: 100 } };
+    const base = { componentes: [{ tipo: "modulo", descricao: "Módulo 600 W", potencia_w: 600, quantidade: 5, ordem: 0 }], valorNegocio: 20000, consumoMedioKwhNegocio: 500, valorContaEnergiaNegocio: null, autoconsumoNegocio: null, parametros: { produtividade_kwh_kwp_mes: 100, percentual_fio_b: l.percentual_fio_b, disponibilidade_mono_kwh: 30, disponibilidade_bi_kwh: 50, disponibilidade_tri_kwh: 100, icms: l.icms, pis_cofins: l.pis_cofins } };
     const dez = await carregarContextoEstimativa(vendedor.cliente, n, "2026-12-31");
     const jan = await carregarContextoEstimativa(vendedor.cliente, n, "2027-01-01");
     expect(avaliarVigencia(l, { ...base, contexto: dez }).vigente).toBe(true);
