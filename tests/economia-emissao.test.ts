@@ -189,8 +189,8 @@ describe("emissão com economia (esquema 7)", () => {
     const com = montarDadosEmissaoSimples({ ...ENTRADA, economia: economiaDe() });
     const sem = montarDadosEmissaoSimples(ENTRADA);
     if (!com.ok || !sem.ok) throw new Error("montagem");
-    expect(com.dados).toMatchObject({ esquema: 7, rodape: RODAPE_COM_ECONOMIA, economia: { horizonteAnos: 25, paybackMeses: 71 } });
-    expect(sem.dados).toMatchObject({ esquema: 7, rodape: RODAPE_SIMPLES_SEM_GERACAO, economia: null });
+    expect(com.dados).toMatchObject({ esquema: 8, rodape: RODAPE_COM_ECONOMIA, economia: { horizonteAnos: 25, paybackMeses: 71 } });
+    expect(sem.dados).toMatchObject({ esquema: 8, rodape: RODAPE_SIMPLES_SEM_GERACAO, economia: null });
     // Rodapé trocado na leitura não passa.
     expect(esquemaDadosEmissaoSimples.safeParse({ ...com.dados, rodape: RODAPE_SIMPLES_SEM_GERACAO }).success).toBe(false);
     expect(esquemaDadosEmissaoSimples.safeParse({ ...sem.dados, rodape: RODAPE_COM_ECONOMIA }).success).toBe(false);

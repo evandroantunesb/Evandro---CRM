@@ -29,13 +29,14 @@ import {
 import { linhasCondicoesEmitidas } from "@/lib/condicoes-pagamento-exibicao";
 import { valorComoPersistido } from "@/lib/consumo-persistido";
 import { TIPOS_COMPONENTE_KIT } from "@/lib/tipos";
+import { distribuirGeracaoMensal } from "@/lib/geracao-mensal";
 import { esquemaEconomiaEmitida, type EconomiaEmitida } from "./economia-emissao";
 
 /** A tela de emissão usa a mesma regra da economia (ver `economia-emissao.ts`). */
 export { avisoDaEconomia } from "./economia-emissao";
 
 /** Identificação do layout que gera o PDF; muda quando o conteúdo/estrutura do modelo simples mudar. */
-export const RENDERIZADOR_SIMPLES = "simples-v7";
+export const RENDERIZADOR_SIMPLES = "simples-v8";
 
 /** Rodapé aprovado (proposta COM a geração estimada). */
 export const RODAPE_SIMPLES =
@@ -316,22 +317,52 @@ const esquemaV6 = z.object({
  */
 const esquemaV7 = esquemaV6.extend({ esquema: z.literal(7), economia: esquemaEconomiaEmitida.nullable() });
 
-/** Economia da versão emitida (só o esquema 7 pode tê-la). */
+/** Geração e consumo mês a mês congelados na emissão (janeiro a dezembro; ver `src/lib/geracao-mensal.ts`). */
+const esquemaMensalEmitido = z.object({
+  geracaoKwh: z.array(z.number().int().nonnegative()).length(12),
+  consumoKwh: z.array(z.number().nonnegative()).length(12),
+  consumoOrigem: z.enum(["informado", "media"]),
+});
+export type MensalEmitido = z.infer<typeof esquemaMensalEmitido>;
+
+/**
+ * Esquema 8 (25/11/2026, proposta completa PR 4): o 7 com a geração e o consumo mês a mês. Nulo = sem o gráfico
+ * (empresa sem curva de geração ou proposta sem geração).
+ */
+const esquemaV8 = esquemaV7.extend({ esquema: z.literal(8), mensal: esquemaMensalEmitido.nullable() });
+
+/** Economia da versão emitida (só os esquemas 7 e 8 podem tê-la). */
 export const economiaDaEmissao = (d: { esquema: number; economia?: EconomiaEmitida | null }): EconomiaEmitida | null =>
-  d.esquema === 7 ? (d.economia ?? null) : null;
+  d.esquema === 7 || d.esquema === 8 ? (d.economia ?? null) : null;
+
+/** Geração e consumo mês a mês da versão emitida (só o esquema 8 pode tê-los). */
+export const mensalDaEmissao = (d: { esquema: number; mensal?: MensalEmitido | null }): MensalEmitido | null =>
+  d.esquema === 8 ? (d.mensal ?? null) : null;
+
+/** Versões com o pós-venda e o conteúdo institucional da empresa (esquema 6 em diante). */
+export const temConteudoV6 = <D extends { esquema: number }>(d: D): d is Extract<D, { esquema: 6 | 7 | 8 }> => d.esquema >= 6;
+
+/** O gráfico mês a mês só existe com geração, e reparte exatamente o total do ano. */
+function mensalConfere(d: { esquema: number; mensal?: MensalEmitido | null; sistema: { geracao: { kwhMes: number } | null } }): boolean {
+  const mensal = mensalDaEmissao(d);
+  if (!mensal) return true;
+  if (!d.sistema.geracao) return false;
+  return mensal.geracaoKwh.reduce((a, b) => a + b, 0) === Math.round(d.sistema.geracao.kwhMes * 12);
+}
 
 export const esquemaDadosEmissaoSimples = z
-  .discriminatedUnion("esquema", [esquemaV4, esquemaV5, esquemaV6, esquemaV7])
+  .discriminatedUnion("esquema", [esquemaV4, esquemaV5, esquemaV6, esquemaV7, esquemaV8])
   // O rodapé acompanha o que a proposta promete: com economia, o aviso das estimativas; sem ela, o da geração.
   .refine((d) => d.rodape === rodapeDaProposta(d.sistema.geracao != null, economiaDaEmissao(d) != null), {
     path: ["rodape"],
     message: "Rodapé não confere com a proposta.",
-  });
+  })
+  .refine(mensalConfere, { path: ["mensal"], message: "Geração mês a mês não confere com a geração da proposta." });
 
 /** Qualquer versão já emitida (leitura). */
 export type DadosEmissaoSimples = z.infer<typeof esquemaDadosEmissaoSimples>;
 /** O que uma emissão nova grava. */
-export type DadosEmissaoAtual = z.infer<typeof esquemaV7>;
+export type DadosEmissaoAtual = z.infer<typeof esquemaV8>;
 
 /** JSON canônico (chaves ordenadas): o mesmo conteúdo gera sempre os mesmos bytes, não importa a ordem do jsonb. */
 export function jsonCanonico(valor: unknown): string {
@@ -421,6 +452,10 @@ export type EntradaEmissaoSimples = {
   hoje: string;
   /** Economia do cálculo v2 vigente (`situacaoDaEconomia`); nulo = a proposta sai sem economia. */
   economia?: EconomiaEmitida | null;
+  /** Curva de geração da empresa (12 valores > 0); nula = a proposta sai sem o gráfico mês a mês. */
+  curvaGeracao?: number[] | null;
+  /** Consumo dos 12 meses do NEGÓCIO; nulo = o gráfico usa o consumo médio. */
+  consumoMensalKwhNegocio?: number[] | null;
 };
 
 export const MENSAGEM_VALIDADE_OBRIGATORIA = "Informe até quando a proposta é válida.";
@@ -519,8 +554,15 @@ export function montarDadosEmissaoSimples(e: EntradaEmissaoSimples): ResultadoMo
     quantidade: c.quantidade,
     potenciaW: c.potencia_w != null && c.potencia_w > 0 ? c.potencia_w : null,
   }));
+  // Gráfico mês a mês: só com geração (produtividade confirmada) e curva da empresa; consumo dos 12 meses ou a média.
+  const geracaoMensal = sistema.geracao && e.curvaGeracao ? distribuirGeracaoMensal(sistema.geracao.kwhMes, e.curvaGeracao) : null;
+  const mensal = geracaoMensal
+    ? e.consumoMensalKwhNegocio
+      ? { geracaoKwh: geracaoMensal, consumoKwh: [...e.consumoMensalKwhNegocio], consumoOrigem: "informado" as const }
+      : { geracaoKwh: geracaoMensal, consumoKwh: Array<number>(12).fill(e.consumoMedioKwhNegocio!), consumoOrigem: "media" as const }
+    : null;
   const candidato = {
-    esquema: 7 as const,
+    esquema: 8 as const,
     cliente: { nome: e.contatoNome!.trim(), endereco: e.contatoEndereco?.trim() || null },
     sistema: {
       kitNome: nomeKitPersonalizado(
@@ -546,10 +588,16 @@ export function montarDadosEmissaoSimples(e: EntradaEmissaoSimples): ResultadoMo
     identidade: e.identidade,
     emissao: { versao: e.versao, emitidaEm: e.emitidaEm },
     economia: e.economia ?? null,
+    mensal,
     rodape: rodapeDaProposta(sistema.geracao != null, e.economia != null),
   };
-  const analisado = esquemaV7.safeParse(candidato);
-  if (!analisado.success || analisado.data.rodape !== rodapeDaProposta(analisado.data.sistema.geracao != null, analisado.data.economia != null)) return { ok: false, pendencias: ["Os dados do negócio não passaram na conferência da proposta. Revise o kit e o cliente."] };
+  const analisado = esquemaV8.safeParse(candidato);
+  if (
+    !analisado.success ||
+    analisado.data.rodape !== rodapeDaProposta(analisado.data.sistema.geracao != null, analisado.data.economia != null) ||
+    !mensalConfere(analisado.data)
+  )
+    return { ok: false, pendencias: ["Os dados do negócio não passaram na conferência da proposta. Revise o kit e o cliente."] };
   return { ok: true, dados: analisado.data };
 }
 
