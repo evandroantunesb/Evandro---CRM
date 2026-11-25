@@ -95,6 +95,18 @@ describe("lerCurvaDoFormulario", () => {
   });
 });
 
+describe("limites da curva", () => {
+  it("recusa valor que o banco não guarda (100.000 ou mais, ou abaixo de 0,001), citando o mês", () => {
+    const base = Array(12).fill("5");
+    expect(lerCurvaDoFormulario(doze("curva_mes_", ["150.000", ...base.slice(1)]))).toEqual({
+      ok: false,
+      mensagem: "curva de geração: use valores de 0,001 a 99.999,999 (Janeiro). Na mesma unidade, só a proporção entre os meses conta.",
+    });
+    expect(lerCurvaDoFormulario(doze("curva_mes_", ["5", "0,0004", ...base.slice(2)])).ok).toBe(false);
+    expect(lerCurvaDoFormulario(doze("curva_mes_", ["99.999,999", "0,001", ...base.slice(2)])).ok).toBe(true);
+  });
+});
+
 describe("auxiliares", () => {
   it("algumMesPresente olha só se o campo veio", () => {
     expect(algumMesPresente({}, "c")).toBe(false);

@@ -84,8 +84,24 @@ export function lerDozeMeses(
   return { ok: true, valores };
 }
 
-/** Curva da empresa no formulário de parâmetros (`curva_mes_01` a `curva_mes_12`): 12 valores > 0 ou nenhum. */
-export const lerCurvaDoFormulario = (entrada: Record<string, unknown>) => lerDozeMeses(entrada, "curva_mes_", "positivo", "curva de geração");
+/** O que a coluna `numeric(8, 3)` guarda sem arredondar para zero nem estourar. */
+const CURVA_MINIMO = 0.001;
+const CURVA_MAXIMO = 99999.999;
+
+/**
+ * Curva da empresa no formulário de parâmetros (`curva_mes_01` a `curva_mes_12`): 12 valores > 0 ou nenhum, cada um
+ * entre 0,001 e 99.999,999 (o que o banco guarda); fora disso, recusa citando o mês.
+ */
+export function lerCurvaDoFormulario(entrada: Record<string, unknown>): ReturnType<typeof lerDozeMeses> {
+  const r = lerDozeMeses(entrada, "curva_mes_", "positivo", "curva de geração");
+  if (!r.ok || !r.valores) return r;
+  const fora = r.valores.findIndex((v) => v < CURVA_MINIMO || v > CURVA_MAXIMO);
+  if (fora < 0) return r;
+  return {
+    ok: false,
+    mensagem: `curva de geração: use valores de 0,001 a 99.999,999 (${MESES_NOMES[fora]}). Na mesma unidade, só a proporção entre os meses conta.`,
+  };
+}
 
 /** Média dos meses em kWh inteiros. */
 export function mediaDosMeses(valores: readonly number[]): number {
