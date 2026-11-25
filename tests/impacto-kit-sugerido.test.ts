@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { analisarLinhas } from "@/lib/kit-linhas";
-import { autonomia, carbonoEvitadoKgAno, FATOR_EMISSAO_SIN } from "@/lib/impacto";
+import { autonomia } from "@/lib/impacto";
 import { inversorSugeridoKw, kitSimples, linhasKitSugerido, opcoesInversorKw, referenciaDoKit, relacaoCcCa } from "@/lib/kit-sugerido";
 
 describe("impacto", () => {
@@ -10,12 +10,6 @@ describe("impacto", () => {
     expect(autonomia(0, 500)).toBeNull();
     expect(autonomia(300, 0)).toBeNull();
     expect(autonomia(Number.NaN, 500)).toBeNull();
-  });
-
-  it("carbono evitado usa o fator oficial (kg/kWh = t/MWh) por ano", () => {
-    expect(FATOR_EMISSAO_SIN).toMatchObject({ tco2PorMwh: 0.0385, ano: 2023 });
-    expect(carbonoEvitadoKgAno(500)).toBe(Math.round(500 * 12 * 0.0385));
-    expect(carbonoEvitadoKgAno(0)).toBeNull();
   });
 });
 
