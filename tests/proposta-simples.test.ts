@@ -300,11 +300,14 @@ describe("rodapé e textos aprovados", () => {
 });
 
 describe("montarDadosEmissaoSimples", () => {
-  it("monta os dados congelados sem economia, payback, contas nem Fio B", () => {
+  it("sem economia informada, monta os dados congelados sem economia, payback, contas nem Fio B", () => {
     const dados = dadosValidos();
     expect(dados.preco.valor).toBe(24500);
     expect(dados.sistema.consumoMedioKwh).toBe(450);
-    expect(jsonCanonico(dados)).not.toMatch(/"(economia|payback|conta|fio)/i);
+    expect(dados.esquema === 7 && dados.economia).toBeNull();
+    const resto = { ...dados } as Record<string, unknown>;
+    delete resto.economia;
+    expect(jsonCanonico(resto)).not.toMatch(/"(economia|payback|conta|fio)/i);
   });
 
   it("exige a validade informada pelo vendedor: sem padrão", () => {
@@ -342,9 +345,9 @@ describe("montarDadosEmissaoSimples", () => {
     }
   });
 
-  it("emissão nova grava o esquema 6, com as condições por modalidade e a observação", () => {
+  it("emissão nova grava o esquema 7, com as condições por modalidade e a observação", () => {
     const dados = dadosValidos();
-    expect(dados.esquema).toBe(6);
+    expect(dados.esquema).toBe(7);
     expect(dados.comercial.condicoesPagamento).toEqual({
       aVista: { descontoPercentual: 0, valor: 24500 },
       parcelado: null,

@@ -73,7 +73,7 @@ export type BarraSaldo = { ano: number; topoPct: number; alturaPct: number; posi
  * Barras do saldo acumulado (gráfico de 25 anos): posição em % da altura, com a linha do zero em `zeroPct`. Nulo quando
  * algum ano não tem saldo (sem o preço do inversor).
  */
-export function barrasDoSaldo(anos: AnoProjecao[]): { barras: BarraSaldo[]; zeroPct: number } | null {
+export function barrasDoSaldo(anos: Pick<AnoProjecao, "ano" | "saldoAcumulado">[]): { barras: BarraSaldo[]; zeroPct: number } | null {
   if (anos.length === 0 || anos.some((a) => a.saldoAcumulado == null)) return null;
   const saldos = anos.map((a) => a.saldoAcumulado as number);
   const max = Math.max(0, ...saldos);

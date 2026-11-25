@@ -10,6 +10,7 @@ import { ultimaVersaoDoNegocio } from "@/lib/propostas/emissoes-dados";
 import { gravarEmissaoSimples } from "@/lib/propostas/emissoes-gravacao";
 import { prepararImagensDaEmissao } from "@/lib/propostas/imagens-emissao";
 import { extrairConteudoDoModelo, montarDadosEmissaoSimples, produtividadeConfirmada } from "@/lib/propostas/proposta-simples";
+import { carregarSituacaoEconomia } from "@/lib/propostas/economia-servidor";
 import { exigirPapel } from "@/lib/sessao";
 import { criarClienteAdmin } from "@/lib/supabase/admin";
 import { criarClienteServidor } from "@/lib/supabase/server";
@@ -22,6 +23,8 @@ const esquema = z.object({
   condicoes: z.string().max(20000),
   // O que o vendedor VIU na tela: se a confirmação da produtividade mudou antes do clique, a emissão é recusada.
   geracaoEsperada: z.enum(["sim", "nao"]),
+  // Idem para a economia: se o cálculo do kit ou o modelo mudou e ela passaria a entrar ou sair, o vendedor confere.
+  economiaEsperada: z.enum(["sim", "nao"]),
   // Preço que a tela usou nas contas das condições (desconto, parcelas): se mudou, o vendedor revê antes de emitir.
   precoEsperado: z.coerce.number(),
 });
@@ -37,14 +40,14 @@ function lerEntradaCondicoes(texto: string): EntradaCondicoes | null {
 }
 
 /**
- * Emite uma proposta simples (sem economia, payback, Fio B nem tipo de ligação): congela os dados exibidos, gera o
+ * Emite a proposta (esquema 7): congela os dados exibidos, gera o
  * PDF UMA vez, guarda no bucket privado e grava a linha imutável com link e arquivo próprios. Emitir de novo cria a
  * próxima versão; nada emitido é alterado.
  *
  * Nada vem do cálculo salvo (`calculos_solares`, legado): potência = módulos do kit atual; geração = potência ×
  * produtividade da empresa, SÓ se o admin confirmou esse valor (senão a proposta sai sem geração); consumo e preço
- * = os do negócio. Ver `proposta-simples.ts`. Não depende da estimativa
- * financeira nem exige recálculo do preço. As condições de pagamento são conferidas aqui contra as regras da empresa e
+ * = os do negócio. Ver `proposta-simples.ts`. A economia (conta, retorno e os anos escolhidos no modelo) só entra com o
+ * cálculo v2 do kit vigente e algum bloco de economia ativo; senão a proposta sai sem ela (`economia-emissao.ts`). As condições de pagamento são conferidas aqui contra as regras da empresa e
  * o desconto permitido a quem emite (`montarCondicoesPagamento`); o valor do negócio não muda na emissão.
  */
 export async function emitirPropostaSimples(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
@@ -55,6 +58,7 @@ export async function emitirPropostaSimples(_: ResultadoAcao, formData: FormData
     validadeAte: formData.get("validadeAte") ?? "",
     condicoes: formData.get("condicoes") ?? "",
     geracaoEsperada: formData.get("geracaoEsperada"),
+    economiaEsperada: formData.get("economiaEsperada"),
     precoEsperado: formData.get("precoEsperado") ?? "",
   });
   if (!dados.success) return { ok: false, mensagem: "Dados inválidos." };
@@ -102,6 +106,13 @@ export async function emitirPropostaSimples(_: ResultadoAcao, formData: FormData
     return { ok: false, mensagem: "A confirmação da produtividade mudou desde que a tela abriu. Confira o aviso de geração e emita de novo. Nada foi emitido." };
   }
 
+  // Economia: só com bloco de economia ativo no modelo e o cálculo v2 do kit vigente; senão a proposta sai sem ela.
+  const economia = await carregarSituacaoEconomia(supabase, negocioId, modeloR.data?.proposta_modelo_blocos);
+  if ((dados.data.economiaEsperada === "sim") !== economia.entra) {
+    revalidatePath(`/negocios/${negocioId}`);
+    return { ok: false, mensagem: "O cálculo do kit ou o modelo de proposta mudou desde que a tela abriu. Confira o aviso de economia e emita de novo. Nada foi emitido." };
+  }
+
   if (Math.round((negocio.valor ?? 0) * 100) !== Math.round(dados.data.precoEsperado * 100)) {
     revalidatePath(`/negocios/${negocioId}`);
     return { ok: false, mensagem: "O valor do negócio mudou desde que a tela abriu. Confira as condições de pagamento e emita de novo. Nada foi emitido." };
@@ -129,6 +140,7 @@ export async function emitirPropostaSimples(_: ResultadoAcao, formData: FormData
     versao,
     emitidaEm,
     hoje: hojeEmSaoPaulo(),
+    economia: economia.entra ? economia.economia : null,
   });
   if (!montagem.ok) return { ok: false, mensagem: montagem.pendencias.join(" ") };
 

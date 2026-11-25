@@ -4,9 +4,11 @@ import { formatarMoeda } from "@/lib/formatacao";
 import { ROTULO_TIPO_COMPONENTE_KIT } from "@/lib/tipos";
 import { FONTES_PDF } from "./fontes-pdf";
 import { CondicoesPagamentoPdf } from "./pdf-condicoes";
+import { SecoesEconomia } from "./pdf-economia";
 import {
   coberturaDoConsumo,
   dataBr,
+  economiaDaEmissao,
   linhasCondicoesPagamento,
   linkWhatsappDaProposta,
   textoPremissaGeracao,
@@ -24,9 +26,10 @@ const NEGRITO = { fontFamily: "Inter", fontWeight: 600 } as const;
  * PDF da proposta simples, seguindo a estrutura aprovada em `docs/referencias/proposta-solar-ibs.html` (spec
  * PROPOSTA_PDF_LAYOUT_IBS.md) e o "depois" aprovado pelo Evandro em 24/11/2026: capa fotográfica com três
  * indicadores, "Sobre a empresa" (só quando a empresa escreveu conteúdo institucional), página do sistema e página de
- * oferta e fechamento (investimento, linha do tempo, pós-venda e QR do WhatsApp). Sem economia, retorno, conta futura
- * nem tipo de ligação: os mesmos espaços mostram potência, geração e cobertura do consumo (só se a produtividade
- * estiver confirmada) e a descrição verificável da solução. Depois da capa, as seções correm em fluxo contínuo: a
+ * oferta e fechamento (investimento, linha do tempo, pós-venda e QR do WhatsApp). Esquema 7: com a economia do cálculo
+ * v2 vigente, a capa mostra a economia por mês e a seção "Sua economia" (pdf-economia.tsx) entra depois do sistema;
+ * sem ela, os mesmos espaços mostram potência, geração e cobertura do consumo (só se a produtividade estiver
+ * confirmada) e a descrição verificável da solução. Depois da capa, as seções correm em fluxo contínuo: a
  * folha vira quando enche, com o mesmo cabeçalho e a numeração total no rodapé, e seção ausente não deixa espaço.
  * Identidade (cores, logo, foto de capa) vem da empresa emissora; nada da marca de exemplo é reproduzido.
  */
@@ -137,6 +140,7 @@ function Capa({ dados, imagens, p }: { dados: DadosEmissaoSimples; imagens: Imag
   const cobertura = coberturaDoConsumo(dados);
   const emitida = new Date(dados.emissao.emitidaEm).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
   const inversor = s.componentes.find((c) => c.tipo === "inversor");
+  const economia = economiaDaEmissao(dados);
   const cartaoBase = { flex: 1, backgroundColor: mix(p.fundo, "#FFFFFF", 0.09), borderWidth: 1, borderColor: p.borda, borderRadius: 10, padding: 12 } as const;
   return (
     <Page size="A4" style={{ backgroundColor: p.fundo, padding: 0, color: p.texto, fontFamily: "Inter" }}>
@@ -199,6 +203,13 @@ function Capa({ dados, imagens, p }: { dados: DadosEmissaoSimples; imagens: Imag
               </>
             )}
           </View>
+          {economia ? (
+            <View style={cartaoBase}>
+              <Text style={{ fontSize: 7.5, ...NEGRITO, letterSpacing: 0.8, color: p.suave }}>ECONOMIA ESTIMADA</Text>
+              <Text style={{ fontSize: 19, ...TITULO, color: p.acento, marginTop: 6 }}>{`${formatarMoeda(Math.round(economia.economiaMensal)).replace(/,00$/, "")}/mês`}</Text>
+              <Text style={{ fontSize: 8.5, color: p.suave, marginTop: 4 }}>na conta de energia</Text>
+            </View>
+          ) : (
           <View style={cartaoBase}>
             <Text style={{ fontSize: 7.5, ...NEGRITO, letterSpacing: 0.8, color: p.suave }}>SOLUÇÃO</Text>
             <Text style={{ fontSize: 19, ...TITULO, marginTop: 6 }}>
@@ -208,6 +219,7 @@ function Capa({ dados, imagens, p }: { dados: DadosEmissaoSimples; imagens: Imag
               {s.modulos?.potenciaW ? `de ${numero(s.modulos.potenciaW)} W cada` : inversor ? inversor.descricao.slice(0, 40) : "Equipamentos listados"}
             </Text>
           </View>
+          )}
         </View>
       </View>
       </View>
@@ -355,7 +367,7 @@ function SecoesOferta({ dados, e, p }: { dados: DadosEmissaoSimples; e: ReturnTy
 
         {c.etapas ? <LinhaDoTempo etapas={c.etapas} e={e} p={p} /> : null}
 
-        {dados.esquema === 6 && dados.comercial.posVenda ? (
+        {(dados.esquema === 6 || dados.esquema === 7) && dados.comercial.posVenda ? (
           <View style={e.cartao} wrap={false}>
             <Text style={e.tituloCartao}>Depois da instalação</Text>
             <View style={{ flexDirection: "row", gap: 9 }}>
@@ -426,7 +438,7 @@ function QrCodePdf({ texto, tamanho }: { texto: string; tamanho: number }) {
 
 /** Faixa final: próximos passos, WhatsApp e validade; com QR do WhatsApp quando o número é um telefone válido. */
 function Fechamento({ dados, p }: { dados: DadosEmissaoSimples; p: ReturnType<typeof paletaDaEmpresa> }) {
-  const link = dados.esquema === 6 ? linkWhatsappDaProposta(dados) : null;
+  const link = (dados.esquema === 6 || dados.esquema === 7) ? linkWhatsappDaProposta(dados) : null;
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 10, borderLeftWidth: 3, borderLeftColor: p.acento, backgroundColor: p.cartao, borderRadius: 9, padding: 9 }} wrap={false}>
       {link ? <QrCodePdf texto={link} tamanho={62} /> : null}
@@ -529,7 +541,8 @@ function SecoesSobre({ inst, e, p }: { inst: Institucional; e: ReturnType<typeof
 export function PropostaSimplesPdfDocument({ dados, imagens }: { dados: DadosEmissaoSimples; imagens: ImagensDoPdf }) {
   const p = paletaDaEmpresa(dados.identidade.corPrimaria, dados.identidade.corDestaque);
   const e = criarEstilos(p);
-  const institucional = dados.esquema === 6 ? dados.institucional : null;
+  const institucional = (dados.esquema === 6 || dados.esquema === 7) ? dados.institucional : null;
+  const economia = economiaDaEmissao(dados);
   return (
     <Document title={`Proposta - ${dados.cliente.nome}`}>
       <Capa dados={dados} imagens={imagens} p={p} />
@@ -540,6 +553,7 @@ export function PropostaSimplesPdfDocument({ dados, imagens }: { dados: DadosEmi
         <View style={e.miolo}>
           {institucional ? <SecoesSobre inst={institucional} e={e} p={p} /> : null}
           <SecoesSistema dados={dados} e={e} p={p} />
+          {economia ? <SecoesEconomia economia={economia} p={p} /> : null}
           <SecoesOferta dados={dados} e={e} p={p} />
         </View>
         <Rodape dados={dados} e={e} />
