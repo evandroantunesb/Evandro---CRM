@@ -84,6 +84,9 @@ export function lerDozeMeses(
   return { ok: true, valores };
 }
 
+/** Curva da empresa no formulário de parâmetros (`curva_mes_01` a `curva_mes_12`): 12 valores > 0 ou nenhum. */
+export const lerCurvaDoFormulario = (entrada: Record<string, unknown>) => lerDozeMeses(entrada, "curva_mes_", "positivo", "curva de geração");
+
 /** Média dos meses em kWh inteiros. */
 export function mediaDosMeses(valores: readonly number[]): number {
   return Math.round(valores.reduce((a, b) => a + b, 0) / valores.length);

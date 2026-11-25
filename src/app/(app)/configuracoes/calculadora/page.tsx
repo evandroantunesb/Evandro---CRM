@@ -54,6 +54,7 @@ export default async function ConfigCalculadora() {
               custoFrete: parametros.custo_frete,
               icms: Number(parametros.icms),
               pisCofins: Number(parametros.pis_cofins),
+              curvaGeracaoMensal: parametros.curva_geracao_mensal?.map(Number) ?? null,
             }}
           />
         )}

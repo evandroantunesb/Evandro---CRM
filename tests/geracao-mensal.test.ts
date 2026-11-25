@@ -3,6 +3,7 @@ import {
   algumMesPresente,
   distribuirGeracaoMensal,
   escalaDoGrafico,
+  lerCurvaDoFormulario,
   lerDozeMeses,
   MESES_ABREV,
   MESES_NOMES,
@@ -75,6 +76,18 @@ describe("lerDozeMeses", () => {
     expect(lerDozeMeses(comZero, "c", "positivo", "curva de geração")).toEqual({ ok: false, mensagem: "curva de geração: valor inválido em Março." });
     expect(lerDozeMeses(doze("c", ["-5", ...consumo.slice(1)]), "c", "zero_ou_mais", "consumo").ok).toBe(false);
     expect(lerDozeMeses(doze("c", ["abc", ...consumo.slice(1)]), "c", "zero_ou_mais", "consumo").ok).toBe(false);
+  });
+});
+
+describe("lerCurvaDoFormulario", () => {
+  it("lê curva_mes_01 a 12: valores, nenhum ou erro com zero", () => {
+    const curva = ["5,9", "5,7", "5,3", "4,6", "3,8", "3,4", "3,6", "4,5", "4,7", "5,4", "6", "6,1"];
+    expect(lerCurvaDoFormulario(doze("curva_mes_", curva))).toEqual({ ok: true, valores: CURVA });
+    expect(lerCurvaDoFormulario(doze("curva_mes_", Array(12).fill("")))).toEqual({ ok: true, valores: null });
+    expect(lerCurvaDoFormulario(doze("curva_mes_", ["5", "5", "0", ...Array(9).fill("5")]))).toEqual({
+      ok: false,
+      mensagem: "curva de geração: valor inválido em Março.",
+    });
   });
 });
 
