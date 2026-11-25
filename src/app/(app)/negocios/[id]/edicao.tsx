@@ -9,7 +9,8 @@ import { editarNegocio } from "@/lib/acoes/negocios";
 import { enviarArquivos } from "@/lib/anexos-navegador";
 import { arquivosEscolhidos, metaArquivo, problemaArquivo } from "@/lib/anexos-regras";
 import { descontoTotal, formatarPercentual } from "@/lib/condicoes-pagamento-proposta";
-import { formatarMesAno, formatarMoeda } from "@/lib/formatacao";
+import { formatarMesAno, formatarMoeda, lerNumeroBr } from "@/lib/formatacao";
+import { MESES_ABREV, mediaDosMeses } from "@/lib/geracao-mensal";
 import { percentualParaCampo } from "@/lib/percentual-exibicao";
 import { criarClienteNavegador } from "@/lib/supabase/navegador";
 import type { ResultadoAcao } from "@/lib/tipos";
@@ -51,6 +52,8 @@ export function EdicaoNegocio({
     valorContaEnergia: number | null;
     /** Autoconsumo (fração da geração); nulo = padrão residencial de 30%. */
     autoconsumoFracao: number | null;
+    /** Consumo dos 12 meses (janeiro a dezembro), opcional; só para o gráfico da proposta. */
+    consumoMensalKwh: number[] | null;
     /** Data prevista (AAAA-MM-DD) ou nula. */
     fechamentoPrevistoEm: string | null;
     /** Legado: mês previsto (AAAA-MM-01), de antes da data com dia. */
@@ -203,6 +206,7 @@ export function EdicaoNegocio({
               dia). Vazio vale 30%, o padrão residencial. Ao mudar, o cálculo do kit fica desatualizado até recalcular.
             </p>
           </div>
+          <ConsumoMesAMes inicial={negocio.consumoMensalKwh} consumoMedio={negocio.consumoMedioKwh} />
           <Campo rotulo="Unidade consumidora" name="unidade_consumidora" defaultValue={negocio.unidadeConsumidora ?? ""} />
           {negocio.consumoEstimadoKwh != null && (
             <p role="status" className="text-xs text-amber-800 md:col-span-2">
@@ -239,5 +243,55 @@ export function EdicaoNegocio({
         <Mensagem resultado={resultado} />
       </div>
     </form>
+  );
+}
+
+/**
+ * Consumo mês a mês (proposta completa, PR 4; prévia aprovada em 25/11/2026): os 12 meses da fatura, opcionais, só para
+ * o gráfico "Geração e consumo mês a mês" da proposta. Campos `consumo_mes_01`…`12`; 12 ou nenhum (o servidor confere).
+ */
+function ConsumoMesAMes({ inicial, consumoMedio }: { inicial: number[] | null; consumoMedio: number | null }) {
+  const [valores, setValores] = useState<string[]>(() => MESES_ABREV.map((_, i) => (inicial?.[i] != null ? String(inicial[i]).replace(".", ",") : "")));
+  const numeros = valores.map((v) => lerNumeroBr(v));
+  const completos = numeros.every((n) => n != null && n >= 0) ? (numeros as number[]) : null;
+  return (
+    <fieldset data-testid="consumo-mes-a-mes" className="flex flex-col gap-3 rounded-xl border border-dourado bg-dourado/10 p-4 md:col-span-2">
+      <legend className="sr-only">Consumo mês a mês (kWh)</legend>
+      <div className="flex flex-wrap items-center gap-2" aria-hidden>
+        <p className="text-sm font-semibold text-texto">Consumo mês a mês (kWh)</p>
+        <span className="rounded-full bg-dourado/25 px-2.5 py-0.5 text-xs font-medium text-texto">Novo</span>
+        <span className="rounded-full bg-superficie-2 px-2.5 py-0.5 text-xs font-medium text-texto-2">opcional</span>
+      </div>
+      <p className="text-xs leading-relaxed text-texto-2">
+        Copie o histórico de 12 meses da fatura. Serve só para o gráfico &quot;Geração e consumo mês a mês&quot; da proposta;
+        economia e retorno continuam pelo consumo médio. Preencha os 12 ou deixe todos vazios (mês sem consumo = 0).
+      </p>
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+        {MESES_ABREV.map((mes, i) => (
+          <label key={mes} className="flex flex-col gap-1 text-xs font-semibold text-texto-2">
+            {mes}
+            <input
+              name={`consumo_mes_${String(i + 1).padStart(2, "0")}`}
+              inputMode="decimal"
+              value={valores[i]}
+              onChange={(ev) => setValores((v) => v.map((x, j) => (j === i ? ev.target.value : x)))}
+              className="min-h-11 w-full rounded-lg border border-linha bg-superficie px-2.5 text-base tabular-nums text-texto"
+            />
+          </label>
+        ))}
+      </div>
+      {completos && (
+        <p data-testid="consumo-mes-a-mes-media" className="flex flex-wrap gap-x-4 gap-y-1 rounded-lg bg-superficie px-3 py-2 text-sm text-texto-2">
+          <span>
+            Média dos 12 meses: <b className="tabular-nums text-texto">{mediaDosMeses(completos).toLocaleString("pt-BR")} kWh</b>
+          </span>
+          {consumoMedio != null && (
+            <span>
+              Consumo médio informado: <b className="tabular-nums text-texto">{Number(consumoMedio).toLocaleString("pt-BR")} kWh</b>
+            </span>
+          )}
+        </p>
+      )}
+    </fieldset>
   );
 }

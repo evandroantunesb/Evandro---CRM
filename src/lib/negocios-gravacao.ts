@@ -20,6 +20,7 @@ import type { Pendencia } from "@/lib/estimativa-financeira";
 import { cnpjValido, cpfValido, formatarDocumento, soDigitos } from "@/lib/dados-cliente-contrato";
 import { mensagemErro } from "@/lib/erros";
 import { formatarMoeda, lerNumeroBr, MENSAGEM_NUMERO_BR } from "@/lib/formatacao";
+import { algumMesPresente, lerDozeMeses } from "@/lib/geracao-mensal";
 import { gravarPrecificacaoNegocio } from "@/lib/compras/precificacao-gravacao";
 import {
   completarContato,
@@ -438,6 +439,15 @@ export async function editarNegocioComCliente(
   const ehEletroposto = registro?.tipo === "eletroposto";
   if (temComercial && !ehEletroposto && d.valor == null) return { ok: false, mensagem: "Informe o valor do negócio." };
 
+  // Consumo dos 12 meses (proposta completa, PR 4): só para o gráfico da proposta; 12 ou nenhum. Formulário sem os
+  // campos (cartão "Oportunidade", formulário antigo aberto) não mexe no que está gravado.
+  const entrada = Object.fromEntries(formData);
+  const consumoMensal =
+    temTecnico && !ehEletroposto && algumMesPresente(entrada, "consumo_mes_")
+      ? lerDozeMeses(entrada, "consumo_mes_", "zero_ou_mais", "consumo mês a mês")
+      : null;
+  if (consumoMensal && !consumoMensal.ok) return { ok: false, mensagem: consumoMensal.mensagem };
+
   const consumoEdicao = resolverConsumo(d.consumo_medio_kwh, d.valor_conta_energia, d.tarifa_efetiva_kwh);
   const camposSolares = ehEletroposto || !temTecnico
     ? {}
@@ -451,6 +461,7 @@ export async function editarNegocioComCliente(
         tarifa_efetiva_kwh: consumoEdicao.tarifaEfetiva,
         valor_conta_energia: d.valor_conta_energia,
         ...(d.autoconsumo_percentual !== undefined ? { autoconsumo_percentual: d.autoconsumo_percentual } : {}),
+        ...(consumoMensal ? { consumo_mensal_kwh: consumoMensal.valores } : {}),
       };
 
   const { data, error } = await supabase
