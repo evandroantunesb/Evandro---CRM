@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { ResultadoCalculoCompleto } from "@/lib/calculadora";
-import { autonomia, carbonoEvitadoKgAno, FATOR_EMISSAO_SIN } from "@/lib/impacto";
+import { autonomia } from "@/lib/impacto";
 
 const moeda = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 const inteiro = (v: number) => Math.round(v).toLocaleString("pt-BR");
@@ -44,7 +44,7 @@ function Metrica({ rotulo, valor, destaque }: { rotulo: string; valor: string | 
 
 /**
  * Resultado ao vivo do cadastro: o mesmo `calcular()` que o servidor grava. Completo → autonomia, economia, conta com
- * solar, geração e carbono evitado. Incompleto → geração e a lista honesta do que falta (nenhum número presumido).
+ * solar e geração. Incompleto → geração e a lista honesta do que falta (nenhum número presumido).
  */
 export function PainelResultado({
   nomeCliente,
@@ -71,7 +71,6 @@ export function PainelResultado({
   const fracao = geracao != null && consumoKwh != null ? autonomia(geracao, consumoKwh) : null;
   const pct = useNumeroAnimado(fracao != null ? Math.round(fracao * 100) : 0);
   const economia = useNumeroAnimado(completo?.economiaMensal ?? 0);
-  const carbono = geracao != null ? carbonoEvitadoKgAno(geracao) : null;
   const raio = 42;
   const volta = 2 * Math.PI * raio;
 
@@ -116,7 +115,6 @@ export function PainelResultado({
               <Metrica rotulo="Economia por mês" valor={completo ? moeda(economia) : null} destaque />
               <Metrica rotulo="Conta com solar" valor={completo ? moeda(completo.contaComSolar) : null} />
               <Metrica rotulo="Geração" valor={geracao != null ? `${inteiro(geracao)} kWh/mês` : null} />
-              <Metrica rotulo="Carbono evitado" valor={carbono != null ? `${inteiro(carbono)} kg/ano` : null} />
               {completo?.financeiro && (
                 <>
                   <Metrica rotulo={`Economia em ${completo.financeiro.projecao.anos.length} anos`} valor={moeda(completo.financeiro.economia25Anos)} />
@@ -143,7 +141,7 @@ export function PainelResultado({
         )}
 
         <p className="mt-5 text-[11px] leading-relaxed text-texto-2">
-          {fonte ? `${fonte} · ` : ""}Carbono: {FATOR_EMISSAO_SIN.fonte} ({FATOR_EMISSAO_SIN.ano}). A conta nunca zera: fica a taxa
+          {fonte ? `${fonte} · ` : ""}A conta nunca zera: fica a taxa
           mínima da ligação.
         </p>
       </div>
