@@ -5,13 +5,15 @@ import { ROTULO_TIPO_COMPONENTE_KIT } from "@/lib/tipos";
 import { FONTES_PDF } from "./fontes-pdf";
 import { CondicoesPagamentoPdf } from "./pdf-condicoes";
 import { SecoesEconomia } from "./pdf-economia";
+import { SecaoGeracaoMensal } from "./pdf-geracao-mensal";
 import {
   coberturaDoConsumo,
   dataBr,
   economiaDaEmissao,
-  temConteudoV6,
   linhasCondicoesPagamento,
   linkWhatsappDaProposta,
+  mensalDaEmissao,
+  temConteudoV6,
   textoPremissaGeracao,
   type DadosEmissaoSimples,
   type Institucional,
@@ -232,6 +234,7 @@ function Capa({ dados, imagens, p }: { dados: DadosEmissaoSimples; imagens: Imag
 function SecoesSistema({ dados, e, p }: { dados: DadosEmissaoSimples; e: ReturnType<typeof criarEstilos>; p: ReturnType<typeof paletaDaEmpresa> }) {
   const s = dados.sistema;
   const cobertura = coberturaDoConsumo(dados);
+  const mensal = mensalDaEmissao(dados);
   return (
     <>
         <View style={e.cartao} wrap={false}>
@@ -270,6 +273,8 @@ function SecoesSistema({ dados, e, p }: { dados: DadosEmissaoSimples; e: ReturnT
           </View>
           {s.geracao ? <Text style={{ fontSize: 7.5, color: p.suave, marginTop: 9, lineHeight: 1.4 }}>{textoPremissaGeracao(dados)}</Text> : null}
         </View>
+
+        {mensal ? <SecaoGeracaoMensal mensal={mensal} p={p} /> : null}
 
         <View style={e.cartao} wrap={false}>
           <Text style={e.tituloCartao}>Equipamentos que serão instalados</Text>

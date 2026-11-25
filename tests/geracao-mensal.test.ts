@@ -1,13 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
   algumMesPresente,
+  descricaoGraficoMensal,
   distribuirGeracaoMensal,
   escalaDoGrafico,
+  legendaConsumo,
   lerCurvaDoFormulario,
   lerDozeMeses,
   MESES_ABREV,
   MESES_NOMES,
   mediaDosMeses,
+  NOTA_GERACAO_MENSAL,
+  resumoGeracaoMensal,
 } from "@/lib/geracao-mensal";
 
 const CURVA = [5.9, 5.7, 5.3, 4.6, 3.8, 3.4, 3.6, 4.5, 4.7, 5.4, 6, 6.1];
@@ -105,5 +109,31 @@ describe("auxiliares", () => {
     expect(escalaDoGrafico([908, 720])).toEqual({ maximo: 1000, marcas: [1000, 750, 500, 250, 0] });
     expect(escalaDoGrafico([2000, 400]).maximo).toBe(2000);
     expect(escalaDoGrafico([0])).toEqual({ maximo: 250, marcas: [250, 187.5, 125, 62.5, 0] });
+  });
+});
+
+describe("textos do gráfico", () => {
+  const ger = distribuirGeracaoMensal(732, CURVA)!;
+  const informado = { geracaoKwh: ger, consumoKwh: [720, 700, 680, 630, 600, 600, 610, 620, 630, 650, 680, 700], consumoOrigem: "informado" as const };
+  const media = { geracaoKwh: ger, consumoKwh: Array(12).fill(650), consumoOrigem: "media" as const };
+
+  it("nota aprovada, sem citar distribuidora específica", () => {
+    expect(NOTA_GERACAO_MENSAL).toBe(
+      "No verão o sistema gera mais e no inverno, menos. O excedente vira crédito na distribuidora e compensa os meses de menor geração (validade de 60 meses).",
+    );
+  });
+
+  it("legenda do consumo conforme a origem", () => {
+    expect(legendaConsumo(informado)).toBe("Seu consumo");
+    expect(legendaConsumo(media)).toBe("Seu consumo médio (650 kWh)");
+  });
+
+  it("resumo com o maior e o menor mês de geração e o total do ano", () => {
+    expect(resumoGeracaoMensal(informado)).toBe("Maior geração: Dez 908 kWh · Menor: Jun 506 kWh · Ano: 8.784 kWh");
+  });
+
+  it("descrição acessível do gráfico", () => {
+    expect(descricaoGraficoMensal(informado)).toBe("Geração estimada de 506 kWh em Jun a 908 kWh em Dez; consumo de 600 a 720 kWh por mês.");
+    expect(descricaoGraficoMensal(media)).toBe("Geração estimada de 506 kWh em Jun a 908 kWh em Dez; consumo médio de 650 kWh por mês.");
   });
 });

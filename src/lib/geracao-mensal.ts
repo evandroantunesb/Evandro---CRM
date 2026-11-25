@@ -92,6 +92,39 @@ export function mediaDosMeses(valores: readonly number[]): number {
   return Math.round(valores.reduce((a, b) => a + b, 0) / valores.length);
 }
 
+/** Série do gráfico (a mesma forma que a proposta emitida congela, ver `MensalEmitido`). */
+export type SerieMensal = { geracaoKwh: readonly number[]; consumoKwh: readonly number[]; consumoOrigem: "informado" | "media" };
+
+/** Nota aprovada do gráfico (prévia de 25/11/2026), sem nomear a distribuidora. */
+export const NOTA_GERACAO_MENSAL =
+  "No verão o sistema gera mais e no inverno, menos. O excedente vira crédito na distribuidora e compensa os meses de menor geração (validade de 60 meses).";
+
+const kwh = (v: number) => `${Math.round(v).toLocaleString("pt-BR")} kWh`;
+
+/** Legenda da série de consumo: os 12 meses informados ou a média do negócio. */
+export function legendaConsumo(s: SerieMensal): string {
+  return s.consumoOrigem === "media" ? `Seu consumo médio (${kwh(s.consumoKwh[0] ?? 0)})` : "Seu consumo";
+}
+
+const extremos = (v: readonly number[]) => ({ maior: v.indexOf(Math.max(...v)), menor: v.indexOf(Math.min(...v)) });
+
+/** Linha abaixo do gráfico do PDF: mês de maior e de menor geração e o total do ano. */
+export function resumoGeracaoMensal(s: SerieMensal): string {
+  const { maior, menor } = extremos(s.geracaoKwh);
+  const ano = s.geracaoKwh.reduce((a, b) => a + b, 0);
+  return `Maior geração: ${MESES_ABREV[maior]} ${kwh(s.geracaoKwh[maior]!)} · Menor: ${MESES_ABREV[menor]} ${kwh(s.geracaoKwh[menor]!)} · Ano: ${kwh(ano)}`;
+}
+
+/** Descrição do gráfico para leitores de tela. */
+export function descricaoGraficoMensal(s: SerieMensal): string {
+  const { maior, menor } = extremos(s.geracaoKwh);
+  const consumo =
+    s.consumoOrigem === "media"
+      ? `consumo médio de ${kwh(s.consumoKwh[0] ?? 0)} por mês`
+      : `consumo de ${Math.round(Math.min(...s.consumoKwh)).toLocaleString("pt-BR")} a ${kwh(Math.max(...s.consumoKwh))} por mês`;
+  return `Geração estimada de ${kwh(s.geracaoKwh[menor]!)} em ${MESES_ABREV[menor]} a ${kwh(s.geracaoKwh[maior]!)} em ${MESES_ABREV[maior]}; ${consumo}.`;
+}
+
 /** Topo do eixo do gráfico: menor múltiplo de 250 que cobre o maior valor (mínimo 250), com 5 marcas até zero. */
 export function escalaDoGrafico(valores: readonly number[]): { maximo: number; marcas: number[] } {
   const maior = Math.max(0, ...valores.filter(Number.isFinite));

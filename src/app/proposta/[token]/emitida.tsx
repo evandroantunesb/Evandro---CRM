@@ -7,8 +7,9 @@ import {
   coberturaDoConsumo,
   dataBr,
   economiaDaEmissao,
-  temConteudoV6,
   linkWhatsappDaProposta,
+  mensalDaEmissao,
+  temConteudoV6,
   textoCondicoesComerciais,
   textoPremissaGeracao,
   type DadosEmissaoSimples,
@@ -16,6 +17,7 @@ import {
 } from "@/lib/propostas/proposta-simples";
 import { ROTULO_TIPO_COMPONENTE_KIT } from "@/lib/tipos";
 import { EconomiaDaProposta } from "./economia";
+import { GeracaoMensalDaProposta } from "./geracao-mensal";
 
 /** Proposta emitida (simples): renderizada SÓ a partir dos dados congelados na emissão. */
 export function PropostaEmitida({ token, dados }: { token: string; dados: DadosEmissaoSimples }) {
@@ -25,6 +27,7 @@ export function PropostaEmitida({ token, dados }: { token: string; dados: DadosE
   const posVenda = temConteudoV6(dados) ? dados.comercial.posVenda : null;
   const whatsapp = temConteudoV6(dados) ? linkWhatsappDaProposta(dados) : null;
   const economia = economiaDaEmissao(dados);
+  const mensal = mensalDaEmissao(dados);
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-6 px-6 py-10">
       <LogoRaion altura={32} />
@@ -88,6 +91,7 @@ export function PropostaEmitida({ token, dados }: { token: string; dados: DadosE
           )}
         </dl>
         {dados.sistema.geracao && <p className="mt-3 text-xs text-zinc-500">{textoPremissaGeracao(dados)}</p>}
+        {mensal && <GeracaoMensalDaProposta mensal={mensal} />}
       </Cartao>
 
       <Cartao titulo="Equipamentos">
