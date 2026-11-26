@@ -275,4 +275,148 @@ describe("Concessionárias: checklist e prazos por concessionária (ordem import
     const daEmpresa = await noBanco("select chave from public.engenharia_prazos where empresa_id = $1 and chave like 'distribuidora%'", [data!.id]);
     expect(daEmpresa).toEqual([]);
   });
+
+  it("canais da Copel: a regra do PEW de hoje virou cadastro", async () => {
+    const canais = await noBanco(
+      "select nome, ordem, ativo, tipos, tensoes from public.concessionaria_canais where concessionaria_id = $1 order by ordem",
+      [copelA],
+    );
+    expect(canais).toEqual([
+      { nome: "PEW", ordem: 10, ativo: true, tipos: ["nova_conexao", "ampliacao", "regularizacao", "ligacao_nova", "aumento_carga"], tensoes: ["baixa"] },
+      { nome: "Site da Copel", ordem: 20, ativo: true, tipos: ["troca_titularidade", "cadastro_compensacao", "ligacao_nova", "aumento_carga"], tensoes: ["media"] },
+      { nome: "CAW", ordem: 30, ativo: true, tipos: [], tensoes: [] },
+      { nome: "Atendimento comercial", ordem: 40, ativo: true, tipos: [], tensoes: [] },
+    ]);
+    expect((await vendedor.cliente.from("concessionaria_canais" as never).insert({ empresa_id: empresa, concessionaria_id: copelA, nome: "Fax" } as never)).error).not.toBeNull();
+    expect((await adminB.cliente.from("concessionaria_canais" as never).select("id").eq("concessionaria_id", copelA)).data).toEqual([]);
+  });
+
+  it("nova concessionária: cópia da Copel ou vazia; só o admin da empresa; sigla válida e nova", async () => {
+    const siglas = await noBanco(
+      "select distinct distribuidora from public.tarifas_gd_aneel where distribuidora not in ('COPEL-DIS', 'CEMIG-D') order by distribuidora limit 2",
+    );
+    const [copia, vazia] = siglas.map((l) => l.distribuidora as string);
+    const criar = (quem: Usuario, nome: string, sigla: string, copiarDe: string | null) =>
+      quem.cliente.rpc("criar_concessionaria" as never, { p_empresa_id: empresa, p_nome: nome, p_distribuidora: sigla, p_copiar_de: copiarDe } as never);
+
+    expect((await criar(vendedor, "Nova", copia, copelA)).error?.message).toBe("Só o admin cria concessionária.");
+    expect((await criar(adminB, "Nova", copia, copelA)).error?.message).toBe("Só o admin cria concessionária.");
+    expect((await criar(admin, "Nova", "NAO-EXISTE", copelA)).error?.message).toBe("Distribuidora não encontrada.");
+    expect((await criar(admin, "Outra Cemig", "CEMIG-D", null)).error?.message).toBe("Esta distribuidora já tem concessionária na empresa.");
+    expect((await criar(admin, "copel", copia, null)).error?.message).toBe("Já existe uma concessionária com esse nome.");
+
+    const r = await criar(admin, `Cópia ${sufixo}`.slice(0, 40), copia, copelA);
+    expect(r.error).toBeNull();
+    const nova = r.data as unknown as string;
+    const titulos = (c: string) =>
+      noBanco("select titulo from public.engenharia_checklist_modelo where concessionaria_id = $1 and ativo order by titulo", [c]).then((l) => l.map((x) => x.titulo));
+    expect(await titulos(nova)).toEqual(await titulos(copelA));
+    const prazos = (c: string) =>
+      noBanco("select chave, dias_uteis, contagem from public.concessionaria_prazos where concessionaria_id = $1 order by chave", [c]);
+    expect(await prazos(nova)).toEqual(await prazos(copelA));
+    const canais = (c: string) =>
+      noBanco("select nome, ordem, ativo, tipos, tensoes from public.concessionaria_canais where concessionaria_id = $1 order by ordem", [c]);
+    expect(await canais(nova)).toEqual(await canais(copelA));
+    const marcados = async (c: string) => {
+      const [l] = await noBanco(
+        "select count(*) filter (where documento_cliente is not null or gera_procuracao)::int as n from public.engenharia_checklist_modelo where concessionaria_id = $1 and ativo",
+        [c],
+      );
+      return l.n;
+    };
+    expect(await marcados(nova)).toBe(await marcados(copelA));
+
+    const rv = await criar(admin, `Vazia ${sufixo}`.slice(0, 40), vazia, null);
+    expect(rv.error).toBeNull();
+    const idVazia = rv.data as unknown as string;
+    expect(await titulos(idVazia)).toEqual([]);
+    expect(await canais(idVazia)).toEqual([]);
+    expect((await prazos(idVazia)).map((p) => p.dias_uteis)).toEqual([null, null, null, null]);
+
+    // A distribuidora não muda depois de criada; o nome, sim.
+    expect((await admin.cliente.from("concessionarias").update({ distribuidora: "COPEL-DIS" }).eq("id", idVazia)).error).not.toBeNull();
+    expect((await admin.cliente.from("concessionarias").update({ nome: `Renomeada ${sufixo}`.slice(0, 40) }).eq("id", idVazia)).error).toBeNull();
+  });
+
+  it("regra 7: trocar a concessionária troca o checklist só se nada foi enviado", async () => {
+    const definir = (obra: string, c: string) => coordEng.cliente.rpc("definir_concessionaria_obra", { p_obra_id: obra, p_concessionaria_id: c });
+    const historico = async (obra: string) => {
+      const [h] = await noBanco(
+        "select dados from public.obra_historico where obra_id = $1 and tipo = 'concessionaria_obra_alterada' order by created_at desc limit 1",
+        [obra],
+      );
+      return h.dados;
+    };
+    const daCemig = (
+      await noBanco("select titulo from public.engenharia_checklist_modelo where concessionaria_id = $1 and ativo order by titulo", [cemigA])
+    ).map((l) => l.titulo);
+
+    // Só pendentes: troca.
+    const limpa = await criarVenda(empresa, `Regra 7 limpa ${sufixo}`, "Copel");
+    ok(await admin.cliente.rpc("aplicar_checklist_engenharia", { p_obra_id: limpa }), "aplicar");
+    ok(await definir(limpa, cemigA), "trocar");
+    expect(await titulosDaObra(limpa)).toEqual(daCemig);
+    expect(await historico(limpa)).toMatchObject({ de: "Copel", para: "Cemig", checklist_trocado: true });
+
+    // Dispensado pelo enquadramento não conta como envio: troca.
+    const enquadrada = await criarVenda(empresa, `Regra 7 enquadrada ${sufixo}`, "Copel");
+    ok(await admin.cliente.rpc("aplicar_checklist_engenharia", { p_obra_id: enquadrada }), "aplicar");
+    ok(await admin.cliente.rpc("salvar_enquadramento_engenharia", { p_obra_id: enquadrada, p_respostas: { titularidade: "pf" } as never }), "enquadrar");
+    const [{ auto }] = await noBanco(
+      "select count(*)::int as auto from public.obra_engenharia_itens where obra_id = $1 and pelo_enquadramento and status = 'dispensado'",
+      [enquadrada],
+    );
+    expect(auto).toBeGreaterThan(0);
+    ok(await definir(enquadrada, cemigA), "trocar enquadrada");
+    expect(await historico(enquadrada)).toMatchObject({ checklist_trocado: true });
+
+    // "Não se aplica" marcado à mão: o checklist fica.
+    const trabalhada = await criarVenda(empresa, `Regra 7 trabalhada ${sufixo}`, "Copel");
+    ok(await admin.cliente.rpc("aplicar_checklist_engenharia", { p_obra_id: trabalhada }), "aplicar");
+    const antes = await titulosDaObra(trabalhada);
+    const { data: item } = await servico.from("obra_engenharia_itens").select("id").eq("obra_id", trabalhada).limit(1).single();
+    ok(await admin.cliente.rpc("alterar_item_engenharia", { p_item_id: item!.id, p_status: "dispensado", p_motivo: "Não se aplica" }), "dispensar");
+    const enviado = await admin.cliente.rpc("checklist_engenharia_enviado" as never, { p_obra_id: trabalhada } as never);
+    expect(enviado.data).toBe(true);
+    ok(await definir(trabalhada, cemigA), "trocar trabalhada");
+    expect(await titulosDaObra(trabalhada)).toEqual(antes);
+    expect(await historico(trabalhada)).toMatchObject({ checklist_trocado: false });
+  });
+
+  it("protocolo: canal da concessionária da obra (sem diferenciar maiúsculas) ou Outro", async () => {
+    const [p] = await noBanco("select canal from public.obra_engenharia_protocolos where obra_id = $1", [obraCopel]);
+    expect(p.canal).toBe("PEW");
+
+    const obra = await criarVenda(empresa, `Canal ${sufixo}`, "Copel");
+    ok(await admin.cliente.rpc("aplicar_checklist_engenharia", { p_obra_id: obra }), "checklist");
+    const { data: itens } = await servico.from("obra_engenharia_itens").select("id").eq("obra_id", obra).eq("obrigatorio", true);
+    for (const i of itens!) ok(await admin.cliente.rpc("alterar_item_engenharia", { p_item_id: i.id, p_status: "dispensado", p_motivo: "Teste" }), "dispensar");
+    const registrar = (canal: string) =>
+      admin.cliente.rpc("registrar_protocolo_engenharia", {
+        p_obra_id: obra,
+        p_distribuidora: "Copel",
+        p_canal: canal,
+        p_numero: `CN-${sufixo}`,
+        p_tipo_solicitacao: "nova_conexao",
+        p_protocolado_em: "2026-11-20",
+      });
+    expect((await registrar("Fax")).error?.message).toBe("Escolha um canal da concessionária da obra.");
+    ok(await registrar("Outro"), "outro");
+    const [q] = await noBanco("select canal from public.obra_engenharia_protocolos where obra_id = $1", [obra]);
+    expect(q.canal).toBe("outro");
+  });
+
+  it("obras sem concessionária, por distribuidora citada no negócio (só o admin vê)", async () => {
+    const [d] = await noBanco(
+      `select t.distribuidora, t.nomes_aceitos[1] as nome from public.tarifas_gd_aneel t
+       where not exists (select 1 from public.concessionarias c where c.empresa_id = $1 and c.distribuidora = t.distribuidora)
+       order by t.distribuidora desc limit 1`,
+      [empresa],
+    );
+    await criarVenda(empresa, `Sem conc ${sufixo}`, d.nome);
+    const { data, error } = await admin.cliente.rpc("obras_sem_concessionaria_por_distribuidora" as never, { p_empresa_id: empresa } as never);
+    expect(error).toBeNull();
+    expect(data as unknown as { distribuidora: string; obras: number }[]).toContainEqual({ distribuidora: d.distribuidora, obras: 1 });
+    expect((await vendedor.cliente.rpc("obras_sem_concessionaria_por_distribuidora" as never, { p_empresa_id: empresa } as never)).error).not.toBeNull();
+  });
 });

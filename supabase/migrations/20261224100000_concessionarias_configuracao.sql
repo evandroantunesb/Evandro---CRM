@@ -93,14 +93,70 @@ from public.engenharia_prazos p
 join public.concessionarias c on c.empresa_id = p.empresa_id and c.distribuidora = 'COPEL-DIS'
 where p.chave in ('distribuidora_analise', 'distribuidora_analise_rural', 'distribuidora_vistoria', 'distribuidora_conexao');
 
--- `inserir_concessionaria_copel` (20261223100000_concessionarias.sql) com os prazos padrão da Copel (valores do engenheiro, 04/11/2026).
-create or replace function public.inserir_concessionaria_copel(p_empresa_id uuid)
+-- ---------------------------------------------------------------------------
+-- 1c. Canais de entrada por concessionária
+-- ---------------------------------------------------------------------------
+
+-- Por onde o pedido entra na distribuidora. `tipos` vazio = sem condição (o canal é listado, nunca sugerido).
+-- `tensoes` vale só para ligação nova e aumento de carga (como a regra do PEW da Copel de 04/11/2026).
+create table public.concessionaria_canais (
+  id uuid primary key default gen_random_uuid(),
+  empresa_id uuid not null references public.empresas (id) on delete cascade,
+  concessionaria_id uuid not null,
+  nome text not null check (length(btrim(nome)) between 1 and 60 and lower(btrim(nome)) <> 'outro'),
+  ordem integer not null default 0 check (ordem between 0 and 9999),
+  ativo boolean not null default true,
+  tipos text[] not null default '{}' check (tipos <@ array[
+    'nova_conexao', 'ampliacao', 'regularizacao', 'troca_titularidade', 'aumento_carga', 'ligacao_nova', 'cadastro_compensacao'
+  ]::text[]),
+  tensoes text[] not null default '{}' check (tensoes <@ array['baixa', 'media']::text[]),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  foreign key (empresa_id, concessionaria_id) references public.concessionarias (empresa_id, id) on delete cascade
+);
+create unique index concessionaria_canais_nome_unico on public.concessionaria_canais (concessionaria_id, lower(btrim(nome)));
+comment on table public.concessionaria_canais is
+  'Canais de entrada do pedido na distribuidora, por concessionária (entrega 3 do item 6). "Outro" é do protocolo, não um canal.';
+
+create or replace function public.proteger_concessionaria_canal()
+returns trigger
+language plpgsql set search_path = ''
+as $$
+begin
+  if new.empresa_id is distinct from old.empresa_id or new.concessionaria_id is distinct from old.concessionaria_id then
+    raise exception 'O canal não muda de concessionária' using errcode = 'check_violation';
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.proteger_concessionaria_canal() from public, anon, authenticated, service_role;
+create trigger concessionaria_canais_proteger before update on public.concessionaria_canais
+  for each row execute function public.proteger_concessionaria_canal();
+create trigger concessionaria_canais_updated_at before update on public.concessionaria_canais
+  for each row execute function public.tocar_updated_at();
+create trigger auditar_concessionaria_canais after insert or update or delete on public.concessionaria_canais
+  for each row execute function public.auditar();
+
+alter table public.concessionaria_canais enable row level security;
+create policy "ver canais da concessionária" on public.concessionaria_canais for select to authenticated
+  using (public.membro_ativo(empresa_id));
+create policy "admin cria canal" on public.concessionaria_canais for insert to authenticated
+  with check (public.tem_papel(empresa_id, '{admin}'));
+create policy "admin edita canal" on public.concessionaria_canais for update to authenticated
+  using (public.tem_papel(empresa_id, '{admin}'))
+  with check (public.tem_papel(empresa_id, '{admin}'));
+revoke delete, truncate on public.concessionaria_canais from anon, authenticated;
+revoke all on public.concessionaria_canais from anon;
+
+-- ---------------------------------------------------------------------------
+-- 1d. Padrão da Copel (prazos do engenheiro de 04/11/2026 e canais da regra de hoje)
+-- ---------------------------------------------------------------------------
+
+-- Só completa o que falta: o que a empresa já tem fica como está.
+create or replace function public.semear_padrao_copel(p_concessionaria_id uuid)
 returns void
 language sql security definer set search_path = ''
 as $$
-  insert into public.concessionarias (empresa_id, nome, distribuidora)
-  values (p_empresa_id, 'Copel', 'COPEL-DIS')
-  on conflict (empresa_id, distribuidora) do nothing;
   insert into public.concessionaria_prazos (empresa_id, concessionaria_id, chave, dias_uteis, contagem)
   select c.empresa_id, c.id, v.chave, v.dias, v.contagem
   from public.concessionarias c
@@ -110,12 +166,44 @@ as $$
     ('distribuidora_vistoria', 7, 'uteis'),
     ('distribuidora_conexao', null::integer, 'uteis')
   ) as v (chave, dias, contagem)
-  where c.empresa_id = p_empresa_id and c.distribuidora = 'COPEL-DIS'
+  where c.id = p_concessionaria_id
   on conflict (concessionaria_id, chave) do nothing;
+  insert into public.concessionaria_canais (empresa_id, concessionaria_id, nome, ordem, tipos, tensoes)
+  select c.empresa_id, c.id, v.nome, v.ordem, v.tipos, v.tensoes
+  from public.concessionarias c
+  cross join (values
+    ('PEW', 10, array['nova_conexao', 'ampliacao', 'regularizacao', 'ligacao_nova', 'aumento_carga']::text[], array['baixa']::text[]),
+    ('Site da Copel', 20, array['troca_titularidade', 'cadastro_compensacao', 'ligacao_nova', 'aumento_carga']::text[], array['media']::text[]),
+    ('CAW', 30, '{}'::text[], '{}'::text[]),
+    ('Atendimento comercial', 40, '{}'::text[], '{}'::text[])
+  ) as v (nome, ordem, tipos, tensoes)
+  where c.id = p_concessionaria_id
+  on conflict (concessionaria_id, lower(btrim(nome))) do nothing;
 $$;
+revoke all on function public.semear_padrao_copel(uuid) from public, anon, authenticated, service_role;
 
--- Quem não tinha alguma chave recebe o padrão da Copel; quem tinha fica com o seu.
-select public.inserir_concessionaria_copel(id) from public.empresas;
+-- `inserir_concessionaria_copel` (20261223100000): a Copel nova já nasce com os prazos e os canais padrão. Chamada de
+-- novo para uma empresa que já tem a Copel, não mexe em nada (um canal renomeado não volta).
+create or replace function public.inserir_concessionaria_copel(p_empresa_id uuid)
+returns void
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_id uuid;
+begin
+  insert into public.concessionarias (empresa_id, nome, distribuidora)
+  values (p_empresa_id, 'Copel', 'COPEL-DIS')
+  on conflict (empresa_id, distribuidora) do nothing
+  returning id into v_id;
+  if v_id is not null then
+    perform public.semear_padrao_copel(v_id);
+  end if;
+end;
+$$;
+revoke all on function public.inserir_concessionaria_copel(uuid) from public, anon, authenticated, service_role;
+
+-- Copel das empresas atuais: completa as chaves que faltarem com o padrão e recebe os canais.
+select public.semear_padrao_copel(id) from public.concessionarias where distribuidora = 'COPEL-DIS';
 
 delete from public.engenharia_prazos
 where chave in ('distribuidora_analise', 'distribuidora_analise_rural', 'distribuidora_vistoria', 'distribuidora_conexao');
@@ -254,7 +342,7 @@ as $$
 $$;
 
 -- ---------------------------------------------------------------------------
--- 1c. Funções do checklist com a concessionária
+-- 1e. Funções do checklist com a concessionária
 -- ---------------------------------------------------------------------------
 
 -- `marcar_documento_cliente_modelo` (20261212100000_procuracao.sql): uma marca por concessionária.
@@ -421,5 +509,269 @@ begin
       'item', v_item.titulo, 'de', 'dispensado', 'para', 'pendente', 'autorizacao', p_aut, 'origem', 'enquadramento'
     ));
   end loop;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- 2a. Nova concessionária
+-- ---------------------------------------------------------------------------
+
+-- `proteger_concessionaria` (20261223100000_concessionarias.sql): o nome muda; a empresa e a distribuidora, não.
+create or replace function public.proteger_concessionaria()
+returns trigger
+language plpgsql set search_path = ''
+as $$
+begin
+  if new.empresa_id is distinct from old.empresa_id then
+    raise exception 'A empresa da concessionária não muda' using errcode = 'check_violation';
+  end if;
+  if new.distribuidora is distinct from old.distribuidora then
+    raise exception 'A distribuidora da concessionária não muda' using errcode = 'check_violation';
+  end if;
+  return new;
+end;
+$$;
+
+-- Cópia de outra concessionária da empresa (itens ativos do modelo, prazos da distribuidora e canais) ou vazia (só os
+-- prazos, sem dias). Só o admin da empresa.
+create or replace function public.criar_concessionaria(p_empresa_id uuid, p_nome text, p_distribuidora text, p_copiar_de uuid default null)
+returns uuid
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_nome text := btrim(coalesce(p_nome, ''));
+  v_sigla text := btrim(coalesce(p_distribuidora, ''));
+  v_id uuid;
+begin
+  if not public.tem_papel(p_empresa_id, '{admin}') then
+    raise exception 'Só o admin cria concessionária.' using errcode = 'insufficient_privilege', hint = 'mensagem_usuario';
+  end if;
+  if length(v_nome) not between 2 and 60 then
+    raise exception 'Informe o nome da concessionária (2 a 60 letras).' using errcode = 'check_violation', hint = 'mensagem_usuario';
+  end if;
+  if not exists (select 1 from public.tarifas_gd_aneel t where t.distribuidora = v_sigla) then
+    raise exception 'Distribuidora não encontrada.' using errcode = 'check_violation', hint = 'mensagem_usuario';
+  end if;
+  if exists (select 1 from public.concessionarias c where c.empresa_id = p_empresa_id and c.distribuidora = v_sigla) then
+    raise exception 'Esta distribuidora já tem concessionária na empresa.' using errcode = 'unique_violation', hint = 'mensagem_usuario';
+  end if;
+  if exists (select 1 from public.concessionarias c where c.empresa_id = p_empresa_id and lower(btrim(c.nome)) = lower(v_nome)) then
+    raise exception 'Já existe uma concessionária com esse nome.' using errcode = 'unique_violation', hint = 'mensagem_usuario';
+  end if;
+  if p_copiar_de is not null and not exists (select 1 from public.concessionarias c where c.id = p_copiar_de and c.empresa_id = p_empresa_id) then
+    raise exception 'Concessionária não encontrada.' using errcode = 'check_violation', hint = 'mensagem_usuario';
+  end if;
+
+  insert into public.concessionarias (empresa_id, nome, distribuidora) values (p_empresa_id, v_nome, v_sigla) returning id into v_id;
+
+  if p_copiar_de is null then
+    insert into public.concessionaria_prazos (empresa_id, concessionaria_id, chave)
+    select p_empresa_id, v_id, k
+    from unnest(array['distribuidora_analise', 'distribuidora_analise_rural', 'distribuidora_vistoria', 'distribuidora_conexao']) as k;
+    return v_id;
+  end if;
+
+  insert into public.concessionaria_prazos (empresa_id, concessionaria_id, chave, dias_uteis, contagem)
+  select p_empresa_id, v_id, p.chave, p.dias_uteis, p.contagem from public.concessionaria_prazos p where p.concessionaria_id = p_copiar_de;
+  insert into public.concessionaria_canais (empresa_id, concessionaria_id, nome, ordem, ativo, tipos, tensoes)
+  select p_empresa_id, v_id, k.nome, k.ordem, k.ativo, k.tipos, k.tensoes from public.concessionaria_canais k where k.concessionaria_id = p_copiar_de;
+  insert into public.engenharia_checklist_modelo
+    (empresa_id, concessionaria_id, grupo, titulo, descricao, obrigatorio, ordem, condicoes, documento_cliente, gera_procuracao)
+  select p_empresa_id, v_id, m.grupo, m.titulo, m.descricao, m.obrigatorio, m.ordem, m.condicoes, m.documento_cliente, m.gera_procuracao
+  from public.engenharia_checklist_modelo m
+  where m.concessionaria_id = p_copiar_de and m.ativo;
+  return v_id;
+end;
+$$;
+revoke all on function public.criar_concessionaria(uuid, text, text, uuid) from public, anon, authenticated, service_role;
+grant execute on function public.criar_concessionaria(uuid, text, text, uuid) to authenticated;
+
+-- Obras sem concessionária, pela distribuidora citada no negócio (mesma comparação de `concessionaria_do_negocio`), para
+-- a tela da nova concessionária. Só o admin.
+create or replace function public.obras_sem_concessionaria_por_distribuidora(p_empresa_id uuid)
+returns table (distribuidora text, obras integer)
+language plpgsql stable security definer set search_path = ''
+as $$
+#variable_conflict use_column
+begin
+  if not public.tem_papel(p_empresa_id, '{admin}') then
+    raise exception 'Só o admin vê esta contagem.' using errcode = 'insufficient_privilege', hint = 'mensagem_usuario';
+  end if;
+  return query
+  select t.distribuidora, count(distinct o.id)::integer
+  from public.obras o
+  join public.negocios n on n.id = o.negocio_id
+  join public.tarifas_gd_aneel t on public.normalizar_nome_distribuidora(coalesce(n.qualif_distribuidora, '')) = any (t.nomes_aceitos)
+  where o.empresa_id = p_empresa_id and o.concessionaria_id is null and o.cancelada_em is null
+  group by t.distribuidora;
+end;
+$$;
+revoke all on function public.obras_sem_concessionaria_por_distribuidora(uuid) from public, anon, authenticated, service_role;
+grant execute on function public.obras_sem_concessionaria_por_distribuidora(uuid) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 2b. Troca da concessionária da obra (regra 7)
+-- ---------------------------------------------------------------------------
+
+-- "Já houve envio" (decisão de 26/11/2026): protocolo, documento anexado ou item que alguém tirou de pendente. O item que
+-- o enquadramento dispensou sozinho não conta. Nulo para quem não é da empresa da obra.
+create or replace function public.checklist_engenharia_enviado(p_obra_id uuid)
+returns boolean
+language sql stable security definer set search_path = ''
+as $$
+  select case when not exists (select 1 from public.obras o where o.id = p_obra_id and public.membro_ativo(o.empresa_id)) then null
+  else exists (select 1 from public.obra_engenharia_protocolos p where p.obra_id = p_obra_id)
+    or exists (select 1 from public.obra_engenharia_documentos d where d.obra_id = p_obra_id)
+    or exists (
+      select 1 from public.obra_engenharia_itens i
+      where i.obra_id = p_obra_id and i.status <> 'pendente'
+        and not (i.status = 'dispensado' and i.pelo_enquadramento and i.motivo = 'Fora do enquadramento')
+    )
+  end;
+$$;
+revoke all on function public.checklist_engenharia_enviado(uuid) from public, anon, authenticated, service_role;
+grant execute on function public.checklist_engenharia_enviado(uuid) to authenticated;
+
+-- `definir_concessionaria_obra` (20261223100000_concessionarias.sql) com a troca do checklist da regra 7.
+create or replace function public.definir_concessionaria_obra(p_obra_id uuid, p_concessionaria_id uuid)
+returns void
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_aut text := public.preparar_escrita_obra(p_obra_id, 'engenharia', false);
+  v_obra public.obras;
+  v_nova public.concessionarias;
+  v_antiga text;
+  v_trocar boolean;
+begin
+  select * into v_obra from public.obras where id = p_obra_id;
+  -- Mesma resposta para "não existe" e "de outra empresa": não revela dados de outras empresas.
+  select * into v_nova from public.concessionarias where id = p_concessionaria_id and empresa_id = v_obra.empresa_id;
+  if not found then
+    raise exception 'Concessionária não encontrada.' using errcode = 'check_violation', hint = 'mensagem_usuario';
+  end if;
+  if v_obra.concessionaria_id is not distinct from v_nova.id then
+    return;
+  end if;
+  select nome into v_antiga from public.concessionarias where id = v_obra.concessionaria_id;
+  update public.obras set concessionaria_id = v_nova.id where id = p_obra_id;
+  -- Regra 7: nada enviado ainda, o checklist passa a ser o da nova concessionária; senão, fica.
+  v_trocar := exists (select 1 from public.obra_engenharia_itens where obra_id = p_obra_id)
+    and not coalesce(public.checklist_engenharia_enviado(p_obra_id), true);
+  if v_trocar then
+    delete from public.obra_engenharia_itens where obra_id = p_obra_id;
+    insert into public.obra_engenharia_itens (empresa_id, obra_id, modelo_id, grupo, titulo, descricao, obrigatorio, ordem)
+    select v_obra.empresa_id, p_obra_id, m.id, btrim(m.grupo), btrim(m.titulo), m.descricao, m.obrigatorio, m.ordem
+    from public.engenharia_checklist_modelo m
+    where m.concessionaria_id = v_nova.id and m.ativo
+      and public.item_vale_no_enquadramento(m.condicoes, public.enquadramento_obra_json(p_obra_id))
+    on conflict (obra_id, modelo_id) do nothing;
+  end if;
+  perform public.registrar_historico_obra(p_obra_id, 'concessionaria_obra_alterada', 'engenharia',
+    jsonb_build_object('de', v_antiga, 'para', v_nova.nome, 'checklist_trocado', v_trocar, 'autorizacao', v_aut));
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- 2c. Protocolo com os canais da concessionária da obra
+-- ---------------------------------------------------------------------------
+
+-- Protocolos antigos guardam os códigos de antes (pew, caw, atendimento, outro); os novos, o nome do canal ou "outro".
+alter table public.obra_engenharia_protocolos drop constraint obra_engenharia_protocolos_canal_check;
+alter table public.obra_engenharia_protocolos add constraint obra_engenharia_protocolos_canal_check
+  check (length(btrim(canal)) between 1 and 60);
+
+-- `registrar_protocolo_engenharia` (20261114100000_engenharia_enquadramento_copel.sql) com os canais da concessionária.
+create or replace function public.registrar_protocolo_engenharia(
+  p_obra_id uuid,
+  p_distribuidora text,
+  p_canal text,
+  p_numero text,
+  p_tipo_solicitacao text,
+  p_protocolado_em date,
+  p_observacao text default null
+)
+returns uuid
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_aut text := public.preparar_escrita_obra(p_obra_id, 'engenharia', true);
+  v_empresa uuid;
+  v_faltam text;
+  v_protocolo uuid;
+  v_evento uuid;
+  v_documentos integer;
+  v_etapa text;
+  v_canal text;
+begin
+  select empresa_id into v_empresa from public.obras where id = p_obra_id;
+
+  if length(btrim(coalesce(p_numero, ''))) not between 1 and 60 then
+    raise exception 'Informe o número do protocolo.' using errcode = 'check_violation', hint = 'mensagem_usuario';
+  end if;
+  if length(btrim(coalesce(p_distribuidora, ''))) not between 2 and 60 then
+    raise exception 'Informe a distribuidora.' using errcode = 'check_violation', hint = 'mensagem_usuario';
+  end if;
+  -- Canal: "outro" ou um canal ativo da concessionária da obra, sem diferenciar maiúsculas (grava o nome cadastrado).
+  if lower(btrim(coalesce(p_canal, ''))) = 'outro' then
+    v_canal := 'outro';
+  else
+    select k.nome into v_canal from public.concessionaria_canais k
+    where k.concessionaria_id = (select concessionaria_id from public.obras where id = p_obra_id)
+      and k.ativo and lower(btrim(k.nome)) = lower(btrim(coalesce(p_canal, '')));
+  end if;
+  if v_canal is null then
+    raise exception 'Escolha um canal da concessionária da obra.' using errcode = 'check_violation', hint = 'mensagem_usuario';
+  end if;
+  if p_tipo_solicitacao is null or not public.resposta_enquadramento_valida('tipo_solicitacao', p_tipo_solicitacao) then
+    raise exception 'Tipo de solicitação inválido.' using errcode = 'check_violation', hint = 'mensagem_usuario';
+  end if;
+  if p_protocolado_em is null or p_protocolado_em > public.hoje_brasilia() then
+    raise exception 'Informe a data do protocolo (não pode ser futura).' using errcode = 'check_violation', hint = 'mensagem_usuario';
+  end if;
+  if p_observacao is not null and length(p_observacao) > 1000 then
+    raise exception 'Observação muito longa (máximo 1000 caracteres).' using errcode = 'check_violation', hint = 'mensagem_usuario';
+  end if;
+
+  -- Gate G2: checklist aplicado e obrigatórios resolvidos.
+  if not exists (select 1 from public.obra_engenharia_itens where obra_id = p_obra_id) then
+    raise exception 'Aplique o checklist e resolva os itens obrigatórios antes de registrar o protocolo.' using errcode = 'check_violation', hint = 'mensagem_usuario';
+  end if;
+  select string_agg(titulo, '; ' order by ordem) into v_faltam
+  from public.obra_engenharia_itens
+  where obra_id = p_obra_id and obrigatorio and status not in ('valido', 'dispensado');
+  if v_faltam is not null then
+    raise exception 'Itens obrigatórios do checklist ainda não resolvidos: %.', v_faltam using errcode = 'check_violation', hint = 'mensagem_usuario';
+  end if;
+
+  if exists (
+    select 1 from public.obra_engenharia_protocolos
+    where obra_id = p_obra_id and status not in ('indeferido', 'cancelado', 'encerrado')
+  ) then
+    raise exception 'Esta obra já tem um protocolo em andamento.' using errcode = 'check_violation', hint = 'mensagem_usuario';
+  end if;
+
+  insert into public.obra_engenharia_protocolos (empresa_id, obra_id, distribuidora, canal, numero, tipo_solicitacao, protocolado_em, observacao, registrado_por)
+  values (v_empresa, p_obra_id, btrim(p_distribuidora), v_canal, btrim(p_numero), p_tipo_solicitacao, p_protocolado_em,
+    nullif(btrim(coalesce(p_observacao, '')), ''), public.meu_membro_id(v_empresa))
+  returning id into v_protocolo;
+
+  insert into public.obra_engenharia_protocolo_eventos (empresa_id, obra_id, protocolo_id, tipo, status_de, status_para, ocorrido_em, autor_membro_id)
+  values (v_empresa, p_obra_id, v_protocolo, 'registrado', null, 'protocolado', p_protocolado_em, public.meu_membro_id(v_empresa))
+  returning id into v_evento;
+  v_documentos := public.registrar_pacote_protocolo(v_evento);
+
+  perform public.registrar_historico_obra(p_obra_id, 'protocolo_engenharia_registrado', 'engenharia', jsonb_build_object(
+    'distribuidora', btrim(p_distribuidora),
+    'canal', v_canal,
+    'documentos', v_documentos,
+    'autorizacao', v_aut
+  ));
+
+  select status into v_etapa from public.obra_fluxos where obra_id = p_obra_id and setor = 'engenharia';
+  if v_etapa in ('a_iniciar', 'projeto_em_elaboracao') then
+    perform public.gravar_status_fluxo_obra(p_obra_id, 'engenharia', 'enviado_concessionaria', v_aut, 'protocolo');
+  end if;
+  return v_protocolo;
 end;
 $$;

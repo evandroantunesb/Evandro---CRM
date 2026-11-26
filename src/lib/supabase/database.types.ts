@@ -1295,6 +1295,60 @@ export type Database = {
           },
         ];
       };
+      concessionaria_canais: {
+        Row: {
+          ativo: boolean;
+          concessionaria_id: string;
+          created_at: string;
+          empresa_id: string;
+          id: string;
+          nome: string;
+          ordem: number;
+          tensoes: string[];
+          tipos: string[];
+          updated_at: string;
+        };
+        Insert: {
+          ativo?: boolean;
+          concessionaria_id: string;
+          created_at?: string;
+          empresa_id: string;
+          id?: string;
+          nome: string;
+          ordem?: number;
+          tensoes?: string[];
+          tipos?: string[];
+          updated_at?: string;
+        };
+        Update: {
+          ativo?: boolean;
+          concessionaria_id?: string;
+          created_at?: string;
+          empresa_id?: string;
+          id?: string;
+          nome?: string;
+          ordem?: number;
+          tensoes?: string[];
+          tipos?: string[];
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "concessionaria_canais_empresa_id_concessionaria_id_fkey";
+            columns: ["empresa_id", "concessionaria_id"];
+            isOneToOne: false;
+            referencedRelation: "concessionarias";
+            referencedColumns: ["empresa_id", "id"];
+          },
+          {
+            foreignKeyName: "concessionaria_canais_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       concessionaria_prazos: {
         Row: {
           chave: string;
@@ -7801,6 +7855,7 @@ export type Database = {
         Returns: number;
       };
       chave_fornecedor: { Args: { p_nome: string }; Returns: string };
+      checklist_engenharia_enviado: { Args: { p_obra_id: string }; Returns: boolean };
       compartilha_empresa: { Args: { p_user_id: string }; Returns: boolean };
       compartilha_empresa_comercial: { Args: { p_user_id: string }; Returns: boolean };
       compartilha_empresa_identidade: { Args: { p_user_id: string }; Returns: boolean };
@@ -7949,6 +8004,15 @@ export type Database = {
           isOneToOne: true;
           isSetofReturn: false;
         };
+      };
+      criar_concessionaria: {
+        Args: {
+          p_copiar_de?: string;
+          p_distribuidora: string;
+          p_empresa_id: string;
+          p_nome: string;
+        };
+        Returns: string;
       };
       criar_material_compra: {
         Args: {
@@ -8698,6 +8762,13 @@ export type Database = {
           venda_alterada_em: string;
         }[];
       };
+      obras_sem_concessionaria_por_distribuidora: {
+        Args: { p_empresa_id: string };
+        Returns: {
+          distribuidora: string;
+          obras: number;
+        }[];
+      };
       opcoes_enquadramento_engenharia: { Args: Record<PropertyKey, never>; Returns: Json };
       oportunidades_pendentes_equipe: {
         Args: { p_empresa_id: string };
@@ -9171,6 +9242,7 @@ export type Database = {
         Args: { p_empresa_id: string; p_meio: string; p_taxas: Json };
         Returns: undefined;
       };
+      semear_padrao_copel: { Args: { p_concessionaria_id: string }; Returns: undefined };
       semear_regras_eletroposto: { Args: { p_empresa_id: string }; Returns: undefined };
       sequencia_produtiva_membro: {
         Args: { p_empresa_id: string };
