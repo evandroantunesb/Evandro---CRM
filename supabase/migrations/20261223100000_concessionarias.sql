@@ -10,6 +10,7 @@
 --  * `definir_concessionaria_obra`: a Engenharia corrige (histórico `concessionaria_obra_alterada`). A troca do
 --    checklist pela regra 7 fica para a entrega 3, quando o modelo do checklist passa a ser por concessionária.
 --  * `aplicar_checklist_engenharia` recusa obra sem concessionária.
+--  * `obras_operacao` devolve a concessionária da obra (o papel `operacao` só lê obras por ela).
 
 -- ---------------------------------------------------------------------------
 -- Cadastro
@@ -102,6 +103,83 @@ update public.obras o set concessionaria_id = c.id
 from public.concessionarias c
 where c.empresa_id = o.empresa_id and c.distribuidora = 'COPEL-DIS' and o.concessionaria_id is null;
 alter table public.obras enable trigger obras_updated_at;
+
+-- `obras_operacao` (corpo de 20261127100000_compras_pdf_documentos.sql) com a concessionária no fim: o papel
+-- `operacao` não lê a tabela `obras`, e a tela da Engenharia precisa saber se a obra tem concessionária.
+drop function public.obras_operacao(uuid);
+create function public.obras_operacao(p_obra_id uuid default null)
+returns table (
+  obra_id uuid,
+  empresa_id uuid,
+  numero integer,
+  cliente_nome text,
+  cidade text,
+  uf text,
+  potencia_kwp numeric,
+  tipo_ligacao public.tipo_ligacao,
+  unidade_consumidora text,
+  snapshot jsonb,
+  snapshot_versao integer,
+  pausada_em timestamptz,
+  pausa_motivo text,
+  cancelada_em timestamptz,
+  cancelamento_motivo text,
+  alerta_pagamento_estornado_em timestamptz,
+  venda_alterada_em timestamptz,
+  created_at timestamptz,
+  updated_at timestamptz,
+  cliente_endereco text,
+  cliente_telefone text,
+  cliente_telefone2 text,
+  cliente_documento text,
+  cliente_rg text,
+  cliente_data_nascimento date,
+  cliente_email text,
+  cliente_inscricao_estadual text,
+  concessionaria_id uuid
+)
+language sql stable security definer set search_path = ''
+as $$
+  select
+    o.id, o.empresa_id, o.numero, o.cliente_nome, o.cidade, o.uf, o.potencia_kwp,
+    o.tipo_ligacao, o.unidade_consumidora,
+    o.snapshot - 'cliente',
+    o.snapshot_versao, o.pausada_em, o.pausa_motivo, o.cancelada_em, o.cancelamento_motivo,
+    o.alerta_pagamento_estornado_em, o.venda_alterada_em, o.created_at, o.updated_at,
+    case when a.operacional or a.engenharia or a.compras or a.administrativo then cl.dados ->> 'endereco' end,
+    case when a.operacional or a.engenharia or a.compras then cl.dados ->> 'telefone' end,
+    case when a.operacional or a.engenharia or a.compras then cl.dados ->> 'telefone2' end,
+    case when a.engenharia or a.administrativo or a.compras then cl.dados ->> 'documento' end,
+    case when a.engenharia or a.compras then cl.dados ->> 'rg' end,
+    case when a.engenharia or a.compras then (cl.dados ->> 'data_nascimento')::date end,
+    case when a.engenharia or a.compras then cl.dados ->> 'email' end,
+    case when a.engenharia or a.compras then cl.dados ->> 'inscricao_estadual' end,
+    o.concessionaria_id
+  from public.obras o
+  left join public.obra_cliente cl on cl.obra_id = o.id
+  -- Setores em que EU sou participante ativo desta obra.
+  cross join lateral (
+    select
+      coalesce(bool_or(p.setor = 'operacional'), false) as operacional,
+      coalesce(bool_or(p.setor = 'engenharia'), false) as engenharia,
+      coalesce(bool_or(p.setor = 'compras'), false) as compras,
+      coalesce(bool_or(p.setor = 'administrativo'), false) as administrativo
+    from public.obra_participantes p
+    where p.obra_id = o.id
+      and p.empresa_id = o.empresa_id
+      and p.membro_id = public.meu_membro_id(o.empresa_id)
+      and p.fim is null
+  ) a
+  where o.empresa_id in (
+      select m.empresa_id from public.empresa_membros m
+      where m.user_id = (select auth.uid()) and m.ativo and m.papel = 'operacao'
+    )
+    and (p_obra_id is null or o.id = p_obra_id)
+    and public.pode_ver_obra_operacao(o.id)
+  order by o.created_at desc, o.numero desc;
+$$;
+revoke all on function public.obras_operacao(uuid) from public, anon, authenticated, service_role;
+grant execute on function public.obras_operacao(uuid) to authenticated;
 
 -- Mesma forma de `normalizarNome` (src/lib/tarifa-gd.ts), que a calculadora usa com `nomes_aceitos`: sem acento,
 -- minúsculas, espaços colapsados e sem espaço nas pontas.

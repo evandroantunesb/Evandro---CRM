@@ -8,9 +8,27 @@
  */
 import { Client } from "pg";
 import { urlBancoLocal } from "./banco-local";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { normalizarNome } from "@/lib/tarifa-gd";
+import type { SupabaseServidor } from "@/lib/supabase/server";
 import { CLIENTE_CONTRATO, criarUsuario, servico, sufixo, type Usuario, anexarDocumentosContrato, gerarContratoTeste } from "./ajuda";
+
+// Ação real da tela (definirConcessionariaObra): só a sessão é substituída, como em negocios-acoes-db.test.ts.
+const sessao = vi.hoisted(() => ({
+  cliente: null as unknown,
+  papel: "",
+}));
+vi.mock("@/lib/sessao", () => ({
+  exigirPapel: async (...papeis: string[]) => {
+    if (!papeis.includes(sessao.papel)) throw new Error("sem permissão");
+    return {};
+  },
+}));
+vi.mock("@/lib/supabase/server", () => ({ criarClienteServidor: async () => sessao.cliente }));
+vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
+
+const { definirConcessionariaObra } = await import("@/lib/acoes/engenharia");
+const { carregarConcessionarias } = await import("@/lib/engenharia-concessionaria");
 
 async function noBanco(sql: string, params: unknown[] = []) {
   const banco = new Client({ connectionString: urlBancoLocal() });
@@ -194,6 +212,34 @@ describe("Concessionárias: cadastro e obra (ordem importa)", { concurrent: fals
     await noBanco("update public.obras set cancelada_em = now(), cancelamento_motivo = 'Desistência' where id = $1", [obra]);
     const cancelada = await definir(coordEng, obra, copelA);
     expect(cancelada.error?.message).toBe("Esta obra foi cancelada e não aceita alterações.");
+  });
+
+  it("tela: a Engenharia (papel operacao) lê a concessionária pela RPC; a ação grava e devolve a mensagem da RPC", async () => {
+    const obra = await criarVenda(empresa, vendedor, admin, `Ação ${sufixo}`, "Cemig");
+    const ler = async () => {
+      const { data, error } = await coordEng.cliente.rpc("obras_operacao", { p_obra_id: obra });
+      if (error) throw error;
+      return data.map((l) => l.concessionaria_id);
+    };
+    expect(await ler()).toEqual([null]);
+    expect(await carregarConcessionarias(coordEng.cliente as unknown as SupabaseServidor, empresa)).toEqual([{ id: copelA, nome: "Copel" }]);
+
+    sessao.cliente = coordEng.cliente;
+    sessao.papel = "operacao";
+    const enviar = (concessionariaId: string) => {
+      const fd = new FormData();
+      fd.set("obraId", obra);
+      fd.set("concessionariaId", concessionariaId);
+      return definirConcessionariaObra(null, fd);
+    };
+    expect(await enviar("nao-e-uuid")).toEqual({ ok: false, mensagem: "Concessionária inválida." });
+    expect(await enviar(copelB)).toEqual({ ok: false, mensagem: "Concessionária não encontrada." });
+    expect(await concessionariaDaObra(obra)).toBeNull();
+    expect(await enviar(copelA)).toEqual({ ok: true, mensagem: "Concessionária da obra salva." });
+    expect(await ler()).toEqual([copelA]);
+
+    sessao.papel = "vendedor";
+    await expect(enviar(copelA)).rejects.toThrow("sem permissão");
   });
 
   it("empresa criada depois também recebe a Copel", async () => {

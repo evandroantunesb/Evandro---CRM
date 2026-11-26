@@ -8628,6 +8628,7 @@ export type Database = {
           cliente_rg: string;
           cliente_telefone: string;
           cliente_telefone2: string;
+          concessionaria_id: string;
           created_at: string;
           empresa_id: string;
           numero: number;
