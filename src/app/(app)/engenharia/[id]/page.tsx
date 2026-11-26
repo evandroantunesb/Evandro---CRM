@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { GestaoFixacao, GestaoSetor } from "@/app/(app)/obras/[id]/gestao";
 import { ChecklistEngenharia } from "@/components/engenharia/checklist";
+import { ConcessionariaDaObra } from "@/components/engenharia/concessionaria";
 import { EnquadramentoEngenharia } from "@/components/engenharia/enquadramento";
 import { IniciarAtuacao } from "@/components/engenharia/iniciar-atuacao";
 import { ObraRedeEngenharia } from "@/components/engenharia/obra-rede";
@@ -14,6 +15,7 @@ import { ListaTarefasSetor, NovaTarefaSetor } from "@/components/tarefas-setor";
 import { Cartao, CartaoRecolhivel, Selo } from "@/components/ui";
 import { formatarDataHora } from "@/lib/crm";
 import { carregarChecklistEngenharia } from "@/lib/engenharia-checklist";
+import { carregarConcessionarias } from "@/lib/engenharia-concessionaria";
 import { carregarEnquadramento } from "@/lib/engenharia-enquadramento";
 import { enquadramentoCompleto, perguntasSemResposta } from "@/lib/engenharia-enquadramento-regras";
 import { carregarRegistrosPassos } from "@/lib/engenharia-passos";
@@ -48,7 +50,7 @@ export default async function CardEngenharia({ params }: PageProps<"/engenharia/
   const { id } = await params;
   const supabase = await criarClienteServidor();
 
-  const [obra, tarefas, { data: meusSetores }, checklist, protocolos, vistorias, registros, prazos, enquadramento, obraRede] = await Promise.all([
+  const [obra, tarefas, { data: meusSetores }, checklist, protocolos, vistorias, registros, prazos, enquadramento, obraRede, concessionarias] = await Promise.all([
     carregarDetalheObra(supabase, { empresaId: atual.empresaId, papel: atual.papel, obraId: id, membroId: atual.membroId }),
     carregarTarefasSetor(supabase, {
       empresaId: atual.empresaId,
@@ -71,6 +73,7 @@ export default async function CardEngenharia({ params }: PageProps<"/engenharia/
     carregarPrazosObras(supabase, atual.empresaId),
     carregarEnquadramento(supabase, { empresaId: atual.empresaId, obraId: id }),
     carregarObraRede(supabase, { empresaId: atual.empresaId, obraId: id }),
+    carregarConcessionarias(supabase, atual.empresaId),
   ]);
   // Operação só entra no card de quem atua em Engenharia (mesma regra da lista).
   if (!obra || (atual.papel === "operacao" && (meusSetores ?? []).length === 0)) notFound();
@@ -95,6 +98,8 @@ export default async function CardEngenharia({ params }: PageProps<"/engenharia/
     instalacaoConcluida: operacional?.status === "instalacao_concluida" || operacional?.status === "concluido",
     obraRedePendente: temOrcamento && !obraRede?.concluidaEm,
   });
+  // Concessionária da obra (entrega 2 do item 6): sem ela, aviso e checklist bloqueado.
+  const concessionaria = concessionarias.find((c) => c.id === obra.concessionariaId) ?? null;
   const local = [resumo.cidade, resumo.uf].filter(Boolean).join("/");
   // Linha do topo no lugar do antigo cartão "Resumo"; o resto da venda fica em "Dados da venda".
   const linhaObra = [
@@ -175,6 +180,11 @@ export default async function CardEngenharia({ params }: PageProps<"/engenharia/
               <SeloCabecalho tom={TOM_SITUACAO[resumo.situacao]}>{ROTULO_SITUACAO_OBRA[resumo.situacao]}</SeloCabecalho>
             )}
             {linhaObra && <SeloCabecalho>{linhaObra}</SeloCabecalho>}
+            {concessionaria ? (
+              <SeloCabecalho>Concessionária: {concessionaria.nome}</SeloCabecalho>
+            ) : (
+              <SeloCabecalho tom="atencao">Concessionária sem cadastro</SeloCabecalho>
+            )}
             {resumo.alertas.map((a) => (
               <SeloCabecalho key={a} tom={TOM_ALERTA[a]}>
                 {ROTULO_ALERTA_OBRA[a]}
@@ -214,6 +224,14 @@ export default async function CardEngenharia({ params }: PageProps<"/engenharia/
         </p>
       )}
       {gestao?.bloqueio && <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-900">{gestao.bloqueio}</p>}
+
+      <ConcessionariaDaObra
+        obraId={resumo.id}
+        atual={concessionaria}
+        opcoes={concessionarias}
+        podeEditar={autorizacaoEngenharia !== null && resumo.situacao !== "cancelada"}
+        distribuidoraNegocio={obra.tecnico.distribuidora}
+      />
 
       <CartaoRecolhivel titulo="Dados da venda" resumo={resumoVenda || "Kit, potência, equipamentos e cliente"}>
         <div className="flex flex-col gap-4">
@@ -299,6 +317,7 @@ export default async function CardEngenharia({ params }: PageProps<"/engenharia/
           autorizacao={autorizacaoEngenharia}
           cancelada={resumo.situacao === "cancelada"}
           veDocumentos={autorizacaoEngenharia !== null}
+          semConcessionaria={!concessionaria}
         />
       </SecaoPasso>
 
@@ -315,6 +334,7 @@ export default async function CardEngenharia({ params }: PageProps<"/engenharia/
             protocolos={protocolos}
             podeAgir={resumo.situacao !== "cancelada"}
             pendentesChecklist={pendentesChecklist}
+            distribuidoraSugerida={concessionaria?.nome ?? ""}
           />
         ) : (
           <p className="text-sm text-zinc-500">O protocolo é visto por quem atua na Engenharia da obra.</p>

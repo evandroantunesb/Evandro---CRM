@@ -26,6 +26,20 @@ function revalidar(obraId: string) {
 
 const comObra = z.object({ obraId: z.string().uuid() });
 
+const comConcessionaria = comObra.extend({ concessionariaId: z.string().uuid() });
+
+/** A Engenharia corrige a concessionária da obra; a RPC recusa a de outra empresa e grava o histórico. */
+export async function definirConcessionariaObra(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  await exigirPapel(...ENGENHARIA);
+  const d = comConcessionaria.safeParse(Object.fromEntries(formData));
+  if (!d.success) return { ok: false, mensagem: "Concessionária inválida." };
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.rpc("definir_concessionaria_obra", { p_obra_id: d.data.obraId, p_concessionaria_id: d.data.concessionariaId });
+  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível salvar a concessionária.") };
+  revalidar(d.data.obraId);
+  return { ok: true, mensagem: "Concessionária da obra salva." };
+}
+
 /** Copia para a obra os itens ativos do modelo que ela ainda não tem. */
 export async function aplicarChecklistEngenharia(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
   await exigirPapel(...ENGENHARIA);
