@@ -51,11 +51,14 @@ export function ProtocolosEngenharia({
   protocolos,
   podeAgir,
   pendentesChecklist,
+  distribuidoraSugerida,
 }: {
   obraId: string;
   pasta: string;
   protocolos: ProtocoloVM[];
   podeAgir: boolean;
+  /** Nome da concessionária da obra, ou vazio quando ela não tem (o campo continua editável). */
+  distribuidoraSugerida: string;
   /** Itens obrigatórios do checklist ainda não resolvidos (gate G2); null = checklist não aplicado. */
   pendentesChecklist: number | null;
 }) {
@@ -76,7 +79,7 @@ export function ProtocolosEngenharia({
                 Faltam {pendentesChecklist} {pendentesChecklist === 1 ? "item obrigatório" : "itens obrigatórios"} do checklist para registrar o protocolo.
               </p>
             ) : (
-              <NovoProtocolo obraId={obraId} pasta={pasta} />
+              <NovoProtocolo obraId={obraId} pasta={pasta} distribuidoraSugerida={distribuidoraSugerida} />
             ))}
         </div>
       )}
@@ -94,7 +97,7 @@ export function ProtocolosEngenharia({
   );
 }
 
-function NovoProtocolo({ obraId, pasta }: { obraId: string; pasta: string }) {
+function NovoProtocolo({ obraId, pasta, distribuidoraSugerida }: { obraId: string; pasta: string; distribuidoraSugerida: string }) {
   const router = useRouter();
   const [resultado, acao, pendente] = useActionState(registrarProtocoloEngenharia, null);
   const [comprovantes, setComprovantes] = useState<File[]>([]);
@@ -107,7 +110,7 @@ function NovoProtocolo({ obraId, pasta }: { obraId: string; pasta: string }) {
       <p className="text-xs text-zinc-600">Protocole no portal da distribuidora e registre aqui o número e a data. O Raion não envia nada ao portal.</p>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Rotulo texto="Distribuidora">
-          <input name="distribuidora" defaultValue="Copel" required maxLength={60} className={CLASSE_ENTRADA} />
+          <input name="distribuidora" defaultValue={distribuidoraSugerida} required maxLength={60} className={CLASSE_ENTRADA} />
         </Rotulo>
         <Rotulo texto="Número do protocolo">
           <input name="numero" required maxLength={60} className={CLASSE_ENTRADA} />
