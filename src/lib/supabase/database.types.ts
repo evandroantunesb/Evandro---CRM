@@ -1295,6 +1295,48 @@ export type Database = {
           },
         ];
       };
+      concessionaria_prazos: {
+        Row: {
+          chave: string;
+          concessionaria_id: string;
+          contagem: string;
+          dias_uteis: number | null;
+          empresa_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          chave: string;
+          concessionaria_id: string;
+          contagem?: string;
+          dias_uteis?: number | null;
+          empresa_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          chave?: string;
+          concessionaria_id?: string;
+          contagem?: string;
+          dias_uteis?: number | null;
+          empresa_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "concessionaria_prazos_empresa_id_concessionaria_id_fkey";
+            columns: ["empresa_id", "concessionaria_id"];
+            isOneToOne: false;
+            referencedRelation: "concessionarias";
+            referencedColumns: ["empresa_id", "id"];
+          },
+          {
+            foreignKeyName: "concessionaria_prazos_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       concessionarias: {
         Row: {
           created_at: string;
@@ -2231,6 +2273,7 @@ export type Database = {
       engenharia_checklist_modelo: {
         Row: {
           ativo: boolean;
+          concessionaria_id: string;
           condicoes: NonNullable<Json>;
           created_at: string;
           descricao: string | null;
@@ -2246,6 +2289,7 @@ export type Database = {
         };
         Insert: {
           ativo?: boolean;
+          concessionaria_id: string;
           condicoes?: NonNullable<Json>;
           created_at?: string;
           descricao?: string | null;
@@ -2261,6 +2305,7 @@ export type Database = {
         };
         Update: {
           ativo?: boolean;
+          concessionaria_id?: string;
           condicoes?: NonNullable<Json>;
           created_at?: string;
           descricao?: string | null;
@@ -2275,6 +2320,13 @@ export type Database = {
           updated_at?: string;
         };
         Relationships: [
+          {
+            foreignKeyName: "engenharia_checklist_modelo_concessionaria_fk";
+            columns: ["empresa_id", "concessionaria_id"];
+            isOneToOne: false;
+            referencedRelation: "concessionarias";
+            referencedColumns: ["empresa_id", "id"];
+          },
           {
             foreignKeyName: "engenharia_checklist_modelo_empresa_id_fkey";
             columns: ["empresa_id"];
@@ -7752,6 +7804,7 @@ export type Database = {
       compartilha_empresa: { Args: { p_user_id: string }; Returns: boolean };
       compartilha_empresa_comercial: { Args: { p_user_id: string }; Returns: boolean };
       compartilha_empresa_identidade: { Args: { p_user_id: string }; Returns: boolean };
+      concessionaria_da_obra: { Args: { p_obra_id: string }; Returns: string };
       concessionaria_do_negocio: {
         Args: { p_distribuidora: string; p_empresa_id: string };
         Returns: string;

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CabecalhoPagina } from "@/components/cabecalho-pagina";
 import { Cartao } from "@/components/ui";
+import { carregarConcessionarias } from "@/lib/engenharia-concessionaria";
 import { lerCondicoes } from "@/lib/engenharia-enquadramento-regras";
 import { carregarConfigPrazos, carregarFeriadosEmpresa } from "@/lib/engenharia-prazos";
 import { CHAVES_PRAZO_DISTRIBUIDORA, CHAVES_PRAZO_INTERNO, type ChavePrazo } from "@/lib/engenharia-prazos-regras";
@@ -44,11 +45,16 @@ export default async function ConfigEngenharia() {
     );
   }
   // Enquanto a migration não estiver aplicada (preview usa o banco de produção), as listas vêm vazias.
+  // Até a tela por concessionária (entrega 3, Task 4), o checklist mostrado é o da Copel.
+  const concessionarias = await carregarConcessionarias(supabase, atual.empresaId);
+  const concessionaria = concessionarias.find((c) => c.nome === "Copel") ?? concessionarias[0];
+  if (!concessionaria) notFound();
   const [{ data }, prazos, feriados, marcosRes] = await Promise.all([
     supabase
       .from("engenharia_checklist_modelo")
       .select("id, grupo, titulo, obrigatorio, ordem, ativo, condicoes")
       .eq("empresa_id", atual.empresaId)
+      .eq("concessionaria_id", concessionaria.id)
       .order("ordem")
       .order("titulo"),
     carregarConfigPrazos(supabase, atual.empresaId),
@@ -80,7 +86,7 @@ export default async function ConfigEngenharia() {
         deixaram de valer viram &quot;não se aplica&quot;.
       </p>
       <Cartao titulo="Novo item">
-        <NovoItemModelo proximaOrdem={(itens.at(-1)?.ordem ?? 0) + 10} />
+        <NovoItemModelo proximaOrdem={(itens.at(-1)?.ordem ?? 0) + 10} concessionariaId={concessionaria.id} />
       </Cartao>
       <Cartao titulo={`Itens (${itens.length})`}>
         {itens.length === 0 ? <p className="text-sm text-zinc-500">Nenhum item cadastrado.</p> : itens.map((i) => <LinhaItemModelo key={i.id} item={i} />)}

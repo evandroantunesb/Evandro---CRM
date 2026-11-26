@@ -27,11 +27,17 @@ export async function criarItemModelo(_: ResultadoAcao, formData: FormData): Pro
   const { atual } = await exigirPapel("admin");
   const d = ler(formData);
   if (!d.success) return { ok: false, mensagem: d.error.issues[0].message };
+  // O modelo é por concessionária (20261224100000); a FK composta recusa a de outra empresa.
+  const concessionaria = z.string().uuid().safeParse(formData.get("concessionariaId"));
+  if (!concessionaria.success) return { ok: false, mensagem: "Escolha a concessionária." };
 
   const supabase = await criarClienteServidor();
-  const { error } = await supabase
-    .from("engenharia_checklist_modelo")
-    .insert({ empresa_id: atual.empresaId, ...d.data, obrigatorio: formData.get("obrigatorio") === "on" });
+  const { error } = await supabase.from("engenharia_checklist_modelo").insert({
+    empresa_id: atual.empresaId,
+    concessionaria_id: concessionaria.data,
+    ...d.data,
+    obrigatorio: formData.get("obrigatorio") === "on",
+  });
   if (error) return { ok: false, mensagem: error.code === "23505" ? DUPLICADO : "Não foi possível criar." };
   revalidatePath(CAMINHO);
   return { ok: true, mensagem: "Item criado." };
