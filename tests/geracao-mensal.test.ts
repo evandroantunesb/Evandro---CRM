@@ -117,10 +117,24 @@ describe("auxiliares", () => {
     expect(mediaDosMeses([720, 700, 680, 630, 600, 600, 610, 620, 630, 650, 680, 700])).toBe(652);
   });
 
-  it("escala do gráfico em degraus de 250, cobrindo o maior valor", () => {
+  it("escala do gráfico em 4 degraus redondos, cobrindo o maior valor", () => {
     expect(escalaDoGrafico([908, 720])).toEqual({ maximo: 1000, marcas: [1000, 750, 500, 250, 0] });
     expect(escalaDoGrafico([2000, 400]).maximo).toBe(2000);
-    expect(escalaDoGrafico([0])).toEqual({ maximo: 250, marcas: [250, 187.5, 125, 62.5, 0] });
+    // Negócio grande: degraus de 1.000, não 812,5 (topo 3.250 com degraus de 250).
+    expect(escalaDoGrafico([3100, 2900])).toEqual({ maximo: 4000, marcas: [4000, 3000, 2000, 1000, 0] });
+    expect(escalaDoGrafico([7400])).toEqual({ maximo: 8000, marcas: [8000, 6000, 4000, 2000, 0] });
+    expect(escalaDoGrafico([180])).toEqual({ maximo: 200, marcas: [200, 150, 100, 50, 0] });
+    // Sem valor: o menor degrau (50), sem marca quebrada.
+    expect(escalaDoGrafico([0])).toEqual({ maximo: 200, marcas: [200, 150, 100, 50, 0] });
+  });
+
+  it("toda marca do eixo é inteira e o topo cobre o maior valor", () => {
+    for (const maior of [1, 49, 201, 260, 999, 1001, 2499, 2501, 9999, 12345, 48000]) {
+      const { maximo, marcas } = escalaDoGrafico([maior]);
+      expect(maximo).toBeGreaterThanOrEqual(maior);
+      expect(marcas.every(Number.isInteger)).toBe(true);
+      expect(marcas).toHaveLength(5);
+    }
   });
 });
 

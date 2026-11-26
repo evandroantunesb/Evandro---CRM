@@ -11,6 +11,8 @@ type Paleta = { fundo: string; cartao: string; borda: string; texto: string; sua
 
 const TITULO = { fontFamily: "Manrope", fontWeight: 700 } as const;
 const CINZA_BARRA = "#6B7280";
+/** Metade da altura do rótulo do eixo: o texto fica centrado na linha da marca. */
+const ROTULO_TOPO = 4;
 
 export function SecaoGeracaoMensal({ mensal, p }: { mensal: SerieMensal; p: Paleta }) {
   const L = 440;
@@ -31,14 +33,15 @@ export function SecaoGeracaoMensal({ mensal, p }: { mensal: SerieMensal; p: Pale
         Geração e consumo mês a mês
       </Text>
       <View style={{ backgroundColor: p.fundo, borderWidth: 1, borderColor: p.borda, borderRadius: 8, padding: 9 }}>
-        <View style={{ flexDirection: "row", gap: 14, marginBottom: 7 }}>
+        <View style={{ flexDirection: "row", gap: 14, marginBottom: 7 - ROTULO_TOPO }}>
           {legenda(p.acento, "Geração estimada")}
           {legenda(CINZA_BARRA, legendaConsumo(mensal))}
         </View>
-        <View style={{ flexDirection: "row" }}>
+        {/* O rótulo do topo sobe ROTULO_TOPO acima da linha: o espaço fica reservado aqui, dentro da seção. */}
+        <View style={{ flexDirection: "row", paddingTop: ROTULO_TOPO }}>
           <View style={{ width: EIXO, height: A, position: "relative" }}>
             {marcas.map((m) => (
-              <Text key={m} style={{ position: "absolute", right: 4, top: y(m) - 4, fontSize: 6.5, color: p.suave }}>
+              <Text key={m} style={{ position: "absolute", right: 4, top: y(m) - ROTULO_TOPO, fontSize: 6.5, color: p.suave }}>
                 {Math.round(m).toLocaleString("pt-BR")}
               </Text>
             ))}

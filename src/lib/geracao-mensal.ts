@@ -141,9 +141,17 @@ export function descricaoGraficoMensal(s: SerieMensal): string {
   return `Geração estimada de ${kwh(s.geracaoKwh[menor]!)} em ${MESES_ABREV[menor]} a ${kwh(s.geracaoKwh[maior]!)} em ${MESES_ABREV[maior]}; ${consumo}.`;
 }
 
-/** Topo do eixo do gráfico: menor múltiplo de 250 que cobre o maior valor (mínimo 250), com 5 marcas até zero. */
+/** Menor degrau do eixo (kWh): mesmo sem valor, as marcas saem inteiras (0, 50, 100, 150, 200). */
+const DEGRAU_MINIMO = 50;
+
+/**
+ * Eixo do gráfico em 4 degraus iguais e redondos (1, 2, 2,5 ou 5 × 10ⁿ, no mínimo 50 kWh), o menor que cobre o maior
+ * valor; 5 marcas do topo até zero, todas inteiras.
+ */
 export function escalaDoGrafico(valores: readonly number[]): { maximo: number; marcas: number[] } {
   const maior = Math.max(0, ...valores.filter(Number.isFinite));
-  const maximo = Math.max(250, Math.ceil(maior / 250) * 250);
-  return { maximo, marcas: [4, 3, 2, 1, 0].map((k) => (maximo * k) / 4) };
+  const alvo = Math.max(DEGRAU_MINIMO, maior / 4);
+  const potencia = 10 ** Math.floor(Math.log10(alvo));
+  const degrau = [1, 2, 2.5, 5, 10].map((m) => m * potencia).find((d) => d >= alvo)!;
+  return { maximo: degrau * 4, marcas: [4, 3, 2, 1, 0].map((k) => degrau * k) };
 }
