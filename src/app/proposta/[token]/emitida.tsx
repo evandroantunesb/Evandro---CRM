@@ -7,8 +7,10 @@ import {
   coberturaDoConsumo,
   dataBr,
   economiaDaEmissao,
+  fioBDaEmissao,
   linkWhatsappDaProposta,
   mensalDaEmissao,
+  parcelaEconomiaDaEmissao,
   temConteudoV6,
   textoCondicoesComerciais,
   textoPremissaGeracao,
@@ -17,6 +19,7 @@ import {
 } from "@/lib/propostas/proposta-simples";
 import { ROTULO_TIPO_COMPONENTE_KIT } from "@/lib/tipos";
 import { EconomiaDaProposta } from "./economia";
+import { FioBDaProposta } from "./fio-b";
 import { GeracaoMensalDaProposta } from "./geracao-mensal";
 
 /** Proposta emitida (simples): renderizada SÓ a partir dos dados congelados na emissão. */
@@ -28,6 +31,7 @@ export function PropostaEmitida({ token, dados }: { token: string; dados: DadosE
   const whatsapp = temConteudoV6(dados) ? linkWhatsappDaProposta(dados) : null;
   const economia = economiaDaEmissao(dados);
   const mensal = mensalDaEmissao(dados);
+  const fioB = fioBDaEmissao(dados);
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-6 px-6 py-10">
       <LogoRaion altura={32} />
@@ -106,6 +110,7 @@ export function PropostaEmitida({ token, dados }: { token: string; dados: DadosE
       </Cartao>
 
       {economia && <EconomiaDaProposta economia={economia} />}
+      {fioB && <FioBDaProposta fioB={fioB} />}
 
       {(dados.comercial.incluso || dados.comercial.exclusos) && (
         <Cartao titulo="O que está incluso">
@@ -147,7 +152,11 @@ export function PropostaEmitida({ token, dados }: { token: string; dados: DadosE
       <Cartao titulo="Investimento">
         <p data-testid="preco-proposta" className="text-2xl font-semibold text-carvao tabular-nums">{formatarMoeda(dados.preco.valor)}</p>
         {dados.esquema !== 4 ? (
-          <CondicoesPagamento condicoes={dados.comercial.condicoesPagamento} validadeAte={dados.comercial.validadeAte} />
+          <CondicoesPagamento
+            condicoes={dados.comercial.condicoesPagamento}
+            validadeAte={dados.comercial.validadeAte}
+            parcelaEconomia={parcelaEconomiaDaEmissao(dados)}
+          />
         ) : (
           <p className="mt-3 text-sm whitespace-pre-wrap text-zinc-700">{textoCondicoesComerciais(dados)}</p>
         )}
@@ -258,7 +267,7 @@ function SobreAEmpresa({ inst }: { inst: Institucional }) {
 
 /** Condições por modalidade (esquema 5), no mesmo arranjo do PDF: à vista e parcelado lado a lado; financiamento e
  * Personalizado em largura total; no celular, um embaixo do outro. */
-function CondicoesPagamento({ condicoes, validadeAte }: { condicoes: CondicoesEmitidas; validadeAte: string }) {
+function CondicoesPagamento({ condicoes, validadeAte, parcelaEconomia }: { condicoes: CondicoesEmitidas; validadeAte: string; parcelaEconomia: string | null }) {
   return (
     <div className="mt-4 flex flex-col gap-3" data-testid="condicoes-pagamento">
       <p className="text-xs font-medium tracking-wide text-dourado-texto uppercase">Condições de pagamento</p>
@@ -287,6 +296,12 @@ function CondicoesPagamento({ condicoes, validadeAte }: { condicoes: CondicoesEm
                   </li>
                 ))}
               </ul>
+            )}
+            {/* Esquema 9: a parcela ao lado da economia (texto já pronto na emissão). */}
+            {s.modalidade === "financiamento" && parcelaEconomia && (
+              <p data-testid="parcela-economia" className="mt-1 rounded-md border-l-2 border-dourado bg-zinc-50 px-2.5 py-1.5 text-sm text-zinc-700">
+                {parcelaEconomia}
+              </p>
             )}
           </div>
         ))}

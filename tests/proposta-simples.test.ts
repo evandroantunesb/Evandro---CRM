@@ -305,7 +305,8 @@ describe("montarDadosEmissaoSimples", () => {
     const dados = dadosValidos();
     expect(dados.preco.valor).toBe(24500);
     expect(dados.sistema.consumoMedioKwh).toBe(450);
-    expect(dados.esquema === 8 && dados.economia).toBeNull();
+    expect(dados.esquema === 9 && dados.economia).toBeNull();
+    expect(dados.esquema === 9 && dados.textosEconomia).toBeNull();
     const resto = { ...dados } as Record<string, unknown>;
     delete resto.economia;
     expect(jsonCanonico(resto)).not.toMatch(/"(economia|payback|conta|fio)/i);
@@ -346,9 +347,9 @@ describe("montarDadosEmissaoSimples", () => {
     }
   });
 
-  it("emissão nova grava o esquema 8, com as condições por modalidade e a observação", () => {
+  it("emissão nova grava o esquema 9, com as condições por modalidade e a observação", () => {
     const dados = dadosValidos();
-    expect(dados.esquema).toBe(8);
+    expect(dados.esquema).toBe(9);
     expect(dados.comercial.condicoesPagamento).toEqual({
       aVista: { descontoPercentual: 0, valor: 24500 },
       parcelado: null,
@@ -408,7 +409,7 @@ const CONSUMO_12 = [520, 500, 480, 430, 400, 400, 410, 420, 430, 450, 480, 500];
 describe("geração e consumo mês a mês (esquema 8)", () => {
   it("com curva e consumo dos 12 meses: congela a geração repartida e o consumo informado", () => {
     const dados = dadosValidos({ curvaGeracao: CURVA, consumoMensalKwhNegocio: CONSUMO_12 });
-    expect(dados.esquema).toBe(8);
+    expect(dados.esquema).toBe(9);
     const mensal = mensalDaEmissao(dados)!;
     expect(mensal.consumoOrigem).toBe("informado");
     expect(mensal.consumoKwh).toEqual(CONSUMO_12);
@@ -428,7 +429,7 @@ describe("geração e consumo mês a mês (esquema 8)", () => {
 
   it("ao ler, recusa gráfico sem geração ou com soma diferente do ano", () => {
     const dados = dadosValidos({ curvaGeracao: CURVA });
-    const semGeracao = { ...dadosValidos({ produtividadeConfirmada: null }), mensal: dados.esquema === 8 ? dados.mensal : null };
+    const semGeracao = { ...dadosValidos({ produtividadeConfirmada: null }), mensal: dados.esquema === 9 ? dados.mensal : null };
     expect(lerDadosDaEmissao(semGeracao, hashDosDados(semGeracao))).toEqual({ ok: false });
     const soma = JSON.parse(JSON.stringify(dados));
     soma.mensal.geracaoKwh[0] += 1;
@@ -438,7 +439,8 @@ describe("geração e consumo mês a mês (esquema 8)", () => {
   it("emissões gravadas no esquema 7 continuam legíveis", () => {
     const v7 = JSON.parse(JSON.stringify(dadosValidos()));
     v7.esquema = 7;
-    delete v7.mensal;
+    delete v7.mensal;
+    delete v7.textosEconomia;
     expect(lerDadosDaEmissao(v7, hashDosDados(v7))).toEqual({ ok: true, dados: v7 });
     expect(mensalDaEmissao(v7)).toBeNull();
   });

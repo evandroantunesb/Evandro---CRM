@@ -19,9 +19,13 @@ import {
   type EconomiaEmitida,
 } from "@/lib/propostas/economia-emissao";
 import { gerarPdfPropostaSimples } from "@/lib/propostas/emissao-simples-pdf";
+import { ANOS_FIO_B_PROPOSTA, fraseParcelaEconomia } from "@/lib/propostas/textos-economia";
 import {
+  economiaDaEmissao,
   esquemaDadosEmissaoSimples,
+  fioBDaEmissao,
   montarDadosEmissaoSimples,
+  parcelaEconomiaDaEmissao,
   RODAPE_COM_ECONOMIA,
   RODAPE_SIMPLES_SEM_GERACAO,
   type EntradaEmissaoSimples,
@@ -189,8 +193,8 @@ describe("emissão com economia (esquema 7)", () => {
     const com = montarDadosEmissaoSimples({ ...ENTRADA, economia: economiaDe() });
     const sem = montarDadosEmissaoSimples(ENTRADA);
     if (!com.ok || !sem.ok) throw new Error("montagem");
-    expect(com.dados).toMatchObject({ esquema: 8, rodape: RODAPE_COM_ECONOMIA, economia: { horizonteAnos: 25, paybackMeses: 71 } });
-    expect(sem.dados).toMatchObject({ esquema: 8, rodape: RODAPE_SIMPLES_SEM_GERACAO, economia: null });
+    expect(com.dados).toMatchObject({ esquema: 9, rodape: RODAPE_COM_ECONOMIA, economia: { horizonteAnos: 25, paybackMeses: 71 } });
+    expect(sem.dados).toMatchObject({ esquema: 9, rodape: RODAPE_SIMPLES_SEM_GERACAO, economia: null });
     // Rodapé trocado na leitura não passa.
     expect(esquemaDadosEmissaoSimples.safeParse({ ...com.dados, rodape: RODAPE_SIMPLES_SEM_GERACAO }).success).toBe(false);
     expect(esquemaDadosEmissaoSimples.safeParse({ ...sem.dados, rodape: RODAPE_COM_ECONOMIA }).success).toBe(false);
@@ -217,5 +221,77 @@ describe("emissão com economia (esquema 7)", () => {
       const pdf = await gerarPdfPropostaSimples(m.dados, { logoUrl: null, fotoCapaUrl: null });
       expect(Buffer.from(pdf.slice(0, 5)).toString("latin1")).toBe("%PDF-");
     }
+  });
+});
+
+describe("esquema 9: Fio B e parcela × economia congelados (textos aprovados em 26/11/2026)", () => {
+  const COM_FINANCIAMENTO: EntradaEmissaoSimples = {
+    ...ENTRADA,
+    condicoes: {
+      ...ENTRADA.condicoes,
+      entrada: {
+        ...ENTRADA.condicoes.entrada!,
+        financiamento: {
+          instituicao: "Sicredi",
+          opcoes: [
+            { entrada: "0", parcelas: "60", valorParcela: "598,00", carenciaDias: 90 },
+            { entrada: "5.000,00", parcelas: "48", valorParcela: "560,00", carenciaDias: 90 },
+          ],
+        },
+      },
+    },
+  };
+
+  it("com economia: Fio B do ano da emissão e a frase da menor parcela, já prontos", () => {
+    const economia = economiaDe();
+    const m = montarDadosEmissaoSimples({ ...COM_FINANCIAMENTO, economia });
+    if (!m.ok) throw new Error(m.pendencias.join(" "));
+    expect(m.dados.esquema).toBe(9);
+    expect(fioBDaEmissao(m.dados)).toEqual({ anoEmissao: 2026, anos: [...ANOS_FIO_B_PROPOSTA] });
+    expect(parcelaEconomiaDaEmissao(m.dados)).toBe(fraseParcelaEconomia(m.dados.comercial.condicoesPagamento, economia!.economiaMensal));
+    expect(parcelaEconomiaDaEmissao(m.dados)).toMatch(/48x, com entrada de R\$\s5\.000,00/);
+  });
+
+  it("com economia e sem financiamento: Fio B sim, frase não", () => {
+    const m = montarDadosEmissaoSimples({ ...ENTRADA, economia: economiaDe() });
+    if (!m.ok) throw new Error(m.pendencias.join(" "));
+    expect(fioBDaEmissao(m.dados)).not.toBeNull();
+    expect(parcelaEconomiaDaEmissao(m.dados)).toBeNull();
+  });
+
+  it("sem economia: nenhum dos dois (mesmo com financiamento)", () => {
+    const m = montarDadosEmissaoSimples(COM_FINANCIAMENTO);
+    if (!m.ok) throw new Error(m.pendencias.join(" "));
+    expect(m.dados).toMatchObject({ esquema: 9, textosEconomia: null });
+  });
+
+  it("leitura recusa os textos sem economia (e economia sem os textos); o texto gravado vale como foi emitido", () => {
+    const com = montarDadosEmissaoSimples({ ...COM_FINANCIAMENTO, economia: economiaDe() });
+    const sem = montarDadosEmissaoSimples(COM_FINANCIAMENTO);
+    if (!com.ok || !sem.ok) throw new Error("montagem");
+    expect(esquemaDadosEmissaoSimples.safeParse({ ...sem.dados, textosEconomia: com.dados.textosEconomia }).success).toBe(false);
+    expect(esquemaDadosEmissaoSimples.safeParse({ ...com.dados, textosEconomia: null }).success).toBe(false);
+    // Uma emissão com outro texto continua legível (o texto não é recalculado na leitura).
+    const outroTexto = { ...com.dados, textosEconomia: { ...com.dados.textosEconomia!, parcelaEconomia: "Texto de uma versão anterior." } };
+    expect(esquemaDadosEmissaoSimples.safeParse(outroTexto).success).toBe(true);
+  });
+
+  it("esquema 8 continua legível e sem os textos novos", () => {
+    const com = montarDadosEmissaoSimples({ ...COM_FINANCIAMENTO, economia: economiaDe() });
+    if (!com.ok) throw new Error("montagem");
+    const v8 = { ...com.dados, esquema: 8 } as Record<string, unknown>;
+    delete v8.textosEconomia;
+    const lida = esquemaDadosEmissaoSimples.safeParse(v8);
+    expect(lida.success).toBe(true);
+    expect(fioBDaEmissao(lida.data!)).toBeNull();
+    expect(parcelaEconomiaDaEmissao(lida.data!)).toBeNull();
+    expect(economiaDaEmissao(lida.data!)).not.toBeNull();
+  });
+
+  it("o PDF gera com as duas seções", async () => {
+    const m = montarDadosEmissaoSimples({ ...COM_FINANCIAMENTO, economia: economiaDe() });
+    if (!m.ok) throw new Error(m.pendencias.join(" "));
+    const pdf = await gerarPdfPropostaSimples(m.dados, { logoUrl: null, fotoCapaUrl: null });
+    expect(Buffer.from(pdf.slice(0, 5)).toString("latin1")).toBe("%PDF-");
   });
 });

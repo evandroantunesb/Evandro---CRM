@@ -31,12 +31,13 @@ import { valorComoPersistido } from "@/lib/consumo-persistido";
 import { TIPOS_COMPONENTE_KIT } from "@/lib/tipos";
 import { distribuirGeracaoMensal } from "@/lib/geracao-mensal";
 import { esquemaEconomiaEmitida, type EconomiaEmitida } from "./economia-emissao";
+import { ANOS_FIO_B_PROPOSTA, fraseParcelaEconomia } from "./textos-economia";
 
 /** A tela de emissão usa a mesma regra da economia (ver `economia-emissao.ts`). */
 export { avisoDaEconomia } from "./economia-emissao";
 
 /** Identificação do layout que gera o PDF; muda quando o conteúdo/estrutura do modelo simples mudar. */
-export const RENDERIZADOR_SIMPLES = "simples-v8";
+export const RENDERIZADOR_SIMPLES = "simples-v9";
 
 /** Rodapé aprovado (proposta COM a geração estimada). */
 export const RODAPE_SIMPLES =
@@ -331,16 +332,46 @@ export type MensalEmitido = z.infer<typeof esquemaMensalEmitido>;
  */
 const esquemaV8 = esquemaV7.extend({ esquema: z.literal(8), mensal: esquemaMensalEmitido.nullable() });
 
-/** Economia da versão emitida (só os esquemas 7 e 8 podem tê-la). */
-export const economiaDaEmissao = (d: { esquema: number; economia?: EconomiaEmitida | null }): EconomiaEmitida | null =>
-  d.esquema === 7 || d.esquema === 8 ? (d.economia ?? null) : null;
+/** Fio B congelado na emissão: o ano da emissão (destacado no gráfico) e a tabela mostrada ao cliente. */
+const esquemaFioBEmitido = z.object({
+  anoEmissao: z.number().int().min(2023).max(2100),
+  anos: z.array(z.object({ ano: z.number().int(), percentual: z.number().min(0).max(1), premissa: z.boolean() })).min(1).max(12),
+});
+export type FioBEmitido = z.infer<typeof esquemaFioBEmitido>;
 
-/** Geração e consumo mês a mês da versão emitida (só o esquema 8 pode tê-los). */
+/**
+ * Esquema 9 (26/11/2026, textos aprovados pelo Evandro): o 8 com "Como funciona a conta com energia solar" (Fio B) e a
+ * frase da parcela do financiamento × economia, já prontos na emissão. Os dois só existem com economia; nulos = a
+ * proposta sai sem eles (sem economia, ou sem financiamento no caso da frase).
+ */
+const esquemaV9 = esquemaV8.extend({
+  esquema: z.literal(9),
+  textosEconomia: z.object({ fioB: esquemaFioBEmitido, parcelaEconomia: z.string().min(1).max(400).nullable() }).nullable(),
+});
+type TextosEconomia = z.infer<typeof esquemaV9>["textosEconomia"];
+
+/** Economia da versão emitida (só os esquemas 7 em diante podem tê-la). */
+export const economiaDaEmissao = (d: { esquema: number; economia?: EconomiaEmitida | null }): EconomiaEmitida | null =>
+  d.esquema >= 7 ? (d.economia ?? null) : null;
+
+/** Geração e consumo mês a mês da versão emitida (só os esquemas 8 em diante podem tê-los). */
 export const mensalDaEmissao = (d: { esquema: number; mensal?: MensalEmitido | null }): MensalEmitido | null =>
-  d.esquema === 8 ? (d.mensal ?? null) : null;
+  d.esquema >= 8 ? (d.mensal ?? null) : null;
+
+type ComTextos = { esquema: number; textosEconomia?: TextosEconomia };
+
+/** Fio B da versão emitida (só o esquema 9 em diante). */
+export const fioBDaEmissao = (d: ComTextos): FioBEmitido | null => (d.esquema >= 9 ? (d.textosEconomia?.fioB ?? null) : null);
+
+/** Frase da parcela × economia da versão emitida (só o esquema 9 em diante). */
+export const parcelaEconomiaDaEmissao = (d: ComTextos): string | null => (d.esquema >= 9 ? (d.textosEconomia?.parcelaEconomia ?? null) : null);
 
 /** Versões com o pós-venda e o conteúdo institucional da empresa (esquema 6 em diante). */
-export const temConteudoV6 = <D extends { esquema: number }>(d: D): d is Extract<D, { esquema: 6 | 7 | 8 }> => d.esquema >= 6;
+export const temConteudoV6 = <D extends { esquema: number }>(d: D): d is Extract<D, { esquema: 6 | 7 | 8 | 9 }> => d.esquema >= 6;
+
+/** Os textos do esquema 9 acompanham a economia: sem ela, nenhum dos dois. */
+const textosConferem = (d: ComTextos & { economia?: EconomiaEmitida | null }) =>
+  d.esquema < 9 || (economiaDaEmissao(d) != null) === (d.textosEconomia != null);
 
 /** O gráfico mês a mês só existe com geração, e reparte exatamente o total do ano. */
 function mensalConfere(d: { esquema: number; mensal?: MensalEmitido | null; sistema: { geracao: { kwhMes: number } | null } }): boolean {
@@ -351,18 +382,19 @@ function mensalConfere(d: { esquema: number; mensal?: MensalEmitido | null; sist
 }
 
 export const esquemaDadosEmissaoSimples = z
-  .discriminatedUnion("esquema", [esquemaV4, esquemaV5, esquemaV6, esquemaV7, esquemaV8])
+  .discriminatedUnion("esquema", [esquemaV4, esquemaV5, esquemaV6, esquemaV7, esquemaV8, esquemaV9])
   // O rodapé acompanha o que a proposta promete: com economia, o aviso das estimativas; sem ela, o da geração.
   .refine((d) => d.rodape === rodapeDaProposta(d.sistema.geracao != null, economiaDaEmissao(d) != null), {
     path: ["rodape"],
     message: "Rodapé não confere com a proposta.",
   })
-  .refine(mensalConfere, { path: ["mensal"], message: "Geração mês a mês não confere com a geração da proposta." });
+  .refine(mensalConfere, { path: ["mensal"], message: "Geração mês a mês não confere com a geração da proposta." })
+  .refine(textosConferem, { path: ["textosEconomia"], message: "Os textos da economia acompanham a economia." });
 
 /** Qualquer versão já emitida (leitura). */
 export type DadosEmissaoSimples = z.infer<typeof esquemaDadosEmissaoSimples>;
 /** O que uma emissão nova grava. */
-export type DadosEmissaoAtual = z.infer<typeof esquemaV8>;
+export type DadosEmissaoAtual = z.infer<typeof esquemaV9>;
 
 /** JSON canônico (chaves ordenadas): o mesmo conteúdo gera sempre os mesmos bytes, não importa a ordem do jsonb. */
 export function jsonCanonico(valor: unknown): string {
@@ -562,7 +594,7 @@ export function montarDadosEmissaoSimples(e: EntradaEmissaoSimples): ResultadoMo
       : { geracaoKwh: geracaoMensal, consumoKwh: Array<number>(12).fill(e.consumoMedioKwhNegocio!), consumoOrigem: "media" as const }
     : null;
   const candidato = {
-    esquema: 8 as const,
+    esquema: 9 as const,
     cliente: { nome: e.contatoNome!.trim(), endereco: e.contatoEndereco?.trim() || null },
     sistema: {
       kitNome: nomeKitPersonalizado(
@@ -589,13 +621,21 @@ export function montarDadosEmissaoSimples(e: EntradaEmissaoSimples): ResultadoMo
     emissao: { versao: e.versao, emitidaEm: e.emitidaEm },
     economia: e.economia ?? null,
     mensal,
+    // Textos do esquema 9, só com economia: o ano da emissão destaca o Fio B do ano; a frase usa a menor parcela.
+    textosEconomia: e.economia
+      ? {
+          fioB: { anoEmissao: Number(e.emitidaEm.slice(0, 4)), anos: ANOS_FIO_B_PROPOSTA.map((a) => ({ ...a })) },
+          parcelaEconomia: fraseParcelaEconomia(condicoes.condicoes, e.economia.economiaMensal),
+        }
+      : null,
     rodape: rodapeDaProposta(sistema.geracao != null, e.economia != null),
   };
-  const analisado = esquemaV8.safeParse(candidato);
+  const analisado = esquemaV9.safeParse(candidato);
   if (
     !analisado.success ||
     analisado.data.rodape !== rodapeDaProposta(analisado.data.sistema.geracao != null, analisado.data.economia != null) ||
-    !mensalConfere(analisado.data)
+    !mensalConfere(analisado.data) ||
+    !textosConferem(analisado.data)
   )
     return { ok: false, pendencias: ["Os dados do negócio não passaram na conferência da proposta. Revise o kit e o cliente."] };
   return { ok: true, dados: analisado.data };
