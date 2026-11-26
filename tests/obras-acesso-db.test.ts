@@ -544,6 +544,7 @@ describe("operacao: dados pessoais do cliente (obras_operacao)", () => {
     "cliente_rg",
     "cliente_telefone",
     "cliente_telefone2",
+    "concessionaria_id",
     "created_at",
     "empresa_id",
     "numero",

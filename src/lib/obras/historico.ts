@@ -41,6 +41,7 @@ const ROTULO_TIPO: Record<string, string> = {
   marco_alterado: "Marco alterado",
   fixacao_definida: "Fixação do telhado",
   checklist_engenharia_aplicado: "Checklist aplicado",
+  concessionaria_obra_alterada: "Concessionária alterada",
   documento_engenharia_enviado: "Documento anexado",
   item_engenharia_alterado: "Item do checklist",
   protocolo_engenharia_registrado: "Protocolo registrado",
@@ -256,6 +257,12 @@ function descrever(linha: LinhaHistoricoObra, nomes: ReadonlyMap<string, string>
       const versao = ler(dados, "versao");
       const nome = typeof item === "string" && item.trim() ? item.trim() : "Item do checklist";
       return typeof versao === "number" ? `${nome}: versão ${versao}` : nome;
+    }
+    case "concessionaria_obra_alterada": {
+      const de = ler(dados, "de");
+      const para = ler(dados, "para");
+      const nome = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
+      return `${nome(de) ?? "sem concessionária"} → ${nome(para) ?? "sem concessionária"}`;
     }
     case "item_engenharia_alterado": {
       const item = ler(dados, "item");
