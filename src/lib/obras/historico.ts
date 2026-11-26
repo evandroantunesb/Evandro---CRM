@@ -262,7 +262,8 @@ function descrever(linha: LinhaHistoricoObra, nomes: ReadonlyMap<string, string>
       const de = ler(dados, "de");
       const para = ler(dados, "para");
       const nome = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
-      return `${nome(de) ?? "sem concessionária"} → ${nome(para) ?? "sem concessionária"}`;
+      const troca = `${nome(de) ?? "sem concessionária"} → ${nome(para) ?? "sem concessionária"}`;
+      return ler(dados, "checklist_trocado") === true ? `${troca}, checklist trocado` : troca;
     }
     case "item_engenharia_alterado": {
       const item = ler(dados, "item");
@@ -274,7 +275,9 @@ function descrever(linha: LinhaHistoricoObra, nomes: ReadonlyMap<string, string>
     // Número do protocolo e texto da distribuidora não aparecem (o histórico é visto por quem vê a obra).
     case "protocolo_engenharia_registrado": {
       const distribuidora = ler(dados, "distribuidora");
-      const canal = rotulo(ROTULO_CANAL_PROTOCOLO, ler(dados, "canal"));
+      // Protocolos antigos: código (pew...); novos: o nome do canal da concessionária (20261224100000).
+      const codigo = ler(dados, "canal");
+      const canal = rotulo(ROTULO_CANAL_PROTOCOLO, codigo) ?? (typeof codigo === "string" && codigo.trim() ? codigo.trim() : null);
       const nome = typeof distribuidora === "string" && distribuidora.trim() ? distribuidora.trim() : "Distribuidora";
       return canal ? `${nome}, via ${canal}` : nome;
     }

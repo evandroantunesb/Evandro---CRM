@@ -21,6 +21,11 @@ vi.mock("@/lib/sessao", () => ({
 }));
 vi.mock("@/lib/supabase/server", () => ({ criarClienteServidor: async () => sessao.cliente }));
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
+vi.mock("next/navigation", () => ({
+  redirect: (url: string) => {
+    throw new Error(`redirect ${url}`);
+  },
+}));
 
 function comoAdmin() {
   sessao.cliente = admin.cliente;
@@ -418,5 +423,97 @@ describe("Concessionárias: checklist e prazos por concessionária (ordem import
     expect(error).toBeNull();
     expect(data as unknown as { distribuidora: string; obras: number }[]).toContainEqual({ distribuidora: d.distribuidora, obras: 1 });
     expect((await vendedor.cliente.rpc("obras_sem_concessionaria_por_distribuidora" as never, { p_empresa_id: empresa } as never)).error).not.toBeNull();
+  });
+
+  it("tela: lê as concessionárias com a sigla, os canais por ordem e se a obra já teve envio", async () => {
+    const { carregarCanais, carregarConcessionarias, checklistEnviado } = await import("@/lib/engenharia-concessionaria");
+    const cliente = coordEng.cliente as unknown as SupabaseServidor;
+    const lista = await carregarConcessionarias(cliente, empresa);
+    expect(lista).toContainEqual({ id: copelA, nome: "Copel", distribuidora: "COPEL-DIS" });
+    const canais = await carregarCanais(cliente, { empresaId: empresa, concessionariaId: copelA });
+    expect(canais.map((c) => c.nome)).toEqual(["PEW", "Site da Copel", "CAW", "Atendimento comercial"]);
+    expect(canais[0]).toMatchObject({ ordem: 10, ativo: true, tensoes: ["baixa"] });
+    expect(await checklistEnviado(cliente, obraCopel)).toBe(true);
+  });
+
+  it("tela: o admin cria concessionária (cópia da Copel), renomeia e cadastra canal; quem coordena salva os prazos", async () => {
+    const { criarConcessionaria, renomearConcessionaria, salvarCanal, salvarPrazosConcessionaria } = await import(
+      "@/app/(app)/configuracoes/engenharia/acoes-concessionarias"
+    );
+    const [{ distribuidora: sigla }] = await noBanco(
+      "select distinct t.distribuidora from public.tarifas_gd_aneel t where not exists (select 1 from public.concessionarias c where c.empresa_id = $1 and c.distribuidora = t.distribuidora) order by 1 limit 1",
+      [empresa],
+    );
+    comoAdmin();
+    await expect(criarConcessionaria(null, formulario({ nome: "Pela tela", distribuidora: sigla, base: "copel" }))).rejects.toThrow(
+      /redirect \/configuracoes\/engenharia\?c=[0-9a-f-]{36}/,
+    );
+    const [nova] = await noBanco("select id from public.concessionarias where empresa_id = $1 and distribuidora = $2", [empresa, sigla]);
+    const [{ n }] = await noBanco("select count(*)::int as n from public.concessionaria_canais where concessionaria_id = $1", [nova.id]);
+    expect(n).toBe(4);
+    expect(await criarConcessionaria(null, formulario({ nome: "Outra", distribuidora: sigla, base: "vazia" }))).toEqual({
+      ok: false,
+      mensagem: "Esta distribuidora já tem concessionária na empresa.",
+    });
+
+    expect(await renomearConcessionaria(null, formulario({ id: nova.id, nome: "Renomeada pela tela" }))).toEqual({ ok: true, mensagem: "Nome salvo." });
+
+    const canal = (campos: Record<string, string>, tipos: string[] = [], tensoes: string[] = []) => {
+      const fd = formulario({ concessionariaId: nova.id, ordem: "50", ativo: "on", ...campos });
+      for (const t of tipos) fd.append("tipos", t);
+      for (const t of tensoes) fd.append("tensoes", t);
+      return salvarCanal(null, fd);
+    };
+    expect(await canal({ nome: "Agência virtual" }, ["voo"])).toEqual({ ok: false, mensagem: "Tipo de solicitação inválido." });
+    expect(await canal({ nome: "Agência virtual" }, ["ligacao_nova"], ["alta"])).toEqual({ ok: false, mensagem: "Tensão inválida." });
+    expect(await canal({ nome: "outro" })).toEqual({ ok: false, mensagem: 'Use outro nome: "Outro" já é a opção fixa do protocolo.' });
+    expect(await canal({ nome: "pew" })).toEqual({ ok: false, mensagem: "Já existe um canal com esse nome." });
+    expect(await canal({ nome: "Agência virtual" }, ["troca_titularidade"])).toEqual({ ok: true, mensagem: "Canal salvo." });
+    const [criado] = await noBanco("select id, tipos, ativo from public.concessionaria_canais where concessionaria_id = $1 and nome = 'Agência virtual'", [nova.id]);
+    expect(criado).toMatchObject({ tipos: ["troca_titularidade"], ativo: true });
+    expect(await canal({ id: criado.id, nome: "Agência virtual", ativo: "" })).toEqual({ ok: true, mensagem: "Canal salvo." });
+    const [desativado] = await noBanco("select ativo from public.concessionaria_canais where id = $1", [criado.id]);
+    expect(desativado.ativo).toBe(false);
+
+    sessao.cliente = coordEng.cliente;
+    sessao.atual = { empresaId: empresa, membroId: membro[coordEng.id], papel: "operacao" };
+    const prazos = formulario({
+      concessionariaId: nova.id,
+      distribuidora_analise: "12",
+      distribuidora_analise_contagem: "uteis",
+      distribuidora_analise_rural: "",
+      distribuidora_analise_rural_contagem: "corridos",
+      distribuidora_vistoria: "7",
+      distribuidora_vistoria_contagem: "uteis",
+      distribuidora_conexao: "",
+      distribuidora_conexao_contagem: "uteis",
+    });
+    expect(await salvarPrazosConcessionaria(null, prazos)).toEqual({ ok: true, mensagem: "Prazos salvos." });
+    const gravados = await noBanco(
+      "select chave, dias_uteis, contagem from public.concessionaria_prazos where concessionaria_id = $1 order by chave",
+      [nova.id],
+    );
+    expect(gravados).toEqual([
+      { chave: "distribuidora_analise", dias_uteis: 12, contagem: "uteis" },
+      { chave: "distribuidora_analise_rural", dias_uteis: null, contagem: "corridos" },
+      { chave: "distribuidora_conexao", dias_uteis: null, contagem: "uteis" },
+      { chave: "distribuidora_vistoria", dias_uteis: 7, contagem: "uteis" },
+    ]);
+  });
+
+  it("tela: a ação do protocolo aceita o nome de um canal da concessionária", async () => {
+    const { registrarProtocoloEngenharia } = await import("@/lib/acoes/engenharia");
+    const obra = await criarVenda(empresa, `Canal pela tela ${sufixo}`, "Copel");
+    ok(await admin.cliente.rpc("aplicar_checklist_engenharia", { p_obra_id: obra }), "checklist");
+    const { data: itens } = await servico.from("obra_engenharia_itens").select("id").eq("obra_id", obra).eq("obrigatorio", true);
+    for (const i of itens!) ok(await admin.cliente.rpc("alterar_item_engenharia", { p_item_id: i.id, p_status: "dispensado", p_motivo: "Teste" }), "dispensar");
+    comoAdmin();
+    const r = await registrarProtocoloEngenharia(
+      null,
+      formulario({ obraId: obra, distribuidora: "Copel", canal: "Site da Copel", numero: `TL-${sufixo}`, tipoSolicitacao: "troca_titularidade", protocoladoEm: "2026-11-20" }),
+    );
+    expect(r?.ok).toBe(true);
+    const [p] = await noBanco("select canal from public.obra_engenharia_protocolos where obra_id = $1", [obra]);
+    expect(p.canal).toBe("Site da Copel");
   });
 });

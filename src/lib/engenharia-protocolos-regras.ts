@@ -11,6 +11,11 @@ export const ROTULO_CANAL: Record<(typeof CANAIS_PROTOCOLO)[number], string> = {
   outro: "Outro",
 };
 
+/** Protocolos antigos guardam o código (pew, caw, atendimento, outro); os novos, o nome do canal da concessionária. */
+export function rotuloCanal(canal: string): string {
+  return Object.hasOwn(ROTULO_CANAL, canal) ? ROTULO_CANAL[canal as keyof typeof ROTULO_CANAL] : canal;
+}
+
 /** Os mesmos tipos do enquadramento (a RPC valida pela mesma lista). */
 export const TIPOS_SOLICITACAO = [
   "nova_conexao",

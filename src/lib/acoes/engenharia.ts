@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { CHAVES_PERGUNTA, respostaValida } from "@/lib/engenharia-enquadramento-regras";
 import { ACOES_PASSO, ehPassoComRegistro } from "@/lib/engenharia-passos-regras";
-import { CANAIS_PROTOCOLO, CATEGORIAS_EXIGENCIA, TIPOS_RESPOSTA, TIPOS_SOLICITACAO } from "@/lib/engenharia-protocolos-regras";
+import { CATEGORIAS_EXIGENCIA, TIPOS_RESPOSTA, TIPOS_SOLICITACAO } from "@/lib/engenharia-protocolos-regras";
 import { TIPOS_REGISTRO_VISTORIA } from "@/lib/engenharia-vistoria-regras";
 import { mensagemErro } from "@/lib/erros";
 import { ENGENHARIA } from "@/lib/permissoes";
@@ -96,7 +96,8 @@ const vazioComoNada = (v: unknown) => (typeof v === "string" && v.trim() === "" 
 
 const esquemaProtocolo = comObra.extend({
   distribuidora: z.string().trim().min(2, "Informe a distribuidora.").max(60),
-  canal: z.enum(CANAIS_PROTOCOLO, { error: "Escolha o canal." }),
+  // Nome de um canal da concessionária da obra ou "outro" (20261224100000); a RPC confere.
+  canal: z.string().trim().min(1, "Escolha o canal.").max(60, "Canal inválido."),
   numero: z.string().trim().min(1, "Informe o número do protocolo.").max(60, "Número muito longo."),
   tipoSolicitacao: z.enum(TIPOS_SOLICITACAO, { error: "Escolha o tipo de solicitação." }),
   protocoladoEm: data,

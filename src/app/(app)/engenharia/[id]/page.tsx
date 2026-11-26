@@ -15,7 +15,7 @@ import { ListaTarefasSetor, NovaTarefaSetor } from "@/components/tarefas-setor";
 import { Cartao, CartaoRecolhivel, Selo } from "@/components/ui";
 import { formatarDataHora } from "@/lib/crm";
 import { carregarChecklistEngenharia } from "@/lib/engenharia-checklist";
-import { carregarConcessionarias } from "@/lib/engenharia-concessionaria";
+import { carregarCanais, carregarConcessionarias } from "@/lib/engenharia-concessionaria";
 import { carregarEnquadramento } from "@/lib/engenharia-enquadramento";
 import { enquadramentoCompleto, perguntasSemResposta } from "@/lib/engenharia-enquadramento-regras";
 import { carregarRegistrosPassos } from "@/lib/engenharia-passos";
@@ -100,6 +100,7 @@ export default async function CardEngenharia({ params }: PageProps<"/engenharia/
   });
   // Concessionária da obra (entrega 2 do item 6): sem ela, aviso e checklist bloqueado.
   const concessionaria = concessionarias.find((c) => c.id === obra.concessionariaId) ?? null;
+  const canais = concessionaria ? await carregarCanais(supabase, { empresaId: atual.empresaId, concessionariaId: concessionaria.id }) : [];
   const local = [resumo.cidade, resumo.uf].filter(Boolean).join("/");
   // Linha do topo no lugar do antigo cartão "Resumo"; o resto da venda fica em "Dados da venda".
   const linhaObra = [
@@ -282,6 +283,7 @@ export default async function CardEngenharia({ params }: PageProps<"/engenharia/
             enquadramento={enquadramento}
             podeEditar={autorizacaoEngenharia !== null && resumo.situacao !== "cancelada"}
             kit={{ potenciaKwp: obra.tecnico.potenciaKwp, inversores: inversoresKit || null }}
+            concessionaria={concessionaria && { nome: concessionaria.nome, canais }}
           />
           {semResposta.length > 0 && semResposta.length < 9 && (
             <p className="text-sm text-zinc-600">Sem resposta: {semResposta.join(", ")}.</p>
