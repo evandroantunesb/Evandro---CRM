@@ -15,9 +15,9 @@ import { ListaTarefasSetor, NovaTarefaSetor } from "@/components/tarefas-setor";
 import { Cartao, CartaoRecolhivel, Selo } from "@/components/ui";
 import { formatarDataHora } from "@/lib/crm";
 import { carregarChecklistEngenharia } from "@/lib/engenharia-checklist";
-import { carregarCanais, carregarConcessionarias } from "@/lib/engenharia-concessionaria";
+import { carregarCanais, carregarConcessionarias, checklistEnviado, concessionariaDoChecklist } from "@/lib/engenharia-concessionaria";
 import { carregarEnquadramento } from "@/lib/engenharia-enquadramento";
-import { enquadramentoCompleto, perguntasSemResposta } from "@/lib/engenharia-enquadramento-regras";
+import { canalSugerido, enquadramentoCompleto, perguntasSemResposta } from "@/lib/engenharia-enquadramento-regras";
 import { carregarRegistrosPassos } from "@/lib/engenharia-passos";
 import { acoesPasso, montarPassosEngenharia, passoAtual, type PassoComRegistro } from "@/lib/engenharia-passos-regras";
 import { carregarObraRede } from "@/lib/engenharia-obra-rede";
@@ -100,7 +100,16 @@ export default async function CardEngenharia({ params }: PageProps<"/engenharia/
   });
   // Concessionária da obra (entrega 2 do item 6): sem ela, aviso e checklist bloqueado.
   const concessionaria = concessionarias.find((c) => c.id === obra.concessionariaId) ?? null;
-  const canais = concessionaria ? await carregarCanais(supabase, { empresaId: atual.empresaId, concessionariaId: concessionaria.id }) : [];
+  const [canais, enviado, origemChecklist] = await Promise.all([
+    concessionaria ? carregarCanais(supabase, { empresaId: atual.empresaId, concessionariaId: concessionaria.id }) : [],
+    checklist.length > 0 ? checklistEnviado(supabase, id) : false,
+    checklist.length > 0 ? concessionariaDoChecklist(supabase, id) : null,
+  ]);
+  // Regra 7: trocar a concessionária troca o checklist só se nada foi enviado.
+  const regraChecklist = checklist.length === 0 ? "sem" : enviado ? "fica" : "trocavel";
+  const checklistAnterior =
+    origemChecklist && origemChecklist !== obra.concessionariaId ? (concessionarias.find((c) => c.id === origemChecklist)?.nome ?? null) : null;
+  const canalDoEnquadramento = canalSugerido(canais, enquadramento?.respostas ?? null)?.nome ?? null;
   const local = [resumo.cidade, resumo.uf].filter(Boolean).join("/");
   // Linha do topo no lugar do antigo cartão "Resumo"; o resto da venda fica em "Dados da venda".
   const linhaObra = [
@@ -232,6 +241,7 @@ export default async function CardEngenharia({ params }: PageProps<"/engenharia/
         opcoes={concessionarias}
         podeEditar={autorizacaoEngenharia !== null && resumo.situacao !== "cancelada"}
         distribuidoraNegocio={obra.tecnico.distribuidora}
+        checklist={regraChecklist}
       />
 
       <CartaoRecolhivel titulo="Dados da venda" resumo={resumoVenda || "Kit, potência, equipamentos e cliente"}>
@@ -320,6 +330,7 @@ export default async function CardEngenharia({ params }: PageProps<"/engenharia/
           cancelada={resumo.situacao === "cancelada"}
           veDocumentos={autorizacaoEngenharia !== null}
           semConcessionaria={!concessionaria}
+          deOutraConcessionaria={checklistAnterior}
         />
       </SecaoPasso>
 
@@ -337,6 +348,8 @@ export default async function CardEngenharia({ params }: PageProps<"/engenharia/
             podeAgir={resumo.situacao !== "cancelada"}
             pendentesChecklist={pendentesChecklist}
             distribuidoraSugerida={concessionaria?.nome ?? ""}
+            canais={canais.filter((c) => c.ativo).map((c) => c.nome)}
+            canalSugerido={canalDoEnquadramento}
           />
         ) : (
           <p className="text-sm text-zinc-500">O protocolo é visto por quem atua na Engenharia da obra.</p>

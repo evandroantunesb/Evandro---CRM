@@ -516,4 +516,12 @@ describe("Concessionárias: checklist e prazos por concessionária (ordem import
     const [p] = await noBanco("select canal from public.obra_engenharia_protocolos where obra_id = $1", [obra]);
     expect(p.canal).toBe("Site da Copel");
   });
+
+  it("tela: diz de qual concessionária veio o checklist já aplicado", async () => {
+    const { concessionariaDoChecklist } = await import("@/lib/engenharia-concessionaria");
+    const cliente = coordEng.cliente as unknown as SupabaseServidor;
+    expect(await concessionariaDoChecklist(cliente, obraCopel)).toBe(copelA);
+    const semChecklist = await criarVenda(empresa, `Sem checklist ${sufixo}`, "Copel");
+    expect(await concessionariaDoChecklist(cliente, semChecklist)).toBeNull();
+  });
 });

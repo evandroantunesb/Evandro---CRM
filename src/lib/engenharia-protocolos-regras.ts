@@ -3,8 +3,8 @@
  * rótulos e quais registros cabem em cada situação. Espelham a RPC, que confere de novo.
  */
 
-export const CANAIS_PROTOCOLO = ["pew", "caw", "atendimento", "outro"] as const;
-export const ROTULO_CANAL: Record<(typeof CANAIS_PROTOCOLO)[number], string> = {
+/** Códigos dos canais gravados antes dos canais por concessionária (20261224100000); "outro" continua valendo. */
+export const ROTULO_CANAL: Record<"pew" | "caw" | "atendimento" | "outro", string> = {
   pew: "PEW (portal da Copel)",
   caw: "CAW",
   atendimento: "Atendimento comercial",

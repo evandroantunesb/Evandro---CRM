@@ -20,6 +20,7 @@ export function ConcessionariaDaObra({
   opcoes,
   podeEditar,
   distribuidoraNegocio,
+  checklist,
 }: {
   obraId: string;
   atual: Opcao | null;
@@ -27,6 +28,8 @@ export function ConcessionariaDaObra({
   podeEditar: boolean;
   /** Texto da distribuidora informado no negócio, para explicar o aviso. */
   distribuidoraNegocio: string | null;
+  /** Regra 7: sem checklist aplicado, checklist que troca (nada enviado) ou que fica (já houve envio). */
+  checklist: "sem" | "trocavel" | "fica";
 }) {
   const [trocando, setTrocando] = useState(false);
 
@@ -63,7 +66,13 @@ export function ConcessionariaDaObra({
           obraId={obraId}
           opcoes={opcoes.filter((o) => o.id !== atual.id)}
           rotulo="Trocar para"
-          observacao="O checklist que já está na obra continua o mesmo."
+          observacao={(nome) =>
+            checklist === "trocavel"
+              ? `Nenhum documento foi enviado: o checklist da obra será trocado pelo da ${nome}.`
+              : checklist === "fica"
+                ? `Esta obra já tem documento enviado: o checklist continua o da ${atual.nome}. Ajuste os itens à mão, se precisar.`
+                : null
+          }
           aoCancelar={() => setTrocando(false)}
           aoSalvar={() => setTrocando(false)}
         />
@@ -83,11 +92,15 @@ function Seletor({
   obraId: string;
   opcoes: Opcao[];
   rotulo: string;
-  observacao?: string;
+  /** Texto sob o seletor, conforme a concessionária escolhida (nulo até escolher). */
+  observacao?: (nome: string) => string | null;
   aoCancelar?: () => void;
   aoSalvar?: () => void;
 }) {
   const [resultado, acao, pendente] = useActionState(definirConcessionariaObra, null);
+  const [escolhida, setEscolhida] = useState("");
+  const nomeEscolhida = opcoes.find((o) => o.id === escolhida)?.nome ?? null;
+  const texto = nomeEscolhida && observacao ? observacao(nomeEscolhida) : null;
   useEffect(() => {
     if (resultado?.ok) aoSalvar?.();
   }, [resultado, aoSalvar]);
@@ -99,7 +112,7 @@ function Seletor({
       <div className="flex flex-wrap items-end gap-2">
         <label className="flex min-w-48 flex-1 flex-col gap-1 text-xs text-zinc-600">
           {rotulo}
-          <select name="concessionariaId" required defaultValue="" className={CLASSE_ENTRADA}>
+          <select name="concessionariaId" required value={escolhida} onChange={(e) => setEscolhida(e.target.value)} className={CLASSE_ENTRADA}>
             <option value="" disabled>
               Escolha…
             </option>
@@ -119,7 +132,7 @@ function Seletor({
           </Botao>
         )}
       </div>
-      {observacao && <p className="text-xs text-zinc-600">{observacao}</p>}
+      {texto && <p className="rounded-md bg-superficie-2 px-3 py-2 text-xs text-texto">{texto}</p>}
       {resultado && !resultado.ok && <Mensagem resultado={resultado} />}
     </form>
   );

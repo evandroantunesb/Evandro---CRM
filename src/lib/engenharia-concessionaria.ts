@@ -38,3 +38,20 @@ export async function checklistEnviado(supabase: SupabaseServidor, obraId: strin
   if (error) throw error;
   return data === true;
 }
+
+/**
+ * Concessionária de onde veio o checklist já aplicado à obra (pelo modelo dos itens); nula sem checklist. Diferente da
+ * concessionária da obra quando ela foi trocada depois de algum envio (regra 7): a tela avisa.
+ */
+export async function concessionariaDoChecklist(supabase: SupabaseServidor, obraId: string): Promise<string | null> {
+  const { data: item, error } = await supabase.from("obra_engenharia_itens").select("modelo_id").eq("obra_id", obraId).limit(1).maybeSingle();
+  if (error) throw error;
+  if (!item?.modelo_id) return null;
+  const { data: modelo, error: erroModelo } = await supabase
+    .from("engenharia_checklist_modelo")
+    .select("concessionaria_id")
+    .eq("id", item.modelo_id)
+    .maybeSingle();
+  if (erroModelo) throw erroModelo;
+  return modelo?.concessionaria_id ?? null;
+}
