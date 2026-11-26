@@ -15,7 +15,10 @@ import type { BaseFicticia } from "./base-ficticia";
  * independente da data real; a emissão volta ao relógio real (o banco exige `emitida_em` perto do `now()` dele).
  * Caso numérico (22/10/2026: vigência da REH 3.592, 2026 → 60%): Copel residencial B1, bifásico
  * (D = 50 kWh), consumo 500 kWh, 5 × 500 W = 2,5 kWp × 120 = 300 kWh, T = 0,76802 (TE + TUSD, sem tributos).
- * Conta sem solar 384,01; com solar 192,22; economia 191,79; payback indisponível.
+ * Método v2 (premissas aprovadas em 24/11/2026): tributos por dentro (ICMS 19% + PIS/Cofins 7,63% → T = 1,046777),
+ * autoconsumo padrão residencial de 30% e perda de 1% no 1º ano (geração do 1º mês 297 kWh, autoconsumo 89,1 kWh).
+ * Conta sem solar 500 × T = 523,39; com solar (410,9 − 207,9) × T + 207,9 × 60% × Fio B com tributos = 248,97;
+ * economia 274,42; payback só ao salvar (investimento = valor do negócio, R$ 19.900).
  */
 
 let base: BaseFicticia;
@@ -107,14 +110,15 @@ test.describe("calculadora GD II integrada", () => {
     await expect(page.getByLabel("Base tributária da tarifa")).toHaveValue("sem_tributos");
     await expect(page.getByTestId("tarifa-origem")).toContainText("Em uso.");
 
-    // Prévia completa: contas, economia, payback indisponível, hipótese visível, limitações e detalhes recolhidos.
+    // Prévia completa: contas com tributos, economia, payback só ao salvar, limitações e detalhes recolhidos.
     const previa = page.getByTestId("previa-sistema");
     await expect(previa).toContainText("300 kWh/mês");
-    await expect(previa).toContainText(/R\$\s384,01\/mês/);
-    await expect(previa).toContainText(/R\$\s192,22\/mês/);
-    await expect(page.getByTestId("previa-economia")).toHaveText(/^R\$\s191,79\/mês$/);
-    await expect(page.getByTestId("previa-payback")).toHaveText("indisponível");
-    await expect(page.getByTestId("hipotese-autoconsumo")).toContainText("autoconsumo simultâneo considerado zero");
+    await expect(previa).toContainText(/R\$\s523,39\/mês/);
+    await expect(previa).toContainText(/R\$\s248,97\/mês/);
+    await expect(page.getByTestId("previa-economia")).toHaveText(/^R\$\s274,42\/mês$/);
+    await expect(page.getByTestId("previa-payback")).toHaveText("aparece ao salvar o kit");
+    // A hipótese de autoconsumo zero é só do método anterior.
+    await expect(page.getByTestId("hipotese-autoconsumo")).toHaveCount(0);
     // Premissas presumidas sempre visíveis (fora do bloco recolhido); tarifa oficial: sem aviso de tarifa informada.
     await expect(page.getByTestId("premissas-presumidas")).toHaveText(
       "Presumido (confira na conta do cliente): tarifa convencional presumida (não tarifa branca); bifásico considerado a três condutores (custo de disponibilidade de 50 kWh).",
@@ -132,16 +136,23 @@ test.describe("calculadora GD II integrada", () => {
     const { data: linha } = await n.cliente
       .from("calculos_solares")
       .select(
-        "estado_financeiro, conta_sem_solar, conta_com_solar, economia_mensal, payback_meses, tarifa_kwh, tarifa_base_tributaria, tarifa_origem, fio_b_rs_mwh, percentual_legal_fio_b, disponibilidade_kwh, tipo_ligacao, financeiro_desatualizado_em, data_referencia",
+        "estado_financeiro, metodo_calculo, conta_sem_solar, conta_com_solar, economia_mensal, payback_meses, payback_motivo, icms, pis_cofins, autoconsumo_fracao, preco_inversor, tarifa_kwh, tarifa_base_tributaria, tarifa_origem, fio_b_rs_mwh, percentual_legal_fio_b, disponibilidade_kwh, tipo_ligacao, financeiro_desatualizado_em, data_referencia",
       )
       .eq("negocio_id", n.id)
       .single();
     expect(linha).toEqual({
       estado_financeiro: "completo",
-      conta_sem_solar: 384.01,
-      conta_com_solar: 192.22,
-      economia_mensal: 191.79,
+      metodo_calculo: "gd2_piso_655i_v2",
+      conta_sem_solar: 523.39,
+      conta_com_solar: 248.97,
+      economia_mensal: 274.42,
+      // O kit do teste não tem inversor: sem preço para a troca no ano 12, o payback fica sem número (com o motivo).
       payback_meses: null,
+      payback_motivo: "inversor_sem_preco",
+      icms: 0.19,
+      pis_cofins: 0.0763,
+      autoconsumo_fracao: 0.3,
+      preco_inversor: null,
       tarifa_kwh: 0.76802,
       tarifa_base_tributaria: "sem_tributos",
       tarifa_origem: "oficial_aneel",
@@ -156,9 +167,14 @@ test.describe("calculadora GD II integrada", () => {
     // Reabrir: o resultado salvo é o atual.
     await page.reload();
     await expect(page.getByTestId("resultado-atual")).toBeVisible();
-    await expect(page.getByTestId("economia-salva")).toHaveText(/^R\$\s191,79\/mês$/);
+    await expect(page.getByTestId("numeros-kit")).toContainText(/R\$\s523,39/);
+    await expect(page.getByTestId("numeros-kit")).toContainText(/R\$\s248,97/);
+    await expect(page.getByTestId("economia-salva")).toHaveText(/^R\$\s274,42$/);
     await expect(page.getByTestId("payback-salvo")).toHaveText("indisponível");
-    await expect(page.getByTestId("hipotese-autoconsumo")).toBeVisible();
+    await expect(page.getByTestId("payback-motivo")).toContainText("O inversor do kit não tem preço na tabela de preços");
+    await expect(page.getByTestId("premissas-projecao")).toContainText("autoconsumo de 30%");
+    await expect(page.getByTestId("projecao-25-anos")).toBeVisible();
+    await expect(page.getByTestId("hipotese-autoconsumo")).toHaveCount(0);
     await expect(page.getByTestId("detalhes-tecnicos")).not.toHaveAttribute("open", "");
     await expect(page.getByTestId("calculo-historico")).toHaveCount(0);
     // Link antigo (proposta com conta e economia, D1/D2 congelados): sem link emitido, o cartão fica escondido.
@@ -179,7 +195,7 @@ test.describe("calculadora GD II integrada", () => {
     const v1 = emissoes![0]!;
     const html1 = await (await request.get(`/proposta/${v1.token}`)).text();
     expect(html1).toMatch(/Geração estimada<\/dt><dd[^>]*>300(<!-- -->)? kWh\/mês/); // o React separa número e unidade com um comentário
-    expect(html1).not.toContain("191,79");
+    expect(html1).not.toContain("274,42");
     const pdf1 = new Uint8Array(await (await request.get(`/proposta/${v1.token}/pdf`)).body());
     expect(sha256(pdf1)).toBe(v1.pdf_sha256);
 
@@ -204,7 +220,7 @@ test.describe("calculadora GD II integrada", () => {
     const { data: hist } = await n.cliente.from("calculos_solares_historico").select("motivo, linha").eq("negocio_id", n.id);
     expect(hist).toHaveLength(1);
     expect(hist![0]!.motivo).toBe("desatualizado_por_entradas");
-    expect(hist![0]!.linha).toMatchObject({ estado_financeiro: "completo", economia_mensal: 191.79, tarifa_base_tributaria: "sem_tributos" });
+    expect(hist![0]!.linha).toMatchObject({ estado_financeiro: "completo", economia_mensal: 274.42, tarifa_base_tributaria: "sem_tributos" });
 
     // Reabrir: nenhuma economia atual; a antiga só no histórico, marcada como desatualizada.
     await page.reload();
@@ -214,7 +230,7 @@ test.describe("calculadora GD II integrada", () => {
     await expect(historico).toContainText("desatualizado");
     await expect(historico).not.toHaveAttribute("open", "");
     await historico.locator("summary").click();
-    await expect(historico).toContainText(/R\$\s191,79\/mês/);
+    await expect(historico).toContainText(/R\$\s274,42/);
     await expect(historico).toContainText("não correspondem às entradas atuais e não entram em proposta");
 
     // A versão emitida continua exatamente a mesma (página e PDF).
@@ -256,7 +272,7 @@ test.describe("calculadora GD II integrada", () => {
     await expect(detalhes).toContainText("art. 291): 100 kWh");
     await page.getByLabel("Tipo de ligação").selectOption("bifasico");
     await expect(detalhes).toContainText("art. 291): 50 kWh");
-    await expect(page.getByTestId("previa-economia")).toHaveText(/^R\$\s191,79\/mês$/);
+    await expect(page.getByTestId("previa-economia")).toHaveText(/^R\$\s274,42\/mês$/);
   });
 
   test("relógio do servidor fora da vigência (10/05/2026): sem tarifa oficial, estimativa incompleta mesmo com tarifa e base", async ({ page }) => {
