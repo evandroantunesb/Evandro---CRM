@@ -1295,6 +1295,41 @@ export type Database = {
           },
         ];
       };
+      concessionarias: {
+        Row: {
+          created_at: string;
+          distribuidora: string;
+          empresa_id: string;
+          id: string;
+          nome: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          distribuidora: string;
+          empresa_id: string;
+          id?: string;
+          nome: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          distribuidora?: string;
+          empresa_id?: string;
+          id?: string;
+          nome?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "concessionarias_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       condicoes_pagamento_preferencias: {
         Row: {
           atualizado_por: string | null;
@@ -5684,6 +5719,7 @@ export type Database = {
           cancelamento_motivo: string | null;
           cidade: string | null;
           cliente_nome: string;
+          concessionaria_id: string | null;
           confirmacao_pagamento_id: string;
           contrato_id: string;
           created_at: string;
@@ -5713,6 +5749,7 @@ export type Database = {
           cancelamento_motivo?: string | null;
           cidade?: string | null;
           cliente_nome: string;
+          concessionaria_id?: string | null;
           confirmacao_pagamento_id: string;
           contrato_id: string;
           created_at?: string;
@@ -5742,6 +5779,7 @@ export type Database = {
           cancelamento_motivo?: string | null;
           cidade?: string | null;
           cliente_nome?: string;
+          concessionaria_id?: string | null;
           confirmacao_pagamento_id?: string;
           contrato_id?: string;
           created_at?: string;
@@ -5766,6 +5804,13 @@ export type Database = {
           vendedor_id?: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "obras_concessionaria_fk";
+            columns: ["empresa_id", "concessionaria_id"];
+            isOneToOne: false;
+            referencedRelation: "concessionarias";
+            referencedColumns: ["empresa_id", "id"];
+          },
           {
             foreignKeyName: "obras_confirmacao_pagamento_id_fkey";
             columns: ["confirmacao_pagamento_id"];
@@ -7707,6 +7752,10 @@ export type Database = {
       compartilha_empresa: { Args: { p_user_id: string }; Returns: boolean };
       compartilha_empresa_comercial: { Args: { p_user_id: string }; Returns: boolean };
       compartilha_empresa_identidade: { Args: { p_user_id: string }; Returns: boolean };
+      concessionaria_do_negocio: {
+        Args: { p_distribuidora: string; p_empresa_id: string };
+        Returns: string;
+      };
       concluir_engenharia_sem_conexao: {
         Args: { p_motivo: string; p_obra_id: string };
         Returns: undefined;
@@ -7973,6 +8022,10 @@ export type Database = {
       };
       definir_atendimento_compras: {
         Args: { p_empresa_id: string; p_setor?: Database["public"]["Enums"]["setor_obra"] };
+        Returns: undefined;
+      };
+      definir_concessionaria_obra: {
+        Args: { p_concessionaria_id: string; p_obra_id: string };
         Returns: undefined;
       };
       definir_entrega_material_prevista: {
@@ -8408,6 +8461,7 @@ export type Database = {
       iniciar_atuacao_engenharia: { Args: { p_obra_id: string }; Returns: string };
       iniciar_compra_obra: { Args: { p_obra_id: string }; Returns: undefined };
       inserir_checklist_engenharia_padrao: { Args: { p_empresa_id: string }; Returns: undefined };
+      inserir_concessionaria_copel: { Args: { p_empresa_id: string }; Returns: undefined };
       inserir_fixacoes_telhado_padrao: { Args: { p_empresa_id: string }; Returns: undefined };
       inserir_prazos_engenharia_padrao: { Args: { p_empresa_id: string }; Returns: undefined };
       inserir_prazos_etapas_obra_padrao: { Args: { p_empresa_id: string }; Returns: undefined };
@@ -8547,6 +8601,7 @@ export type Database = {
           setor: Database["public"]["Enums"]["setor_obra"];
         }[];
       };
+      normalizar_nome_distribuidora: { Args: { p: string }; Returns: string };
       notificar_aviso_pagamento: {
         Args: { p_aviso: Database["public"]["Tables"]["avisos_pagamento"]["Row"]; p_tipo: string };
         Returns: undefined;
