@@ -10,4 +10,17 @@ describe("histórico: concessionária da obra (20261223100000_concessionarias.sq
     );
     expect(textos).toEqual(expect.arrayContaining(["Concessionária alterada: sem concessionária → Copel", "Concessionária alterada: Copel → Cemig"]));
   });
+
+  it("diz quando o checklist foi trocado junto (regra 7)", () => {
+    const [item] = montarHistorico([linha({ de: "Copel", para: "Cemig", checklist_trocado: true })], new Map());
+    expect(item.descricao).toBe("Copel → Cemig, checklist trocado");
+  });
+
+  it("protocolo registrado com o nome do canal da concessionária", () => {
+    const [item] = montarHistorico(
+      [{ created_at: "2026-11-26T12:00:00Z", tipo: "protocolo_engenharia_registrado", setor: "engenharia", dados: { distribuidora: "Cemig", canal: "Agência virtual" }, autor_membro_id: null }],
+      new Map(),
+    );
+    expect(item.descricao).toBe("Cemig, via Agência virtual");
+  });
 });

@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
-  canalCopel,
+  canalSugerido,
   enquadramentoCompleto,
   itemVale,
   lerCondicoes,
   perguntasSemResposta,
   textoCondicoes,
+  type CanalConcessionaria,
   type RespostasEnquadramento,
 } from "@/lib/engenharia-enquadramento-regras";
 
@@ -62,21 +63,39 @@ describe("enquadramento (P6c)", () => {
   });
 });
 
-describe("canal da Copel (enquadramento Copel, 04/11/2026)", () => {
-  it("geração, ligação nova e aumento de carga em baixa tensão vão pelo PEW; o resto pelos sites", () => {
-    for (const tipo of ["nova_conexao", "ampliacao", "regularizacao"]) expect(canalCopel({ tipo_solicitacao: tipo }), tipo).toBe("pew");
-    expect(canalCopel({ tipo_solicitacao: "ligacao_nova", tensao: "baixa" })).toBe("pew");
-    expect(canalCopel({ tipo_solicitacao: "aumento_carga", tensao: "baixa" })).toBe("pew");
-    expect(canalCopel({ tipo_solicitacao: "aumento_carga", tensao: "media" })).toBe("site");
-    expect(canalCopel({ tipo_solicitacao: "troca_titularidade" })).toBe("site");
-    expect(canalCopel({ tipo_solicitacao: "cadastro_compensacao" })).toBe("site");
+// Canais da Copel como a migration 20261224100000 cadastra (a regra de 04/11/2026 virou cadastro).
+const CANAIS_COPEL: CanalConcessionaria[] = [
+  { id: "pew", nome: "PEW", ordem: 10, ativo: true, tipos: ["nova_conexao", "ampliacao", "regularizacao", "ligacao_nova", "aumento_carga"], tensoes: ["baixa"] },
+  { id: "site", nome: "Site da Copel", ordem: 20, ativo: true, tipos: ["troca_titularidade", "cadastro_compensacao", "ligacao_nova", "aumento_carga"], tensoes: ["media"] },
+  { id: "caw", nome: "CAW", ordem: 30, ativo: true, tipos: [], tensoes: [] },
+  { id: "atendimento", nome: "Atendimento comercial", ordem: 40, ativo: true, tipos: [], tensoes: [] },
+];
+const sugerido = (r: RespostasEnquadramento | null, canais = CANAIS_COPEL) => canalSugerido(canais, r)?.nome ?? null;
+
+describe("canal sugerido pelos canais da concessionária (Copel igual à regra de 04/11/2026)", () => {
+  it("geração, ligação nova e aumento de carga em baixa tensão vão pelo PEW; o resto pelo site", () => {
+    for (const tipo of ["nova_conexao", "ampliacao", "regularizacao"]) expect(sugerido({ tipo_solicitacao: tipo }), tipo).toBe("PEW");
+    expect(sugerido({ tipo_solicitacao: "nova_conexao", tensao: "media" })).toBe("PEW");
+    expect(sugerido({ tipo_solicitacao: "ligacao_nova", tensao: "baixa" })).toBe("PEW");
+    expect(sugerido({ tipo_solicitacao: "aumento_carga", tensao: "baixa" })).toBe("PEW");
+    expect(sugerido({ tipo_solicitacao: "aumento_carga", tensao: "media" })).toBe("Site da Copel");
+    expect(sugerido({ tipo_solicitacao: "troca_titularidade" })).toBe("Site da Copel");
+    expect(sugerido({ tipo_solicitacao: "cadastro_compensacao" })).toBe("Site da Copel");
   });
 
-  it("sem tipo, 'Outra' ou tensão indefinida onde ela decide: não diz", () => {
-    expect(canalCopel(null)).toBeNull();
-    expect(canalCopel({})).toBeNull();
-    expect(canalCopel({ tipo_solicitacao: "outro" })).toBeNull();
-    expect(canalCopel({ tipo_solicitacao: "ligacao_nova", tensao: "verificar" })).toBeNull();
-    expect(canalCopel({ tipo_solicitacao: "aumento_carga" })).toBeNull();
+  it("sem tipo, 'Outra' ou tensão indefinida onde ela decide: não sugere", () => {
+    expect(sugerido(null)).toBeNull();
+    expect(sugerido({})).toBeNull();
+    expect(sugerido({ tipo_solicitacao: "outro" })).toBeNull();
+    expect(sugerido({ tipo_solicitacao: "ligacao_nova", tensao: "verificar" })).toBeNull();
+    expect(sugerido({ tipo_solicitacao: "aumento_carga" })).toBeNull();
+  });
+
+  it("segue a ordem, ignora canal inativo e nunca sugere canal sem condição", () => {
+    const semPew = CANAIS_COPEL.map((c) => (c.nome === "PEW" ? { ...c, ativo: false } : c));
+    expect(sugerido({ tipo_solicitacao: "nova_conexao" }, semPew)).toBeNull();
+    const invertidos = CANAIS_COPEL.map((c) => (c.nome === "Site da Copel" ? { ...c, ordem: 5, tipos: ["nova_conexao"], tensoes: [] } : c));
+    expect(sugerido({ tipo_solicitacao: "nova_conexao" }, invertidos)).toBe("Site da Copel");
+    expect(sugerido({ tipo_solicitacao: "troca_titularidade" }, CANAIS_COPEL.filter((c) => c.tipos.length === 0))).toBeNull();
   });
 });

@@ -42,6 +42,14 @@ Cada empresa cadastra as próprias concessionárias, e cada uma tem o próprio c
 9. **"Documento enviado" na regra 7** = algum item do checklist da obra já saiu de pendente (arquivo anexado, marcado como entregue ou "não se aplica") ou já existe protocolo. **(proposta do Claude; conferir na leitura)**
 10. Configuração por concessionária: quem edita hoje o checklist e os prazos da Engenharia (admin) edita o cadastro das concessionárias.
 
+## Decisões de 26/11/2026 (entrega 3; prévia em https://claude.ai/artifact/BFk2a57EMctEpmB9FLbKwe)
+
+- **Item 8 confirmado:** só os prazos da distribuidora configuráveis hoje (análise, análise em zona rural, vistoria e conexão) passam a ser por concessionária. Os internos (a iniciar, projeto em elaboração, ART, exigência, correção de campo) continuam da empresa. O prazo da obra de rede continua vindo do orçamento de cada obra.
+- **Item 9 confirmado:** "já houve envio" = algum item do checklist da obra saiu de pendente por ação de alguém (arquivo anexado, conferido, válido, inválido ou "não se aplica" marcado à mão) ou já existe protocolo. Item que o enquadramento dispensou sozinho ("Fora do enquadramento") não conta.
+- **Canais da Copel:** PEW (nova conexão, ampliação, regularização; ligação nova e aumento de carga só em baixa tensão), Site da Copel (troca de titularidade, cadastro de compensação; ligação nova e aumento de carga em média tensão), CAW e Atendimento comercial sem condição, até o engenheiro confirmar se ainda são usados. O canal sugerido é o primeiro, pela ordem, que vale para o tipo e a tensão do enquadramento; canal sem condição nunca é sugerido, só listado. Para a Copel, a sugestão fica idêntica à regra de hoje.
+- **Obras sem concessionária ao criar uma nova:** continuam com o aviso até a Engenharia escolher. A tela da nova concessionária mostra quantas obras sem concessionária citam aquela distribuidora no negócio.
+- **Escolhas da prévia aprovadas:** faixa "Concessionária" em Configurações › Engenharia; só o admin cria concessionária e edita checklist e canais; os prazos da distribuidora seguem editáveis por quem edita prazos hoje (admin, gestor e coordenador da Engenharia); concessionária não se apaga, só troca de nome (a distribuidora não muda); protocolo lista os canais da concessionária da obra mais "Outro", e protocolos antigos ficam com o canal gravado.
+
 ## Entregas (PRs nesta ordem)
 
 1. **Tarifas ANEEL de todas as distribuidoras.** Independente. Migration de carga em `tarifas_gd_aneel` com a mesma rastreabilidade (recurso, linhas, data de extração, hash) e `nomes_aceitos` por distribuidora; o seletor de distribuidora da calculadora passa a listar todas.

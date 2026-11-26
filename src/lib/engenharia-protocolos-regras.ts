@@ -3,13 +3,18 @@
  * rótulos e quais registros cabem em cada situação. Espelham a RPC, que confere de novo.
  */
 
-export const CANAIS_PROTOCOLO = ["pew", "caw", "atendimento", "outro"] as const;
-export const ROTULO_CANAL: Record<(typeof CANAIS_PROTOCOLO)[number], string> = {
+/** Códigos dos canais gravados antes dos canais por concessionária (20261224100000); "outro" continua valendo. */
+export const ROTULO_CANAL: Record<"pew" | "caw" | "atendimento" | "outro", string> = {
   pew: "PEW (portal da Copel)",
   caw: "CAW",
   atendimento: "Atendimento comercial",
   outro: "Outro",
 };
+
+/** Protocolos antigos guardam o código (pew, caw, atendimento, outro); os novos, o nome do canal da concessionária. */
+export function rotuloCanal(canal: string): string {
+  return Object.hasOwn(ROTULO_CANAL, canal) ? ROTULO_CANAL[canal as keyof typeof ROTULO_CANAL] : canal;
+}
 
 /** Os mesmos tipos do enquadramento (a RPC valida pela mesma lista). */
 export const TIPOS_SOLICITACAO = [

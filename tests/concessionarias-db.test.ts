@@ -222,7 +222,7 @@ describe("Concessionárias: cadastro e obra (ordem importa)", { concurrent: fals
       return data.map((l) => l.concessionaria_id);
     };
     expect(await ler()).toEqual([null]);
-    expect(await carregarConcessionarias(coordEng.cliente as unknown as SupabaseServidor, empresa)).toEqual([{ id: copelA, nome: "Copel" }]);
+    expect(await carregarConcessionarias(coordEng.cliente as unknown as SupabaseServidor, empresa)).toEqual([{ id: copelA, nome: "Copel", distribuidora: "COPEL-DIS" }]);
 
     sessao.cliente = coordEng.cliente;
     sessao.papel = "operacao";

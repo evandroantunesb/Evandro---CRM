@@ -10,14 +10,13 @@ import {
 } from "@/lib/acoes/engenharia";
 import { LinkArquivo, Rotulo, dataBr, hojeBr, useEnvioDepois } from "./eventos-comum";
 import {
-  CANAIS_PROTOCOLO,
   CATEGORIAS_EXIGENCIA,
-  ROTULO_CANAL,
   ROTULO_CATEGORIA,
   ROTULO_EVENTO,
   ROTULO_STATUS_EXIGENCIA,
   ROTULO_STATUS_PROTOCOLO,
   ROTULO_TIPO_SOLICITACAO,
+  rotuloCanal,
   TIPOS_SOLICITACAO,
   exigeDescricao,
   protocoloEncerrado,
@@ -52,6 +51,8 @@ export function ProtocolosEngenharia({
   podeAgir,
   pendentesChecklist,
   distribuidoraSugerida,
+  canais,
+  canalSugerido,
 }: {
   obraId: string;
   pasta: string;
@@ -59,6 +60,10 @@ export function ProtocolosEngenharia({
   podeAgir: boolean;
   /** Nome da concessionária da obra, ou vazio quando ela não tem (o campo continua editável). */
   distribuidoraSugerida: string;
+  /** Nomes dos canais ativos da concessionária da obra, pela ordem (20261224100000). */
+  canais: string[];
+  /** Canal sugerido pelo enquadramento, se houver. */
+  canalSugerido: string | null;
   /** Itens obrigatórios do checklist ainda não resolvidos (gate G2); null = checklist não aplicado. */
   pendentesChecklist: number | null;
 }) {
@@ -79,7 +84,7 @@ export function ProtocolosEngenharia({
                 Faltam {pendentesChecklist} {pendentesChecklist === 1 ? "item obrigatório" : "itens obrigatórios"} do checklist para registrar o protocolo.
               </p>
             ) : (
-              <NovoProtocolo obraId={obraId} pasta={pasta} distribuidoraSugerida={distribuidoraSugerida} />
+              <NovoProtocolo obraId={obraId} pasta={pasta} distribuidoraSugerida={distribuidoraSugerida} canais={canais} canalSugerido={canalSugerido} />
             ))}
         </div>
       )}
@@ -97,7 +102,21 @@ export function ProtocolosEngenharia({
   );
 }
 
-function NovoProtocolo({ obraId, pasta, distribuidoraSugerida }: { obraId: string; pasta: string; distribuidoraSugerida: string }) {
+function NovoProtocolo({
+  obraId,
+  pasta,
+  distribuidoraSugerida,
+  canais,
+  canalSugerido,
+}: {
+  obraId: string;
+  pasta: string;
+  distribuidoraSugerida: string;
+  canais: string[];
+  canalSugerido: string | null;
+}) {
+  // O sugerido pelo enquadramento vem primeiro; "Outro" sempre por último.
+  const opcoesCanal = canalSugerido ? [canalSugerido, ...canais.filter((c) => c !== canalSugerido)] : canais;
   const router = useRouter();
   const [resultado, acao, pendente] = useActionState(registrarProtocoloEngenharia, null);
   const [comprovantes, setComprovantes] = useState<File[]>([]);
@@ -116,12 +135,13 @@ function NovoProtocolo({ obraId, pasta, distribuidoraSugerida }: { obraId: strin
           <input name="numero" required maxLength={60} className={CLASSE_ENTRADA} />
         </Rotulo>
         <Rotulo texto="Canal">
-          <select name="canal" defaultValue="pew" className={CLASSE_ENTRADA}>
-            {CANAIS_PROTOCOLO.map((c) => (
+          <select name="canal" defaultValue={opcoesCanal[0] ?? "outro"} className={CLASSE_ENTRADA}>
+            {opcoesCanal.map((c) => (
               <option key={c} value={c}>
-                {ROTULO_CANAL[c]}
+                {c === canalSugerido ? `${c} (sugerido)` : c}
               </option>
             ))}
+            <option value="outro">Outro</option>
           </select>
         </Rotulo>
         <Rotulo texto="Tipo de solicitação">
@@ -167,7 +187,7 @@ function Protocolo({ obraId, pasta, protocolo, podeAgir }: { obraId: string; pas
         <Selo tom={TOM[protocolo.status]}>{ROTULO_STATUS_PROTOCOLO[protocolo.status]}</Selo>
       </div>
       <p className="text-xs text-zinc-500">
-        {rotuloDe(ROTULO_CANAL, protocolo.canal)} · {rotuloDe(ROTULO_TIPO_SOLICITACAO, protocolo.tipoSolicitacao)} · protocolado em {dataBr(protocolo.protocoladoEm)} · registrado
+        {rotuloCanal(protocolo.canal)} · {rotuloDe(ROTULO_TIPO_SOLICITACAO, protocolo.tipoSolicitacao)} · protocolado em {dataBr(protocolo.protocoladoEm)} · registrado
         manualmente
       </p>
       {protocolo.observacao && <p className="text-xs text-zinc-700">{protocolo.observacao}</p>}

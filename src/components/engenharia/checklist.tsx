@@ -47,6 +47,7 @@ export function ChecklistEngenharia({
   cancelada,
   veDocumentos,
   semConcessionaria,
+  deOutraConcessionaria = null,
 }: {
   obraId: string;
   /** `empresa/obra`, pasta da obra no bucket. */
@@ -57,6 +58,8 @@ export function ChecklistEngenharia({
   veDocumentos: boolean;
   /** Obra sem concessionária: o banco recusa aplicar o checklist (20261223100000_concessionarias.sql). */
   semConcessionaria: boolean;
+  /** Nome da concessionária anterior quando o checklist veio dela (a da obra foi trocada depois de algum envio). */
+  deOutraConcessionaria?: string | null;
 }) {
   const podeAplicar = autorizacao !== null && !cancelada;
   if (itens.length === 0) {
@@ -80,6 +83,9 @@ export function ChecklistEngenharia({
   const r = resumoChecklist(itens);
   return (
     <div className="flex flex-col gap-4">
+      {deOutraConcessionaria && (
+        <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-900">Checklist da concessionária anterior ({deOutraConcessionaria}).</p>
+      )}
       <p className="text-sm text-zinc-700">
         Obrigatórios resolvidos: <span className="font-medium text-texto">{r.obrigatoriosResolvidos} de {r.obrigatorios}</span>
         {" · "}Total: {r.resolvidos} de {r.total}
