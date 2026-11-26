@@ -11,9 +11,10 @@ type Paleta = ReturnType<typeof paletaDaEmpresa>;
 /**
  * Condições de pagamento da proposta (esquema 5) no PDF, organizadas por modalidade: à vista ao lado do parcelado; o
  * financiamento (opções lado a lado) e o Personalizado (partes em duas colunas) em largura total; a observação
- * embaixo. Compacto para a proposta caber em 3 páginas no pior caso.
+ * embaixo. Compacto para a proposta caber em 3 páginas no pior caso. No esquema 9 com economia e financiamento, a
+ * frase da parcela × economia (já pronta na emissão) fica logo abaixo do financiamento.
  */
-export function CondicoesPagamentoPdf({ condicoes, p }: { condicoes: CondicoesEmitidas; p: Paleta }) {
+export function CondicoesPagamentoPdf({ condicoes, p, parcelaEconomia = null }: { condicoes: CondicoesEmitidas; p: Paleta; parcelaEconomia?: string | null }) {
   const secoes = secoesCondicoesEmitidas(condicoes);
   const de = (m: SecaoCondicao["modalidade"]) => secoes.find((s) => s.modalidade === m);
   const linhas = [[de("aVista"), de("parcelado")], [de("financiamento")], [de("personalizado")]].map((l) => l.filter((s): s is SecaoCondicao => !!s));
@@ -25,10 +26,17 @@ export function CondicoesPagamentoPdf({ condicoes, p }: { condicoes: CondicoesEm
         {linhas
           .filter((l) => l.length > 0)
           .map((l, i) => (
-            <View key={i} style={{ flexDirection: "row", gap: 6 }}>
-              {l.map((s) => (
-                <Modalidade key={s.modalidade} secao={s} p={p} estreita={s.modalidade === "aVista" && l.length > 1} />
-              ))}
+            <View key={i} style={{ gap: 5 }}>
+              <View style={{ flexDirection: "row", gap: 6 }}>
+                {l.map((s) => (
+                  <Modalidade key={s.modalidade} secao={s} p={p} estreita={s.modalidade === "aVista" && l.length > 1} />
+                ))}
+              </View>
+              {parcelaEconomia && l.some((s) => s.modalidade === "financiamento") ? (
+                <Text style={{ fontSize: 8, lineHeight: 1.35, backgroundColor: p.fundo, borderLeftWidth: 2, borderLeftColor: p.acento, borderRadius: 4, paddingVertical: 4, paddingHorizontal: 7 }}>
+                  {parcelaEconomia}
+                </Text>
+              ) : null}
             </View>
           ))}
       </View>

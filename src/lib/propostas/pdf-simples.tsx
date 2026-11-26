@@ -5,14 +5,17 @@ import { ROTULO_TIPO_COMPONENTE_KIT } from "@/lib/tipos";
 import { FONTES_PDF } from "./fontes-pdf";
 import { CondicoesPagamentoPdf } from "./pdf-condicoes";
 import { SecoesEconomia } from "./pdf-economia";
+import { SecaoFioB } from "./pdf-fio-b";
 import { SecaoGeracaoMensal } from "./pdf-geracao-mensal";
 import {
   coberturaDoConsumo,
   dataBr,
   economiaDaEmissao,
+  fioBDaEmissao,
   linhasCondicoesPagamento,
   linkWhatsappDaProposta,
   mensalDaEmissao,
+  parcelaEconomiaDaEmissao,
   temConteudoV6,
   textoPremissaGeracao,
   type DadosEmissaoSimples,
@@ -354,7 +357,7 @@ function SecoesOferta({ dados, e, p }: { dados: DadosEmissaoSimples; e: ReturnTy
             <Text style={{ fontSize: 22, ...TITULO }}>{formatarMoeda(dados.preco.valor)}</Text>
           </View>
           {dados.esquema !== 4 ? (
-            <CondicoesPagamentoPdf condicoes={dados.comercial.condicoesPagamento} p={p} />
+            <CondicoesPagamentoPdf condicoes={dados.comercial.condicoesPagamento} p={p} parcelaEconomia={parcelaEconomiaDaEmissao(dados)} />
           ) : linhasCondicoesPagamento(dados).length > 0 ? (
             // Esquema 4 (texto livre): uma opção por linha.
             <View style={{ marginTop: 7 }}>
@@ -549,6 +552,7 @@ export function PropostaSimplesPdfDocument({ dados, imagens }: { dados: DadosEmi
   const e = criarEstilos(p);
   const institucional = temConteudoV6(dados) ? dados.institucional : null;
   const economia = economiaDaEmissao(dados);
+  const fioB = fioBDaEmissao(dados);
   return (
     <Document title={`Proposta - ${dados.cliente.nome}`}>
       <Capa dados={dados} imagens={imagens} p={p} />
@@ -560,6 +564,7 @@ export function PropostaSimplesPdfDocument({ dados, imagens }: { dados: DadosEmi
           {institucional ? <SecoesSobre inst={institucional} e={e} p={p} /> : null}
           <SecoesSistema dados={dados} e={e} p={p} />
           {economia ? <SecoesEconomia economia={economia} p={p} /> : null}
+          {fioB ? <SecaoFioB fioB={fioB} p={p} /> : null}
           <SecoesOferta dados={dados} e={e} p={p} />
         </View>
         <Rodape dados={dados} e={e} />
