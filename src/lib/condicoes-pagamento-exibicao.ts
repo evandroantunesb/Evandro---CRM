@@ -22,7 +22,13 @@ export function linhasCondicoesEmitidas(c: CondicoesEmitidas): string[] {
   if (c.parcelado) {
     linhas.push(`${ROTULO_MEIO_PARCELAMENTO[c.parcelado.meio]}: ${c.parcelado.opcoes.map((o) => `${o.parcelas}x de ${moeda(o.valorParcela)}`).join(" · ")}`);
   }
-  if (c.financiamento) {
+  if (c.financiamento && c.financiamento.entrada != null && c.financiamento.carenciaDias != null) {
+    // Entrada e carência únicas (emissões a partir de 27/11/2026): ditas uma vez, com as parcelas na mesma linha.
+    const f = c.financiamento;
+    const titulo = f.instituicao ? `Financiamento (${f.instituicao})` : "Financiamento";
+    const entrada = f.entrada! > 0 ? `entrada de ${moeda(f.entrada!)}; ` : "";
+    linhas.push(`${titulo}: ${entrada}${f.opcoes.map((o) => `${o.parcelas}x de ${moeda(o.valorParcela)}`).join(" · ")}; carência de ${f.carenciaDias} dias`);
+  } else if (c.financiamento) {
     const titulo = c.financiamento.instituicao ? `Financiamento (${c.financiamento.instituicao})` : "Financiamento";
     for (const o of c.financiamento.opcoes) {
       const entrada = o.entrada > 0 ? `entrada de ${moeda(o.entrada)} + ` : "";
@@ -67,7 +73,16 @@ export function secoesCondicoesEmitidas(c: CondicoesEmitidas): SecaoCondicao[] {
       itens: c.parcelado.opcoes.map((o) => ({ valor: `${o.parcelas}x de ${moeda(o.valorParcela)}`, detalhe: null })),
     });
   }
-  if (c.financiamento) {
+  if (c.financiamento && c.financiamento.entrada != null && c.financiamento.carenciaDias != null) {
+    // Entrada e carência únicas (emissões a partir de 27/11/2026): na linha de apoio, uma vez; as opções só com as parcelas.
+    const f = c.financiamento;
+    secoes.push({
+      modalidade: "financiamento",
+      titulo: "Financiamento",
+      subtitulo: [f.instituicao, f.entrada! > 0 ? `Entrada de ${moeda(f.entrada!)}` : "Sem entrada", `carência de ${f.carenciaDias} dias`].filter(Boolean).join(" · "),
+      itens: f.opcoes.map((o) => ({ valor: `${o.parcelas}x de ${moeda(o.valorParcela)}`, detalhe: null })),
+    });
+  } else if (c.financiamento) {
     secoes.push({
       modalidade: "financiamento",
       titulo: "Financiamento",

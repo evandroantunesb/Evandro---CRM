@@ -57,7 +57,11 @@ export async function salvarTaxasParcelamento(_: ResultadoAcao, formData: FormDa
   const rotulo = ROTULO_MEIO_PARCELAMENTO[meio.data];
   return {
     ok: true,
-    mensagem: lidas.taxas.length ? `${rotulo}: ${lidas.taxas.length} opções de parcelamento salvas.` : `${rotulo} fica indisponível para os vendedores.`,
+    mensagem: lidas.taxas.length
+      ? `${rotulo}: ${lidas.taxas.length} opções de parcelamento salvas.`
+      : meio.data === "cartao"
+        ? "Cartão: o vendedor informa a taxa na emissão."
+        : `${rotulo} fica indisponível para os vendedores.`,
   };
 }
 

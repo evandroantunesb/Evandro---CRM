@@ -2,23 +2,29 @@
 
 import { useState, type ReactNode } from "react";
 import { CLASSE_ENTRADA, Campo, Selecao } from "@/components/ui";
-import { MEIOS_PARCELAMENTO, ROTULO_MEIO_PARCELAMENTO, type MeioParcelamento } from "@/lib/condicoes-pagamento";
+import { MAX_PARCELAS, MEIOS_PARCELAMENTO, ROTULO_MEIO_PARCELAMENTO, type MeioParcelamento } from "@/lib/condicoes-pagamento";
 import {
   CARENCIAS_FINANCIAMENTO,
   FORMAS_PERSONALIZADO,
   LIMITES_CONDICOES,
   MOMENTOS_PERSONALIZADO,
+  PRAZOS_FINANCIAMENTO_AUTOMATICO,
   ROTULO_FORMA,
   ROTULO_MOMENTO,
   descontoDaSoma,
   descontoDoValor,
   descontoPermitido,
   excessoAVista,
+  parcelaCartaoMensal,
+  parcelaPrice,
   passaDoPermitido,
   pendenciaValorNegocio,
+  taxaPeloVendedor,
   valorAVista,
   valorParcela,
   type EntradaCondicoes,
+  type ModoFinanciamento,
+  type ModoTaxaVendedor,
   type RegrasCondicoes,
 } from "@/lib/condicoes-pagamento-proposta";
 import { formatarMoeda, lerNumeroBr } from "@/lib/formatacao";
@@ -30,7 +36,9 @@ type Parte = NonNullable<EntradaCondicoes["personalizado"]>["partes"][number];
 const percentual = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
 /** "28.500,00": formato que `lerNumeroBr` lê de volta. */
 const reaisEditaveis = (n: number) => n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const opcaoVazia = (): Financiamento["opcoes"][number] => ({ entrada: "", parcelas: "", valorParcela: "", carenciaDias: 90 });
+const opcaoVazia = (): Financiamento["opcoes"][number] => ({ parcelas: "", valorParcela: "" });
+/** Parcelas marcadas de saída no cartão com a taxa do vendedor. */
+const PARCELAS_SUGERIDAS = [1, 3, 6, 10, 12];
 const parteVazia = (): Parte => ({ valor: "", forma: "pix", momento: "assinatura", data: "", observacao: "" });
 
 /**
@@ -53,29 +61,56 @@ export function CondicoesPagamento({
   observacaoSugerida: string;
   hoje: string;
 }) {
-  const meiosDisponiveis = MEIOS_PARCELAMENTO.filter((m) => regras.taxas[m].length > 0);
+  // O cartão aparece sempre: sem taxas da empresa, o vendedor informa a taxa da maquininha (27/11/2026).
+  const meiosDisponiveis = MEIOS_PARCELAMENTO.filter((m) => regras.taxas[m].length > 0 || taxaPeloVendedor(m, regras));
   const maxDesconto = descontoPermitido(regras);
 
   const [aVista, setAVista] = useState(true);
   const [desconto, setDesconto] = useState("0");
   // Valor à vista digitado em R$ (nulo = calculado a partir do %).
   const [valorDigitado, setValorDigitado] = useState<string | null>(null);
-  const [parcelado, setParcelado] = useState(meiosDisponiveis.length > 0);
+  const [parcelado, setParcelado] = useState(MEIOS_PARCELAMENTO.some((m) => regras.taxas[m].length > 0));
   const [meio, setMeio] = useState<MeioParcelamento>(meiosDisponiveis[0] ?? "cartao");
   // Por meio: as parcelas marcadas para aparecer (padrão: todas as configuradas).
   const [parcelasMarcadas, setParcelasMarcadas] = useState(() =>
-    Object.fromEntries(MEIOS_PARCELAMENTO.map((m) => [m, regras.taxas[m].map((t) => t.parcelas)])) as Record<MeioParcelamento, number[]>,
+    Object.fromEntries(
+      MEIOS_PARCELAMENTO.map((m) => [m, taxaPeloVendedor(m, regras) ? PARCELAS_SUGERIDAS : regras.taxas[m].map((t) => t.parcelas)]),
+    ) as Record<MeioParcelamento, number[]>,
   );
+  // Cartão com a taxa do vendedor: taxa ao mês ou uma taxa por parcela.
+  const [modoTaxa, setModoTaxa] = useState<ModoTaxaVendedor>("mensal");
+  const [taxaMensalCartao, setTaxaMensalCartao] = useState("");
+  const [taxasPorParcela, setTaxasPorParcela] = useState<Record<number, string>>({});
   const [repassarTaxas, setRepassarTaxas] = useState(true);
   const [financiamento, setFinanciamento] = useState(false);
-  const [dadosFinanciamento, setDadosFinanciamento] = useState<Financiamento>({ instituicao: "", opcoes: [opcaoVazia()] });
+  const [dadosFinanciamento, setDadosFinanciamento] = useState<Financiamento>({
+    instituicao: "",
+    entrada: "",
+    carenciaDias: 90,
+    modo: "automatico",
+    taxaMensal: "",
+    opcoes: [opcaoVazia()],
+  });
   const [personalizado, setPersonalizado] = useState(false);
   const [partes, setPartes] = useState<Parte[]>([parteVazia(), parteVazia()]);
   const [observacao, setObservacao] = useState(observacaoSugerida.trim().slice(0, LIMITES_CONDICOES.observacao));
 
   const entrada: EntradaCondicoes = {
     aVista: aVista ? { desconto, ...(valorDigitado != null ? { valor: valorDigitado } : {}) } : null,
-    parcelado: parcelado ? { meio, parcelas: parcelasMarcadas[meio], repassarTaxas } : null,
+    parcelado: parcelado
+      ? {
+          meio,
+          parcelas: parcelasMarcadas[meio],
+          repassarTaxas,
+          taxaVendedor: taxaPeloVendedor(meio, regras)
+            ? {
+                modo: modoTaxa,
+                mensal: taxaMensalCartao,
+                porParcela: parcelasMarcadas[meio].map((n) => ({ parcelas: n, taxa: taxasPorParcela[n] ?? "" })),
+              }
+            : null,
+        }
+      : null,
     financiamento: financiamento ? dadosFinanciamento : null,
     personalizado: personalizado && regras.personalizadoAtivo ? { partes } : null,
     observacao,
@@ -91,8 +126,32 @@ export function CondicoesPagamento({
   const excesso = temPreco && descontoValido ? excessoAVista(preco, descontoLido, regras) : null;
   const nenhuma = !aVista && !parcelado && !financiamento && !personalizado;
 
-  const mudarFinanciamento = (i: number, campo: keyof Financiamento["opcoes"][number], valor: string | number) =>
+  const mudarFinanciamento = (i: number, campo: keyof Financiamento["opcoes"][number], valor: string) =>
     setDadosFinanciamento((f) => ({ ...f, opcoes: f.opcoes.map((o, k) => (k === i ? { ...o, [campo]: valor } : o)) }));
+  const marcarParcela = (n: number, marcar: boolean) =>
+    setParcelasMarcadas((atual) => ({
+      ...atual,
+      [meio]: marcar ? [...atual[meio], n].sort((a, b) => a - b) : atual[meio].filter((x) => x !== n),
+    }));
+
+  // Prévias (o servidor refaz as contas na emissão).
+  const taxaVendedorNoMeio = taxaPeloVendedor(meio, regras);
+  const mensalCartao = lerNumeroBr(taxaMensalCartao);
+  const taxaMensalOk = mensalCartao != null && Number.isFinite(mensalCartao) && mensalCartao >= 0 && mensalCartao <= LIMITES_CONDICOES.taxaMensal;
+  const previaParcela = (n: number): number | null => {
+    if (!temPreco) return null;
+    if (!taxaVendedorNoMeio) {
+      const t = regras.taxas[meio].find((x) => x.parcelas === n);
+      return t ? valorParcela(preco, n, t.taxa, repassarTaxas) : null;
+    }
+    if (modoTaxa === "mensal") return taxaMensalOk ? parcelaCartaoMensal(preco, mensalCartao, n, repassarTaxas) : null;
+    const t = lerNumeroBr(taxasPorParcela[n] ?? "");
+    return t != null && Number.isFinite(t) && t >= 0 && t < 100 ? valorParcela(preco, n, t, repassarTaxas) : null;
+  };
+  const entradaFin = lerNumeroBr(dadosFinanciamento.entrada) ?? 0;
+  const taxaFin = lerNumeroBr(dadosFinanciamento.taxaMensal);
+  const financiado = temPreco && Number.isFinite(entradaFin) && entradaFin >= 0 && entradaFin < preco ? preco - entradaFin : null;
+  const taxaFinOk = taxaFin != null && Number.isFinite(taxaFin) && taxaFin >= 0 && taxaFin <= LIMITES_CONDICOES.taxaMensal;
   const mudarParte = (i: number, campo: keyof Parte, valor: string) => setPartes((ps) => ps.map((p, k) => (k === i ? { ...p, [campo]: valor } : p)));
 
   return (
@@ -162,24 +221,68 @@ export function CondicoesPagamento({
               ))}
             </div>
           )}
-          <div role="group" aria-label="Parcelas que aparecem na proposta" className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-            <span className="w-full text-xs text-texto-2">Mostrar no {ROTULO_MEIO_PARCELAMENTO[meio].toLowerCase()}:</span>
-            {regras.taxas[meio].map((t) => (
-              <label key={t.parcelas} className="flex min-h-11 items-center gap-1.5 md:min-h-0">
-                <input
-                  type="checkbox"
-                  checked={parcelasMarcadas[meio].includes(t.parcelas)}
-                  onChange={(e) =>
-                    setParcelasMarcadas((atual) => ({
-                      ...atual,
-                      [meio]: e.target.checked ? [...atual[meio], t.parcelas] : atual[meio].filter((n) => n !== t.parcelas),
-                    }))
-                  }
-                />
-                {t.parcelas}x
-              </label>
-            ))}
-          </div>
+          {taxaVendedorNoMeio ? (
+            <>
+              <Alternar
+                rotulo="Como informar a taxa da maquininha"
+                opcoes={[
+                  { valor: "mensal", rotulo: "Taxa ao mês" },
+                  { valor: "parcela", rotulo: "Parcela a parcela" },
+                ]}
+                valor={modoTaxa}
+                aoEscolher={(v) => setModoTaxa(v as ModoTaxaVendedor)}
+              />
+              {modoTaxa === "mensal" && (
+                <label className="flex w-36 flex-col gap-1 text-sm">
+                  <span className="font-medium text-texto-2">Taxa ao mês (%)</span>
+                  <input value={taxaMensalCartao} onChange={(e) => setTaxaMensalCartao(e.target.value)} inputMode="decimal" placeholder="2,99" className={CLASSE_ENTRADA} />
+                </label>
+              )}
+              <div role="group" aria-label="Parcelas que aparecem na proposta" className="flex flex-wrap gap-1.5">
+                <span className="w-full text-xs text-texto-2">Parcelas que aparecem na proposta:</span>
+                {Array.from({ length: MAX_PARCELAS }, (_, i) => i + 1).map((n) => {
+                  const marcada = parcelasMarcadas[meio].includes(n);
+                  return (
+                    <button
+                      key={n}
+                      type="button"
+                      aria-pressed={marcada}
+                      onClick={() => marcarParcela(n, !marcada)}
+                      className={`min-h-11 min-w-11 rounded-full border px-2 text-sm font-medium md:min-h-8 md:min-w-10 ${marcada ? "border-texto bg-texto text-fundo" : "border-linha text-texto-2"}`}
+                    >
+                      {n}x
+                    </button>
+                  );
+                })}
+              </div>
+              {modoTaxa === "parcela" && parcelasMarcadas[meio].length > 0 && (
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {parcelasMarcadas[meio].map((n) => (
+                    <label key={n} className="flex flex-col gap-1 text-sm">
+                      <span className="font-medium text-texto-2">Taxa em {n}x (%)</span>
+                      <input
+                        value={taxasPorParcela[n] ?? ""}
+                        onChange={(e) => setTaxasPorParcela((t) => ({ ...t, [n]: e.target.value }))}
+                        inputMode="decimal"
+                        placeholder="0"
+                        className={CLASSE_ENTRADA}
+                      />
+                    </label>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <div role="group" aria-label="Parcelas que aparecem na proposta" className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+              <span className="w-full text-xs text-texto-2">Mostrar no {ROTULO_MEIO_PARCELAMENTO[meio].toLowerCase()}:</span>
+              {regras.taxas[meio].map((t) => (
+                <label key={t.parcelas} className="flex min-h-11 items-center gap-1.5 md:min-h-0">
+                  <input type="checkbox" checked={parcelasMarcadas[meio].includes(t.parcelas)} onChange={(e) => marcarParcela(t.parcelas, e.target.checked)} />
+                  {t.parcelas}x
+                </label>
+              ))}
+            </div>
+          )}
           <label className="flex items-start gap-2 text-sm">
             <input type="checkbox" checked={repassarTaxas} onChange={(e) => setRepassarTaxas(e.target.checked)} className="mt-0.5" />
             <span>
@@ -190,9 +293,11 @@ export function CondicoesPagamento({
           {temPreco && parcelasMarcadas[meio].length > 0 && (
             <p className="text-xs text-texto-2" data-testid="previa-parcelado">
               Prévia:{" "}
-              {regras.taxas[meio]
-                .filter((t) => parcelasMarcadas[meio].includes(t.parcelas))
-                .map((t) => `${t.parcelas}x ${formatarMoeda(valorParcela(preco, t.parcelas, t.taxa, repassarTaxas))}`)
+              {parcelasMarcadas[meio]
+                .map((n) => {
+                  const v = previaParcela(n);
+                  return `${n}x ${v != null ? formatarMoeda(v) : "—"}`;
+                })
                 .join(" · ")}
             </p>
           )}
@@ -200,50 +305,116 @@ export function CondicoesPagamento({
       )}
 
       <Modalidade rotulo="Financiamento" marcada={financiamento} aoMarcar={setFinanciamento}>
-        <Campo
-          rotulo="Instituição (opcional)"
-          value={dadosFinanciamento.instituicao}
-          maxLength={LIMITES_CONDICOES.instituicao}
-          onChange={(e) => setDadosFinanciamento((f) => ({ ...f, instituicao: e.target.value }))}
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <Campo
+            rotulo="Instituição (opcional)"
+            value={dadosFinanciamento.instituicao}
+            maxLength={LIMITES_CONDICOES.instituicao}
+            onChange={(e) => setDadosFinanciamento((f) => ({ ...f, instituicao: e.target.value }))}
+          />
+          <Campo
+            rotulo="Entrada (R$)"
+            inputMode="decimal"
+            placeholder="0"
+            value={dadosFinanciamento.entrada}
+            onChange={(e) => setDadosFinanciamento((f) => ({ ...f, entrada: e.target.value }))}
+          />
+          <Selecao rotulo="Carência" value={dadosFinanciamento.carenciaDias} onChange={(e) => setDadosFinanciamento((f) => ({ ...f, carenciaDias: Number(e.target.value) }))}>
+            {CARENCIAS_FINANCIAMENTO.map((d) => (
+              <option key={d} value={d}>
+                {d} dias
+              </option>
+            ))}
+          </Selecao>
+        </div>
+        <Alternar
+          rotulo="Como montar as opções do financiamento"
+          opcoes={[
+            { valor: "automatico", rotulo: "Automático pela taxa" },
+            { valor: "manual", rotulo: "Manual" },
+          ]}
+          valor={dadosFinanciamento.modo}
+          aoEscolher={(v) => setDadosFinanciamento((f) => ({ ...f, modo: v as ModoFinanciamento }))}
         />
-        {dadosFinanciamento.opcoes.map((o, i) => (
-          <div key={i} className="flex flex-col gap-2 rounded-md bg-superficie-2 p-2">
-            <div className="flex items-center justify-between text-xs font-medium text-texto-2">
-              Opção {i + 1}
-              {dadosFinanciamento.opcoes.length > 1 && (
-                <button
-                  type="button"
-                  className="min-h-11 px-2 text-xs text-texto-2 underline-offset-2 hover:underline md:min-h-0"
-                  onClick={() => setDadosFinanciamento((f) => ({ ...f, opcoes: f.opcoes.filter((_, k) => k !== i) }))}
-                >
-                  Remover
-                </button>
+        {dadosFinanciamento.modo === "automatico" ? (
+          <>
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="flex w-36 flex-col gap-1 text-sm">
+                <span className="font-medium text-texto-2">Taxa ao mês (%)</span>
+                <input
+                  value={dadosFinanciamento.taxaMensal}
+                  onChange={(e) => setDadosFinanciamento((f) => ({ ...f, taxaMensal: e.target.value }))}
+                  inputMode="decimal"
+                  placeholder="2,5"
+                  className={CLASSE_ENTRADA}
+                />
+              </label>
+              {financiado != null && (
+                <p className="pb-2 text-xs text-texto-2">
+                  Financiado: {formatarMoeda(financiado)}
+                  {entradaFin > 0 && ` (${formatarMoeda(preco!)} menos a entrada)`}
+                </p>
               )}
             </div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <Campo rotulo="Entrada (R$)" inputMode="decimal" placeholder="0" value={o.entrada} onChange={(e) => mudarFinanciamento(i, "entrada", e.target.value)} />
-              <Campo rotulo="Parcelas" inputMode="numeric" placeholder="60" value={o.parcelas} onChange={(e) => mudarFinanciamento(i, "parcelas", e.target.value)} />
-              <Campo
-                rotulo="Parcela (R$)"
-                inputMode="decimal"
-                placeholder="690,00"
-                value={o.valorParcela}
-                onChange={(e) => mudarFinanciamento(i, "valorParcela", e.target.value)}
-              />
-              <Selecao rotulo="Carência" value={o.carenciaDias} onChange={(e) => mudarFinanciamento(i, "carenciaDias", Number(e.target.value))}>
-                {CARENCIAS_FINANCIAMENTO.map((d) => (
-                  <option key={d} value={d}>
-                    {d} dias
-                  </option>
-                ))}
-              </Selecao>
-            </div>
-          </div>
-        ))}
-        {dadosFinanciamento.opcoes.length < LIMITES_CONDICOES.opcoesFinanciamento && (
-          <BotaoAdicionar onClick={() => setDadosFinanciamento((f) => ({ ...f, opcoes: [...f.opcoes, opcaoVazia()] }))}>
-            + Adicionar opção (até {LIMITES_CONDICOES.opcoesFinanciamento})
-          </BotaoAdicionar>
+            {financiado != null && taxaFinOk && (
+              <table className="w-full text-sm" data-testid="previa-financiamento">
+                <thead>
+                  <tr className="border-b border-linha text-left text-xs text-texto-2">
+                    <th className="py-1.5 font-medium">Prazo</th>
+                    <th className="py-1.5 text-right font-medium">Parcela</th>
+                    <th className="py-1.5 text-right font-medium">Total pago</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {PRAZOS_FINANCIAMENTO_AUTOMATICO.map((n) => {
+                    const v = parcelaPrice(financiado, taxaFin, n);
+                    return (
+                      <tr key={n} className="border-b border-linha">
+                        <td className="py-1.5">{n}x</td>
+                        <td className="py-1.5 text-right tabular-nums whitespace-nowrap">{formatarMoeda(v)}</td>
+                        <td className="py-1.5 text-right tabular-nums whitespace-nowrap">{formatarMoeda(entradaFin + v * n)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+            <p className="text-xs text-texto-2">Parcelas iguais pela tabela Price. O total pago é só para você conferir; a proposta mostra a entrada e as parcelas.</p>
+          </>
+        ) : (
+          <>
+            {dadosFinanciamento.opcoes.map((o, i) => (
+              <div key={i} className="flex flex-col gap-2 rounded-md bg-superficie-2 p-2">
+                <div className="flex items-center justify-between text-xs font-medium text-texto-2">
+                  Opção {i + 1}
+                  {dadosFinanciamento.opcoes.length > 1 && (
+                    <button
+                      type="button"
+                      className="min-h-11 px-2 text-xs text-texto-2 underline-offset-2 hover:underline md:min-h-0"
+                      onClick={() => setDadosFinanciamento((f) => ({ ...f, opcoes: f.opcoes.filter((_, k) => k !== i) }))}
+                    >
+                      Remover
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Campo rotulo="Parcelas" inputMode="numeric" placeholder="60" value={o.parcelas} onChange={(e) => mudarFinanciamento(i, "parcelas", e.target.value)} />
+                  <Campo
+                    rotulo="Parcela (R$)"
+                    inputMode="decimal"
+                    placeholder="690,00"
+                    value={o.valorParcela}
+                    onChange={(e) => mudarFinanciamento(i, "valorParcela", e.target.value)}
+                  />
+                </div>
+              </div>
+            ))}
+            {dadosFinanciamento.opcoes.length < LIMITES_CONDICOES.opcoesFinanciamento && (
+              <BotaoAdicionar onClick={() => setDadosFinanciamento((f) => ({ ...f, opcoes: [...f.opcoes, opcaoVazia()] }))}>
+                + Adicionar opção (até {LIMITES_CONDICOES.opcoesFinanciamento})
+              </BotaoAdicionar>
+            )}
+          </>
         )}
       </Modalidade>
 
@@ -336,6 +507,35 @@ function Modalidade({ rotulo, marcada, aoMarcar, children }: { rotulo: string; m
         {rotulo}
       </label>
       {marcada && <div className="flex flex-col gap-2 pl-6">{children}</div>}
+    </div>
+  );
+}
+
+/** Escolha entre dois modos (botões que alternam), com o modo atual marcado. */
+function Alternar({
+  rotulo,
+  opcoes,
+  valor,
+  aoEscolher,
+}: {
+  rotulo: string;
+  opcoes: { valor: string; rotulo: string }[];
+  valor: string;
+  aoEscolher: (v: string) => void;
+}) {
+  return (
+    <div role="group" aria-label={rotulo} className="flex self-start rounded-full border border-linha p-0.5">
+      {opcoes.map((o) => (
+        <button
+          key={o.valor}
+          type="button"
+          aria-pressed={valor === o.valor}
+          onClick={() => aoEscolher(o.valor)}
+          className={`min-h-11 rounded-full px-3 text-sm font-medium md:min-h-8 ${valor === o.valor ? "bg-texto text-fundo" : "text-texto-2"}`}
+        >
+          {o.rotulo}
+        </button>
+      ))}
     </div>
   );
 }

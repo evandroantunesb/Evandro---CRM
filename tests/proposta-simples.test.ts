@@ -35,14 +35,18 @@ const CONDICOES: EntradaEmissaoSimples["condicoes"] = {
   entrada: { aVista: { desconto: "0" }, parcelado: null, financiamento: null, personalizado: null, observacao: "50% na assinatura e 50% na instalação" },
   regras: REGRAS,
 };
-/** Todas as modalidades no máximo: 24 parcelas, 3 financiamentos, 4 partes com observação e a observação no limite. */
+/** Todas as modalidades no máximo: 24 parcelas, 5 financiamentos, 4 partes com observação e a observação no limite. */
 const PIOR_CASO_CONDICOES: EntradaEmissaoSimples["condicoes"] = {
   entrada: {
     aVista: { desconto: "5,5" },
     parcelado: { meio: "cartao", parcelas: Array.from({ length: MAX_PARCELAS }, (_, i) => i + 1), repassarTaxas: true },
     financiamento: {
       instituicao: palavras(LIMITES_CONDICOES.instituicao),
-      opcoes: Array.from({ length: LIMITES_CONDICOES.opcoesFinanciamento }, () => ({ entrada: "12.345,67", parcelas: "84", valorParcela: "1.234,56", carenciaDias: 150 })),
+      entrada: "12.345,67",
+      carenciaDias: 150,
+      modo: "manual",
+      taxaMensal: "",
+      opcoes: Array.from({ length: LIMITES_CONDICOES.opcoesFinanciamento }, () => ({ parcelas: "84", valorParcela: "1.234,56" })),
     },
     personalizado: {
       partes: Array.from({ length: LIMITES_CONDICOES.partesPersonalizado }, () => ({
@@ -403,59 +407,111 @@ describe("montarDadosEmissaoSimples", () => {
   });
 });
 
-const CURVA = [5.9, 5.7, 5.3, 4.6, 3.8, 3.4, 3.6, 4.5, 4.7, 5.4, 6, 6.1];
-const CONSUMO_12 = [520, 500, 480, 430, 400, 400, 410, 420, 430, 450, 480, 500];
-
-describe("geração e consumo mês a mês (esquema 8)", () => {
-  it("com curva e consumo dos 12 meses: congela a geração repartida e o consumo informado", () => {
-    const dados = dadosValidos({ curvaGeracao: CURVA, consumoMensalKwhNegocio: CONSUMO_12 });
-    expect(dados.esquema).toBe(9);
-    const mensal = mensalDaEmissao(dados)!;
-    expect(mensal.consumoOrigem).toBe("informado");
-    expect(mensal.consumoKwh).toEqual(CONSUMO_12);
-    expect(mensal.geracaoKwh.reduce((a, b) => a + b, 0)).toBe(Math.round(dados.sistema.geracao!.kwhMes * 12));
-  });
-
-  it("sem os 12 meses: o consumo do gráfico é a média do negócio", () => {
-    const mensal = mensalDaEmissao(dadosValidos({ curvaGeracao: CURVA, consumoMensalKwhNegocio: null }))!;
-    expect(mensal.consumoOrigem).toBe("media");
-    expect(mensal.consumoKwh).toEqual(Array(12).fill(450));
-  });
-
-  it("sem curva ou sem produtividade confirmada: emite sem o gráfico, sem pendência nova", () => {
-    expect(mensalDaEmissao(dadosValidos({ curvaGeracao: null, consumoMensalKwhNegocio: CONSUMO_12 }))).toBeNull();
-    expect(mensalDaEmissao(dadosValidos({ curvaGeracao: CURVA, produtividadeConfirmada: null }))).toBeNull();
-  });
-
-  it("ao ler, recusa gráfico sem geração ou com soma diferente do ano", () => {
-    const dados = dadosValidos({ curvaGeracao: CURVA });
-    const semGeracao = { ...dadosValidos({ produtividadeConfirmada: null }), mensal: dados.esquema === 9 ? dados.mensal : null };
-    expect(lerDadosDaEmissao(semGeracao, hashDosDados(semGeracao))).toEqual({ ok: false });
-    const soma = JSON.parse(JSON.stringify(dados));
-    soma.mensal.geracaoKwh[0] += 1;
-    expect(lerDadosDaEmissao(soma, hashDosDados(soma))).toEqual({ ok: false });
-  });
-
-  it("emissões gravadas no esquema 7 continuam legíveis", () => {
-    const v7 = JSON.parse(JSON.stringify(dadosValidos()));
-    v7.esquema = 7;
+const CURVA = [5.9, 5.7, 5.3, 4.6, 3.8, 3.4, 3.6, 4.5, 4.7, 5.4, 6, 6.1];
+
+const CONSUMO_12 = [520, 500, 480, 430, 400, 400, 410, 420, 430, 450, 480, 500];
+
+
+
+describe("geração e consumo mês a mês (esquema 8)", () => {
+
+  it("com curva e consumo dos 12 meses: congela a geração repartida e o consumo informado", () => {
+
+    const dados = dadosValidos({ curvaGeracao: CURVA, consumoMensalKwhNegocio: CONSUMO_12 });
+
+    expect(dados.esquema).toBe(9);
+
+    const mensal = mensalDaEmissao(dados)!;
+
+    expect(mensal.consumoOrigem).toBe("informado");
+
+    expect(mensal.consumoKwh).toEqual(CONSUMO_12);
+
+    expect(mensal.geracaoKwh.reduce((a, b) => a + b, 0)).toBe(Math.round(dados.sistema.geracao!.kwhMes * 12));
+
+  });
+
+
+
+  it("sem os 12 meses: o consumo do gráfico é a média do negócio", () => {
+
+    const mensal = mensalDaEmissao(dadosValidos({ curvaGeracao: CURVA, consumoMensalKwhNegocio: null }))!;
+
+    expect(mensal.consumoOrigem).toBe("media");
+
+    expect(mensal.consumoKwh).toEqual(Array(12).fill(450));
+
+  });
+
+
+
+  it("sem curva ou sem produtividade confirmada: emite sem o gráfico, sem pendência nova", () => {
+
+    expect(mensalDaEmissao(dadosValidos({ curvaGeracao: null, consumoMensalKwhNegocio: CONSUMO_12 }))).toBeNull();
+
+    expect(mensalDaEmissao(dadosValidos({ curvaGeracao: CURVA, produtividadeConfirmada: null }))).toBeNull();
+
+  });
+
+
+
+  it("ao ler, recusa gráfico sem geração ou com soma diferente do ano", () => {
+
+    const dados = dadosValidos({ curvaGeracao: CURVA });
+
+    const semGeracao = { ...dadosValidos({ produtividadeConfirmada: null }), mensal: dados.esquema === 9 ? dados.mensal : null };
+
+    expect(lerDadosDaEmissao(semGeracao, hashDosDados(semGeracao))).toEqual({ ok: false });
+
+    const soma = JSON.parse(JSON.stringify(dados));
+
+    soma.mensal.geracaoKwh[0] += 1;
+
+    expect(lerDadosDaEmissao(soma, hashDosDados(soma))).toEqual({ ok: false });
+
+  });
+
+
+
+  it("emissões gravadas no esquema 7 continuam legíveis", () => {
+
+    const v7 = JSON.parse(JSON.stringify(dadosValidos()));
+
+    v7.esquema = 7;
+
     delete v7.mensal;
-    delete v7.textosEconomia;
-    expect(lerDadosDaEmissao(v7, hashDosDados(v7))).toEqual({ ok: true, dados: v7 });
-    expect(mensalDaEmissao(v7)).toBeNull();
-  });
-
-  it("mudar a curva ou o consumo depois não muda os dados já montados", () => {
-    const curva = [...CURVA];
-    const consumo = [...CONSUMO_12];
-    const dados = dadosValidos({ curvaGeracao: curva, consumoMensalKwhNegocio: consumo });
-    const antes = JSON.stringify(mensalDaEmissao(dados));
-    curva[0] = 99;
-    consumo[0] = 1;
-    expect(JSON.stringify(mensalDaEmissao(dados))).toBe(antes);
-  });
-});
-
+    delete v7.textosEconomia;
+
+    expect(lerDadosDaEmissao(v7, hashDosDados(v7))).toEqual({ ok: true, dados: v7 });
+
+    expect(mensalDaEmissao(v7)).toBeNull();
+
+  });
+
+
+
+  it("mudar a curva ou o consumo depois não muda os dados já montados", () => {
+
+    const curva = [...CURVA];
+
+    const consumo = [...CONSUMO_12];
+
+    const dados = dadosValidos({ curvaGeracao: curva, consumoMensalKwhNegocio: consumo });
+
+    const antes = JSON.stringify(mensalDaEmissao(dados));
+
+    curva[0] = 99;
+
+    consumo[0] = 1;
+
+    expect(JSON.stringify(mensalDaEmissao(dados))).toBe(antes);
+
+  });
+
+});
+
+
+
 describe("integridade dos dados gravados", () => {
   it("o hash não depende da ordem das chaves nem de passar pelo jsonb", () => {
     const dados = dadosValidos();

@@ -7,10 +7,13 @@ import {
   descontoTotal,
   excessoAVista,
   montarCondicoesPagamento,
+  parcelaPrice,
   pendenciaValorNegocio,
   precoMinimoCentavos,
   referenciaDesconto,
+  taxaPeloVendedor,
   valorParcela,
+  type CondicoesEmitidas,
   type EntradaCondicoes,
   type RegrasCondicoes,
 } from "@/lib/condicoes-pagamento-proposta";
@@ -73,31 +76,93 @@ describe("modalidades", () => {
     expect(montar({ parcelado: { meio: "cartao", parcelas: [], repassarTaxas: false } }).ok).toBe(false);
   });
 
-  it("financiamento: valores digitados, entrada opcional, até 84x e carência da lista", () => {
-    const opcao = { entrada: "", parcelas: "60", valorParcela: "690,00", carenciaDias: 90 };
-    const r = montar({ financiamento: { instituicao: " Banco X ", opcoes: [opcao, { ...opcao, entrada: "1.000", parcelas: "84", valorParcela: "560" }] } });
+  it("financiamento manual: entrada e carência únicas, até 5 opções digitadas, até 84x", () => {
+    const fin = { instituicao: " Banco X ", entrada: "1.000", carenciaDias: 90, modo: "manual" as const, taxaMensal: "" };
+    const opcao = { parcelas: "60", valorParcela: "690,00" };
+    const r = montar({ financiamento: { ...fin, opcoes: [opcao, { parcelas: "84", valorParcela: "560" }] } });
     expect(r.ok && r.condicoes.financiamento).toEqual({
       instituicao: "Banco X",
+      entrada: 1000,
+      carenciaDias: 90,
       opcoes: [
-        { entrada: 0, parcelas: 60, valorParcela: 690, carenciaDias: 90 },
+        { entrada: 1000, parcelas: 60, valorParcela: 690, carenciaDias: 90 },
         { entrada: 1000, parcelas: 84, valorParcela: 560, carenciaDias: 90 },
       ],
     });
-    const semInstituicao = montar({ financiamento: { instituicao: "", opcoes: [opcao] } });
-    expect(semInstituicao.ok && semInstituicao.condicoes.financiamento?.instituicao).toBeNull();
-    for (const ruim of [
-      { parcelas: "85" },
-      { parcelas: "0" },
-      { parcelas: "12,5" },
-      { valorParcela: "" },
-      { valorParcela: "1.2" },
-      { carenciaDias: 45 },
-      { entrada: "30.000" },
-    ]) {
-      expect(montar({ financiamento: { instituicao: "", opcoes: [{ ...opcao, ...ruim }] } }).ok, JSON.stringify(ruim)).toBe(false);
+    const semInstituicao = montar({ financiamento: { ...fin, instituicao: "", entrada: "", opcoes: [opcao] } });
+    expect(semInstituicao.ok && semInstituicao.condicoes.financiamento).toMatchObject({ instituicao: null, entrada: 0 });
+    for (const ruim of [{ parcelas: "85" }, { parcelas: "0" }, { parcelas: "12,5" }, { valorParcela: "" }, { valorParcela: "1.2" }]) {
+      expect(montar({ financiamento: { ...fin, opcoes: [{ ...opcao, ...ruim }] } }).ok, JSON.stringify(ruim)).toBe(false);
     }
-    expect(montar({ financiamento: { instituicao: "", opcoes: [] } }).ok).toBe(false);
-    expect(montar({ financiamento: { instituicao: "", opcoes: Array.from({ length: 4 }, () => opcao) } }).ok).toBe(false);
+    expect(montar({ financiamento: { ...fin, carenciaDias: 45, opcoes: [opcao] } }).ok).toBe(false);
+    expect(montar({ financiamento: { ...fin, entrada: "30.000", opcoes: [opcao] } }).ok).toBe(false);
+    expect(montar({ financiamento: { ...fin, opcoes: [] } }).ok).toBe(false);
+    expect(montar({ financiamento: { ...fin, opcoes: Array.from({ length: 5 }, () => opcao) } }).ok).toBe(true);
+    expect(montar({ financiamento: { ...fin, opcoes: Array.from({ length: 6 }, () => opcao) } }).ok).toBe(false);
+  });
+
+  it("financiamento automático: parcelas pela tabela Price em 24, 36, 48 e 60x sobre o preço menos a entrada", () => {
+    expect(parcelaPrice(25000, 2.5, 24)).toBe(1397.82);
+    expect(parcelaPrice(1200, 0, 24)).toBe(50);
+    const fin = { instituicao: "", entrada: "5.000", carenciaDias: 60, modo: "automatico" as const, taxaMensal: "2,5", opcoes: [] };
+    const r = montar({ financiamento: fin });
+    expect(r.ok && r.condicoes.financiamento).toEqual({
+      instituicao: null,
+      entrada: 5000,
+      carenciaDias: 60,
+      taxaMensal: 2.5,
+      opcoes: [
+        { entrada: 5000, parcelas: 24, valorParcela: 1397.82, carenciaDias: 60 },
+        { entrada: 5000, parcelas: 36, valorParcela: 1061.29, carenciaDias: 60 },
+        { entrada: 5000, parcelas: 48, valorParcela: 900.15, carenciaDias: 60 },
+        { entrada: 5000, parcelas: 60, valorParcela: 808.83, carenciaDias: 60 },
+      ],
+    });
+    for (const taxaMensal of ["", "-1", "10,01", "abc"]) expect(montar({ financiamento: { ...fin, taxaMensal } }).ok, taxaMensal).toBe(false);
+  });
+
+  it("cartão sem taxas da empresa: o vendedor informa a taxa ao mês (1x sem juros) ou parcela a parcela", () => {
+    const semTabela = { taxas: { cartao: [], boleto: [] } };
+    expect(taxaPeloVendedor("cartao", semTabela)).toBe(true);
+    expect(taxaPeloVendedor("cartao", REGRAS)).toBe(false);
+    expect(taxaPeloVendedor("boleto", semTabela)).toBe(false);
+    const mensal = { modo: "mensal" as const, mensal: "2,99", porParcela: [] };
+    const r = montar({ parcelado: { meio: "cartao", parcelas: [12, 1, 3], repassarTaxas: true, taxaVendedor: mensal } }, semTabela);
+    expect(r.ok && r.condicoes.parcelado).toEqual({
+      meio: "cartao",
+      repassarTaxas: true,
+      taxaMensal: 2.99,
+      opcoes: [
+        { parcelas: 1, taxaPercentual: 0, valorParcela: 30000 },
+        { parcelas: 3, taxaPercentual: 5.69, valorParcela: 10603.87 },
+        { parcelas: 12, taxaPercentual: 17, valorParcela: 3012.06 },
+      ],
+    });
+    const semRepasse = montar({ parcelado: { meio: "cartao", parcelas: [3], repassarTaxas: false, taxaVendedor: mensal } }, semTabela);
+    expect(semRepasse.ok && semRepasse.condicoes.parcelado?.opcoes).toEqual([{ parcelas: 3, taxaPercentual: 5.69, valorParcela: 10000 }]);
+
+    const porParcela = { modo: "parcela" as const, mensal: "", porParcela: [{ parcelas: 3, taxa: "5" }, { parcelas: 1, taxa: "4" }] };
+    const p = montar({ parcelado: { meio: "cartao", parcelas: [1, 3], repassarTaxas: true, taxaVendedor: porParcela } }, semTabela);
+    expect(p.ok && p.condicoes.parcelado).toEqual({
+      meio: "cartao",
+      repassarTaxas: true,
+      opcoes: [
+        { parcelas: 1, taxaPercentual: 4, valorParcela: 31250 },
+        { parcelas: 3, taxaPercentual: 5, valorParcela: 10526.32 },
+      ],
+    });
+
+    // Sem taxa, taxa fora do limite, parcela sem taxa, nenhuma parcela ou parcela fora de 1 a 24: recusa.
+    expect(montar({ parcelado: { meio: "cartao", parcelas: [3], repassarTaxas: true } }, semTabela).ok).toBe(false);
+    expect(montar({ parcelado: { meio: "cartao", parcelas: [3], repassarTaxas: true, taxaVendedor: { ...mensal, mensal: "11" } } }, semTabela).ok).toBe(false);
+    expect(montar({ parcelado: { meio: "cartao", parcelas: [1, 3, 6], repassarTaxas: true, taxaVendedor: porParcela } }, semTabela).ok).toBe(false);
+    expect(montar({ parcelado: { meio: "cartao", parcelas: [], repassarTaxas: true, taxaVendedor: mensal } }, semTabela).ok).toBe(false);
+    expect(montar({ parcelado: { meio: "cartao", parcelas: [25], repassarTaxas: true, taxaVendedor: mensal } }, semTabela).ok).toBe(false);
+  });
+
+  it("cartão com taxas da empresa: a taxa que o vendedor mandar é ignorada (vale a tabela)", () => {
+    const r = montar({ parcelado: { meio: "cartao", parcelas: [1], repassarTaxas: true, taxaVendedor: { modo: "mensal", mensal: "0", porParcela: [] } } });
+    expect(r.ok && r.condicoes.parcelado).toEqual({ meio: "cartao", repassarTaxas: true, opcoes: [{ parcelas: 1, taxaPercentual: 3, valorParcela: 30927.84 }] });
   });
 
   it("personalizado: partes com valor, forma e momento; data só no momento 'data' e a partir de hoje", () => {
@@ -230,7 +295,7 @@ describe("texto das condições emitidas (PDF e página até a PR 3b)", () => {
     const r = montar({
       aVista: { desconto: "5" },
       parcelado: { meio: "cartao", parcelas: [1, 3], repassarTaxas: false },
-      financiamento: { instituicao: "Banco X", opcoes: [{ entrada: "1.000", parcelas: "60", valorParcela: "690", carenciaDias: 90 }] },
+      financiamento: { instituicao: "Banco X", entrada: "1.000", carenciaDias: 90, modo: "manual", taxaMensal: "", opcoes: [{ parcelas: "60", valorParcela: "690" }] },
       personalizado: { partes: [{ valor: "30.000", forma: "pix", momento: "data", data: "2026-12-01", observacao: "" }] },
       observacao: "Valores válidos até a validade",
     });
@@ -239,7 +304,7 @@ describe("texto das condições emitidas (PDF e página até a PR 3b)", () => {
     expect(linhasCondicoesEmitidas(r.condicoes)).toEqual([
       `À vista: R$${nbsp}28.500,00 (5% de desconto)`,
       `Cartão: 1x de R$${nbsp}30.000,00 · 3x de R$${nbsp}10.000,00`,
-      `Financiamento (Banco X): entrada de R$${nbsp}1.000,00 + 60x de R$${nbsp}690,00, carência de 90 dias`,
+      `Financiamento (Banco X): entrada de R$${nbsp}1.000,00; 60x de R$${nbsp}690,00; carência de 90 dias`,
       `Personalizado, total de R$${nbsp}30.000,00: R$${nbsp}30.000,00 (PIX) em 01/12/2026`,
       "Valores válidos até a validade",
     ]);
@@ -251,7 +316,7 @@ describe("condições por modalidade (PDF e página, PR 3b)", () => {
     const r = montar({
       aVista: { desconto: "5" },
       parcelado: { meio: "cartao", parcelas: [1, 3], repassarTaxas: false },
-      financiamento: { instituicao: "", opcoes: [{ entrada: "", parcelas: "60", valorParcela: "690", carenciaDias: 90 }] },
+      financiamento: { instituicao: "", entrada: "", carenciaDias: 90, modo: "manual", taxaMensal: "", opcoes: [{ parcelas: "60", valorParcela: "690" }] },
       personalizado: { partes: [{ valor: "30.000", forma: "transferencia", momento: "conexao", data: "", observacao: "após a vistoria" }] },
     });
     if (!r.ok) throw new Error(r.pendencias.join(" "));
@@ -270,8 +335,8 @@ describe("condições por modalidade (PDF e página, PR 3b)", () => {
       {
         modalidade: "financiamento",
         titulo: "Financiamento",
-        subtitulo: null,
-        itens: [{ valor: `60x de R$${nbsp}690,00`, detalhe: "Sem entrada · carência de 90 dias" }],
+        subtitulo: "Sem entrada · carência de 90 dias",
+        itens: [{ valor: `60x de R$${nbsp}690,00`, detalhe: null }],
       },
       {
         modalidade: "personalizado",
@@ -280,6 +345,26 @@ describe("condições por modalidade (PDF e página, PR 3b)", () => {
         itens: [{ valor: `R$${nbsp}30.000,00 · Transferência`, detalhe: "Na conexão — após a vistoria" }],
       },
     ]);
+  });
+
+  it("financiamento emitido antes da entrada única: entrada e carência em cada opção, como antes", () => {
+    const nbsp = " ";
+    const antiga: CondicoesEmitidas = {
+      aVista: null,
+      parcelado: null,
+      financiamento: { instituicao: "Banco X", opcoes: [{ entrada: 1000, parcelas: 60, valorParcela: 690, carenciaDias: 90 }] },
+      personalizado: null,
+      observacao: null,
+    };
+    expect(secoesCondicoesEmitidas(antiga)).toEqual([
+      {
+        modalidade: "financiamento",
+        titulo: "Financiamento",
+        subtitulo: "Banco X",
+        itens: [{ valor: `60x de R$${nbsp}690,00`, detalhe: `Entrada de R$${nbsp}1.000,00 · carência de 90 dias` }],
+      },
+    ]);
+    expect(linhasCondicoesEmitidas(antiga)).toEqual([`Financiamento (Banco X): entrada de R$${nbsp}1.000,00 + 60x de R$${nbsp}690,00, carência de 90 dias`]);
   });
 
   it("modalidade não marcada não aparece; à vista sem desconto fica sem linha de apoio", () => {
