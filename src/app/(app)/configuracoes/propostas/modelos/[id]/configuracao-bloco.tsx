@@ -4,6 +4,7 @@ import { ChevronDown } from "lucide-react";
 import { useActionState, useState } from "react";
 import { Botao, Mensagem } from "@/components/ui";
 import { salvarConfigBlocoModelo } from "@/lib/acoes/proposta-modelos";
+import { HORIZONTES_PROPOSTA, horizonteDoBloco } from "@/lib/propostas/economia-emissao";
 
 function itensDoConfig(config: unknown): string[] {
   if (!config || typeof config !== "object") return [];
@@ -160,12 +161,48 @@ function EditorDozeMeses({ modeloId, blocoId, config, chave, rotulo }: { modeloI
   );
 }
 
+/**
+ * Bloco "Retorno/fluxo de caixa": quantos anos a proposta mostra ao cliente (5 a 25; decisão do Evandro em 25/11/2026)
+ * e o texto opcional. O cálculo continua com 25 anos; a emissão guarda os anos escolhidos.
+ */
+function EditorRetorno({ modeloId, blocoId, config }: { modeloId: string; blocoId: string; config: unknown }) {
+  const [anos, setAnos] = useState<number>(() => horizonteDoBloco(config));
+  const [texto, setTexto] = useState(campoDoConfig(config, "texto"));
+  const configJson = JSON.stringify({ anos, texto });
+  return (
+    <CampoFormulario modeloId={modeloId} blocoId={blocoId} configJson={configJson}>
+      <fieldset className="flex flex-col gap-1 text-xs">
+        <legend className="mb-1 font-medium text-zinc-600">Anos mostrados ao cliente</legend>
+        <div className="flex flex-wrap gap-1.5">
+          {HORIZONTES_PROPOSTA.map((n) => (
+            <label key={n} className="relative">
+              <input type="radio" name={`anos-${blocoId}`} value={n} checked={anos === n} onChange={() => setAnos(n)} className="peer sr-only" />
+              <span className="inline-flex min-h-11 min-w-14 cursor-pointer items-center justify-center rounded-lg bg-white px-3 text-sm font-semibold text-zinc-700 ring-1 ring-zinc-300 peer-checked:bg-carvao peer-checked:text-dourado peer-checked:ring-carvao peer-focus-visible:outline-2 peer-focus-visible:outline-dourado">
+                {n}
+              </span>
+            </label>
+          ))}
+        </div>
+        <span className="mt-1 text-zinc-500">
+          Vale para o gráfico do retorno e o total &quot;Em N anos&quot; da proposta e da página on-line. O cálculo continua com 25 anos, o
+          retorno aparece mesmo quando passa desse prazo e a ficha do negócio mostra sempre os 25 anos. Propostas já emitidas não mudam.
+        </span>
+      </fieldset>
+      <label className="flex flex-col gap-1 text-xs">
+        <span className="font-medium text-zinc-600">Texto sobre o retorno (opcional)</span>
+        <textarea value={texto} onChange={(e) => setTexto(e.target.value)} rows={3} className={CLASSE_CAMPO} />
+      </label>
+    </CampoFormulario>
+  );
+}
+
 type CampoSpec = { chave: string; rotulo: string; multilinha?: boolean };
 type EspecificacaoBloco =
   | { tipo: "lista"; rotulo: string; dica: string }
   | { tipo: "lista-dupla"; rotuloA: string; chaveA: string; rotuloB: string; chaveB: string }
   | { tipo: "doze"; chave: string; rotulo: string }
-  | { tipo: "campos"; campos: CampoSpec[] };
+  | { tipo: "campos"; campos: CampoSpec[] }
+  | { tipo: "retorno" };
 
 /** Só entram aqui os tipos cujo renderer (src/lib/propostas/pdf.tsx) de fato lê `config`. */
 const ESPECIFICACAO: Record<string, EspecificacaoBloco> = {
@@ -200,7 +237,7 @@ const ESPECIFICACAO: Record<string, EspecificacaoBloco> = {
   generation_vs_consumption: { tipo: "doze", chave: "valoresConsumo", rotulo: "Consumo mensal (kWh), 12 valores separados por vírgula (Jan a Dez)" },
   simulation_assumptions: { tipo: "campos", campos: [{ chave: "texto", rotulo: "Premissas técnicas", multilinha: true }] },
   long_term_generation: { tipo: "campos", campos: [{ chave: "texto", rotulo: "Projeção de longo prazo", multilinha: true }] },
-  cashflow_payback: { tipo: "campos", campos: [{ chave: "texto", rotulo: "Texto sobre o retorno (opcional)", multilinha: true }] },
+  cashflow_payback: { tipo: "retorno" },
   extra_costs: { tipo: "lista", rotulo: "Itens e serviços adicionais", dica: 'um por linha, "nome | valor"' },
   validity_timeline: { tipo: "lista", rotulo: "Validade e prazo", dica: 'um por linha, "rótulo | valor"' },
   project_steps: { tipo: "lista", rotulo: "Etapas da instalação", dica: 'um por linha, "título | prazo | descrição"' },
@@ -257,6 +294,8 @@ export function ConfiguracaoBloco({ modeloId, blocoId, tipo, config }: { modeloI
           <EditorLista modeloId={modeloId} blocoId={blocoId} config={config} rotulo={espec.rotulo} dica={espec.dica} />
         ) : espec.tipo === "lista-dupla" ? (
           <EditorListaDupla modeloId={modeloId} blocoId={blocoId} config={config} rotuloA={espec.rotuloA} chaveA={espec.chaveA} rotuloB={espec.rotuloB} chaveB={espec.chaveB} />
+        ) : espec.tipo === "retorno" ? (
+          <EditorRetorno modeloId={modeloId} blocoId={blocoId} config={config} />
         ) : espec.tipo === "doze" ? (
           <EditorDozeMeses modeloId={modeloId} blocoId={blocoId} config={config} chave={espec.chave} rotulo={espec.rotulo} />
         ) : (

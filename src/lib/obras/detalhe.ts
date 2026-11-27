@@ -115,6 +115,8 @@ export type ObraDetalheVM = {
   /** Controles do modo Gestão; null para quem não tem nenhuma autorização de escrita (gestor, vendedor, SDR...). */
   gestao: GestaoObraVM | null;
   fixacao: FixacaoObraVM;
+  /** Concessionária da obra (20261223100000_concessionarias.sql); null = sem cadastro, o checklist não é aplicado. */
+  concessionariaId: string | null;
 };
 
 export type OpcaoFixacaoVM = { id: string; nome: string };
@@ -174,7 +176,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Colunas lidas de `obras` no caminho comercial (explícitas: nunca `*`). */
 const COLUNAS_OBRA =
-  "id, numero, negocio_id, cliente_nome, cidade, uf, potencia_kwp, tipo_ligacao, unidade_consumidora, snapshot, pausada_em, pausa_motivo, cancelada_em, cancelamento_motivo, alerta_pagamento_estornado_em, venda_alterada_em, created_at";
+  "id, numero, negocio_id, cliente_nome, cidade, uf, potencia_kwp, tipo_ligacao, unidade_consumidora, snapshot, pausada_em, pausa_motivo, cancelada_em, cancelamento_motivo, alerta_pagamento_estornado_em, venda_alterada_em, created_at, concessionaria_id";
 
 /** Forma comum às duas fontes (tabela `obras` e RPC `obras_operacao`). */
 type ObraBase = {
@@ -196,6 +198,7 @@ type ObraBase = {
   vendaAlteradaEm: string | null;
   criadaEm: string;
   contato: ContatoClienteVM | null;
+  concessionariaId: string | null;
 };
 
 const ehSetor = (setor: string): setor is SetorObra => (SETORES_OBRA as readonly string[]).includes(setor);
@@ -240,6 +243,7 @@ async function lerObraOperacao(supabase: SupabaseServidor, empresaId: string, ob
     vendaAlteradaEm: o.venda_alterada_em ?? null,
     criadaEm: o.created_at,
     contato: Object.values(contato).some((v) => v !== null) ? contato : null,
+    concessionariaId: o.concessionaria_id ?? null,
   };
 }
 
@@ -267,6 +271,7 @@ async function lerObraComercial(supabase: SupabaseServidor, empresaId: string, o
     vendaAlteradaEm: o.venda_alterada_em,
     criadaEm: o.created_at,
     contato: null,
+    concessionariaId: o.concessionaria_id,
   };
 }
 
@@ -420,6 +425,7 @@ export async function carregarDetalheObra(
     historico: montarHistorico(historicoRes.data ?? [], nomes),
     gestao,
     fixacao: { ...fixacao, podeEditar: podeEditarFixacao && fixacao.disponivel },
+    concessionariaId: obra.concessionariaId,
   };
 }
 

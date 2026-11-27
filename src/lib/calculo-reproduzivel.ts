@@ -6,7 +6,9 @@
  *
  * Estados gravados (migrations 20261023200000 e 20261023210000):
  *  - `completo`: regra aceita (`calcular`, ramo `completa`) com o retrato do que foi usado (data, tarifa e base,
- *    linha oficial, Fio B, percentual legal, vigência, piso, autoconsumo, ressalvas). Payback nulo (P0).
+ *    linha oficial, Fio B, percentual legal, vigência, piso, autoconsumo, ressalvas). Com os tributos da empresa nos
+ *    parâmetros, sai o método v2 (tributos, autoconsumo do negócio, projeção de 25 anos e payback; migration
+ *    20261221100000); sem eles, o v1 (payback nulo).
  *  - `incompleto`: resultado técnico sem parte financeira, com as pendências E as novas entradas (tarifa, base,
  *    data e, quando resolvidos, linha oficial e percentual), para que a linha corresponda ao que foi digitado.
  * Conta em R$ sem kWh não tem linha (`linha: null`: a coluna de consumo exige kWh). Linhas `legado` foram geradas
@@ -17,6 +19,7 @@ import { calcular, type EntradaCalculo } from "@/lib/calculadora";
 import { consumoComoPersistido, valorComoPersistido } from "@/lib/consumo-persistido";
 import { avaliarEstimativa, listaDePendencias, type Pendencia } from "@/lib/estimativa-financeira";
 import { calcularFioBGd2 } from "@/lib/fio-b-gd2";
+import { comTributos, fatorGeracao, PREMISSAS_PROJECAO } from "@/lib/projecao-financeira";
 import type { Database } from "@/lib/supabase/database.types";
 import {
   disponibilidadeArt291,
@@ -59,6 +62,10 @@ export type EntradaLinhaCalculo = {
   tarifaKwh: number;
   /** Base declarada da tarifa; nula = não declarada (pendência). */
   tarifaBaseTributaria?: BaseTributaria | null;
+  /** Autoconsumo do negócio (fração da geração); nulo = padrão residencial de 30%. */
+  autoconsumoFracao?: number | null;
+  /** Preço atual do inversor do kit (R$); nulo = desconhecido (sem payback). */
+  precoInversor?: number | null;
 };
 
 /** Campos de `parametros_calculadora` usados no cálculo. */
@@ -68,6 +75,9 @@ export type ParametrosCalculo = {
   disponibilidade_mono_kwh: number;
   disponibilidade_bi_kwh: number;
   disponibilidade_tri_kwh: number;
+  /** Tributos da empresa (migration 20261221100000); ausentes = método v1. */
+  icms?: number | null;
+  pis_cofins?: number | null;
 };
 
 /**
@@ -220,6 +230,15 @@ export function linhaDeCalculo(
     tarifaKwh,
     produtividadeKwhKwpMes: parametros.produtividade_kwh_kwp_mes,
     dadosEstimativa: { contexto, tarifaBaseTributaria: base },
+    financeiro:
+      parametros.icms != null && parametros.pis_cofins != null
+        ? {
+            icms: Number(parametros.icms),
+            pisCofins: Number(parametros.pis_cofins),
+            autoconsumoFracao: entrada.autoconsumoFracao ?? PREMISSAS_PROJECAO.autoconsumoResidencial,
+            precoInversor: entrada.precoInversor != null && entrada.precoInversor > 0 ? valorComoPersistido(entrada.precoInversor, CASAS_PRECO) : null,
+          }
+        : undefined,
   });
 
   const comum = {
@@ -267,6 +286,7 @@ export function linhaDeCalculo(
         payback_meses: null,
         autoconsumo_kwh: null,
         ressalvas: null,
+        ...SEM_V2,
       },
     };
   }
@@ -299,9 +319,38 @@ export function linhaDeCalculo(
       conta_sem_solar: resultado.contaSemSolar,
       conta_com_solar: resultado.contaComSolar,
       economia_mensal: resultado.economiaMensal,
-      // Payback indisponível no P0 (contrato, seção 4); o banco recusa outro valor no estado `completo`.
-      payback_meses: null,
+      // v1: payback indisponível (P0); v2: o da projeção ou nulo com o motivo (o banco confere os dois).
+      payback_meses: resultado.paybackMeses,
+      ...colunasV2(resultado.financeiro),
     },
+  };
+}
+
+/** Colunas do método v2 nulas (estado incompleto e método v1). */
+const SEM_V2 = {
+  icms: null,
+  pis_cofins: null,
+  autoconsumo_fracao: null,
+  preco_inversor: null,
+  economia_primeiro_ano: null,
+  economia_25_anos: null,
+  saldo_25_anos: null,
+  payback_motivo: null,
+  projecao: null,
+} satisfies Partial<LinhaCalculo>;
+
+function colunasV2(f: Extract<ReturnType<typeof calcular>, { estado: "completa" }>["financeiro"]): Partial<LinhaCalculo> {
+  if (!f) return SEM_V2;
+  return {
+    icms: f.icms,
+    pis_cofins: f.pisCofins,
+    autoconsumo_fracao: f.autoconsumoFracao,
+    preco_inversor: f.precoInversor,
+    economia_primeiro_ano: f.economiaPrimeiroAno,
+    economia_25_anos: f.economia25Anos,
+    saldo_25_anos: f.saldo25Anos,
+    payback_motivo: f.paybackMotivo,
+    projecao: f.projecao,
   };
 }
 
@@ -342,6 +391,9 @@ export type LinhaCompletaGravada = {
   fio_b_rs_mwh: number | null;
   percentual_legal_fio_b: number | null;
   autoconsumo_kwh: number | null;
+  /** Método v2: tributos usados (nulos no v1). */
+  icms?: number | null;
+  pis_cofins?: number | null;
 };
 
 /**
@@ -350,13 +402,16 @@ export type LinhaCompletaGravada = {
  */
 export function recalcularDaLinha(l: LinhaCompletaGravada) {
   if (l.fio_b_rs_mwh == null || l.percentual_legal_fio_b == null) return null;
+  // v2: o 1º mês da projeção (tributos por dentro e a perda do 1º ano); v1: a conta sem tributos.
+  const v2 = l.icms != null && l.pis_cofins != null;
+  const tributar = (v: number) => (v2 ? comTributos(v, Number(l.icms), Number(l.pis_cofins)) : v);
   const r = calcularFioBGd2({
     consumoTotalKwh: Number(l.consumo_medio_kwh),
-    geracaoTotalKwh: Number(l.kit_potencia_kwp) * Number(l.produtividade_kwh_kwp_mes),
+    geracaoTotalKwh: Number(l.kit_potencia_kwp) * Number(l.produtividade_kwh_kwp_mes) * (v2 ? fatorGeracao(1) : 1),
     autoconsumoInstantaneoKwh: Number(l.autoconsumo_kwh ?? 0),
-    tarifaCheiaRsKwh: Number(l.tarifa_kwh),
+    tarifaCheiaRsKwh: tributar(Number(l.tarifa_kwh)),
     custoDisponibilidadeKwh: Number(l.disponibilidade_kwh),
-    custoEnergiaCompensadaRsKwh: (Number(l.percentual_legal_fio_b) * Number(l.fio_b_rs_mwh)) / 1000,
+    custoEnergiaCompensadaRsKwh: tributar((Number(l.percentual_legal_fio_b) * Number(l.fio_b_rs_mwh)) / 1000),
   });
   return r.ok ? r : null;
 }

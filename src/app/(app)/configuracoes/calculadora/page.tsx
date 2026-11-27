@@ -52,6 +52,9 @@ export default async function ConfigCalculadora() {
               custoEngenharia: parametros.custo_engenharia,
               comissaoPercentual: parametros.comissao_percentual,
               custoFrete: parametros.custo_frete,
+              icms: Number(parametros.icms),
+              pisCofins: Number(parametros.pis_cofins),
+              curvaGeracaoMensal: parametros.curva_geracao_mensal?.map(Number) ?? null,
             }}
           />
         )}

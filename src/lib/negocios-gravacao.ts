@@ -14,11 +14,13 @@ import {
 } from "@/lib/calculo-reproduzivel";
 import { carregarVigencia, mensagemDeRecusa, motivosDaAcao } from "@/lib/calculo-vigencia";
 import { montarLinhaCalculo } from "@/lib/calculo-servidor";
+import { precoInversorParaCalculo } from "@/lib/compras/precificacao-gravacao";
 import { atualizarPrecoDoCalculo, autorizarGravacaoCalculo, gravarLinhaCalculo, marcarCalculoDesatualizado } from "@/lib/calculo-gravacao";
 import type { Pendencia } from "@/lib/estimativa-financeira";
 import { cnpjValido, cpfValido, formatarDocumento, soDigitos } from "@/lib/dados-cliente-contrato";
 import { mensagemErro } from "@/lib/erros";
 import { formatarMoeda, lerNumeroBr, MENSAGEM_NUMERO_BR } from "@/lib/formatacao";
+import { algumMesPresente, lerDozeMeses } from "@/lib/geracao-mensal";
 import { gravarPrecificacaoNegocio } from "@/lib/compras/precificacao-gravacao";
 import {
   completarContato,
@@ -181,6 +183,24 @@ export type ResultadoCriacao =
   | { ok: true; negocioId: string; empresaId: string; avisos: AvisoCriacao[]; estimativa?: EstimativaCriacao }
   | { ok: false; mensagem: string; contatoId?: string };
 
+/**
+ * Preço atual dos inversores do kit para a troca no ano 12 do cálculo (método v2). Só depois da autorização da sessão no
+ * negócio: lê custos com a chave de serviço (ver `precoInversorParaCalculo`).
+ */
+function precoInversor(empresaId: string, componentes: ComponenteKit[]) {
+  return precoInversorParaCalculo(
+    empresaId,
+    componentes.map((c) => ({
+      tipo: c.tipo,
+      descricao: c.descricao,
+      quantidade: c.quantidade,
+      potenciaW: c.potenciaW,
+      materialId: c.materialId ?? null,
+      precoVendaManual: c.precoVendaManual ?? null,
+    })),
+  );
+}
+
 async function inserirItensKit(supabase: SupabaseServidor, empresaId: string, negocioId: string, componentes: ComponenteKit[]) {
   return supabase
     .from("kit_componentes")
@@ -330,6 +350,9 @@ export async function criarNegocioComCliente(supabase: SupabaseServidor, atual: 
         valorFaturaMedio: d.valor_fatura_medio,
         tarifaKwh: d.tarifa_kwh,
         tarifaBaseTributaria: d.tarifa_base_tributaria,
+        // Negócio novo: autoconsumo padrão (30% no residencial).
+        autoconsumoFracao: null,
+        precoInversor: autorizado.ok ? await precoInversor(autorizado.autorizacao.empresaId, d.componentes) : null,
       }, { tipoCliente: d.qualif_tipo_cliente, distribuidoraInformada: d.qualif_distribuidora });
       if (montado.ok) {
         const { error: erroCalculo } = autorizado.ok
@@ -371,6 +394,21 @@ const esquemaEdicao = z.object({
   consumo_medio_kwh: numeroBrOpcional,
   tarifa_efetiva_kwh: numeroBrOpcional,
   valor_conta_energia: numeroBrOpcional,
+  // Autoconsumo em % da geração (0 a 100); vazio = padrão residencial de 30% (gravado nulo).
+  autoconsumo_percentual: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v, ctx) => {
+      if (v === undefined) return undefined;
+      if (v === "") return null;
+      const n = lerNumeroBr(v);
+      if (n == null || !Number.isFinite(n) || n < 0 || n > 100) {
+        ctx.addIssue({ code: "custom", message: "Autoconsumo: informe de 0 a 100%." });
+        return z.NEVER;
+      }
+      return Math.round(n * 100) / 10000;
+    }),
   // Data prevista (AAAA-MM-DD); vazio limpa a previsão. Salvar a data limpa o mês legado (`fechamento_previsto`).
   fechamento_previsto_em: z
     .union([z.string().regex(/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/, "Data prevista inválida"), z.literal("")])
@@ -401,6 +439,15 @@ export async function editarNegocioComCliente(
   const ehEletroposto = registro?.tipo === "eletroposto";
   if (temComercial && !ehEletroposto && d.valor == null) return { ok: false, mensagem: "Informe o valor do negócio." };
 
+  // Consumo dos 12 meses (proposta completa, PR 4): só para o gráfico da proposta; 12 ou nenhum. Formulário sem os
+  // campos (cartão "Oportunidade", formulário antigo aberto) não mexe no que está gravado.
+  const entrada = Object.fromEntries(formData);
+  const consumoMensal =
+    temTecnico && !ehEletroposto && algumMesPresente(entrada, "consumo_mes_")
+      ? lerDozeMeses(entrada, "consumo_mes_", "zero_ou_mais", "consumo mês a mês")
+      : null;
+  if (consumoMensal && !consumoMensal.ok) return { ok: false, mensagem: consumoMensal.mensagem };
+
   const consumoEdicao = resolverConsumo(d.consumo_medio_kwh, d.valor_conta_energia, d.tarifa_efetiva_kwh);
   const camposSolares = ehEletroposto || !temTecnico
     ? {}
@@ -413,6 +460,8 @@ export async function editarNegocioComCliente(
         consumo_estimado_kwh: consumoEdicao.origem === "estimado" ? consumoEdicao.kwh : null,
         tarifa_efetiva_kwh: consumoEdicao.tarifaEfetiva,
         valor_conta_energia: d.valor_conta_energia,
+        ...(d.autoconsumo_percentual !== undefined ? { autoconsumo_percentual: d.autoconsumo_percentual } : {}),
+        ...(consumoMensal ? { consumo_mensal_kwh: consumoMensal.valores } : {}),
       };
 
   const { data, error } = await supabase
@@ -517,7 +566,7 @@ export async function salvarKitComCliente(
   const [{ data: negocio }, { data: calculoAtual, error: erroCalculo }, { data: itensAntigos, error: erroAntigos }] = await Promise.all([
     supabase
       .from("negocios")
-      .select("valor, consumo_medio_kwh, consumo_estimado_kwh, tarifa_efetiva_kwh, valor_conta_energia, qualif_tipo_cliente, qualif_distribuidora")
+      .select("valor, consumo_medio_kwh, consumo_estimado_kwh, tarifa_efetiva_kwh, valor_conta_energia, qualif_tipo_cliente, qualif_distribuidora, autoconsumo_percentual")
       .eq("id", d.negocioId)
       .maybeSingle(),
     supabase
@@ -561,6 +610,8 @@ export async function salvarKitComCliente(
       valorFaturaMedio,
       tarifaKwh: d.tarifaKwh,
       tarifaBaseTributaria: d.tarifaBaseTributaria,
+      autoconsumoFracao: negocio.autoconsumo_percentual == null ? null : Number(negocio.autoconsumo_percentual),
+      precoInversor: await precoInversor(autorizacao.empresaId, d.componentes),
     }, { tipoCliente: negocio.qualif_tipo_cliente, distribuidoraInformada: negocio.qualif_distribuidora });
     if (!montado.ok && !montado.incompleta) return { ok: false, mensagem: `${montado.mensagem} Nada foi alterado.` };
   }

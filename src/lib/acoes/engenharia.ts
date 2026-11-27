@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { CHAVES_PERGUNTA, respostaValida } from "@/lib/engenharia-enquadramento-regras";
 import { ACOES_PASSO, ehPassoComRegistro } from "@/lib/engenharia-passos-regras";
-import { CANAIS_PROTOCOLO, CATEGORIAS_EXIGENCIA, TIPOS_RESPOSTA, TIPOS_SOLICITACAO } from "@/lib/engenharia-protocolos-regras";
+import { CATEGORIAS_EXIGENCIA, TIPOS_RESPOSTA, TIPOS_SOLICITACAO } from "@/lib/engenharia-protocolos-regras";
 import { TIPOS_REGISTRO_VISTORIA } from "@/lib/engenharia-vistoria-regras";
 import { mensagemErro } from "@/lib/erros";
 import { ENGENHARIA } from "@/lib/permissoes";
@@ -25,6 +25,20 @@ function revalidar(obraId: string) {
 }
 
 const comObra = z.object({ obraId: z.string().uuid() });
+
+const comConcessionaria = comObra.extend({ concessionariaId: z.string().uuid() });
+
+/** A Engenharia corrige a concessionária da obra; a RPC recusa a de outra empresa e grava o histórico. */
+export async function definirConcessionariaObra(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
+  await exigirPapel(...ENGENHARIA);
+  const d = comConcessionaria.safeParse(Object.fromEntries(formData));
+  if (!d.success) return { ok: false, mensagem: "Concessionária inválida." };
+  const supabase = await criarClienteServidor();
+  const { error } = await supabase.rpc("definir_concessionaria_obra", { p_obra_id: d.data.obraId, p_concessionaria_id: d.data.concessionariaId });
+  if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível salvar a concessionária.") };
+  revalidar(d.data.obraId);
+  return { ok: true, mensagem: "Concessionária da obra salva." };
+}
 
 /** Copia para a obra os itens ativos do modelo que ela ainda não tem. */
 export async function aplicarChecklistEngenharia(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
@@ -82,7 +96,8 @@ const vazioComoNada = (v: unknown) => (typeof v === "string" && v.trim() === "" 
 
 const esquemaProtocolo = comObra.extend({
   distribuidora: z.string().trim().min(2, "Informe a distribuidora.").max(60),
-  canal: z.enum(CANAIS_PROTOCOLO, { error: "Escolha o canal." }),
+  // Nome de um canal da concessionária da obra ou "outro" (20261224100000); a RPC confere.
+  canal: z.string().trim().min(1, "Escolha o canal.").max(60, "Canal inválido."),
   numero: z.string().trim().min(1, "Informe o número do protocolo.").max(60, "Número muito longo."),
   tipoSolicitacao: z.enum(TIPOS_SOLICITACAO, { error: "Escolha o tipo de solicitação." }),
   protocoladoEm: data,

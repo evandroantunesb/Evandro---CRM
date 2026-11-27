@@ -36,10 +36,19 @@ Cada empresa cadastra as próprias concessionárias, e cada uma tem o próprio c
 4. **Empresas e obras atuais:** toda empresa ganha a concessionária "Copel" com o checklist, prazos e canais que tem hoje, e toda obra existente aponta para ela. **(proposta do Claude, aceita)**
 5. **A obra herda a concessionária do negócio** (`negocios.qualif_distribuidora`, já escolhida na calculadora/cadastro), casando com a distribuidora ANEEL da concessionária cadastrada. A Engenharia pode corrigir.
 6. **Negócio com distribuidora que a empresa não cadastrou** (ou vazia, ou texto livre "outra"): a obra nasce com aviso "concessionária sem cadastro" e checklist vazio, até alguém cadastrar ou escolher a concessionária. **(proposta do Claude, aceita)**
+6a. **Distribuidora vazia no negócio (decisão do Evandro em 25/11/2026):** se a empresa tem uma única concessionária cadastrada, a obra usa essa (hoje, a Copel), para nada mudar a quem só atende a Copel. Distribuidora preenchida que não bate com nenhuma concessionária continua na regra 6 (aviso e sem checklist).
 7. **Concessionária corrigida pela Engenharia:** se nenhum documento do checklist foi enviado ainda, o checklist é trocado pelo da nova concessionária; se já houve envio, o checklist fica e a tela avisa que ele é da concessionária anterior. **(proposta do Claude, aceita)**
 8. **Só os prazos da distribuidora variam por concessionária** (análise do protocolo, aprovação, vistoria, conexão, obra de rede). Os prazos internos da equipe (a iniciar, projeto em elaboração, ART, exigência, correção em campo) continuam da empresa. **(proposta do Claude; conferir na leitura)**
 9. **"Documento enviado" na regra 7** = algum item do checklist da obra já saiu de pendente (arquivo anexado, marcado como entregue ou "não se aplica") ou já existe protocolo. **(proposta do Claude; conferir na leitura)**
 10. Configuração por concessionária: quem edita hoje o checklist e os prazos da Engenharia (admin) edita o cadastro das concessionárias.
+
+## Decisões de 26/11/2026 (entrega 3; prévia em https://claude.ai/artifact/BFk2a57EMctEpmB9FLbKwe)
+
+- **Item 8 confirmado:** só os prazos da distribuidora configuráveis hoje (análise, análise em zona rural, vistoria e conexão) passam a ser por concessionária. Os internos (a iniciar, projeto em elaboração, ART, exigência, correção de campo) continuam da empresa. O prazo da obra de rede continua vindo do orçamento de cada obra.
+- **Item 9 confirmado:** "já houve envio" = algum item do checklist da obra saiu de pendente por ação de alguém (arquivo anexado, conferido, válido, inválido ou "não se aplica" marcado à mão) ou já existe protocolo. Item que o enquadramento dispensou sozinho ("Fora do enquadramento") não conta.
+- **Canais da Copel:** PEW (nova conexão, ampliação, regularização; ligação nova e aumento de carga só em baixa tensão), Site da Copel (troca de titularidade, cadastro de compensação; ligação nova e aumento de carga em média tensão), CAW e Atendimento comercial sem condição, até o engenheiro confirmar se ainda são usados. O canal sugerido é o primeiro, pela ordem, que vale para o tipo e a tensão do enquadramento; canal sem condição nunca é sugerido, só listado. Para a Copel, a sugestão fica idêntica à regra de hoje.
+- **Obras sem concessionária ao criar uma nova:** continuam com o aviso até a Engenharia escolher. A tela da nova concessionária mostra quantas obras sem concessionária citam aquela distribuidora no negócio.
+- **Escolhas da prévia aprovadas:** faixa "Concessionária" em Configurações › Engenharia; só o admin cria concessionária e edita checklist e canais; os prazos da distribuidora seguem editáveis por quem edita prazos hoje (admin, gestor e coordenador da Engenharia); concessionária não se apaga, só troca de nome (a distribuidora não muda); protocolo lista os canais da concessionária da obra mais "Outro", e protocolos antigos ficam com o canal gravado.
 
 ## Entregas (PRs nesta ordem)
 

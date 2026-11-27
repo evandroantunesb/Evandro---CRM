@@ -1,8 +1,10 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { Botao, Campo, Mensagem } from "@/components/ui";
 import { confirmarProdutividade, criarKit, editarKit, editarParametros } from "@/lib/acoes/calculadora";
+import { lerNumeroBr } from "@/lib/formatacao";
+import { MESES_ABREV, MESES_NOMES } from "@/lib/geracao-mensal";
 import { percentualParaCampo } from "@/lib/percentual-exibicao";
 
 const inputClasse = "min-w-0 flex-1 rounded-md border border-zinc-300 px-3 py-1.5 text-sm";
@@ -77,6 +79,9 @@ export function FormularioParametros({
     custoEngenharia: number;
     comissaoPercentual: number;
     custoFrete: number;
+    icms: number;
+    pisCofins: number;
+    curvaGeracaoMensal: number[] | null;
   };
 }) {
   const [resultado, acao, pendente] = useActionState(editarParametros, null);
@@ -89,6 +94,7 @@ export function FormularioParametros({
         defaultValue={String(parametros.produtividadeKwhKwpMes).replace(".", ",")}
         required
       />
+      <CurvaGeracaoMensal inicial={parametros.curvaGeracaoMensal} />
       {/* Fio B e disponibilidade saíram da edição: a estimativa usa a regra legal, não estes valores da empresa. */}
       <div data-testid="parametros-regulatorios" className="rounded-md bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
         <p className="font-medium text-zinc-700">Fio B e custo de disponibilidade: definidos pela regra, não configuráveis</p>
@@ -106,6 +112,28 @@ export function FormularioParametros({
           kWh.
         </p>
       </div>
+      <p className="mt-2 text-sm font-medium text-zinc-700">Tributos da conta de luz</p>
+      <div className="grid grid-cols-2 gap-2">
+        <Campo
+          rotulo="ICMS (%)"
+          name="icms"
+          inputMode="decimal"
+          defaultValue={percentualParaCampo(parametros.icms)}
+          required
+        />
+        <Campo
+          rotulo="PIS/Cofins (%)"
+          name="pis_cofins"
+          inputMode="decimal"
+          defaultValue={percentualParaCampo(parametros.pisCofins)}
+          required
+        />
+      </div>
+      <p data-testid="tributos-ajuda" className="-mt-1 text-xs text-zinc-500">
+        Entram &quot;por dentro&quot; na tarifa e no Fio B pago, como na fatura. A energia compensada pelo sistema é isenta
+        (Lei PR 19.595/2018 e Lei 13.169/2015). O PIS/Cofins muda todo mês: use o da última fatura da distribuidora. Ao
+        mudar, os cálculos já feitos ficam desatualizados até o vendedor recalcular o kit.
+      </p>
       <p className="mt-2 text-sm font-medium text-zinc-700">Custos internos (opcional)</p>
       <p className="-mt-2 text-xs text-zinc-500">
         Somados automaticamente ao preço sugerido do negócio junto com o preço estimado dos componentes do catálogo —
@@ -153,6 +181,65 @@ export function FormularioParametros({
       </Botao>
       <Mensagem resultado={resultado} />
     </form>
+  );
+}
+
+/**
+ * Curva de geração por mês (proposta completa, PR 4; prévia aprovada em 25/11/2026). 12 valores da região em qualquer
+ * unidade: só a proporção entre os meses reparte a geração do ano no gráfico da proposta. Campos `curva_mes_01`…`12`.
+ */
+function CurvaGeracaoMensal({ inicial }: { inicial: number[] | null }) {
+  const [valores, setValores] = useState<string[]>(() => MESES_NOMES.map((_, i) => (inicial?.[i] != null ? String(inicial[i]).replace(".", ",") : "")));
+  const numeros = valores.map((v) => lerNumeroBr(v));
+  const completa = numeros.every((n) => n != null && n > 0);
+  const soma = completa ? numeros.reduce<number>((a, b) => a + (b ?? 0), 0) : 0;
+  const maior = completa ? Math.max(...numeros.map((n) => n ?? 0)) : 0;
+  return (
+    <fieldset data-testid="curva-geracao" className="flex flex-col gap-3 rounded-xl border border-dourado bg-dourado/10 p-4">
+      <legend className="sr-only">Curva de geração por mês</legend>
+      <div className="flex flex-wrap items-center gap-2" aria-hidden>
+        <p className="text-sm font-semibold text-zinc-800">Curva de geração por mês</p>
+        <span className="rounded-full bg-dourado/25 px-2.5 py-0.5 text-xs font-medium text-zinc-800">Novo</span>
+        <span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-700">opcional</span>
+      </div>
+      <p className="text-xs leading-relaxed text-zinc-700">
+        Digite os 12 valores da sua região na mesma unidade (por exemplo, a irradiação média de cada mês do SunData/CRESESB,
+        em kWh/m² por dia). O sistema usa só a proporção entre os meses: a geração do ano continua sendo a produtividade
+        acima × 12. Sem a curva, a proposta sai sem o gráfico mês a mês.
+      </p>
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+        {MESES_NOMES.map((nome, i) => (
+          <label key={nome} className="flex flex-col gap-1 text-xs font-semibold text-zinc-600">
+            {nome}
+            <input
+              name={`curva_mes_${String(i + 1).padStart(2, "0")}`}
+              inputMode="decimal"
+              value={valores[i]}
+              onChange={(ev) => setValores((v) => v.map((x, j) => (j === i ? ev.target.value : x)))}
+              className="min-h-11 w-full rounded-lg border border-zinc-300 bg-white px-2.5 text-base tabular-nums text-zinc-900"
+            />
+          </label>
+        ))}
+      </div>
+      {completa && (
+        <div className="rounded-lg bg-white p-3 shadow-[0_0_0_1px_#ece8de]">
+          <p className="mb-2 text-xs font-semibold text-zinc-700">Como fica a geração do ano (parte de cada mês)</p>
+          <div className="grid h-24 grid-cols-12 items-end gap-1" aria-hidden>
+            {numeros.map((n, i) => (
+              <div key={MESES_ABREV[i]} className="flex h-full flex-col items-center justify-end gap-0.5">
+                <span className="text-[10px] font-semibold tabular-nums text-zinc-700">{(((n ?? 0) / soma) * 100).toFixed(1).replace(".", ",")}%</span>
+                <span className="block w-full rounded-t bg-dourado" style={{ height: `${Math.round(((n ?? 0) / maior) * 70)}%` }} />
+              </div>
+            ))}
+          </div>
+          <div className="mt-1 grid grid-cols-12 gap-1 text-center text-[10px] text-zinc-500" aria-hidden>
+            {MESES_ABREV.map((m) => (
+              <span key={m}>{m}</span>
+            ))}
+          </div>
+        </div>
+      )}
+    </fieldset>
   );
 }
 

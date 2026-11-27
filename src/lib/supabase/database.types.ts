@@ -326,6 +326,7 @@ export type Database = {
       calculos_solares: {
         Row: {
           atualizado_por: string | null;
+          autoconsumo_fracao: number | null;
           autoconsumo_kwh: number | null;
           consumo_medio_kwh: number;
           conta_com_solar: number | null;
@@ -336,7 +337,9 @@ export type Database = {
           data_referencia: string | null;
           disponibilidade_kwh: number;
           distribuidora: string | null;
+          economia_25_anos: number | null;
           economia_mensal: number | null;
+          economia_primeiro_ano: number | null;
           empresa_id: string;
           enquadramento: string | null;
           estado_financeiro: string;
@@ -347,6 +350,7 @@ export type Database = {
           fio_b_vigencia_fim: string | null;
           fio_b_vigencia_inicio: string | null;
           geracao_estimada_kwh_mes: number;
+          icms: number | null;
           id: string;
           kit_id: string | null;
           kit_nome: string;
@@ -359,11 +363,16 @@ export type Database = {
           negocio_id: string;
           observacoes: string | null;
           payback_meses: number | null;
+          payback_motivo: string | null;
           pendencias: Json | null;
           percentual_fio_b: number;
           percentual_legal_fio_b: number | null;
+          pis_cofins: number | null;
+          preco_inversor: number | null;
           produtividade_kwh_kwp_mes: number;
+          projecao: Json | null;
           ressalvas: string[] | null;
+          saldo_25_anos: number | null;
           tarifa_base_tributaria: string | null;
           tarifa_gd_id: string | null;
           tarifa_kwh: number;
@@ -374,6 +383,7 @@ export type Database = {
         };
         Insert: {
           atualizado_por?: string | null;
+          autoconsumo_fracao?: number | null;
           autoconsumo_kwh?: number | null;
           consumo_medio_kwh: number;
           conta_com_solar?: number | null;
@@ -384,7 +394,9 @@ export type Database = {
           data_referencia?: string | null;
           disponibilidade_kwh: number;
           distribuidora?: string | null;
+          economia_25_anos?: number | null;
           economia_mensal?: number | null;
+          economia_primeiro_ano?: number | null;
           empresa_id: string;
           enquadramento?: string | null;
           estado_financeiro?: string;
@@ -395,6 +407,7 @@ export type Database = {
           fio_b_vigencia_fim?: string | null;
           fio_b_vigencia_inicio?: string | null;
           geracao_estimada_kwh_mes: number;
+          icms?: number | null;
           id?: string;
           kit_id?: string | null;
           kit_nome: string;
@@ -407,11 +420,16 @@ export type Database = {
           negocio_id: string;
           observacoes?: string | null;
           payback_meses?: number | null;
+          payback_motivo?: string | null;
           pendencias?: Json | null;
           percentual_fio_b: number;
           percentual_legal_fio_b?: number | null;
+          pis_cofins?: number | null;
+          preco_inversor?: number | null;
           produtividade_kwh_kwp_mes: number;
+          projecao?: Json | null;
           ressalvas?: string[] | null;
+          saldo_25_anos?: number | null;
           tarifa_base_tributaria?: string | null;
           tarifa_gd_id?: string | null;
           tarifa_kwh: number;
@@ -422,6 +440,7 @@ export type Database = {
         };
         Update: {
           atualizado_por?: string | null;
+          autoconsumo_fracao?: number | null;
           autoconsumo_kwh?: number | null;
           consumo_medio_kwh?: number;
           conta_com_solar?: number | null;
@@ -432,7 +451,9 @@ export type Database = {
           data_referencia?: string | null;
           disponibilidade_kwh?: number;
           distribuidora?: string | null;
+          economia_25_anos?: number | null;
           economia_mensal?: number | null;
+          economia_primeiro_ano?: number | null;
           empresa_id?: string;
           enquadramento?: string | null;
           estado_financeiro?: string;
@@ -443,6 +464,7 @@ export type Database = {
           fio_b_vigencia_fim?: string | null;
           fio_b_vigencia_inicio?: string | null;
           geracao_estimada_kwh_mes?: number;
+          icms?: number | null;
           id?: string;
           kit_id?: string | null;
           kit_nome?: string;
@@ -455,11 +477,16 @@ export type Database = {
           negocio_id?: string;
           observacoes?: string | null;
           payback_meses?: number | null;
+          payback_motivo?: string | null;
           pendencias?: Json | null;
           percentual_fio_b?: number;
           percentual_legal_fio_b?: number | null;
+          pis_cofins?: number | null;
+          preco_inversor?: number | null;
           produtividade_kwh_kwp_mes?: number;
+          projecao?: Json | null;
           ressalvas?: string[] | null;
+          saldo_25_anos?: number | null;
           tarifa_base_tributaria?: string | null;
           tarifa_gd_id?: string | null;
           tarifa_kwh?: number;
@@ -1261,6 +1288,137 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "compras_tabelas_preco_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      concessionaria_canais: {
+        Row: {
+          ativo: boolean;
+          concessionaria_id: string;
+          created_at: string;
+          empresa_id: string;
+          id: string;
+          nome: string;
+          ordem: number;
+          tensoes: string[];
+          tipos: string[];
+          updated_at: string;
+        };
+        Insert: {
+          ativo?: boolean;
+          concessionaria_id: string;
+          created_at?: string;
+          empresa_id: string;
+          id?: string;
+          nome: string;
+          ordem?: number;
+          tensoes?: string[];
+          tipos?: string[];
+          updated_at?: string;
+        };
+        Update: {
+          ativo?: boolean;
+          concessionaria_id?: string;
+          created_at?: string;
+          empresa_id?: string;
+          id?: string;
+          nome?: string;
+          ordem?: number;
+          tensoes?: string[];
+          tipos?: string[];
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "concessionaria_canais_empresa_id_concessionaria_id_fkey";
+            columns: ["empresa_id", "concessionaria_id"];
+            isOneToOne: false;
+            referencedRelation: "concessionarias";
+            referencedColumns: ["empresa_id", "id"];
+          },
+          {
+            foreignKeyName: "concessionaria_canais_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      concessionaria_prazos: {
+        Row: {
+          chave: string;
+          concessionaria_id: string;
+          contagem: string;
+          dias_uteis: number | null;
+          empresa_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          chave: string;
+          concessionaria_id: string;
+          contagem?: string;
+          dias_uteis?: number | null;
+          empresa_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          chave?: string;
+          concessionaria_id?: string;
+          contagem?: string;
+          dias_uteis?: number | null;
+          empresa_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "concessionaria_prazos_empresa_id_concessionaria_id_fkey";
+            columns: ["empresa_id", "concessionaria_id"];
+            isOneToOne: false;
+            referencedRelation: "concessionarias";
+            referencedColumns: ["empresa_id", "id"];
+          },
+          {
+            foreignKeyName: "concessionaria_prazos_empresa_id_fkey";
+            columns: ["empresa_id"];
+            isOneToOne: false;
+            referencedRelation: "empresas";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      concessionarias: {
+        Row: {
+          created_at: string;
+          distribuidora: string;
+          empresa_id: string;
+          id: string;
+          nome: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          distribuidora: string;
+          empresa_id: string;
+          id?: string;
+          nome: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          distribuidora?: string;
+          empresa_id?: string;
+          id?: string;
+          nome?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "concessionarias_empresa_id_fkey";
             columns: ["empresa_id"];
             isOneToOne: false;
             referencedRelation: "empresas";
@@ -2169,6 +2327,7 @@ export type Database = {
       engenharia_checklist_modelo: {
         Row: {
           ativo: boolean;
+          concessionaria_id: string;
           condicoes: NonNullable<Json>;
           created_at: string;
           descricao: string | null;
@@ -2184,6 +2343,7 @@ export type Database = {
         };
         Insert: {
           ativo?: boolean;
+          concessionaria_id: string;
           condicoes?: NonNullable<Json>;
           created_at?: string;
           descricao?: string | null;
@@ -2199,6 +2359,7 @@ export type Database = {
         };
         Update: {
           ativo?: boolean;
+          concessionaria_id?: string;
           condicoes?: NonNullable<Json>;
           created_at?: string;
           descricao?: string | null;
@@ -2213,6 +2374,13 @@ export type Database = {
           updated_at?: string;
         };
         Relationships: [
+          {
+            foreignKeyName: "engenharia_checklist_modelo_concessionaria_fk";
+            columns: ["empresa_id", "concessionaria_id"];
+            isOneToOne: false;
+            referencedRelation: "concessionarias";
+            referencedColumns: ["empresa_id", "id"];
+          },
           {
             foreignKeyName: "engenharia_checklist_modelo_empresa_id_fkey";
             columns: ["empresa_id"];
@@ -3609,8 +3777,10 @@ export type Database = {
         Row: {
           arquivado_em: string | null;
           arquivado_por: string | null;
+          autoconsumo_percentual: number | null;
           consumo_estimado_kwh: number | null;
           consumo_medio_kwh: number | null;
+          consumo_mensal_kwh: number[] | null;
           contato_id: string;
           created_at: string;
           criado_por: string | null;
@@ -3658,8 +3828,10 @@ export type Database = {
         Insert: {
           arquivado_em?: string | null;
           arquivado_por?: string | null;
+          autoconsumo_percentual?: number | null;
           consumo_estimado_kwh?: number | null;
           consumo_medio_kwh?: number | null;
+          consumo_mensal_kwh?: number[] | null;
           contato_id: string;
           created_at?: string;
           criado_por?: string | null;
@@ -3707,8 +3879,10 @@ export type Database = {
         Update: {
           arquivado_em?: string | null;
           arquivado_por?: string | null;
+          autoconsumo_percentual?: number | null;
           consumo_estimado_kwh?: number | null;
           consumo_medio_kwh?: number | null;
+          consumo_mensal_kwh?: number[] | null;
           contato_id?: string;
           created_at?: string;
           criado_por?: string | null;
@@ -5651,6 +5825,7 @@ export type Database = {
           cancelamento_motivo: string | null;
           cidade: string | null;
           cliente_nome: string;
+          concessionaria_id: string | null;
           confirmacao_pagamento_id: string;
           contrato_id: string;
           created_at: string;
@@ -5680,6 +5855,7 @@ export type Database = {
           cancelamento_motivo?: string | null;
           cidade?: string | null;
           cliente_nome: string;
+          concessionaria_id?: string | null;
           confirmacao_pagamento_id: string;
           contrato_id: string;
           created_at?: string;
@@ -5709,6 +5885,7 @@ export type Database = {
           cancelamento_motivo?: string | null;
           cidade?: string | null;
           cliente_nome?: string;
+          concessionaria_id?: string | null;
           confirmacao_pagamento_id?: string;
           contrato_id?: string;
           created_at?: string;
@@ -5733,6 +5910,13 @@ export type Database = {
           vendedor_id?: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "obras_concessionaria_fk";
+            columns: ["empresa_id", "concessionaria_id"];
+            isOneToOne: false;
+            referencedRelation: "concessionarias";
+            referencedColumns: ["empresa_id", "id"];
+          },
           {
             foreignKeyName: "obras_confirmacao_pagamento_id_fkey";
             columns: ["confirmacao_pagamento_id"];
@@ -5807,6 +5991,7 @@ export type Database = {
       parametros_calculadora: {
         Row: {
           comissao_percentual: number;
+          curva_geracao_mensal: number[] | null;
           custo_engenharia: number;
           custo_frete: number;
           custo_instalacao_por_modulo: number;
@@ -5815,7 +6000,9 @@ export type Database = {
           disponibilidade_mono_kwh: number;
           disponibilidade_tri_kwh: number;
           empresa_id: string;
+          icms: number;
           percentual_fio_b: number;
+          pis_cofins: number;
           produtividade_confirmada_em: string | null;
           produtividade_confirmada_fonte: string | null;
           produtividade_confirmada_por: string | null;
@@ -5826,6 +6013,7 @@ export type Database = {
         };
         Insert: {
           comissao_percentual?: number;
+          curva_geracao_mensal?: number[] | null;
           custo_engenharia?: number;
           custo_frete?: number;
           custo_instalacao_por_modulo?: number;
@@ -5834,7 +6022,9 @@ export type Database = {
           disponibilidade_mono_kwh?: number;
           disponibilidade_tri_kwh?: number;
           empresa_id: string;
+          icms?: number;
           percentual_fio_b?: number;
+          pis_cofins?: number;
           produtividade_confirmada_em?: string | null;
           produtividade_confirmada_fonte?: string | null;
           produtividade_confirmada_por?: string | null;
@@ -5845,6 +6035,7 @@ export type Database = {
         };
         Update: {
           comissao_percentual?: number;
+          curva_geracao_mensal?: number[] | null;
           custo_engenharia?: number;
           custo_frete?: number;
           custo_instalacao_por_modulo?: number;
@@ -5853,7 +6044,9 @@ export type Database = {
           disponibilidade_mono_kwh?: number;
           disponibilidade_tri_kwh?: number;
           empresa_id?: string;
+          icms?: number;
           percentual_fio_b?: number;
+          pis_cofins?: number;
           produtividade_confirmada_em?: string | null;
           produtividade_confirmada_fonte?: string | null;
           produtividade_confirmada_por?: string | null;
@@ -7662,9 +7855,15 @@ export type Database = {
         Returns: number;
       };
       chave_fornecedor: { Args: { p_nome: string }; Returns: string };
+      checklist_engenharia_enviado: { Args: { p_obra_id: string }; Returns: boolean };
       compartilha_empresa: { Args: { p_user_id: string }; Returns: boolean };
       compartilha_empresa_comercial: { Args: { p_user_id: string }; Returns: boolean };
       compartilha_empresa_identidade: { Args: { p_user_id: string }; Returns: boolean };
+      concessionaria_da_obra: { Args: { p_obra_id: string }; Returns: string };
+      concessionaria_do_negocio: {
+        Args: { p_distribuidora: string; p_empresa_id: string };
+        Returns: string;
+      };
       concluir_engenharia_sem_conexao: {
         Args: { p_motivo: string; p_obra_id: string };
         Returns: undefined;
@@ -7806,6 +8005,15 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      criar_concessionaria: {
+        Args: {
+          p_copiar_de?: string;
+          p_distribuidora: string;
+          p_empresa_id: string;
+          p_nome: string;
+        };
+        Returns: string;
+      };
       criar_material_compra: {
         Args: {
           p_categoria: string;
@@ -7931,6 +8139,10 @@ export type Database = {
       };
       definir_atendimento_compras: {
         Args: { p_empresa_id: string; p_setor?: Database["public"]["Enums"]["setor_obra"] };
+        Returns: undefined;
+      };
+      definir_concessionaria_obra: {
+        Args: { p_concessionaria_id: string; p_obra_id: string };
         Returns: undefined;
       };
       definir_entrega_material_prevista: {
@@ -8366,6 +8578,7 @@ export type Database = {
       iniciar_atuacao_engenharia: { Args: { p_obra_id: string }; Returns: string };
       iniciar_compra_obra: { Args: { p_obra_id: string }; Returns: undefined };
       inserir_checklist_engenharia_padrao: { Args: { p_empresa_id: string }; Returns: undefined };
+      inserir_concessionaria_copel: { Args: { p_empresa_id: string }; Returns: undefined };
       inserir_fixacoes_telhado_padrao: { Args: { p_empresa_id: string }; Returns: undefined };
       inserir_prazos_engenharia_padrao: { Args: { p_empresa_id: string }; Returns: undefined };
       inserir_prazos_etapas_obra_padrao: { Args: { p_empresa_id: string }; Returns: undefined };
@@ -8505,6 +8718,7 @@ export type Database = {
           setor: Database["public"]["Enums"]["setor_obra"];
         }[];
       };
+      normalizar_nome_distribuidora: { Args: { p: string }; Returns: string };
       notificar_aviso_pagamento: {
         Args: { p_aviso: Database["public"]["Tables"]["avisos_pagamento"]["Row"]; p_tipo: string };
         Returns: undefined;
@@ -8531,6 +8745,7 @@ export type Database = {
           cliente_rg: string;
           cliente_telefone: string;
           cliente_telefone2: string;
+          concessionaria_id: string;
           created_at: string;
           empresa_id: string;
           numero: number;
@@ -8545,6 +8760,13 @@ export type Database = {
           unidade_consumidora: string;
           updated_at: string;
           venda_alterada_em: string;
+        }[];
+      };
+      obras_sem_concessionaria_por_distribuidora: {
+        Args: { p_empresa_id: string };
+        Returns: {
+          distribuidora: string;
+          obras: number;
         }[];
       };
       opcoes_enquadramento_engenharia: { Args: Record<PropertyKey, never>; Returns: Json };
@@ -9020,6 +9242,7 @@ export type Database = {
         Args: { p_empresa_id: string; p_meio: string; p_taxas: Json };
         Returns: undefined;
       };
+      semear_padrao_copel: { Args: { p_concessionaria_id: string }; Returns: undefined };
       semear_regras_eletroposto: { Args: { p_empresa_id: string }; Returns: undefined };
       sequencia_produtiva_membro: {
         Args: { p_empresa_id: string };
@@ -9144,8 +9367,10 @@ export type Database = {
         Returns: {
           arquivado_em: string | null;
           arquivado_por: string | null;
+          autoconsumo_percentual: number | null;
           consumo_estimado_kwh: number | null;
           consumo_medio_kwh: number | null;
+          consumo_mensal_kwh: number[] | null;
           contato_id: string;
           created_at: string;
           criado_por: string | null;
@@ -9202,8 +9427,10 @@ export type Database = {
         Returns: {
           arquivado_em: string | null;
           arquivado_por: string | null;
+          autoconsumo_percentual: number | null;
           consumo_estimado_kwh: number | null;
           consumo_medio_kwh: number | null;
+          consumo_mensal_kwh: number[] | null;
           contato_id: string;
           created_at: string;
           criado_por: string | null;

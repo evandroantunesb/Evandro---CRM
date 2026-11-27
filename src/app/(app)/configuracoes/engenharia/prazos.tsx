@@ -3,19 +3,28 @@
 import { useActionState } from "react";
 import { Botao, CLASSE_ENTRADA, Mensagem } from "@/components/ui";
 import { CONTAGENS_PRAZO, MARCO_PRAZO, ROTULO_CONTAGEM, ROTULO_PRAZO, type ChavePrazo, type ContagemPrazo } from "@/lib/engenharia-prazos-regras";
+import { salvarPrazosConcessionaria } from "./acoes-concessionarias";
 import { adicionarFeriado, removerFeriado, salvarPrazos } from "./actions";
 
 const entrada = `min-w-0 text-sm ${CLASSE_ENTRADA}`;
 
-/** Dias de cada prazo e se contam úteis ou corridos. Vazio = sem prazo. */
+/**
+ * Dias de cada prazo e se contam úteis ou corridos. Vazio = sem prazo. Com `concessionariaId`, grava os prazos da
+ * distribuidora daquela concessionária; sem, os internos da empresa.
+ */
 export function FormPrazos({
   grupos,
+  concessionariaId,
+  rotuloSalvar = "Salvar prazos",
 }: {
   grupos: { titulo: string; ajuda: string; prazos: { chave: ChavePrazo; dias: number | null; contagem: ContagemPrazo }[] }[];
+  concessionariaId?: string;
+  rotuloSalvar?: string;
 }) {
-  const [resultado, acao, pendente] = useActionState(salvarPrazos, null);
+  const [resultado, acao, pendente] = useActionState(concessionariaId ? salvarPrazosConcessionaria : salvarPrazos, null);
   return (
     <form action={acao} className="flex flex-col gap-4">
+      {concessionariaId && <input type="hidden" name="concessionariaId" value={concessionariaId} />}
       {grupos.map((g) => (
         <fieldset key={g.titulo} className="flex flex-col gap-2">
           <legend className="text-sm font-medium text-texto">{g.titulo}</legend>
@@ -56,7 +65,7 @@ export function FormPrazos({
       ))}
       <div className="flex flex-wrap items-center gap-2">
         <Botao type="submit" disabled={pendente}>
-          Salvar prazos
+          {rotuloSalvar}
         </Botao>
         <Mensagem resultado={resultado} />
       </div>

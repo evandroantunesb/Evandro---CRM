@@ -3,6 +3,7 @@
 import { Paperclip } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useState, useTransition } from "react";
+import { AVISO_SEM_CONCESSIONARIA } from "@/components/engenharia/concessionaria";
 import { Botao, CLASSE_ENTRADA, classeBotao, Mensagem, Selo } from "@/components/ui";
 import { alterarItemEngenharia, aplicarChecklistEngenharia, registrarDocumentoEngenharia } from "@/lib/acoes/engenharia";
 import { usarArquivoNegocioEngenharia } from "@/lib/acoes/engenharia-arquivo-negocio";
@@ -45,6 +46,8 @@ export function ChecklistEngenharia({
   autorizacao,
   cancelada,
   veDocumentos,
+  semConcessionaria,
+  deOutraConcessionaria = null,
 }: {
   obraId: string;
   /** `empresa/obra`, pasta da obra no bucket. */
@@ -53,19 +56,36 @@ export function ChecklistEngenharia({
   autorizacao: AutorizacaoEngenharia;
   cancelada: boolean;
   veDocumentos: boolean;
+  /** Obra sem concessionária: o banco recusa aplicar o checklist (20261223100000_concessionarias.sql). */
+  semConcessionaria: boolean;
+  /** Nome da concessionária anterior quando o checklist veio dela (a da obra foi trocada depois de algum envio). */
+  deOutraConcessionaria?: string | null;
 }) {
   const podeAplicar = autorizacao !== null && !cancelada;
   if (itens.length === 0) {
     return (
       <div className="flex flex-col gap-3 text-sm">
         <p className="text-zinc-600">O checklist ainda não foi aplicado nesta obra.</p>
-        {podeAplicar && <Aplicar obraId={obraId} rotulo="Aplicar checklist" />}
+        {podeAplicar &&
+          (semConcessionaria ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <Botao type="button" disabled>
+                Aplicar checklist
+              </Botao>
+              <span className="text-amber-900">{AVISO_SEM_CONCESSIONARIA}</span>
+            </div>
+          ) : (
+            <Aplicar obraId={obraId} rotulo="Aplicar checklist" />
+          ))}
       </div>
     );
   }
   const r = resumoChecklist(itens);
   return (
     <div className="flex flex-col gap-4">
+      {deOutraConcessionaria && (
+        <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-900">Checklist da concessionária anterior ({deOutraConcessionaria}).</p>
+      )}
       <p className="text-sm text-zinc-700">
         Obrigatórios resolvidos: <span className="font-medium text-texto">{r.obrigatoriosResolvidos} de {r.obrigatorios}</span>
         {" · "}Total: {r.resolvidos} de {r.total}

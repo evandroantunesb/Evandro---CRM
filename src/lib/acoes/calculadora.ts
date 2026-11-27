@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { mensagemErro } from "@/lib/erros";
 import { lerNumeroBr, MENSAGEM_NUMERO_BR } from "@/lib/formatacao";
+import { algumMesPresente, lerCurvaDoFormulario } from "@/lib/geracao-mensal";
 import { atualizarPrecoCalculoComCliente, salvarKitComCliente } from "@/lib/negocios-gravacao";
 import { LIMITES_CONFIRMACAO } from "@/lib/propostas/proposta-simples";
 import { exigirPapel } from "@/lib/sessao";
@@ -123,6 +124,22 @@ export async function editarParametros(_: ResultadoAcao, formData: FormData): Pr
     .optional()
     .transform((v) => lerNumeroBr(v) ?? 0)
     .pipe(z.number({ message: `Custo inválido. ${MENSAGEM_NUMERO_BR}` }).nonnegative("Custo inválido"));
+  // Tributos da conta de luz (método v2): obrigatórios e nos limites do banco (`parametros_calculadora`).
+  const tributo = (nome: string, limite: number) =>
+    z
+      .string({ message: `Informe o ${nome}.` })
+      .trim()
+      .min(1, `Informe o ${nome}.`)
+      .transform((v) => {
+        const n = lerNumeroBr(v);
+        return n == null ? null : Math.round(n * 100) / 10000;
+      })
+      .pipe(
+        z
+          .number({ message: `${nome} inválido. ${MENSAGEM_NUMERO_BR}` })
+          .min(0, `${nome} inválido.`)
+          .lt(limite, `O ${nome} precisa ficar abaixo de ${limite * 100}%.`),
+      );
   const dados = z
     .object({
       // Fio B e disponibilidade não são mais editáveis: a estimativa usa a regra legal (Lei 14.300, art. 27; REN 1.000,
@@ -133,11 +150,21 @@ export async function editarParametros(_: ResultadoAcao, formData: FormData): Pr
       custo_engenharia: custoOpcional,
       comissao_percentual: percentual,
       custo_frete: custoOpcional,
+      icms: tributo("ICMS", 0.5),
+      pis_cofins: tributo("PIS/Cofins", 0.3),
     })
+    .refine((d) => d.icms + d.pis_cofins < 0.6, { message: "ICMS e PIS/Cofins somados precisam ficar abaixo de 60%." })
     .safeParse(Object.fromEntries(formData));
   if (!dados.success) return { ok: false, mensagem: dados.error.issues[0].message };
+  // Curva de geração por mês (proposta completa, PR 4): 12 ou nenhuma. Formulário sem os campos não mexe nela.
+  const entrada = Object.fromEntries(formData);
+  const curva = algumMesPresente(entrada, "curva_mes_") ? lerCurvaDoFormulario(entrada) : null;
+  if (curva && !curva.ok) return { ok: false, mensagem: curva.mensagem };
   const supabase = await criarClienteServidor();
-  const { error } = await supabase.from("parametros_calculadora").update(dados.data).eq("empresa_id", atual.empresaId);
+  const { error } = await supabase
+    .from("parametros_calculadora")
+    .update({ ...dados.data, ...(curva ? { curva_geracao_mensal: curva.valores } : {}) })
+    .eq("empresa_id", atual.empresaId);
   if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível salvar os parâmetros.") };
   revalidatePath(CAMINHO_LISTAS);
   return { ok: true, mensagem: "Parâmetros salvos." };

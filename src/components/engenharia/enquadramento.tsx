@@ -4,24 +4,26 @@ import { useActionState, useState } from "react";
 import { Botao, CLASSE_ENTRADA, Mensagem } from "@/components/ui";
 import { salvarEnquadramentoEngenharia } from "@/lib/acoes/engenharia";
 import {
-  canalCopel,
+  canalSugerido,
   PERGUNTAS_ENQUADRAMENTO,
   rotuloResposta,
+  type CanalConcessionaria,
   type EnquadramentoVM,
   type RespostasEnquadramento,
 } from "@/lib/engenharia-enquadramento-regras";
 
+/** Concessionária da obra com os canais dela (20261224100000); nula = obra sem concessionária. */
+export type CanaisDaObra = { nome: string; canais: CanalConcessionaria[] } | null;
+
 const numero = (n: number | null) => (n == null ? "" : String(n).replace(".", ","));
-/** Canal da Copel calculado das respostas (só informativo). */
-function Canal({ respostas }: { respostas: RespostasEnquadramento | null }) {
-  const canal = canalCopel(respostas);
+/** Canal sugerido pelas respostas e pelos canais da concessionária da obra (só informativo). */
+function Canal({ respostas, concessionaria }: { respostas: RespostasEnquadramento | null; concessionaria: CanaisDaObra }) {
+  const canal = concessionaria && canalSugerido(concessionaria.canais, respostas);
   if (!canal) return null;
   return (
     <p className="rounded-lg bg-superficie-2 px-3 py-2 text-sm text-texto">
-      <span className="font-medium">Canal: {canal === "pew" ? "PEW" : "site da Copel"}.</span>{" "}
-      <span className="text-texto-2">
-        Projetos de geração, ligação nova e aumento de carga em baixa tensão vão pelo PEW; os demais pelos sites da Copel.
-      </span>
+      <span className="font-medium">Canal: {canal.nome}.</span>{" "}
+      <span className="text-texto-2">Pelo cadastro de canais da {concessionaria.nome}.</span>
     </p>
   );
 }
@@ -38,11 +40,13 @@ export function EnquadramentoEngenharia({
   enquadramento,
   podeEditar,
   kit,
+  concessionaria,
 }: {
   obraId: string;
   enquadramento: EnquadramentoVM | null;
   podeEditar: boolean;
   kit: { potenciaKwp: number | null; inversores: string | null };
+  concessionaria: CanaisDaObra;
 }) {
   const [resultado, acao, pendente] = useActionState(salvarEnquadramentoEngenharia, null);
   const [respostas, setRespostas] = useState<RespostasEnquadramento>(enquadramento?.respostas ?? {});
@@ -51,7 +55,7 @@ export function EnquadramentoEngenharia({
     if (!enquadramento) return <p className="text-sm text-zinc-500">Enquadramento ainda não preenchido.</p>;
     return (
       <div className="flex flex-col gap-3">
-        <Canal respostas={enquadramento.respostas} />
+        <Canal respostas={enquadramento.respostas} concessionaria={concessionaria} />
         <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
           {PERGUNTAS_ENQUADRAMENTO.map((p) => {
             const r = enquadramento.respostas[p.chave];
@@ -90,7 +94,7 @@ export function EnquadramentoEngenharia({
           </label>
         ))}
       </div>
-      <Canal respostas={respostas} />
+      <Canal respostas={respostas} concessionaria={concessionaria} />
       {respostas.situacao_ambiental === "nao_aplicavel" && (
         <label className="flex flex-col gap-1 text-xs text-zinc-600">
           Por que a questão ambiental não se aplica?

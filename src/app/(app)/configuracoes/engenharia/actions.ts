@@ -3,13 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { CHAVES_PERGUNTA, respostaValida, type CondicoesItem } from "@/lib/engenharia-enquadramento-regras";
-import { CHAVES_PRAZO_CONFIG, lerContagem, type ContagemPrazo } from "@/lib/engenharia-prazos-regras";
+import { CHAVES_PRAZO_INTERNO } from "@/lib/engenharia-prazos-regras";
 import { PRAZOS_OBRA } from "@/lib/permissoes";
 import { coordenaSetor } from "@/lib/prazos-permissao";
 import { exigirPapel } from "@/lib/sessao";
 import { carregarSetoresCoordenados } from "@/lib/setores-coordenados";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import type { ResultadoAcao } from "@/lib/tipos";
+import { gravarPrazos } from "./gravar-prazos";
 
 const CAMINHO = "/configuracoes/engenharia";
 const DUPLICADO = "Já existe um item com esse título.";
@@ -27,11 +28,17 @@ export async function criarItemModelo(_: ResultadoAcao, formData: FormData): Pro
   const { atual } = await exigirPapel("admin");
   const d = ler(formData);
   if (!d.success) return { ok: false, mensagem: d.error.issues[0].message };
+  // O modelo é por concessionária (20261224100000); a FK composta recusa a de outra empresa.
+  const concessionaria = z.string().uuid().safeParse(formData.get("concessionariaId"));
+  if (!concessionaria.success) return { ok: false, mensagem: "Escolha a concessionária." };
 
   const supabase = await criarClienteServidor();
-  const { error } = await supabase
-    .from("engenharia_checklist_modelo")
-    .insert({ empresa_id: atual.empresaId, ...d.data, obrigatorio: formData.get("obrigatorio") === "on" });
+  const { error } = await supabase.from("engenharia_checklist_modelo").insert({
+    empresa_id: atual.empresaId,
+    concessionaria_id: concessionaria.data,
+    ...d.data,
+    obrigatorio: formData.get("obrigatorio") === "on",
+  });
   if (error) return { ok: false, mensagem: error.code === "23505" ? DUPLICADO : "Não foi possível criar." };
   revalidatePath(CAMINHO);
   return { ok: true, mensagem: "Item criado." };
@@ -81,47 +88,35 @@ export async function salvarCondicoesModelo(_: ResultadoAcao, formData: FormData
 // Prazos e feriados (P5)
 // ---------------------------------------------------------------------------
 
-const dias = z.union([z.literal(""), z.coerce.number().int("Use dias inteiros").min(1, "Mínimo de 1 dia").max(365, "Máximo de 365 dias")]);
-
 /**
- * Vazio = sem prazo. Só os dias mudam: as linhas nascem com a empresa. Admin, gestor e o coordenador da Engenharia
- * (20261124100000); o banco confere de novo.
+ * Prazos internos da empresa (os da distribuidora são por concessionária, em `salvarPrazosConcessionaria`). Vazio = sem
+ * prazo. Admin, gestor e o coordenador da Engenharia (20261124100000); o banco confere de novo.
  */
 export async function salvarPrazos(_: ResultadoAcao, formData: FormData): Promise<ResultadoAcao> {
   const { atual } = await exigirPapel(...PRAZOS_OBRA);
-  const supabaseSessao = await criarClienteServidor();
-  if (!coordenaSetor(atual.papel, await carregarSetoresCoordenados(supabaseSessao, atual), "engenharia")) {
+  const supabase = await criarClienteServidor();
+  if (!coordenaSetor(atual.papel, await carregarSetoresCoordenados(supabase, atual), "engenharia")) {
     return { ok: false, mensagem: "Só quem coordena a Engenharia muda estes prazos." };
   }
-  const valores: { chave: (typeof CHAVES_PRAZO_CONFIG)[number]; dias: number | null; contagem: ContagemPrazo }[] = [];
-  for (const chave of CHAVES_PRAZO_CONFIG) {
-    const d = dias.safeParse(String(formData.get(chave) ?? "").trim());
-    if (!d.success) return { ok: false, mensagem: d.error.issues[0].message };
-    valores.push({ chave, dias: d.data === "" ? null : d.data, contagem: lerContagem(formData.get(`${chave}_contagem`)) });
-  }
-
-  // Só o que mudou: cada linha gravada vira um registro de auditoria, e menos escritas deixam menos espaço para um
-  // salvamento parcial se uma delas falhar.
-  const supabase = supabaseSessao;
-  const { data: atuais, error: erroLeitura } = await supabase
-    .from("engenharia_prazos")
-    .select("chave, dias_uteis, contagem")
-    .eq("empresa_id", atual.empresaId);
-  if (erroLeitura) return { ok: false, mensagem: "Não foi possível salvar os prazos." };
-  const antes = new Map((atuais ?? []).map((p) => [p.chave, p]));
-  const mudou = (v: (typeof valores)[number]) => antes.get(v.chave)?.dias_uteis !== v.dias || antes.get(v.chave)?.contagem !== v.contagem;
-  for (const v of valores.filter(mudou)) {
-    // A RLS recusa sem erro (zero linhas): confere que a linha foi gravada.
-    const { data, error } = await supabase
-      .from("engenharia_prazos")
-      .update({ dias_uteis: v.dias, contagem: v.contagem })
-      .eq("empresa_id", atual.empresaId)
-      .eq("chave", v.chave)
-      .select("chave");
-    if (error || (data ?? []).length === 0) return { ok: false, mensagem: "Não foi possível salvar os prazos." };
-  }
-  revalidatePath(CAMINHO);
-  return { ok: true, mensagem: "Prazos salvos." };
+  const r = await gravarPrazos(
+    formData,
+    CHAVES_PRAZO_INTERNO,
+    async () => {
+      const { data, error } = await supabase.from("engenharia_prazos").select("chave, dias_uteis, contagem").eq("empresa_id", atual.empresaId);
+      return error ? null : data;
+    },
+    async (chave, dias, contagem) => {
+      const { data, error } = await supabase
+        .from("engenharia_prazos")
+        .update({ dias_uteis: dias, contagem })
+        .eq("empresa_id", atual.empresaId)
+        .eq("chave", chave)
+        .select("chave");
+      return !error && (data ?? []).length > 0;
+    },
+  );
+  if (r?.ok) revalidatePath(CAMINHO);
+  return r;
 }
 
 const esquemaFeriado = z.object({

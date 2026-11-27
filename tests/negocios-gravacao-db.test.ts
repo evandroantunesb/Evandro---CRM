@@ -252,6 +252,30 @@ describe("ciclo completo com contato novo", () => {
     expect(await previsao()).toEqual({ fechamento_previsto: null, fechamento_previsto_em: null });
   });
 
+  it("autoconsumo em % na Conta de luz: grava a fração; vazio volta ao padrão (nulo); fora de 0 a 100 é recusado; ausente não mexe", async () => {
+    const r = await criar(vendedor, novoNegocio());
+    const f = await reabrir(vendedor, r.negocioId!);
+    const autoconsumo = async () =>
+      (await servico.from("negocios").select("autoconsumo_percentual").eq("id", r.negocioId!).single()).data!.autoconsumo_percentual;
+    const editar = (mudar: Record<string, string>) =>
+      editarNegocioComCliente(cliente(vendedor), atual[vendedor.id], edicaoAtual(r.negocioId!, f.negocio, mudar));
+
+    expect(await autoconsumo()).toBeNull();
+    expect((await editar({ autoconsumo_percentual: "45,5" })).ok).toBe(true);
+    expect(await autoconsumo()).toBe(0.455);
+    // O formulário sem o campo (ex.: só a Oportunidade) não apaga o que está gravado.
+    expect((await editar({})).ok).toBe(true);
+    expect(await autoconsumo()).toBe(0.455);
+    for (const invalido of ["101", "-1", "abc"]) {
+      expect(await editar({ autoconsumo_percentual: invalido })).toEqual({ ok: false, mensagem: "Autoconsumo: informe de 0 a 100%." });
+    }
+    expect(await autoconsumo()).toBe(0.455);
+    expect((await editar({ autoconsumo_percentual: "0" })).ok).toBe(true);
+    expect(await autoconsumo()).toBe(0);
+    expect((await editar({ autoconsumo_percentual: "" })).ok).toBe(true);
+    expect(await autoconsumo()).toBeNull();
+  });
+
   it("criar → reabrir → editar negócio e contato → reabrir preserva tudo", async () => {
     const r = await criar(
       vendedor,

@@ -100,7 +100,9 @@ describe("prévia → salvar → reabrir: resultado completo pela regra aceita",
     const l = await linha(negocioId);
     expect(l).toMatchObject({
       estado_financeiro: "completo",
-      metodo_calculo: "gd2_piso_655i_v1",
+      // Método v2 (24/11/2026): ICMS 19% e PIS/Cofins 7,63% da empresa, autoconsumo padrão de 30% e a perda do 1º ano
+      // (geração de 297 kWh, 89,1 kWh consumidos na hora). O kit não tem inversor: sem payback, com o motivo.
+      metodo_calculo: "gd2_piso_655i_v2",
       tarifa_kwh: 0.76802,
       tarifa_base_tributaria: "sem_tributos",
       tarifa_origem: "oficial_aneel",
@@ -113,20 +115,26 @@ describe("prévia → salvar → reabrir: resultado completo pela regra aceita",
       fio_b_vigencia_fim: "2027-06-23",
       disponibilidade_kwh: 50,
       geracao_estimada_kwh_mes: 300,
-      kwh_compensado: 300,
-      kwh_faturado: 200,
+      kwh_compensado: 207.9,
+      kwh_faturado: 203,
       kwh_nao_compensado: 0,
-      custo_fio_b: 38.62,
-      conta_sem_solar: 384.01,
-      conta_com_solar: 192.22,
-      economia_mensal: 191.79,
+      custo_fio_b: 36.47,
+      conta_sem_solar: 523.39,
+      conta_com_solar: 248.97,
+      economia_mensal: 274.42,
       payback_meses: null,
-      autoconsumo_kwh: 0,
+      payback_motivo: "inversor_sem_preco",
+      preco_inversor: null,
+      icms: 0.19,
+      pis_cofins: 0.0763,
+      autoconsumo_fracao: 0.3,
+      autoconsumo_kwh: 89.1,
       pendencias: null,
       financeiro_desatualizado_em: null,
     });
-    expect(l.ressalvas).toEqual(expect.arrayContaining(["autoconsumo_zero", "tabela4_nao_conferida", "payback_indisponivel", "bifasico_tres_condutores"]));
-    expect(recalcularDaLinha(l)).toMatchObject({ contaSemSolar: 384.01, contaComSolar: 192.22, economiaMensal: 191.79 });
+    expect(l.ressalvas).toEqual(expect.arrayContaining(["autoconsumo_informado", "tributos_empresa", "projecao_premissas", "payback_sem_preco_inversor", "bifasico_tres_condutores"]));
+    expect(l.ressalvas).not.toContain("sem_tributos");
+    expect(recalcularDaLinha(l)).toMatchObject({ contaSemSolar: 523.39, contaComSolar: 248.97, economiaMensal: 274.42 });
 
     const lido = await carregarVigencia(vendedor.cliente, negocioId);
     if (!lido.ok || !lido.calculo) throw new Error("leitura");
@@ -134,11 +142,35 @@ describe("prévia → salvar → reabrir: resultado completo pela regra aceita",
     expect(await historico(negocioId)).toEqual([]);
   });
 
+  it("v2 com inversor de preço conhecido: grava o payback, o saldo e a projeção, sem motivo", async () => {
+    const negocioId = await novoNegocio();
+    const kit = JSON.stringify([
+      { tipo: "modulo", descricao: "Módulo 600 W", potenciaW: 600, quantidade: 5 },
+      { tipo: "inversor", descricao: "Inversor 3 kW", potenciaW: null, quantidade: 1, precoVendaManual: 3000 },
+    ]);
+    expect(await salvar(negocioId, { componentes: kit })).toMatchObject({ ok: true });
+    const l = await linha(negocioId);
+    expect(l).toMatchObject({ estado_financeiro: "completo", metodo_calculo: "gd2_piso_655i_v2", preco_inversor: 3000, payback_motivo: null, economia_mensal: 274.42 });
+    expect(Number(l.payback_meses)).toBeGreaterThan(0);
+    expect(l.saldo_25_anos).not.toBeNull();
+    expect((l.projecao as { anos: unknown[] }).anos).toHaveLength(25);
+    expect(l.ressalvas).not.toContain("payback_sem_preco_inversor");
+  });
+
+  it("o banco recusa payback junto com o motivo de não ter e payback no método v1", async () => {
+    const negocioId = await novoNegocio();
+    await salvar(negocioId);
+    const tentar = async (campos: TablesUpdate<"calculos_solares">) => (await servico.from("calculos_solares").update(campos).eq("negocio_id", negocioId)).error?.code ?? null;
+    expect(await tentar({ payback_meses: 40 })).toBe("23514");
+    expect(await tentar({ metodo_calculo: "gd2_piso_655i_v1" })).toBe("23514");
+    expect(await tentar({ metodo_calculo: "gd2_piso_655i_v3" })).toBe("23514");
+  });
+
   it("ligação muda o piso gravado: monofásico 30, trifásico 100 (nunca 50 fixo)", async () => {
     for (const [tipo, d] of [["monofasico", 30], ["trifasico", 100]] as const) {
       const negocioId = await novoNegocio();
       await salvar(negocioId, { tipoLigacao: tipo, consumoMedioKwh: "20" });
-      expect(await linha(negocioId)).toMatchObject({ estado_financeiro: "completo", disponibilidade_kwh: d, conta_com_solar: Math.round(d * 0.76802 * 100) / 100 });
+      expect(await linha(negocioId)).toMatchObject({ estado_financeiro: "completo", disponibilidade_kwh: d, conta_com_solar: Math.round(((d * 0.76802) / (1 - 0.19 - 0.0763)) * 100) / 100 });
     }
   });
 });
@@ -171,7 +203,7 @@ describe("entradas mudam e o resultado novo fica incompleto (R6.1, R6.2, R6.4)",
     const h = await historico(negocioId);
     expect(h).toHaveLength(1);
     expect(h[0]).toMatchObject({ motivo: "desatualizado_por_entradas", calculo_id: antes.id, empresa_id: empresa });
-    expect(h[0].linha).toMatchObject({ estado_financeiro: "completo", economia_mensal: 191.79, tarifa_kwh: 0.76802, tarifa_base_tributaria: "sem_tributos" });
+    expect(h[0].linha).toMatchObject({ estado_financeiro: "completo", economia_mensal: 274.42, tarifa_kwh: 0.76802, tarifa_base_tributaria: "sem_tributos" });
 
     // Nenhuma economia antiga na proposta atual: a vigência recusa (incompleta).
     const lido = await carregarVigencia(vendedor.cliente, negocioId);
@@ -187,7 +219,7 @@ describe("entradas mudam e o resultado novo fica incompleto (R6.1, R6.2, R6.4)",
     // Recalcular completo: linha nova completa; o histórico fica como está.
     const ok = await salvar(negocioId);
     expect(ok.mensagem).toBe("Kit e cálculo salvos.");
-    expect(await linha(negocioId)).toMatchObject({ estado_financeiro: "completo", economia_mensal: 191.79 });
+    expect(await linha(negocioId)).toMatchObject({ estado_financeiro: "completo", economia_mensal: 274.42 });
     expect(await historico(negocioId)).toHaveLength(1);
   });
 
@@ -199,6 +231,9 @@ describe("entradas mudam e o resultado novo fica incompleto (R6.1, R6.2, R6.4)",
       estado_financeiro: "legado", metodo_calculo: null, pendencias: null, payback_meses: 80, kwh_faturado: 0, kwh_compensado: 500,
       custo_fio_b: 60, conta_sem_solar: 475, conta_com_solar: 60, economia_mensal: 415, data_referencia: null, tarifa_origem: null,
       tarifa_gd_id: null, tarifa_base_tributaria: null, ressalvas: null,
+      // Linha legada não tem nada do método v2 (o banco recusa).
+      icms: null, pis_cofins: null, autoconsumo_fracao: null, preco_inversor: null, economia_primeiro_ano: null,
+      economia_25_anos: null, saldo_25_anos: null, payback_motivo: null, projecao: null,
     };
     expect((await servico.from("calculos_solares").update(legado).eq("negocio_id", negocioId)).error).toBeNull();
     const historicoAntes = (await historico(negocioId)).length;
@@ -219,7 +254,7 @@ describe("entradas mudam e o resultado novo fica incompleto (R6.1, R6.2, R6.4)",
     expect(r.ok).toBe(true);
     expect(r.mensagem).toContain("O cálculo anterior foi marcado como desatualizado");
     const marcado = await linha(negocioId);
-    expect(marcado).toMatchObject({ estado_financeiro: "completo", economia_mensal: 191.79, financeiro_desatualizado_motivo: "entradas_alteradas_sem_resultado_novo" });
+    expect(marcado).toMatchObject({ estado_financeiro: "completo", economia_mensal: 274.42, financeiro_desatualizado_motivo: "entradas_alteradas_sem_resultado_novo" });
     expect(marcado.financeiro_desatualizado_em).not.toBeNull();
     expect(await historico(negocioId)).toEqual([]); // a marca não muda o resultado: não arquiva
 
@@ -242,7 +277,7 @@ describe("datas: percentual pelo ano e componente pela vigência", () => {
     await salvar(negocioId);
     const l = await linha(negocioId);
     const n = { tipoCliente: "residencial", distribuidoraInformada: "Copel" };
-    const base = { componentes: [{ tipo: "modulo", descricao: "Módulo 600 W", potencia_w: 600, quantidade: 5, ordem: 0 }], valorNegocio: 20000, consumoMedioKwhNegocio: 500, valorContaEnergiaNegocio: null, parametros: { produtividade_kwh_kwp_mes: 100, percentual_fio_b: l.percentual_fio_b, disponibilidade_mono_kwh: 30, disponibilidade_bi_kwh: 50, disponibilidade_tri_kwh: 100 } };
+    const base = { componentes: [{ tipo: "modulo", descricao: "Módulo 600 W", potencia_w: 600, quantidade: 5, ordem: 0 }], valorNegocio: 20000, consumoMedioKwhNegocio: 500, valorContaEnergiaNegocio: null, autoconsumoNegocio: null, parametros: { produtividade_kwh_kwp_mes: 100, percentual_fio_b: l.percentual_fio_b, disponibilidade_mono_kwh: 30, disponibilidade_bi_kwh: 50, disponibilidade_tri_kwh: 100, icms: l.icms, pis_cofins: l.pis_cofins } };
     const dez = await carregarContextoEstimativa(vendedor.cliente, n, "2026-12-31");
     const jan = await carregarContextoEstimativa(vendedor.cliente, n, "2027-01-01");
     expect(avaliarVigencia(l, { ...base, contexto: dez }).vigente).toBe(true);
@@ -254,7 +289,7 @@ describe("datas: percentual pelo ano e componente pela vigência", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2027-01-01T12:00:00-03:00"));
     await salvar(negocioId);
-    expect(await linha(negocioId)).toMatchObject({ estado_financeiro: "completo", data_referencia: "2027-01-01", percentual_legal_fio_b: 0.75, conta_com_solar: 201.87, economia_mensal: 182.14 });
+    expect(await linha(negocioId)).toMatchObject({ estado_financeiro: "completo", data_referencia: "2027-01-01", percentual_legal_fio_b: 0.75, conta_com_solar: 258.09, economia_mensal: 265.3 });
 
     vi.setSystemTime(new Date("2027-06-24T12:00:00-03:00"));
     const r = await salvar(negocioId);
@@ -280,7 +315,7 @@ describe("preço e valor comercial", () => {
     expect(lido.vigencia.motivos).toEqual(["preco"]);
     const ok = await atualizarPrecoCalculoComCliente(cliente(vendedor), atualVendedor, negocioId);
     expect(ok).toMatchObject({ ok: true, mensagem: "Preço do cálculo atualizado." });
-    expect(await linha(negocioId)).toMatchObject({ kit_preco: 22000, payback_meses: null, economia_mensal: 191.79 });
+    expect(await linha(negocioId)).toMatchObject({ kit_preco: 22000, payback_meses: null, economia_mensal: 274.42 });
     expect(await historico(negocioId)).toEqual([]); // preço não muda o resultado: não arquiva
   });
 });

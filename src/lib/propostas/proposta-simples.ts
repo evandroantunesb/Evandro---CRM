@@ -1,6 +1,7 @@
 /**
- * Proposta simples provisória (M2 P0): até 3 páginas A4 (capa, sistema, oferta), no layout aprovado em
- * `docs/referencias/proposta-solar-ibs.html`, SEM economia, payback, Fio B nem tipo de ligação. Puro (sem I/O, sem
+ * Proposta simples (M2 P0; esquema 6 em 24/11/2026): capa, "Sobre a empresa" (só com conteúdo institucional escrito
+ * pela empresa), sistema e oferta com próximos passos, no layout aprovado pelo Evandro (artefato "Proposta comercial:
+ * antes e depois"), SEM economia, payback, Fio B nem tipo de ligação. Puro (sem I/O, sem
  * "server-only").
  *
  * A emissão nunca altera os modelos publicados da empresa. Só LÊ deles o conteúdo que a empresa escreveu (condições,
@@ -28,9 +29,15 @@ import {
 import { linhasCondicoesEmitidas } from "@/lib/condicoes-pagamento-exibicao";
 import { valorComoPersistido } from "@/lib/consumo-persistido";
 import { TIPOS_COMPONENTE_KIT } from "@/lib/tipos";
+import { distribuirGeracaoMensal } from "@/lib/geracao-mensal";
+import { esquemaEconomiaEmitida, type EconomiaEmitida } from "./economia-emissao";
+import { ANOS_FIO_B_PROPOSTA, fraseParcelaEconomia } from "./textos-economia";
+
+/** A tela de emissão usa a mesma regra da economia (ver `economia-emissao.ts`). */
+export { avisoDaEconomia } from "./economia-emissao";
 
 /** Identificação do layout que gera o PDF; muda quando o conteúdo/estrutura do modelo simples mudar. */
-export const RENDERIZADOR_SIMPLES = "simples-v5";
+export const RENDERIZADOR_SIMPLES = "simples-v9";
 
 /** Rodapé aprovado (proposta COM a geração estimada). */
 export const RODAPE_SIMPLES =
@@ -39,20 +46,39 @@ export const RODAPE_SIMPLES =
 /** Variante para a proposta SEM geração (produtividade não confirmada): não promete um número que não está nela. */
 export const RODAPE_SIMPLES_SEM_GERACAO = "Esta proposta apresenta o sistema. Não inclui estimativa de geração, economia ou prazo de retorno.";
 
-export const rodapeDaProposta = (temGeracao: boolean) => (temGeracao ? RODAPE_SIMPLES : RODAPE_SIMPLES_SEM_GERACAO);
+/** Rodapé aprovado da proposta COM economia (esquema 7, decisão do Evandro em 25/11/2026). */
+export const RODAPE_COM_ECONOMIA = "Estimativas comerciais; a geração e a economia reais variam com clima, consumo e tarifas.";
+
+export const rodapeDaProposta = (temGeracao: boolean, temEconomia = false) =>
+  temEconomia ? RODAPE_COM_ECONOMIA : temGeracao ? RODAPE_SIMPLES : RODAPE_SIMPLES_SEM_GERACAO;
 
 /** Limites da identificação da confirmação da produtividade (cabem na linha de premissa da página 2). */
 export const LIMITES_CONFIRMACAO = { fonteMin: 10, fonteMax: 120, responsavelMin: 3, responsavelMax: 60 } as const;
 
 /**
- * Limites que mantêm a proposta em 3 páginas A4 sem cortar nada: passou do limite, a emissão é recusada com a
- * orientação, em vez de truncar o texto que a empresa confirmou.
+ * Limites que mantêm cada página A4 sem cortar nada: passou do limite, a emissão é recusada com a orientação, em vez
+ * de truncar o texto que a empresa confirmou.
  */
 export const LIMITES_SIMPLES = {
   incluso: 5,
   exclusos: 4,
   garantias: 3,
-  etapas: 4,
+  etapas: 5,
+  posVenda: 3,
+  sobreTexto: 600,
+  numeros: 4,
+  numeroRotulo: 30,
+  numeroValor: 20,
+  projetos: 3,
+  projetoTitulo: 40,
+  projetoDescricao: 90,
+  depoimentos: 2,
+  depoimentoNome: 40,
+  depoimentoTexto: 240,
+  equipe: 2,
+  equipeNome: 50,
+  equipeRegistro: 50,
+  equipeTexto: 90,
   textoItem: 70,
   etapaTitulo: 28,
   etapaPrazo: 20,
@@ -81,6 +107,18 @@ export type ConteudoDoModelo = {
   garantias: string[] | null;
   /** Etapas ("título | prazo | descrição") escritas pela empresa; nulo = sem conteúdo. */
   etapas: Etapa[] | null;
+  /** Suporte e manutenção depois da instalação (bloco "Suporte e manutenção"); nulo = sem conteúdo. */
+  posVenda: string[] | null;
+  /** Página "Sobre a empresa" (blocos institucionais ativos e escritos); nulo = página omitida. */
+  institucional: Institucional | null;
+};
+
+export type Institucional = {
+  sobre: string | null;
+  numeros: { rotulo: string; valor: string }[] | null;
+  projetos: { titulo: string; descricao: string | null }[] | null;
+  depoimentos: { nome: string; texto: string }[] | null;
+  equipe: { nome: string; registro: string | null; texto: string | null }[] | null;
 };
 
 function listaEscrita(valor: unknown): string[] | null {
@@ -111,7 +149,40 @@ export function extrairConteudoDoModelo(blocos: { tipo: string; ativo: boolean; 
     exclusos: listaEscrita(escopo?.excluido),
     garantias: itensDe(ativo("warranties")),
     etapas: etapas.length ? etapas : null,
+    posVenda: itensDe(ativo("support_maintenance")),
+    institucional: institucionalDoModelo(ativo),
   };
+}
+
+/** Linhas "a | b | c" de um bloco de lista, com as partes aparadas; linha sem a primeira parte é descartada. */
+function linhasComPartes(config: unknown): string[][] {
+  return (itensDe(config) ?? []).map((linha) => linha.split("|").map((p) => p.trim())).filter((partes) => partes[0]);
+}
+
+function ouNulo<T>(lista: T[]): T[] | null {
+  return lista.length ? lista : null;
+}
+
+/** Conteúdo institucional dos blocos ATIVOS, só o que a empresa escreveu; tudo vazio = nulo (sem a página). */
+function institucionalDoModelo(ativo: (tipo: string) => unknown): Institucional | null {
+  const sobreBruto = (ativo("about_company") as { texto?: unknown } | null | undefined)?.texto;
+  const sobre = typeof sobreBruto === "string" && sobreBruto.trim() ? sobreBruto.trim() : null;
+  const numeros = ouNulo(
+    linhasComPartes(ativo("company_numbers"))
+      .filter((p) => p[1])
+      .map(([rotulo, valor]) => ({ rotulo: rotulo!, valor: valor! })),
+  );
+  const projetos = ouNulo(linhasComPartes(ativo("portfolio")).map(([titulo, descricao]) => ({ titulo: titulo!, descricao: descricao || null })));
+  const depoimentos = ouNulo(
+    linhasComPartes(ativo("testimonials"))
+      .filter((p) => p[1])
+      .map(([nome, texto]) => ({ nome: nome!, texto: texto! })),
+  );
+  const equipe = ouNulo(
+    linhasComPartes(ativo("team_and_certifications")).map(([nome, registro, texto]) => ({ nome: nome!, registro: registro || null, texto: texto || null })),
+  );
+  if (!sobre && !numeros && !projetos && !depoimentos && !equipe) return null;
+  return { sobre, numeros, projetos, depoimentos, equipe };
 }
 
 /** Validade padrão da proposta quando o modelo não define uma (decisão do Evandro, 29/10/2026). */
@@ -215,22 +286,115 @@ const esquemaV4 = z.object({
   comercial: z.object({ ...comercialComum, condicoesPagamento: z.string().trim().min(1).max(LIMITES_SIMPLES.condicoes) }),
 });
 
-/** Esquema 5: condições escolhidas por modalidade e conferidas no servidor (ver `montarCondicoesPagamento`). */
+/** Esquema 5: condições escolhidas por modalidade e conferidas no servidor (ver `montarCondicoesPagamento`). Só leitura. */
 const esquemaV5 = z.object({
   esquema: z.literal(5),
   ...comum,
   comercial: z.object({ ...comercialComum, condicoesPagamento: esquemaCondicoesEmitidas }),
 });
 
+const textoInst = z.string().trim().min(1).max(600);
+const textoInstNulo = textoInst.nullable();
+
+/** Esquema 6 (24/11/2026): o 5 com o pós-venda e o conteúdo institucional da empresa ("Sobre a empresa"). */
+const esquemaV6 = z.object({
+  esquema: z.literal(6),
+  ...comum,
+  comercial: z.object({ ...comercialComum, condicoesPagamento: esquemaCondicoesEmitidas, posVenda: listaDeItens }),
+  institucional: z
+    .object({
+      sobre: textoInstNulo,
+      numeros: z.array(z.object({ rotulo: textoInst, valor: textoInst })).min(1).max(8).nullable(),
+      projetos: z.array(z.object({ titulo: textoInst, descricao: textoInstNulo })).min(1).max(8).nullable(),
+      depoimentos: z.array(z.object({ nome: textoInst, texto: textoInst })).min(1).max(8).nullable(),
+      equipe: z.array(z.object({ nome: textoInst, registro: textoInstNulo, texto: textoInstNulo })).min(1).max(8).nullable(),
+    })
+    .nullable(),
+});
+
+/**
+ * Esquema 7 (25/11/2026, proposta completa PR 3): o 6 com a economia do cálculo v2 vigente (conta, economia, retorno e
+ * os anos escolhidos no modelo). Nula = a proposta sai sem economia (modelo sem blocos ou cálculo não vigente).
+ */
+const esquemaV7 = esquemaV6.extend({ esquema: z.literal(7), economia: esquemaEconomiaEmitida.nullable() });
+
+/** Geração e consumo mês a mês congelados na emissão (janeiro a dezembro; ver `src/lib/geracao-mensal.ts`). */
+const esquemaMensalEmitido = z.object({
+  geracaoKwh: z.array(z.number().int().nonnegative()).length(12),
+  consumoKwh: z.array(z.number().nonnegative()).length(12),
+  consumoOrigem: z.enum(["informado", "media"]),
+});
+export type MensalEmitido = z.infer<typeof esquemaMensalEmitido>;
+
+/**
+ * Esquema 8 (25/11/2026, proposta completa PR 4): o 7 com a geração e o consumo mês a mês. Nulo = sem o gráfico
+ * (empresa sem curva de geração ou proposta sem geração).
+ */
+const esquemaV8 = esquemaV7.extend({ esquema: z.literal(8), mensal: esquemaMensalEmitido.nullable() });
+
+/** Fio B congelado na emissão: o ano da emissão (destacado no gráfico) e a tabela mostrada ao cliente. */
+const esquemaFioBEmitido = z.object({
+  anoEmissao: z.number().int().min(2023).max(2100),
+  anos: z.array(z.object({ ano: z.number().int(), percentual: z.number().min(0).max(1), premissa: z.boolean() })).min(1).max(12),
+});
+export type FioBEmitido = z.infer<typeof esquemaFioBEmitido>;
+
+/**
+ * Esquema 9 (26/11/2026, textos aprovados pelo Evandro): o 8 com "Como funciona a conta com energia solar" (Fio B) e a
+ * frase da parcela do financiamento × economia, já prontos na emissão. Os dois só existem com economia; nulos = a
+ * proposta sai sem eles (sem economia, ou sem financiamento no caso da frase).
+ */
+const esquemaV9 = esquemaV8.extend({
+  esquema: z.literal(9),
+  textosEconomia: z.object({ fioB: esquemaFioBEmitido, parcelaEconomia: z.string().min(1).max(400).nullable() }).nullable(),
+});
+type TextosEconomia = z.infer<typeof esquemaV9>["textosEconomia"];
+
+/** Economia da versão emitida (só os esquemas 7 em diante podem tê-la). */
+export const economiaDaEmissao = (d: { esquema: number; economia?: EconomiaEmitida | null }): EconomiaEmitida | null =>
+  d.esquema >= 7 ? (d.economia ?? null) : null;
+
+/** Geração e consumo mês a mês da versão emitida (só os esquemas 8 em diante podem tê-los). */
+export const mensalDaEmissao = (d: { esquema: number; mensal?: MensalEmitido | null }): MensalEmitido | null =>
+  d.esquema >= 8 ? (d.mensal ?? null) : null;
+
+type ComTextos = { esquema: number; textosEconomia?: TextosEconomia };
+
+/** Fio B da versão emitida (só o esquema 9 em diante). */
+export const fioBDaEmissao = (d: ComTextos): FioBEmitido | null => (d.esquema >= 9 ? (d.textosEconomia?.fioB ?? null) : null);
+
+/** Frase da parcela × economia da versão emitida (só o esquema 9 em diante). */
+export const parcelaEconomiaDaEmissao = (d: ComTextos): string | null => (d.esquema >= 9 ? (d.textosEconomia?.parcelaEconomia ?? null) : null);
+
+/** Versões com o pós-venda e o conteúdo institucional da empresa (esquema 6 em diante). */
+export const temConteudoV6 = <D extends { esquema: number }>(d: D): d is Extract<D, { esquema: 6 | 7 | 8 | 9 }> => d.esquema >= 6;
+
+/** Os textos do esquema 9 acompanham a economia: sem ela, nenhum dos dois. */
+const textosConferem = (d: ComTextos & { economia?: EconomiaEmitida | null }) =>
+  d.esquema < 9 || (economiaDaEmissao(d) != null) === (d.textosEconomia != null);
+
+/** O gráfico mês a mês só existe com geração, e reparte exatamente o total do ano. */
+function mensalConfere(d: { esquema: number; mensal?: MensalEmitido | null; sistema: { geracao: { kwhMes: number } | null } }): boolean {
+  const mensal = mensalDaEmissao(d);
+  if (!mensal) return true;
+  if (!d.sistema.geracao) return false;
+  return mensal.geracaoKwh.reduce((a, b) => a + b, 0) === Math.round(d.sistema.geracao.kwhMes * 12);
+}
+
 export const esquemaDadosEmissaoSimples = z
-  .discriminatedUnion("esquema", [esquemaV4, esquemaV5])
-  // O rodapé acompanha a geração: com o número, o aprovado; sem ele, a variante que não o promete.
-  .refine((d) => d.rodape === rodapeDaProposta(d.sistema.geracao != null), { path: ["rodape"], message: "Rodapé não confere com a proposta." });
+  .discriminatedUnion("esquema", [esquemaV4, esquemaV5, esquemaV6, esquemaV7, esquemaV8, esquemaV9])
+  // O rodapé acompanha o que a proposta promete: com economia, o aviso das estimativas; sem ela, o da geração.
+  .refine((d) => d.rodape === rodapeDaProposta(d.sistema.geracao != null, economiaDaEmissao(d) != null), {
+    path: ["rodape"],
+    message: "Rodapé não confere com a proposta.",
+  })
+  .refine(mensalConfere, { path: ["mensal"], message: "Geração mês a mês não confere com a geração da proposta." })
+  .refine(textosConferem, { path: ["textosEconomia"], message: "Os textos da economia acompanham a economia." });
 
 /** Qualquer versão já emitida (leitura). */
 export type DadosEmissaoSimples = z.infer<typeof esquemaDadosEmissaoSimples>;
 /** O que uma emissão nova grava. */
-export type DadosEmissaoAtual = z.infer<typeof esquemaV5>;
+export type DadosEmissaoAtual = z.infer<typeof esquemaV9>;
 
 /** JSON canônico (chaves ordenadas): o mesmo conteúdo gera sempre os mesmos bytes, não importa a ordem do jsonb. */
 export function jsonCanonico(valor: unknown): string {
@@ -312,12 +476,18 @@ export type EntradaEmissaoSimples = {
   validadeAte: string | null;
   /** O que o vendedor escolheu (nulo = não veio) e o que a empresa permite a quem emite, lido no servidor. */
   condicoes: { entrada: EntradaCondicoes | null; regras: RegrasCondicoes };
-  conteudo: Pick<ConteudoDoModelo, "incluso" | "exclusos" | "garantias" | "etapas">;
+  conteudo: Pick<ConteudoDoModelo, "incluso" | "exclusos" | "garantias" | "etapas" | "posVenda" | "institucional">;
   identidade: { nomeExibicao: string; corPrimaria: string; corDestaque: string; whatsapp: string };
   versao: number;
   emitidaEm: string;
   /** AAAA-MM-DD de hoje em São Paulo. */
   hoje: string;
+  /** Economia do cálculo v2 vigente (`situacaoDaEconomia`); nulo = a proposta sai sem economia. */
+  economia?: EconomiaEmitida | null;
+  /** Curva de geração da empresa (12 valores > 0); nula = a proposta sai sem o gráfico mês a mês. */
+  curvaGeracao?: number[] | null;
+  /** Consumo dos 12 meses do NEGÓCIO; nulo = o gráfico usa o consumo médio. */
+  consumoMensalKwhNegocio?: number[] | null;
 };
 
 export const MENSAGEM_VALIDADE_OBRIGATORIA = "Informe até quando a proposta é válida.";
@@ -382,6 +552,7 @@ export function montarDadosEmissaoSimples(e: EntradaEmissaoSimples): ResultadoMo
     ["Incluso", e.conteudo.incluso, L.incluso],
     ["Não incluso", e.conteudo.exclusos, L.exclusos],
     ["Garantias", e.conteudo.garantias, L.garantias],
+    ["Suporte e manutenção", e.conteudo.posVenda, L.posVenda],
   ] as const) {
     if (!itens) continue;
     if (itens.length > max) pendencias.push(`O modelo da empresa tem ${itens.length} itens em "${nome}": a proposta simples comporta até ${max}. Reduza no modelo.`);
@@ -393,6 +564,7 @@ export function montarDadosEmissaoSimples(e: EntradaEmissaoSimples): ResultadoMo
       pendencias.push(`Há etapa com texto acima do limite (título ${L.etapaTitulo}, prazo ${L.etapaPrazo}, descrição ${L.etapaDescricao} caracteres). Encurte no modelo.`);
     }
   }
+  pendencias.push(...pendenciasInstitucional(e.conteudo.institucional));
   const temPreco = typeof e.valorNegocio === "number" && e.valorNegocio > 0;
   if (!temPreco) pendencias.push("Informe o valor do negócio (preço da proposta).");
   // As condições dependem do preço (desconto, parcelas): sem preço, só a pendência dele.
@@ -414,8 +586,15 @@ export function montarDadosEmissaoSimples(e: EntradaEmissaoSimples): ResultadoMo
     quantidade: c.quantidade,
     potenciaW: c.potencia_w != null && c.potencia_w > 0 ? c.potencia_w : null,
   }));
+  // Gráfico mês a mês: só com geração (produtividade confirmada) e curva da empresa; consumo dos 12 meses ou a média.
+  const geracaoMensal = sistema.geracao && e.curvaGeracao ? distribuirGeracaoMensal(sistema.geracao.kwhMes, e.curvaGeracao) : null;
+  const mensal = geracaoMensal
+    ? e.consumoMensalKwhNegocio
+      ? { geracaoKwh: geracaoMensal, consumoKwh: [...e.consumoMensalKwhNegocio], consumoOrigem: "informado" as const }
+      : { geracaoKwh: geracaoMensal, consumoKwh: Array<number>(12).fill(e.consumoMedioKwhNegocio!), consumoOrigem: "media" as const }
+    : null;
   const candidato = {
-    esquema: 5 as const,
+    esquema: 9 as const,
     cliente: { nome: e.contatoNome!.trim(), endereco: e.contatoEndereco?.trim() || null },
     sistema: {
       kitNome: nomeKitPersonalizado(
@@ -435,14 +614,80 @@ export function montarDadosEmissaoSimples(e: EntradaEmissaoSimples): ResultadoMo
       exclusos: e.conteudo.exclusos,
       garantias: e.conteudo.garantias,
       etapas: e.conteudo.etapas,
+      posVenda: e.conteudo.posVenda,
     },
+    institucional: e.conteudo.institucional,
     identidade: e.identidade,
     emissao: { versao: e.versao, emitidaEm: e.emitidaEm },
-    rodape: rodapeDaProposta(sistema.geracao != null),
+    economia: e.economia ?? null,
+    mensal,
+    // Textos do esquema 9, só com economia: o ano da emissão destaca o Fio B do ano; a frase usa a menor parcela.
+    textosEconomia: e.economia
+      ? {
+          fioB: { anoEmissao: Number(e.emitidaEm.slice(0, 4)), anos: ANOS_FIO_B_PROPOSTA.map((a) => ({ ...a })) },
+          parcelaEconomia: fraseParcelaEconomia(condicoes.condicoes, e.economia.economiaMensal),
+        }
+      : null,
+    rodape: rodapeDaProposta(sistema.geracao != null, e.economia != null),
   };
-  const analisado = esquemaV5.safeParse(candidato);
-  if (!analisado.success || analisado.data.rodape !== rodapeDaProposta(analisado.data.sistema.geracao != null)) return { ok: false, pendencias: ["Os dados do negócio não passaram na conferência da proposta. Revise o kit e o cliente."] };
+  const analisado = esquemaV9.safeParse(candidato);
+  if (
+    !analisado.success ||
+    analisado.data.rodape !== rodapeDaProposta(analisado.data.sistema.geracao != null, analisado.data.economia != null) ||
+    !mensalConfere(analisado.data) ||
+    !textosConferem(analisado.data)
+  )
+    return { ok: false, pendencias: ["Os dados do negócio não passaram na conferência da proposta. Revise o kit e o cliente."] };
   return { ok: true, dados: analisado.data };
+}
+
+/** Limites da página "Sobre a empresa": acima deles a emissão é recusada com a orientação (nada é cortado). */
+function pendenciasInstitucional(inst: Institucional | null): string[] {
+  if (!inst) return [];
+  const L = LIMITES_SIMPLES;
+  const p: string[] = [];
+  const n = (t: string | null) => t?.length ?? 0;
+  const conferir = (bloco: string, quantidade: number, max: number, regra: string, longo: boolean) => {
+    if (quantidade > max) p.push(`O modelo da empresa tem ${quantidade} itens em "${bloco}": a proposta comporta até ${max}. Reduza no modelo.`);
+    if (longo) p.push(`Há item de "${bloco}" com texto acima do limite (${regra}). Encurte no modelo.`);
+  };
+  if (n(inst.sobre) > L.sobreTexto) p.push(`O texto de "Quem somos" passa de ${L.sobreTexto} caracteres. Encurte no modelo.`);
+  if (inst.numeros) {
+    const longo = inst.numeros.some((x) => n(x.rotulo) > L.numeroRotulo || n(x.valor) > L.numeroValor);
+    conferir("Nossos números", inst.numeros.length, L.numeros, `rótulo ${L.numeroRotulo}, valor ${L.numeroValor} caracteres`, longo);
+  }
+  if (inst.projetos) {
+    const longo = inst.projetos.some((x) => n(x.titulo) > L.projetoTitulo || n(x.descricao) > L.projetoDescricao);
+    conferir("Nossos projetos", inst.projetos.length, L.projetos, `título ${L.projetoTitulo}, descrição ${L.projetoDescricao} caracteres`, longo);
+  }
+  if (inst.depoimentos) {
+    const longo = inst.depoimentos.some((x) => n(x.nome) > L.depoimentoNome || n(x.texto) > L.depoimentoTexto);
+    conferir("Depoimentos", inst.depoimentos.length, L.depoimentos, `nome ${L.depoimentoNome}, depoimento ${L.depoimentoTexto} caracteres`, longo);
+  }
+  if (inst.equipe) {
+    const longo = inst.equipe.some((x) => n(x.nome) > L.equipeNome || n(x.registro) > L.equipeRegistro || n(x.texto) > L.equipeTexto);
+    conferir("Equipe e qualificações", inst.equipe.length, L.equipe, `nome ${L.equipeNome}, registro ${L.equipeRegistro}, texto ${L.equipeTexto} caracteres`, longo);
+  }
+  return p;
+}
+
+/** Quanto do consumo informado a geração estimada cobre (%, inteiro); nulo sem geração confirmada. */
+export function coberturaDoConsumo(dados: DadosEmissaoSimples): number | null {
+  const s = dados.sistema;
+  return s.geracao ? Math.round((s.geracao.kwhMes / s.consumoMedioKwh) * 100) : null;
+}
+
+/**
+ * Link do WhatsApp da empresa com a mensagem pronta, para o QR code do fechamento (decisão do Evandro em 24/11/2026):
+ * o link da proposta on-line só existe depois da gravação (o token é sorteado no banco), então o QR leva ao consultor.
+ * Número brasileiro sem o 55 ganha o código do país; número que não parece celular ou fixo com DDD (ex.: 0800) = sem QR.
+ */
+export function linkWhatsappDaProposta(dados: DadosEmissaoSimples): string | null {
+  const digitos = dados.identidade.whatsapp.replace(/\D/g, "");
+  const numero = digitos.length === 10 || digitos.length === 11 ? `55${digitos}` : digitos;
+  if (!/^55[1-9]\d{9,10}$/.test(numero)) return null;
+  const mensagem = `Olá! Quero falar sobre a proposta nº ${dados.emissao.versao} de ${dados.cliente.nome}.`;
+  return `https://wa.me/${numero}?text=${encodeURIComponent(mensagem)}`;
 }
 
 // ---------------------------------------------------------------------------

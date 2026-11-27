@@ -117,6 +117,32 @@ export function precificarKit({
   };
 }
 
+/**
+ * Preço atual de venda dos inversores do kit, para a troca no ano 12 da projeção (proposta completa, decisão do Evandro
+ * em 24/11/2026): mesma regra do preço sugerido (melhor custo × (1 + margem) ou o preço à mão), × quantidade. Nulo se o
+ * kit não tem inversor ou algum inversor está sem preço: o cálculo fica sem payback, nunca com valor inventado.
+ */
+export function precoInversorDoKit({
+  itens,
+  custos,
+  margens,
+}: {
+  itens: ItemPrecificacao[];
+  custos: ReadonlyMap<string, CustoMaterial>;
+  margens: MargensCategoria;
+}): number | null {
+  const inversores = itens.filter((i) => i.tipo === "inversor");
+  if (!inversores.length) return null;
+  let total = 0;
+  for (const item of inversores) {
+    const custo = item.materialId ? custos.get(item.materialId) : undefined;
+    const unitario = custo ? vendaSugerida(custo.custo, margens[custo.categoria]) : item.precoVendaManual;
+    if (!(unitario != null && unitario > 0)) return null;
+    total += unitario * item.quantidade;
+  }
+  return centavos(total);
+}
+
 /** Categoria do material que combina com o tipo do item do kit (o que o vendedor pode escolher em cada linha). */
 export function categoriasDoTipo(tipo: TipoComponenteKit): CategoriaMaterial[] {
   if (tipo === "modulo") return ["modulos"];

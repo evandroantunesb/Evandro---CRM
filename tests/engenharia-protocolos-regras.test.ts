@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { exigeDescricao, protocoloEncerrado, respostasPossiveis, statusProtocolo } from "@/lib/engenharia-protocolos-regras";
+import { exigeDescricao, protocoloEncerrado, respostasPossiveis, rotuloCanal, statusProtocolo } from "@/lib/engenharia-protocolos-regras";
 import { montarHistorico } from "@/lib/obras/historico";
 
 describe("respostas do protocolo (espelho da RPC)", () => {
@@ -17,6 +17,14 @@ describe("respostas do protocolo (espelho da RPC)", () => {
   it("exigência, indeferido e cancelado pedem texto; status desconhecido vira protocolado", () => {
     expect(["exigencia", "indeferido", "cancelado", "aprovado", "reenvio"].map((t) => exigeDescricao(t as never))).toEqual([true, true, true, false, false]);
     expect(statusProtocolo("novo")).toBe("protocolado");
+  });
+});
+
+describe("canal do protocolo", () => {
+  it("protocolos antigos mostram o rótulo do código; os novos, o nome do canal", () => {
+    expect(rotuloCanal("pew")).toBe("PEW (portal da Copel)");
+    expect(rotuloCanal("outro")).toBe("Outro");
+    expect(rotuloCanal("Site da Copel")).toBe("Site da Copel");
   });
 });
 

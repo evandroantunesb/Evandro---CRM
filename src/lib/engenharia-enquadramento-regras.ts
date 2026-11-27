@@ -174,22 +174,26 @@ export function textoCondicoes(condicoes: CondicoesItem): string {
   return partes.length ? partes.join(" · ") : "Vale sempre";
 }
 
-/** Tipos de solicitação de geração distribuída (projeto de micro ou minigeração). */
-const TIPOS_GERACAO = ["nova_conexao", "ampliacao", "regularizacao"];
+/** Canal de entrada da concessionária (`concessionaria_canais`, 20261224100000). */
+export type CanalConcessionaria = { id: string; nome: string; ordem: number; ativo: boolean; tipos: string[]; tensoes: string[] };
+
+/** Tipos em que a tensão decide o canal (as tensões do canal só valem para eles). */
+const TIPOS_COM_TENSAO = ["ligacao_nova", "aumento_carga"];
 
 /**
- * Por onde o pedido entra na Copel (informativo; decisão do Evandro em 04/11/2026): projetos de geração, ligação nova
- * em baixa tensão (padrão individual) e aumento de carga em baixa tensão vão pelo PEW; os demais pelos sites da
- * Copel. Null quando ainda não dá para dizer (sem tipo, "Outra", ou tensão não definida em ligação nova e aumento de carga).
+ * Canal sugerido pelo enquadramento (informativo): o primeiro canal ativo, pela ordem, cujo tipo de solicitação bate
+ * e, em ligação nova e aumento de carga, cuja tensão bate com a respondida. Canal sem tipos não é sugerido (só listado).
+ * Null quando ainda não dá para dizer (sem tipo, "Outra" ou tensão não definida onde ela decide). Com os canais da
+ * Copel, dá o mesmo resultado da regra de 04/11/2026 (PEW ou site).
  */
-export function canalCopel(respostas: RespostasEnquadramento | null): "pew" | "site" | null {
+export function canalSugerido(canais: readonly CanalConcessionaria[], respostas: RespostasEnquadramento | null): CanalConcessionaria | null {
   const tipo = respostas?.tipo_solicitacao;
   if (!tipo || tipo === "outro") return null;
-  if (TIPOS_GERACAO.includes(tipo)) return "pew";
-  if (tipo === "ligacao_nova" || tipo === "aumento_carga") {
-    if (respostas?.tensao === "baixa") return "pew";
-    if (respostas?.tensao === "media") return "site";
-    return null;
-  }
-  return "site";
+  const tensao = respostas?.tensao;
+  return (
+    canais
+      .filter((c) => c.ativo && c.tipos.includes(tipo))
+      .toSorted((a, b) => a.ordem - b.ordem)
+      .find((c) => !TIPOS_COM_TENSAO.includes(tipo) || c.tensoes.length === 0 || (tensao !== undefined && c.tensoes.includes(tensao))) ?? null
+  );
 }

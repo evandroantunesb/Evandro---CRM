@@ -20,6 +20,7 @@ export function EmitirProposta({
   preco,
   regrasCondicoes,
   geracaoConfirmada,
+  economia,
   bloqueio,
   avisoValor = null,
   emissoes,
@@ -40,6 +41,8 @@ export function EmitirProposta({
   regrasCondicoes: RegrasCondicoes;
   /** O admin confirmou a produtividade atual da calculadora: só então a proposta mostra a geração estimada. */
   geracaoConfirmada: boolean;
+  /** A economia entra (cálculo v2 do kit vigente e bloco de economia no modelo) ou o porquê de ficar fora. */
+  economia: { entra: boolean; horizonteAnos: number | null; texto: string | null };
   /** Motivo pelo qual não dá para emitir agora (o servidor confere de novo); nulo = liberada. */
   bloqueio: string | null;
   /** O valor do negócio já foi ajustado por uma condição escolhida no contrato: conferir o preço antes de emitir. */
@@ -55,9 +58,12 @@ export function EmitirProposta({
       <form action={acao} className="flex flex-col gap-3">
         <input type="hidden" name="negocioId" value={negocioId} />
         <input type="hidden" name="geracaoEsperada" value={geracaoConfirmada ? "sim" : "nao"} />
+        <input type="hidden" name="economiaEsperada" value={economia.entra ? "sim" : "nao"} />
         <p className="text-sm text-zinc-600">
-          Proposta simples: o sistema, a geração estimada, o preço e as condições. Não inclui economia nem prazo de retorno. Depois de
-          emitida não muda: para corrigir, emita uma nova versão.
+          {economia.entra
+            ? "Proposta com o sistema, a geração estimada, a conta antes e depois, a economia, o retorno, o preço e as condições."
+            : "Proposta com o sistema, a geração estimada, o preço e as condições, sem economia nem prazo de retorno."}{" "}
+          Depois de emitida não muda: para corrigir, emita uma nova versão.
         </p>
         {bloqueio && (
           <p role="status" data-testid="emissao-bloqueada" className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900">
@@ -93,23 +99,33 @@ export function EmitirProposta({
               ? "entra na proposta (produtividade confirmada pelo admin)"
               : "fora da proposta: o admin precisa confirmar a produtividade em Configurações > Kits e calculadora"}
           </li>
+          <li data-testid="economia-status">
+            Economia e retorno:{" "}
+            {economia.entra ? `entram na proposta (cálculo do kit atualizado; ${economia.horizonteAnos} anos no gráfico, pelo modelo)` : economia.texto}
+          </li>
           {(
             [
               ["Incluso", conteudoModelo.incluso?.length],
               ["Não incluso", conteudoModelo.exclusos?.length],
               ["Garantias", conteudoModelo.garantias?.length],
               ["Etapas", conteudoModelo.etapas?.length],
+              ["Depois da instalação", conteudoModelo.posVenda?.length],
             ] as const
           ).map(([nome, n]) => (
             <li key={nome}>
               {nome}: {n ? `${n} item(ns) do modelo da empresa` : "fora da proposta (o modelo não tem conteúdo confirmado)"}
             </li>
           ))}
+          <li>
+            Sobre a empresa:{" "}
+            {conteudoModelo.institucional ? "entra na proposta (blocos institucionais do modelo)" : "fora da proposta (o modelo não tem conteúdo institucional)"}
+          </li>
         </ul>
-        <p className="rounded-md bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
-          Detalhe interno (não aparece para o cliente): GD II e Fio B de 60% em 2026 ficam fora da proposta até o enquadramento do negócio e
-          os dados serem validados.
-        </p>
+        {!economia.entra && (
+          <p className="rounded-md bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
+            Detalhe interno (não aparece para o cliente): GD II e Fio B ficam fora da proposta enquanto a economia não entra.
+          </p>
+        )}
         <Mensagem resultado={resultado} />
         <Botao type="submit" disabled={emitindo || !!bloqueio} className="self-start">
           {emitindo ? "Emitindo..." : emissoes.length > 0 ? "Emitir nova versão" : "Emitir proposta"}

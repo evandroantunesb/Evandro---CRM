@@ -16,7 +16,7 @@ import { mensagemPropostaIncompleta, pendenciasSemDados } from "@/lib/estimativa
 import { EDITAR_MODELO_CONTRATO, PEDIDOS_AOS_SETORES, PROPOSTA_E_CONTRATO, pode } from "@/lib/permissoes";
 import { carregarProcuracaoNegocio } from "@/lib/procuracao";
 import { listarEmissoesDoNegocio } from "@/lib/propostas/emissoes-dados";
-import { extrairConteudoDoModelo, validadePadraoDaEmpresa, produtividadeConfirmada } from "@/lib/propostas/proposta-simples";
+import { avisoDaEconomia, extrairConteudoDoModelo, validadePadraoDaEmpresa, produtividadeConfirmada } from "@/lib/propostas/proposta-simples";
 import { avisarSchemaAusente, funcaoAusente, tabelaAusente } from "@/lib/schema-ausente";
 import { criarClienteServidor } from "@/lib/supabase/server";
 import { cartaoFechamento } from "@/lib/venda";
@@ -38,7 +38,7 @@ export async function carregarFicha(atual: Vinculo, id: string, abaParam: string
     supabase
       .from("negocios")
       .select(
-        "id, empresa_id, tipo, numero, titulo, valor, descricao, status, arquivado_em, arquivado_por, motivo_arquivamento, funil_id, etapa_id, origem_id, responsavel_id, motivo_perda_id, motivo_perda_detalhe, fechado_em, created_at, updated_at, tipo_telhado, endereco_instalacao, unidade_consumidora, padrao_cliente, estrutura_telhado, consumo_medio_kwh, consumo_estimado_kwh, tarifa_efetiva_kwh, valor_conta_energia, fechamento_previsto, fechamento_previsto_em, qualif_tipo_cliente, qualif_possui_conta_energia, qualif_distribuidora, qualif_imovel_proprio, qualif_objetivo, qualif_prazo_instalacao, qualif_busca_financiamento, qualif_orcamento_outra_empresa, qualif_e_decisor, qualif_outro_decisor, qualif_participantes_decisao, qualif_observacoes, contatos(id, nome, tipo, telefone, email, endereco, cidade, uf, documento, rg, data_nascimento, inscricao_estadual, cep, logradouro, numero, bairro, complemento)",
+        "id, empresa_id, tipo, numero, titulo, valor, descricao, status, arquivado_em, arquivado_por, motivo_arquivamento, funil_id, etapa_id, origem_id, responsavel_id, motivo_perda_id, motivo_perda_detalhe, fechado_em, created_at, updated_at, tipo_telhado, endereco_instalacao, unidade_consumidora, padrao_cliente, estrutura_telhado, consumo_medio_kwh, consumo_estimado_kwh, tarifa_efetiva_kwh, valor_conta_energia, fechamento_previsto, fechamento_previsto_em, autoconsumo_percentual, consumo_mensal_kwh, qualif_tipo_cliente, qualif_possui_conta_energia, qualif_distribuidora, qualif_imovel_proprio, qualif_objetivo, qualif_prazo_instalacao, qualif_busca_financiamento, qualif_orcamento_outra_empresa, qualif_e_decisor, qualif_outro_decisor, qualif_participantes_decisao, qualif_observacoes, contatos(id, nome, tipo, telefone, email, endereco, cidade, uf, documento, rg, data_nascimento, inscricao_estadual, cep, logradouro, numero, bairro, complemento)",
       )
       .eq("id", id)
       .maybeSingle(),
@@ -76,7 +76,7 @@ export async function carregarFicha(atual: Vinculo, id: string, abaParam: string
       supabase
         .from("calculos_solares")
         .select(
-          "id, kit_nome, kit_potencia_kwp, kit_preco, tipo_ligacao, consumo_medio_kwh, valor_fatura_medio, tarifa_kwh, geracao_estimada_kwh_mes, economia_mensal, payback_meses, observacoes, estado_financeiro, conta_sem_solar, conta_com_solar, kwh_compensado, kwh_nao_compensado, custo_fio_b, tarifa_base_tributaria, tarifa_origem, distribuidora, fio_b_rs_mwh, percentual_legal_fio_b, fio_b_vigencia_inicio, fio_b_vigencia_fim, disponibilidade_kwh, data_referencia, ressalvas",
+          "id, kit_nome, kit_potencia_kwp, kit_preco, tipo_ligacao, consumo_medio_kwh, valor_fatura_medio, tarifa_kwh, geracao_estimada_kwh_mes, economia_mensal, payback_meses, observacoes, estado_financeiro, conta_sem_solar, conta_com_solar, kwh_compensado, kwh_nao_compensado, custo_fio_b, tarifa_base_tributaria, tarifa_origem, distribuidora, fio_b_rs_mwh, percentual_legal_fio_b, fio_b_vigencia_inicio, fio_b_vigencia_fim, disponibilidade_kwh, data_referencia, ressalvas, metodo_calculo, economia_primeiro_ano, economia_25_anos, saldo_25_anos, payback_motivo, autoconsumo_fracao, icms, pis_cofins, projecao",
         )
         .eq("negocio_id", id)
         .maybeSingle(),
@@ -339,7 +339,7 @@ export async function carregarFicha(atual: Vinculo, id: string, abaParam: string
     atual, negocio, config, parametros, temperatura, atividades, notas, tarefas, anexos, calculo, conferencia, semArquivo,
     componentes, materiaisKit, precoSugeridoKit, ehEletroposto, eletroposto, propostaEletroposto, outrosNegocios, eletropostoNaEmpresa, proposta, modelosProposta,
     emissoesAusente, emissoes, conteudoModelo, regrasCondicoes, validadePadraoDias, geracaoConfirmada, aberturas, contrato, statusPagamento,
-    registroManualIndisponivel, registrosPagamento, situacaoPagamentoSolo, mostrarPagamentoSolo, mostrarPagamentoPro, ultimoHandoff,
+    economiaEmissao: avisoDaEconomia(modeloPadrao?.proposta_modelo_blocos, carregamento), registroManualIndisponivel, registrosPagamento, situacaoPagamentoSolo, mostrarPagamentoSolo, mostrarPagamentoPro, ultimoHandoff,
     podeResponderHandoff, obraDoNegocio, arquivado, precoDesatualizado, precoContratoDesatualizado, escolhaCondicao, condicaoRegistrada, vigenciaDaTela, contextoEstimativa, historicoCalculo,
     bloqueioProposta, bloqueioEmissao, bloqueioContrato, responsavelInativo, cartao, contato, pendenciasCliente, nomes, souAdmin,
     etiquetasMarcadas, etiquetasVisiveis, abas, aba, pedidosSetor, desconto, procuracao, recusasDocumentos: aba === "proposta" && obraDoNegocio ? await carregarRecusasDocumentos(supabase, negocio.id, nomes.membro) : [],

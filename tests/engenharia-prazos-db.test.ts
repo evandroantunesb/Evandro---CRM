@@ -93,6 +93,13 @@ async function indicadores(quem: Usuario, desde: string) {
   };
 }
 
+/** Prazo da distribuidora da Copel da empresa (20261224100000_concessionarias_configuracao.sql), pelo admin. */
+async function prazoCopel(chave: string, dias: number, contagem: "uteis" | "corridos") {
+  const { data: copel } = await servico.from("concessionarias").select("id").eq("empresa_id", empresa).eq("distribuidora", "COPEL-DIS").single();
+  const r = await admin.cliente.from("concessionaria_prazos").update({ dias_uteis: dias, contagem }).eq("concessionaria_id", copel!.id).eq("chave", chave);
+  if (r.error) throw r.error;
+}
+
 async function prazos(quem: Usuario) {
   const { data, error } = await quem.cliente.rpc("prazos_engenharia", { p_empresa_id: empresa });
   if (error) throw error;
@@ -201,6 +208,11 @@ describe("Engenharia: prazos e indicadores (ordem importa)", { concurrent: false
       exigencia: "3 uteis",
       correcao_campo: "5 uteis",
       art: "1 uteis",
+    });
+    // Os da distribuidora ficam na Copel da empresa (20261224100000), com os mesmos valores.
+    const { data: copel } = await servico.from("concessionarias").select("id").eq("empresa_id", empresa).eq("distribuidora", "COPEL-DIS").single();
+    const { data: daCopel } = await admin.cliente.from("concessionaria_prazos").select("chave, dias_uteis, contagem").eq("concessionaria_id", copel!.id);
+    expect(Object.fromEntries((daCopel ?? []).map((p) => [p.chave, `${p.dias_uteis ?? "-"} ${p.contagem}`]))).toEqual({
       distribuidora_analise: "15 corridos",
       distribuidora_analise_rural: "30 corridos",
       distribuidora_vistoria: "7 uteis",
@@ -217,10 +229,7 @@ describe("Engenharia: prazos e indicadores (ordem importa)", { concurrent: false
     const { data: igual } = await servico.from("engenharia_prazos").select("dias_uteis").eq("empresa_id", empresa).eq("chave", "a_iniciar").single();
     expect(igual!.dias_uteis).toBe(2);
     // O resto do teste usa 10 dias úteis na análise (as contas de dia útil já estão cobertas aqui).
-    ok(
-      await admin.cliente.from("engenharia_prazos").update({ dias_uteis: 10, contagem: "uteis" }).eq("empresa_id", empresa).eq("chave", "distribuidora_analise"),
-      "configurar",
-    );
+    await prazoCopel("distribuidora_analise", 10, "uteis");
   });
 
   it("prazo da etapa: obra nova em 'A iniciar' conta 2 dias úteis a partir de hoje", async () => {
@@ -331,10 +340,7 @@ describe("Engenharia: prazos em dias corridos, zona rural e ART (Copel, 04/11/20
   }
 
   it("aprovação em dias corridos: vence no marco + N e conta dias corridos", async () => {
-    ok(
-      await admin.cliente.from("engenharia_prazos").update({ dias_uteis: 15, contagem: "corridos" }).eq("empresa_id", empresa).eq("chave", "distribuidora_analise"),
-      "corridos",
-    );
+    await prazoCopel("distribuidora_analise", 15, "corridos");
     const { data: p } = await servico.from("obra_engenharia_protocolos").select("id").eq("obra_id", obra).single();
     ok(await execEng.cliente.rpc("registrar_evento_protocolo_engenharia", { p_protocolo_id: p!.id, p_tipo: "reenvio", p_ocorrido_em: hoje() }), "reenvio");
     const fim = new Date(`${hoje()}T12:00:00Z`);
@@ -343,14 +349,7 @@ describe("Engenharia: prazos em dias corridos, zona rural e ART (Copel, 04/11/20
   });
 
   it("zona rural no enquadramento usa o prazo rural (a chave devolvida continua a da análise)", async () => {
-    ok(
-      await admin.cliente
-        .from("engenharia_prazos")
-        .update({ dias_uteis: 30, contagem: "corridos" })
-        .eq("empresa_id", empresa)
-        .eq("chave", "distribuidora_analise_rural"),
-      "rural",
-    );
+    await prazoCopel("distribuidora_analise_rural", 30, "corridos");
     ok(await execEng.cliente.rpc("salvar_enquadramento_engenharia", { p_obra_id: obra, p_respostas: { zona: "rural" } as never }), "zona rural");
     expect(await prazoDe("distribuidora_analise")).toMatchObject({ dias_restantes: 30, contagem: "corridos" });
     ok(await execEng.cliente.rpc("salvar_enquadramento_engenharia", { p_obra_id: obra, p_respostas: { zona: "urbana" } as never }), "zona urbana");

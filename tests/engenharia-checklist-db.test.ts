@@ -155,18 +155,21 @@ describe("Engenharia: checklist e documentos (ordem importa)", { concurrent: fal
     const { data } = await servico.from("engenharia_checklist_modelo").select("id, titulo, obrigatorio, ativo").eq("empresa_id", empresa);
     expect(data).toHaveLength(20);
     expect(data!.filter((m) => !m.obrigatorio)).toHaveLength(3);
+    // O modelo é da Copel da empresa (20261224100000_concessionarias_configuracao.sql).
+    const { data: copel } = await servico.from("concessionarias").select("id").eq("empresa_id", empresa).eq("distribuidora", "COPEL-DIS").single();
+    const concessionaria_id = copel!.id;
 
     const criado = await admin.cliente
       .from("engenharia_checklist_modelo")
-      .insert({ empresa_id: empresa, grupo: "Outros", titulo: "Foto do padrão de entrada", obrigatorio: false, ordem: 120 })
+      .insert({ empresa_id: empresa, concessionaria_id, grupo: "Outros", titulo: "Foto do padrão de entrada", obrigatorio: false, ordem: 120 })
       .select("id")
       .single();
     expect(criado.error).toBeNull();
-    const duplicado = await admin.cliente.from("engenharia_checklist_modelo").insert({ empresa_id: empresa, grupo: "Outros", titulo: " foto do PADRÃO de entrada " });
+    const duplicado = await admin.cliente.from("engenharia_checklist_modelo").insert({ empresa_id: empresa, concessionaria_id, grupo: "Outros", titulo: " foto do PADRÃO de entrada " });
     expect(duplicado.error?.code).toBe("23505");
 
     for (const quem of [gestor, coordEng, adminB]) {
-      const r = await quem.cliente.from("engenharia_checklist_modelo").insert({ empresa_id: empresa, grupo: "X", titulo: `Não pode ${quem.email}` });
+      const r = await quem.cliente.from("engenharia_checklist_modelo").insert({ empresa_id: empresa, concessionaria_id, grupo: "X", titulo: `Não pode ${quem.email}` });
       expect(r.error).not.toBeNull();
     }
     expect((await admin.cliente.from("engenharia_checklist_modelo").delete().eq("id", criado.data!.id)).error).not.toBeNull();

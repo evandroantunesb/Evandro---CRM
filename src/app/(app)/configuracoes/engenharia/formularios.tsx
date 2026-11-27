@@ -9,10 +9,11 @@ const entrada = `min-w-0 text-sm ${CLASSE_ENTRADA}`;
 
 export type ItemModelo = { id: string; grupo: string; titulo: string; obrigatorio: boolean; ordem: number; ativo: boolean; condicoes: CondicoesItem };
 
-export function NovoItemModelo({ proximaOrdem }: { proximaOrdem: number }) {
+export function NovoItemModelo({ proximaOrdem, concessionariaId }: { proximaOrdem: number; concessionariaId: string }) {
   const [resultado, acao, pendente] = useActionState(criarItemModelo, null);
   return (
     <form action={acao} className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+      <input type="hidden" name="concessionariaId" value={concessionariaId} />
       <input name="grupo" placeholder="Grupo (ex.: Equipamentos)" aria-label="Grupo" className={`${entrada} sm:w-56`} required maxLength={60} />
       <input name="titulo" placeholder="Ex.: Foto do padrão de entrada" aria-label="Título do item" className={`${entrada} flex-1`} required maxLength={160} />
       <input name="ordem" type="number" min={0} max={9999} defaultValue={proximaOrdem} aria-label="Ordem" className={`${entrada} w-24`} />

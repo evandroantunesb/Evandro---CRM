@@ -7,19 +7,21 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { gravarEmissaoSimples, lerEmissaoPorToken } from "@/lib/propostas/emissoes-gravacao";
 import { ultimaVersaoDoNegocio } from "@/lib/propostas/emissoes-dados";
-import { extrairConteudoDoModelo, montarDadosEmissaoSimples, produtividadeConfirmada, sha256Hex } from "@/lib/propostas/proposta-simples";
+import { extrairConteudoDoModelo, mensalDaEmissao, montarDadosEmissaoSimples, produtividadeConfirmada, sha256Hex } from "@/lib/propostas/proposta-simples";
 import { criarUsuario, servico, sufixo, type Usuario } from "./ajuda";
 
+const CURVA = [5.9, 5.7, 5.3, 4.6, 3.8, 3.4, 3.6, 4.5, 4.7, 5.4, 6, 6.1];
+const CONSUMO_12 = [520, 500, 480, 430, 400, 400, 410, 420, 430, 450, 480, 500];
 let vendedor: Usuario, adminUser: Usuario;
 let empresaId: string, negocioId: string, membroId: string, modeloId: string;
 
 async function dadosAtuais(versao: number) {
   const [{ data: n }, { data: comps }, { data: par }, { data: modelo }] = await Promise.all([
-    servico.from("negocios").select("valor, consumo_medio_kwh, contatos(nome, endereco, cidade, uf)").eq("id", negocioId).single(),
+    servico.from("negocios").select("valor, consumo_medio_kwh, consumo_mensal_kwh, contatos(nome, endereco, cidade, uf)").eq("id", negocioId).single(),
     servico.from("kit_componentes").select("tipo, descricao, potencia_w, quantidade").eq("negocio_id", negocioId).order("ordem"),
     servico
       .from("parametros_calculadora")
-      .select("produtividade_kwh_kwp_mes, produtividade_confirmada_valor, produtividade_confirmada_em, produtividade_confirmada_fonte, produtividade_confirmada_responsavel")
+      .select("produtividade_kwh_kwp_mes, produtividade_confirmada_valor, produtividade_confirmada_em, produtividade_confirmada_fonte, produtividade_confirmada_responsavel, curva_geracao_mensal")
       .eq("empresa_id", empresaId)
       .single(),
     servico.from("proposta_modelos").select("proposta_modelo_blocos(tipo, ativo, config)").eq("id", modeloId).single(),
@@ -43,6 +45,8 @@ async function dadosAtuais(versao: number) {
     versao,
     emitidaEm: new Date().toISOString(),
     hoje: "2026-10-22",
+    curvaGeracao: par!.curva_geracao_mensal?.map(Number) ?? null,
+    consumoMensalKwhNegocio: n!.consumo_mensal_kwh?.map(Number) ?? null,
   });
   if (!r.ok) throw new Error(r.pendencias.join(" "));
   return r.dados;
@@ -87,6 +91,8 @@ beforeAll(async () => {
     { empresa_id: empresaId, negocio_id: negocioId, tipo: "inversor", descricao: "Inversor 5 kW", potencia_w: null, quantidade: 1, ordem: 1 },
   ]);
   await servico.from("parametros_calculadora").update({ produtividade_kwh_kwp_mes: 120 }).eq("empresa_id", empresaId);
+  await adminUser.cliente.from("parametros_calculadora").update({ curva_geracao_mensal: CURVA }).eq("empresa_id", empresaId);
+  await servico.from("negocios").update({ consumo_mensal_kwh: CONSUMO_12 }).eq("id", negocioId);
   // O admin confirma a produtividade (sem isso a proposta sai sem geração).
   const { error: erroConfirmar } = await adminUser.cliente.rpc("confirmar_produtividade_calculadora", {
     p_empresa_id: empresaId,
@@ -124,6 +130,9 @@ describe("emissão preservada: emitir, baixar, reabrir", () => {
     expect(sha256Hex(lida.pdf)).toBe(lida.emissao.pdf_sha256);
     expect(lida.dados.sistema.potenciaKwp).toBe(5.4);
     expect(lida.dados.sistema.geracao?.kwhMes).toBe(648);
+    const mensal = mensalDaEmissao(lida.dados);
+    expect(mensal?.consumoKwh).toEqual(CONSUMO_12);
+    expect(mensal?.geracaoKwh.reduce((a, b) => a + b, 0)).toBe(7776);
     bytesV1 = lida.pdf;
     hashV1 = sha256Hex(lida.pdf);
   });
@@ -131,7 +140,8 @@ describe("emissão preservada: emitir, baixar, reabrir", () => {
   it("depois de mudar preço, consumo, kit, produtividade e modelo, o mesmo link entrega o mesmo PDF e os mesmos dados", async () => {
     await servico.from("negocios").update({ valor: 99999, consumo_medio_kwh: 10 }).eq("id", negocioId);
     await servico.from("kit_componentes").update({ quantidade: 40 }).eq("negocio_id", negocioId).eq("tipo", "modulo");
-    await servico.from("parametros_calculadora").update({ produtividade_kwh_kwp_mes: 200 }).eq("empresa_id", empresaId);
+    await servico.from("parametros_calculadora").update({ produtividade_kwh_kwp_mes: 200, curva_geracao_mensal: CURVA.map((v) => v * 3) }).eq("empresa_id", empresaId);
+    await servico.from("negocios").update({ consumo_mensal_kwh: null }).eq("id", negocioId);
     await servico.from("proposta_modelo_blocos").update({ config: { itens: ["OUTRO TEXTO"] } }).eq("modelo_id", modeloId).eq("tipo", "warranties");
     await servico.from("proposta_modelo_blocos").delete().eq("modelo_id", modeloId).eq("tipo", "included_services");
     await servico.from("proposta_modelos").update({ status: "arquivado" }).eq("id", modeloId);
@@ -146,6 +156,8 @@ describe("emissão preservada: emitir, baixar, reabrir", () => {
     expect(lida.dados.sistema.potenciaKwp).toBe(5.4);
     expect(lida.dados.comercial.garantias).toEqual(["Módulos: 12 anos"]);
     expect(lida.dados.comercial.incluso).toEqual(["Projeto e homologação", "Instalação"]);
+    expect(mensalDaEmissao(lida.dados)).toEqual(mensalDaEmissao(v1.dados));
+    expect(mensalDaEmissao(lida.dados)?.consumoOrigem).toBe("informado");
   });
 
   it("a nova emissão (v2) usa os dados atuais e tem link e arquivo próprios; a v1 não muda", async () => {

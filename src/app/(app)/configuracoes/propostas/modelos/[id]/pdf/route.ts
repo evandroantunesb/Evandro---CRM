@@ -10,7 +10,7 @@ const EXPIRA_SEGUNDOS = 300;
 
 /** Pré-visualização do PDF de um modelo, com dados fictícios (sem negócio real ainda). */
 export async function GET(_: Request, { params }: RouteContext<"/configuracoes/propostas/modelos/[id]/pdf">) {
-  const { atual } = await exigirPapel("admin");
+  const { atual } = await exigirPapel("admin", "gestor");
   const { id } = await params;
   const supabase = await criarClienteServidor();
 

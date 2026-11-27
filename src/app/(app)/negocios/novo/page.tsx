@@ -125,6 +125,8 @@ export default async function NovoNegocio({ searchParams }: PageProps<"/negocios
                 custoMaterialCaPorKwp: parametros.custo_material_ca_por_kwp,
                 custoEngenharia: parametros.custo_engenharia,
                 comissaoPercentual: parametros.comissao_percentual,
+                icms: Number(parametros.icms),
+                pisCofins: Number(parametros.pis_cofins),
               }
             : null
         }

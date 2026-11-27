@@ -1,7 +1,9 @@
 import { Cartao } from "@/components/ui";
 import type { BaseTributaria } from "@/lib/tarifa-gd";
 import { type TipoComponenteKit, type TipoLigacao } from "@/lib/tipos";
-import { KitPersonalizado, type CalculoHistorico } from "./kit-personalizado";
+import { METODO_GD2_PISO_V2 } from "@/lib/calculadora";
+import { anosDaProjecaoSalva, ehMotivoSemPayback } from "@/lib/projecao-exibicao";
+import { KitPersonalizado, type CalculoHistorico, type CalculoSalvo } from "./kit-personalizado";
 import type { Ficha } from "./dados-ficha";
 import { EdicaoDados } from "./edicao-dados";
 
@@ -20,6 +22,30 @@ function historicoDaTela(h: { arquivado_em: string; motivo: string; linha: unkno
   };
 }
 
+/**
+ * Parte do método v2 gravada na linha (`calculos_solares`); nula fora do v2 ou se a projeção gravada não confere. A
+ * tela nunca desenha a partir de dado incompleto.
+ */
+function resultadoV2DaLinha(c: NonNullable<Ficha["calculo"]>): CalculoSalvo["v2"] {
+  if (c.metodo_calculo !== METODO_GD2_PISO_V2 || c.estado_financeiro !== "completo") return null;
+  const anos = anosDaProjecaoSalva(c.projecao);
+  if (!anos || c.economia_primeiro_ano == null || c.economia_25_anos == null || c.autoconsumo_fracao == null || c.icms == null || c.pis_cofins == null) {
+    return null;
+  }
+  const premissas = (c.projecao as { premissas?: unknown }).premissas;
+  return {
+    paybackMotivo: ehMotivoSemPayback(c.payback_motivo) ? c.payback_motivo : null,
+    economiaPrimeiroAno: Number(c.economia_primeiro_ano),
+    economia25Anos: Number(c.economia_25_anos),
+    saldo25Anos: c.saldo_25_anos == null ? null : Number(c.saldo_25_anos),
+    autoconsumoFracao: Number(c.autoconsumo_fracao),
+    icms: Number(c.icms),
+    pisCofins: Number(c.pis_cofins),
+    premissas: premissas && typeof premissas === "object" ? Object.fromEntries(Object.entries(premissas).filter(([, v]) => typeof v === "number")) : {},
+    anos,
+  };
+}
+
 /** Aba Conta e sistema: conta de luz e local, e o kit com a prévia do cálculo. */
 export function AbaSistema({ ficha }: { ficha: Ficha }) {
   const { negocio, componentes, materiaisKit, precoSugeridoKit, parametros, precoDesatualizado, vigenciaDaTela, contextoEstimativa, historicoCalculo, calculo } = ficha;
@@ -30,6 +56,7 @@ export function AbaSistema({ ficha }: { ficha: Ficha }) {
       <KitPersonalizado
         negocioId={negocio.id}
         negocioValor={negocio.valor}
+        autoconsumoFracao={negocio.autoconsumo_percentual == null ? null : Number(negocio.autoconsumo_percentual)}
         estruturaTelhado={negocio.estrutura_telhado}
         padraoCliente={negocio.padrao_cliente}
         consumoMedioKwhPadrao={negocio.consumo_medio_kwh}
@@ -58,6 +85,8 @@ export function AbaSistema({ ficha }: { ficha: Ficha }) {
                 custoMaterialCaPorKwp: parametros.custo_material_ca_por_kwp,
                 custoEngenharia: parametros.custo_engenharia,
                 comissaoPercentual: parametros.comissao_percentual,
+                icms: Number(parametros.icms),
+                pisCofins: Number(parametros.pis_cofins),
               }
             : null
         }
@@ -95,6 +124,8 @@ export function AbaSistema({ ficha }: { ficha: Ficha }) {
                 disponibilidadeKwh: calculo.disponibilidade_kwh,
                 dataReferencia: calculo.data_referencia,
                 ressalvas: calculo.ressalvas,
+                metodo: calculo.metodo_calculo,
+                v2: resultadoV2DaLinha(calculo),
               }
             : null
         }

@@ -1,5 +1,6 @@
 import "server-only";
 import {
+  CHAVES_PRAZO_DISTRIBUIDORA,
   ehChavePrazo,
   lerContagem,
   lerIndicadores,
@@ -47,6 +48,23 @@ export async function carregarConfigPrazos(supabase: SupabaseServidor, empresaId
   return (data ?? []).flatMap((p) =>
     ehChavePrazo(p.chave) ? [{ chave: p.chave, dias: p.dias_uteis, contagem: lerContagem(p.contagem) }] : [],
   );
+}
+
+/** Prazos da distribuidora de uma concessionária (20261224100000), na ordem de `CHAVES_PRAZO_DISTRIBUIDORA`. */
+export async function carregarPrazosConcessionaria(
+  supabase: SupabaseServidor,
+  { empresaId, concessionariaId }: { empresaId: string; concessionariaId: string },
+): Promise<ConfigPrazo[]> {
+  const { data, error } = await supabase
+    .from("concessionaria_prazos")
+    .select("chave, dias_uteis, contagem")
+    .eq("empresa_id", empresaId)
+    .eq("concessionaria_id", concessionariaId);
+  if (error) throw error;
+  return CHAVES_PRAZO_DISTRIBUIDORA.flatMap((chave) => {
+    const p = data.find((l) => l.chave === chave);
+    return p ? [{ chave, dias: p.dias_uteis, contagem: lerContagem(p.contagem) }] : [];
+  });
 }
 
 export async function carregarFeriadosEmpresa(supabase: SupabaseServidor, empresaId: string) {

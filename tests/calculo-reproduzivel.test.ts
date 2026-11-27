@@ -131,6 +131,16 @@ describe("linhaDeCalculo: estimativa incompleta, só o resultado técnico", () =
       payback_meses: null,
       autoconsumo_kwh: null,
       ressalvas: null,
+      // Método v2 (migration 20261221100000): nada da projeção numa linha incompleta.
+      icms: null,
+      pis_cofins: null,
+      autoconsumo_fracao: null,
+      preco_inversor: null,
+      economia_primeiro_ano: null,
+      economia_25_anos: null,
+      saldo_25_anos: null,
+      payback_motivo: null,
+      projecao: null,
       // Novas entradas registradas mesmo incompleta (sem contexto: só tarifa e origem; base não declarada).
       data_referencia: null,
       tarifa_base_tributaria: null,

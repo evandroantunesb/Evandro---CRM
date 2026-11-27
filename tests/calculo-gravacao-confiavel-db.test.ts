@@ -179,7 +179,7 @@ describe("vendedor autenticado não grava financeiro direto (PostgREST)", () => 
     expect(antes).toMatchObject({ estado_financeiro: "incompleto" });
     const { error } = await vendedor.cliente
       .from("calculos_solares")
-      .update({ estado_financeiro: "completo", economia_mensal: 191.79, metodo_calculo: "gd2_piso_655i_v1", pendencias: null })
+      .update({ estado_financeiro: "completo", economia_mensal: 274.42, metodo_calculo: "gd2_piso_655i_v1", pendencias: null })
       .eq("negocio_id", negocioId);
     expect(error?.code).toBe("42501");
     expect(await linha(negocioId)).toEqual(antes);
@@ -282,7 +282,7 @@ describe("autorização real (empresa, negócio, papel) e autoria da sessão", (
     expect(await salvarComo(vendedor, adulterado, negocioId)).toMatchObject({ ok: true, mensagem: "Kit e cálculo salvos." });
     expect(await linha(negocioId)).toMatchObject({
       estado_financeiro: "completo",
-      economia_mensal: 191.79,
+      economia_mensal: 274.42,
       empresa_id: empresa,
       criado_por: atualVendedor.membroId,
       atualizado_por: atualVendedor.membroId,
@@ -290,7 +290,7 @@ describe("autorização real (empresa, negócio, papel) e autoria da sessão", (
     // Preço também passa pelo servidor (e com a autoria da sessão).
     await servico.from("negocios").update({ valor: 22000 }).eq("id", negocioId);
     expect(await atualizarPrecoCalculoComCliente(cliente(vendedor), adulterado, negocioId)).toMatchObject({ ok: true });
-    expect(await linha(negocioId)).toMatchObject({ kit_preco: 22000, atualizado_por: atualVendedor.membroId, economia_mensal: 191.79 });
+    expect(await linha(negocioId)).toMatchObject({ kit_preco: 22000, atualizado_por: atualVendedor.membroId, economia_mensal: 274.42 });
   });
 });
 
@@ -368,7 +368,7 @@ describe("exclusão: só quem pode, sempre com a linha inteira e a autoria no hi
     expect(h[0]!.linha).toMatchObject({
       id: antes.id,
       estado_financeiro: "completo",
-      economia_mensal: 191.79,
+      economia_mensal: 274.42,
       criado_por: atualVendedor.membroId,
       tarifa_gd_id: antes.tarifa_gd_id,
     });
