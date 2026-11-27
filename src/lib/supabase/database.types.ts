@@ -36,6 +36,7 @@ export type Database = {
           tamanho: number;
           tipo_mime: string | null;
         };
+        ComputedFields: never;
         Insert: {
           caminho: string;
           categoria?: string;
@@ -95,6 +96,7 @@ export type Database = {
           negocio_id: string | null;
           tipo: string;
         };
+        ComputedFields: never;
         Insert: {
           ator_id?: string | null;
           contato_id?: string | null;
@@ -152,6 +154,7 @@ export type Database = {
           negocio_id: string;
           status: Database["public"]["Enums"]["status_atribuicao_lead"];
         };
+        ComputedFields: never;
         Insert: {
           created_at?: string;
           decidido_em?: string | null;
@@ -236,6 +239,7 @@ export type Database = {
           observacao: string | null;
           situacao: string;
         };
+        ComputedFields: never;
         Insert: {
           comprovante_caminho: string;
           comprovante_nome: string;
@@ -381,6 +385,7 @@ export type Database = {
           updated_at: string;
           valor_fatura_medio: number | null;
         };
+        ComputedFields: never;
         Insert: {
           atualizado_por?: string | null;
           autoconsumo_fracao?: number | null;
@@ -552,6 +557,7 @@ export type Database = {
           motivo: string;
           negocio_id: string;
         };
+        ComputedFields: never;
         Insert: {
           arquivado_em?: string;
           arquivado_por?: string | null;
@@ -606,6 +612,7 @@ export type Database = {
           id: number;
           origem: string;
         };
+        ComputedFields: never;
         Insert: {
           created_at?: string;
           empresa_id: string;
@@ -658,6 +665,7 @@ export type Database = {
           valor_comissao: number;
           valor_total: number;
         };
+        ComputedFields: never;
         Insert: {
           calculado_por?: string | null;
           created_at?: string;
@@ -751,6 +759,7 @@ export type Database = {
           pedido_id: string | null;
           tipo: string;
         };
+        ComputedFields: never;
         Insert: {
           caminho: string;
           created_at?: string;
@@ -803,6 +812,7 @@ export type Database = {
           mapa: NonNullable<Json>;
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           empresa_id: string;
           fornecedor_chave: string;
@@ -833,6 +843,7 @@ export type Database = {
           margem: number;
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           atualizado_por?: string | null;
           categoria: string;
@@ -869,6 +880,7 @@ export type Database = {
           unidade: string;
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           categoria?: string;
           created_at?: string;
@@ -925,6 +937,7 @@ export type Database = {
           valido_ate: string;
           valor_total: number;
         };
+        ComputedFields: never;
         Insert: {
           arquivo_id: string;
           cobertura: string;
@@ -1010,6 +1023,7 @@ export type Database = {
           unidade: string;
           valor_unitario: number;
         };
+        ComputedFields: never;
         Insert: {
           created_at?: string;
           descricao: string;
@@ -1086,6 +1100,7 @@ export type Database = {
           valor_total: number;
           vencimento: string;
         };
+        ComputedFields: never;
         Insert: {
           cancelado_em?: string | null;
           cancelado_por?: string | null;
@@ -1178,6 +1193,7 @@ export type Database = {
           preco: number;
           tabela_id: string | null;
         };
+        ComputedFields: never;
         Insert: {
           codigo_fornecedor?: string | null;
           created_at?: string;
@@ -1249,6 +1265,7 @@ export type Database = {
           subiram: number;
           valido_ate: string | null;
         };
+        ComputedFields: never;
         Insert: {
           baixaram?: number;
           caminho: string;
@@ -1308,6 +1325,7 @@ export type Database = {
           tipos: string[];
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           ativo?: boolean;
           concessionaria_id: string;
@@ -1358,6 +1376,7 @@ export type Database = {
           empresa_id: string;
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           chave: string;
           concessionaria_id: string;
@@ -1400,6 +1419,7 @@ export type Database = {
           nome: string;
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           created_at?: string;
           distribuidora: string;
@@ -1441,6 +1461,7 @@ export type Database = {
           valor_negocio_parcelado: string;
           valor_negocio_personalizado: string;
         };
+        ComputedFields: never;
         Insert: {
           atualizado_por?: string | null;
           created_at?: string;
@@ -1504,6 +1525,7 @@ export type Database = {
           motivo_estorno: string | null;
           negocio_id: string;
         };
+        ComputedFields: never;
         Insert: {
           beneficiario_membro_id: string;
           beneficiario_user_id: string;
@@ -1612,6 +1634,7 @@ export type Database = {
           updated_at: string;
           xp_bonus: number;
         };
+        ComputedFields: never;
         Insert: {
           ativa?: boolean;
           ativa_desde?: string;
@@ -1658,6 +1681,7 @@ export type Database = {
           id: string;
           membro_id: string;
         };
+        ComputedFields: never;
         Insert: {
           conquista_id: string;
           desbloqueada_em?: string;
@@ -1722,6 +1746,7 @@ export type Database = {
           uf: string | null;
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           bairro?: string | null;
           cep?: string | null;
@@ -1809,6 +1834,7 @@ export type Database = {
           token: string;
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           atualizado_por?: string | null;
           condicao_pagamento?: Json | null;
@@ -1918,6 +1944,7 @@ export type Database = {
           negocio_id: string;
           valor: number | null;
         };
+        ComputedFields: never;
         Insert: {
           condicao?: Json | null;
           conteudo: string;
@@ -1979,6 +2006,7 @@ export type Database = {
           solicitado_por: string;
           status: string;
         };
+        ComputedFields: never;
         Insert: {
           created_at?: string;
           decidido_em?: string | null;
@@ -2046,6 +2074,7 @@ export type Database = {
           id: string;
           nome: string;
         };
+        ComputedFields: never;
         Insert: {
           created_at?: string;
           data: string;
@@ -2085,6 +2114,7 @@ export type Database = {
           updated_at: string;
           user_id: string;
         };
+        ComputedFields: never;
         Insert: {
           ativo?: boolean;
           created_at?: string;
@@ -2140,6 +2170,7 @@ export type Database = {
           pulados: number[];
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           concluido_em?: string | null;
           created_at?: string;
@@ -2181,6 +2212,7 @@ export type Database = {
           texto: string | null;
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           atualizado_por?: string | null;
           created_at?: string;
@@ -2232,6 +2264,7 @@ export type Database = {
           setores_desligados: string[];
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           atualizado_por?: string | null;
           created_at?: string;
@@ -2286,6 +2319,7 @@ export type Database = {
           situacao: Database["public"]["Enums"]["situacao_empresa"];
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           cnpj?: string | null;
           compras_atendido_por?: Database["public"]["Enums"]["setor_obra"] | null;
@@ -2341,6 +2375,7 @@ export type Database = {
           titulo: string;
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           ativo?: boolean;
           concessionaria_id: string;
@@ -2397,6 +2432,7 @@ export type Database = {
           obras: number;
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           empresa_id: string;
           kwp?: number;
@@ -2427,6 +2463,7 @@ export type Database = {
           empresa_id: string;
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           chave: string;
           contagem?: string;
@@ -2459,6 +2496,7 @@ export type Database = {
           equipe_id: string;
           membro_id: string;
         };
+        ComputedFields: never;
         Insert: {
           created_at?: string;
           e_gestor?: boolean;
@@ -2506,6 +2544,7 @@ export type Database = {
           nome: string;
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           ativa?: boolean;
           created_at?: string;
@@ -2542,6 +2581,7 @@ export type Database = {
           telefone: string | null;
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           ativa?: boolean;
           created_at?: string;
@@ -2587,6 +2627,7 @@ export type Database = {
           ordem: number;
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           ativa?: boolean;
           campos_obrigatorios?: string[];
@@ -2646,6 +2687,7 @@ export type Database = {
           nome: string;
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           ativa?: boolean;
           cor?: string | null;
@@ -2687,6 +2729,7 @@ export type Database = {
           profile_at_event: Database["public"]["Enums"]["perfil_gamificacao"] | null;
           tipo: string;
         };
+        ComputedFields: never;
         Insert: {
           ator_id?: string | null;
           beneficiario_id?: string | null;
@@ -2735,6 +2778,7 @@ export type Database = {
           valor_por_usuario: number;
           valor_total: number;
         };
+        ComputedFields: never;
         Insert: {
           created_at?: string;
           empresa_id: string;
@@ -2780,6 +2824,7 @@ export type Database = {
           nome: string;
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           ativa?: boolean;
           created_at?: string;
@@ -2820,6 +2865,7 @@ export type Database = {
           updated_at: string;
           visualizacoes: number;
         };
+        ComputedFields: never;
         Insert: {
           ativo?: boolean;
           created_at?: string;
@@ -2880,6 +2926,7 @@ export type Database = {
           ordem: number;
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           ativo?: boolean;
           created_at?: string;
@@ -2927,6 +2974,7 @@ export type Database = {
           updated_at: string;
           xp: number;
         };
+        ComputedFields: never;
         Insert: {
           ativa?: boolean;
           condicao?: Json | null;
@@ -2990,6 +3038,7 @@ export type Database = {
           refresh_token: string;
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           created_at?: string;
           email_google?: string | null;
@@ -3043,6 +3092,7 @@ export type Database = {
           status: string;
           status_qualificacao: string;
         };
+        ComputedFields: never;
         Insert: {
           contato_id: string;
           created_at?: string;
@@ -3132,6 +3182,7 @@ export type Database = {
           id: string;
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           autor_id: string;
           created_at?: string;
@@ -3184,6 +3235,7 @@ export type Database = {
           negocio_id: string;
           saiu_em: string | null;
         };
+        ComputedFields: never;
         Insert: {
           empresa_id: string;
           entrou_em?: string;
@@ -3240,6 +3292,7 @@ export type Database = {
           quantidade: number;
           tipo: Database["public"]["Enums"]["tipo_componente_kit"];
         };
+        ComputedFields: never;
         Insert: {
           created_at?: string;
           descricao: string;
@@ -3302,6 +3355,7 @@ export type Database = {
           preco: number;
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           ativo?: boolean;
           created_at?: string;
@@ -3346,6 +3400,7 @@ export type Database = {
           id: number;
           user_id: string | null;
         };
+        ComputedFields: never;
         Insert: {
           acao: string;
           created_at?: string;
@@ -3389,6 +3444,7 @@ export type Database = {
           setor: Database["public"]["Enums"]["setor_obra"];
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           capacidade: Database["public"]["Enums"]["capacidade_obra"];
           created_at?: string;
@@ -3433,6 +3489,7 @@ export type Database = {
           origem: string;
           setor: Database["public"]["Enums"]["setor_obra"];
         };
+        ComputedFields: never;
         Insert: {
           autor_contexto?: Json | null;
           autor_membro_id?: string | null;
@@ -3484,6 +3541,7 @@ export type Database = {
           updated_at: string;
           valor_alvo: number;
         };
+        ComputedFields: never;
         Insert: {
           ativa?: boolean;
           created_at?: string;
@@ -3544,6 +3602,7 @@ export type Database = {
           empresa_id: string;
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           atualizado_por?: string | null;
           conteudo?: string;
@@ -3583,6 +3642,7 @@ export type Database = {
           empresa_id: string;
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           atualizado_por?: string | null;
           conteudo?: string;
@@ -3623,6 +3683,7 @@ export type Database = {
           nome: string;
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           ativo?: boolean;
           created_at?: string;
@@ -3658,6 +3719,7 @@ export type Database = {
           negocio_id: string;
           parcial: boolean;
         };
+        ComputedFields: never;
         Insert: {
           calculado_em?: string;
           custo_itens: number;
@@ -3698,6 +3760,7 @@ export type Database = {
           etiqueta_id: string;
           negocio_id: string;
         };
+        ComputedFields: never;
         Insert: {
           created_at?: string;
           empresa_id: string;
@@ -3742,6 +3805,7 @@ export type Database = {
           negocio_id: string;
           preco_sugerido: number | null;
         };
+        ComputedFields: never;
         Insert: {
           avisos?: NonNullable<Json>;
           calculado_em?: string;
@@ -3825,6 +3889,7 @@ export type Database = {
           valor: number | null;
           valor_conta_energia: number | null;
         };
+        ComputedFields: never;
         Insert: {
           arquivado_em?: string | null;
           arquivado_por?: string | null;
@@ -4015,6 +4080,7 @@ export type Database = {
           updated_at: string;
           usina_fv: boolean;
         };
+        ComputedFields: never;
         Insert: {
           atualizado_por?: string | null;
           created_at?: string;
@@ -4082,6 +4148,7 @@ export type Database = {
           nome: string | null;
           xp_minimo: number;
         };
+        ComputedFields: never;
         Insert: {
           ativa?: boolean;
           empresa_id: string;
@@ -4116,6 +4183,7 @@ export type Database = {
           texto: string;
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           autor_id?: string | null;
           created_at?: string;
@@ -4169,6 +4237,7 @@ export type Database = {
           mensagem: string;
           tipo: string;
         };
+        ComputedFields: never;
         Insert: {
           created_at?: string;
           empresa_id: string;
@@ -4218,6 +4287,7 @@ export type Database = {
           obra_id: string;
           prevista_para: string | null;
         };
+        ComputedFields: never;
         Insert: {
           anotacao?: string | null;
           empresa_id: string;
@@ -4274,6 +4344,7 @@ export type Database = {
           id: string;
           obra_id: string;
         };
+        ComputedFields: never;
         Insert: {
           caminho: string;
           created_at?: string;
@@ -4323,6 +4394,7 @@ export type Database = {
           empresa_id: string;
           obra_id: string;
         };
+        ComputedFields: never;
         Insert: {
           created_at?: string;
           dados: NonNullable<Json>;
@@ -4371,6 +4443,7 @@ export type Database = {
           valor: number;
           vencimento: string;
         };
+        ComputedFields: never;
         Insert: {
           categoria: string;
           comprovante_caminho?: string | null;
@@ -4451,6 +4524,7 @@ export type Database = {
           registrado_por: string | null;
           valor: number;
         };
+        ComputedFields: never;
         Insert: {
           categoria: string;
           created_at?: string;
@@ -4502,6 +4576,7 @@ export type Database = {
           updated_at: string;
           valor_vendido: number | null;
         };
+        ComputedFields: never;
         Insert: {
           created_at?: string;
           empresa_id: string;
@@ -4537,6 +4612,7 @@ export type Database = {
           impostos_percentual: number;
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           comissoes_percentual?: number;
           empresa_id: string;
@@ -4575,6 +4651,7 @@ export type Database = {
           tipo_mime: string | null;
           versao: number;
         };
+        ComputedFields: never;
         Insert: {
           anexo_origem_id?: string | null;
           caminho: string;
@@ -4651,6 +4728,7 @@ export type Database = {
           titularidade: string | null;
           zona: string | null;
         };
+        ComputedFields: never;
         Insert: {
           atualizado_em?: string;
           atualizado_por?: string | null;
@@ -4717,6 +4795,7 @@ export type Database = {
           resolvida_em: string | null;
           status: string;
         };
+        ComputedFields: never;
         Insert: {
           categoria: string;
           created_at?: string;
@@ -4785,6 +4864,7 @@ export type Database = {
           status: string;
           titulo: string;
         };
+        ComputedFields: never;
         Insert: {
           atualizado_em?: string | null;
           atualizado_por?: string | null;
@@ -4848,6 +4928,7 @@ export type Database = {
           pagamento_em: string | null;
           prazo_dias: number | null;
         };
+        ComputedFields: never;
         Insert: {
           atualizado_em?: string;
           atualizado_por?: string | null;
@@ -4898,6 +4979,7 @@ export type Database = {
           observacao: string | null;
           passo: number;
         };
+        ComputedFields: never;
         Insert: {
           acao: string;
           autor_membro_id?: string | null;
@@ -4941,6 +5023,7 @@ export type Database = {
           tamanho: number;
           tipo_mime: string | null;
         };
+        ComputedFields: never;
         Insert: {
           caminho: string;
           created_at?: string;
@@ -4988,6 +5071,7 @@ export type Database = {
           empresa_id: string;
           evento_id: string;
         };
+        ComputedFields: never;
         Insert: {
           documento_id: string;
           empresa_id: string;
@@ -5029,6 +5113,7 @@ export type Database = {
           status_para: string;
           tipo: string;
         };
+        ComputedFields: never;
         Insert: {
           autor_membro_id?: string | null;
           created_at?: string;
@@ -5088,6 +5173,7 @@ export type Database = {
           tipo_solicitacao: string;
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           canal: string;
           created_at?: string;
@@ -5141,6 +5227,7 @@ export type Database = {
           tamanho: number;
           tipo_mime: string | null;
         };
+        ComputedFields: never;
         Insert: {
           caminho: string;
           created_at?: string;
@@ -5196,6 +5283,7 @@ export type Database = {
           tipo: string;
           vistoria_id: string;
         };
+        ComputedFields: never;
         Insert: {
           autor_membro_id?: string | null;
           created_at?: string;
@@ -5255,6 +5343,7 @@ export type Database = {
           status: string;
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           agendada_para?: string | null;
           conexao_confirmada_em?: string | null;
@@ -5308,6 +5397,7 @@ export type Database = {
           titulo: string;
           valor: number | null;
         };
+        ComputedFields: never;
         Insert: {
           aberto_em?: string;
           aberto_por?: string | null;
@@ -5350,6 +5440,7 @@ export type Database = {
           obra_id: string;
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           created_at?: string;
           empresa_id: string;
@@ -5397,6 +5488,7 @@ export type Database = {
           status_desde: string;
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           aguardando?: Database["public"]["Enums"]["aguardando_obra"] | null;
           aguardando_desde?: string | null;
@@ -5450,6 +5542,7 @@ export type Database = {
           setor: Database["public"]["Enums"]["setor_obra"] | null;
           tipo: string;
         };
+        ComputedFields: never;
         Insert: {
           autor_contexto?: Json | null;
           autor_membro_id?: string | null;
@@ -5498,6 +5591,7 @@ export type Database = {
           termino: string;
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           agendado_por?: string | null;
           created_at?: string;
@@ -5571,6 +5665,7 @@ export type Database = {
           respondido_por: string | null;
           texto: string | null;
         };
+        ComputedFields: never;
         Insert: {
           cobrado_em?: string | null;
           created_at?: string;
@@ -5623,6 +5718,7 @@ export type Database = {
           status: Database["public"]["Enums"]["status_marco_obra"];
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           concluido_em?: string | null;
           concluido_por_membro_id?: string | null;
@@ -5664,6 +5760,7 @@ export type Database = {
           nome: string;
           obra_id: string;
         };
+        ComputedFields: never;
         Insert: {
           anexada_em?: string;
           anexada_por?: string | null;
@@ -5698,6 +5795,7 @@ export type Database = {
           planejado: number;
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           categoria: string;
           empresa_id: string;
@@ -5737,6 +5835,7 @@ export type Database = {
           setor: Database["public"]["Enums"]["setor_obra"];
           substitui_id: string | null;
         };
+        ComputedFields: never;
         Insert: {
           created_at?: string;
           criado_por_user_id?: string | null;
@@ -5796,6 +5895,7 @@ export type Database = {
           empresa_id: string;
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           chave: string;
           dias_uteis: number;
@@ -5849,6 +5949,7 @@ export type Database = {
           venda_alterada_em: string | null;
           vendedor_id: string | null;
         };
+        ComputedFields: never;
         Insert: {
           alerta_pagamento_estornado_em?: string | null;
           cancelada_em?: string | null;
@@ -5958,6 +6059,7 @@ export type Database = {
           prazo_auto_aprovacao_minutos: number;
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           ativa?: boolean;
           cor?: string | null;
@@ -6011,6 +6113,7 @@ export type Database = {
           produtividade_kwh_kwp_mes: number;
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           comissao_percentual?: number;
           curva_geracao_mensal?: number[] | null;
@@ -6082,6 +6185,7 @@ export type Database = {
           telefone: string | null;
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           avatar_caminho?: string | null;
           created_at?: string;
@@ -6116,6 +6220,7 @@ export type Database = {
           updated_at: string;
           vigencia_inicio: string;
         };
+        ComputedFields: never;
         Insert: {
           created_at?: string;
           criado_por?: string | null;
@@ -6180,6 +6285,7 @@ export type Database = {
           valor_fixo: number | null;
           valor_por_usuario: number | null;
         };
+        ComputedFields: never;
         Insert: {
           atualizado_por?: string | null;
           created_at?: string;
@@ -6221,6 +6327,7 @@ export type Database = {
           created_at: string;
           user_id: string;
         };
+        ComputedFields: never;
         Insert: {
           created_at?: string;
           user_id: string;
@@ -6250,6 +6357,7 @@ export type Database = {
           regra_id: string | null;
           xp: number;
         };
+        ComputedFields: never;
         Insert: {
           condicao_avaliada?: Json | null;
           created_at?: string;
@@ -6331,6 +6439,7 @@ export type Database = {
           membro_id: string;
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           empresa_id: string;
           ligado?: boolean;
@@ -6376,6 +6485,7 @@ export type Database = {
           updated_at: string;
           whatsapp: string | null;
         };
+        ComputedFields: never;
         Insert: {
           atualizado_por?: string | null;
           cor_destaque?: string | null;
@@ -6435,6 +6545,7 @@ export type Database = {
           tipo: string;
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           ativo?: boolean;
           config?: NonNullable<Json>;
@@ -6482,6 +6593,7 @@ export type Database = {
           status: Database["public"]["Enums"]["proposta_modelo_status"];
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           atualizado_por?: string | null;
           capa_variante?: Database["public"]["Enums"]["proposta_modelo_capa"];
@@ -6543,6 +6655,7 @@ export type Database = {
           updated_at: string;
           validade_dias: number;
         };
+        ComputedFields: never;
         Insert: {
           atualizado_por?: string | null;
           created_at?: string;
@@ -6594,6 +6707,7 @@ export type Database = {
           token: string;
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           atualizado_por?: string | null;
           blocos_emitidos?: Json | null;
@@ -6672,6 +6786,7 @@ export type Database = {
           id: number;
           proposta_id: string;
         };
+        ComputedFields: never;
         Insert: {
           aberta_em?: string;
           id?: never;
@@ -6710,6 +6825,7 @@ export type Database = {
           validade_ate: string;
           versao: number;
         };
+        ComputedFields: never;
         Insert: {
           dados: NonNullable<Json>;
           dados_sha256: string;
@@ -6784,6 +6900,7 @@ export type Database = {
           updated_at: string;
           validade_ate: string | null;
         };
+        ComputedFields: never;
         Insert: {
           ativa?: boolean;
           created_at?: string;
@@ -6848,6 +6965,7 @@ export type Database = {
           registrado_por_user_id: string;
           substitui_id: string | null;
         };
+        ComputedFields: never;
         Insert: {
           data_recebimento: string;
           empresa_id: string;
@@ -6931,6 +7049,7 @@ export type Database = {
           temperatura: string;
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           ativa?: boolean;
           atualizado_por?: string | null;
@@ -6983,6 +7102,7 @@ export type Database = {
           status: Database["public"]["Enums"]["status_resgate"];
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           created_at?: string;
           empresa_id: string;
@@ -7041,6 +7161,7 @@ export type Database = {
           situacao: string;
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           created_at?: string;
           dia: string;
@@ -7101,6 +7222,7 @@ export type Database = {
           updated_at: string;
           vence_em: string;
         };
+        ComputedFields: never;
         Insert: {
           concluida_em?: string | null;
           concluida_por?: string | null;
@@ -7185,6 +7307,7 @@ export type Database = {
           titulo: string;
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           ativa?: boolean;
           created_at?: string;
@@ -7245,6 +7368,7 @@ export type Database = {
           titulo: string;
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           cancelada_em?: string | null;
           cancelada_por?: string | null;
@@ -7362,6 +7486,7 @@ export type Database = {
           tarefa_id: string;
           tipo_mime: string | null;
         };
+        ComputedFields: never;
         Insert: {
           caminho: string;
           created_at?: string;
@@ -7412,6 +7537,7 @@ export type Database = {
           tarefa_id: string;
           tipo: string;
         };
+        ComputedFields: never;
         Insert: {
           autor_membro_id?: string | null;
           autor_user_id?: string | null;
@@ -7465,6 +7591,7 @@ export type Database = {
           vigencia_fim: string;
           vigencia_inicio: string;
         };
+        ComputedFields: never;
         Insert: {
           ato: string;
           base_tributaria: string;
@@ -7522,6 +7649,7 @@ export type Database = {
           taxa_percentual: number;
           updated_at: string;
         };
+        ComputedFields: never;
         Insert: {
           atualizado_por?: string | null;
           created_at?: string;
@@ -7773,7 +7901,10 @@ export type Database = {
       avisar_documento_cliente_recusado: {
         Args: {
           p_documento: string;
-          p_item: Database["public"]["Tables"]["obra_engenharia_itens"]["Row"];
+          p_item: Omit<
+            Database["public"]["Tables"]["obra_engenharia_itens"]["Row"],
+            Database["public"]["Tables"]["obra_engenharia_itens"]["ComputedFields"]
+          >;
           p_motivo: string;
         };
         Returns: undefined;
@@ -8425,7 +8556,10 @@ export type Database = {
         Args: {
           p_membro_id: string;
           p_motivo: string;
-          p_negocio: Database["public"]["Tables"]["negocios"]["Row"];
+          p_negocio: Omit<
+            Database["public"]["Tables"]["negocios"]["Row"],
+            Database["public"]["Tables"]["negocios"]["ComputedFields"]
+          >;
           p_tipo_atividade: string;
         };
         Returns: {
@@ -8497,7 +8631,10 @@ export type Database = {
         Args: {
           p_itens: Json;
           p_kit: Json;
-          p_pedido: Database["public"]["Tables"]["compras_pedidos"]["Row"];
+          p_pedido: Omit<
+            Database["public"]["Tables"]["compras_pedidos"]["Row"],
+            Database["public"]["Tables"]["compras_pedidos"]["ComputedFields"]
+          >;
         };
         Returns: number;
       };
@@ -8586,7 +8723,10 @@ export type Database = {
         Args: {
           p_data: string;
           p_membro_id: string;
-          p_negocio: Database["public"]["Tables"]["negocios"]["Row"];
+          p_negocio: Omit<
+            Database["public"]["Tables"]["negocios"]["Row"],
+            Database["public"]["Tables"]["negocios"]["ComputedFields"]
+          >;
           p_observacao: string;
           p_substitui_id: string;
         };
@@ -8720,7 +8860,13 @@ export type Database = {
       };
       normalizar_nome_distribuidora: { Args: { p: string }; Returns: string };
       notificar_aviso_pagamento: {
-        Args: { p_aviso: Database["public"]["Tables"]["avisos_pagamento"]["Row"]; p_tipo: string };
+        Args: {
+          p_aviso: Omit<
+            Database["public"]["Tables"]["avisos_pagamento"]["Row"],
+            Database["public"]["Tables"]["avisos_pagamento"]["ComputedFields"]
+          >;
+          p_tipo: string;
+        };
         Returns: undefined;
       };
       obra_concluida_pro: { Args: { p_obra_id: string }; Returns: boolean };
@@ -8848,7 +8994,10 @@ export type Database = {
       pode_decidir_desconto: {
         Args: {
           p_membro_id: string;
-          p_solicitacao: Database["public"]["Tables"]["descontos_solicitacoes"]["Row"];
+          p_solicitacao: Omit<
+            Database["public"]["Tables"]["descontos_solicitacoes"]["Row"],
+            Database["public"]["Tables"]["descontos_solicitacoes"]["ComputedFields"]
+          >;
         };
         Returns: boolean;
       };
