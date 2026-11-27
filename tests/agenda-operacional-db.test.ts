@@ -238,8 +238,17 @@ describe("Agenda do período", () => {
   });
 
   it("vendedor vê só as obras dos próprios clientes; outra empresa e período longo não trazem nada", async () => {
-    const doVendedor = await agenda(vendedor, somarDias(inicio, -7), somarDias(inicio, 7));
-    expect(new Set(doVendedor.map((e) => e.obra_id))).toEqual(new Set([obraVendedor]));
+    // Outras obras do vendedor criadas neste arquivo podem cair na janela (a entrega contratada conta a partir do dia
+    // em que o teste roda): o que importa é ver a própria obra, não ver a do outro vendedor e só ver clientes dele.
+    const doVendedor = new Set((await agenda(vendedor, somarDias(inicio, -7), somarDias(inicio, 7))).map((e) => e.obra_id));
+    expect(doVendedor.has(obraVendedor)).toBe(true);
+    expect(doVendedor.has(obraOutro)).toBe(false);
+    const { data: dele } = ok(
+      await servico.from("obras").select("id, negocios!inner(responsavel_id)").eq("negocios.responsavel_id", m(empresa, vendedor)),
+      "obras do vendedor",
+    );
+    const obrasDele = new Set(dele!.map((o) => o.id));
+    expect([...doVendedor].every((id) => obrasDele.has(id))).toBe(true);
     expect(await agenda(adminB, somarDias(inicio, -7), somarDias(inicio, 7))).toEqual([]);
     expect(await agenda(adminB, somarDias(inicio, -7), somarDias(inicio, 7), empresaB)).toEqual([]);
     expect(await agenda(admin, inicio, somarDias(inicio, 90))).toEqual([]);
