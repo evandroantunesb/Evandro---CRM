@@ -34,12 +34,24 @@ export type CarenciaFinanciamento = (typeof CARENCIAS_FINANCIAMENTO)[number];
 
 export const LIMITES_CONDICOES = {
   parcelasFinanciamento: 84,
-  opcoesFinanciamento: 3,
+  opcoesFinanciamento: 5,
+  /** Taxa ao mês (%) do financiamento automático e do cartão com a taxa do vendedor. */
+  taxaMensal: 10,
   partesPersonalizado: 4,
   instituicao: 40,
   observacaoParte: 60,
   observacao: 240,
 } as const;
+
+/** Prazos do financiamento automático (pedido do Evandro em 27/11/2026): sempre os quatro. */
+export const PRAZOS_FINANCIAMENTO_AUTOMATICO = [24, 36, 48, 60] as const;
+
+export const MODOS_FINANCIAMENTO = ["automatico", "manual"] as const;
+export type ModoFinanciamento = (typeof MODOS_FINANCIAMENTO)[number];
+
+/** Como o vendedor informa a taxa do cartão quando a empresa não deixou as taxas pré-configuradas. */
+export const MODOS_TAXA_VENDEDOR = ["mensal", "parcela"] as const;
+export type ModoTaxaVendedor = (typeof MODOS_TAXA_VENDEDOR)[number];
 
 export const MENSAGEM_NENHUMA_CONDICAO = "Marque pelo menos uma condição de pagamento.";
 export const ORIENTACAO_APROVACAO = "Peça aprovação no cartão Desconto.";
@@ -49,14 +61,30 @@ export const esquemaEntradaCondicoes = z.object({
   // Desconto em % ou o valor à vista em R$ (o vendedor digita um dos dois; com `valor` preenchido, vale o valor).
   aVista: z.object({ desconto: z.string().max(20), valor: z.string().max(30).optional() }).nullable(),
   parcelado: z
-    .object({ meio: z.enum(MEIOS_PARCELAMENTO), parcelas: z.array(z.number().int()).max(MAX_PARCELAS), repassarTaxas: z.boolean() })
+    .object({
+      meio: z.enum(MEIOS_PARCELAMENTO),
+      parcelas: z.array(z.number().int()).max(MAX_PARCELAS),
+      repassarTaxas: z.boolean(),
+      // Só vale no cartão sem taxas pré-configuradas pela empresa: a taxa que o vendedor informa (muda de maquininha).
+      taxaVendedor: z
+        .object({
+          modo: z.enum(MODOS_TAXA_VENDEDOR),
+          mensal: z.string().max(20),
+          porParcela: z.array(z.object({ parcelas: z.number().int(), taxa: z.string().max(20) })).max(MAX_PARCELAS),
+        })
+        .nullable()
+        .optional(),
+    })
     .nullable(),
+  // Uma entrada e uma carência para a simulação inteira (27/11/2026); automático pela taxa ao mês ou opções manuais.
   financiamento: z
     .object({
       instituicao: z.string().max(200),
-      opcoes: z
-        .array(z.object({ entrada: z.string().max(30), parcelas: z.string().max(10), valorParcela: z.string().max(30), carenciaDias: z.number().int() }))
-        .max(10),
+      entrada: z.string().max(30),
+      carenciaDias: z.number().int(),
+      modo: z.enum(MODOS_FINANCIAMENTO),
+      taxaMensal: z.string().max(20),
+      opcoes: z.array(z.object({ parcelas: z.string().max(10), valorParcela: z.string().max(30) })).max(10),
     })
     .nullable(),
   personalizado: z
@@ -82,6 +110,8 @@ export type RegrasCondicoes = {
   descontoAprovado: number;
   /** Preço sugerido pela tabela de preços (Compras P4b), se o negócio tem; ausente = sem sugerido. */
   precoSugerido?: number | null;
+  /** Taxa ao mês do cartão pré-configurada pela empresa (20261225100000); ausente ou nula = parcela a parcela. */
+  taxaMensalCartao?: number | null;
 };
 
 /** Desconto total que quem emite pode dar neste negócio (o limite dele ou o maior já aprovado). */
@@ -144,6 +174,8 @@ export const esquemaCondicoesEmitidas = z
       .object({
         meio: z.enum(MEIOS_PARCELAMENTO),
         repassarTaxas: z.boolean(),
+        // Cartão com a taxa ao mês informada pelo vendedor (27/11/2026); ausente nas emissões anteriores e nas outras.
+        taxaMensal: z.number().min(0).max(LIMITES_CONDICOES.taxaMensal).optional(),
         opcoes: z
           .array(z.object({ parcelas: z.number().int().min(1).max(MAX_PARCELAS), taxaPercentual: z.number().min(0).lt(100), valorParcela: dinheiro }))
           .min(1)
@@ -153,6 +185,11 @@ export const esquemaCondicoesEmitidas = z
     financiamento: z
       .object({
         instituicao: z.string().min(1).max(LIMITES_CONDICOES.instituicao).nullable(),
+        // Entrada e carência únicas (27/11/2026): presentes nas emissões novas, repetidas em cada opção; ausentes nas antigas.
+        entrada: z.number().finite().min(0).optional(),
+        carenciaDias: z.literal(CARENCIAS_FINANCIAMENTO).optional(),
+        // Financiamento automático: a taxa ao mês usada nas parcelas.
+        taxaMensal: z.number().min(0).max(LIMITES_CONDICOES.taxaMensal).optional(),
         opcoes: z
           .array(
             z.object({
@@ -201,6 +238,34 @@ export function valorParcela(preco: number, parcelas: number, taxaPercentual: nu
   return emReais(Math.round((bruto * 100) / parcelas));
 }
 
+/**
+ * Parcela pela tabela Price (parcelas iguais) de `valor` em `parcelas` vezes a `taxaMensal` % ao mês, em centavos
+ * arredondados. Taxa zero: o valor dividido pelas parcelas.
+ */
+export function parcelaPrice(valor: number, taxaMensal: number, parcelas: number): number {
+  const i = taxaMensal / 100;
+  const bruto = i === 0 ? valor / parcelas : (valor * i) / (1 - (1 + i) ** -parcelas);
+  return emReais(Math.round(bruto * 100));
+}
+
+/**
+ * Parcela do cartão com a taxa ao mês do vendedor: 1x é o preço (crédito à vista, sem juros); de 2x em diante, com
+ * repasse, a tabela Price; sem repasse, o preço dividido.
+ */
+export const parcelaCartaoMensal = (preco: number, taxaMensal: number, parcelas: number, repassarTaxas: boolean) =>
+  repassarTaxas && parcelas > 1 ? parcelaPrice(preco, taxaMensal, parcelas) : valorParcela(preco, parcelas, 0, false);
+
+/**
+ * Taxa total (%) que a parcela pela taxa ao mês representa sobre o preço, para guardar junto da opção do cartão como a
+ * taxa da tabela da empresa: 1 − preço ÷ (parcela × parcelas). Duas casas; zero sem juros.
+ */
+export function taxaTotalDaMensal(taxaMensal: number, parcelas: number): number {
+  if (taxaMensal === 0 || parcelas === 1) return 0;
+  const i = taxaMensal / 100;
+  const fator = (parcelas * i) / (1 - (1 + i) ** -parcelas);
+  return Math.round((1 - 1 / fator) * 10000) / 100;
+}
+
 /** Valor à vista com o desconto, em centavos arredondados. */
 export const valorAVista = (preco: number, descontoPercentual: number) => emReais(Math.round(preco * (100 - descontoPercentual)));
 
@@ -221,6 +286,15 @@ function dataValida(texto: string): boolean {
   const data = new Date(Date.UTC(a, m - 1, d));
   return data.getUTCFullYear() === a && data.getUTCMonth() === m - 1 && data.getUTCDate() === d;
 }
+
+/**
+ * O cartão sem taxas pré-configuradas pela empresa fica com a taxa que o vendedor informa na emissão (27/11/2026: a taxa
+ * muda de maquininha para maquininha). Com taxas cadastradas, o vendedor só escolhe as parcelas. O boleto segue só pela
+ * configuração da empresa.
+ */
+export const taxaPeloVendedor = (meio: MeioParcelamento, regras: Pick<RegrasCondicoes, "taxas">) => meio === "cartao" && regras.taxas.cartao.length === 0;
+
+const taxaValida = (t: number | null | undefined): t is number => t != null && Number.isFinite(t) && t >= 0 && t < 100;
 
 export type ResultadoCondicoes = { ok: true; condicoes: CondicoesEmitidas } | { ok: false; pendencias: string[] };
 
@@ -266,10 +340,48 @@ export function montarCondicoesPagamento(entrada: EntradaCondicoes, regras: Regr
     const tabela = new Map(regras.taxas[meio].map((t) => [t.parcelas, t.taxa]));
     const escolhidas = [...new Set(entrada.parcelado.parcelas)].sort((a, b) => a - b);
     const nomeMeio = ROTULO_MEIO_PARCELAMENTO[meio].toLowerCase();
-    if (tabela.size === 0) p.push(`Parcelado: a empresa não oferece parcelas no ${nomeMeio}.`);
+    if (taxaPeloVendedor(meio, regras)) {
+      // Cartão sem taxas pré-configuradas pela empresa: vale a taxa que o vendedor informa (27/11/2026).
+      const t = entrada.parcelado.taxaVendedor;
+      const mensal = t?.modo === "mensal" ? lerNumeroBr(t.mensal) : null;
+      const porParcela = new Map((t?.modo === "parcela" ? t.porParcela : []).map((x) => [x.parcelas, lerNumeroBr(x.taxa)]));
+      if (escolhidas.length === 0) p.push("Cartão: marque pelo menos uma parcela para mostrar.");
+      else if (escolhidas.some((n) => !Number.isInteger(n) || n < 1 || n > MAX_PARCELAS)) p.push(`Cartão: parcelas de 1 a ${MAX_PARCELAS}.`);
+      else if (!t) p.push("Cartão: informe a taxa da maquininha.");
+      else if (t.modo === "mensal" && (mensal == null || !Number.isFinite(mensal) || mensal < 0 || mensal > L.taxaMensal))
+        p.push(`Cartão: informe a taxa ao mês, de 0 a ${L.taxaMensal}%.`);
+      else if (t.modo === "parcela" && escolhidas.some((n) => !taxaValida(porParcela.get(n)))) p.push("Cartão: informe a taxa de cada parcela marcada, de 0 a 99,99%.");
+      else if (t.modo === "mensal") {
+        const i = Math.round(mensal! * 100) / 100;
+        parcelado = {
+          meio,
+          repassarTaxas,
+          taxaMensal: i,
+          opcoes: escolhidas.map((n) => ({ parcelas: n, taxaPercentual: taxaTotalDaMensal(i, n), valorParcela: parcelaCartaoMensal(preco, i, n, repassarTaxas) })),
+        };
+      } else {
+        parcelado = {
+          meio,
+          repassarTaxas,
+          opcoes: escolhidas.map((n) => {
+            const taxa = Math.round(porParcela.get(n)! * 100) / 100;
+            return { parcelas: n, taxaPercentual: taxa, valorParcela: valorParcela(preco, n, taxa, repassarTaxas) };
+          }),
+        };
+      }
+    } else if (tabela.size === 0) p.push(`Parcelado: a empresa não oferece parcelas no ${nomeMeio}.`);
     else if (escolhidas.length === 0) p.push("Parcelado: marque pelo menos uma parcela para mostrar.");
     else if (escolhidas.some((n) => !tabela.has(n))) p.push(`Parcelado: há parcela que a empresa não oferece no ${nomeMeio}.`);
-    else {
+    else if (meio === "cartao" && regras.taxaMensalCartao != null) {
+      // Taxa ao mês pré-configurada pela empresa: as parcelas da tabela, com a parcela pela tabela Price (1x sem juros).
+      const i = regras.taxaMensalCartao;
+      parcelado = {
+        meio,
+        repassarTaxas,
+        taxaMensal: i,
+        opcoes: escolhidas.map((n) => ({ parcelas: n, taxaPercentual: tabela.get(n)!, valorParcela: parcelaCartaoMensal(preco, i, n, repassarTaxas) })),
+      };
+    } else {
       parcelado = {
         meio,
         repassarTaxas,
@@ -281,23 +393,48 @@ export function montarCondicoesPagamento(entrada: EntradaCondicoes, regras: Regr
   let financiamento: CondicoesEmitidas["financiamento"] = null;
   if (entrada.financiamento) {
     const antes = p.length;
-    const instituicao = entrada.financiamento.instituicao.trim();
-    const opcoes = entrada.financiamento.opcoes;
+    const f = entrada.financiamento;
+    const instituicao = f.instituicao.trim();
+    const valorEntrada = lerNumeroBr(f.entrada) ?? 0;
+    const entradaOk = Number.isFinite(valorEntrada) && valorEntrada >= 0 && centavos(valorEntrada) < centavos(preco);
+    const carenciaOk = (CARENCIAS_FINANCIAMENTO as readonly number[]).includes(f.carenciaDias);
     if (instituicao.length > L.instituicao) p.push(`Financiamento: a instituição passa de ${L.instituicao} caracteres.`);
-    if (opcoes.length === 0) p.push("Financiamento: preencha pelo menos uma opção.");
-    if (opcoes.length > L.opcoesFinanciamento) p.push(`Financiamento: até ${L.opcoesFinanciamento} opções.`);
-    const lidas = opcoes.map((o, i) => {
-      const n = `Financiamento, opção ${i + 1}`;
-      const valorEntrada = lerNumeroBr(o.entrada) ?? 0;
-      const parcelas = Number(o.parcelas.trim() || Number.NaN);
-      const parcela = lerNumeroBr(o.valorParcela);
-      if (!Number.isFinite(valorEntrada) || valorEntrada < 0 || centavos(valorEntrada) >= centavos(preco)) p.push(`${n}: a entrada precisa ser menor que o preço.`);
-      if (!Number.isInteger(parcelas) || parcelas < 1 || parcelas > L.parcelasFinanciamento) p.push(`${n}: parcelas de 1 a ${L.parcelasFinanciamento}.`);
-      if (parcela == null || !Number.isFinite(parcela) || centavos(parcela) <= 0) p.push(`${n}: informe o valor da parcela.`);
-      if (!(CARENCIAS_FINANCIAMENTO as readonly number[]).includes(o.carenciaDias)) p.push(`${n}: escolha a carência.`);
-      return { entrada: emReais(centavos(valorEntrada)), parcelas, valorParcela: emReais(centavos(parcela ?? 0)), carenciaDias: o.carenciaDias as CarenciaFinanciamento };
-    });
-    if (p.length === antes) financiamento = { instituicao: instituicao || null, opcoes: lidas };
+    if (!entradaOk) p.push("Financiamento: a entrada precisa ser menor que o preço.");
+    if (!carenciaOk) p.push("Financiamento: escolha a carência.");
+    const entradaReais = entradaOk ? emReais(centavos(valorEntrada)) : 0;
+    const carenciaDias = f.carenciaDias as CarenciaFinanciamento;
+    let opcoes: { parcelas: number; valorParcela: number }[] = [];
+    let taxaMensal: number | undefined;
+    if (f.modo === "automatico") {
+      const i = lerNumeroBr(f.taxaMensal);
+      if (i == null || !Number.isFinite(i) || i < 0 || i > L.taxaMensal) p.push(`Financiamento: informe a taxa ao mês, de 0 a ${L.taxaMensal}%.`);
+      else if (entradaOk) {
+        const taxa = Math.round(i * 100) / 100;
+        taxaMensal = taxa;
+        const financiado = emReais(centavos(preco) - centavos(entradaReais));
+        opcoes = PRAZOS_FINANCIAMENTO_AUTOMATICO.map((n) => ({ parcelas: n, valorParcela: parcelaPrice(financiado, taxa, n) }));
+      }
+    } else {
+      if (f.opcoes.length === 0) p.push("Financiamento: preencha pelo menos uma opção.");
+      if (f.opcoes.length > L.opcoesFinanciamento) p.push(`Financiamento: até ${L.opcoesFinanciamento} opções.`);
+      opcoes = f.opcoes.map((o, i) => {
+        const n = `Financiamento, opção ${i + 1}`;
+        const parcelas = Number(o.parcelas.trim() || Number.NaN);
+        const parcela = lerNumeroBr(o.valorParcela);
+        if (!Number.isInteger(parcelas) || parcelas < 1 || parcelas > L.parcelasFinanciamento) p.push(`${n}: parcelas de 1 a ${L.parcelasFinanciamento}.`);
+        if (parcela == null || !Number.isFinite(parcela) || centavos(parcela) <= 0) p.push(`${n}: informe o valor da parcela.`);
+        return { parcelas, valorParcela: emReais(centavos(parcela ?? 0)) };
+      });
+    }
+    if (p.length === antes) {
+      financiamento = {
+        instituicao: instituicao || null,
+        entrada: entradaReais,
+        carenciaDias,
+        ...(taxaMensal != null ? { taxaMensal } : {}),
+        opcoes: opcoes.map((o) => ({ entrada: entradaReais, parcelas: o.parcelas, valorParcela: o.valorParcela, carenciaDias })),
+      };
+    }
   }
 
   let personalizado: CondicoesEmitidas["personalizado"] = null;

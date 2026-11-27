@@ -7,8 +7,11 @@ import {
   ROTULO_MEIO_PARCELAMENTO,
   esquemaPreferencias,
   esquemaValorNegocio,
+  lerParcelasMarcadas,
   lerTaxasDoFormulario,
 } from "@/lib/condicoes-pagamento";
+import { LIMITES_CONDICOES, taxaTotalDaMensal } from "@/lib/condicoes-pagamento-proposta";
+import { lerNumeroBr } from "@/lib/formatacao";
 import { mensagemErro } from "@/lib/erros";
 import { CONDICOES_PAGAMENTO } from "@/lib/permissoes";
 import { exigirPapel } from "@/lib/sessao";
@@ -46,18 +49,37 @@ export async function salvarTaxasParcelamento(_: ResultadoAcao, formData: FormDa
   const { atual } = await exigirPapel(...CONDICOES_PAGAMENTO);
   const meio = z.enum(MEIOS_PARCELAMENTO).safeParse(formData.get("meio"));
   if (!meio.success) return { ok: false, mensagem: "Meio de pagamento inválido." };
-  const lidas = lerTaxasDoFormulario(formData);
+  // Cartão com a taxa ao mês da empresa (27/11/2026): as parcelas marcadas, cada uma com a taxa total equivalente.
+  const mensal = meio.data === "cartao" && formData.get("modoEmpresa") === "mensal";
+  let taxaMensal: number | null = null;
+  if (mensal) {
+    const i = lerNumeroBr(String(formData.get("taxaMensal") ?? ""));
+    if (i == null || !Number.isFinite(i) || i < 0 || i > LIMITES_CONDICOES.taxaMensal) {
+      return { ok: false, mensagem: `Informe a taxa ao mês, de 0 a ${LIMITES_CONDICOES.taxaMensal}%.` };
+    }
+    taxaMensal = Math.round(i * 100) / 100;
+  }
+  const lidas = mensal
+    ? { ok: true as const, taxas: lerParcelasMarcadas(formData).map((n) => ({ parcelas: n, taxa: taxaTotalDaMensal(taxaMensal!, n) })) }
+    : lerTaxasDoFormulario(formData);
   if (!lidas.ok) return lidas;
 
   const supabase = await criarClienteServidor();
-  const { error } = await supabase.rpc("salvar_taxas_parcelamento", { p_empresa_id: atual.empresaId, p_meio: meio.data, p_taxas: lidas.taxas });
+  const { error } =
+    meio.data === "cartao"
+      ? await supabase.rpc("salvar_taxas_cartao", { p_empresa_id: atual.empresaId, p_taxa_mensal: taxaMensal as number, p_taxas: lidas.taxas })
+      : await supabase.rpc("salvar_taxas_parcelamento", { p_empresa_id: atual.empresaId, p_meio: meio.data, p_taxas: lidas.taxas });
   if (error) return { ok: false, mensagem: mensagemErro(error, "Não foi possível salvar.") };
 
   revalidatePath("/configuracoes/condicoes-pagamento");
   const rotulo = ROTULO_MEIO_PARCELAMENTO[meio.data];
   return {
     ok: true,
-    mensagem: lidas.taxas.length ? `${rotulo}: ${lidas.taxas.length} opções de parcelamento salvas.` : `${rotulo} fica indisponível para os vendedores.`,
+    mensagem: lidas.taxas.length
+      ? `${rotulo}: ${lidas.taxas.length} opções de parcelamento salvas.`
+      : meio.data === "cartao"
+        ? "Cartão: o vendedor informa a taxa na emissão."
+        : `${rotulo} fica indisponível para os vendedores.`,
   };
 }
 

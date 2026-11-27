@@ -1449,6 +1449,7 @@ export type Database = {
       condicoes_pagamento_preferencias: {
         Row: {
           atualizado_por: string | null;
+          cartao_taxa_mensal: number | null;
           created_at: string;
           desconto_max_gestor: number;
           desconto_max_vendedor: number;
@@ -1464,6 +1465,7 @@ export type Database = {
         ComputedFields: never;
         Insert: {
           atualizado_por?: string | null;
+          cartao_taxa_mensal?: number | null;
           created_at?: string;
           desconto_max_gestor?: number;
           desconto_max_vendedor?: number;
@@ -1478,6 +1480,7 @@ export type Database = {
         };
         Update: {
           atualizado_por?: string | null;
+          cartao_taxa_mensal?: number | null;
           created_at?: string;
           desconto_max_gestor?: number;
           desconto_max_vendedor?: number;
@@ -9385,6 +9388,10 @@ export type Database = {
       };
       salvar_regras_temperatura: {
         Args: { p_empresa_id: string; p_regras: Json };
+        Returns: undefined;
+      };
+      salvar_taxas_cartao: {
+        Args: { p_empresa_id: string; p_taxa_mensal: number; p_taxas: Json };
         Returns: undefined;
       };
       salvar_taxas_parcelamento: {

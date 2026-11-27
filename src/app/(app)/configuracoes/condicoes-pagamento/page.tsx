@@ -14,7 +14,7 @@ export default async function CondicoesPagamento() {
     supabase
       .from("condicoes_pagamento_preferencias")
       .select(
-        "desconto_max_vendedor, desconto_max_gestor, personalizado_ativo, valor_negocio_avista, valor_negocio_parcelado, valor_negocio_financiamento, valor_negocio_personalizado",
+        "desconto_max_vendedor, desconto_max_gestor, personalizado_ativo, valor_negocio_avista, valor_negocio_parcelado, valor_negocio_financiamento, valor_negocio_personalizado, cartao_taxa_mensal",
       )
       .eq("empresa_id", atual.empresaId)
       .maybeSingle(),
@@ -45,6 +45,7 @@ export default async function CondicoesPagamento() {
           <FormularioTaxas
             meio={meio}
             taxas={(taxas ?? []).filter((t) => t.meio === meio).map((t) => ({ parcelas: t.parcelas, taxa: Number(t.taxa_percentual) }))}
+            taxaMensal={meio === "cartao" && preferencias?.cartao_taxa_mensal != null ? Number(preferencias.cartao_taxa_mensal) : null}
           />
         </Cartao>
       ))}

@@ -233,9 +233,13 @@ describe("esquema 9: Fio B e parcela × economia congelados (textos aprovados em
         ...ENTRADA.condicoes.entrada!,
         financiamento: {
           instituicao: "Sicredi",
+          entrada: "5.000,00",
+          carenciaDias: 90,
+          modo: "manual",
+          taxaMensal: "",
           opcoes: [
-            { entrada: "0", parcelas: "60", valorParcela: "598,00", carenciaDias: 90 },
-            { entrada: "5.000,00", parcelas: "48", valorParcela: "560,00", carenciaDias: 90 },
+            { parcelas: "60", valorParcela: "598,00" },
+            { parcelas: "48", valorParcela: "560,00" },
           ],
         },
       },

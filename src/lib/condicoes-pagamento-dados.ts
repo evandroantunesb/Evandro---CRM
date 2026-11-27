@@ -16,7 +16,11 @@ export async function carregarRegrasCondicoes(
   negocioId: string,
 ): Promise<RegrasCondicoes | null> {
   const [preferenciasR, taxasR, limiteR, aprovadoR, sugeridoR] = await Promise.all([
-    supabase.from("condicoes_pagamento_preferencias").select("desconto_max_vendedor, desconto_max_gestor, personalizado_ativo").eq("empresa_id", empresaId).maybeSingle(),
+    supabase
+      .from("condicoes_pagamento_preferencias")
+      .select("desconto_max_vendedor, desconto_max_gestor, personalizado_ativo, cartao_taxa_mensal")
+      .eq("empresa_id", empresaId)
+      .maybeSingle(),
     supabase.from("taxas_parcelamento").select("meio, parcelas, taxa_percentual").eq("empresa_id", empresaId).order("parcelas"),
     supabase.rpc("meu_limite_desconto", { p_empresa_id: empresaId }),
     supabase
@@ -43,6 +47,7 @@ export async function carregarRegrasCondicoes(
     limiteDesconto: Number(limiteR.data ?? 0),
     descontoAprovado: Number(aprovadoR.data?.percentual ?? 0),
     precoSugerido: sugeridoR.data?.preco_sugerido == null ? null : Number(sugeridoR.data.preco_sugerido),
+    taxaMensalCartao: preferenciasR.data?.cartao_taxa_mensal == null ? null : Number(preferenciasR.data.cartao_taxa_mensal),
   };
 }
 

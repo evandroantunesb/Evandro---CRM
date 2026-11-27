@@ -98,6 +98,39 @@ describe("condições de pagamento: parcelas e taxas", { concurrent: false, shuf
   });
 });
 
+describe("cartão com a taxa ao mês da empresa (20261225100000)", { concurrent: false, shuffle: false }, () => {
+  const salvarCartao = (u: Usuario, taxaMensal: number | null, taxas: unknown) =>
+    u.cliente.rpc("salvar_taxas_cartao", { p_empresa_id: empresa, p_taxa_mensal: taxaMensal as number, p_taxas: taxas as never });
+  const taxaMensal = async () =>
+    (await servico.from("condicoes_pagamento_preferencias").select("cartao_taxa_mensal").eq("empresa_id", empresa).single()).data?.cartao_taxa_mensal;
+
+  it("gestor grava as parcelas e a taxa ao mês de uma vez; parcela a parcela volta a taxa para nula", async () => {
+    expect((await salvarCartao(gestor, 2.99, [{ parcelas: 1, taxa: 0 }, { parcelas: 3, taxa: 5.69 }])).error).toBeNull();
+    expect(Number(await taxaMensal())).toBe(2.99);
+    expect(await taxasDe(admin, "cartao")).toEqual([[1, 0], [3, 5.69]]);
+    expect((await salvarCartao(admin, null, [{ parcelas: 2, taxa: 4 }])).error).toBeNull();
+    expect(await taxaMensal()).toBeNull();
+    expect(await taxasDe(admin, "cartao")).toEqual([[2, 4]]);
+  });
+
+  it("lista vazia: o vendedor informa a taxa (sem tabela e sem taxa ao mês)", async () => {
+    expect((await salvarCartao(admin, 2.5, [])).error).toBeNull();
+    expect(await taxaMensal()).toBeNull();
+    expect(await taxasDe(admin, "cartao")).toEqual([]);
+  });
+
+  it("taxa ao mês acima de 10% é recusada e nada muda; vendedor e outra empresa não salvam", async () => {
+    expect((await salvarCartao(admin, 1.5, [{ parcelas: 6, taxa: 8 }])).error).toBeNull();
+    expect((await salvarCartao(admin, 10.5, [{ parcelas: 2, taxa: 4 }])).error).not.toBeNull();
+    expect(await taxasDe(admin, "cartao")).toEqual([[6, 8]]);
+    expect(Number(await taxaMensal())).toBe(1.5);
+    expect((await salvarCartao(vendedor, 2, [{ parcelas: 2, taxa: 4 }])).error).not.toBeNull();
+    const deB = await adminB.cliente.rpc("salvar_taxas_cartao", { p_empresa_id: empresa, p_taxa_mensal: 2, p_taxas: [] as never });
+    expect(deB.error).not.toBeNull();
+    expect(await taxasDe(admin, "cartao")).toEqual([[6, 8]]);
+  });
+});
+
 describe("leitura do formulário de taxas", () => {
   const formulario = (campos: Record<string, string>) => {
     const f = new FormData();
