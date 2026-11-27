@@ -872,14 +872,15 @@ export function FormularioNegocio({
               rotulo="Distribuidora"
               list="distribuidoras-conhecidas"
               autoComplete="off"
-              placeholder="Escolha ou digite para buscar"
+              placeholder="Digite para buscar"
               aria-describedby="distribuidora-ajuda"
               value={distribuidoraTexto}
               onChange={(e) => setDistribuidoraTexto(e.target.value)}
               maxLength={80}
             />
+            {/* Lista vazia até o primeiro caractere: ao clicar no campo, o navegador não abre as 85 distribuidoras de uma vez. */}
             <datalist id="distribuidoras-conhecidas">
-              {opcoesDistribuidora.map((r) => (
+              {(distribuidoraTexto.trim() ? opcoesDistribuidora : []).map((r) => (
                 <option key={r} value={r} />
               ))}
             </datalist>
