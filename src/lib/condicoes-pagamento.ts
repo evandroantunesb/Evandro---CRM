@@ -100,6 +100,11 @@ export type TaxaParcela = { parcelas: number; taxa: number };
  * Lê a tabela de um meio do formulário: para cada parcela de 1 a 24, `disponivel_<n>` marcado e `taxa_<n>` (0 a
  * 99,99%). Parcela desmarcada fica de fora; nenhuma marcada = meio indisponível.
  */
+/** Parcelas marcadas (`disponivel_<n>`) de 1 a 24, sem as taxas: o cartão com a taxa ao mês da empresa. */
+export function lerParcelasMarcadas(dados: FormData): number[] {
+  return Array.from({ length: MAX_PARCELAS }, (_, i) => i + 1).filter((n) => dados.get(`disponivel_${n}`) === "on");
+}
+
 export function lerTaxasDoFormulario(dados: FormData): { ok: true; taxas: TaxaParcela[] } | { ok: false; mensagem: string } {
   const taxas: TaxaParcela[] = [];
   const taxa = percentual(99.99, "Taxa");

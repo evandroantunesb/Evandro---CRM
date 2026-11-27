@@ -52,7 +52,7 @@ export function FormularioPreferencias({ preferencias }: { preferencias: Prefere
   );
 }
 
-export function FormularioTaxas({ meio, taxas }: { meio: MeioParcelamento; taxas: TaxaParcela[] }) {
+export function FormularioTaxas({ meio, taxas, taxaMensal = null }: { meio: MeioParcelamento; taxas: TaxaParcela[]; taxaMensal?: number | null }) {
   const [resultado, acao, salvando] = useActionState(salvarTaxasParcelamento, null);
   const [marcadas, setMarcadas] = useState(() => new Set(taxas.map((t) => t.parcelas)));
   const [valores, setValores] = useState<Record<number, string>>(() => Object.fromEntries(taxas.map((t) => [t.parcelas, formatar(t.taxa)])));
@@ -60,8 +60,11 @@ export function FormularioTaxas({ meio, taxas }: { meio: MeioParcelamento; taxas
   // Só no cartão (27/11/2026): sem taxas cadastradas, o vendedor informa a taxa na emissão (muda de maquininha).
   const ehCartao = meio === "cartao";
   const [peloVendedor, setPeloVendedor] = useState(ehCartao && taxas.length === 0);
+  const [modoEmpresa, setModoEmpresa] = useState<"parcela" | "mensal">(taxaMensal != null ? "mensal" : "parcela");
+  const [mensal, setMensal] = useState(taxaMensal != null ? formatar(taxaMensal) : "");
   const rotulo = ROTULO_MEIO_PARCELAMENTO[meio];
   const grade = !(ehCartao && peloVendedor);
+  const porMes = ehCartao && modoEmpresa === "mensal";
 
   return (
     <form action={acao} className="flex flex-col gap-4">
@@ -87,26 +90,60 @@ export function FormularioTaxas({ meio, taxas }: { meio: MeioParcelamento; taxas
           </label>
         </fieldset>
       )}
+      {grade && ehCartao && (
+        <>
+          <input type="hidden" name="modoEmpresa" value={modoEmpresa} />
+          <div role="group" aria-label="Como a empresa define a taxa do cartão" className="flex self-start rounded-full border border-linha p-0.5">
+            {(
+              [
+                ["mensal", "Taxa ao mês"],
+                ["parcela", "Parcela a parcela"],
+              ] as const
+            ).map(([valor, nome]) => (
+              <button
+                key={valor}
+                type="button"
+                aria-pressed={modoEmpresa === valor}
+                onClick={() => setModoEmpresa(valor)}
+                className={`min-h-11 rounded-full px-3 text-sm font-medium md:min-h-8 ${modoEmpresa === valor ? "bg-texto text-fundo" : "text-texto-2"}`}
+              >
+                {nome}
+              </button>
+            ))}
+          </div>
+          {porMes && (
+            <label className="flex w-40 flex-col gap-1 text-sm">
+              <span className="font-medium text-texto-2">Taxa ao mês (%)</span>
+              <input name="taxaMensal" value={mensal} onChange={(e) => setMensal(e.target.value)} inputMode="decimal" placeholder="2,99" className={CLASSE_ENTRADA} />
+            </label>
+          )}
+        </>
+      )}
       {grade && (
         <>
-          <p className="text-xs text-texto-2">
-            Marque as parcelas que a empresa oferece no {rotulo.toLowerCase()} e a taxa que a operadora desconta em cada uma.
-            {ehCartao ? " Nenhuma marcada: o vendedor informa a taxa na emissão." : ` Nenhuma marcada: o ${rotulo.toLowerCase()} não aparece para o vendedor.`}
-          </p>
-          <div className="flex flex-wrap items-end gap-2">
-            <label className="flex flex-col gap-1 text-sm">
-              <span className="font-medium text-texto-2">Preencher as marcadas com (%)</span>
-              <input value={preencher} onChange={(e) => setPreencher(e.target.value)} inputMode="decimal" placeholder="0" className={`${CLASSE_ENTRADA} w-28`} />
-            </label>
-            <Botao
-              type="button"
-              variante="secundario"
-              disabled={!preencher.trim() || marcadas.size === 0}
-              onClick={() => setValores((v) => ({ ...v, ...Object.fromEntries([...marcadas].map((n) => [n, preencher.trim()])) }))}
-            >
-              Aplicar a todas
-            </Botao>
-          </div>
+          {porMes && <p className="text-xs text-texto-2">Marque as parcelas que a empresa oferece. A parcela sai pela tabela Price com a taxa ao mês; 1x sem juros.</p>}
+          {!porMes && (
+            <p className="text-xs text-texto-2">
+              Marque as parcelas que a empresa oferece no {rotulo.toLowerCase()} e a taxa que a operadora desconta em cada uma.
+              {ehCartao ? " Nenhuma marcada: o vendedor informa a taxa na emissão." : ` Nenhuma marcada: o ${rotulo.toLowerCase()} não aparece para o vendedor.`}
+            </p>
+          )}
+          {!porMes && (
+            <div className="flex flex-wrap items-end gap-2">
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="font-medium text-texto-2">Preencher as marcadas com (%)</span>
+                <input value={preencher} onChange={(e) => setPreencher(e.target.value)} inputMode="decimal" placeholder="0" className={`${CLASSE_ENTRADA} w-28`} />
+              </label>
+              <Botao
+                type="button"
+                variante="secundario"
+                disabled={!preencher.trim() || marcadas.size === 0}
+                onClick={() => setValores((v) => ({ ...v, ...Object.fromEntries([...marcadas].map((n) => [n, preencher.trim()])) }))}
+              >
+                Aplicar a todas
+              </Botao>
+            </div>
+          )}
           <div className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
             {Array.from({ length: MAX_PARCELAS }, (_, i) => i + 1).map((n) => {
               const ativa = marcadas.has(n);
@@ -128,19 +165,21 @@ export function FormularioTaxas({ meio, taxas }: { meio: MeioParcelamento; taxas
                     />
                     {n}x
                   </label>
-                  <label className="flex flex-1 items-center gap-2 text-sm text-texto-2">
-                    <span className="sr-only">Taxa em {n}x (%)</span>
-                    <input
-                      name={`taxa_${n}`}
-                      inputMode="decimal"
-                      disabled={!ativa}
-                      value={valores[n] ?? ""}
-                      onChange={(e) => setValores((v) => ({ ...v, [n]: e.target.value }))}
-                      placeholder="0"
-                      className={`${CLASSE_ENTRADA} w-24`}
-                    />
-                    %
-                  </label>
+                  {!porMes && (
+                    <label className="flex flex-1 items-center gap-2 text-sm text-texto-2">
+                      <span className="sr-only">Taxa em {n}x (%)</span>
+                      <input
+                        name={`taxa_${n}`}
+                        inputMode="decimal"
+                        disabled={!ativa}
+                        value={valores[n] ?? ""}
+                        onChange={(e) => setValores((v) => ({ ...v, [n]: e.target.value }))}
+                        placeholder="0"
+                        className={`${CLASSE_ENTRADA} w-24`}
+                      />
+                      %
+                    </label>
+                  )}
                 </div>
               );
             })}

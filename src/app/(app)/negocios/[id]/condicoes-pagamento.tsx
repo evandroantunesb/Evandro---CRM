@@ -142,7 +142,10 @@ export function CondicoesPagamento({
     if (!temPreco) return null;
     if (!taxaVendedorNoMeio) {
       const t = regras.taxas[meio].find((x) => x.parcelas === n);
-      return t ? valorParcela(preco, n, t.taxa, repassarTaxas) : null;
+      if (!t) return null;
+      return meio === "cartao" && regras.taxaMensalCartao != null
+        ? parcelaCartaoMensal(preco, regras.taxaMensalCartao, n, repassarTaxas)
+        : valorParcela(preco, n, t.taxa, repassarTaxas);
     }
     if (modoTaxa === "mensal") return taxaMensalOk ? parcelaCartaoMensal(preco, mensalCartao, n, repassarTaxas) : null;
     const t = lerNumeroBr(taxasPorParcela[n] ?? "");

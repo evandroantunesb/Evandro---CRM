@@ -232,11 +232,11 @@ jobs:
       # Trava fail-closed: o conjunto do dry-run acima precisa ser exatamente o autorizado, senão o
       # job termina aqui, antes da aplicação. Sem credenciais. Para autorizar outro conjunto, a lista
       # abaixo muda por commit revisado (e uma nova tag), nunca por entrada do operador.
-      # Concessionárias, entrega 3 (item 6, 26/11/2026): só ela, com a 20261223100000 (#429) já aplicada.
+      # Cartão com a taxa ao mês da empresa (#441, 27/11/2026): só ela, com a 20261224100000 (#430) já aplicada.
       - name: Conferir que o conjunto pendente é exatamente o autorizado
         env:
           MIGRATIONS_AUTORIZADAS: |
-                        20261224100000_concessionarias_configuracao.sql
+                        20261225100000_cartao_taxa_mensal.sql
         run: bash .github/scripts/validar-conjunto-migrations.sh "$RUNNER_TEMP/dry-run.txt"
       - name: Aplicar (supabase db push --include-all)
         env:

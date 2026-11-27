@@ -110,6 +110,8 @@ export type RegrasCondicoes = {
   descontoAprovado: number;
   /** Preço sugerido pela tabela de preços (Compras P4b), se o negócio tem; ausente = sem sugerido. */
   precoSugerido?: number | null;
+  /** Taxa ao mês do cartão pré-configurada pela empresa (20261225100000); ausente ou nula = parcela a parcela. */
+  taxaMensalCartao?: number | null;
 };
 
 /** Desconto total que quem emite pode dar neste negócio (o limite dele ou o maior já aprovado). */
@@ -370,7 +372,16 @@ export function montarCondicoesPagamento(entrada: EntradaCondicoes, regras: Regr
     } else if (tabela.size === 0) p.push(`Parcelado: a empresa não oferece parcelas no ${nomeMeio}.`);
     else if (escolhidas.length === 0) p.push("Parcelado: marque pelo menos uma parcela para mostrar.");
     else if (escolhidas.some((n) => !tabela.has(n))) p.push(`Parcelado: há parcela que a empresa não oferece no ${nomeMeio}.`);
-    else {
+    else if (meio === "cartao" && regras.taxaMensalCartao != null) {
+      // Taxa ao mês pré-configurada pela empresa: as parcelas da tabela, com a parcela pela tabela Price (1x sem juros).
+      const i = regras.taxaMensalCartao;
+      parcelado = {
+        meio,
+        repassarTaxas,
+        taxaMensal: i,
+        opcoes: escolhidas.map((n) => ({ parcelas: n, taxaPercentual: tabela.get(n)!, valorParcela: parcelaCartaoMensal(preco, i, n, repassarTaxas) })),
+      };
+    } else {
       parcelado = {
         meio,
         repassarTaxas,

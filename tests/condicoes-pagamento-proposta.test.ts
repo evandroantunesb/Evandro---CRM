@@ -160,6 +160,21 @@ describe("modalidades", () => {
     expect(montar({ parcelado: { meio: "cartao", parcelas: [25], repassarTaxas: true, taxaVendedor: mensal } }, semTabela).ok).toBe(false);
   });
 
+  it("cartão com a taxa ao mês pré-configurada pela empresa: as parcelas da tabela pela tabela Price (1x sem juros)", () => {
+    const r = montar({ parcelado: { meio: "cartao", parcelas: [1, 3], repassarTaxas: true } }, { taxaMensalCartao: 2.99 });
+    expect(r.ok && r.condicoes.parcelado).toEqual({
+      meio: "cartao",
+      repassarTaxas: true,
+      taxaMensal: 2.99,
+      opcoes: [
+        { parcelas: 1, taxaPercentual: 3, valorParcela: 30000 },
+        { parcelas: 3, taxaPercentual: 5, valorParcela: 10603.87 },
+      ],
+    });
+    // Parcela fora da tabela continua recusada; o boleto não usa a taxa ao mês do cartão.
+    expect(montar({ parcelado: { meio: "cartao", parcelas: [12], repassarTaxas: true } }, { taxaMensalCartao: 2.99 }).ok).toBe(false);
+  });
+
   it("cartão com taxas da empresa: a taxa que o vendedor mandar é ignorada (vale a tabela)", () => {
     const r = montar({ parcelado: { meio: "cartao", parcelas: [1], repassarTaxas: true, taxaVendedor: { modo: "mensal", mensal: "0", porParcela: [] } } });
     expect(r.ok && r.condicoes.parcelado).toEqual({ meio: "cartao", repassarTaxas: true, opcoes: [{ parcelas: 1, taxaPercentual: 3, valorParcela: 30927.84 }] });
