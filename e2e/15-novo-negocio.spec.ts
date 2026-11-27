@@ -22,7 +22,11 @@ test.describe("Novo negócio — computador", () => {
     await entrarComo(page, base.usuarios.vendedor, base.senha);
     await preencherNovoNegocio(page, "Cliente Horizonte (fictício)", "45900000020", "1.200");
     await escolher(page, "Tipo de cliente", "Residencial");
+    // A lista de distribuidoras só ganha opções depois do primeiro caractere (clicar não abre todas de uma vez).
+    const opcoesDistribuidora = page.locator("#distribuidoras-conhecidas option");
+    await expect(opcoesDistribuidora).toHaveCount(0);
     await page.getByRole("combobox", { name: "Distribuidora" }).fill("Copel");
+    expect(await opcoesDistribuidora.count()).toBeGreaterThan(0);
 
     // 1.200 kWh → 17 módulos (1.264,8 kWh/mês) = 100%. Dois a menos: 15 × 620 W × 120 = 1.116 kWh = 93%.
     await expect(autonomia(page)).toHaveText("100%");
